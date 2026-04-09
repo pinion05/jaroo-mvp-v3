@@ -1,14 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useRef, useState } from 'react'
+import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 import {
-  homeForecast,
-  homeHoldings,
-  momentumSignals,
-  momentumStages,
-  portfolioScoreBreakdown,
+  APPLIED_HOME_PORTFOLIO_EVENT,
+  APPLIED_HOME_PORTFOLIO_STORAGE_KEY,
+  buildHomeHoldingsFromOcrRows,
+  homeForecast as defaultHomeForecast,
+  homeHoldings as defaultHomeHoldings,
+  momentumSignals as defaultMomentumSignals,
+  momentumStages as defaultMomentumStages,
+  portfolioScoreBreakdown as defaultPortfolioScoreBreakdown,
+  readAppliedHomePortfolio,
   type HomeBadgeTone,
   type HomeHolding,
   type HomeMetricTone,
@@ -22,6 +27,257 @@ const GAP = 0.03
 
 type ViewMode = 'donut' | 'heatmap'
 type SheetMode = 'score' | 'momentum' | null
+type ScoreBreakdownItem = (typeof defaultPortfolioScoreBreakdown)[number]
+type MomentumSignalItem = (typeof defaultMomentumSignals)[number]
+type ForecastCard = typeof defaultHomeForecast
+
+type PortfolioSummary = {
+  score: string
+  badge: string
+  badgeTone: HomeBadgeTone
+  summaryText: string
+  momentumValue: string
+  forecast: ForecastCard
+  scoreBreakdown: ScoreBreakdownItem[]
+  momentumSignals: MomentumSignalItem[]
+  momentumStages: typeof defaultMomentumStages
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function getHoldingChangeValue(item: HomeHolding) {
+  return parseOcrNumber(item.change)
+}
+
+function getValueToneClass(item: HomeHolding) {
+  const changeValue = getHoldingChangeValue(item)
+
+  if (changeValue !== null && changeValue > 0) {
+    return styles.valuePositive
+  }
+
+  return styles.valueDanger
+}
+
+function getHeatmapChipStyle(item: HomeHolding) {
+  if (item.badgeTone === 'green') {
+    return { background: 'rgba(29,158,117,.28)', color: '#C7F0E0' }
+  }
+
+  if (item.badgeTone === 'red') {
+    return { background: 'rgba(226,75,74,.35)', color: '#F7C1C1' }
+  }
+
+  return { background: 'rgba(239,159,39,.3)', color: '#FAC775' }
+}
+
+function buildPortfolioSummary(holdings: HomeHolding[], isAppliedPortfolio: boolean): PortfolioSummary {
+  if (!isAppliedPortfolio) {
+    return {
+      score: '54',
+      badge: '주의',
+      badgeTone: 'amber',
+      summaryText: '1개 종목이\n위험해요',
+      momentumValue: '나아지는 중 ↑',
+      forecast: defaultHomeForecast,
+      scoreBreakdown: defaultPortfolioScoreBreakdown,
+      momentumSignals: defaultMomentumSignals,
+      momentumStages: defaultMomentumStages,
+    }
+  }
+
+  const changeValues = holdings.map(getHoldingChangeValue).filter((value): value is number => value !== null)
+  const avgChange = changeValues.length > 0 ? changeValues.reduce((sum, value) => sum + value, 0) / changeValues.length : 0
+  const negativeCount = changeValues.filter((value) => value < 0).length
+  const positiveCount = changeValues.filter((value) => value >= 0).length
+  const scoreNumber = clamp(Math.round(60 + avgChange), 0, 99)
+  const worstHolding = [...holdings].sort((left, right) => (getHoldingChangeValue(left) ?? 0) - (getHoldingChangeValue(right) ?? 0))[0] ?? holdings[0]
+  const dominantHolding = [...holdings].sort((left, right) => right.donutPercent - left.donutPercent)[0] ?? holdings[0]
+  const bestHolding = [...holdings].sort((left, right) => (getHoldingChangeValue(right) ?? -999) - (getHoldingChangeValue(left) ?? -999))[0] ?? holdings[0]
+  const scoreBadgeTone: HomeBadgeTone = negativeCount > 0 ? (negativeCount >= Math.ceil(holdings.length / 2) ? 'red' : 'amber') : 'green'
+  const scoreBadge = scoreBadgeTone === 'green' ? '양호' : scoreBadgeTone === 'red' ? '주의' : '관찰'
+  const summaryText = negativeCount > 0 ? `${negativeCount}개 종목이\n손실 구간이에요` : `${positiveCount}개 종목이\n수익 중이에요`
+  const forecastBody = `${holdings.length}개 OCR 종목을 홈에 적용했어요. ${worstHolding?.name ?? holdings[0]?.name} ${worstHolding?.change ?? ''} 상태를 먼저 확인해보세요.`
+
+  const scoreBreakdown: ScoreBreakdownItem[] = [
+    {
+      label: '비중 집중도',
+      score: `${clamp(Math.round((dominantHolding?.donutPercent ?? 0) * 100), 0, 100)} / 100`,
+      scoreColor: dominantHolding?.donutColor ?? '#185FA5',
+      barWidth: `${Math.max(12, Math.round((dominantHolding?.donutPercent ?? 0) * 100))}%`,
+      barColor: dominantHolding?.donutColor ?? '#185FA5',
+      description: `${dominantHolding?.name ?? '-'} 비중이 가장 커요. 홈 도넛과 히트맵도 이 비중을 기준으로 다시 그려졌어요.`,
+      stocks: holdings.slice(0, 4).map((item) => ({ label: `${item.name} ${item.heatmapWeight}`, dot: item.donutColor })),
+    },
+    {
+      label: '손익 상태',
+      score: `${Math.max(0, 100 - negativeCount * 20)} / 100`,
+      scoreColor: negativeCount > 0 ? '#A32D2D' : '#3B6D11',
+      barWidth: `${clamp(100 - negativeCount * 20, 15, 100)}%`,
+      barColor: negativeCount > 0 ? '#E24B4A' : '#639922',
+      description: negativeCount > 0 ? `${negativeCount}개 종목이 손실 구간이에요. 가장 약한 종목은 ${worstHolding?.name ?? '-'}예요.` : '현재 인식된 종목은 모두 수익 또는 보합 구간이에요.',
+      stocks: holdings.slice(0, 4).map((item) => ({
+        label: `${item.name} ${item.change}`,
+        dot: item.donutColor,
+        background: getHoldingChangeValue(item) !== null && (getHoldingChangeValue(item) ?? 0) < 0 ? '#FCEBEB' : '#EAF3DE',
+        color: getHoldingChangeValue(item) !== null && (getHoldingChangeValue(item) ?? 0) < 0 ? '#A32D2D' : '#3B6D11',
+      })),
+    },
+    {
+      label: '회복 모멘텀',
+      score: `${clamp(Math.round(avgChange + 50), 0, 100)} / 100`,
+      scoreColor: avgChange >= 0 ? '#3B6D11' : '#854F0B',
+      barWidth: `${clamp(Math.round(avgChange + 50), 15, 100)}%`,
+      barColor: avgChange >= 0 ? '#639922' : '#EF9F27',
+      description: avgChange >= 0 ? `평균 수익률이 ${avgChange.toFixed(1)}%예요. ${bestHolding?.name ?? '-'} 흐름이 가장 좋아요.` : `평균 수익률이 ${avgChange.toFixed(1)}%예요. OCR 적용 후 약한 종목부터 우선 확인하는 게 좋아요.`,
+      stocks: holdings.slice(0, 4).map((item) => ({ label: `${item.name} · ${item.change}`, dot: item.donutColor })),
+    },
+    {
+      label: '적용 상태',
+      score: `${holdings.length * 10} / 100`,
+      scoreColor: '#185FA5',
+      barWidth: `${clamp(holdings.length * 18, 15, 100)}%`,
+      barColor: '#185FA5',
+      description: `merge에서 확정한 ${holdings.length}개 종목이 홈에 적용됐어요. 부족한 분석 필드는 placeholder로 채워 안정적으로 보여줘요.`,
+      stocks: holdings.slice(0, 4).map((item) => ({ label: `${item.name} 적용 완료`, dot: item.donutColor })),
+    },
+  ]
+
+  const momentumSignals: MomentumSignalItem[] = holdings.slice(0, 4).map((item) => {
+    const changeValue = getHoldingChangeValue(item)
+    const positive = changeValue !== null && changeValue >= 0
+    const danger = changeValue !== null && changeValue <= -20
+
+    return {
+      name: item.name,
+      dot: item.donutColor,
+      badge: positive ? '순풍' : danger ? '역풍' : '미풍',
+      badgeBackground: positive ? '#EAF3DE' : danger ? '#FCEBEB' : '#f0efe8',
+      badgeColor: positive ? '#3B6D11' : danger ? '#A32D2D' : '#888',
+      description: positive
+        ? `${item.name}는 현재 ${item.change}로 인식됐어요. 수익 구간 대응 전략을 이어서 볼 수 있어요.`
+        : danger
+          ? `${item.name}는 ${item.change} 손실 구간이에요. 우선순위 종목으로 먼저 점검하는 게 좋아요.`
+          : `${item.name}는 ${item.change} 상태예요. 추가 변화가 있는지 계속 확인해보세요.`,
+      blink: danger || undefined,
+    }
+  })
+
+  const activeStageIndex = avgChange >= 8 ? 4 : avgChange >= 0 ? 3 : avgChange >= -10 ? 2 : avgChange >= -20 ? 1 : 0
+  const momentumStages = defaultMomentumStages.map((stage, index) => ({
+    ...stage,
+    active: index === activeStageIndex,
+  }))
+  const momentumValue = avgChange >= 8 ? '빠르게 개선 중 ↑' : avgChange >= 0 ? '나아지는 중 ↑' : avgChange >= -10 ? '천천히 회복 중 →' : '경계 필요 ↓'
+
+  return {
+    score: String(scoreNumber),
+    badge: scoreBadge,
+    badgeTone: scoreBadgeTone,
+    summaryText,
+    momentumValue,
+    forecast: {
+      label: 'OCR APPLIED',
+      body: forecastBody,
+      cta: '딥스캔으로 상세 전략 보기 ›',
+      href: '/deepscan',
+    },
+    scoreBreakdown,
+    momentumSignals,
+    momentumStages,
+  }
+}
+
+function HeatmapTile({
+  item,
+  className,
+  nameClassName,
+  weightClassName,
+  changeClassName,
+  onClick,
+}: {
+  item: HomeHolding
+  className: string
+  nameClassName?: string
+  weightClassName?: string
+  changeClassName?: string
+  onClick: () => void
+}) {
+  return (
+    <button
+      type='button'
+      className={cn(styles.heatmapTile, className, item.blink && styles.blink)}
+      style={{ background: item.heatmapBackground }}
+      onClick={onClick}
+    >
+      <div className={cn(styles.heatmapWeight, weightClassName)}>{item.heatmapWeight}</div>
+      <div className={cn(styles.heatmapName, nameClassName)}>{item.shortName || item.name}</div>
+      <div className={cn(styles.heatmapChange, changeClassName)}>
+        {item.heatmapMeta ? `${item.heatmapChange} · ${item.heatmapMeta}` : item.heatmapChange}
+      </div>
+      {item.heatmapBadge ? (
+        <div className={cn(styles.heatmapChip, changeClassName && styles.heatmapChipTiny)} style={getHeatmapChipStyle(item)}>
+          {item.heatmapBadge}
+        </div>
+      ) : null}
+    </button>
+  )
+}
+
+const defaultAppliedPortfolioSnapshot = { holdings: defaultHomeHoldings, isAppliedPortfolio: false } as const
+
+let cachedAppliedPortfolioRaw: string | null | undefined
+let cachedAppliedPortfolioSnapshot: { holdings: HomeHolding[]; isAppliedPortfolio: boolean } = defaultAppliedPortfolioSnapshot
+
+function getAppliedPortfolioSnapshot() {
+  if (typeof window === 'undefined') {
+    return defaultAppliedPortfolioSnapshot
+  }
+
+  const rawValue = window.sessionStorage.getItem(APPLIED_HOME_PORTFOLIO_STORAGE_KEY)
+
+  if (rawValue === cachedAppliedPortfolioRaw) {
+    return cachedAppliedPortfolioSnapshot
+  }
+
+  cachedAppliedPortfolioRaw = rawValue
+
+  if (!rawValue) {
+    cachedAppliedPortfolioSnapshot = defaultAppliedPortfolioSnapshot
+    return cachedAppliedPortfolioSnapshot
+  }
+
+  const appliedPortfolio = readAppliedHomePortfolio()
+
+  if (appliedPortfolio?.rows.length) {
+    cachedAppliedPortfolioSnapshot = {
+      holdings: buildHomeHoldingsFromOcrRows(appliedPortfolio.rows),
+      isAppliedPortfolio: true,
+    }
+    return cachedAppliedPortfolioSnapshot
+  }
+
+  cachedAppliedPortfolioSnapshot = defaultAppliedPortfolioSnapshot
+  return cachedAppliedPortfolioSnapshot
+}
+
+function subscribeAppliedPortfolio(onStoreChange: () => void) {
+  if (typeof window === 'undefined') {
+    return () => {}
+  }
+
+  const handleChange = () => onStoreChange()
+
+  window.addEventListener('storage', handleChange)
+  window.addEventListener(APPLIED_HOME_PORTFOLIO_EVENT, handleChange)
+
+  return () => {
+    window.removeEventListener('storage', handleChange)
+    window.removeEventListener(APPLIED_HOME_PORTFOLIO_EVENT, handleChange)
+  }
+}
 
 function polar(deg: number, radius: number) {
   const angle = ((deg - 90) * Math.PI) / 180
@@ -33,11 +289,12 @@ function polar(deg: number, radius: number) {
 }
 
 function getArcPath(startPercent: number, percent: number) {
+  const visiblePercent = Math.max(percent - GAP, 0.01)
   const startAngle = startPercent * 360
-  const endAngle = startAngle + (percent - GAP) * 360
+  const endAngle = startAngle + visiblePercent * 360
   const startPoint = polar(startAngle, R)
   const endPoint = polar(endAngle, R)
-  const largeArc = percent - GAP > 0.5 ? 1 : 0
+  const largeArc = visiblePercent > 0.5 ? 1 : 0
 
   return `M${startPoint.x},${startPoint.y} A${R},${R} 0 ${largeArc},1 ${endPoint.x},${endPoint.y}`
 }
@@ -116,6 +373,11 @@ export function JarooHomeScreen() {
   const [openStockCardId, setOpenStockCardId] = useState<number | null>(null)
   const [isEtfCardOpen, setIsEtfCardOpen] = useState(false)
   const [openSheet, setOpenSheet] = useState<SheetMode>(null)
+  const { holdings: homeHoldings, isAppliedPortfolio } = useSyncExternalStore(
+    subscribeAppliedPortfolio,
+    getAppliedPortfolioSnapshot,
+    () => ({ holdings: defaultHomeHoldings, isAppliedPortfolio: false }),
+  )
 
   const donutLayout = useMemo(() => {
     const result = homeHoldings.reduce<{
@@ -131,9 +393,10 @@ export function JarooHomeScreen() {
       (accumulator, item) => {
         const start = accumulator.start
         const path = getArcPath(start, item.donutPercent)
+        const visiblePercent = Math.max(item.donutPercent - GAP, 0.01)
         const end = start + item.donutPercent
         const startAngle = start * 360
-        const endAngle = startAngle + (item.donutPercent - GAP) * 360
+        const endAngle = startAngle + visiblePercent * 360
         const midpoint = startAngle + (endAngle - startAngle) / 2
         const labelPoint = polar(midpoint, R + 24)
         const textWidth = item.donutLabel.length * 6.2
@@ -161,9 +424,16 @@ export function JarooHomeScreen() {
     )
 
     return result.layout
-  }, [])
+  }, [homeHoldings])
 
   const selectedHolding = selectedId === null ? null : homeHoldings.find((item) => item.id === selectedId) ?? null
+  const summaryData = useMemo(() => buildPortfolioSummary(homeHoldings, isAppliedPortfolio), [homeHoldings, isAppliedPortfolio])
+  const primaryHeatmapHolding = homeHoldings[0] ?? null
+  const secondaryHeatmapHolding = homeHoldings[1] ?? null
+  const tertiaryHeatmapHolding = homeHoldings[2] ?? null
+  const wideHeatmapHolding = homeHoldings[3] ?? null
+  const footerHeatmapHolding = homeHoldings[4] ?? null
+  const extraHeatmapHoldings = homeHoldings.slice(5)
 
   function scrollToCard(id: number) {
     const frame = frameRef.current
@@ -193,9 +463,10 @@ export function JarooHomeScreen() {
       return
     }
 
+    const selectedItem = homeHoldings.find((item) => item.id === id)
     setSelectedId(id)
 
-    if (id === 4) {
+    if (selectedItem?.kind === 'etf') {
       setOpenStockCardId(null)
       setIsEtfCardOpen(true)
     } else {
@@ -220,7 +491,9 @@ export function JarooHomeScreen() {
   }
 
   function handleHeatmapClick(id: number) {
-    if (id === 4) {
+    const selectedItem = homeHoldings.find((item) => item.id === id)
+
+    if (selectedItem?.kind === 'etf') {
       setOpenStockCardId(null)
       setIsEtfCardOpen(true)
     } else {
@@ -342,10 +615,10 @@ export function JarooHomeScreen() {
                     color: selectedHolding ? selectedHolding.centerScoreColor : 'white',
                   }}
                 >
-                  {selectedHolding ? selectedHolding.centerScore : '54'}
+                  {selectedHolding ? selectedHolding.centerScore : summaryData.score}
                 </div>
-                <div className={cn(styles.dcBadge, badgeToneClass(selectedHolding?.centerBadgeTone ?? 'amber'))}>
-                  {selectedHolding ? selectedHolding.centerBadge : '주의'}
+                <div className={cn(styles.dcBadge, badgeToneClass(selectedHolding?.centerBadgeTone ?? summaryData.badgeTone))}>
+                  {selectedHolding ? selectedHolding.centerBadge : summaryData.badge}
                 </div>
                 <div className={styles.dcTxt}>
                   {selectedHolding ? (
@@ -367,7 +640,7 @@ export function JarooHomeScreen() {
             <button type='button' className={styles.momentumBanner} onClick={() => setOpenSheet('momentum')}>
               <span className={styles.momentumDot} />
               <span className={styles.momentumText}>이번 주 포트폴리오 순풍</span>
-              <span className={styles.momentumValue}>나아지는 중 ↑</span>
+              <span className={styles.momentumValue}>{summaryData.momentumValue}</span>
               <span className={styles.momentumArrow}>›</span>
             </button>
           </div>
@@ -375,92 +648,76 @@ export function JarooHomeScreen() {
           <div className={cn(styles.view, view !== 'heatmap' && styles.hidden)}>
             <div className={styles.heatmapHeader}>
               <div>
-                <div className={styles.heatmapScore}>54</div>
+                <div className={styles.heatmapScore}>{summaryData.score}</div>
                 <div className={styles.heatmapScoreLabel}>포트폴리오 점수</div>
               </div>
               <div className={styles.heatmapSummary}>
-                <div className={styles.heatmapSummaryBadge}>주의</div>
+                <div className={styles.heatmapSummaryBadge}>{summaryData.badge}</div>
                 <div className={styles.heatmapSummaryText}>
-                  1개 종목이
+                  {summaryData.summaryText.split('\n')[0]}
                   <br />
-                  위험해요
+                  {summaryData.summaryText.split('\n')[1]}
                 </div>
               </div>
             </div>
             <div className={styles.heatmapGrid}>
-              <div className={styles.heatmapRow}>
-                <button
-                  type='button'
-                  className={cn(styles.heatmapTile, styles.heatmapSamsung)}
-                  style={{ background: homeHoldings[0].heatmapBackground }}
-                  onClick={() => handleHeatmapClick(0)}
-                >
-                  <div className={styles.heatmapWeight}>{homeHoldings[0].heatmapWeight}</div>
-                  <div className={styles.heatmapName}>{homeHoldings[0].name}</div>
-                  <div className={styles.heatmapChange}>{homeHoldings[0].heatmapChange}</div>
-                  <div className={styles.heatmapChip} style={{ background: 'rgba(226,75,74,.35)', color: '#F7C1C1' }}>
-                    {homeHoldings[0].heatmapBadge}
-                  </div>
-                </button>
-                <div className={styles.heatmapColumn}>
-                  <button
-                    type='button'
-                    className={cn(styles.heatmapTile, styles.heatmapSmall)}
-                    style={{ background: homeHoldings[3].heatmapBackground }}
-                    onClick={() => handleHeatmapClick(3)}
-                  >
-                    <div className={cn(styles.heatmapWeight, styles.heatmapWeightSmall)}>{homeHoldings[3].heatmapWeight}</div>
-                    <div className={cn(styles.heatmapName, styles.heatmapNameSmall)}>{homeHoldings[3].name}</div>
-                    <div className={cn(styles.heatmapChange, styles.heatmapChangeSmall)}>{homeHoldings[3].heatmapChange}</div>
-                  </button>
-                  <button
-                    type='button'
-                    className={cn(
-                      styles.heatmapTile,
-                      styles.heatmapSmall,
-                      homeHoldings[2].blink && styles.blink,
-                    )}
-                    style={{ background: homeHoldings[2].heatmapBackground }}
-                    onClick={() => handleHeatmapClick(2)}
-                  >
-                    <div className={cn(styles.heatmapWeight, styles.heatmapWeightSmall)}>{homeHoldings[2].heatmapWeight}</div>
-                    <div className={cn(styles.heatmapName, styles.heatmapNameTiny)}>{homeHoldings[2].shortName}</div>
-                    <div className={cn(styles.heatmapChip, styles.heatmapChipTiny)} style={{ background: 'rgba(55,138,221,.3)', color: '#B5D4F4' }}>
-                      거래정지
+              {primaryHeatmapHolding ? (
+                <>
+                  <div className={styles.heatmapRow}>
+                    <HeatmapTile
+                      item={primaryHeatmapHolding}
+                      className={styles.heatmapSamsung}
+                      onClick={() => handleHeatmapClick(primaryHeatmapHolding.id)}
+                    />
+                    <div className={styles.heatmapColumn}>
+                      {secondaryHeatmapHolding ? (
+                        <HeatmapTile
+                          item={secondaryHeatmapHolding}
+                          className={styles.heatmapSmall}
+                          weightClassName={styles.heatmapWeightSmall}
+                          nameClassName={styles.heatmapNameSmall}
+                          changeClassName={styles.heatmapChangeSmall}
+                          onClick={() => handleHeatmapClick(secondaryHeatmapHolding.id)}
+                        />
+                      ) : null}
+                      {tertiaryHeatmapHolding ? (
+                        <HeatmapTile
+                          item={tertiaryHeatmapHolding}
+                          className={styles.heatmapSmall}
+                          weightClassName={styles.heatmapWeightSmall}
+                          nameClassName={styles.heatmapNameTiny}
+                          changeClassName={styles.heatmapChangeSmall}
+                          onClick={() => handleHeatmapClick(tertiaryHeatmapHolding.id)}
+                        />
+                      ) : null}
                     </div>
-                  </button>
-                </div>
-              </div>
-              <button
-                type='button'
-                className={cn(styles.heatmapTile, styles.heatmapWide)}
-                style={{ background: homeHoldings[1].heatmapBackground }}
-                onClick={() => handleHeatmapClick(1)}
-              >
-                <div className={styles.heatmapWeight}>{homeHoldings[1].heatmapWeight}</div>
-                <div className={styles.heatmapName}>{homeHoldings[1].name}</div>
-                <div className={styles.heatmapChange}>{homeHoldings[1].heatmapChange}</div>
-                <div className={styles.heatmapChip} style={{ background: 'rgba(239,159,39,.3)', color: '#FAC775' }}>
-                  {homeHoldings[1].heatmapBadge}
-                </div>
-              </button>
-              <button
-                type='button'
-                className={cn(styles.heatmapTile, styles.heatmapFooter)}
-                style={{ background: homeHoldings[4].heatmapBackground }}
-                onClick={() => handleHeatmapClick(4)}
-              >
-                <div className={styles.heatmapWeight}>{homeHoldings[4].heatmapWeight}</div>
-                <div className={cn(styles.heatmapName, styles.heatmapNameSmall)}>{homeHoldings[4].name}</div>
-                <div className={cn(styles.heatmapChange, styles.heatmapChangeSmall)}>
-                  {homeHoldings[4].heatmapChange} · {homeHoldings[4].heatmapMeta}
-                </div>
-              </button>
+                  </div>
+                  {wideHeatmapHolding ? (
+                    <HeatmapTile
+                      item={wideHeatmapHolding}
+                      className={styles.heatmapWide}
+                      onClick={() => handleHeatmapClick(wideHeatmapHolding.id)}
+                    />
+                  ) : null}
+                  {footerHeatmapHolding ? (
+                    <HeatmapTile
+                      item={footerHeatmapHolding}
+                      className={styles.heatmapFooter}
+                      nameClassName={styles.heatmapNameSmall}
+                      changeClassName={styles.heatmapChangeSmall}
+                      onClick={() => handleHeatmapClick(footerHeatmapHolding.id)}
+                    />
+                  ) : null}
+                  {extraHeatmapHoldings.map((item) => (
+                    <HeatmapTile key={item.id} item={item} className={styles.heatmapWide} onClick={() => handleHeatmapClick(item.id)} />
+                  ))}
+                </>
+              ) : null}
             </div>
             <button type='button' className={styles.momentumBanner} onClick={() => setOpenSheet('momentum')}>
               <span className={styles.momentumDot} />
               <span className={styles.momentumText}>이번 주 포트폴리오 순풍</span>
-              <span className={styles.momentumValue}>나아지는 중 ↑</span>
+              <span className={styles.momentumValue}>{summaryData.momentumValue}</span>
               <span className={styles.momentumArrow}>›</span>
             </button>
           </div>
@@ -472,7 +729,7 @@ export function JarooHomeScreen() {
           {homeHoldings.map((item) => {
             const isEtf = item.kind === 'etf'
             const open = isEtf ? isEtfCardOpen : openStockCardId === item.id
-            const valueToneClass = item.cardTone === 'profit' ? styles.valuePositive : styles.valueDanger
+            const valueToneClass = getValueToneClass(item)
 
             return (
               <div
@@ -519,7 +776,7 @@ export function JarooHomeScreen() {
                   </div>
                   <div className={styles.stockValue}>
                     <div className={cn(styles.stockValueStrong, valueToneClass)}>{item.change}</div>
-                    <div className={cn(styles.stockSub, item.cardTone === 'profit' ? styles.valuePositive : styles.valueDanger)} style={{ marginTop: 2 }}>
+                    <div className={cn(styles.stockSub, valueToneClass)} style={{ marginTop: 2 }}>
                       {item.pnl}
                     </div>
                   </div>
@@ -587,10 +844,10 @@ export function JarooHomeScreen() {
           })}
 
           <div className={styles.forecastCard}>
-            <div className={styles.forecastLabel}>{homeForecast.label}</div>
-            <div className={styles.forecastText}>{homeForecast.body}</div>
-            <Link href={homeForecast.href} className={styles.forecastMore}>
-              {homeForecast.cta}
+            <div className={styles.forecastLabel}>{summaryData.forecast.label}</div>
+            <div className={styles.forecastText}>{summaryData.forecast.body}</div>
+            <Link href={summaryData.forecast.href} className={styles.forecastMore}>
+              {summaryData.forecast.cta}
             </Link>
           </div>
         </div>
@@ -628,15 +885,15 @@ export function JarooHomeScreen() {
             <div className={styles.sheetTitle}>포트폴리오 점수</div>
             <div className={styles.sheetSubtitle}>각 항목이 내 포트폴리오에 미치는 영향이에요</div>
             <div className={styles.sheetScoreRow}>
-              <div className={styles.sheetScoreNum}>54</div>
-              <div className={styles.sheetScoreBadge}>주의</div>
+              <div className={styles.sheetScoreNum}>{summaryData.score}</div>
+              <div className={styles.sheetScoreBadge}>{summaryData.badge}</div>
               <div className={styles.sheetScoreText}>
                 100점 만점
                 <br />
                 상위 47%
               </div>
             </div>
-            {portfolioScoreBreakdown.map((item) => (
+            {summaryData.scoreBreakdown.map((item) => (
               <div key={item.label} className={styles.breakdownItem}>
                 <div className={styles.breakdownHeader}>
                   <div className={styles.breakdownLabel}>{item.label}</div>
@@ -687,7 +944,7 @@ export function JarooHomeScreen() {
             <div className={styles.sheetSubtitle}>9인 위원회가 매주 종목별 회복 신호를 분석해요</div>
             <div className={styles.momentumStageRow}>
               <div className={styles.momentumStages}>
-                {momentumStages.map((stage) => (
+                {summaryData.momentumStages.map((stage) => (
                   <div
                     key={stage.label}
                     className={cn(
@@ -705,7 +962,7 @@ export function JarooHomeScreen() {
               <div className={styles.momentumStageHint}>지난주 미풍 → 이번 주 순풍으로 한 단계 올라왔어요</div>
             </div>
             <div className={styles.sheetSectionTitle}>종목별 회복 신호</div>
-            {momentumSignals.map((signal) => (
+            {summaryData.momentumSignals.map((signal) => (
               <div key={signal.name} className={styles.breakdownItem}>
                 <div className={styles.signalRow}>
                   <span className={cn(styles.signal, signal.blink && styles.blink)} style={{ background: signal.dot, marginTop: 0 }} />
