@@ -1,0 +1,1031 @@
+.viewport {
+  background: #fff;
+  display: flex;
+  justify-content: center;
+  min-height: 100vh;
+}
+
+.frame {
+  position: relative;
+  background: #fff;
+  width: 340px;
+  min-height: 100vh;
+  overflow-y: auto;
+  overflow-x: hidden;
+  scroll-behavior: smooth;
+}
+
+.frame::-webkit-scrollbar {
+  display: none;
+}
+
+.topBar {
+  padding: 14px 16px 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #0c447c;
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.appName {
+  font-size: 16px;
+  font-weight: 500;
+  color: white;
+}
+
+.topIcons {
+  display: flex;
+  gap: 10px;
+}
+
+.iconButton {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  position: relative;
+  cursor: pointer;
+  border: none;
+}
+
+.bellDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: #e24b4a;
+  position: absolute;
+  top: 1px;
+  right: 1px;
+}
+
+.hero {
+  background: #0c447c;
+  padding: 12px 18px 20px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.viewToggle {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 14px;
+}
+
+.viewToggleButton {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 14px;
+  border-radius: 10px;
+  font-size: 11px;
+  cursor: pointer;
+  border: 0.5px solid rgba(255, 255, 255, 0.2);
+  color: rgba(255, 255, 255, 0.5);
+  background: transparent;
+}
+
+.viewToggleButtonOn {
+  background: rgba(255, 255, 255, 0.15);
+  color: white;
+  border-color: rgba(255, 255, 255, 0.4);
+}
+
+.view {
+  width: 100%;
+}
+
+.hidden {
+  display: none;
+}
+
+.donutOuter {
+  position: relative;
+  width: 210px;
+  height: 210px;
+  margin: 0 auto;
+}
+
+.donutSvg {
+  width: 210px;
+  height: 210px;
+  overflow: visible;
+}
+
+.donutCenter {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  text-align: center;
+  width: 96px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+}
+
+.dcScore {
+  font-weight: 500;
+  line-height: 1;
+}
+
+.dcBadge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 7px;
+  margin: 4px auto;
+  display: inline-block;
+}
+
+.dcBadgeAmber {
+  background: #faeeda;
+  color: #854f0b;
+}
+
+.dcBadgeRed {
+  background: rgba(226, 75, 74, 0.35);
+  color: #f7c1c1;
+}
+
+.dcBadgeGreen {
+  background: rgba(29, 158, 117, 0.3);
+  color: #9fe1cb;
+}
+
+.dcTxt {
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.5;
+}
+
+.arcSeg {
+  cursor: pointer;
+  transition: opacity 0.2s, filter 0.2s;
+}
+
+.dimmed {
+  opacity: 0.28;
+}
+
+.selected {
+  filter: brightness(1.2);
+}
+
+.scrollHint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  margin-top: 10px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.4);
+  transition: opacity 0.3s;
+}
+
+.scrollArrow {
+  animation: bounce 0.9s infinite;
+}
+
+.momentumBanner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  padding: 9px 12px;
+  margin-top: 10px;
+  cursor: pointer;
+  border: 0.5px solid rgba(255, 255, 255, 0.15);
+  width: 100%;
+}
+
+.momentumDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  background: #9fe1cb;
+  flex-shrink: 0;
+}
+
+.momentumText {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.85);
+  flex: 1;
+  text-align: left;
+}
+
+.momentumValue {
+  font-size: 11px;
+  font-weight: 500;
+  color: #9fe1cb;
+}
+
+.momentumArrow {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.4);
+  margin-left: 2px;
+}
+
+.heatmapHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  margin-bottom: 12px;
+}
+
+.heatmapScore {
+  font-size: 32px;
+  font-weight: 500;
+  color: white;
+  line-height: 1;
+}
+
+.heatmapScoreLabel {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  margin-top: 3px;
+}
+
+.heatmapSummary {
+  text-align: right;
+}
+
+.heatmapSummaryBadge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 7px;
+  background: #faeeda;
+  color: #854f0b;
+  display: inline-block;
+  margin-bottom: 4px;
+}
+
+.heatmapSummaryText {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  line-height: 1.4;
+}
+
+.heatmapGrid {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  width: 100%;
+}
+
+.heatmapRow {
+  display: flex;
+  gap: 5px;
+}
+
+.heatmapColumn {
+  flex: 2;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.heatmapTile {
+  border-radius: 10px;
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  position: relative;
+  cursor: pointer;
+  border: none;
+  text-align: left;
+}
+
+.heatmapTileActive {
+  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.2);
+}
+
+.heatmapSamsung {
+  flex: 5;
+  height: 108px;
+}
+
+.heatmapSmall {
+  height: 51px;
+  padding: 7px 9px;
+}
+
+.heatmapWide {
+  width: 100%;
+  height: 64px;
+}
+
+.heatmapFooter {
+  width: 100%;
+  height: 52px;
+  padding: 8px 10px;
+}
+
+.heatmapWeight {
+  position: absolute;
+  top: 8px;
+  right: 9px;
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.heatmapWeightSmall {
+  top: 6px;
+  right: 8px;
+  font-size: 9px;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.heatmapName {
+  font-size: 12px;
+  font-weight: 500;
+  color: white;
+}
+
+.heatmapNameSmall {
+  font-size: 11px;
+}
+
+.heatmapNameTiny {
+  font-size: 10px;
+}
+
+.heatmapChange {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.8);
+  margin-top: 2px;
+}
+
+.heatmapChangeSmall {
+  font-size: 9px;
+  margin-top: 1px;
+}
+
+.heatmapChip {
+  display: inline-block;
+  font-size: 9px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  margin-top: 3px;
+  font-weight: 500;
+}
+
+.heatmapChipTiny {
+  font-size: 8px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  margin-top: 2px;
+}
+
+.body {
+  padding: 12px 14px;
+  background: #fff;
+}
+
+.sectionLabel {
+  font-size: 11px;
+  color: #888;
+  letter-spacing: 0.04em;
+  margin-bottom: 8px;
+}
+
+.stockCard {
+  background: #fff;
+  border-radius: 12px;
+  border: 0.5px solid #e8e8e8;
+  padding: 11px 12px;
+  margin-bottom: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s;
+}
+
+.cardHalt {
+  border-color: #f7c1c1;
+  background: #fff8f8;
+}
+
+.cardProfit {
+  border-color: #c0dd97;
+}
+
+.cardEtf {
+  border-color: #b5d4f4;
+}
+
+.cardActive {
+  border-color: #185fa5;
+  border-width: 1.5px;
+}
+
+.stockCardMain {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+}
+
+.signal {
+  width: 7px;
+  height: 7px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  margin-top: 4px;
+}
+
+.signalDanger {
+  background: #e24b4a;
+}
+
+.signalWarning {
+  background: #ef9f27;
+}
+
+.signalPositive {
+  background: #639922;
+}
+
+.signalHalt {
+  background: #e24b4a;
+  animation: blink 1.2s infinite;
+}
+
+.signalEtf {
+  background: #185fa5;
+}
+
+.stockInfo {
+  flex: 1;
+}
+
+.stockNameRow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 2px;
+}
+
+.stockName {
+  font-size: 13px;
+  font-weight: 500;
+  color: #111;
+}
+
+.stockBadge {
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 7px;
+}
+
+.badgeRed {
+  background: #fcebeb;
+  color: #a32d2d;
+}
+
+.badgeAmber {
+  background: #faeeda;
+  color: #854f0b;
+}
+
+.badgeGreen {
+  background: #eaf3de;
+  color: #3b6d11;
+}
+
+.stockSub {
+  font-size: 11px;
+  color: #999;
+}
+
+.stockValue {
+  text-align: right;
+}
+
+.stockValueStrong {
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.valueDanger,
+.valueHalt {
+  color: #a32d2d;
+}
+
+.valuePositive {
+  color: #3b6d11;
+}
+
+.detail {
+  display: none;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 0.5px solid #eee;
+}
+
+.detailOpen {
+  display: block;
+}
+
+.aiBox {
+  border-radius: 6px;
+  padding: 8px 10px;
+  margin-bottom: 8px;
+  border: 0.5px solid transparent;
+}
+
+.aiLabel {
+  font-size: 10px;
+  color: #999;
+  margin-bottom: 3px;
+}
+
+.aiText {
+  font-size: 11px;
+  color: #555;
+  line-height: 1.6;
+}
+
+.metaLine {
+  font-size: 11px;
+  color: #aaa;
+  margin-bottom: 8px;
+}
+
+.metricGrid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.metricCard {
+  background: #f8f8f6;
+  border-radius: 6px;
+  padding: 6px 7px;
+}
+
+.metricLabel {
+  font-size: 9px;
+  color: #999;
+  margin-bottom: 2px;
+}
+
+.metricValue {
+  font-size: 11px;
+  font-weight: 500;
+}
+
+.metricDanger {
+  color: #a32d2d;
+}
+
+.metricWarning {
+  color: #854f0b;
+}
+
+.metricPositive {
+  color: #3b6d11;
+}
+
+.metricLocked {
+  color: #bbb;
+}
+
+.metricNeutral {
+  color: #555;
+}
+
+.detailButton {
+  width: 100%;
+  padding: 9px;
+  border-radius: 8px;
+  border: none;
+  font-size: 12px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  color: white;
+  text-decoration: none;
+}
+
+.buttonBlue {
+  background: #185fa5;
+}
+
+.buttonRed {
+  background: #a32d2d;
+}
+
+.buttonGreen {
+  background: #3b6d11;
+}
+
+.credit {
+  font-size: 9px;
+  background: rgba(255, 255, 255, 0.2);
+  padding: 2px 6px;
+  border-radius: 6px;
+}
+
+.actionSubLabel {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.6);
+  font-weight: 400;
+}
+
+.marketTag {
+  font-size: 9px;
+  padding: 1px 5px;
+  border-radius: 4px;
+  font-weight: 500;
+  flex-shrink: 0;
+}
+
+.marketKospi {
+  background: #eef2ff;
+  color: #4f46e5;
+}
+
+.marketKosdaq {
+  background: #f0fdf4;
+  color: #16a34a;
+}
+
+.marketEtf {
+  background: #eff6ff;
+  color: #185fa5;
+}
+
+.marketNasdaq {
+  background: #fff7ed;
+  color: #c2410c;
+}
+
+.forecastCard {
+  background: #f8f8f6;
+  border-radius: 12px;
+  padding: 12px;
+  margin-bottom: 4px;
+}
+
+.forecastLabel {
+  font-size: 10px;
+  color: #999;
+  letter-spacing: 0.04em;
+  margin-bottom: 5px;
+}
+
+.forecastText {
+  font-size: 12px;
+  color: #555;
+  line-height: 1.65;
+}
+
+.forecastMore {
+  font-size: 11px;
+  color: #185fa5;
+  margin-top: 6px;
+  text-decoration: none;
+  display: inline-block;
+}
+
+.bottomNav {
+  display: flex;
+  border-top: 0.5px solid #eee;
+  background: #fff;
+}
+
+.navItem {
+  flex: 1;
+  padding: 11px 0;
+  text-align: center;
+  font-size: 10px;
+  color: #aaa;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  background: transparent;
+  border: none;
+}
+
+.navItemOn {
+  color: #185fa5;
+}
+
+.navIcon {
+  width: 16px;
+  height: 16px;
+  border-radius: 3px;
+  background: #f0efe8;
+}
+
+.navIconOn {
+  background: #e6f1fb;
+}
+
+.modalMount {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  justify-content: center;
+  z-index: 30;
+  pointer-events: none;
+}
+
+.modalInner {
+  position: relative;
+  width: 100%;
+  max-width: 340px;
+  height: 100vh;
+}
+
+.sheetOverlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.4);
+  display: none;
+  pointer-events: auto;
+}
+
+.sheetOverlayOpen {
+  display: block;
+}
+
+.sheet {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  padding: 0 0 20px;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  pointer-events: auto;
+}
+
+.sheetOpen {
+  transform: translateY(0);
+}
+
+.sheetHandle {
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: #ddd;
+  margin: 12px auto 16px;
+}
+
+.sheetTitle {
+  font-size: 15px;
+  font-weight: 500;
+  color: #111;
+  padding: 0 16px;
+  margin-bottom: 4px;
+}
+
+.sheetSubtitle {
+  font-size: 11px;
+  color: #aaa;
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+.sheetScoreRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+.sheetScoreNum {
+  font-size: 36px;
+  font-weight: 500;
+  color: #185fa5;
+  line-height: 1;
+}
+
+.sheetScoreBadge {
+  font-size: 12px;
+  font-weight: 500;
+  padding: 3px 10px;
+  border-radius: 8px;
+  background: #faeeda;
+  color: #854f0b;
+}
+
+.sheetScoreText {
+  font-size: 11px;
+  color: #aaa;
+  margin-left: auto;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.breakdownItem {
+  padding: 12px 16px;
+  border-bottom: 0.5px solid #f0efe8;
+}
+
+.breakdownItem:last-child {
+  border-bottom: none;
+}
+
+.breakdownHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 6px;
+}
+
+.breakdownLabel {
+  font-size: 13px;
+  font-weight: 500;
+  color: #111;
+}
+
+.breakdownScore {
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.breakdownBarTrack {
+  height: 4px;
+  background: #f0efe8;
+  border-radius: 2px;
+  margin-bottom: 7px;
+}
+
+.breakdownBarFill {
+  height: 100%;
+  border-radius: 2px;
+}
+
+.breakdownDesc {
+  font-size: 11px;
+  color: #888;
+  line-height: 1.6;
+  margin-bottom: 6px;
+}
+
+.breakdownStocks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.breakdownStockTag {
+  font-size: 10px;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: #f0efe8;
+  color: #555;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.breakdownStockDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+}
+
+.momentumStageRow {
+  padding: 0 16px;
+  margin-bottom: 16px;
+}
+
+.momentumStages {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.momentumStage {
+  flex: 1;
+  text-align: center;
+  padding: 8px 4px;
+  border-radius: 8px;
+}
+
+.stageDanger {
+  background: #fcebeb;
+}
+
+.stageMuted {
+  background: #f0efe8;
+}
+
+.stagePositive {
+  background: #eaf3de;
+  border: 1.5px solid #639922;
+}
+
+.momentumStageLabel {
+  font-size: 10px;
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.stageDanger .momentumStageLabel,
+.stageDanger .momentumStageSub {
+  color: #a32d2d;
+}
+
+.stageMuted .momentumStageLabel {
+  color: #888;
+}
+
+.stageMuted .momentumStageSub {
+  color: #aaa;
+}
+
+.stagePositive .momentumStageLabel,
+.stagePositive .momentumStageSub {
+  color: #3b6d11;
+}
+
+.momentumStageSub {
+  font-size: 9px;
+}
+
+.momentumStageHint {
+  font-size: 11px;
+  color: #aaa;
+  text-align: center;
+}
+
+.sheetSectionTitle {
+  padding: 0 16px 6px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #111;
+}
+
+.signalRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 5px;
+}
+
+.signalName {
+  font-size: 12px;
+  font-weight: 500;
+  color: #111;
+  flex: 1;
+}
+
+.signalBadge {
+  font-size: 11px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 6px;
+}
+
+.signalDesc {
+  font-size: 11px;
+  color: #888;
+  line-height: 1.6;
+}
+
+.blink {
+  animation: blink 1.2s infinite;
+}
+
+@keyframes bounce {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+
+  50% {
+    transform: translateY(3px);
+  }
+}
+
+@keyframes blink {
+  0%,
+  100% {
+    opacity: 1;
+  }
+
+  50% {
+    opacity: 0.3;
+  }
+}
