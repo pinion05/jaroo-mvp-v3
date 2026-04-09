@@ -1,6 +1,7 @@
 import type { Metadata } from 'next'
 import { Noto_Sans_KR } from 'next/font/google'
 import './globals.css'
+import { DebugPageNav } from '@/components/debug-page-nav'
 
 const notoSansKr = Noto_Sans_KR({
   variable: '--font-noto-sans-kr',
@@ -20,7 +21,10 @@ export default function RootLayout({
 }>) {
   return (
     <html lang='ko' className={`${notoSansKr.variable} h-full antialiased`}>
-      <body className='min-h-full bg-background font-sans text-foreground'>{children}</body>
+      <body className='min-h-full bg-background font-sans text-foreground'>
+        <DebugPageNav />
+        <div className='md:pl-28'>{children}</div>
+      </body>
     </html>
   )
 }
