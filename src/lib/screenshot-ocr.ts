@@ -43,7 +43,7 @@ export type OcrMergeResult = {
 
 const OCR_NUMBER_TEXT_PATTERN = /(shares?|share|stocks?|stock|주|원|krw|usd|eur|jpy|cny|aud|cad|hkd)/gi
 
-function parseOcrNumber(value: string) {
+export function parseOcrNumber(value: string) {
   const normalizedValue = value.trim().replace(/[−–—]/g, '-')
 
   if (!normalizedValue) {
@@ -72,7 +72,7 @@ function parseOcrNumber(value: string) {
   return isWrappedNegative ? -Math.abs(parsedValue) : parsedValue
 }
 
-function formatComputedNumber(value: number) {
+export function formatComputedNumber(value: number) {
   const roundedValue = Number(value.toFixed(4))
 
   if (!Number.isFinite(roundedValue)) {
