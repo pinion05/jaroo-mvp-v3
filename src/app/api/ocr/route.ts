@@ -30,8 +30,9 @@ const OCR_SCHEMA = {
             name: { type: 'string' },
             quantity: { type: 'string' },
             profitRate: { type: 'string' },
+            evaluationAmount: { type: 'string' },
           },
-          required: ['name', 'quantity', 'profitRate'],
+          required: ['name', 'quantity', 'profitRate', 'evaluationAmount'],
         },
       },
     },
@@ -43,7 +44,7 @@ const SYSTEM_PROMPT = `You are an OCR extraction engine for Korean and English b
 Return ONLY valid JSON matching the provided schema.
 Never output markdown, prose, explanations, code fences, or extra keys.
 Top-level object must be exactly {"rows": [...]}.
-Every row must contain exactly 3 string fields: name, quantity, profitRate.
+Every row must contain exactly 4 string fields: name, quantity, profitRate, evaluationAmount.
 Do not add any other fields.
 If a value is unreadable, use an empty string.
 If there are no holdings rows, return {"rows": []}.
@@ -52,15 +53,17 @@ Field rules:
 - name: stock/security name as shown in the screenshot. Preserve Korean or English text.
 - quantity: holding quantity as shown. Keep units if visible, for example "12주", "5 shares", "1,000".
 - profitRate: profit/loss percentage as shown, for example "+12.4%", "-3.18%", "0%".
+- evaluationAmount: holding evaluation/market value as shown, for example "1,234,000원", "$845.12", "2,500".
 
 OCR guidance:
-- The screenshot may contain Korean labels such as 종목명, 보유수량, 수익률, 평가손익, 잔고, 보유종목.
-- The screenshot may also contain English labels such as Name, Qty, Shares, P/L, Return, Profit Rate.
+- The screenshot may contain Korean labels such as 종목명, 보유수량, 수익률, 평가금액, 평가금, 평가손익, 잔고, 보유종목.
+- The screenshot may also contain English labels such as Name, Qty, Shares, P/L, Return, Profit Rate, Valuation, Market Value, Amount.
 - Extract only actual holding rows from the portfolio/list area.
 - Ignore totals, headers, footers, tabs, buttons, timestamps, ads, and account summary text unless they are part of a row.
 - Do not infer hidden values. Use only what is visible.
 - Quantity must map to the user's holding count, not price or valuation.
 - profitRate must map to the return/percentage column, not profit amount.
+- evaluationAmount must map to the row-level valuation/market value amount, not profit/loss amount, principal, or a totals summary.
 - If the same row appears twice due to sticky headers or repeated sections, keep one row only.`
 
 function extractTextContent(content: string | Array<{ type?: string; text?: string }> | undefined) {

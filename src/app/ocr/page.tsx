@@ -93,6 +93,36 @@ function buildLegacyCompatibleSession(rawSession: string): ScreenshotUploadSessi
   return null
 }
 
+function OcrMetricChip({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
+  return (
+    <div className='rounded-[14px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
+      <p className='text-[10px] text-[color:var(--jaroo-muted)]'>{label}</p>
+      <p className={cn('mt-1 truncate text-[12px] font-semibold text-[color:var(--jaroo-ink)]', valueClassName)}>{value || '-'}</p>
+    </div>
+  )
+}
+
+function OcrResolvedRowCard({ row, isLast }: { row: OcrSourceRow; isLast: boolean }) {
+  return (
+    <div className={cn('px-4 py-3', !isLast && 'border-b border-[color:var(--jaroo-border)]')}>
+      <div className='flex items-start justify-between gap-3'>
+        <div className='min-w-0'>
+          <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.name || '-'}</p>
+          <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.fileName}</p>
+        </div>
+        <p className='shrink-0 text-[11px] font-medium text-[color:var(--jaroo-primary)]'>{row.profitRate || '-'}</p>
+      </div>
+
+      <div className='mt-3 grid grid-cols-2 gap-2'>
+        <OcrMetricChip label='보유 수량' value={row.quantity} />
+        <OcrMetricChip label='평가 금액' value={row.evaluationAmount} />
+        <OcrMetricChip label='평균 단가' value={row.averagePrice} />
+        <OcrMetricChip label='수익률' value={row.profitRate} valueClassName='text-[color:var(--jaroo-primary)]' />
+      </div>
+    </div>
+  )
+}
+
 export default function OcrPage() {
   const router = useRouter()
   const [session, setSession] = useState<ScreenshotUploadSession | null>(null)
@@ -299,10 +329,12 @@ export default function OcrPage() {
         OCR_MERGE_RESULT_STORAGE_KEY,
         JSON.stringify({
           broker: session.broker,
-          rows: resolvedRows.map(({ name, quantity, profitRate, fileName }) => ({
+          rows: resolvedRows.map(({ name, quantity, profitRate, evaluationAmount, averagePrice, fileName }) => ({
             name,
             quantity,
             profitRate,
+            evaluationAmount,
+            averagePrice,
             fileName,
           })),
         }),
@@ -444,10 +476,8 @@ export default function OcrPage() {
       ) : null}
 
       <Card className='overflow-hidden rounded-[24px] border border-[color:var(--jaroo-border)] bg-white shadow-none'>
-        <div className='grid grid-cols-[1.6fr_1fr_1fr] gap-2 border-b border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)] px-4 py-3 text-[11px] font-medium text-[color:var(--jaroo-muted)]'>
-          <p>종목명</p>
-          <p className='text-right'>보유 수량</p>
-          <p className='text-right'>수익률</p>
+        <div className='border-b border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)] px-4 py-3'>
+          <p className='text-[11px] font-medium text-[color:var(--jaroo-muted)]'>종목명, 보유 수량, 수익률, 평가 금액, 평균 단가를 함께 확인하세요</p>
         </div>
 
         {requestState === 'loading' ? (
@@ -455,7 +485,7 @@ export default function OcrPage() {
             <LoaderCircle className='size-5 animate-spin text-[color:var(--jaroo-primary)]' />
             <div>
               <p className='text-[13px] font-medium text-[color:var(--jaroo-ink)]'>OCR 분석 중</p>
-              <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>여러 스크린샷에서 종목명, 보유 수량, 수익률을 순서대로 추출하고 있어요.</p>
+              <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>여러 스크린샷에서 종목명, 보유 수량, 수익률, 평가 금액을 순서대로 추출하고 있어요.</p>
             </div>
           </div>
         ) : null}
@@ -465,19 +495,7 @@ export default function OcrPage() {
             {resolvedRows.map((item, index) => {
               const isLast = index === resolvedRows.length - 1
 
-              return (
-                <div
-                  key={`${item.id}-${index}`}
-                  className={cn('grid grid-cols-[1.6fr_1fr_1fr] gap-2 px-4 py-3', !isLast && 'border-b border-[color:var(--jaroo-border)]')}
-                >
-                  <div className='min-w-0'>
-                    <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{item.name || '-'}</p>
-                    <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{item.fileName}</p>
-                  </div>
-                  <p className='truncate text-right text-[12px] text-[color:var(--jaroo-ink)]'>{item.quantity || '-'}</p>
-                  <p className='truncate text-right text-[12px] font-medium text-[color:var(--jaroo-primary)]'>{item.profitRate || '-'}</p>
-                </div>
-              )
+              return <OcrResolvedRowCard key={`${item.id}-${index}`} row={item} isLast={isLast} />
             })}
           </div>
         ) : null}

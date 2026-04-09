@@ -7,18 +7,48 @@ import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { JarooShell } from '@/components/jaroo-shell'
 import { mergeStocks, newStocks, type MergeChoiceId } from '@/lib/jaroo-data'
-import { OCR_MERGE_RESULT_STORAGE_KEY, type OcrRow } from '@/lib/screenshot-ocr'
+import { OCR_MERGE_RESULT_STORAGE_KEY, sanitizeOcrRows, type OcrRow } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 
 const defaultSelections = Object.fromEntries(mergeStocks.map((item) => [item.id, item.defaultChoice])) as Record<string, MergeChoiceId>
 
 type MergeResultRow = OcrRow & {
-  fileName?: string
+  fileName: string
 }
 
 type MergeResultSession = {
   broker: string
   rows: MergeResultRow[]
+}
+
+function MergeMetricChip({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
+  return (
+    <div className='rounded-[14px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
+      <p className='text-[10px] text-[color:var(--jaroo-muted)]'>{label}</p>
+      <p className={cn('mt-1 truncate text-[12px] font-semibold text-[color:var(--jaroo-ink)]', valueClassName)}>{value || '-'}</p>
+    </div>
+  )
+}
+
+function MergeResultRowCard({ row, isLast }: { row: MergeResultRow; isLast: boolean }) {
+  return (
+    <div className={cn('px-4 py-3', !isLast && 'border-b border-[color:var(--jaroo-border)]')}>
+      <div className='flex items-start justify-between gap-3'>
+        <div className='min-w-0'>
+          <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.name || '-'}</p>
+          {row.fileName ? <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.fileName}</p> : null}
+        </div>
+        <p className='shrink-0 text-[11px] font-medium text-[color:var(--jaroo-primary)]'>{row.profitRate || '-'}</p>
+      </div>
+
+      <div className='mt-3 grid grid-cols-2 gap-2'>
+        <MergeMetricChip label='보유 수량' value={row.quantity} />
+        <MergeMetricChip label='평가 금액' value={row.evaluationAmount} />
+        <MergeMetricChip label='평균 단가' value={row.averagePrice} />
+        <MergeMetricChip label='수익률' value={row.profitRate} valueClassName='text-[color:var(--jaroo-primary)]' />
+      </div>
+    </div>
+  )
 }
 
 function readMergeResultSession(): MergeResultSession | null {
@@ -40,13 +70,26 @@ function readMergeResultSession(): MergeResultSession | null {
     }
 
     const rows = parsed.rows
-      .filter((item): item is MergeResultRow => typeof item?.name === 'string' && typeof item?.quantity === 'string' && typeof item?.profitRate === 'string')
-      .map((item) => ({
-        name: item.name,
-        quantity: item.quantity,
-        profitRate: item.profitRate,
-        fileName: typeof item.fileName === 'string' ? item.fileName : '',
-      }))
+      .map((item) => {
+        const sanitizedRow = sanitizeOcrRows([
+          {
+            name: typeof item?.name === 'string' ? item.name : '',
+            quantity: typeof item?.quantity === 'string' ? item.quantity : '',
+            profitRate: typeof item?.profitRate === 'string' ? item.profitRate : '',
+            evaluationAmount: typeof item?.evaluationAmount === 'string' ? item.evaluationAmount : '',
+          },
+        ])[0]
+
+        if (!sanitizedRow) {
+          return null
+        }
+
+        return {
+          ...sanitizedRow,
+          fileName: typeof item?.fileName === 'string' ? item.fileName : '',
+        }
+      })
+      .filter((item): item is MergeResultRow => item !== null)
 
     return {
       broker: parsed.broker,
@@ -78,26 +121,15 @@ export default function MergePage() {
         <section className='space-y-2'>
           <p className='px-1 text-[11px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>OCR 확정 결과</p>
           <Card className='overflow-hidden rounded-[20px] border border-[color:var(--jaroo-border)] shadow-none'>
-            <div className='grid grid-cols-[1.6fr_1fr_1fr] gap-2 border-b border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)] px-4 py-3 text-[11px] font-medium text-[color:var(--jaroo-muted)]'>
-              <p>종목명</p>
-              <p className='text-right'>보유 수량</p>
-              <p className='text-right'>수익률</p>
+            <div className='border-b border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)] px-4 py-3'>
+              <p className='text-[11px] font-medium text-[color:var(--jaroo-muted)]'>종목명, 보유 수량, 수익률, 평가 금액, 평균 단가를 함께 보여줘요</p>
             </div>
             {mergeResult.rows.map((row, index) => (
-              <div
-                key={`${row.name}-${row.quantity}-${row.profitRate}-${index}`}
-                className={cn(
-                  'grid grid-cols-[1.6fr_1fr_1fr] gap-2 px-4 py-3',
-                  index < mergeResult.rows.length - 1 && 'border-b border-[color:var(--jaroo-border)]',
-                )}
-              >
-                <div className='min-w-0'>
-                  <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.name}</p>
-                  {row.fileName ? <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.fileName}</p> : null}
-                </div>
-                <p className='truncate text-right text-[12px] text-[color:var(--jaroo-ink)]'>{row.quantity || '-'}</p>
-                <p className='truncate text-right text-[12px] font-medium text-[color:var(--jaroo-primary)]'>{row.profitRate || '-'}</p>
-              </div>
+              <MergeResultRowCard
+                key={`${row.name}-${row.quantity}-${row.profitRate}-${row.evaluationAmount}-${index}`}
+                row={row}
+                isLast={index === mergeResult.rows.length - 1}
+              />
             ))}
           </Card>
         </section>

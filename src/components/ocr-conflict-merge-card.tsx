@@ -66,6 +66,14 @@ export function OcrConflictMergeCard({ conflict, selectedCandidateId, onSelect }
                   <p className='mt-1 text-[12px] font-semibold text-[color:var(--jaroo-ink)]'>{candidate.quantity || '-'}</p>
                 </div>
                 <div className='rounded-[16px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
+                  <p className='text-[10px] text-[color:var(--jaroo-muted)]'>평가 금액</p>
+                  <p className='mt-1 text-[12px] font-semibold text-[color:var(--jaroo-ink)]'>{candidate.evaluationAmount || '-'}</p>
+                </div>
+                <div className='rounded-[16px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
+                  <p className='text-[10px] text-[color:var(--jaroo-muted)]'>평균 단가</p>
+                  <p className='mt-1 text-[12px] font-semibold text-[color:var(--jaroo-ink)]'>{candidate.averagePrice || '-'}</p>
+                </div>
+                <div className='rounded-[16px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
                   <p className='text-[10px] text-[color:var(--jaroo-muted)]'>수익률</p>
                   <p className='mt-1 text-[12px] font-semibold text-[color:var(--jaroo-primary)]'>{candidate.profitRate || '-'}</p>
                 </div>

@@ -6,6 +6,8 @@ export type OcrRow = {
   name: string
   quantity: string
   profitRate: string
+  evaluationAmount: string
+  averagePrice: string
 }
 
 export type ScreenshotUploadImage = {
@@ -39,6 +41,76 @@ export type OcrMergeResult = {
   conflicts: OcrConflict[]
 }
 
+const OCR_NUMBER_TEXT_PATTERN = /(shares?|share|stocks?|stock|주|원|krw|usd|eur|jpy|cny|aud|cad|hkd)/gi
+
+function parseOcrNumber(value: string) {
+  const normalizedValue = value.trim().replace(/[−–—]/g, '-')
+
+  if (!normalizedValue) {
+    return null
+  }
+
+  const wrappedNegativeMatch = normalizedValue.match(/^\((.*)\)$/)
+  const isWrappedNegative = Boolean(wrappedNegativeMatch)
+  const unwrappedValue = wrappedNegativeMatch?.[1] ?? normalizedValue
+  const cleanedValue = unwrappedValue
+    .replaceAll(',', '')
+    .replace(/\s+/g, '')
+    .replace(/[₩$€¥£%]/g, '')
+    .replace(OCR_NUMBER_TEXT_PATTERN, '')
+
+  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(cleanedValue)) {
+    return null
+  }
+
+  const parsedValue = Number(cleanedValue)
+
+  if (!Number.isFinite(parsedValue)) {
+    return null
+  }
+
+  return isWrappedNegative ? -Math.abs(parsedValue) : parsedValue
+}
+
+function formatComputedNumber(value: number) {
+  const roundedValue = Number(value.toFixed(4))
+
+  if (!Number.isFinite(roundedValue)) {
+    return ''
+  }
+
+  return roundedValue.toLocaleString('ko-KR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  })
+}
+
+export function computeAveragePrice(quantity: string, profitRate: string, evaluationAmount: string) {
+  const parsedQuantity = parseOcrNumber(quantity)
+  const parsedProfitRate = parseOcrNumber(profitRate)
+  const parsedEvaluationAmount = parseOcrNumber(evaluationAmount)
+
+  if (parsedQuantity === null || parsedProfitRate === null || parsedEvaluationAmount === null || parsedQuantity === 0) {
+    return ''
+  }
+
+  const profitRateDecimal = parsedProfitRate / 100
+  const principalDivisor = 1 + profitRateDecimal
+
+  if (!Number.isFinite(principalDivisor) || principalDivisor === 0) {
+    return ''
+  }
+
+  const principal = parsedEvaluationAmount / principalDivisor
+  const averagePrice = principal / parsedQuantity
+
+  if (!Number.isFinite(averagePrice)) {
+    return ''
+  }
+
+  return formatComputedNumber(averagePrice)
+}
+
 export function sanitizeOcrRows(input: unknown): OcrRow[] {
   if (!Array.isArray(input)) {
     return []
@@ -46,12 +118,21 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
 
   return input
     .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
-    .map((item) => ({
-      name: typeof item.name === 'string' ? item.name.trim() : '',
-      quantity: typeof item.quantity === 'string' ? item.quantity.trim() : '',
-      profitRate: typeof item.profitRate === 'string' ? item.profitRate.trim() : '',
-    }))
-    .filter((item) => item.name.length > 0 || item.quantity.length > 0 || item.profitRate.length > 0)
+    .map((item) => {
+      const name = typeof item.name === 'string' ? item.name.trim() : ''
+      const quantity = typeof item.quantity === 'string' ? item.quantity.trim() : ''
+      const profitRate = typeof item.profitRate === 'string' ? item.profitRate.trim() : ''
+      const evaluationAmount = typeof item.evaluationAmount === 'string' ? item.evaluationAmount.trim() : ''
+
+      return {
+        name,
+        quantity,
+        profitRate,
+        evaluationAmount,
+        averagePrice: computeAveragePrice(quantity, profitRate, evaluationAmount),
+      }
+    })
+    .filter((item) => item.name.length > 0 || item.quantity.length > 0 || item.profitRate.length > 0 || item.evaluationAmount.length > 0)
 }
 
 export function normalizeStockName(name: string) {
@@ -59,7 +140,15 @@ export function normalizeStockName(name: string) {
 }
 
 export function normalizeComparableValue(value: string) {
-  return value.trim().replace(/[−–—]/g, '-').replace(/\s+/g, '').replace(/,/g, '').replace(/^\+/, '')
+  return value
+    .trim()
+    .toLowerCase()
+    .replace(/[−–—]/g, '-')
+    .replace(/\s+/g, '')
+    .replace(/,/g, '')
+    .replace(/^\+/, '')
+    .replace(/[₩$€¥£%]/g, '')
+    .replace(OCR_NUMBER_TEXT_PATTERN, '')
 }
 
 export function buildOcrSourceRows(uploads: ScreenshotUploadImage[], rowsByUpload: Record<string, OcrRow[]>) {
@@ -100,7 +189,7 @@ export function buildMergedOcrResult(rows: OcrSourceRow[]): OcrMergeResult {
     const uniqueCandidates = new Map<string, OcrSourceRow>()
 
     groupRows.forEach((row) => {
-      const variantKey = `${normalizeComparableValue(row.quantity)}::${normalizeComparableValue(row.profitRate)}`
+      const variantKey = `${normalizeComparableValue(row.quantity)}::${normalizeComparableValue(row.profitRate)}::${normalizeComparableValue(row.evaluationAmount)}`
 
       if (!uniqueCandidates.has(variantKey)) {
         uniqueCandidates.set(variantKey, row)
