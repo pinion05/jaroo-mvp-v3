@@ -1,31 +1,54 @@
 'use client'
 
 import Image from 'next/image'
-import { useEffect, useState, type ChangeEvent } from 'react'
+import { useMemo, useState, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Camera, Check, ImageUp, Sparkles } from 'lucide-react'
+import { ArrowLeft, Camera, ImagePlus, ImageUp, Sparkles } from 'lucide-react'
 import { JarooShell } from '@/components/jaroo-shell'
 import { Button } from '@/components/ui/button'
+import {
+  MAX_SCREENSHOT_UPLOADS,
+  SCREENSHOT_OCR_STORAGE_KEY,
+  type ScreenshotUploadImage,
+  type ScreenshotUploadSession,
+} from '@/lib/screenshot-ocr'
 import { brokerOptions } from '@/lib/jaroo-data'
-import { SCREENSHOT_OCR_STORAGE_KEY, type ScreenshotUploadSession } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
+
+const MAX_TOTAL_IMAGE_DATA_URL_LENGTH = 4_000_000
+
+function readFileAsDataUrl(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader()
+
+    reader.onload = () => {
+      if (typeof reader.result === 'string') {
+        resolve(reader.result)
+        return
+      }
+
+      reject(new Error('이미지를 읽을 수 없습니다.'))
+    }
+
+    reader.onerror = () => reject(new Error('이미지를 읽을 수 없습니다.'))
+    reader.readAsDataURL(file)
+  })
+}
 
 export default function ScreenshotPage() {
   const router = useRouter()
   const [selectedBroker, setSelectedBroker] = useState(brokerOptions[0] ?? '')
-  const [selectedFileName, setSelectedFileName] = useState('')
-  const [previewUrl, setPreviewUrl] = useState('')
-  const [imageDataUrl, setImageDataUrl] = useState('')
+  const [uploads, setUploads] = useState<ScreenshotUploadImage[]>([])
   const [isPreparing, setIsPreparing] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
 
-  useEffect(() => {
-    return () => {
-      if (previewUrl) {
-        URL.revokeObjectURL(previewUrl)
-      }
+  const uploadSummaryText = useMemo(() => {
+    if (uploads.length === 0) {
+      return '아래 파일 선택 버튼으로 실제 이미지를 고르세요'
     }
-  }, [previewUrl])
+
+    return `${uploads.length}장 선택됨 · /ocr에서 순서대로 분석돼요`
+  }, [uploads.length])
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -37,55 +60,52 @@ export default function ScreenshotPage() {
   }
 
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+    const files = Array.from(event.target.files ?? [])
+    event.target.value = ''
 
-    if (!file) {
+    if (files.length === 0) {
       return
     }
 
-    if (!file.type.startsWith('image/')) {
+    if (files.length > MAX_SCREENSHOT_UPLOADS) {
+      setErrorMessage(`한 번에 최대 ${MAX_SCREENSHOT_UPLOADS}장까지 업로드할 수 있어요.`)
+      return
+    }
+
+    if (files.some((file) => !file.type.startsWith('image/'))) {
       setErrorMessage('이미지 파일만 업로드할 수 있어요.')
       return
     }
 
     setErrorMessage('')
-    setSelectedFileName(file.name)
 
-    setPreviewUrl((current) => {
-      if (current) {
-        URL.revokeObjectURL(current)
-      }
+    const nextUploads = await Promise.all(
+      files.map(async (file, index) => ({
+        id: `${Date.now()}-${index}-${file.name}`,
+        fileName: file.name,
+        imageDataUrl: await readFileAsDataUrl(file),
+      })),
+    ).catch(() => null)
 
-      return URL.createObjectURL(file)
-    })
-
-    const dataUrl = await new Promise<string>((resolve, reject) => {
-      const reader = new FileReader()
-
-      reader.onload = () => {
-        if (typeof reader.result === 'string') {
-          resolve(reader.result)
-          return
-        }
-
-        reject(new Error('이미지를 읽을 수 없습니다.'))
-      }
-
-      reader.onerror = () => reject(new Error('이미지를 읽을 수 없습니다.'))
-      reader.readAsDataURL(file)
-    }).catch(() => '')
-
-    if (!dataUrl) {
+    if (!nextUploads) {
       setErrorMessage('이미지를 읽는 중 문제가 생겼어요. 다시 시도해주세요.')
-      setImageDataUrl('')
+      setUploads([])
       return
     }
 
-    setImageDataUrl(dataUrl)
+    const totalImagePayloadLength = nextUploads.reduce((sum, upload) => sum + upload.imageDataUrl.length, 0)
+
+    if (totalImagePayloadLength > MAX_TOTAL_IMAGE_DATA_URL_LENGTH) {
+      setErrorMessage('선택한 이미지 용량이 너무 커요. 장수를 줄이거나 더 작은 스크린샷으로 다시 시도해주세요.')
+      setUploads([])
+      return
+    }
+
+    setUploads(nextUploads)
   }
 
   const handleContinue = () => {
-    if (!imageDataUrl || !selectedFileName) {
+    if (uploads.length === 0) {
       setErrorMessage('먼저 스크린샷 이미지를 선택해주세요.')
       return
     }
@@ -94,12 +114,16 @@ export default function ScreenshotPage() {
 
     const payload: ScreenshotUploadSession = {
       broker: selectedBroker,
-      fileName: selectedFileName,
-      imageDataUrl,
+      uploads,
     }
 
-    sessionStorage.setItem(SCREENSHOT_OCR_STORAGE_KEY, JSON.stringify(payload))
-    router.push('/ocr')
+    try {
+      sessionStorage.setItem(SCREENSHOT_OCR_STORAGE_KEY, JSON.stringify(payload))
+      router.push('/ocr')
+    } catch {
+      setIsPreparing(false)
+      setErrorMessage('이미지 임시 저장에 실패했어요. 장수를 줄이거나 더 작은 스크린샷으로 다시 시도해주세요.')
+    }
   }
 
   return (
@@ -127,45 +151,44 @@ export default function ScreenshotPage() {
           <div
             className={cn(
               'w-full rounded-[24px] border border-dashed px-4 py-5 text-center transition',
-              imageDataUrl
+              uploads.length > 0
                 ? 'border-[color:var(--jaroo-success)]/55 bg-[color:var(--jaroo-success-ghost)]'
                 : 'border-[color:var(--jaroo-primary)]/30 bg-[color:var(--jaroo-accent)]/40',
             )}
           >
-            {previewUrl ? (
-              <div className='space-y-3'>
-                <div className='mx-auto flex size-12 items-center justify-center rounded-full bg-[color:var(--jaroo-success)]/12 text-[color:var(--jaroo-success)]'>
-                  <Check className='size-5' strokeWidth={2.5} />
-                </div>
-                <div>
-                  <p className='text-[14px] font-medium text-[color:var(--jaroo-success)]'>스크린샷 선택됨</p>
-                  <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>{selectedFileName}</p>
-                </div>
-                <div className='relative mx-auto h-44 w-full max-w-[220px] overflow-hidden rounded-[20px] border border-white/80 bg-white shadow-sm'>
-                  <Image src={previewUrl} alt={selectedFileName || '업로드된 스크린샷 미리보기'} fill unoptimized className='object-cover' />
-                </div>
+            <div className='mx-auto flex size-12 items-center justify-center rounded-full bg-[color:var(--jaroo-primary)] text-white'>
+              {uploads.length > 0 ? <ImagePlus className='size-5' /> : <Camera className='size-5' />}
+            </div>
+            <p className='mt-3 text-[14px] font-medium text-[color:var(--jaroo-ink)]'>스크린샷 업로드</p>
+            <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>{uploadSummaryText}</p>
+
+            {uploads.length > 0 ? (
+              <div className='mt-4 grid grid-cols-3 gap-2'>
+                {uploads.map((upload, index) => (
+                  <div key={upload.id} className='overflow-hidden rounded-[18px] border border-white/90 bg-white shadow-sm'>
+                    <div className='relative aspect-[3/4]'>
+                      <Image src={upload.imageDataUrl} alt={upload.fileName} fill unoptimized className='object-cover' />
+                    </div>
+                    <div className='border-t border-[color:var(--jaroo-border)] px-2 py-2 text-left'>
+                      <p className='truncate text-[10px] font-medium text-[color:var(--jaroo-ink)]'>{index + 1}. {upload.fileName}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
-            ) : (
-              <>
-                <div className='mx-auto flex size-12 items-center justify-center rounded-full bg-[color:var(--jaroo-primary)] text-white'>
-                  <Camera className='size-5' />
-                </div>
-                <p className='mt-3 text-[14px] font-medium text-[color:var(--jaroo-ink)]'>스크린샷 업로드</p>
-                <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>아래 파일 선택 버튼으로 실제 이미지를 고르세요</p>
-              </>
-            )}
+            ) : null}
           </div>
 
           <input
             id='screenshot-upload'
             type='file'
             accept='image/*'
+            multiple
             onChange={handleFileChange}
             className='block w-full cursor-pointer rounded-[18px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)] file:mr-3 file:rounded-[12px] file:border-0 file:bg-[color:var(--jaroo-primary)] file:px-3 file:py-2 file:text-[12px] file:font-medium file:text-white'
           />
 
           {errorMessage ? <p className='text-[11px] text-[#D54841]'>{errorMessage}</p> : null}
-          <p className='text-[10px] text-[color:var(--jaroo-muted)]'>debug build: upload-v3</p>
+          <p className='text-[10px] text-[color:var(--jaroo-muted)]'>최대 {MAX_SCREENSHOT_UPLOADS}장까지 선택 가능 · 다시 선택하면 새 목록으로 바뀌어요</p>
         </section>
 
         <section className='space-y-2'>
@@ -197,7 +220,7 @@ export default function ScreenshotPage() {
           <Button
             type='button'
             onClick={handleContinue}
-            disabled={!imageDataUrl || isPreparing}
+            disabled={uploads.length === 0 || isPreparing}
             className='h-12 w-full rounded-[20px] bg-[color:var(--jaroo-primary)] text-[14px] font-medium text-white hover:bg-[color:var(--jaroo-primary-strong)] disabled:bg-[color:var(--jaroo-primary)] disabled:opacity-45'
           >
             <span className='flex items-center gap-2'>
