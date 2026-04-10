@@ -770,8 +770,8 @@ export function JarooHomeScreen() {
                       </div>
                     </div>
                     <div className={styles.stockSub}>
-                      <span className={cn(styles.marketTag, marketToneClass(item.marketTone))}>{item.market}</span>{' '}
-                      {item.shares}
+                      <span className={cn(styles.marketTag, marketToneClass(item.marketTone))}>{item.market}</span>
+                      {item.identifierLabel ? ` · ${item.identifierLabel}` : ''} · {item.shares}
                     </div>
                   </div>
                   <div className={styles.stockValue}>

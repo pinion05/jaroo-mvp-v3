@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "build:instrument-universe": "python scripts/build-instrument-universe.py",
     "start": "next start",
     "lint": "eslint"
   },
