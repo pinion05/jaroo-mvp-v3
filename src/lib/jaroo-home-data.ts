@@ -1,4 +1,5 @@
-import { computeAveragePrice, parseOcrNumber, sanitizeOcrRows, type OcrRow } from '@/lib/screenshot-ocr'
+import { buildDeepScanTargetSession, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding, type DeepScanTargetSession } from '@/lib/deepscan-target'
+import { computeAveragePrice, normalizeStockName, parseOcrNumber, sanitizeOcrRows, type OcrRow } from '@/lib/screenshot-ocr'
 
 export type HomeBadgeTone = 'amber' | 'red' | 'green'
 export type HomeCardTone = 'danger' | 'warning' | 'halt' | 'profit' | 'etf'
@@ -11,6 +12,7 @@ export type HomeHolding = {
   id: number
   kind: 'stock' | 'etf'
   name: string
+  code?: string
   shortName: string
   donutLabel: string
   shares: string
@@ -60,6 +62,7 @@ export const homeHoldings: HomeHolding[] = [
     id: 0,
     kind: 'stock',
     name: '삼성전자',
+    code: '005930',
     shortName: '삼성전자',
     donutLabel: '삼성전자',
     shares: '128주',
@@ -104,6 +107,7 @@ export const homeHoldings: HomeHolding[] = [
     id: 1,
     kind: 'stock',
     name: '코칩',
+    code: '094360',
     shortName: '코칩',
     donutLabel: '코칩',
     shares: '350주',
@@ -148,6 +152,7 @@ export const homeHoldings: HomeHolding[] = [
     id: 2,
     kind: 'stock',
     name: '드래곤플라이',
+    code: '030350',
     shortName: '드래곤',
     donutLabel: '드래곤',
     shares: '500주',
@@ -190,6 +195,7 @@ export const homeHoldings: HomeHolding[] = [
     id: 3,
     kind: 'stock',
     name: 'SK하이닉스',
+    code: '000660',
     shortName: 'SK하이닉스',
     donutLabel: 'SK하이닉스',
     shares: '40주',
@@ -232,6 +238,7 @@ export const homeHoldings: HomeHolding[] = [
     id: 4,
     kind: 'etf',
     name: 'KODEX 200',
+    code: '069500',
     shortName: 'KODEX 200',
     donutLabel: 'KODEX200',
     shares: '100주',
@@ -387,6 +394,7 @@ export const momentumSignals = [
 
 export const APPLIED_HOME_PORTFOLIO_STORAGE_KEY = 'jaroo:applied-home-portfolio'
 export const APPLIED_HOME_PORTFOLIO_EVENT = 'jaroo:applied-home-portfolio:updated'
+export const DEEPSCAN_TARGET_STORAGE_KEY = 'jaroo:deepscan-target'
 
 export type AppliedHomePortfolioSession = {
   broker: string
@@ -395,6 +403,11 @@ export type AppliedHomePortfolioSession = {
 }
 
 const OCR_HOME_DONUT_COLORS = ['#E24B4A', '#EF9F27', '#1D9E75', '#378ADD', '#185FA5', '#7C3AED', '#0EA5E9', '#F97316']
+const HOME_HOLDING_CODE_BY_NAME = new Map(
+  homeHoldings
+    .filter((item) => item.code)
+    .map((item) => [normalizeStockName(item.name), item.code as string]),
+)
 
 function formatNumber(value: number, maximumFractionDigits = 0) {
   return value.toLocaleString('ko-KR', {
@@ -585,6 +598,73 @@ export function readAppliedHomePortfolio(): AppliedHomePortfolioSession | null {
   }
 }
 
+export function persistDeepScanTarget(holding: HomeHolding) {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  try {
+    window.sessionStorage.setItem(DEEPSCAN_TARGET_STORAGE_KEY, JSON.stringify(buildDeepScanTargetSession(holding)))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function readDeepScanTargetSession(): DeepScanTargetSession | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const rawValue = window.sessionStorage.getItem(DEEPSCAN_TARGET_STORAGE_KEY)
+
+  if (!rawValue) {
+    return null
+  }
+
+  try {
+    const parsedValue = JSON.parse(rawValue) as Partial<DeepScanTargetSession>
+    const holding = parsedValue?.holding
+
+    if (!holding || typeof holding !== 'object' || typeof holding.name !== 'string') {
+      return null
+    }
+
+    const rebuiltSession = buildDeepScanTargetSession(holding as HomeHolding)
+
+    return {
+      ...rebuiltSession,
+      selectedAt: typeof parsedValue.selectedAt === 'string' ? parsedValue.selectedAt : rebuiltSession.selectedAt,
+    }
+  } catch {
+    return null
+  }
+}
+
+export function readDeepScanTarget(): HomeHolding | null {
+  return readDeepScanTargetSession()?.holding ?? null
+}
+
+export function resolveDeepScanTargetSession() {
+  const storedTarget = readDeepScanTargetSession()
+
+  if (storedTarget) {
+    return storedTarget
+  }
+
+  const appliedPortfolio = readAppliedHomePortfolio()
+
+  if (appliedPortfolio?.rows.length) {
+    const appliedHolding = pickDeepScanDefaultHolding(buildHomeHoldingsFromOcrRows(appliedPortfolio.rows))
+
+    if (appliedHolding) {
+      return buildDeepScanTargetSession(appliedHolding)
+    }
+  }
+
+  return buildDeepScanTargetSession(createPlaceholderDeepScanHolding())
+}
+
 export function buildHomeHoldingsFromOcrRows(rows: OcrRow[]): HomeHolding[] {
   const sanitizedRows = sanitizeOcrRows(rows)
 
@@ -611,11 +691,13 @@ export function buildHomeHoldingsFromOcrRows(rows: OcrRow[]): HomeHolding[] {
     const donutPercent = weights[index] / totalWeight
     const market = kind === 'etf' ? 'ETF' : 'OCR'
     const displayName = row.name.trim() || `인식 종목 ${index + 1}`
+    const resolvedCode = row.code || row.ticker || HOME_HOLDING_CODE_BY_NAME.get(normalizeStockName(displayName))
 
     return {
       id: index,
       kind,
       name: displayName,
+      code: resolvedCode,
       shortName: displayName.replace(/\s+/g, '').slice(0, 8) || displayName,
       donutLabel: displayName.replace(/\s+/g, '').slice(0, 10) || displayName,
       shares,

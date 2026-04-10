@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 import {
@@ -12,6 +13,7 @@ import {
   homeHoldings as defaultHomeHoldings,
   momentumSignals as defaultMomentumSignals,
   momentumStages as defaultMomentumStages,
+  persistDeepScanTarget,
   portfolioScoreBreakdown as defaultPortfolioScoreBreakdown,
   readAppliedHomePortfolio,
   type HomeBadgeTone,
@@ -428,6 +430,13 @@ export function JarooHomeScreen() {
 
   const selectedHolding = selectedId === null ? null : homeHoldings.find((item) => item.id === selectedId) ?? null
   const summaryData = useMemo(() => buildPortfolioSummary(homeHoldings, isAppliedPortfolio), [homeHoldings, isAppliedPortfolio])
+  const defaultDeepScanHolding = useMemo(() => {
+    if (selectedHolding?.kind === 'stock') {
+      return selectedHolding
+    }
+
+    return pickDeepScanDefaultHolding(homeHoldings)
+  }, [homeHoldings, selectedHolding])
   const primaryHeatmapHolding = homeHoldings[0] ?? null
   const secondaryHeatmapHolding = homeHoldings[1] ?? null
   const tertiaryHeatmapHolding = homeHoldings[2] ?? null
@@ -821,7 +830,12 @@ export function JarooHomeScreen() {
                     <Link
                       href={item.actionHref}
                       className={cn(styles.detailButton, actionToneClass(item))}
-                      onClick={(event) => event.stopPropagation()}
+                      onClick={(event) => {
+                        event.stopPropagation()
+                        if (item.kind === 'stock') {
+                          persistDeepScanTarget(item)
+                        }
+                      }}
                     >
                       {item.actionLabel}
                       {item.actionSubLabel ? <span className={styles.actionSubLabel}>{item.actionSubLabel}</span> : null}
@@ -846,7 +860,15 @@ export function JarooHomeScreen() {
           <div className={styles.forecastCard}>
             <div className={styles.forecastLabel}>{summaryData.forecast.label}</div>
             <div className={styles.forecastText}>{summaryData.forecast.body}</div>
-            <Link href={summaryData.forecast.href} className={styles.forecastMore}>
+            <Link
+              href={summaryData.forecast.href}
+              className={styles.forecastMore}
+              onClick={() => {
+                if (defaultDeepScanHolding) {
+                  persistDeepScanTarget(defaultDeepScanHolding)
+                }
+              }}
+            >
               {summaryData.forecast.cta}
             </Link>
           </div>
