@@ -8,6 +8,8 @@ export type OcrRow = {
   profitRate: string
   evaluationAmount: string
   averagePrice: string
+  code?: string
+  ticker?: string
 }
 
 export type ScreenshotUploadImage = {
@@ -43,7 +45,7 @@ export type OcrMergeResult = {
 
 const OCR_NUMBER_TEXT_PATTERN = /(shares?|share|stocks?|stock|주|원|krw|usd|eur|jpy|cny|aud|cad|hkd)/gi
 
-function parseOcrNumber(value: string) {
+export function parseOcrNumber(value: string) {
   const normalizedValue = value.trim().replace(/[−–—]/g, '-')
 
   if (!normalizedValue) {
@@ -72,7 +74,7 @@ function parseOcrNumber(value: string) {
   return isWrappedNegative ? -Math.abs(parsedValue) : parsedValue
 }
 
-function formatComputedNumber(value: number) {
+export function formatComputedNumber(value: number) {
   const roundedValue = Number(value.toFixed(4))
 
   if (!Number.isFinite(roundedValue)) {
@@ -111,6 +113,15 @@ export function computeAveragePrice(quantity: string, profitRate: string, evalua
   return formatComputedNumber(averagePrice)
 }
 
+function normalizeInstrumentCode(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const normalized = value.trim().replace(/\s+/g, '').toUpperCase()
+  return normalized.length > 0 ? normalized : undefined
+}
+
 export function sanitizeOcrRows(input: unknown): OcrRow[] {
   if (!Array.isArray(input)) {
     return []
@@ -123,6 +134,8 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
       const quantity = typeof item.quantity === 'string' ? item.quantity.trim() : ''
       const profitRate = typeof item.profitRate === 'string' ? item.profitRate.trim() : ''
       const evaluationAmount = typeof item.evaluationAmount === 'string' ? item.evaluationAmount.trim() : ''
+      const code = normalizeInstrumentCode(item.code)
+      const ticker = normalizeInstrumentCode(item.ticker)
 
       return {
         name,
@@ -130,6 +143,8 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
         profitRate,
         evaluationAmount,
         averagePrice: computeAveragePrice(quantity, profitRate, evaluationAmount),
+        code,
+        ticker,
       }
     })
     .filter((item) => item.name.length > 0 || item.quantity.length > 0 || item.profitRate.length > 0 || item.evaluationAmount.length > 0)

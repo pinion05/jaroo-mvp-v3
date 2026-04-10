@@ -1,3 +1,6 @@
+import { buildDeepScanTargetSession, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding, type DeepScanTargetSession } from '@/lib/deepscan-target'
+import { computeAveragePrice, normalizeStockName, parseOcrNumber, sanitizeOcrRows, type OcrRow } from '@/lib/screenshot-ocr'
+
 export type HomeBadgeTone = 'amber' | 'red' | 'green'
 export type HomeCardTone = 'danger' | 'warning' | 'halt' | 'profit' | 'etf'
 export type HomeMetricTone = 'danger' | 'warning' | 'positive' | 'locked' | 'neutral'
@@ -9,10 +12,12 @@ export type HomeHolding = {
   id: number
   kind: 'stock' | 'etf'
   name: string
+  code?: string
   shortName: string
   donutLabel: string
   shares: string
   averagePrice: string
+  evaluationAmount?: string
   market: string
   marketTone: HomeMarketTone
   badge: string
@@ -57,6 +62,7 @@ export const homeHoldings: HomeHolding[] = [
     id: 0,
     kind: 'stock',
     name: '삼성전자',
+    code: '005930',
     shortName: '삼성전자',
     donutLabel: '삼성전자',
     shares: '128주',
@@ -101,6 +107,7 @@ export const homeHoldings: HomeHolding[] = [
     id: 1,
     kind: 'stock',
     name: '코칩',
+    code: '094360',
     shortName: '코칩',
     donutLabel: '코칩',
     shares: '350주',
@@ -145,6 +152,7 @@ export const homeHoldings: HomeHolding[] = [
     id: 2,
     kind: 'stock',
     name: '드래곤플라이',
+    code: '030350',
     shortName: '드래곤',
     donutLabel: '드래곤',
     shares: '500주',
@@ -187,6 +195,7 @@ export const homeHoldings: HomeHolding[] = [
     id: 3,
     kind: 'stock',
     name: 'SK하이닉스',
+    code: '000660',
     shortName: 'SK하이닉스',
     donutLabel: 'SK하이닉스',
     shares: '40주',
@@ -229,6 +238,7 @@ export const homeHoldings: HomeHolding[] = [
     id: 4,
     kind: 'etf',
     name: 'KODEX 200',
+    code: '069500',
     shortName: 'KODEX 200',
     donutLabel: 'KODEX200',
     shares: '100주',
@@ -381,3 +391,355 @@ export const momentumSignals = [
     blink: true,
   },
 ]
+
+export const APPLIED_HOME_PORTFOLIO_STORAGE_KEY = 'jaroo:applied-home-portfolio'
+export const APPLIED_HOME_PORTFOLIO_EVENT = 'jaroo:applied-home-portfolio:updated'
+export const DEEPSCAN_TARGET_STORAGE_KEY = 'jaroo:deepscan-target'
+
+export type AppliedHomePortfolioSession = {
+  broker: string
+  rows: OcrRow[]
+  appliedAt?: string
+}
+
+const OCR_HOME_DONUT_COLORS = ['#E24B4A', '#EF9F27', '#1D9E75', '#378ADD', '#185FA5', '#7C3AED', '#0EA5E9', '#F97316']
+const HOME_HOLDING_CODE_BY_NAME = new Map(
+  homeHoldings
+    .filter((item) => item.code)
+    .map((item) => [normalizeStockName(item.name), item.code as string]),
+)
+
+function formatNumber(value: number, maximumFractionDigits = 0) {
+  return value.toLocaleString('ko-KR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits,
+  })
+}
+
+function formatCurrencyValue(value: string) {
+  const parsedValue = parseOcrNumber(value)
+
+  if (parsedValue === null) {
+    return value.trim() || '-'
+  }
+
+  return `${formatNumber(parsedValue)}원`
+}
+
+function formatQuantityValue(value: string) {
+  const parsedValue = parseOcrNumber(value)
+
+  if (parsedValue === null) {
+    return value.trim() || '-'
+  }
+
+  return `${formatNumber(parsedValue)}주`
+}
+
+function formatPercentValue(value: string) {
+  const parsedValue = parseOcrNumber(value)
+
+  if (parsedValue === null) {
+    return value.trim() || '-'
+  }
+
+  return `${parsedValue > 0 ? '+' : ''}${formatNumber(parsedValue, 2)}%`
+}
+
+function formatSignedCurrencyValue(value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return '-'
+  }
+
+  return `${value > 0 ? '+' : value < 0 ? '-' : ''}${formatNumber(Math.abs(value))}원`
+}
+
+function inferHoldingKind(name: string): HomeHolding['kind'] {
+  return /(etf|kodex|tiger|koosef|kosef|arirang|ace|sol|kbstar|timefolio)/i.test(name) ? 'etf' : 'stock'
+}
+
+function deriveHoldingTone(profitRateValue: number | null) {
+  if (profitRateValue === null) {
+    return {
+      badge: '인식 완료',
+      badgeTone: 'amber' as HomeBadgeTone,
+      cardTone: 'warning' as HomeCardTone,
+      signalTone: 'warning' as HomeHolding['signalTone'],
+      centerScoreColor: '#FAC775',
+      metricTone: 'neutral' as HomeMetricTone,
+      heatmapBackground: '#BC7010',
+    }
+  }
+
+  if (profitRateValue >= 0) {
+    return {
+      badge: '수익 중',
+      badgeTone: 'green' as HomeBadgeTone,
+      cardTone: 'profit' as HomeCardTone,
+      signalTone: 'positive' as HomeHolding['signalTone'],
+      centerScoreColor: '#9FE1CB',
+      metricTone: 'positive' as HomeMetricTone,
+      heatmapBackground: '#1A7A5E',
+    }
+  }
+
+  if (profitRateValue <= -20) {
+    return {
+      badge: '긴급 점검',
+      badgeTone: 'red' as HomeBadgeTone,
+      cardTone: 'danger' as HomeCardTone,
+      signalTone: 'danger' as HomeHolding['signalTone'],
+      centerScoreColor: '#F09595',
+      metricTone: 'danger' as HomeMetricTone,
+      heatmapBackground: '#C13030',
+    }
+  }
+
+  return {
+    badge: '관찰 중',
+    badgeTone: 'amber' as HomeBadgeTone,
+    cardTone: 'warning' as HomeCardTone,
+    signalTone: 'warning' as HomeHolding['signalTone'],
+    centerScoreColor: '#FAC775',
+    metricTone: 'warning' as HomeMetricTone,
+    heatmapBackground: '#BC7010',
+  }
+}
+
+function buildOpinionText(name: string, kind: HomeHolding['kind'], profitRateValue: number | null) {
+  if (kind === 'etf') {
+    return `${name} ETF를 OCR에서 읽어 홈 포트폴리오에 반영했어요. 섹터 구성과 회복 시나리오는 ETF 분석에서 더 확인할 수 있어요.`
+  }
+
+  if (profitRateValue === null) {
+    return `${name} 정보를 OCR에서 읽어 홈에 적용했어요. 세부 전략은 딥스캔으로 이어서 확인할 수 있어요.`
+  }
+
+  if (profitRateValue >= 0) {
+    return `${name} 수익 구간을 OCR에서 반영했어요. 익절 또는 추가 전략은 딥스캔으로 이어서 검토해보세요.`
+  }
+
+  if (profitRateValue <= -20) {
+    return `${name} 손실 폭이 크게 인식됐어요. 딥스캔으로 회복 가능성과 대응 전략을 먼저 확인해보세요.`
+  }
+
+  return `${name} 손실 구간을 OCR에서 반영했어요. 회복 신호가 있는지 딥스캔으로 추가 확인해보세요.`
+}
+
+function computeProfitAmountValue(profitRateValue: number | null, evaluationAmountValue: number | null) {
+  if (profitRateValue === null || evaluationAmountValue === null) {
+    return null
+  }
+
+  const divisor = 1 + profitRateValue / 100
+
+  if (!Number.isFinite(divisor) || divisor === 0) {
+    return null
+  }
+
+  const principal = evaluationAmountValue / divisor
+  const profitAmount = evaluationAmountValue - principal
+
+  return Number.isFinite(profitAmount) ? profitAmount : null
+}
+
+export function persistAppliedHomePortfolio(session: AppliedHomePortfolioSession) {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  try {
+    window.sessionStorage.setItem(
+      APPLIED_HOME_PORTFOLIO_STORAGE_KEY,
+      JSON.stringify({
+        broker: session.broker,
+        rows: sanitizeOcrRows(session.rows),
+        appliedAt: session.appliedAt ?? new Date().toISOString(),
+      }),
+    )
+    window.dispatchEvent(new Event(APPLIED_HOME_PORTFOLIO_EVENT))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function readAppliedHomePortfolio(): AppliedHomePortfolioSession | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const rawValue = window.sessionStorage.getItem(APPLIED_HOME_PORTFOLIO_STORAGE_KEY)
+
+  if (!rawValue) {
+    return null
+  }
+
+  try {
+    const parsedValue = JSON.parse(rawValue) as Partial<AppliedHomePortfolioSession>
+
+    if (typeof parsedValue?.broker !== 'string' || !Array.isArray(parsedValue?.rows)) {
+      return null
+    }
+
+    const rows = sanitizeOcrRows(parsedValue.rows)
+
+    if (rows.length === 0) {
+      return null
+    }
+
+    return {
+      broker: parsedValue.broker,
+      rows,
+      appliedAt: typeof parsedValue.appliedAt === 'string' ? parsedValue.appliedAt : undefined,
+    }
+  } catch {
+    return null
+  }
+}
+
+export function persistDeepScanTarget(holding: HomeHolding) {
+  if (typeof window === 'undefined') {
+    return false
+  }
+
+  try {
+    window.sessionStorage.setItem(DEEPSCAN_TARGET_STORAGE_KEY, JSON.stringify(buildDeepScanTargetSession(holding)))
+    return true
+  } catch {
+    return false
+  }
+}
+
+export function readDeepScanTargetSession(): DeepScanTargetSession | null {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const rawValue = window.sessionStorage.getItem(DEEPSCAN_TARGET_STORAGE_KEY)
+
+  if (!rawValue) {
+    return null
+  }
+
+  try {
+    const parsedValue = JSON.parse(rawValue) as Partial<DeepScanTargetSession>
+    const holding = parsedValue?.holding
+
+    if (!holding || typeof holding !== 'object' || typeof holding.name !== 'string') {
+      return null
+    }
+
+    const rebuiltSession = buildDeepScanTargetSession(holding as HomeHolding)
+
+    return {
+      ...rebuiltSession,
+      selectedAt: typeof parsedValue.selectedAt === 'string' ? parsedValue.selectedAt : rebuiltSession.selectedAt,
+    }
+  } catch {
+    return null
+  }
+}
+
+export function readDeepScanTarget(): HomeHolding | null {
+  return readDeepScanTargetSession()?.holding ?? null
+}
+
+export function resolveDeepScanTargetSession() {
+  const storedTarget = readDeepScanTargetSession()
+
+  if (storedTarget) {
+    return storedTarget
+  }
+
+  const appliedPortfolio = readAppliedHomePortfolio()
+
+  if (appliedPortfolio?.rows.length) {
+    const appliedHolding = pickDeepScanDefaultHolding(buildHomeHoldingsFromOcrRows(appliedPortfolio.rows))
+
+    if (appliedHolding) {
+      return buildDeepScanTargetSession(appliedHolding)
+    }
+  }
+
+  return buildDeepScanTargetSession(createPlaceholderDeepScanHolding())
+}
+
+export function buildHomeHoldingsFromOcrRows(rows: OcrRow[]): HomeHolding[] {
+  const sanitizedRows = sanitizeOcrRows(rows)
+
+  if (sanitizedRows.length === 0) {
+    return []
+  }
+
+  const weights = sanitizedRows.map((row) => {
+    const evaluationAmountValue = parseOcrNumber(row.evaluationAmount)
+    return evaluationAmountValue !== null && evaluationAmountValue > 0 ? evaluationAmountValue : 1
+  })
+  const totalWeight = weights.reduce((sum, value) => sum + value, 0) || sanitizedRows.length
+
+  return sanitizedRows.map((row, index) => {
+    const kind = inferHoldingKind(row.name)
+    const profitRateValue = parseOcrNumber(row.profitRate)
+    const evaluationAmountValue = parseOcrNumber(row.evaluationAmount)
+    const tone = deriveHoldingTone(profitRateValue)
+    const averagePrice = formatCurrencyValue(row.averagePrice || computeAveragePrice(row.quantity, row.profitRate, row.evaluationAmount))
+    const evaluationAmount = formatCurrencyValue(row.evaluationAmount)
+    const shares = formatQuantityValue(row.quantity)
+    const change = formatPercentValue(row.profitRate)
+    const pnl = formatSignedCurrencyValue(computeProfitAmountValue(profitRateValue, evaluationAmountValue))
+    const donutPercent = weights[index] / totalWeight
+    const market = kind === 'etf' ? 'ETF' : 'OCR'
+    const displayName = row.name.trim() || `인식 종목 ${index + 1}`
+    const resolvedCode = row.code || row.ticker || HOME_HOLDING_CODE_BY_NAME.get(normalizeStockName(displayName))
+
+    return {
+      id: index,
+      kind,
+      name: displayName,
+      code: resolvedCode,
+      shortName: displayName.replace(/\s+/g, '').slice(0, 8) || displayName,
+      donutLabel: displayName.replace(/\s+/g, '').slice(0, 10) || displayName,
+      shares,
+      averagePrice,
+      evaluationAmount,
+      market,
+      marketTone: kind === 'etf' ? 'etf' : 'kospi',
+      badge: tone.badge,
+      badgeTone: tone.badgeTone,
+      cardTone: tone.cardTone,
+      change,
+      pnl,
+      signalTone: kind === 'etf' ? 'etf' : tone.signalTone,
+      centerScore: change,
+      centerScoreColor: tone.centerScoreColor,
+      centerBadge: tone.badge,
+      centerBadgeTone: tone.badgeTone,
+      centerName: displayName,
+      donutColor: OCR_HOME_DONUT_COLORS[index % OCR_HOME_DONUT_COLORS.length],
+      donutPercent,
+      heatmapWeight: `${Math.round(donutPercent * 100)}%`,
+      heatmapBackground: kind === 'etf' ? '#1E4D8C' : tone.heatmapBackground,
+      heatmapChange: change,
+      heatmapMeta: kind === 'etf' ? 'ETF' : undefined,
+      heatmapBadge: tone.badge,
+      heatmapBadgeTone: tone.badgeTone,
+      blink: tone.cardTone === 'danger' && kind !== 'etf',
+      opinionLabel: kind === 'etf' ? 'OCR 요약' : 'AI 간략 의견',
+      opinionText: buildOpinionText(displayName, kind, profitRateValue),
+      opinionBackground: kind === 'etf' ? '#f0f7ff' : tone.cardTone === 'profit' ? '#F0FAF4' : tone.cardTone === 'danger' ? '#FFF0F0' : '#f8f8f6',
+      opinionBorder: kind === 'etf' ? '#B5D4F4' : tone.cardTone === 'danger' ? '#F7C1C1' : 'transparent',
+      opinionTextColor: kind === 'etf' ? '#0C447C' : tone.cardTone === 'profit' ? '#27500A' : tone.cardTone === 'danger' ? '#791F1F' : '#555',
+      metaLine: `평단 ${averagePrice} · 평가금액 ${evaluationAmount}`,
+      metrics: [
+        { label: '보유 수량', value: shares, tone: 'neutral' },
+        { label: '수익률', value: change, tone: tone.metricTone },
+        { label: '평가 금액', value: evaluationAmount, tone: 'neutral' },
+      ],
+      actionLabel: kind === 'etf' ? 'ETF 분석' : '딥스캔',
+      actionSubLabel: kind === 'etf' ? '섹터 구성 + 회복 시나리오' : 'AI 9인 위원회 분석',
+      actionCredits: '300cr',
+      actionHref: kind === 'etf' ? '/etf' : '/deepscan',
+    }
+  })
+}
