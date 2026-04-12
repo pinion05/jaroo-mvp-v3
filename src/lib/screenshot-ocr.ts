@@ -14,6 +14,8 @@ export type OcrRow = {
   resolvedMarket?: string
   resolvedMarketTone?: 'kospi' | 'kosdaq' | 'nasdaq' | 'etf'
   resolvedKind?: 'stock' | 'etf'
+  code?: string
+  ticker?: string
 }
 
 export type ScreenshotUploadImage = {
@@ -117,6 +119,15 @@ export function computeAveragePrice(quantity: string, profitRate: string, evalua
   return formatComputedNumber(averagePrice)
 }
 
+function normalizeInstrumentCode(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const normalized = value.trim().replace(/\s+/g, '').toUpperCase()
+  return normalized.length > 0 ? normalized : undefined
+}
+
 export function sanitizeOcrRows(input: unknown): OcrRow[] {
   if (!Array.isArray(input)) {
     return []
@@ -130,9 +141,11 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
       const profitRate = typeof item.profitRate === 'string' ? item.profitRate.trim() : ''
       const evaluationAmount = typeof item.evaluationAmount === 'string' ? item.evaluationAmount.trim() : ''
       const averagePrice = typeof item.averagePrice === 'string' ? item.averagePrice.trim() : ''
+      const code = normalizeInstrumentCode(item.code)
+      const ticker = normalizeInstrumentCode(item.ticker)
       const resolvedName = typeof item.resolvedName === 'string' ? item.resolvedName.trim() : undefined
-      const resolvedCode = typeof item.resolvedCode === 'string' ? item.resolvedCode.trim() : undefined
-      const resolvedTicker = typeof item.resolvedTicker === 'string' ? item.resolvedTicker.trim().toUpperCase() : undefined
+      const resolvedCode = normalizeInstrumentCode(item.resolvedCode)
+      const resolvedTicker = normalizeInstrumentCode(item.resolvedTicker)
       const resolvedMarket = typeof item.resolvedMarket === 'string' ? item.resolvedMarket.trim() : undefined
       const resolvedMarketTone: OcrRow['resolvedMarketTone'] =
         item.resolvedMarketTone === 'kospi' || item.resolvedMarketTone === 'kosdaq' || item.resolvedMarketTone === 'nasdaq' || item.resolvedMarketTone === 'etf'
@@ -146,6 +159,8 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
         profitRate,
         evaluationAmount,
         averagePrice: averagePrice || computeAveragePrice(quantity, profitRate, evaluationAmount),
+        code,
+        ticker,
         resolvedName,
         resolvedCode,
         resolvedTicker,

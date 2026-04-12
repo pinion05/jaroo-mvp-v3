@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react'
-import { createDeepScanTargetFromHolding, persistDeepScanTarget } from '@/lib/jaroo-deepscan-target'
+import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 import {
@@ -13,6 +13,7 @@ import {
   homeHoldings as defaultHomeHoldings,
   momentumSignals as defaultMomentumSignals,
   momentumStages as defaultMomentumStages,
+  persistDeepScanTarget,
   portfolioScoreBreakdown as defaultPortfolioScoreBreakdown,
   readAppliedHomePortfolio,
   type HomeBadgeTone,
@@ -85,8 +86,8 @@ function getHoldingIdentifierText(item: HomeHolding) {
 function handleHoldingActionClick(item: HomeHolding, event: MouseEvent<HTMLAnchorElement>) {
   event.stopPropagation()
 
-  if (item.actionHref === '/deepscan') {
-    persistDeepScanTarget(createDeepScanTargetFromHolding(item))
+  if (item.actionHref === '/deepscan' && item.kind === 'stock') {
+    persistDeepScanTarget(item)
   }
 }
 
@@ -445,7 +446,13 @@ export function JarooHomeScreen() {
 
   const selectedHolding = selectedId === null ? null : homeHoldings.find((item) => item.id === selectedId) ?? null
   const summaryData = useMemo(() => buildPortfolioSummary(homeHoldings, isAppliedPortfolio), [homeHoldings, isAppliedPortfolio])
-  const primaryDeepScanHolding = homeHoldings.find((item) => item.actionHref === '/deepscan') ?? null
+  const defaultDeepScanHolding = useMemo(() => {
+    if (selectedHolding?.kind === 'stock') {
+      return selectedHolding
+    }
+
+    return pickDeepScanDefaultHolding(homeHoldings)
+  }, [homeHoldings, selectedHolding])
   const primaryHeatmapHolding = homeHoldings[0] ?? null
   const secondaryHeatmapHolding = homeHoldings[1] ?? null
   const tertiaryHeatmapHolding = homeHoldings[2] ?? null
@@ -869,8 +876,8 @@ export function JarooHomeScreen() {
               href={summaryData.forecast.href}
               className={styles.forecastMore}
               onClick={() => {
-                if (summaryData.forecast.href === '/deepscan' && primaryDeepScanHolding) {
-                  persistDeepScanTarget(createDeepScanTargetFromHolding(primaryDeepScanHolding))
+                if (summaryData.forecast.href === '/deepscan' && defaultDeepScanHolding) {
+                  persistDeepScanTarget(defaultDeepScanHolding)
                 }
               }}
             >

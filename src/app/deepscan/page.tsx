@@ -8,14 +8,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { JarooShell } from '@/components/jaroo-shell'
-import {
-  deepScanAxisGroups,
-  deepScanNewsItems,
-  deepScanOtherScenarios,
-  deepScanScenarioDetails,
-  deepScanSellRows,
-} from '@/lib/jaroo-data'
-import { readDeepScanTarget, type DeepScanTarget } from '@/lib/jaroo-deepscan-target'
+import { resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
 import { cn } from '@/lib/utils'
 
 type TabValue = 'analysis' | 'strategy'
@@ -75,23 +68,18 @@ const scenarioToneStyles = {
   },
 } as const
 
-const fallbackDeepScanTarget: DeepScanTarget = {
-  name: '삼성전자',
-  kind: 'stock',
-  market: 'KOSPI',
-  shares: '128주',
-  change: '-23.4%',
-  averagePrice: '74,600원',
-  identifierCode: '005930',
-  identifierLabel: '005930',
-}
-
-function getDeepScanIdentifierText(target: DeepScanTarget) {
-  const identifiers = [target.identifierTicker, target.identifierCode].filter(
+function getDeepScanIdentifierText(target: {
+  identifierTicker?: string
+  identifierCode?: string
+  identifierLabel?: string
+  code?: string
+  market?: string
+}) {
+  const identifiers = [target.identifierTicker, target.identifierCode, target.code].filter(
     (value, index, values): value is string => Boolean(value) && values.indexOf(value) === index,
   )
 
-  return identifiers.length > 0 ? identifiers.join(' · ') : target.identifierLabel ?? target.market
+  return identifiers.length > 0 ? identifiers.join(' · ') : target.identifierLabel ?? target.market ?? '코드 미확인'
 }
 
 function scorePillClass(score: number) {
@@ -108,6 +96,22 @@ function scorePillClass(score: number) {
   }
 
   return 'bg-[color:var(--jaroo-warning-soft)] text-[color:var(--jaroo-warning)]'
+}
+
+function summaryTagClass(tone: 'positive' | 'danger' | 'neutral' | 'primary' | 'warning') {
+  if (tone === 'positive') {
+    return newsToneStyles.positive
+  }
+
+  if (tone === 'danger') {
+    return newsToneStyles.danger
+  }
+
+  if (tone === 'neutral') {
+    return newsToneStyles.neutral
+  }
+
+  return scenarioToneStyles[tone].pill
 }
 
 function SectionToggle({
@@ -149,7 +153,6 @@ function SectionToggle({
 export default function DeepScanPage() {
   const [tab, setTab] = useState<TabValue>('analysis')
   const [selectedAxis, setSelectedAxis] = useState(0)
-  const [deepScanTarget] = useState<DeepScanTarget>(() => readDeepScanTarget() ?? fallbackDeepScanTarget)
   const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>({
     why: false,
     news: false,
@@ -158,14 +161,16 @@ export default function DeepScanPage() {
     sellNow: false,
     pfSim: false,
   })
+  const [targetSession] = useState(resolveDeepScanTargetSession)
+
+  const viewModel = targetSession.viewModel
 
   const scrollContentToTop = () => {
     const container = document.querySelector<HTMLElement>("[data-slot='jaroo-shell-main']")
     container?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
-  const identifierText = getDeepScanIdentifierText(deepScanTarget)
-  const summaryStatText = [deepScanTarget.change, deepScanTarget.shares].filter(Boolean).join(' · ')
+  const identifierText = getDeepScanIdentifierText(viewModel.holding)
 
   const handleTabChange = (value: TabValue) => {
     setTab(value)
@@ -183,7 +188,7 @@ export default function DeepScanPage() {
     <JarooShell
       title={
         <span className='flex items-center gap-1.5'>
-          <span>{deepScanTarget.name}</span>
+          <span>{viewModel.holding.name}</span>
           <span className='text-[13px] font-normal text-[color:var(--jaroo-muted)]'>{identifierText}</span>
         </span>
       }
@@ -228,21 +233,21 @@ export default function DeepScanPage() {
               <p className='text-[11px] font-medium tracking-[0.05em] text-[color:var(--jaroo-primary)]'>
                 AI 9인 위원회 종합 분석
               </p>
-              <span className='text-xs font-medium text-[color:var(--jaroo-danger)]'>{summaryStatText}</span>
+              <span className={cn('text-xs font-medium', viewModel.statusToneClass)}>{viewModel.statusText}</span>
             </div>
             <h1 className='mt-3 text-[28px] font-semibold leading-tight text-[color:var(--jaroo-primary-strong)]'>
-              지금은 버티는 게 나아요
+              {viewModel.title}
             </h1>
-            <p className='mt-3 text-sm leading-7 text-[color:var(--jaroo-ink)]/80'>
-              반등 신호가 있지만 외국인 매도가 부담이에요. 지지선(52,100)을 지키면 6개월 내 회복 가능성이 높아요.
-            </p>
+            <p className='mt-3 text-sm leading-7 text-[color:var(--jaroo-ink)]/80'>{viewModel.body}</p>
             <div className='my-4 h-px bg-[color:var(--jaroo-primary)]/15' />
             <div className='flex items-center gap-3'>
-              <p className='text-base font-semibold text-[color:var(--jaroo-primary-strong)]'>6.5 / 10</p>
+              <p className='text-base font-semibold text-[color:var(--jaroo-primary-strong)]'>{viewModel.score} / 10</p>
               <Badge className='rounded-[8px] bg-[#b5d4f4] px-3 py-1 text-[11px] text-[color:var(--jaroo-primary-strong)]'>
-                양호
+                {viewModel.scoreLabel}
               </Badge>
-              <span className='ml-auto text-xs text-[color:var(--jaroo-primary)]'>지난주 6.1 → 6.5 ↑</span>
+              <span className='ml-auto text-xs text-[color:var(--jaroo-primary)]'>
+                지난주 {(viewModel.score - viewModel.scoreDelta).toFixed(1)} → {viewModel.score.toFixed(1)} ↑
+              </span>
             </div>
           </Card>
 
@@ -250,7 +255,7 @@ export default function DeepScanPage() {
             label='AI 분석 결과'
             isOpen={openSections.why}
             onToggle={() => toggleSection('why')}
-            tags={deepScanAxisGroups.map((axis) => (
+            tags={viewModel.axisGroups.map((axis) => (
               <span
                 key={axis.label}
                 className={cn(
@@ -264,7 +269,7 @@ export default function DeepScanPage() {
           >
             <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
               <div className='grid grid-cols-3 gap-2'>
-                {deepScanAxisGroups.map((axis, index) => {
+                {viewModel.axisGroups.map((axis, index) => {
                   const toneStyle = axisToneStyles[axis.tone]
                   const active = index === selectedAxis
 
@@ -295,7 +300,7 @@ export default function DeepScanPage() {
               <div className='my-4 h-px bg-[color:var(--jaroo-border)]' />
 
               {(() => {
-                const axis = deepScanAxisGroups[selectedAxis]
+                const axis = viewModel.axisGroups[selectedAxis] ?? viewModel.axisGroups[0]
 
                 return (
                   <div key={`${axis.label}-detail`}>
@@ -340,32 +345,20 @@ export default function DeepScanPage() {
           </SectionToggle>
 
           <SectionToggle
-            label='뉴스 및 공시'
+            label={viewModel.insightSectionLabel}
             isOpen={openSections.news}
             onToggle={() => toggleSection('news')}
-            tags={[
+            tags={viewModel.insightSummaryTags.map((tag) => (
               <span
-                key='positive'
-                className='rounded-full bg-[color:var(--jaroo-success-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-success)]'
+                key={tag.key}
+                className={cn('rounded-full px-2.5 py-1 text-[11px] font-medium', summaryTagClass(tag.tone))}
               >
-                긍정 1건
-              </span>,
-              <span
-                key='danger'
-                className='rounded-full bg-[color:var(--jaroo-danger-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-danger)]'
-              >
-                부정 1건
-              </span>,
-              <span
-                key='neutral'
-                className='rounded-full bg-[color:var(--jaroo-secondary)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-muted)]'
-              >
-                중립 1건
-              </span>,
-            ]}
+                {tag.text}
+              </span>
+            ))}
           >
             <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] px-4 py-2 shadow-none'>
-              {deepScanNewsItems.map((item) => (
+              {viewModel.insightItems.map((item) => (
                 <div
                   key={`${item.source}-${item.title}`}
                   className='border-b border-[color:var(--jaroo-border)] py-4 last:border-b-0'
@@ -401,8 +394,8 @@ export default function DeepScanPage() {
           <Card className='rounded-[24px] border-0 bg-[color:var(--jaroo-success-ghost)] px-4 py-4 shadow-none'>
             <div className='flex items-center gap-3'>
               <div className='size-2 rounded-full bg-[color:var(--jaroo-success)]' />
-              <p className='flex-1 text-sm font-semibold text-[color:var(--jaroo-success)]'>이번 주 순풍 — 나아지는 중</p>
-              <span className='rounded-full bg-[#c0dd97] px-2.5 py-1 text-xs font-medium text-[color:var(--jaroo-success)]'>↑</span>
+              <p className={cn('flex-1 text-sm font-semibold', viewModel.weekSignalTone)}>{viewModel.weekSignal}</p>
+              <span className={cn('rounded-full px-2.5 py-1 text-xs font-medium', viewModel.weekBadgeClass)}>{viewModel.weekBadgeText}</span>
             </div>
           </Card>
 
@@ -410,18 +403,22 @@ export default function DeepScanPage() {
             <p className='text-[11px] font-medium tracking-[0.08em] text-[color:var(--jaroo-muted)]'>추천 시나리오</p>
             <div className='mt-4 flex items-end gap-4'>
               <div className='flex-1'>
-                <p className='text-4xl font-semibold leading-none text-[color:var(--jaroo-primary)]'>순풍</p>
-                <p className='mt-2 text-sm text-[color:var(--jaroo-primary)]'>나아지는 중 · 약 7개월</p>
+                <p className='text-4xl font-semibold leading-none text-[color:var(--jaroo-primary)]'>{viewModel.scenarioLabel}</p>
+                <p className='mt-2 text-sm text-[color:var(--jaroo-primary)]'>
+                  {viewModel.scenarioCondition} · {viewModel.scenarioPeriod}
+                </p>
               </div>
               <div className='text-right'>
-                <p className='text-4xl font-semibold leading-none text-[color:var(--jaroo-primary)]'>62%</p>
+                <p className='text-4xl font-semibold leading-none text-[color:var(--jaroo-primary)]'>{viewModel.scenarioProbability}</p>
                 <p className='mt-2 text-[11px] text-[color:var(--jaroo-muted)]'>가능성</p>
               </div>
             </div>
             <div className='mt-4 h-1.5 rounded-full bg-[color:var(--jaroo-secondary)]'>
-              <div className='h-full w-[62%] rounded-full bg-[color:var(--jaroo-primary)]' />
+              <div className='h-full rounded-full bg-[color:var(--jaroo-primary)]' style={{ width: viewModel.scenarioProbability }} />
             </div>
-            <p className='mt-3 text-xs text-[color:var(--jaroo-muted)]'>현재 57,200원 → 목표 74,600원</p>
+            <p className='mt-3 text-xs text-[color:var(--jaroo-muted)]'>
+              현재 {viewModel.currentPriceText} → 목표 {viewModel.targetPriceText}
+            </p>
             <button
               type='button'
               onClick={() => toggleSection('scenarioDetail')}
@@ -437,7 +434,7 @@ export default function DeepScanPage() {
             </button>
             {openSections.scenarioDetail ? (
               <div className='mt-3 space-y-3'>
-                {deepScanScenarioDetails.map((detail, index) => (
+                {viewModel.scenarioDetails.map((detail, index) => (
                   <div
                     key={detail}
                     className='flex items-start gap-3 border-b border-[color:var(--jaroo-border)] pb-3 last:border-b-0 last:pb-0'
@@ -456,23 +453,17 @@ export default function DeepScanPage() {
             label='다른 시나리오 비교'
             isOpen={openSections.otherScenarios}
             onToggle={() => toggleSection('otherScenarios')}
-            tags={[
+            tags={viewModel.otherScenarioTags.map((tag) => (
               <span
-                key='strong'
-                className='rounded-full bg-[color:var(--jaroo-success-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-success)]'
+                key={tag.key}
+                className={cn('rounded-full px-2.5 py-1 text-[11px] font-medium', summaryTagClass(tag.tone))}
               >
-                강풍 28%
-              </span>,
-              <span
-                key='light'
-                className='rounded-full bg-[color:var(--jaroo-warning-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-warning)]'
-              >
-                미풍 10%
-              </span>,
-            ]}
+                {tag.text}
+              </span>
+            ))}
           >
             <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] px-4 py-2 shadow-none'>
-              {deepScanOtherScenarios.map((scenario) => (
+              {viewModel.otherScenarios.map((scenario) => (
                 <div
                   key={`${scenario.label}-${scenario.period}`}
                   className={cn(
@@ -497,12 +488,10 @@ export default function DeepScanPage() {
             label='지금 팔면'
             isOpen={openSections.sellNow}
             onToggle={() => toggleSection('sellNow')}
-            tags={
-              <span className='text-sm font-semibold text-[color:var(--jaroo-danger)]'>-4,820,000원 손실 확정</span>
-            }
+            tags={<span className={cn('text-sm font-semibold', viewModel.statusToneClass)}>{viewModel.realizedText}</span>}
           >
             <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] px-4 py-2 shadow-none'>
-              {deepScanSellRows.map((row) => {
+              {viewModel.sellRows.map((row) => {
                 const isTagRow = row.tag && row.tagTone
                 const valueClass = row.valueTone === 'danger'
                   ? 'text-[color:var(--jaroo-danger)]'
@@ -548,19 +537,23 @@ export default function DeepScanPage() {
             label='포트폴리오 점수 변화'
             isOpen={openSections.pfSim}
             onToggle={() => toggleSection('pfSim')}
-            tags={<span className='text-sm font-semibold text-[color:var(--jaroo-success)]'>54점 → 66점 예상</span>}
+            tags={
+              <span className='text-sm font-semibold text-[color:var(--jaroo-success)]'>
+                {viewModel.portfolioScoreBefore}점 → {viewModel.portfolioScoreAfter}점 예상
+              </span>
+            }
           >
             <Card className='rounded-[24px] border-0 bg-[color:var(--jaroo-secondary)] p-5 text-center shadow-none'>
-              <p className='text-[11px] text-[color:var(--jaroo-muted)]'>{deepScanTarget.name} 비중 조정 후 재배분 시</p>
+              <p className='text-[11px] text-[color:var(--jaroo-muted)]'>{viewModel.holding.name} 대응 후 재배분 시</p>
               <div className='mt-4 flex items-center justify-center gap-4'>
-                <p className='text-4xl font-semibold text-[color:var(--jaroo-muted)]/70'>54</p>
+                <p className='text-4xl font-semibold text-[color:var(--jaroo-muted)]/70'>{viewModel.portfolioScoreBefore}</p>
                 <span className='text-xl text-[color:var(--jaroo-muted)]'>→</span>
-                <p className='text-4xl font-semibold text-[color:var(--jaroo-success)]'>66</p>
+                <p className='text-4xl font-semibold text-[color:var(--jaroo-success)]'>{viewModel.portfolioScoreAfter}</p>
                 <span className='rounded-full bg-[color:var(--jaroo-success-soft)] px-3 py-1 text-xs font-medium text-[color:var(--jaroo-success)]'>
-                  +12p
+                  +{viewModel.portfolioScoreAfter - viewModel.portfolioScoreBefore}p
                 </span>
               </div>
-              <p className='mt-3 text-xs leading-5 text-[color:var(--jaroo-muted)]'>전체 리스크 점수가 개선돼요</p>
+              <p className='mt-3 text-xs leading-5 text-[color:var(--jaroo-muted)]'>실제 인식 종목 기준으로 포트폴리오 균형을 다시 봐요.</p>
             </Card>
           </SectionToggle>
 

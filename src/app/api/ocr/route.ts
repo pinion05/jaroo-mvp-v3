@@ -32,6 +32,8 @@ const OCR_SCHEMA = {
             quantity: { type: 'string' },
             profitRate: { type: 'string' },
             evaluationAmount: { type: 'string' },
+            code: { type: 'string' },
+            ticker: { type: 'string' },
           },
           required: ['name', 'quantity', 'profitRate', 'evaluationAmount'],
         },
@@ -45,7 +47,8 @@ const SYSTEM_PROMPT = `You are an OCR extraction engine for Korean and English b
 Return ONLY valid JSON matching the provided schema.
 Never output markdown, prose, explanations, code fences, or extra keys.
 Top-level object must be exactly {"rows": [...]}.
-Every row must contain exactly 4 string fields: name, quantity, profitRate, evaluationAmount.
+Every row must contain the 4 required string fields: name, quantity, profitRate, evaluationAmount.
+You may additionally include code and/or ticker when they are visibly shown in the same row.
 Do not add any other fields.
 If a value is unreadable, use an empty string.
 If there are no holdings rows, return {"rows": []}.
@@ -55,6 +58,8 @@ Field rules:
 - quantity: holding quantity as shown. Keep units if visible, for example "12주", "5 shares", "1,000".
 - profitRate: profit/loss percentage as shown, for example "+12.4%", "-3.18%", "0%".
 - evaluationAmount: holding evaluation/market value as shown, for example "1,234,000원", "$845.12", "2,500".
+- code: local stock code/security code when visibly shown, for example "005930". Otherwise use "".
+- ticker: market ticker when visibly shown, for example "AAPL". Otherwise use "".
 
 OCR guidance:
 - The screenshot may contain Korean labels such as 종목명, 보유수량, 수익률, 평가금액, 평가금, 평가손익, 잔고, 보유종목.
