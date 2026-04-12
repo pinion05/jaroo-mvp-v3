@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { enrichOcrRowsWithInstrumentInfo } from '@/lib/holding-instrument-lookup'
 import { sanitizeOcrRows } from '@/lib/screenshot-ocr'
+import { enrichOcrRowsViaTickerMap } from '@/lib/ticker-map-resolver'
 
 type ResolveInstrumentsRequest = {
   rows?: unknown
@@ -15,5 +16,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'At least one OCR row is required.' }, { status: 400 })
   }
 
-  return NextResponse.json({ rows: enrichOcrRowsWithInstrumentInfo(rows) })
+  const tickerMapResolvedRows = await enrichOcrRowsViaTickerMap(rows)
+
+  return NextResponse.json({ rows: enrichOcrRowsWithInstrumentInfo(tickerMapResolvedRows) })
 }

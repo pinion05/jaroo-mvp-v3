@@ -18,6 +18,8 @@ export type HomeHolding = {
   evaluationAmount?: string
   market: string
   marketTone: HomeMarketTone
+  identifierTicker?: string
+  identifierCode?: string
   identifierLabel?: string
   badge: string
   badgeTone: HomeBadgeTone
@@ -466,6 +468,27 @@ function resolveHomeMarketTone(resolvedMarketTone: OcrRow['resolvedMarketTone'],
   return 'kospi'
 }
 
+function buildHoldingIdentifierLabel(ticker?: string, code?: string) {
+  const identifiers = [ticker, code].filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index)
+  return identifiers.length > 0 ? identifiers.join(' · ') : undefined
+}
+
+function buildHoldingMetaLine(ticker: string | undefined, code: string | undefined, averagePrice: string, evaluationAmount: string) {
+  const parts: string[] = []
+
+  if (ticker) {
+    parts.push(`티커 ${ticker}`)
+  }
+
+  if (code) {
+    parts.push(`종목코드 ${code}`)
+  }
+
+  parts.push(`평단 ${averagePrice}`, `평가금액 ${evaluationAmount}`)
+
+  return parts.join(' · ')
+}
+
 function deriveHoldingTone(profitRateValue: number | null) {
   if (profitRateValue === null) {
     return {
@@ -632,8 +655,9 @@ export function buildHomeHoldingsFromOcrRows(rows: OcrRow[]): HomeHolding[] {
     const donutPercent = weights[index] / totalWeight
     const displayName = row.resolvedName?.trim() || row.name.trim() || `인식 종목 ${index + 1}`
     const market = row.resolvedMarket?.trim() || (kind === 'etf' ? 'ETF' : 'OCR')
-    const identifierLabel = row.resolvedTicker?.trim() || row.resolvedCode?.trim() || undefined
-    const identifierPrefix = row.resolvedTicker ? '티커' : row.resolvedCode ? '종목코드' : ''
+    const identifierTicker = row.resolvedTicker?.trim() || undefined
+    const identifierCode = row.resolvedCode?.trim() || undefined
+    const identifierLabel = buildHoldingIdentifierLabel(identifierTicker, identifierCode)
 
     return {
       id: index,
@@ -646,6 +670,8 @@ export function buildHomeHoldingsFromOcrRows(rows: OcrRow[]): HomeHolding[] {
       evaluationAmount,
       market,
       marketTone: resolveHomeMarketTone(row.resolvedMarketTone, market, kind),
+      identifierTicker,
+      identifierCode,
       identifierLabel,
       badge: tone.badge,
       badgeTone: tone.badgeTone,
@@ -672,7 +698,7 @@ export function buildHomeHoldingsFromOcrRows(rows: OcrRow[]): HomeHolding[] {
       opinionBackground: kind === 'etf' ? '#f0f7ff' : tone.cardTone === 'profit' ? '#F0FAF4' : tone.cardTone === 'danger' ? '#FFF0F0' : '#f8f8f6',
       opinionBorder: kind === 'etf' ? '#B5D4F4' : tone.cardTone === 'danger' ? '#F7C1C1' : 'transparent',
       opinionTextColor: kind === 'etf' ? '#0C447C' : tone.cardTone === 'profit' ? '#27500A' : tone.cardTone === 'danger' ? '#791F1F' : '#555',
-      metaLine: identifierLabel ? `${identifierPrefix} ${identifierLabel} · 평단 ${averagePrice} · 평가금액 ${evaluationAmount}` : `평단 ${averagePrice} · 평가금액 ${evaluationAmount}`,
+      metaLine: buildHoldingMetaLine(identifierTicker, identifierCode, averagePrice, evaluationAmount),
       metrics: [
         { label: '보유 수량', value: shares, tone: 'neutral' },
         { label: '수익률', value: change, tone: tone.metricTone },

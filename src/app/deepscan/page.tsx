@@ -15,6 +15,7 @@ import {
   deepScanScenarioDetails,
   deepScanSellRows,
 } from '@/lib/jaroo-data'
+import { readDeepScanTarget, type DeepScanTarget } from '@/lib/jaroo-deepscan-target'
 import { cn } from '@/lib/utils'
 
 type TabValue = 'analysis' | 'strategy'
@@ -74,6 +75,25 @@ const scenarioToneStyles = {
   },
 } as const
 
+const fallbackDeepScanTarget: DeepScanTarget = {
+  name: '삼성전자',
+  kind: 'stock',
+  market: 'KOSPI',
+  shares: '128주',
+  change: '-23.4%',
+  averagePrice: '74,600원',
+  identifierCode: '005930',
+  identifierLabel: '005930',
+}
+
+function getDeepScanIdentifierText(target: DeepScanTarget) {
+  const identifiers = [target.identifierTicker, target.identifierCode].filter(
+    (value, index, values): value is string => Boolean(value) && values.indexOf(value) === index,
+  )
+
+  return identifiers.length > 0 ? identifiers.join(' · ') : target.identifierLabel ?? target.market
+}
+
 function scorePillClass(score: number) {
   if (score >= 7) {
     return 'bg-[color:var(--jaroo-success-soft)] text-[color:var(--jaroo-success)]'
@@ -129,6 +149,7 @@ function SectionToggle({
 export default function DeepScanPage() {
   const [tab, setTab] = useState<TabValue>('analysis')
   const [selectedAxis, setSelectedAxis] = useState(0)
+  const [deepScanTarget] = useState<DeepScanTarget>(() => readDeepScanTarget() ?? fallbackDeepScanTarget)
   const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>({
     why: false,
     news: false,
@@ -142,6 +163,9 @@ export default function DeepScanPage() {
     const container = document.querySelector<HTMLElement>("[data-slot='jaroo-shell-main']")
     container?.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  const identifierText = getDeepScanIdentifierText(deepScanTarget)
+  const summaryStatText = [deepScanTarget.change, deepScanTarget.shares].filter(Boolean).join(' · ')
 
   const handleTabChange = (value: TabValue) => {
     setTab(value)
@@ -159,8 +183,8 @@ export default function DeepScanPage() {
     <JarooShell
       title={
         <span className='flex items-center gap-1.5'>
-          <span>삼성전자</span>
-          <span className='text-[13px] font-normal text-[color:var(--jaroo-muted)]'>005930</span>
+          <span>{deepScanTarget.name}</span>
+          <span className='text-[13px] font-normal text-[color:var(--jaroo-muted)]'>{identifierText}</span>
         </span>
       }
       backHref='/home'
@@ -204,7 +228,7 @@ export default function DeepScanPage() {
               <p className='text-[11px] font-medium tracking-[0.05em] text-[color:var(--jaroo-primary)]'>
                 AI 9인 위원회 종합 분석
               </p>
-              <span className='text-xs font-medium text-[color:var(--jaroo-danger)]'>-23.4% · 128주</span>
+              <span className='text-xs font-medium text-[color:var(--jaroo-danger)]'>{summaryStatText}</span>
             </div>
             <h1 className='mt-3 text-[28px] font-semibold leading-tight text-[color:var(--jaroo-primary-strong)]'>
               지금은 버티는 게 나아요
@@ -527,7 +551,7 @@ export default function DeepScanPage() {
             tags={<span className='text-sm font-semibold text-[color:var(--jaroo-success)]'>54점 → 66점 예상</span>}
           >
             <Card className='rounded-[24px] border-0 bg-[color:var(--jaroo-secondary)] p-5 text-center shadow-none'>
-              <p className='text-[11px] text-[color:var(--jaroo-muted)]'>삼성전자 비중 조정 후 재배분 시</p>
+              <p className='text-[11px] text-[color:var(--jaroo-muted)]'>{deepScanTarget.name} 비중 조정 후 재배분 시</p>
               <div className='mt-4 flex items-center justify-center gap-4'>
                 <p className='text-4xl font-semibold text-[color:var(--jaroo-muted)]/70'>54</p>
                 <span className='text-xl text-[color:var(--jaroo-muted)]'>→</span>

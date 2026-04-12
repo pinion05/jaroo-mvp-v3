@@ -31,6 +31,23 @@ test('미국 회사명은 semantic search로 티커까지 매핑한다', () => {
   assert.match(resolved?.name ?? '', /Microsoft/i)
 })
 
+test('미국 한글 종목명도 공개 별칭으로 티커까지 매핑한다', () => {
+  const resolved = resolveHoldingInstrument('팔란티어')
+
+  assert.equal(resolved?.ticker, 'PLTR')
+  assert.match(resolved?.name ?? '', /Palantir/i)
+})
+
+test('한국어 오타도 벡터 fallback으로 미국 티커까지 매핑한다', () => {
+  const palantir = resolveHoldingInstrument('파란티어')
+  const broadcom = resolveHoldingInstrument('브로드콤')
+
+  assert.equal(palantir?.ticker, 'PLTR')
+  assert.match(palantir?.name ?? '', /Palantir/i)
+  assert.equal(broadcom?.ticker, 'AVGO')
+  assert.match(broadcom?.name ?? '', /Broadcom/i)
+})
+
 test('OCR row를 하이브리드 검색으로 실제 종목 정보로 enrich 한다', () => {
   const [row] = enrichOcrRowsWithInstrumentInfo([
     {
@@ -46,23 +63,28 @@ test('OCR row를 하이브리드 검색으로 실제 종목 정보로 enrich 한
   assert.match(row?.resolvedName ?? '', /Microsoft/i)
 })
 
-test('home 보유종목 카드는 enrich 된 종목 식별자를 그대로 노출한다', () => {
+test('home 보유종목은 resolve 된 ticker/code를 함께 유지한다', () => {
   const [holding] = buildHomeHoldingsFromOcrRows([
     {
-      name: '하이닉스',
-      quantity: '12주',
-      profitRate: '-3.2%',
-      evaluationAmount: '845,000원',
-      averagePrice: '72,000원',
-      resolvedName: 'SK하이닉스',
-      resolvedCode: '000660',
-      resolvedMarket: 'KOSPI',
-      resolvedMarketTone: 'kospi',
+      name: '마이크로소프트',
+      quantity: '3주',
+      profitRate: '+18.4%',
+      evaluationAmount: '$3,450.00',
+      averagePrice: '$972.11',
+      resolvedName: 'Microsoft Corporation',
+      resolvedTicker: 'MSFT',
+      resolvedCode: 'US5949181045',
+      resolvedMarket: 'NASDAQ',
+      resolvedMarketTone: 'nasdaq',
       resolvedKind: 'stock',
     },
   ])
 
-  assert.equal(holding?.name, 'SK하이닉스')
-  assert.equal(holding?.market, 'KOSPI')
-  assert.match(holding?.metaLine ?? '', /000660/)
+  assert.equal(holding?.name, 'Microsoft Corporation')
+  assert.equal(holding?.market, 'NASDAQ')
+  assert.equal(holding?.identifierTicker, 'MSFT')
+  assert.equal(holding?.identifierCode, 'US5949181045')
+  assert.equal(holding?.identifierLabel, 'MSFT · US5949181045')
+  assert.match(holding?.metaLine ?? '', /티커 MSFT/)
+  assert.match(holding?.metaLine ?? '', /종목코드 US5949181045/)
 })

@@ -73,14 +73,7 @@ function readMergeResultSession(): MergeResultSession | null {
 
     const rows = parsed.rows
       .map((item) => {
-        const sanitizedRow = sanitizeOcrRows([
-          {
-            name: typeof item?.name === 'string' ? item.name : '',
-            quantity: typeof item?.quantity === 'string' ? item.quantity : '',
-            profitRate: typeof item?.profitRate === 'string' ? item.profitRate : '',
-            evaluationAmount: typeof item?.evaluationAmount === 'string' ? item.evaluationAmount : '',
-          },
-        ])[0]
+        const sanitizedRow = sanitizeOcrRows([item])[0]
 
         if (!sanitizedRow) {
           return null
@@ -109,7 +102,7 @@ export default function JarooMergeScreen() {
   const [isApplying, setIsApplying] = useState(false)
   const [applyError, setApplyError] = useState('')
 
-  const handleApply = async () => {
+  const handleApply = () => {
     if (isApplying) {
       return
     }
@@ -123,28 +116,18 @@ export default function JarooMergeScreen() {
     setIsApplying(true)
 
     try {
-      const response = await fetch('/api/instruments/resolve', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ rows: mergeResult.rows }),
-      })
-
-      const payload = (await response.json().catch(() => null)) as { rows?: OcrRow[]; error?: string } | null
-
-      if (!response.ok || !Array.isArray(payload?.rows)) {
-        throw new Error(payload?.error || '종목 식별자 매핑에 실패했어요.')
-      }
-
-      persistAppliedHomePortfolio({
+      const persisted = persistAppliedHomePortfolio({
         broker: mergeResult.broker,
-        rows: payload.rows,
+        rows: mergeResult.rows,
       })
+
+      if (!persisted) {
+        throw new Error('포트폴리오 저장에 실패했어요.')
+      }
 
       router.push('/home')
     } catch (error) {
-      setApplyError(error instanceof Error ? error.message : '종목 식별자 매핑에 실패했어요.')
+      setApplyError(error instanceof Error ? error.message : '포트폴리오 저장에 실패했어요.')
       setIsApplying(false)
     }
   }
@@ -273,16 +256,14 @@ export default function JarooMergeScreen() {
       <div className='space-y-2 pt-1'>
         <button
           type='button'
-          onClick={() => {
-            void handleApply()
-          }}
+          onClick={handleApply}
           disabled={isApplying}
           className={buttonVariants({
             className:
               'h-12 w-full rounded-[20px] bg-[color:var(--jaroo-primary)] text-[14px] font-medium text-white hover:bg-[color:var(--jaroo-primary-strong)] disabled:pointer-events-none disabled:opacity-60',
           })}
         >
-          {isApplying ? '종목 식별자 매핑 중...' : '포트폴리오에 적용하기'}
+          {isApplying ? '포트폴리오 적용 중...' : '포트폴리오에 적용하기'}
         </button>
         <Link
           href='/screenshot'

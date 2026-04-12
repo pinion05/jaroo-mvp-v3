@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react'
+import { createDeepScanTargetFromHolding, persistDeepScanTarget } from '@/lib/jaroo-deepscan-target'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 import {
@@ -71,6 +72,22 @@ function getHeatmapChipStyle(item: HomeHolding) {
   }
 
   return { background: 'rgba(239,159,39,.3)', color: '#FAC775' }
+}
+
+function getHoldingIdentifierText(item: HomeHolding) {
+  const identifiers = [item.identifierTicker, item.identifierCode].filter(
+    (value, index, values): value is string => Boolean(value) && values.indexOf(value) === index,
+  )
+
+  return identifiers.length > 0 ? identifiers.join(' · ') : item.identifierLabel
+}
+
+function handleHoldingActionClick(item: HomeHolding, event: MouseEvent<HTMLAnchorElement>) {
+  event.stopPropagation()
+
+  if (item.actionHref === '/deepscan') {
+    persistDeepScanTarget(createDeepScanTargetFromHolding(item))
+  }
 }
 
 function buildPortfolioSummary(holdings: HomeHolding[], isAppliedPortfolio: boolean): PortfolioSummary {
@@ -428,6 +445,7 @@ export function JarooHomeScreen() {
 
   const selectedHolding = selectedId === null ? null : homeHoldings.find((item) => item.id === selectedId) ?? null
   const summaryData = useMemo(() => buildPortfolioSummary(homeHoldings, isAppliedPortfolio), [homeHoldings, isAppliedPortfolio])
+  const primaryDeepScanHolding = homeHoldings.find((item) => item.actionHref === '/deepscan') ?? null
   const primaryHeatmapHolding = homeHoldings[0] ?? null
   const secondaryHeatmapHolding = homeHoldings[1] ?? null
   const tertiaryHeatmapHolding = homeHoldings[2] ?? null
@@ -730,6 +748,7 @@ export function JarooHomeScreen() {
             const isEtf = item.kind === 'etf'
             const open = isEtf ? isEtfCardOpen : openStockCardId === item.id
             const valueToneClass = getValueToneClass(item)
+            const holdingIdentifierText = getHoldingIdentifierText(item)
 
             return (
               <div
@@ -771,7 +790,7 @@ export function JarooHomeScreen() {
                     </div>
                     <div className={styles.stockSub}>
                       <span className={cn(styles.marketTag, marketToneClass(item.marketTone))}>{item.market}</span>
-                      {item.identifierLabel ? ` · ${item.identifierLabel}` : ''} · {item.shares}
+                      {holdingIdentifierText ? ` · ${holdingIdentifierText}` : ''} · {item.shares}
                     </div>
                   </div>
                   <div className={styles.stockValue}>
@@ -821,7 +840,7 @@ export function JarooHomeScreen() {
                     <Link
                       href={item.actionHref}
                       className={cn(styles.detailButton, actionToneClass(item))}
-                      onClick={(event) => event.stopPropagation()}
+                      onClick={(event) => handleHoldingActionClick(item, event)}
                     >
                       {item.actionLabel}
                       {item.actionSubLabel ? <span className={styles.actionSubLabel}>{item.actionSubLabel}</span> : null}
@@ -846,7 +865,15 @@ export function JarooHomeScreen() {
           <div className={styles.forecastCard}>
             <div className={styles.forecastLabel}>{summaryData.forecast.label}</div>
             <div className={styles.forecastText}>{summaryData.forecast.body}</div>
-            <Link href={summaryData.forecast.href} className={styles.forecastMore}>
+            <Link
+              href={summaryData.forecast.href}
+              className={styles.forecastMore}
+              onClick={() => {
+                if (summaryData.forecast.href === '/deepscan' && primaryDeepScanHolding) {
+                  persistDeepScanTarget(createDeepScanTargetFromHolding(primaryDeepScanHolding))
+                }
+              }}
+            >
               {summaryData.forecast.cta}
             </Link>
           </div>
