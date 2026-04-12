@@ -6,6 +6,7 @@ import {
   enrichOcrRowsWithInstrumentInfo,
   getInstrumentUniverseStats,
   resolveHoldingInstrument,
+  searchHoldingInstrumentCandidates,
 } from './holding-instrument-lookup'
 
 test('로컬 종목 유니버스가 한국/미국 종목을 충분히 포함한다', () => {
@@ -46,6 +47,15 @@ test('한국어 오타도 벡터 fallback으로 미국 티커까지 매핑한다
   assert.match(palantir?.name ?? '', /Palantir/i)
   assert.equal(broadcom?.ticker, 'AVGO')
   assert.match(broadcom?.name ?? '', /Broadcom/i)
+})
+
+test('후보 검색은 카드 선택용 상위 후보들을 반환한다', () => {
+  const candidates = searchHoldingInstrumentCandidates('마이크로소프트', 3)
+
+  assert.equal(candidates.length, 3)
+  assert.equal(candidates[0]?.ticker, 'MSFT')
+  assert.match(candidates[0]?.name ?? '', /Microsoft/i)
+  assert.ok(candidates.every((candidate) => candidate.confidence >= 0.45))
 })
 
 test('OCR row를 하이브리드 검색으로 실제 종목 정보로 enrich 한다', () => {
