@@ -1,14 +1,14 @@
 'use client'
 
 import Link from 'next/link'
-import { useState, type ReactNode } from 'react'
+import { useState, useSyncExternalStore, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { JarooShell } from '@/components/jaroo-shell'
-import { resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
+import { DEEPSCAN_TARGET_EVENT, DEEPSCAN_TARGET_STORAGE_KEY, resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
 import { cn } from '@/lib/utils'
 
 type TabValue = 'analysis' | 'strategy'
@@ -150,6 +150,26 @@ function SectionToggle({
   )
 }
 
+function subscribeDeepScanTarget(callback: () => void) {
+  if (typeof window === 'undefined') {
+    return () => {}
+  }
+
+  const handleStorage = (event: StorageEvent) => {
+    if (event.key === null || event.key === DEEPSCAN_TARGET_STORAGE_KEY) {
+      callback()
+    }
+  }
+
+  window.addEventListener('storage', handleStorage)
+  window.addEventListener(DEEPSCAN_TARGET_EVENT, callback)
+
+  return () => {
+    window.removeEventListener('storage', handleStorage)
+    window.removeEventListener(DEEPSCAN_TARGET_EVENT, callback)
+  }
+}
+
 export default function DeepScanPage() {
   const [tab, setTab] = useState<TabValue>('analysis')
   const [selectedAxis, setSelectedAxis] = useState(0)
@@ -161,7 +181,11 @@ export default function DeepScanPage() {
     sellNow: false,
     pfSim: false,
   })
-  const [targetSession] = useState(resolveDeepScanTargetSession)
+  const targetSession = useSyncExternalStore(
+    subscribeDeepScanTarget,
+    resolveDeepScanTargetSession,
+    resolveDeepScanTargetSession,
+  )
 
   const viewModel = targetSession.viewModel
 

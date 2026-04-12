@@ -398,6 +398,7 @@ export const momentumSignals = [
 export const APPLIED_HOME_PORTFOLIO_STORAGE_KEY = 'jaroo:applied-home-portfolio'
 export const APPLIED_HOME_PORTFOLIO_EVENT = 'jaroo:applied-home-portfolio:updated'
 export const DEEPSCAN_TARGET_STORAGE_KEY = 'jaroo:deepscan-target'
+export const DEEPSCAN_TARGET_EVENT = 'jaroo:deepscan-target:updated'
 
 export type AppliedHomePortfolioSession = {
   broker: string
@@ -649,6 +650,7 @@ export function persistDeepScanTarget(holding: HomeHolding) {
 
   try {
     window.sessionStorage.setItem(DEEPSCAN_TARGET_STORAGE_KEY, JSON.stringify(buildDeepScanTargetSession(holding)))
+    window.dispatchEvent(new Event(DEEPSCAN_TARGET_EVENT))
     return true
   } catch {
     return false

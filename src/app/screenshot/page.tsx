@@ -12,10 +12,10 @@ import {
   type ScreenshotUploadImage,
   type ScreenshotUploadSession,
 } from '@/lib/screenshot-ocr'
-import { brokerOptions } from '@/lib/jaroo-data'
 import { cn } from '@/lib/utils'
 
 const MAX_TOTAL_IMAGE_DATA_URL_LENGTH = 4_000_000
+const PERSISTED_SCREENSHOT_BROKER = '기타'
 
 function readFileAsDataUrl(file: File) {
   return new Promise<string>((resolve, reject) => {
@@ -37,7 +37,6 @@ function readFileAsDataUrl(file: File) {
 
 export default function ScreenshotPage() {
   const router = useRouter()
-  const [selectedBroker, setSelectedBroker] = useState(brokerOptions[0] ?? '')
   const [uploads, setUploads] = useState<ScreenshotUploadImage[]>([])
   const [isPreparing, setIsPreparing] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -113,7 +112,7 @@ export default function ScreenshotPage() {
     setIsPreparing(true)
 
     const payload: ScreenshotUploadSession = {
-      broker: selectedBroker,
+      broker: PERSISTED_SCREENSHOT_BROKER,
       uploads,
     }
 
@@ -189,31 +188,6 @@ export default function ScreenshotPage() {
 
           {errorMessage ? <p className='text-[11px] text-[#D54841]'>{errorMessage}</p> : null}
           <p className='text-[10px] text-[color:var(--jaroo-muted)]'>최대 {MAX_SCREENSHOT_UPLOADS}장까지 선택 가능 · 다시 선택하면 새 목록으로 바뀌어요</p>
-        </section>
-
-        <section className='space-y-2'>
-          <p className='text-[11px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>어느 증권사 화면인가요?</p>
-          <div className='flex flex-wrap gap-2'>
-            {brokerOptions.map((broker) => {
-              const isActive = broker === selectedBroker
-
-              return (
-                <button
-                  key={broker}
-                  type='button'
-                  onClick={() => setSelectedBroker(broker)}
-                  className={cn(
-                    'rounded-xl border px-3 py-2 text-[12px] font-medium transition',
-                    isActive
-                      ? 'border-[color:var(--jaroo-primary)]/25 bg-[color:var(--jaroo-accent)] text-[color:var(--jaroo-primary)]'
-                      : 'border-[color:var(--jaroo-border)] bg-white text-[color:var(--jaroo-muted)] hover:bg-[color:var(--jaroo-secondary)]',
-                  )}
-                >
-                  {broker}
-                </button>
-              )
-            })}
-          </div>
         </section>
 
         <div className='space-y-2 pt-1'>
