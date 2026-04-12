@@ -29,44 +29,87 @@ type TickerMapResolvers = {
   usResolver: TickerMapUsResolver
 }
 
-const DEFAULT_TICKER_MAP_REPO_ROOT = '/home/pinion/worktrees/kr-us-stock-name-ticker-maps-unified-stock-lookup'
+const TICKER_MAP_REPO_ROOT_ENV = 'TICKER_MAP_REPO_ROOT'
 
 let cachedResolversPromise: Promise<TickerMapResolvers | null> | null = null
+const warnedTickerMapMessages = new Set<string>()
+
+function warnTickerMapOnce(key: string, message: string, error?: unknown) {
+  if (warnedTickerMapMessages.has(key)) {
+    return
+  }
+
+  warnedTickerMapMessages.add(key)
+
+  const errorDetails =
+    error instanceof Error ? ` (${error.name}: ${error.message})` : error ? ` (${String(error)})` : ''
+
+  console.warn(`[ticker-map-resolver] ${message}${errorDetails}`)
+}
 
 function resolveTickerMapRepoRoot() {
-  const configuredPath = process.env.TICKER_MAP_REPO_ROOT?.trim()
-  return configuredPath || DEFAULT_TICKER_MAP_REPO_ROOT
+  const configuredPath = process.env[TICKER_MAP_REPO_ROOT_ENV]?.trim()
+
+  if (configuredPath) {
+    return configuredPath
+  }
+
+  warnTickerMapOnce(
+    'missing-repo-root',
+    `${TICKER_MAP_REPO_ROOT_ENV} is not configured. Ticker-map resolution is disabled until an explicit repo path is provided.`,
+  )
+
+  return null
 }
 
 async function importExternalModule(modulePath: string) {
   const moduleUrl = pathToFileURL(modulePath).href
 
-  return Function('modulePath', 'return import(modulePath)')(moduleUrl) as Promise<Record<string, unknown>>
+  return import(/* webpackIgnore: true */ moduleUrl) as Promise<Record<string, unknown>>
 }
 
 async function loadTickerMapResolvers(): Promise<TickerMapResolvers | null> {
-  if (!cachedResolversPromise) {
-    cachedResolversPromise = (async () => {
-      try {
-        const repoRoot = resolveTickerMapRepoRoot()
-        const [{ createKrStockResolver }, { createKoFuzzyResolver }] = await Promise.all([
-          importExternalModule(path.join(repoRoot, 'src/kr-stock-resolver.js')),
-          importExternalModule(path.join(repoRoot, 'src/ko-fuzzy-resolver.js')),
-        ])
+  if (cachedResolversPromise) {
+    return cachedResolversPromise
+  }
 
-        if (typeof createKrStockResolver !== 'function' || typeof createKoFuzzyResolver !== 'function') {
-          return null
-        }
+  const repoRoot = resolveTickerMapRepoRoot()
+  if (!repoRoot) {
+    return null
+  }
 
-        return {
-          krResolver: createKrStockResolver() as TickerMapKrResolver,
-          usResolver: createKoFuzzyResolver() as TickerMapUsResolver,
-        }
-      } catch {
+  const modulePaths = [
+    path.join(repoRoot, 'src/kr-stock-resolver.js'),
+    path.join(repoRoot, 'src/ko-fuzzy-resolver.js'),
+  ]
+
+  cachedResolversPromise = (async () => {
+    try {
+      const [{ createKrStockResolver }, { createKoFuzzyResolver }] = await Promise.all(modulePaths.map(importExternalModule))
+
+      if (typeof createKrStockResolver !== 'function' || typeof createKoFuzzyResolver !== 'function') {
+        warnTickerMapOnce(
+          `invalid-exports:${repoRoot}`,
+          `Ticker-map modules did not expose the expected resolver factories: ${modulePaths.join(', ')}`,
+        )
+        cachedResolversPromise = null
         return null
       }
-    })()
-  }
+
+      return {
+        krResolver: createKrStockResolver() as TickerMapKrResolver,
+        usResolver: createKoFuzzyResolver() as TickerMapUsResolver,
+      }
+    } catch (error) {
+      warnTickerMapOnce(
+        `load-failure:${repoRoot}`,
+        `Failed to load ticker-map resolver modules from ${repoRoot}: ${modulePaths.join(', ')}`,
+        error,
+      )
+      cachedResolversPromise = null
+      return null
+    }
+  })()
 
   return cachedResolversPromise
 }

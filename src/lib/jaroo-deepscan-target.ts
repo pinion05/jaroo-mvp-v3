@@ -75,7 +75,7 @@ export function readDeepScanTarget(): DeepScanTarget | null {
 
     if (
       typeof parsed?.name !== 'string' ||
-      typeof parsed?.kind !== 'string' ||
+      (parsed?.kind !== 'stock' && parsed?.kind !== 'etf') ||
       typeof parsed?.market !== 'string' ||
       typeof parsed?.shares !== 'string' ||
       typeof parsed?.change !== 'string' ||
