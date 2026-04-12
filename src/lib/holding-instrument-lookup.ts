@@ -26,6 +26,11 @@ type IndexedInstrument = InstrumentUniverseEntry & {
   searchTerms: IndexedSearchTerm[]
 }
 
+type RankedInstrumentMatch = {
+  entry: IndexedInstrument
+  score: number
+}
+
 export type ResolvedInstrument = {
   name: string
   code?: string
@@ -269,6 +274,32 @@ function extractStructuredIdentifiers(query: string) {
   }
 }
 
+function compareRankedInstrumentMatches(left: RankedInstrumentMatch, right: RankedInstrumentMatch) {
+  return right.score - left.score || left.entry.name.localeCompare(right.entry.name, 'ko-KR')
+}
+
+function insertRankedInstrumentMatch(matches: RankedInstrumentMatch[], nextMatch: RankedInstrumentMatch, limit: number) {
+  if (matches.length >= limit && compareRankedInstrumentMatches(nextMatch, matches[matches.length - 1]) >= 0) {
+    return
+  }
+
+  matches.push(nextMatch)
+
+  for (let index = matches.length - 1; index > 0; index -= 1) {
+    if (compareRankedInstrumentMatches(matches[index], matches[index - 1]) >= 0) {
+      break
+    }
+
+    const previousMatch = matches[index - 1]
+    matches[index - 1] = matches[index]
+    matches[index] = previousMatch
+  }
+
+  if (matches.length > limit) {
+    matches.pop()
+  }
+}
+
 function scoreSearchTerm(
   queryCollapsed: string,
   queryTokens: string[],
@@ -348,23 +379,30 @@ export function searchHoldingInstrumentCandidates(identifier: string, limit = 5,
     return []
   }
 
-  const rankedMatches = indexedUniverse
-    .map((entry) => {
-      let entryBestScore = 0
+  const rankedMatches: RankedInstrumentMatch[] = []
 
-      for (const term of entry.searchTerms) {
-        entryBestScore = Math.max(entryBestScore, scoreSearchTerm(queryCollapsed, queryTokens, queryGrams, term))
-      }
+  for (const entry of indexedUniverse) {
+    let entryBestScore = 0
 
-      return {
+    for (const term of entry.searchTerms) {
+      entryBestScore = Math.max(entryBestScore, scoreSearchTerm(queryCollapsed, queryTokens, queryGrams, term))
+    }
+
+    if (entryBestScore < minConfidence) {
+      continue
+    }
+
+    insertRankedInstrumentMatch(
+      rankedMatches,
+      {
         entry,
         score: entryBestScore,
-      }
-    })
-    .filter(({ score }) => score >= minConfidence)
-    .sort((left, right) => right.score - left.score || left.entry.name.localeCompare(right.entry.name, 'ko-KR'))
+      },
+      limit,
+    )
+  }
 
-  return rankedMatches.slice(0, limit).map(({ entry, score }) => toResolvedInstrument(entry, score))
+  return rankedMatches.map(({ entry, score }) => toResolvedInstrument(entry, score))
 }
 
 export function resolveHoldingInstrument(identifier: string): ResolvedInstrument | null {

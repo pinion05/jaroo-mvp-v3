@@ -160,11 +160,11 @@ function applyInstrumentCandidate(row: OcrSourceRow, candidate?: OcrInstrumentCa
   return {
     ...row,
     resolvedName: candidate.resolvedName,
-    resolvedCode: candidate.resolvedCode,
-    resolvedTicker: candidate.resolvedTicker,
-    resolvedMarket: candidate.resolvedMarket,
-    resolvedMarketTone: candidate.resolvedMarketTone,
-    resolvedKind: candidate.resolvedKind,
+    resolvedCode: candidate.resolvedCode ?? row.resolvedCode,
+    resolvedTicker: candidate.resolvedTicker ?? row.resolvedTicker,
+    resolvedMarket: candidate.resolvedMarket ?? row.resolvedMarket,
+    resolvedMarketTone: candidate.resolvedMarketTone ?? row.resolvedMarketTone,
+    resolvedKind: candidate.resolvedKind ?? row.resolvedKind,
   }
 }
 

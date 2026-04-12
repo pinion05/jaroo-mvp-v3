@@ -63,6 +63,10 @@ function getDefaultTickerMapRepoCandidates() {
   ].filter(Boolean)
 }
 
+function canUseDefaultTickerMapRepoDiscovery() {
+  return process.env.NODE_ENV !== 'production'
+}
+
 function resolveTickerMapRepoRoot() {
   const configuredPath = process.env[TICKER_MAP_REPO_ROOT_ENV]?.trim()
 
@@ -75,6 +79,15 @@ function resolveTickerMapRepoRoot() {
       `missing-configured-repo-root:${configuredPath}`,
       `${TICKER_MAP_REPO_ROOT_ENV} is set but src/ko-fuzzy-resolver.js was not found under ${configuredPath}.`,
     )
+  }
+
+  if (!canUseDefaultTickerMapRepoDiscovery()) {
+    warnTickerMapOnce(
+      'missing-repo-root',
+      `${TICKER_MAP_REPO_ROOT_ENV} is not configured. Ticker-map resolution is disabled in production until an explicit repo path is provided.`,
+    )
+
+    return null
   }
 
   const defaultRepoRoot = getDefaultTickerMapRepoCandidates().find((candidatePath) => hasKoFuzzyResolverModule(candidatePath))
@@ -205,6 +218,11 @@ export async function searchTickerMapCandidates(query: string, topN = 5): Promis
     .resolve(normalizedQuery, { topN })
     .map((candidate) => normalizeTickerMapCandidate(candidate))
     .filter((candidate): candidate is TickerMapSearchCandidate => candidate !== null)
+}
+
+export function resetTickerMapResolverCacheForTests() {
+  cachedResolversPromise = null
+  warnedTickerMapMessages.clear()
 }
 
 export async function resolveTickerMapRow(row: OcrRow): Promise<Partial<OcrRow> | null> {

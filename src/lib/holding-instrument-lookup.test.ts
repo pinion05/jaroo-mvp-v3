@@ -58,6 +58,15 @@ test('후보 검색은 카드 선택용 상위 후보들을 반환한다', () =>
   assert.ok(candidates.every((candidate) => candidate.confidence >= 0.45))
 })
 
+test('limit=1 후보 검색은 최고 우선순위 결과만 유지한다', () => {
+  const resolved = resolveHoldingInstrument('Microsoft Corporation')
+  const [candidate] = searchHoldingInstrumentCandidates('Microsoft Corporation', 1)
+
+  assert.equal(candidate?.ticker, resolved?.ticker)
+  assert.equal(candidate?.name, resolved?.name)
+  assert.equal(candidate?.confidence, resolved?.confidence)
+})
+
 test('OCR row를 하이브리드 검색으로 실제 종목 정보로 enrich 한다', () => {
   const [row] = enrichOcrRowsWithInstrumentInfo([
     {
