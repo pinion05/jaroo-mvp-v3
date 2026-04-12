@@ -25,6 +25,12 @@ import { cn } from '@/lib/utils'
 
 type OcrRequestState = 'idle' | 'loading' | 'success' | 'error'
 type UploadRequestState = 'idle' | 'loading' | 'success' | 'error'
+type InstrumentResolveState = 'idle' | 'loading' | 'success' | 'error'
+
+type ResolveInstrumentsResponse = {
+  rows?: unknown
+  error?: string
+}
 
 type UploadStatus = {
   state: UploadRequestState
@@ -102,7 +108,38 @@ function OcrMetricChip({ label, value, valueClassName }: { label: string; value:
   )
 }
 
-function OcrResolvedRowCard({ row, isLast }: { row: OcrSourceRow; isLast: boolean }) {
+async function resolveInstrumentRows(rows: OcrSourceRow[]) {
+  const response = await fetch('/api/instruments/resolve', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ rows }),
+  })
+
+  const payload = (await response.json().catch(() => null)) as ResolveInstrumentsResponse | null
+  const sanitizedRows = sanitizeOcrRows(payload?.rows)
+
+  if (!response.ok || !Array.isArray(payload?.rows) || sanitizedRows.length !== rows.length) {
+    throw new Error(payload?.error || '종목 식별자 확인에 실패했어요.')
+  }
+
+  return rows.map((row, index) => ({
+    ...row,
+    ...sanitizedRows[index],
+  }))
+}
+
+function OcrResolvedRowCard({ row, isLast, identifierStatus }: { row: OcrSourceRow; isLast: boolean; identifierStatus: InstrumentResolveState }) {
+  const identifierName = row.resolvedName?.trim()
+  const identifierMeta = [row.resolvedMarket?.trim(), row.resolvedTicker?.trim(), row.resolvedCode?.trim()].filter(Boolean).join(' · ')
+  const identifierStatusText =
+    identifierStatus === 'loading'
+      ? '식별자 확인 중'
+      : identifierStatus === 'error'
+        ? '식별자 확인 실패'
+        : '식별자 미확인'
+
   return (
     <div className={cn('px-4 py-3', !isLast && 'border-b border-[color:var(--jaroo-border)]')}>
       <div className='flex items-start justify-between gap-3'>
@@ -111,6 +148,18 @@ function OcrResolvedRowCard({ row, isLast }: { row: OcrSourceRow; isLast: boolea
           <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.fileName}</p>
         </div>
         <p className='shrink-0 text-[11px] font-medium text-[color:var(--jaroo-primary)]'>{row.profitRate || '-'}</p>
+      </div>
+
+      <div className='mt-3 rounded-[14px] border border-[#DCE8F5] bg-[#F7FBFF] px-3 py-2'>
+        <p className='text-[10px] text-[color:var(--jaroo-muted)]'>식별된 종목</p>
+        {identifierName || identifierMeta ? (
+          <>
+            <p className='mt-1 truncate text-[12px] font-semibold text-[color:var(--jaroo-ink)]'>{identifierName || row.name || '-'}</p>
+            <p className='mt-1 truncate text-[10px] text-[color:var(--jaroo-primary)]'>{identifierMeta || '이름만 확인됨'}</p>
+          </>
+        ) : (
+          <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>{identifierStatusText}</p>
+        )}
       </div>
 
       <div className='mt-3 grid grid-cols-2 gap-2'>
@@ -130,6 +179,9 @@ export default function OcrPage() {
   const [errorMessage, setErrorMessage] = useState('')
   const [uploadStatuses, setUploadStatuses] = useState<Record<string, UploadStatus>>({})
   const [baseMergedRows, setBaseMergedRows] = useState<OcrSourceRow[]>([])
+  const [resolvedInstrumentRows, setResolvedInstrumentRows] = useState<OcrSourceRow[]>([])
+  const [instrumentResolveState, setInstrumentResolveState] = useState<InstrumentResolveState>('idle')
+  const [instrumentResolveError, setInstrumentResolveError] = useState('')
   const [conflicts, setConflicts] = useState<ReturnType<typeof buildMergedOcrResult>['conflicts']>([])
   const [conflictSelections, setConflictSelections] = useState<Record<string, string>>({})
 
@@ -170,6 +222,9 @@ export default function OcrPage() {
     setRequestState('loading')
     setErrorMessage('')
     setBaseMergedRows([])
+    setResolvedInstrumentRows([])
+    setInstrumentResolveState('idle')
+    setInstrumentResolveError('')
     setConflicts([])
     setConflictSelections({})
 
@@ -287,6 +342,46 @@ export default function OcrPage() {
 
   const resolvedRows = useMemo(() => resolveMergedOcrRows(baseMergedRows, conflicts, conflictSelections), [baseMergedRows, conflicts, conflictSelections])
 
+  useEffect(() => {
+    if (requestState !== 'success' || resolvedRows.length === 0) {
+      setResolvedInstrumentRows([])
+      setInstrumentResolveState('idle')
+      setInstrumentResolveError('')
+      return
+    }
+
+    let isCancelled = false
+
+    setResolvedInstrumentRows(resolvedRows)
+    setInstrumentResolveState('loading')
+    setInstrumentResolveError('')
+
+    void resolveInstrumentRows(resolvedRows)
+      .then((nextRows) => {
+        if (isCancelled) {
+          return
+        }
+
+        setResolvedInstrumentRows(nextRows)
+        setInstrumentResolveState('success')
+      })
+      .catch((error) => {
+        if (isCancelled) {
+          return
+        }
+
+        setResolvedInstrumentRows(resolvedRows)
+        setInstrumentResolveState('error')
+        setInstrumentResolveError(error instanceof Error ? error.message : '종목 식별자 확인에 실패했어요.')
+      })
+
+    return () => {
+      isCancelled = true
+    }
+  }, [requestState, resolvedRows])
+
+  const previewRows = resolvedInstrumentRows.length > 0 ? resolvedInstrumentRows : resolvedRows
+
   const completedUploadCount = useMemo(
     () => session?.uploads.filter((upload) => uploadStatuses[upload.id]?.state === 'success').length ?? 0,
     [session?.uploads, uploadStatuses],
@@ -307,6 +402,14 @@ export default function OcrPage() {
         return `${resolvedRows.length}행 정리됨 · 충돌 ${unresolvedConflictCount}건 선택 필요`
       }
 
+      if (instrumentResolveState === 'loading') {
+        return `${resolvedRows.length}개 종목 정리 완료 · 식별자 확인 중`
+      }
+
+      if (instrumentResolveState === 'error') {
+        return `${resolvedRows.length}개 종목 정리 완료 · 식별자 확인 재시도 필요`
+      }
+
       return `${resolvedRows.length}개 종목 정리 완료`
     }
 
@@ -315,9 +418,9 @@ export default function OcrPage() {
     }
 
     return '업로드된 스크린샷을 준비 중이에요'
-  }, [completedUploadCount, conflicts.length, requestState, resolvedRows.length, session?.uploads.length, unresolvedConflictCount])
+  }, [completedUploadCount, conflicts.length, instrumentResolveState, requestState, resolvedRows.length, session?.uploads.length, unresolvedConflictCount])
 
-  const canContinue = requestState === 'success' && unresolvedConflictCount === 0 && resolvedRows.length > 0
+  const canContinue = requestState === 'success' && instrumentResolveState === 'success' && unresolvedConflictCount === 0 && previewRows.length > 0
 
   const handleContinue = () => {
     if (!canContinue || !session) {
@@ -329,12 +432,18 @@ export default function OcrPage() {
         OCR_MERGE_RESULT_STORAGE_KEY,
         JSON.stringify({
           broker: session.broker,
-          rows: resolvedRows.map(({ name, quantity, profitRate, evaluationAmount, averagePrice, fileName }) => ({
+          rows: previewRows.map(({ name, quantity, profitRate, evaluationAmount, averagePrice, resolvedName, resolvedCode, resolvedTicker, resolvedMarket, resolvedMarketTone, resolvedKind, fileName }) => ({
             name,
             quantity,
             profitRate,
             evaluationAmount,
             averagePrice,
+            resolvedName,
+            resolvedCode,
+            resolvedTicker,
+            resolvedMarket,
+            resolvedMarketTone,
+            resolvedKind,
             fileName,
           })),
         }),
@@ -477,7 +586,7 @@ export default function OcrPage() {
 
       <Card className='overflow-hidden rounded-[24px] border border-[color:var(--jaroo-border)] bg-white shadow-none'>
         <div className='border-b border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)] px-4 py-3'>
-          <p className='text-[11px] font-medium text-[color:var(--jaroo-muted)]'>종목명, 보유 수량, 수익률, 평가 금액, 평균 단가를 함께 확인하세요</p>
+          <p className='text-[11px] font-medium text-[color:var(--jaroo-muted)]'>종목명과 식별자(name/ticker/code/market), 보유 수량, 수익률, 평가 금액, 평균 단가를 함께 확인하세요</p>
         </div>
 
         {requestState === 'loading' ? (
@@ -490,23 +599,30 @@ export default function OcrPage() {
           </div>
         ) : null}
 
-        {requestState !== 'loading' && resolvedRows.length > 0 ? (
+        {requestState !== 'loading' && previewRows.length > 0 ? (
           <div>
-            {resolvedRows.map((item, index) => {
-              const isLast = index === resolvedRows.length - 1
+            {previewRows.map((item, index) => {
+              const isLast = index === previewRows.length - 1
 
-              return <OcrResolvedRowCard key={`${item.id}-${index}`} row={item} isLast={isLast} />
+              return <OcrResolvedRowCard key={`${item.id}-${index}`} row={item} isLast={isLast} identifierStatus={instrumentResolveState} />
             })}
           </div>
         ) : null}
 
-        {requestState !== 'loading' && resolvedRows.length === 0 ? (
+        {requestState !== 'loading' && previewRows.length === 0 ? (
           <div className='px-4 py-8 text-center'>
             <p className='text-[13px] font-medium text-[color:var(--jaroo-ink)]'>인식된 종목이 없어요</p>
             <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>종목 목록이 보이도록 스크린샷을 다시 선택해보세요.</p>
           </div>
         ) : null}
       </Card>
+
+      {requestState === 'success' && instrumentResolveState === 'error' ? (
+        <div className='flex items-start gap-2 rounded-[20px] border border-[#FAC775] bg-[color:var(--jaroo-warning-soft)] px-4 py-3 text-[#854F0B]'>
+          <AlertTriangle className='mt-0.5 size-4 shrink-0' />
+          <p className='text-[12px] leading-6'>{instrumentResolveError || '종목 식별자 확인에 실패했어요. OCR 다시 시도하기로 새로 분석해주세요.'}</p>
+        </div>
+      ) : null}
 
       {requestState === 'error' ? (
         <div className='flex items-start gap-2 rounded-[20px] border border-[#FAC775] bg-[color:var(--jaroo-warning-soft)] px-4 py-3 text-[#854F0B]'>

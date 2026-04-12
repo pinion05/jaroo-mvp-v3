@@ -8,6 +8,12 @@ export type OcrRow = {
   profitRate: string
   evaluationAmount: string
   averagePrice: string
+  resolvedName?: string
+  resolvedCode?: string
+  resolvedTicker?: string
+  resolvedMarket?: string
+  resolvedMarketTone?: 'kospi' | 'kosdaq' | 'nasdaq' | 'etf'
+  resolvedKind?: 'stock' | 'etf'
   code?: string
   ticker?: string
 }
@@ -134,17 +140,33 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
       const quantity = typeof item.quantity === 'string' ? item.quantity.trim() : ''
       const profitRate = typeof item.profitRate === 'string' ? item.profitRate.trim() : ''
       const evaluationAmount = typeof item.evaluationAmount === 'string' ? item.evaluationAmount.trim() : ''
+      const averagePrice = typeof item.averagePrice === 'string' ? item.averagePrice.trim() : ''
       const code = normalizeInstrumentCode(item.code)
       const ticker = normalizeInstrumentCode(item.ticker)
+      const resolvedName = typeof item.resolvedName === 'string' ? item.resolvedName.trim() : undefined
+      const resolvedCode = normalizeInstrumentCode(item.resolvedCode)
+      const resolvedTicker = normalizeInstrumentCode(item.resolvedTicker)
+      const resolvedMarket = typeof item.resolvedMarket === 'string' ? item.resolvedMarket.trim() : undefined
+      const resolvedMarketTone: OcrRow['resolvedMarketTone'] =
+        item.resolvedMarketTone === 'kospi' || item.resolvedMarketTone === 'kosdaq' || item.resolvedMarketTone === 'nasdaq' || item.resolvedMarketTone === 'etf'
+          ? item.resolvedMarketTone
+          : undefined
+      const resolvedKind: OcrRow['resolvedKind'] = item.resolvedKind === 'stock' || item.resolvedKind === 'etf' ? item.resolvedKind : undefined
 
       return {
         name,
         quantity,
         profitRate,
         evaluationAmount,
-        averagePrice: computeAveragePrice(quantity, profitRate, evaluationAmount),
+        averagePrice: averagePrice || computeAveragePrice(quantity, profitRate, evaluationAmount),
         code,
         ticker,
+        resolvedName,
+        resolvedCode,
+        resolvedTicker,
+        resolvedMarket,
+        resolvedMarketTone,
+        resolvedKind,
       }
     })
     .filter((item) => item.name.length > 0 || item.quantity.length > 0 || item.profitRate.length > 0 || item.evaluationAmount.length > 0)

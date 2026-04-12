@@ -73,14 +73,7 @@ function readMergeResultSession(): MergeResultSession | null {
 
     const rows = parsed.rows
       .map((item) => {
-        const sanitizedRow = sanitizeOcrRows([
-          {
-            name: typeof item?.name === 'string' ? item.name : '',
-            quantity: typeof item?.quantity === 'string' ? item.quantity : '',
-            profitRate: typeof item?.profitRate === 'string' ? item.profitRate : '',
-            evaluationAmount: typeof item?.evaluationAmount === 'string' ? item.evaluationAmount : '',
-          },
-        ])[0]
+        const sanitizedRow = sanitizeOcrRows([item])[0]
 
         if (!sanitizedRow) {
           return null
@@ -106,6 +99,38 @@ export default function JarooMergeScreen() {
   const router = useRouter()
   const [selectedOptions, setSelectedOptions] = useState<Record<string, MergeChoiceId>>(defaultSelections)
   const [mergeResult] = useState<MergeResultSession | null>(() => readMergeResultSession())
+  const [isApplying, setIsApplying] = useState(false)
+  const [applyError, setApplyError] = useState('')
+
+  const handleApply = () => {
+    if (isApplying) {
+      return
+    }
+
+    if (!mergeResult) {
+      router.push('/home')
+      return
+    }
+
+    setApplyError('')
+    setIsApplying(true)
+
+    try {
+      const persisted = persistAppliedHomePortfolio({
+        broker: mergeResult.broker,
+        rows: mergeResult.rows,
+      })
+
+      if (!persisted) {
+        throw new Error('포트폴리오 저장에 실패했어요.')
+      }
+
+      router.push('/home')
+    } catch (error) {
+      setApplyError(error instanceof Error ? error.message : '포트폴리오 저장에 실패했어요.')
+      setIsApplying(false)
+    }
+  }
 
   return (
     <JarooShell title='종목 병합 확인' backHref='/screenshot' showBottomNav={false} mainClassName='space-y-3 px-3 py-3'>
@@ -231,22 +256,14 @@ export default function JarooMergeScreen() {
       <div className='space-y-2 pt-1'>
         <button
           type='button'
-          onClick={() => {
-            if (mergeResult) {
-              persistAppliedHomePortfolio({
-                broker: mergeResult.broker,
-                rows: mergeResult.rows,
-              })
-            }
-
-            router.push('/home')
-          }}
+          onClick={handleApply}
+          disabled={isApplying}
           className={buttonVariants({
             className:
-              'h-12 w-full rounded-[20px] bg-[color:var(--jaroo-primary)] text-[14px] font-medium text-white hover:bg-[color:var(--jaroo-primary-strong)]',
+              'h-12 w-full rounded-[20px] bg-[color:var(--jaroo-primary)] text-[14px] font-medium text-white hover:bg-[color:var(--jaroo-primary-strong)] disabled:pointer-events-none disabled:opacity-60',
           })}
         >
-          포트폴리오에 적용하기
+          {isApplying ? '포트폴리오 적용 중...' : '포트폴리오에 적용하기'}
         </button>
         <Link
           href='/screenshot'
@@ -258,6 +275,7 @@ export default function JarooMergeScreen() {
         >
           다시 업로드하기
         </Link>
+        {applyError ? <p className='text-[11px] text-[#D54841]'>{applyError}</p> : null}
       </div>
     </JarooShell>
   )

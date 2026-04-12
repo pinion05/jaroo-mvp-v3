@@ -68,6 +68,20 @@ const scenarioToneStyles = {
   },
 } as const
 
+function getDeepScanIdentifierText(target: {
+  identifierTicker?: string
+  identifierCode?: string
+  identifierLabel?: string
+  code?: string
+  market?: string
+}) {
+  const identifiers = [target.identifierTicker, target.identifierCode, target.code].filter(
+    (value, index, values): value is string => Boolean(value) && values.indexOf(value) === index,
+  )
+
+  return identifiers.length > 0 ? identifiers.join(' · ') : target.identifierLabel ?? target.market ?? '코드 미확인'
+}
+
 function scorePillClass(score: number) {
   if (score >= 7) {
     return 'bg-[color:var(--jaroo-success-soft)] text-[color:var(--jaroo-success)]'
@@ -156,6 +170,8 @@ export default function DeepScanPage() {
     container?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const identifierText = getDeepScanIdentifierText(viewModel.holding)
+
   const handleTabChange = (value: TabValue) => {
     setTab(value)
     scrollContentToTop()
@@ -173,9 +189,7 @@ export default function DeepScanPage() {
       title={
         <span className='flex items-center gap-1.5'>
           <span>{viewModel.holding.name}</span>
-          <span className='text-[13px] font-normal text-[color:var(--jaroo-muted)]'>
-            {viewModel.holding.code ?? '코드 미확인'}
-          </span>
+          <span className='text-[13px] font-normal text-[color:var(--jaroo-muted)]'>{identifierText}</span>
         </span>
       }
       backHref='/home'

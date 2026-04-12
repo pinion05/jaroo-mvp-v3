@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
@@ -73,6 +73,22 @@ function getHeatmapChipStyle(item: HomeHolding) {
   }
 
   return { background: 'rgba(239,159,39,.3)', color: '#FAC775' }
+}
+
+function getHoldingIdentifierText(item: HomeHolding) {
+  const identifiers = [item.identifierTicker, item.identifierCode].filter(
+    (value, index, values): value is string => Boolean(value) && values.indexOf(value) === index,
+  )
+
+  return identifiers.length > 0 ? identifiers.join(' · ') : item.identifierLabel
+}
+
+function handleHoldingActionClick(item: HomeHolding, event: MouseEvent<HTMLAnchorElement>) {
+  event.stopPropagation()
+
+  if (item.actionHref === '/deepscan' && item.kind === 'stock') {
+    persistDeepScanTarget(item)
+  }
 }
 
 function buildPortfolioSummary(holdings: HomeHolding[], isAppliedPortfolio: boolean): PortfolioSummary {
@@ -739,6 +755,7 @@ export function JarooHomeScreen() {
             const isEtf = item.kind === 'etf'
             const open = isEtf ? isEtfCardOpen : openStockCardId === item.id
             const valueToneClass = getValueToneClass(item)
+            const holdingIdentifierText = getHoldingIdentifierText(item)
 
             return (
               <div
@@ -779,8 +796,8 @@ export function JarooHomeScreen() {
                       </div>
                     </div>
                     <div className={styles.stockSub}>
-                      <span className={cn(styles.marketTag, marketToneClass(item.marketTone))}>{item.market}</span>{' '}
-                      {item.shares}
+                      <span className={cn(styles.marketTag, marketToneClass(item.marketTone))}>{item.market}</span>
+                      {holdingIdentifierText ? ` · ${holdingIdentifierText}` : ''} · {item.shares}
                     </div>
                   </div>
                   <div className={styles.stockValue}>
@@ -830,12 +847,7 @@ export function JarooHomeScreen() {
                     <Link
                       href={item.actionHref}
                       className={cn(styles.detailButton, actionToneClass(item))}
-                      onClick={(event) => {
-                        event.stopPropagation()
-                        if (item.kind === 'stock') {
-                          persistDeepScanTarget(item)
-                        }
-                      }}
+                      onClick={(event) => handleHoldingActionClick(item, event)}
                     >
                       {item.actionLabel}
                       {item.actionSubLabel ? <span className={styles.actionSubLabel}>{item.actionSubLabel}</span> : null}
@@ -864,7 +876,7 @@ export function JarooHomeScreen() {
               href={summaryData.forecast.href}
               className={styles.forecastMore}
               onClick={() => {
-                if (defaultDeepScanHolding) {
+                if (summaryData.forecast.href === '/deepscan' && defaultDeepScanHolding) {
                   persistDeepScanTarget(defaultDeepScanHolding)
                 }
               }}

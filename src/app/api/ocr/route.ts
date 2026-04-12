@@ -11,6 +11,7 @@ type OpenRouterResponse = {
   }>
   error?: {
     message?: string
+    code?: number
   }
 }
 
@@ -70,6 +71,14 @@ OCR guidance:
 - profitRate must map to the return/percentage column, not profit amount.
 - evaluationAmount must map to the row-level valuation/market value amount, not profit/loss amount, principal, or a totals summary.
 - If the same row appears twice due to sticky headers or repeated sections, keep one row only.`
+
+export function extractOpenRouterErrorMessage(result: OpenRouterResponse | null | undefined) {
+  return typeof result?.error?.message === 'string' ? result.error.message.trim() : ''
+}
+
+export function extractOpenRouterErrorStatus(result: OpenRouterResponse | null | undefined) {
+  return typeof result?.error?.code === 'number' && Number.isInteger(result.error.code) ? result.error.code : 502
+}
 
 function extractTextContent(content: string | Array<{ type?: string; text?: string }> | undefined) {
   if (typeof content === 'string') {
@@ -150,10 +159,13 @@ export async function POST(request: Request) {
   })
 
   const result = (await upstreamResponse.json().catch(() => null)) as OpenRouterResponse | null
+  const upstreamErrorMessage = extractOpenRouterErrorMessage(result)
 
-  if (!upstreamResponse.ok) {
-    const message = result?.error?.message || 'OpenRouter OCR request failed.'
-    return NextResponse.json({ error: message }, { status: upstreamResponse.status || 502 })
+  if (!upstreamResponse.ok || upstreamErrorMessage) {
+    return NextResponse.json(
+      { error: upstreamErrorMessage || 'OpenRouter OCR request failed.' },
+      { status: !upstreamResponse.ok ? upstreamResponse.status || 502 : extractOpenRouterErrorStatus(result) },
+    )
   }
 
   const rawContent = extractTextContent(result?.choices?.[0]?.message?.content)
