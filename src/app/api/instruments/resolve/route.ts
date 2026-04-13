@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import {
-  enrichOcrRowsWithInstrumentInfo,
-  resolveHoldingInstrument,
-  searchHoldingInstrumentCandidates,
-  type ResolvedInstrument,
-} from '@/lib/holding-instrument-lookup'
+import { resolveHoldingInstrument, searchHoldingInstrumentCandidates, type ResolvedInstrument } from '@/lib/holding-instrument-lookup'
 import {
   sanitizeOcrRows,
   type OcrInstrumentCandidate,
@@ -57,6 +52,37 @@ function toInstrumentCandidate(
 
 export function filterVisibleInstrumentCandidates(candidates: OcrInstrumentCandidate[]) {
   return candidates.filter((candidate) => typeof candidate.score !== 'number' || candidate.score >= MIN_VISIBLE_CANDIDATE_SCORE)
+}
+
+function toResolvedOcrRow(row: OcrRow, resolved: ResolvedInstrument): OcrRow {
+  return {
+    ...row,
+    resolvedName: resolved.name,
+    resolvedCode: resolved.code,
+    resolvedTicker: resolved.ticker,
+    resolvedMarket: resolved.market,
+    resolvedMarketTone: resolved.marketTone,
+    resolvedKind: resolved.kind,
+  }
+}
+
+function resolveVisibleInstrumentByName(name: string) {
+  return searchHoldingInstrumentCandidates(name, 1, MIN_VISIBLE_CANDIDATE_SCORE)[0] ?? null
+}
+
+export function enrichResolveRowsWithVisibleInstrumentInfo(rows: OcrRow[]): OcrRow[] {
+  return sanitizeOcrRows(rows).map((row) => {
+    const resolved =
+      resolveHoldingInstrument(row.resolvedCode ?? '') ??
+      resolveHoldingInstrument(row.resolvedTicker ?? '') ??
+      resolveVisibleInstrumentByName(row.name)
+
+    if (!resolved) {
+      return row
+    }
+
+    return toResolvedOcrRow(row, resolved)
+  })
 }
 
 function dedupeCandidates(candidates: OcrInstrumentCandidate[]) {
@@ -154,7 +180,7 @@ async function buildResolveCandidates(rows: OcrRow[]) {
     rows.map(async (row) => {
       const [tickerMapCandidates, localCandidates] = await Promise.all([buildTickerMapCandidates(row), Promise.resolve(buildLocalCandidates(row))])
 
-      return filterVisibleInstrumentCandidates(dedupeCandidates([...tickerMapCandidates, ...localCandidates])).slice(0, MAX_CANDIDATES_PER_ROW)
+      return dedupeCandidates([...tickerMapCandidates, ...localCandidates]).slice(0, MAX_CANDIDATES_PER_ROW)
     }),
   )
 }
@@ -186,7 +212,7 @@ export async function POST(request: Request) {
   }
 
   const [tickerMapResolvedRows, candidates] = await Promise.all([enrichOcrRowsViaTickerMap(rows), buildResolveCandidates(rows)])
-  const enrichedRows = enrichOcrRowsWithInstrumentInfo(tickerMapResolvedRows)
+  const enrichedRows = enrichResolveRowsWithVisibleInstrumentInfo(tickerMapResolvedRows)
 
   return NextResponse.json({ rows: enrichedRows, candidates })
 }
