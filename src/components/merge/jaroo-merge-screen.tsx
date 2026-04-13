@@ -33,12 +33,23 @@ function MergeMetricChip({ label, value, valueClassName }: { label: string; valu
 }
 
 function MergeResultRowCard({ row, isLast }: { row: MergeResultRow; isLast: boolean }) {
+  const resolvedIdentifier = [row.resolvedTicker, row.resolvedCode].filter(Boolean).join(' · ')
+  const resolvedMeta = [row.resolvedMarket, resolvedIdentifier].filter(Boolean).join(' · ')
+
   return (
     <div className={cn('px-4 py-3', !isLast && 'border-b border-[color:var(--jaroo-border)]')}>
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
           <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.name || '-'}</p>
           {row.fileName ? <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.fileName}</p> : null}
+          {row.resolvedName || resolvedMeta ? (
+            <div className='mt-1 space-y-0.5'>
+              {row.resolvedName ? (
+                <p className='truncate text-[10px] font-medium text-[color:var(--jaroo-primary)]'>확정 종목: {row.resolvedName}</p>
+              ) : null}
+              {resolvedMeta ? <p className='truncate text-[10px] text-[color:var(--jaroo-muted)]'>{resolvedMeta}</p> : null}
+            </div>
+          ) : null}
         </div>
         <p className='shrink-0 text-[11px] font-medium text-[color:var(--jaroo-primary)]'>{row.profitRate || '-'}</p>
       </div>

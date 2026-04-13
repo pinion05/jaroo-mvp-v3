@@ -736,6 +736,15 @@ export function JarooHomeScreen() {
         </div>
 
         <div className={styles.body}>
+          {!isAppliedPortfolio ? (
+            <div className={styles.forecastCard}>
+              <div className={styles.forecastLabel}>OCR IMPORT</div>
+              <div className={styles.forecastText}>아직 홈에 적용한 포트폴리오가 없어요. 보유 종목 스크린샷을 올리면 merge 확인 후 바로 홈에 반영할 수 있어요.</div>
+              <Link href='/screenshot' className={cn(styles.detailButton, styles.buttonBlue, styles.uploadCtaButton)}>
+                스크린샷 업로드하기
+              </Link>
+            </div>
+          ) : null}
           <div className={styles.sectionLabel}>종목별 현황</div>
 
           {homeHoldings.map((item) => {
