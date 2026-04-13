@@ -207,7 +207,10 @@ function OcrResolvedRowCard({
       <button
         type='button'
         onClick={hasCandidatePicker ? onToggleExpand : undefined}
-        className={cn('w-full px-4 py-3 text-left', hasCandidatePicker && 'transition hover:bg-[color:var(--jaroo-secondary)]')}
+        className={cn(
+          'w-full px-4 py-3 text-left',
+          hasCandidatePicker ? 'transition hover:bg-[color:var(--jaroo-secondary)]' : 'cursor-default'
+        )}
       >
         <div className='flex items-start justify-between gap-3'>
           <div className='min-w-0'>
@@ -540,7 +543,7 @@ export default function OcrPage() {
 
           return retainedSelections
         })
-        setExpandedRowId((current) => ((current && (result.candidatesByRowId[current]?.length ?? 0) > 1) ? current : null))
+        setExpandedRowId((current) => (current && result.candidatesByRowId[current]?.length > 1 ? current : null))
         setInstrumentResolveState('success')
       })
       .catch((error) => {
