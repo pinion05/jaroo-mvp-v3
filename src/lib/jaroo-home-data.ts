@@ -400,6 +400,11 @@ export const APPLIED_HOME_PORTFOLIO_EVENT = 'jaroo:applied-home-portfolio:update
 export const DEEPSCAN_TARGET_STORAGE_KEY = 'jaroo:deepscan-target'
 export const DEEPSCAN_TARGET_EVENT = 'jaroo:deepscan-target:updated'
 
+const DEEPSCAN_SERVER_SNAPSHOT = buildDeepScanTargetSession(createPlaceholderDeepScanHolding())
+
+let cachedDeepScanSnapshotKey: string | null = null
+let cachedDeepScanSnapshot: DeepScanTargetSession | null = null
+
 export type AppliedHomePortfolioSession = {
   broker: string
   rows: OcrRow[]
@@ -692,9 +697,23 @@ export function readDeepScanTarget(): HomeHolding | null {
 }
 
 export function resolveDeepScanTargetSession() {
+  if (typeof window === 'undefined') {
+    return DEEPSCAN_SERVER_SNAPSHOT
+  }
+
+  const rawStoredTarget = window.sessionStorage.getItem(DEEPSCAN_TARGET_STORAGE_KEY)
+  const rawAppliedPortfolio = window.sessionStorage.getItem(APPLIED_HOME_PORTFOLIO_STORAGE_KEY)
+  const snapshotKey = `${rawStoredTarget ?? ''}::${rawAppliedPortfolio ?? ''}`
+
+  if (cachedDeepScanSnapshot && cachedDeepScanSnapshotKey === snapshotKey) {
+    return cachedDeepScanSnapshot
+  }
+
   const storedTarget = readDeepScanTargetSession()
 
   if (storedTarget) {
+    cachedDeepScanSnapshotKey = snapshotKey
+    cachedDeepScanSnapshot = storedTarget
     return storedTarget
   }
 
@@ -704,11 +723,17 @@ export function resolveDeepScanTargetSession() {
     const appliedHolding = pickDeepScanDefaultHolding(buildHomeHoldingsFromOcrRows(appliedPortfolio.rows))
 
     if (appliedHolding) {
-      return buildDeepScanTargetSession(appliedHolding)
+      const nextSnapshot = buildDeepScanTargetSession(appliedHolding)
+      cachedDeepScanSnapshotKey = snapshotKey
+      cachedDeepScanSnapshot = nextSnapshot
+      return nextSnapshot
     }
   }
 
-  return buildDeepScanTargetSession(createPlaceholderDeepScanHolding())
+  cachedDeepScanSnapshotKey = snapshotKey
+  cachedDeepScanSnapshot = DEEPSCAN_SERVER_SNAPSHOT
+
+  return DEEPSCAN_SERVER_SNAPSHOT
 }
 
 export function buildHomeHoldingsFromOcrRows(rows: OcrRow[]): HomeHolding[] {
