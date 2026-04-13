@@ -1,7 +1,13 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { MAX_RESOLVE_NAME_LENGTH, MAX_RESOLVE_ROWS, getResolveRowsValidationError } from './route'
+import {
+  MAX_RESOLVE_NAME_LENGTH,
+  MAX_RESOLVE_ROWS,
+  MIN_VISIBLE_CANDIDATE_SCORE,
+  filterVisibleInstrumentCandidates,
+  getResolveRowsValidationError,
+} from './route'
 
 function createRow(name: string) {
   return {
@@ -10,6 +16,15 @@ function createRow(name: string) {
     profitRate: '0',
     evaluationAmount: '1000',
     averagePrice: '1000',
+  }
+}
+
+function createCandidate(id: string, score?: number) {
+  return {
+    id,
+    resolvedName: `candidate-${id}`,
+    source: 'local' as const,
+    score,
   }
 }
 
@@ -39,4 +54,18 @@ test('resolve API는 허용 범위의 rows를 통과시킨다', () => {
   const rows = [createRow('삼성전자'), createRow('Apple')]
 
   assert.equal(getResolveRowsValidationError(rows), '')
+})
+
+test('resolve API 후보 노출은 65% 미만 점수를 숨긴다', () => {
+  const visibleCandidates = filterVisibleInstrumentCandidates([
+    createCandidate('low', MIN_VISIBLE_CANDIDATE_SCORE - 0.01),
+    createCandidate('threshold', MIN_VISIBLE_CANDIDATE_SCORE),
+    createCandidate('high', MIN_VISIBLE_CANDIDATE_SCORE + 0.2),
+    createCandidate('unknown'),
+  ])
+
+  assert.deepEqual(
+    visibleCandidates.map((candidate) => candidate.id),
+    ['threshold', 'high', 'unknown'],
+  )
 })
