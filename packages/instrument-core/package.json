@@ -1,0 +1,26 @@
+{
+  "name": "@jaroo/instrument-core",
+  "version": "0.1.0",
+  "description": "Jaroo internal KR/US instrument resolver data and fuzzy lookup utilities",
+  "main": "src/ko-fuzzy-resolver.js",
+  "type": "commonjs",
+  "bin": {
+    "ko-fuzzy-resolve": "bin/ko-fuzzy-resolve.js",
+    "ko-fuzzy-http-server": "bin/ko-fuzzy-http-server.js"
+  },
+  "scripts": {
+    "test": "node --test",
+    "check": "node --check src/ko-fuzzy-resolver.js && node --check src/kr-stock-resolver.js && node --check src/ko-fuzzy-http-server.js && node --check bin/ko-fuzzy-resolve.js && node --check bin/ko-fuzzy-http-server.js"
+  },
+  "keywords": [
+    "stocks",
+    "ticker",
+    "korean",
+    "fuzzy-search"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "hangul-util": "^1.0.0"
+  },
+  "private": true
+}
