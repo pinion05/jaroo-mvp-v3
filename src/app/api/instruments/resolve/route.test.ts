@@ -1,16 +1,49 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { MAX_RESOLVE_NAME_LENGTH, MAX_RESOLVE_ROWS, getResolveRowsValidationError } from './route'
+import { resolveHoldingInstrument } from '@/lib/holding-instrument-lookup'
 
-function createRow(name: string) {
+import {
+  MAX_RESOLVE_NAME_LENGTH,
+  MAX_RESOLVE_ROWS,
+  MIN_VISIBLE_CANDIDATE_SCORE,
+  enrichResolveRowsWithVisibleInstrumentInfo,
+  filterVisibleInstrumentCandidates,
+  getResolveRowsValidationError,
+} from './route'
+
+function createRow(name: string, overrides: Record<string, unknown> = {}) {
   return {
     name,
     quantity: '1',
     profitRate: '0',
     evaluationAmount: '1000',
     averagePrice: '1000',
+    ...overrides,
   }
+}
+
+function createCandidate(id: string, score?: number) {
+  return {
+    id,
+    resolvedName: `candidate-${id}`,
+    source: 'local' as const,
+    score,
+  }
+}
+
+function findHiddenLowConfidenceNameResolution() {
+  const boundaryQueries = ['Microsoft orporation', 'AMAZN COM INC', 'NIDIA CORP', 'Boadcom Inc.', 'Aphabet Inc.']
+
+  for (const query of boundaryQueries) {
+    const resolved = resolveHoldingInstrument(query)
+
+    if (resolved && resolved.confidence >= 0.62 && resolved.confidence < MIN_VISIBLE_CANDIDATE_SCORE) {
+      return { query, resolved }
+    }
+  }
+
+  throw new Error('Expected a known boundary query whose confidence stays between 0.62 and 0.65.')
 }
 
 test('resolve API는 빈 rows를 거절한다', () => {
@@ -39,4 +72,43 @@ test('resolve API는 허용 범위의 rows를 통과시킨다', () => {
   const rows = [createRow('삼성전자'), createRow('Apple')]
 
   assert.equal(getResolveRowsValidationError(rows), '')
+})
+
+test('resolve API 후보 노출은 65% 미만 점수를 숨긴다', () => {
+  const visibleCandidates = filterVisibleInstrumentCandidates([
+    createCandidate('low', MIN_VISIBLE_CANDIDATE_SCORE - 0.01),
+    createCandidate('threshold', MIN_VISIBLE_CANDIDATE_SCORE),
+    createCandidate('high', MIN_VISIBLE_CANDIDATE_SCORE + 0.2),
+    createCandidate('unknown'),
+  ])
+
+  assert.deepEqual(
+    visibleCandidates.map((candidate) => candidate.id),
+    ['threshold', 'high', 'unknown'],
+  )
+})
+
+test('resolve API는 숨겨진 저신뢰 name 매치를 row auto-resolve에 쓰지 않는다', () => {
+  const { query, resolved } = findHiddenLowConfidenceNameResolution()
+  const [row] = enrichResolveRowsWithVisibleInstrumentInfo([createRow(query)])
+
+  assert.ok(resolved.confidence >= 0.62)
+  assert.ok(resolved.confidence < MIN_VISIBLE_CANDIDATE_SCORE)
+  assert.equal(row?.resolvedTicker, undefined)
+  assert.equal(row?.resolvedCode, undefined)
+  assert.equal(row?.resolvedName, undefined)
+})
+
+test('resolve API는 명시적 ticker가 있으면 가시성 임계값과 무관하게 enrich를 유지한다', () => {
+  const { query, resolved } = findHiddenLowConfidenceNameResolution()
+  assert.ok(resolved.ticker)
+
+  const [row] = enrichResolveRowsWithVisibleInstrumentInfo([
+    createRow(query, {
+      resolvedTicker: resolved.ticker,
+    }),
+  ])
+
+  assert.equal(row?.resolvedTicker, resolved.ticker)
+  assert.equal(row?.resolvedName, resolved.name)
 })

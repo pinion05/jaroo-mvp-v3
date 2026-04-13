@@ -1,11 +1,6 @@
 import { NextResponse } from 'next/server'
 
-import {
-  enrichOcrRowsWithInstrumentInfo,
-  resolveHoldingInstrument,
-  searchHoldingInstrumentCandidates,
-  type ResolvedInstrument,
-} from '@/lib/holding-instrument-lookup'
+import { resolveHoldingInstrument, searchHoldingInstrumentCandidates, type ResolvedInstrument } from '@/lib/holding-instrument-lookup'
 import {
   sanitizeOcrRows,
   type OcrInstrumentCandidate,
@@ -19,6 +14,7 @@ type ResolveInstrumentsRequest = {
 
 export const MAX_RESOLVE_ROWS = 100
 export const MAX_RESOLVE_NAME_LENGTH = 200
+export const MIN_VISIBLE_CANDIDATE_SCORE = 0.65
 const MAX_CANDIDATES_PER_ROW = 5
 
 function trimOrUndefined(value: string | null | undefined) {
@@ -54,6 +50,41 @@ function toInstrumentCandidate(
   }
 }
 
+export function filterVisibleInstrumentCandidates(candidates: OcrInstrumentCandidate[]) {
+  return candidates.filter((candidate) => typeof candidate.score !== 'number' || candidate.score >= MIN_VISIBLE_CANDIDATE_SCORE)
+}
+
+function toResolvedOcrRow(row: OcrRow, resolved: ResolvedInstrument): OcrRow {
+  return {
+    ...row,
+    resolvedName: resolved.name,
+    resolvedCode: resolved.code,
+    resolvedTicker: resolved.ticker,
+    resolvedMarket: resolved.market,
+    resolvedMarketTone: resolved.marketTone,
+    resolvedKind: resolved.kind,
+  }
+}
+
+function resolveVisibleInstrumentByName(name: string) {
+  return searchHoldingInstrumentCandidates(name, 1, MIN_VISIBLE_CANDIDATE_SCORE)[0] ?? null
+}
+
+export function enrichResolveRowsWithVisibleInstrumentInfo(rows: OcrRow[]): OcrRow[] {
+  return sanitizeOcrRows(rows).map((row) => {
+    const resolved =
+      resolveHoldingInstrument(row.resolvedCode ?? '') ??
+      resolveHoldingInstrument(row.resolvedTicker ?? '') ??
+      resolveVisibleInstrumentByName(row.name)
+
+    if (!resolved) {
+      return row
+    }
+
+    return toResolvedOcrRow(row, resolved)
+  })
+}
+
 function dedupeCandidates(candidates: OcrInstrumentCandidate[]) {
   const uniqueCandidates = new Map<string, OcrInstrumentCandidate>()
 
@@ -82,10 +113,12 @@ function buildLocalCandidates(row: OcrRow) {
   )
   const currentResolvedInstrument = getCurrentResolvedInstrument(row)
 
-  return dedupeCandidates([
-    ...(currentResolvedInstrument ? [toInstrumentCandidate(currentResolvedInstrument, 'local')] : []),
-    ...nameMatches,
-  ]).slice(0, MAX_CANDIDATES_PER_ROW)
+  return dedupeCandidates(
+    filterVisibleInstrumentCandidates([
+      ...(currentResolvedInstrument ? [toInstrumentCandidate(currentResolvedInstrument, 'local')] : []),
+      ...nameMatches,
+    ]),
+  ).slice(0, MAX_CANDIDATES_PER_ROW)
 }
 
 async function buildTickerMapCandidates(row: OcrRow) {
@@ -98,45 +131,47 @@ async function buildTickerMapCandidates(row: OcrRow) {
   const matches = await searchTickerMapCandidates(row.name, MAX_CANDIDATES_PER_ROW)
 
   return dedupeCandidates(
-    matches
-      .map((match) => {
-        const resolvedTicker = trimOrUndefined(match.ticker)?.toUpperCase()
-        const resolvedViaTicker = resolvedTicker ? resolveHoldingInstrument(resolvedTicker) : null
+    filterVisibleInstrumentCandidates(
+      matches
+        .map((match) => {
+          const resolvedTicker = trimOrUndefined(match.ticker)?.toUpperCase()
+          const resolvedViaTicker = resolvedTicker ? resolveHoldingInstrument(resolvedTicker) : null
 
-        if (resolvedViaTicker) {
-          return toInstrumentCandidate(
-            {
-              ...resolvedViaTicker,
-              confidence: typeof match.score === 'number' ? match.score : resolvedViaTicker.confidence,
-            },
-            'ticker-map',
-            typeof match.score === 'number' ? match.score : resolvedViaTicker.confidence,
-            trimOrUndefined(match.via),
-          )
-        }
+          if (resolvedViaTicker) {
+            return toInstrumentCandidate(
+              {
+                ...resolvedViaTicker,
+                confidence: typeof match.score === 'number' ? match.score : resolvedViaTicker.confidence,
+              },
+              'ticker-map',
+              typeof match.score === 'number' ? match.score : resolvedViaTicker.confidence,
+              trimOrUndefined(match.via),
+            )
+          }
 
-        const resolvedName = trimOrUndefined(match.canonicalEn) ?? trimOrUndefined(match.canonicalKo)
+          const resolvedName = trimOrUndefined(match.canonicalEn) ?? trimOrUndefined(match.canonicalKo)
 
-        if (!resolvedName && !resolvedTicker) {
-          return null
-        }
+          if (!resolvedName && !resolvedTicker) {
+            return null
+          }
 
-        const fallbackName = resolvedName ?? resolvedTicker ?? row.name.trim()
+          const fallbackName = resolvedName ?? resolvedTicker ?? row.name.trim()
 
-        return {
-          id: buildCandidateId({
+          return {
+            id: buildCandidateId({
+              resolvedName: fallbackName,
+              resolvedCode: undefined,
+              resolvedTicker,
+            }),
             resolvedName: fallbackName,
-            resolvedCode: undefined,
             resolvedTicker,
-          }),
-          resolvedName: fallbackName,
-          resolvedTicker,
-          source: 'ticker-map' as const,
-          score: typeof match.score === 'number' ? match.score : undefined,
-          via: trimOrUndefined(match.via),
-        }
-      })
-      .filter((candidate): candidate is OcrInstrumentCandidate => candidate !== null),
+            source: 'ticker-map' as const,
+            score: typeof match.score === 'number' ? match.score : undefined,
+            via: trimOrUndefined(match.via),
+          }
+        })
+        .filter((candidate): candidate is OcrInstrumentCandidate => candidate !== null),
+    ),
   ).slice(0, MAX_CANDIDATES_PER_ROW)
 }
 
@@ -177,7 +212,7 @@ export async function POST(request: Request) {
   }
 
   const [tickerMapResolvedRows, candidates] = await Promise.all([enrichOcrRowsViaTickerMap(rows), buildResolveCandidates(rows)])
-  const enrichedRows = enrichOcrRowsWithInstrumentInfo(tickerMapResolvedRows)
+  const enrichedRows = enrichResolveRowsWithVisibleInstrumentInfo(tickerMapResolvedRows)
 
   return NextResponse.json({ rows: enrichedRows, candidates })
 }
