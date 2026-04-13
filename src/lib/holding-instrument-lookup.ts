@@ -26,6 +26,11 @@ type IndexedInstrument = InstrumentUniverseEntry & {
   searchTerms: IndexedSearchTerm[]
 }
 
+type RankedInstrumentMatch = {
+  entry: IndexedInstrument
+  score: number
+}
+
 export type ResolvedInstrument = {
   name: string
   code?: string
@@ -40,6 +45,7 @@ export type ResolvedInstrument = {
 const CODE_PATTERN = /\b\d{6}\b/
 const PURE_TICKER_PATTERN = /^[A-Z]{1,5}$/
 const MIN_CONFIDENCE = 0.62
+const MIN_CANDIDATE_CONFIDENCE = 0.45
 
 function normalizeLookupValue(value: string) {
   return value
@@ -230,6 +236,26 @@ function toResolvedInstrument(entry: IndexedInstrument, confidence: number): Res
   }
 }
 
+function getResolvedInstrumentKey(candidate: Pick<ResolvedInstrument, 'code' | 'ticker' | 'name'>) {
+  return normalizeIdentifier(candidate.code) || normalizeIdentifier(candidate.ticker) || collapseNormalizedValue(candidate.name)
+}
+
+function dedupeResolvedInstruments(candidates: ResolvedInstrument[]) {
+  const uniqueCandidates = new Map<string, ResolvedInstrument>()
+
+  for (const candidate of candidates) {
+    const candidateKey = getResolvedInstrumentKey(candidate)
+
+    if (!candidateKey || uniqueCandidates.has(candidateKey)) {
+      continue
+    }
+
+    uniqueCandidates.set(candidateKey, candidate)
+  }
+
+  return [...uniqueCandidates.values()]
+}
+
 function extractStructuredIdentifiers(query: string) {
   const code = query.match(CODE_PATTERN)?.[0] ?? ''
   const tickerTokens = Array.from(
@@ -245,6 +271,32 @@ function extractStructuredIdentifiers(query: string) {
   return {
     code,
     tickerTokens,
+  }
+}
+
+function compareRankedInstrumentMatches(left: RankedInstrumentMatch, right: RankedInstrumentMatch) {
+  return right.score - left.score || left.entry.name.localeCompare(right.entry.name, 'ko-KR')
+}
+
+function insertRankedInstrumentMatch(matches: RankedInstrumentMatch[], nextMatch: RankedInstrumentMatch, limit: number) {
+  if (matches.length >= limit && compareRankedInstrumentMatches(nextMatch, matches[matches.length - 1]) >= 0) {
+    return
+  }
+
+  matches.push(nextMatch)
+
+  for (let index = matches.length - 1; index > 0; index -= 1) {
+    if (compareRankedInstrumentMatches(matches[index], matches[index - 1]) >= 0) {
+      break
+    }
+
+    const previousMatch = matches[index - 1]
+    matches[index - 1] = matches[index]
+    matches[index] = previousMatch
+  }
+
+  if (matches.length > limit) {
+    matches.pop()
   }
 }
 
@@ -294,26 +346,29 @@ export function getInstrumentUniverseStats() {
   }
 }
 
-export function resolveHoldingInstrument(identifier: string): ResolvedInstrument | null {
+export function searchHoldingInstrumentCandidates(identifier: string, limit = 5, minConfidence = MIN_CANDIDATE_CONFIDENCE): ResolvedInstrument[] {
+  if (limit <= 0) {
+    return []
+  }
+
   const directMatch = resolveByExactIdentifier(identifier)
 
   if (directMatch) {
-    return toResolvedInstrument(directMatch, 1)
+    return [toResolvedInstrument(directMatch, 1)]
   }
 
   const { code, tickerTokens } = extractStructuredIdentifiers(identifier)
   const embeddedCodeMatch = resolveByExactIdentifier(code)
+  const structuredMatches = dedupeResolvedInstruments([
+    ...(embeddedCodeMatch ? [toResolvedInstrument(embeddedCodeMatch, 0.99)] : []),
+    ...tickerTokens.flatMap((ticker) => {
+      const embeddedTickerMatch = resolveByExactIdentifier(ticker)
+      return embeddedTickerMatch ? [toResolvedInstrument(embeddedTickerMatch, 0.98)] : []
+    }),
+  ])
 
-  if (embeddedCodeMatch) {
-    return toResolvedInstrument(embeddedCodeMatch, 0.99)
-  }
-
-  for (const ticker of tickerTokens) {
-    const embeddedTickerMatch = resolveByExactIdentifier(ticker)
-
-    if (embeddedTickerMatch) {
-      return toResolvedInstrument(embeddedTickerMatch, 0.98)
-    }
+  if (structuredMatches.length > 0) {
+    return structuredMatches.slice(0, limit)
   }
 
   const queryCollapsed = collapseNormalizedValue(identifier)
@@ -321,11 +376,10 @@ export function resolveHoldingInstrument(identifier: string): ResolvedInstrument
   const queryGrams = buildGramMap(identifier)
 
   if (!queryCollapsed) {
-    return null
+    return []
   }
 
-  let bestMatch: IndexedInstrument | null = null
-  let bestScore = 0
+  const rankedMatches: RankedInstrumentMatch[] = []
 
   for (const entry of indexedUniverse) {
     let entryBestScore = 0
@@ -334,17 +388,25 @@ export function resolveHoldingInstrument(identifier: string): ResolvedInstrument
       entryBestScore = Math.max(entryBestScore, scoreSearchTerm(queryCollapsed, queryTokens, queryGrams, term))
     }
 
-    if (entryBestScore > bestScore) {
-      bestScore = entryBestScore
-      bestMatch = entry
+    if (entryBestScore < minConfidence) {
+      continue
     }
+
+    insertRankedInstrumentMatch(
+      rankedMatches,
+      {
+        entry,
+        score: entryBestScore,
+      },
+      limit,
+    )
   }
 
-  if (!bestMatch || bestScore < MIN_CONFIDENCE) {
-    return null
-  }
+  return rankedMatches.map(({ entry, score }) => toResolvedInstrument(entry, score))
+}
 
-  return toResolvedInstrument(bestMatch, bestScore)
+export function resolveHoldingInstrument(identifier: string): ResolvedInstrument | null {
+  return searchHoldingInstrumentCandidates(identifier, 1, MIN_CONFIDENCE)[0] ?? null
 }
 
 export function enrichOcrRowsWithInstrumentInfo(rows: OcrRow[]): OcrRow[] {

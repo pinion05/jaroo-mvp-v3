@@ -1,35 +1,30 @@
+import fs from 'node:fs'
+import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
 import type { OcrRow } from '@/lib/screenshot-ocr'
 
-type TickerMapKrResult = {
-  matched?: boolean
-  name?: string | null
-  code?: string | null
-}
-
-type TickerMapKrResolver = {
-  resolve(query: string): TickerMapKrResult | null
-}
-
-type TickerMapUsResult = {
+export type TickerMapSearchCandidate = {
   ticker?: string | null
   canonicalKo?: string | null
   canonicalEn?: string | null
   via?: string | null
+  score?: number | null
+  recallRank?: number | null
+  names?: string[] | null
 }
 
 type TickerMapUsResolver = {
-  resolve(query: string, options?: { topN?: number }): TickerMapUsResult[]
+  resolve(query: string, options?: { topN?: number }): TickerMapSearchCandidate[]
 }
 
 type TickerMapResolvers = {
-  krResolver: TickerMapKrResolver
   usResolver: TickerMapUsResolver
 }
 
 const TICKER_MAP_REPO_ROOT_ENV = 'TICKER_MAP_REPO_ROOT'
+const DEFAULT_TICKER_MAP_REPO_NAME = 'kr-us-stock-name-ticker-maps'
 
 let cachedResolversPromise: Promise<TickerMapResolvers | null> | null = null
 const warnedTickerMapMessages = new Set<string>()
@@ -47,16 +42,68 @@ function warnTickerMapOnce(key: string, message: string, error?: unknown) {
   console.warn(`[ticker-map-resolver] ${message}${errorDetails}`)
 }
 
+function trimOrUndefined(value: string | null | undefined) {
+  const trimmedValue = value?.trim()
+  return trimmedValue ? trimmedValue : undefined
+}
+
+function hasKoFuzzyResolverModule(repoRoot: string) {
+  return fs.existsSync(path.join(repoRoot, 'src/ko-fuzzy-resolver.js'))
+}
+
+function getDefaultTickerMapRepoCandidates() {
+  const homeDir = os.homedir()
+  const cwd = process.cwd()
+
+  return [
+    homeDir ? path.join(homeDir, DEFAULT_TICKER_MAP_REPO_NAME) : '',
+    path.resolve(cwd, '..', DEFAULT_TICKER_MAP_REPO_NAME),
+    path.resolve(cwd, '..', '..', DEFAULT_TICKER_MAP_REPO_NAME),
+    path.resolve(cwd, '..', '..', '..', DEFAULT_TICKER_MAP_REPO_NAME),
+  ].filter(Boolean)
+}
+
+function canUseDefaultTickerMapRepoDiscovery() {
+  return process.env.NODE_ENV !== 'production'
+}
+
 function resolveTickerMapRepoRoot() {
   const configuredPath = process.env[TICKER_MAP_REPO_ROOT_ENV]?.trim()
 
   if (configuredPath) {
-    return configuredPath
+    if (hasKoFuzzyResolverModule(configuredPath)) {
+      return configuredPath
+    }
+
+    warnTickerMapOnce(
+      `missing-configured-repo-root:${configuredPath}`,
+      `${TICKER_MAP_REPO_ROOT_ENV} is set but src/ko-fuzzy-resolver.js was not found under ${configuredPath}.`,
+    )
+  }
+
+  if (!canUseDefaultTickerMapRepoDiscovery()) {
+    warnTickerMapOnce(
+      'missing-repo-root',
+      `${TICKER_MAP_REPO_ROOT_ENV} is not configured. Ticker-map resolution is disabled in production until an explicit repo path is provided.`,
+    )
+
+    return null
+  }
+
+  const defaultRepoRoot = getDefaultTickerMapRepoCandidates().find((candidatePath) => hasKoFuzzyResolverModule(candidatePath))
+
+  if (defaultRepoRoot) {
+    warnTickerMapOnce(
+      `using-default-repo-root:${defaultRepoRoot}`,
+      `${TICKER_MAP_REPO_ROOT_ENV} is not configured. Falling back to ${defaultRepoRoot}.`,
+    )
+
+    return defaultRepoRoot
   }
 
   warnTickerMapOnce(
     'missing-repo-root',
-    `${TICKER_MAP_REPO_ROOT_ENV} is not configured. Ticker-map resolution is disabled until an explicit repo path is provided.`,
+    `${TICKER_MAP_REPO_ROOT_ENV} is not configured and no colocated ${DEFAULT_TICKER_MAP_REPO_NAME} repo was found. Ticker-map resolution is disabled.`,
   )
 
   return null
@@ -66,6 +113,24 @@ async function importExternalModule(modulePath: string) {
   const moduleUrl = pathToFileURL(modulePath).href
 
   return import(/* webpackIgnore: true */ moduleUrl) as Promise<Record<string, unknown>>
+}
+
+function getCreateKoFuzzyResolver(moduleExports: Record<string, unknown>) {
+  if (typeof moduleExports.createKoFuzzyResolver === 'function') {
+    return moduleExports.createKoFuzzyResolver as () => TickerMapUsResolver
+  }
+
+  const defaultExport = moduleExports.default
+
+  if (
+    typeof defaultExport === 'object' &&
+    defaultExport !== null &&
+    typeof (defaultExport as Record<string, unknown>).createKoFuzzyResolver === 'function'
+  ) {
+    return (defaultExport as Record<string, unknown>).createKoFuzzyResolver as () => TickerMapUsResolver
+  }
+
+  return null
 }
 
 async function loadTickerMapResolvers(): Promise<TickerMapResolvers | null> {
@@ -78,34 +143,27 @@ async function loadTickerMapResolvers(): Promise<TickerMapResolvers | null> {
     return null
   }
 
-  const modulePaths = [
-    path.join(repoRoot, 'src/kr-stock-resolver.js'),
-    path.join(repoRoot, 'src/ko-fuzzy-resolver.js'),
-  ]
+  const modulePath = path.join(repoRoot, 'src/ko-fuzzy-resolver.js')
 
   cachedResolversPromise = (async () => {
     try {
-      const [{ createKrStockResolver }, { createKoFuzzyResolver }] = await Promise.all(modulePaths.map(importExternalModule))
+      const moduleExports = await importExternalModule(modulePath)
+      const createKoFuzzyResolver = getCreateKoFuzzyResolver(moduleExports)
 
-      if (typeof createKrStockResolver !== 'function' || typeof createKoFuzzyResolver !== 'function') {
+      if (!createKoFuzzyResolver) {
         warnTickerMapOnce(
           `invalid-exports:${repoRoot}`,
-          `Ticker-map modules did not expose the expected resolver factories: ${modulePaths.join(', ')}`,
+          `Ticker-map module did not expose createKoFuzzyResolver: ${modulePath}`,
         )
         cachedResolversPromise = null
         return null
       }
 
       return {
-        krResolver: createKrStockResolver() as TickerMapKrResolver,
-        usResolver: createKoFuzzyResolver() as TickerMapUsResolver,
+        usResolver: createKoFuzzyResolver(),
       }
     } catch (error) {
-      warnTickerMapOnce(
-        `load-failure:${repoRoot}`,
-        `Failed to load ticker-map resolver modules from ${repoRoot}: ${modulePaths.join(', ')}`,
-        error,
-      )
+      warnTickerMapOnce(`load-failure:${repoRoot}`, `Failed to load ticker-map resolver module from ${modulePath}`, error)
       cachedResolversPromise = null
       return null
     }
@@ -114,43 +172,75 @@ async function loadTickerMapResolvers(): Promise<TickerMapResolvers | null> {
   return cachedResolversPromise
 }
 
-function trimOrUndefined(value: string | null | undefined) {
-  const trimmedValue = value?.trim()
-  return trimmedValue ? trimmedValue : undefined
+function normalizeTickerMapCandidate(candidate: TickerMapSearchCandidate): TickerMapSearchCandidate | null {
+  const ticker = trimOrUndefined(candidate.ticker)?.toUpperCase()
+  const canonicalKo = trimOrUndefined(candidate.canonicalKo)
+  const canonicalEn = trimOrUndefined(candidate.canonicalEn)
+  const via = trimOrUndefined(candidate.via)
+  const score = typeof candidate.score === 'number' && Number.isFinite(candidate.score) ? candidate.score : undefined
+  const recallRank = typeof candidate.recallRank === 'number' && Number.isFinite(candidate.recallRank) ? candidate.recallRank : undefined
+  const names = Array.isArray(candidate.names)
+    ? candidate.names
+        .filter((name): name is string => typeof name === 'string')
+        .map((name) => name.trim())
+        .filter(Boolean)
+    : undefined
+
+  if (!ticker && !canonicalKo && !canonicalEn) {
+    return null
+  }
+
+  return {
+    ticker,
+    canonicalKo,
+    canonicalEn,
+    via,
+    score,
+    recallRank,
+    names,
+  }
 }
 
-export async function resolveTickerMapRow(row: OcrRow): Promise<Partial<OcrRow> | null> {
-  const query = row.name.trim()
+export async function searchTickerMapCandidates(query: string, topN = 5): Promise<TickerMapSearchCandidate[]> {
+  const normalizedQuery = query.trim()
 
-  if (!query) {
-    return null
+  if (!normalizedQuery) {
+    return []
   }
 
   const resolvers = await loadTickerMapResolvers()
 
   if (!resolvers) {
+    return []
+  }
+
+  return resolvers.usResolver
+    .resolve(normalizedQuery, { topN })
+    .map((candidate) => normalizeTickerMapCandidate(candidate))
+    .filter((candidate): candidate is TickerMapSearchCandidate => candidate !== null)
+}
+
+export function resetTickerMapResolverCacheForTests() {
+  cachedResolversPromise = null
+  warnedTickerMapMessages.clear()
+}
+
+export async function resolveTickerMapRow(row: OcrRow): Promise<Partial<OcrRow> | null> {
+  const bestCandidate = (await searchTickerMapCandidates(row.name, 1))[0]
+
+  if (!bestCandidate) {
     return null
   }
 
-  const krMatch = resolvers.krResolver.resolve(query)
+  const isExactMatch = bestCandidate.via === 'exact' || (bestCandidate.score ?? 0) >= 0.99
 
-  if (krMatch?.matched) {
-    return {
-      resolvedName: trimOrUndefined(krMatch.name) ?? query,
-      resolvedCode: trimOrUndefined(krMatch.code),
-    }
-  }
-
-  const usMatch = resolvers.usResolver.resolve(query, { topN: 1 })[0]
-  const resolvedTicker = trimOrUndefined(usMatch?.ticker)?.toUpperCase()
-
-  if (!resolvedTicker) {
+  if (!isExactMatch) {
     return null
   }
 
   return {
-    resolvedName: trimOrUndefined(usMatch?.canonicalEn) ?? trimOrUndefined(usMatch?.canonicalKo) ?? query,
-    resolvedTicker,
+    resolvedName: trimOrUndefined(bestCandidate.canonicalEn) ?? trimOrUndefined(bestCandidate.canonicalKo) ?? row.name.trim(),
+    resolvedTicker: trimOrUndefined(bestCandidate.ticker)?.toUpperCase(),
   }
 }
 

@@ -4,7 +4,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, Check, LoaderCircle, RefreshCcw, ScanSearch } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Check, ChevronDown, LoaderCircle, RefreshCcw, ScanSearch } from 'lucide-react'
 import { OcrConflictMergeCard } from '@/components/ocr-conflict-merge-card'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -15,7 +15,9 @@ import {
   buildMergedOcrResult,
   buildOcrSourceRows,
   resolveMergedOcrRows,
+  sanitizeOcrInstrumentCandidateLists,
   sanitizeOcrRows,
+  type OcrInstrumentCandidate,
   type OcrRow,
   type OcrSourceRow,
   type ScreenshotUploadImage,
@@ -29,7 +31,13 @@ type InstrumentResolveState = 'idle' | 'loading' | 'success' | 'error'
 
 type ResolveInstrumentsResponse = {
   rows?: unknown
+  candidates?: unknown
   error?: string
+}
+
+type ResolvedInstrumentRowsResult = {
+  rows: OcrSourceRow[]
+  candidatesByRowId: Record<string, OcrInstrumentCandidate[]>
 }
 
 type UploadStatus = {
@@ -108,7 +116,7 @@ function OcrMetricChip({ label, value, valueClassName }: { label: string; value:
   )
 }
 
-async function resolveInstrumentRows(rows: OcrSourceRow[]) {
+async function resolveInstrumentRows(rows: OcrSourceRow[]): Promise<ResolvedInstrumentRowsResult> {
   const response = await fetch('/api/instruments/resolve', {
     method: 'POST',
     headers: {
@@ -119,18 +127,70 @@ async function resolveInstrumentRows(rows: OcrSourceRow[]) {
 
   const payload = (await response.json().catch(() => null)) as ResolveInstrumentsResponse | null
   const sanitizedRows = sanitizeOcrRows(payload?.rows)
+  const sanitizedCandidates = sanitizeOcrInstrumentCandidateLists(payload?.candidates)
 
-  if (!response.ok || !Array.isArray(payload?.rows) || sanitizedRows.length !== rows.length) {
+  if (!response.ok || !Array.isArray(payload?.rows) || sanitizedRows.length !== rows.length || sanitizedCandidates.length !== rows.length) {
     throw new Error(payload?.error || '종목 식별자 확인에 실패했어요.')
   }
 
-  return rows.map((row, index) => ({
+  const mergedRows = rows.map((row, index) => ({
     ...row,
     ...sanitizedRows[index],
   }))
+
+  return {
+    rows: mergedRows,
+    candidatesByRowId: Object.fromEntries(mergedRows.map((row, index) => [row.id, sanitizedCandidates[index]])),
+  }
 }
 
-function OcrResolvedRowCard({ row, isLast, identifierStatus }: { row: OcrSourceRow; isLast: boolean; identifierStatus: InstrumentResolveState }) {
+function formatCandidateScore(score?: number) {
+  if (typeof score !== 'number' || !Number.isFinite(score)) {
+    return ''
+  }
+
+  return `${Math.round(score * 100)}%`
+}
+
+function applyInstrumentCandidate(row: OcrSourceRow, candidate?: OcrInstrumentCandidate) {
+  if (!candidate) {
+    return row
+  }
+
+  return {
+    ...row,
+    resolvedName: candidate.resolvedName,
+    resolvedCode: candidate.resolvedCode ?? row.resolvedCode,
+    resolvedTicker: candidate.resolvedTicker ?? row.resolvedTicker,
+    resolvedMarket: candidate.resolvedMarket ?? row.resolvedMarket,
+    resolvedMarketTone: candidate.resolvedMarketTone ?? row.resolvedMarketTone,
+    resolvedKind: candidate.resolvedKind ?? row.resolvedKind,
+  }
+}
+
+type OcrResolvedRowCardProps = {
+  row: OcrSourceRow
+  isLast: boolean
+  identifierStatus: InstrumentResolveState
+  candidates: OcrInstrumentCandidate[]
+  isExpanded: boolean
+  selectedCandidateId?: string
+  onToggleExpand: () => void
+  onSelectCandidate: (candidateId: string) => void
+  onClearCandidateSelection: () => void
+}
+
+function OcrResolvedRowCard({
+  row,
+  isLast,
+  identifierStatus,
+  candidates,
+  isExpanded,
+  selectedCandidateId,
+  onToggleExpand,
+  onSelectCandidate,
+  onClearCandidateSelection,
+}: OcrResolvedRowCardProps) {
   const identifierName = row.resolvedName?.trim()
   const identifierMeta = [row.resolvedMarket?.trim(), row.resolvedTicker?.trim(), row.resolvedCode?.trim()].filter(Boolean).join(' · ')
   const identifierStatusText =
@@ -139,35 +199,122 @@ function OcrResolvedRowCard({ row, isLast, identifierStatus }: { row: OcrSourceR
       : identifierStatus === 'error'
         ? '식별자 확인 실패'
         : '식별자 미확인'
+  const hasCandidates = candidates.length > 0
+  const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId)
 
   return (
-    <div className={cn('px-4 py-3', !isLast && 'border-b border-[color:var(--jaroo-border)]')}>
-      <div className='flex items-start justify-between gap-3'>
-        <div className='min-w-0'>
-          <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.name || '-'}</p>
-          <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.fileName}</p>
+    <div className={cn(!isLast && 'border-b border-[color:var(--jaroo-border)]')}>
+      <button
+        type='button'
+        onClick={hasCandidates ? onToggleExpand : undefined}
+        className={cn('w-full px-4 py-3 text-left', hasCandidates && 'transition hover:bg-[color:var(--jaroo-secondary)]')}
+      >
+        <div className='flex items-start justify-between gap-3'>
+          <div className='min-w-0'>
+            <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.name || '-'}</p>
+            <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.fileName}</p>
+          </div>
+          <p className='shrink-0 text-[11px] font-medium text-[color:var(--jaroo-primary)]'>{row.profitRate || '-'}</p>
         </div>
-        <p className='shrink-0 text-[11px] font-medium text-[color:var(--jaroo-primary)]'>{row.profitRate || '-'}</p>
-      </div>
 
-      <div className='mt-3 rounded-[14px] border border-[#DCE8F5] bg-[#F7FBFF] px-3 py-2'>
-        <p className='text-[10px] text-[color:var(--jaroo-muted)]'>식별된 종목</p>
-        {identifierName || identifierMeta ? (
-          <>
-            <p className='mt-1 truncate text-[12px] font-semibold text-[color:var(--jaroo-ink)]'>{identifierName || row.name || '-'}</p>
-            <p className='mt-1 truncate text-[10px] text-[color:var(--jaroo-primary)]'>{identifierMeta || '이름만 확인됨'}</p>
-          </>
-        ) : (
-          <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>{identifierStatusText}</p>
-        )}
-      </div>
+        <div className='mt-3 rounded-[14px] border border-[#DCE8F5] bg-[#F7FBFF] px-3 py-2'>
+          <div className='flex items-start justify-between gap-3'>
+            <div className='min-w-0'>
+              <p className='text-[10px] text-[color:var(--jaroo-muted)]'>식별된 종목</p>
+              {identifierName || identifierMeta ? (
+                <>
+                  <p className='mt-1 truncate text-[12px] font-semibold text-[color:var(--jaroo-ink)]'>{identifierName || row.name || '-'}</p>
+                  <p className='mt-1 truncate text-[10px] text-[color:var(--jaroo-primary)]'>{identifierMeta || '이름만 확인됨'}</p>
+                </>
+              ) : (
+                <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>{identifierStatusText}</p>
+              )}
+            </div>
+            {hasCandidates ? (
+              <div className='flex shrink-0 items-center gap-2 pl-2'>
+                <span className='rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[color:var(--jaroo-primary)]'>
+                  {selectedCandidate ? '후보 적용됨' : `후보 ${candidates.length}개`}
+                </span>
+                <ChevronDown className={cn('size-4 text-[color:var(--jaroo-primary)] transition', isExpanded && 'rotate-180')} />
+              </div>
+            ) : null}
+          </div>
+        </div>
 
-      <div className='mt-3 grid grid-cols-2 gap-2'>
-        <OcrMetricChip label='보유 수량' value={row.quantity} />
-        <OcrMetricChip label='평가 금액' value={row.evaluationAmount} />
-        <OcrMetricChip label='평균 단가' value={row.averagePrice} />
-        <OcrMetricChip label='수익률' value={row.profitRate} valueClassName='text-[color:var(--jaroo-primary)]' />
-      </div>
+        <div className='mt-3 grid grid-cols-2 gap-2'>
+          <OcrMetricChip label='보유 수량' value={row.quantity} />
+          <OcrMetricChip label='평가 금액' value={row.evaluationAmount} />
+          <OcrMetricChip label='평균 단가' value={row.averagePrice} />
+          <OcrMetricChip label='수익률' value={row.profitRate} valueClassName='text-[color:var(--jaroo-primary)]' />
+        </div>
+      </button>
+
+      {hasCandidates && isExpanded ? (
+        <div className='border-t border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)] px-4 py-3'>
+          <div className='flex items-center justify-between gap-3'>
+            <div>
+              <p className='text-[11px] font-semibold text-[color:var(--jaroo-ink)]'>추천 식별 후보</p>
+              <p className='mt-1 text-[10px] text-[color:var(--jaroo-muted)]'>ticker-map 후보를 우선 노출하고, 부족한 경우 로컬 유니버스 후보를 함께 보여줘요.</p>
+            </div>
+            {selectedCandidate ? (
+              <button
+                type='button'
+                onClick={onClearCandidateSelection}
+                className='shrink-0 rounded-full border border-[color:var(--jaroo-primary)] bg-white px-2.5 py-1 text-[10px] font-semibold text-[color:var(--jaroo-primary)]'
+              >
+                기본 식별 유지
+              </button>
+            ) : null}
+          </div>
+
+          <div className='mt-3 space-y-2'>
+            {candidates.map((candidate, index) => {
+              const active = selectedCandidateId === candidate.id
+              const candidateMeta = [candidate.resolvedMarket?.trim(), candidate.resolvedTicker?.trim(), candidate.resolvedCode?.trim()].filter(Boolean).join(' · ')
+              const scoreLabel = formatCandidateScore(candidate.score)
+              const evidenceText = [candidate.source === 'ticker-map' ? 'ticker-map' : '로컬', scoreLabel, candidate.via].filter(Boolean).join(' · ')
+
+              return (
+                <button
+                  key={candidate.id}
+                  type='button'
+                  onClick={() => onSelectCandidate(candidate.id)}
+                  className={cn(
+                    'w-full rounded-[18px] border px-3 py-3 text-left transition',
+                    active
+                      ? 'border-[color:var(--jaroo-primary)] bg-white shadow-[0_6px_20px_rgba(75,157,245,0.12)]'
+                      : 'border-[color:var(--jaroo-border)] bg-white hover:bg-[#F9FCFF]',
+                  )}
+                >
+                  <div className='flex items-start justify-between gap-3'>
+                    <div className='min-w-0'>
+                      <div className='flex flex-wrap items-center gap-1.5'>
+                        <span className={cn('text-[10px] font-semibold', active ? 'text-[color:var(--jaroo-primary)]' : 'text-[color:var(--jaroo-muted)]')}>
+                          후보 {index + 1}
+                        </span>
+                        <span className='rounded-full bg-[color:var(--jaroo-secondary)] px-2 py-0.5 text-[10px] font-medium text-[color:var(--jaroo-muted)]'>
+                          {candidate.source === 'ticker-map' ? 'ticker-map' : '로컬'}
+                        </span>
+                      </div>
+                      <p className='mt-1 truncate text-[12px] font-semibold text-[color:var(--jaroo-ink)]'>{candidate.resolvedName}</p>
+                      <p className='mt-1 truncate text-[10px] text-[color:var(--jaroo-primary)]'>{candidateMeta || '식별자 일부만 확인됨'}</p>
+                      {evidenceText ? <p className='mt-1 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{evidenceText}</p> : null}
+                    </div>
+                    <span
+                      className={cn(
+                        'shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold',
+                        active ? 'bg-[color:var(--jaroo-primary)] text-white' : 'bg-[color:var(--jaroo-secondary)] text-[color:var(--jaroo-muted)]',
+                      )}
+                    >
+                      {active ? '적용됨' : '선택'}
+                    </span>
+                  </div>
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -180,6 +327,9 @@ export default function OcrPage() {
   const [uploadStatuses, setUploadStatuses] = useState<Record<string, UploadStatus>>({})
   const [baseMergedRows, setBaseMergedRows] = useState<OcrSourceRow[]>([])
   const [resolvedInstrumentRows, setResolvedInstrumentRows] = useState<OcrSourceRow[]>([])
+  const [instrumentCandidatesByRowId, setInstrumentCandidatesByRowId] = useState<Record<string, OcrInstrumentCandidate[]>>({})
+  const [selectedInstrumentCandidateIds, setSelectedInstrumentCandidateIds] = useState<Record<string, string>>({})
+  const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
   const [instrumentResolveState, setInstrumentResolveState] = useState<InstrumentResolveState>('idle')
   const [instrumentResolveError, setInstrumentResolveError] = useState('')
   const [conflicts, setConflicts] = useState<ReturnType<typeof buildMergedOcrResult>['conflicts']>([])
@@ -223,6 +373,9 @@ export default function OcrPage() {
     setErrorMessage('')
     setBaseMergedRows([])
     setResolvedInstrumentRows([])
+    setInstrumentCandidatesByRowId({})
+    setSelectedInstrumentCandidateIds({})
+    setExpandedRowId(null)
     setInstrumentResolveState('idle')
     setInstrumentResolveError('')
     setConflicts([])
@@ -345,6 +498,9 @@ export default function OcrPage() {
   useEffect(() => {
     if (requestState !== 'success' || resolvedRows.length === 0) {
       setResolvedInstrumentRows([])
+      setInstrumentCandidatesByRowId({})
+      setSelectedInstrumentCandidateIds({})
+      setExpandedRowId(null)
       setInstrumentResolveState('idle')
       setInstrumentResolveError('')
       return
@@ -357,12 +513,34 @@ export default function OcrPage() {
     setInstrumentResolveError('')
 
     void resolveInstrumentRows(resolvedRows)
-      .then((nextRows) => {
+      .then((result) => {
         if (isCancelled) {
           return
         }
 
-        setResolvedInstrumentRows(nextRows)
+        setResolvedInstrumentRows(result.rows)
+        setInstrumentCandidatesByRowId(result.candidatesByRowId)
+        setSelectedInstrumentCandidateIds((current) => {
+          const retainedSelections = Object.fromEntries(
+            Object.entries(current).filter(([rowId, candidateId]) => result.candidatesByRowId[rowId]?.some((candidate) => candidate.id === candidateId)),
+          )
+
+          for (const row of result.rows) {
+            if (retainedSelections[row.id]) {
+              continue
+            }
+
+            const hasResolvedIdentifier = Boolean(row.resolvedTicker || row.resolvedCode || row.resolvedName)
+            const firstCandidate = result.candidatesByRowId[row.id]?.[0]
+
+            if (!hasResolvedIdentifier && firstCandidate) {
+              retainedSelections[row.id] = firstCandidate.id
+            }
+          }
+
+          return retainedSelections
+        })
+        setExpandedRowId((current) => (current && result.candidatesByRowId[current] ? current : null))
         setInstrumentResolveState('success')
       })
       .catch((error) => {
@@ -371,6 +549,9 @@ export default function OcrPage() {
         }
 
         setResolvedInstrumentRows(resolvedRows)
+        setInstrumentCandidatesByRowId({})
+        setSelectedInstrumentCandidateIds({})
+        setExpandedRowId(null)
         setInstrumentResolveState('error')
         setInstrumentResolveError(error instanceof Error ? error.message : '종목 식별자 확인에 실패했어요.')
       })
@@ -380,7 +561,16 @@ export default function OcrPage() {
     }
   }, [requestState, resolvedRows])
 
-  const previewRows = resolvedInstrumentRows.length > 0 ? resolvedInstrumentRows : resolvedRows
+  const previewRows = useMemo(() => {
+    const baseRows = resolvedInstrumentRows.length > 0 ? resolvedInstrumentRows : resolvedRows
+
+    return baseRows.map((row) =>
+      applyInstrumentCandidate(
+        row,
+        instrumentCandidatesByRowId[row.id]?.find((candidate) => candidate.id === selectedInstrumentCandidateIds[row.id]),
+      ),
+    )
+  }, [instrumentCandidatesByRowId, resolvedInstrumentRows, resolvedRows, selectedInstrumentCandidateIds])
 
   const completedUploadCount = useMemo(
     () => session?.uploads.filter((upload) => uploadStatuses[upload.id]?.state === 'success').length ?? 0,
@@ -586,7 +776,7 @@ export default function OcrPage() {
 
       <Card className='overflow-hidden rounded-[24px] border border-[color:var(--jaroo-border)] bg-white shadow-none'>
         <div className='border-b border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)] px-4 py-3'>
-          <p className='text-[11px] font-medium text-[color:var(--jaroo-muted)]'>종목명과 식별자(name/ticker/code/market), 보유 수량, 수익률, 평가 금액, 평균 단가를 함께 확인하세요</p>
+          <p className='text-[11px] font-medium text-[color:var(--jaroo-muted)]'>종목명과 식별자(name/ticker/code/market), 보유 수량, 수익률, 평가 금액, 평균 단가를 함께 확인하세요. 카드를 누르면 추천 후보를 펼칠 수 있어요.</p>
         </div>
 
         {requestState === 'loading' ? (
@@ -604,7 +794,31 @@ export default function OcrPage() {
             {previewRows.map((item, index) => {
               const isLast = index === previewRows.length - 1
 
-              return <OcrResolvedRowCard key={`${item.id}-${index}`} row={item} isLast={isLast} identifierStatus={instrumentResolveState} />
+              return (
+                <OcrResolvedRowCard
+                  key={`${item.id}-${index}`}
+                  row={item}
+                  isLast={isLast}
+                  identifierStatus={instrumentResolveState}
+                  candidates={instrumentCandidatesByRowId[item.id] ?? []}
+                  isExpanded={expandedRowId === item.id}
+                  selectedCandidateId={selectedInstrumentCandidateIds[item.id]}
+                  onToggleExpand={() => setExpandedRowId((current) => (current === item.id ? null : item.id))}
+                  onSelectCandidate={(candidateId) =>
+                    setSelectedInstrumentCandidateIds((current) => ({
+                      ...current,
+                      [item.id]: candidateId,
+                    }))
+                  }
+                  onClearCandidateSelection={() =>
+                    setSelectedInstrumentCandidateIds((current) => {
+                      const nextSelections = { ...current }
+                      delete nextSelections[item.id]
+                      return nextSelections
+                    })
+                  }
+                />
+              )
             })}
           </div>
         ) : null}
