@@ -38,6 +38,19 @@ export type OcrSourceRow = OcrRow & {
   normalizedName: string
 }
 
+export type OcrInstrumentCandidate = {
+  id: string
+  resolvedName: string
+  resolvedCode?: string
+  resolvedTicker?: string
+  resolvedMarket?: string
+  resolvedMarketTone?: OcrRow['resolvedMarketTone']
+  resolvedKind?: OcrRow['resolvedKind']
+  source: 'ticker-map' | 'local'
+  score?: number
+  via?: string
+}
+
 export type OcrConflict = {
   key: string
   displayName: string
@@ -170,6 +183,58 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
       }
     })
     .filter((item) => item.name.length > 0 || item.quantity.length > 0 || item.profitRate.length > 0 || item.evaluationAmount.length > 0)
+}
+
+export function sanitizeOcrInstrumentCandidates(input: unknown): OcrInstrumentCandidate[] {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  return input
+    .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+    .reduce<OcrInstrumentCandidate[]>((candidates, item) => {
+      const id = typeof item.id === 'string' ? item.id.trim() : ''
+      const resolvedName = typeof item.resolvedName === 'string' ? item.resolvedName.trim() : ''
+      const source = item.source === 'local' ? 'local' : item.source === 'ticker-map' ? 'ticker-map' : null
+
+      if (!id || !resolvedName || !source) {
+        return candidates
+      }
+
+      const resolvedCode = normalizeInstrumentCode(item.resolvedCode)
+      const resolvedTicker = normalizeInstrumentCode(item.resolvedTicker)
+      const resolvedMarket = typeof item.resolvedMarket === 'string' ? item.resolvedMarket.trim() : undefined
+      const resolvedMarketTone: OcrRow['resolvedMarketTone'] =
+        item.resolvedMarketTone === 'kospi' || item.resolvedMarketTone === 'kosdaq' || item.resolvedMarketTone === 'nasdaq' || item.resolvedMarketTone === 'etf'
+          ? item.resolvedMarketTone
+          : undefined
+      const resolvedKind: OcrRow['resolvedKind'] = item.resolvedKind === 'stock' || item.resolvedKind === 'etf' ? item.resolvedKind : undefined
+      const score = typeof item.score === 'number' && Number.isFinite(item.score) ? item.score : undefined
+      const via = typeof item.via === 'string' ? item.via.trim() : undefined
+
+      candidates.push({
+        id,
+        resolvedName,
+        resolvedCode,
+        resolvedTicker,
+        resolvedMarket,
+        resolvedMarketTone,
+        resolvedKind,
+        source,
+        score,
+        via,
+      })
+
+      return candidates
+    }, [])
+}
+
+export function sanitizeOcrInstrumentCandidateLists(input: unknown): OcrInstrumentCandidate[][] {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  return input.map((item) => sanitizeOcrInstrumentCandidates(item))
 }
 
 export function normalizeStockName(name: string) {
