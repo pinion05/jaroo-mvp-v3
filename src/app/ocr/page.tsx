@@ -199,15 +199,15 @@ function OcrResolvedRowCard({
       : identifierStatus === 'error'
         ? '식별자 확인 실패'
         : '식별자 미확인'
-  const hasCandidates = candidates.length > 0
+  const hasCandidatePicker = candidates.length > 1
   const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId)
 
   return (
     <div className={cn(!isLast && 'border-b border-[color:var(--jaroo-border)]')}>
       <button
         type='button'
-        onClick={hasCandidates ? onToggleExpand : undefined}
-        className={cn('w-full px-4 py-3 text-left', hasCandidates && 'transition hover:bg-[color:var(--jaroo-secondary)]')}
+        onClick={hasCandidatePicker ? onToggleExpand : undefined}
+        className={cn('w-full px-4 py-3 text-left', hasCandidatePicker && 'transition hover:bg-[color:var(--jaroo-secondary)]')}
       >
         <div className='flex items-start justify-between gap-3'>
           <div className='min-w-0'>
@@ -230,7 +230,7 @@ function OcrResolvedRowCard({
                 <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>{identifierStatusText}</p>
               )}
             </div>
-            {hasCandidates ? (
+            {hasCandidatePicker ? (
               <div className='flex shrink-0 items-center gap-2 pl-2'>
                 <span className='rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[color:var(--jaroo-primary)]'>
                   {selectedCandidate ? '후보 적용됨' : `후보 ${candidates.length}개`}
@@ -249,7 +249,7 @@ function OcrResolvedRowCard({
         </div>
       </button>
 
-      {hasCandidates && isExpanded ? (
+      {hasCandidatePicker && isExpanded ? (
         <div className='border-t border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)] px-4 py-3'>
           <div className='flex items-center justify-between gap-3'>
             <div>
@@ -540,7 +540,7 @@ export default function OcrPage() {
 
           return retainedSelections
         })
-        setExpandedRowId((current) => (current && result.candidatesByRowId[current] ? current : null))
+        setExpandedRowId((current) => ((current && (result.candidatesByRowId[current]?.length ?? 0) > 1) ? current : null))
         setInstrumentResolveState('success')
       })
       .catch((error) => {
@@ -776,7 +776,7 @@ export default function OcrPage() {
 
       <Card className='overflow-hidden rounded-[24px] border border-[color:var(--jaroo-border)] bg-white shadow-none'>
         <div className='border-b border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)] px-4 py-3'>
-          <p className='text-[11px] font-medium text-[color:var(--jaroo-muted)]'>종목명과 식별자(name/ticker/code/market), 보유 수량, 수익률, 평가 금액, 평균 단가를 함께 확인하세요. 카드를 누르면 추천 후보를 펼칠 수 있어요.</p>
+          <p className='text-[11px] font-medium text-[color:var(--jaroo-muted)]'>종목명과 식별자(name/ticker/code/market), 보유 수량, 수익률, 평가 금액, 평균 단가를 함께 확인하세요. 후보가 여러 개인 카드만 추천 후보를 펼칠 수 있어요.</p>
         </div>
 
         {requestState === 'loading' ? (
