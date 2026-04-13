@@ -1,7 +1,8 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react'
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react'
+import { Cell, Pie, PieChart, ResponsiveContainer, Treemap, type PieLabelRenderProps, type TreemapNode } from 'recharts'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
@@ -22,16 +23,15 @@ import {
 } from '@/lib/jaroo-home-data'
 import styles from './jaroo-home-screen.module.css'
 
-const CX = 105
-const CY = 105
-const R = 82
-const GAP = 0.03
+const DONUT_CHART_SIZE = 210
 
 type ViewMode = 'donut' | 'heatmap'
 type SheetMode = 'score' | 'momentum' | null
 type ScoreBreakdownItem = (typeof defaultPortfolioScoreBreakdown)[number]
 type MomentumSignalItem = (typeof defaultMomentumSignals)[number]
 type ForecastCard = typeof defaultHomeForecast
+type DonutChartDatum = HomeHolding & { value: number }
+type HeatmapChartDatum = HomeHolding & { value: number; name: string }
 
 type PortfolioSummary = {
   score: string
@@ -73,6 +73,14 @@ function getHeatmapChipStyle(item: HomeHolding) {
   }
 
   return { background: 'rgba(239,159,39,.3)', color: '#FAC775' }
+}
+
+function getHeatmapChangeText(item: HomeHolding) {
+  if (item.heatmapMeta) {
+    return item.heatmapChange ? `${item.heatmapChange} · ${item.heatmapMeta}` : item.heatmapMeta
+  }
+
+  return item.heatmapChange ?? ''
 }
 
 function getHoldingIdentifierText(item: HomeHolding) {
@@ -214,27 +222,29 @@ function HeatmapTile({
   nameClassName,
   weightClassName,
   changeClassName,
+  style,
+  active = false,
   onClick,
 }: {
   item: HomeHolding
-  className: string
+  className?: string
   nameClassName?: string
   weightClassName?: string
   changeClassName?: string
+  style?: React.CSSProperties
+  active?: boolean
   onClick: () => void
 }) {
   return (
     <button
       type='button'
-      className={cn(styles.heatmapTile, className, item.blink && styles.blink)}
-      style={{ background: item.heatmapBackground }}
+      className={cn(styles.heatmapTile, className, active && styles.heatmapTileActive, item.blink && styles.blink)}
+      style={{ background: item.heatmapBackground, ...style }}
       onClick={onClick}
     >
       <div className={cn(styles.heatmapWeight, weightClassName)}>{item.heatmapWeight}</div>
       <div className={cn(styles.heatmapName, nameClassName)}>{item.shortName || item.name}</div>
-      <div className={cn(styles.heatmapChange, changeClassName)}>
-        {item.heatmapMeta ? `${item.heatmapChange} · ${item.heatmapMeta}` : item.heatmapChange}
-      </div>
+      <div className={cn(styles.heatmapChange, changeClassName)}>{getHeatmapChangeText(item)}</div>
       {item.heatmapBadge ? (
         <div className={cn(styles.heatmapChip, changeClassName && styles.heatmapChipTiny)} style={getHeatmapChipStyle(item)}>
           {item.heatmapBadge}
@@ -295,26 +305,6 @@ function subscribeAppliedPortfolio(onStoreChange: () => void) {
     window.removeEventListener('storage', handleChange)
     window.removeEventListener(APPLIED_HOME_PORTFOLIO_EVENT, handleChange)
   }
-}
-
-function polar(deg: number, radius: number) {
-  const angle = ((deg - 90) * Math.PI) / 180
-
-  return {
-    x: CX + radius * Math.cos(angle),
-    y: CY + radius * Math.sin(angle),
-  }
-}
-
-function getArcPath(startPercent: number, percent: number) {
-  const visiblePercent = Math.max(percent - GAP, 0.01)
-  const startAngle = startPercent * 360
-  const endAngle = startAngle + visiblePercent * 360
-  const startPoint = polar(startAngle, R)
-  const endPoint = polar(endAngle, R)
-  const largeArc = visiblePercent > 0.5 ? 1 : 0
-
-  return `M${startPoint.x},${startPoint.y} A${R},${R} 0 ${largeArc},1 ${endPoint.x},${endPoint.y}`
 }
 
 function badgeToneClass(tone: HomeBadgeTone) {
@@ -389,7 +379,7 @@ export function JarooHomeScreen() {
   const [view, setView] = useState<ViewMode>('donut')
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [openStockCardId, setOpenStockCardId] = useState<number | null>(null)
-  const [isEtfCardOpen, setIsEtfCardOpen] = useState(false)
+  const [openEtfCardId, setOpenEtfCardId] = useState<number | null>(null)
   const [openSheet, setOpenSheet] = useState<SheetMode>(null)
   const { holdings: homeHoldings, isAppliedPortfolio } = useSyncExternalStore(
     subscribeAppliedPortfolio,
@@ -397,53 +387,15 @@ export function JarooHomeScreen() {
     () => ({ holdings: defaultHomeHoldings, isAppliedPortfolio: false }),
   )
 
-  const donutLayout = useMemo(() => {
-    const result = homeHoldings.reduce<{
-      start: number
-      layout: Array<{
-        id: number
-        path: string
-        x: number
-        y: number
-        textWidth: number
-      }>
-    }>(
-      (accumulator, item) => {
-        const start = accumulator.start
-        const path = getArcPath(start, item.donutPercent)
-        const visiblePercent = Math.max(item.donutPercent - GAP, 0.01)
-        const end = start + item.donutPercent
-        const startAngle = start * 360
-        const endAngle = startAngle + visiblePercent * 360
-        const midpoint = startAngle + (endAngle - startAngle) / 2
-        const labelPoint = polar(midpoint, R + 24)
-        const textWidth = item.donutLabel.length * 6.2
-        const x = Math.max(textWidth / 2 + 6, Math.min(210 - textWidth / 2 - 6, labelPoint.x))
-        const y = Math.max(12, Math.min(200, labelPoint.y))
-
-        return {
-          start: end,
-          layout: [
-            ...accumulator.layout,
-            {
-              id: item.id,
-              path,
-              x,
-              y,
-              textWidth,
-            },
-          ],
-        }
-      },
-      {
-        start: -0.5,
-        layout: [],
-      },
-    )
-
-    return result.layout
-  }, [homeHoldings])
-
+  const donutChartData = useMemo<DonutChartDatum[]>(
+    () => homeHoldings.map((item) => ({ ...item, value: Math.max(item.donutPercent, 0.01) })),
+    [homeHoldings],
+  )
+  const heatmapChartData = useMemo<HeatmapChartDatum[]>(
+    () => homeHoldings.map((item) => ({ ...item, name: item.shortName || item.name, value: Math.max(item.donutPercent, 0.01) })),
+    [homeHoldings],
+  )
+  const heatmapChartHeight = Math.max(234, 234 + Math.max(0, heatmapChartData.length - 5) * 34)
   const selectedHolding = selectedId === null ? null : homeHoldings.find((item) => item.id === selectedId) ?? null
   const summaryData = useMemo(() => buildPortfolioSummary(homeHoldings, isAppliedPortfolio), [homeHoldings, isAppliedPortfolio])
   const defaultDeepScanHolding = useMemo(() => {
@@ -453,14 +405,28 @@ export function JarooHomeScreen() {
 
     return pickDeepScanDefaultHolding(homeHoldings)
   }, [homeHoldings, selectedHolding])
-  const primaryHeatmapHolding = homeHoldings[0] ?? null
-  const secondaryHeatmapHolding = homeHoldings[1] ?? null
-  const tertiaryHeatmapHolding = homeHoldings[2] ?? null
-  const wideHeatmapHolding = homeHoldings[3] ?? null
-  const footerHeatmapHolding = homeHoldings[4] ?? null
-  const extraHeatmapHoldings = homeHoldings.slice(5)
+  const renderDonutLabel = useCallback(({ x, y, payload }: PieLabelRenderProps) => {
+    const item = payload as DonutChartDatum | undefined
 
-  function scrollToCard(id: number) {
+    if (!item || typeof x !== 'number' || typeof y !== 'number') {
+      return null
+    }
+
+    const textWidth = item.donutLabel.length * 6.2
+    const labelX = clamp(x, textWidth / 2 + 10, DONUT_CHART_SIZE - textWidth / 2 - 10)
+    const labelY = clamp(y, 12, DONUT_CHART_SIZE - 12)
+
+    return (
+      <g pointerEvents='none'>
+        <rect x={labelX - textWidth / 2 - 5} y={labelY - 8} width={textWidth + 10} height={15} rx={6} fill='rgba(10,25,55,.8)' />
+        <text x={labelX} y={labelY} fontSize='10' fill='white' textAnchor='middle' fontWeight='500' dominantBaseline='middle'>
+          {item.donutLabel}
+        </text>
+      </g>
+    )
+  }, [])
+
+  const scrollToCard = useCallback((id: number) => {
     const frame = frameRef.current
     const card = cardRefs.current[id]
 
@@ -474,64 +440,114 @@ export function JarooHomeScreen() {
         behavior: 'smooth',
       })
     }, 80)
-  }
+  }, [])
 
-  function resetSelection() {
+  const resetSelection = useCallback(() => {
     setSelectedId(null)
     setOpenStockCardId(null)
-    setIsEtfCardOpen(false)
-  }
+    setOpenEtfCardId(null)
+  }, [])
 
-  function selectHolding(id: number, shouldScroll = true) {
-    if (selectedId === id) {
-      resetSelection()
-      return
-    }
+  const selectHolding = useCallback(
+    (id: number, shouldScroll = true) => {
+      if (selectedId === id) {
+        resetSelection()
+        return
+      }
 
-    const selectedItem = homeHoldings.find((item) => item.id === id)
-    setSelectedId(id)
+      const selectedItem = homeHoldings.find((item) => item.id === id)
+      setSelectedId(id)
 
-    if (selectedItem?.kind === 'etf') {
-      setOpenStockCardId(null)
-      setIsEtfCardOpen(true)
-    } else {
+      if (selectedItem?.kind === 'etf') {
+        setOpenStockCardId(null)
+        setOpenEtfCardId(id)
+      } else {
+        setOpenStockCardId(id)
+        setOpenEtfCardId(null)
+      }
+
+      if (shouldScroll) {
+        scrollToCard(id)
+      }
+    },
+    [homeHoldings, resetSelection, scrollToCard, selectedId],
+  )
+
+  const toggleCard = useCallback(
+    (id: number) => {
+      if (openStockCardId === id && selectedId === id) {
+        resetSelection()
+        return
+      }
+
+      setSelectedId(id)
       setOpenStockCardId(id)
-      setIsEtfCardOpen(false)
-    }
+      setOpenEtfCardId(null)
+    },
+    [openStockCardId, resetSelection, selectedId],
+  )
 
-    if (shouldScroll) {
+  const handleHeatmapClick = useCallback(
+    (id: number) => {
+      const selectedItem = homeHoldings.find((item) => item.id === id)
+      setSelectedId(id)
+
+      if (selectedItem?.kind === 'etf') {
+        setOpenStockCardId(null)
+        setOpenEtfCardId(id)
+      } else {
+        setOpenStockCardId(id)
+        setOpenEtfCardId(null)
+      }
+
       scrollToCard(id)
-    }
-  }
+    },
+    [homeHoldings, scrollToCard],
+  )
 
-  function toggleCard(id: number) {
-    if (openStockCardId === id && selectedId === id) {
-      resetSelection()
-      return
-    }
+  const toggleEtfCard = useCallback(
+    (id: number) => {
+      if (openEtfCardId === id && selectedId === id) {
+        resetSelection()
+        return
+      }
 
-    setSelectedId(id)
-    setOpenStockCardId(id)
-    setIsEtfCardOpen(false)
-  }
-
-  function handleHeatmapClick(id: number) {
-    const selectedItem = homeHoldings.find((item) => item.id === id)
-
-    if (selectedItem?.kind === 'etf') {
+      setSelectedId(id)
       setOpenStockCardId(null)
-      setIsEtfCardOpen(true)
-    } else {
-      setOpenStockCardId(id)
-      setIsEtfCardOpen(false)
-    }
+      setOpenEtfCardId(id)
+    },
+    [openEtfCardId, resetSelection, selectedId],
+  )
 
-    scrollToCard(id)
-  }
+  const renderHeatmapContent = useCallback(
+    (node: TreemapNode) => {
+      const item = node as TreemapNode & Partial<HeatmapChartDatum>
 
-  function toggleEtfCard() {
-    setIsEtfCardOpen((current) => !current)
-  }
+      if (item.depth !== 1 || typeof item.id !== 'number' || item.width <= 0 || item.height <= 0) {
+        return <g />
+      }
+
+      const isCompactTile = item.width < 100 || item.height < 58
+      const isTinyTile = item.width < 78 || item.height < 48
+      const isActive = item.id === selectedId || item.id === openStockCardId || item.id === openEtfCardId
+
+      return (
+        <foreignObject x={item.x} y={item.y} width={item.width} height={item.height}>
+          <HeatmapTile
+            item={item as HomeHolding}
+            className={styles.heatmapTreemapTile}
+            weightClassName={isCompactTile ? styles.heatmapWeightSmall : undefined}
+            nameClassName={isTinyTile ? styles.heatmapNameTiny : isCompactTile ? styles.heatmapNameSmall : undefined}
+            changeClassName={isCompactTile ? styles.heatmapChangeSmall : undefined}
+            style={{ width: '100%', height: '100%', padding: isCompactTile ? '7px 9px' : '9px 10px' }}
+            active={isActive}
+            onClick={() => handleHeatmapClick(item.id as number)}
+          />
+        </foreignObject>
+      )
+    },
+    [handleHeatmapClick, openEtfCardId, openStockCardId, selectedId],
+  )
 
   return (
     <div className={styles.viewport}>
@@ -590,48 +606,59 @@ export function JarooHomeScreen() {
 
           <div className={cn(styles.view, view !== 'donut' && styles.hidden)}>
             <div className={styles.donutOuter}>
-              <svg viewBox='0 0 210 210' className={styles.donutSvg}>
-                <circle cx='105' cy='105' r='82' fill='none' stroke='rgba(255,255,255,.07)' strokeWidth='24' />
-                {homeHoldings.map((item, index) => {
-                  const layout = donutLayout[index]
-                  return (
-                    <g key={item.id}>
-                      <path
-                        className={cn(
-                          styles.arcSeg,
-                          selectedId !== null && selectedId !== item.id && styles.dimmed,
-                          selectedId === item.id && styles.selected,
-                        )}
-                        fill='none'
-                        stroke={item.donutColor}
-                        strokeWidth='24'
-                        strokeLinecap='round'
-                        d={layout.path}
-                        onClick={() => selectHolding(item.id)}
-                      />
-                      <rect
-                        x={layout.x - layout.textWidth / 2 - 5}
-                        y={layout.y - 8}
-                        width={layout.textWidth + 10}
-                        height='15'
-                        rx='6'
-                        fill='rgba(10,25,55,.8)'
-                      />
-                      <text
-                        x={layout.x}
-                        y={layout.y}
-                        fontSize='10'
-                        fill='white'
-                        textAnchor='middle'
-                        fontWeight='500'
-                        dominantBaseline='middle'
-                      >
-                        {item.donutLabel}
-                      </text>
-                    </g>
-                  )
-                })}
-              </svg>
+              <div className={styles.donutSvg}>
+                <ResponsiveContainer width='100%' height='100%'>
+                  <PieChart>
+                    <Pie
+                      data={[{ value: 1 }]}
+                      dataKey='value'
+                      cx='50%'
+                      cy='50%'
+                      innerRadius={58}
+                      outerRadius={82}
+                      fill='rgba(255,255,255,.07)'
+                      stroke='none'
+                      isAnimationActive={false}
+                    />
+                    <Pie
+                      data={donutChartData}
+                      dataKey='value'
+                      nameKey='donutLabel'
+                      cx='50%'
+                      cy='50%'
+                      innerRadius={58}
+                      outerRadius={82}
+                      startAngle={90}
+                      endAngle={-270}
+                      paddingAngle={homeHoldings.length > 1 ? 3 : 0}
+                      cornerRadius={10}
+                      stroke='none'
+                      labelLine={false}
+                      label={renderDonutLabel}
+                      isAnimationActive={false}
+                      onClick={(data) => {
+                        const item = data.payload as DonutChartDatum | undefined
+
+                        if (item) {
+                          selectHolding(item.id)
+                        }
+                      }}
+                    >
+                      {donutChartData.map((item) => (
+                        <Cell
+                          key={item.id}
+                          fill={item.donutColor}
+                          className={cn(
+                            styles.arcSeg,
+                            selectedId !== null && selectedId !== item.id && styles.dimmed,
+                            selectedId === item.id && styles.selected,
+                          )}
+                        />
+                      ))}
+                    </Pie>
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
               <button type='button' className={styles.donutCenter} onClick={() => setOpenSheet('score')}>
                 <div
                   className={styles.dcScore}
@@ -686,58 +713,18 @@ export function JarooHomeScreen() {
               </div>
             </div>
             <div className={styles.heatmapGrid}>
-              {primaryHeatmapHolding ? (
-                <>
-                  <div className={styles.heatmapRow}>
-                    <HeatmapTile
-                      item={primaryHeatmapHolding}
-                      className={styles.heatmapSamsung}
-                      onClick={() => handleHeatmapClick(primaryHeatmapHolding.id)}
-                    />
-                    <div className={styles.heatmapColumn}>
-                      {secondaryHeatmapHolding ? (
-                        <HeatmapTile
-                          item={secondaryHeatmapHolding}
-                          className={styles.heatmapSmall}
-                          weightClassName={styles.heatmapWeightSmall}
-                          nameClassName={styles.heatmapNameSmall}
-                          changeClassName={styles.heatmapChangeSmall}
-                          onClick={() => handleHeatmapClick(secondaryHeatmapHolding.id)}
-                        />
-                      ) : null}
-                      {tertiaryHeatmapHolding ? (
-                        <HeatmapTile
-                          item={tertiaryHeatmapHolding}
-                          className={styles.heatmapSmall}
-                          weightClassName={styles.heatmapWeightSmall}
-                          nameClassName={styles.heatmapNameTiny}
-                          changeClassName={styles.heatmapChangeSmall}
-                          onClick={() => handleHeatmapClick(tertiaryHeatmapHolding.id)}
-                        />
-                      ) : null}
-                    </div>
-                  </div>
-                  {wideHeatmapHolding ? (
-                    <HeatmapTile
-                      item={wideHeatmapHolding}
-                      className={styles.heatmapWide}
-                      onClick={() => handleHeatmapClick(wideHeatmapHolding.id)}
-                    />
-                  ) : null}
-                  {footerHeatmapHolding ? (
-                    <HeatmapTile
-                      item={footerHeatmapHolding}
-                      className={styles.heatmapFooter}
-                      nameClassName={styles.heatmapNameSmall}
-                      changeClassName={styles.heatmapChangeSmall}
-                      onClick={() => handleHeatmapClick(footerHeatmapHolding.id)}
-                    />
-                  ) : null}
-                  {extraHeatmapHoldings.map((item) => (
-                    <HeatmapTile key={item.id} item={item} className={styles.heatmapWide} onClick={() => handleHeatmapClick(item.id)} />
-                  ))}
-                </>
-              ) : null}
+              <div className={styles.heatmapTreemap} style={{ height: heatmapChartHeight }}>
+                <ResponsiveContainer width='100%' height='100%'>
+                  <Treemap
+                    data={heatmapChartData}
+                    dataKey='value'
+                    aspectRatio={1.25}
+                    stroke='rgba(255,255,255,.08)'
+                    content={renderHeatmapContent}
+                    isAnimationActive={false}
+                  />
+                </ResponsiveContainer>
+              </div>
             </div>
             <button type='button' className={styles.momentumBanner} onClick={() => setOpenSheet('momentum')}>
               <span className={styles.momentumDot} />
@@ -753,7 +740,7 @@ export function JarooHomeScreen() {
 
           {homeHoldings.map((item) => {
             const isEtf = item.kind === 'etf'
-            const open = isEtf ? isEtfCardOpen : openStockCardId === item.id
+            const open = isEtf ? openEtfCardId === item.id : openStockCardId === item.id
             const valueToneClass = getValueToneClass(item)
             const holdingIdentifierText = getHoldingIdentifierText(item)
 
@@ -772,7 +759,7 @@ export function JarooHomeScreen() {
                 )}
                 onClick={() => {
                   if (isEtf) {
-                    toggleEtfCard()
+                    toggleEtfCard(item.id)
                     return
                   }
 
