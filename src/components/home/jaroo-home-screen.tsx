@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react'
+import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Treemap, type PieLabelRenderProps, type TreemapNode } from 'recharts'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
@@ -379,7 +379,7 @@ export function JarooHomeScreen() {
   const [view, setView] = useState<ViewMode>('donut')
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [openStockCardId, setOpenStockCardId] = useState<number | null>(null)
-  const [isEtfCardOpen, setIsEtfCardOpen] = useState(false)
+  const [openEtfCardId, setOpenEtfCardId] = useState<number | null>(null)
   const [openSheet, setOpenSheet] = useState<SheetMode>(null)
   const { holdings: homeHoldings, isAppliedPortfolio } = useSyncExternalStore(
     subscribeAppliedPortfolio,
@@ -405,7 +405,7 @@ export function JarooHomeScreen() {
 
     return pickDeepScanDefaultHolding(homeHoldings)
   }, [homeHoldings, selectedHolding])
-  const renderDonutLabel = ({ x, y, payload }: PieLabelRenderProps) => {
+  const renderDonutLabel = useCallback(({ x, y, payload }: PieLabelRenderProps) => {
     const item = payload as DonutChartDatum | undefined
 
     if (!item || typeof x !== 'number' || typeof y !== 'number') {
@@ -424,35 +424,9 @@ export function JarooHomeScreen() {
         </text>
       </g>
     )
-  }
-  const renderHeatmapContent = (node: TreemapNode) => {
-    const item = node as TreemapNode & Partial<HeatmapChartDatum>
+  }, [])
 
-    if (item.depth !== 1 || typeof item.id !== 'number' || item.width <= 0 || item.height <= 0) {
-      return <g />
-    }
-
-    const isCompactTile = item.width < 100 || item.height < 58
-    const isTinyTile = item.width < 78 || item.height < 48
-    const isActive = item.id === selectedId || item.id === openStockCardId || (item.kind === 'etf' && isEtfCardOpen)
-
-    return (
-      <foreignObject x={item.x} y={item.y} width={item.width} height={item.height}>
-        <HeatmapTile
-          item={item as HomeHolding}
-          className={styles.heatmapTreemapTile}
-          weightClassName={isCompactTile ? styles.heatmapWeightSmall : undefined}
-          nameClassName={isTinyTile ? styles.heatmapNameTiny : isCompactTile ? styles.heatmapNameSmall : undefined}
-          changeClassName={isCompactTile ? styles.heatmapChangeSmall : undefined}
-          style={{ width: '100%', height: '100%', padding: isCompactTile ? '7px 9px' : '9px 10px' }}
-          active={isActive}
-          onClick={() => handleHeatmapClick(item.id as number)}
-        />
-      </foreignObject>
-    )
-  }
-
-  function scrollToCard(id: number) {
+  const scrollToCard = useCallback((id: number) => {
     const frame = frameRef.current
     const card = cardRefs.current[id]
 
@@ -466,64 +440,114 @@ export function JarooHomeScreen() {
         behavior: 'smooth',
       })
     }, 80)
-  }
+  }, [])
 
-  function resetSelection() {
+  const resetSelection = useCallback(() => {
     setSelectedId(null)
     setOpenStockCardId(null)
-    setIsEtfCardOpen(false)
-  }
+    setOpenEtfCardId(null)
+  }, [])
 
-  function selectHolding(id: number, shouldScroll = true) {
-    if (selectedId === id) {
-      resetSelection()
-      return
-    }
+  const selectHolding = useCallback(
+    (id: number, shouldScroll = true) => {
+      if (selectedId === id) {
+        resetSelection()
+        return
+      }
 
-    const selectedItem = homeHoldings.find((item) => item.id === id)
-    setSelectedId(id)
+      const selectedItem = homeHoldings.find((item) => item.id === id)
+      setSelectedId(id)
 
-    if (selectedItem?.kind === 'etf') {
-      setOpenStockCardId(null)
-      setIsEtfCardOpen(true)
-    } else {
+      if (selectedItem?.kind === 'etf') {
+        setOpenStockCardId(null)
+        setOpenEtfCardId(id)
+      } else {
+        setOpenStockCardId(id)
+        setOpenEtfCardId(null)
+      }
+
+      if (shouldScroll) {
+        scrollToCard(id)
+      }
+    },
+    [homeHoldings, resetSelection, scrollToCard, selectedId],
+  )
+
+  const toggleCard = useCallback(
+    (id: number) => {
+      if (openStockCardId === id && selectedId === id) {
+        resetSelection()
+        return
+      }
+
+      setSelectedId(id)
       setOpenStockCardId(id)
-      setIsEtfCardOpen(false)
-    }
+      setOpenEtfCardId(null)
+    },
+    [openStockCardId, resetSelection, selectedId],
+  )
 
-    if (shouldScroll) {
+  const handleHeatmapClick = useCallback(
+    (id: number) => {
+      const selectedItem = homeHoldings.find((item) => item.id === id)
+      setSelectedId(id)
+
+      if (selectedItem?.kind === 'etf') {
+        setOpenStockCardId(null)
+        setOpenEtfCardId(id)
+      } else {
+        setOpenStockCardId(id)
+        setOpenEtfCardId(null)
+      }
+
       scrollToCard(id)
-    }
-  }
+    },
+    [homeHoldings, scrollToCard],
+  )
 
-  function toggleCard(id: number) {
-    if (openStockCardId === id && selectedId === id) {
-      resetSelection()
-      return
-    }
+  const toggleEtfCard = useCallback(
+    (id: number) => {
+      if (openEtfCardId === id && selectedId === id) {
+        resetSelection()
+        return
+      }
 
-    setSelectedId(id)
-    setOpenStockCardId(id)
-    setIsEtfCardOpen(false)
-  }
-
-  function handleHeatmapClick(id: number) {
-    const selectedItem = homeHoldings.find((item) => item.id === id)
-
-    if (selectedItem?.kind === 'etf') {
+      setSelectedId(id)
       setOpenStockCardId(null)
-      setIsEtfCardOpen(true)
-    } else {
-      setOpenStockCardId(id)
-      setIsEtfCardOpen(false)
-    }
+      setOpenEtfCardId(id)
+    },
+    [openEtfCardId, resetSelection, selectedId],
+  )
 
-    scrollToCard(id)
-  }
+  const renderHeatmapContent = useCallback(
+    (node: TreemapNode) => {
+      const item = node as TreemapNode & Partial<HeatmapChartDatum>
 
-  function toggleEtfCard() {
-    setIsEtfCardOpen((current) => !current)
-  }
+      if (item.depth !== 1 || typeof item.id !== 'number' || item.width <= 0 || item.height <= 0) {
+        return <g />
+      }
+
+      const isCompactTile = item.width < 100 || item.height < 58
+      const isTinyTile = item.width < 78 || item.height < 48
+      const isActive = item.id === selectedId || item.id === openStockCardId || item.id === openEtfCardId
+
+      return (
+        <foreignObject x={item.x} y={item.y} width={item.width} height={item.height}>
+          <HeatmapTile
+            item={item as HomeHolding}
+            className={styles.heatmapTreemapTile}
+            weightClassName={isCompactTile ? styles.heatmapWeightSmall : undefined}
+            nameClassName={isTinyTile ? styles.heatmapNameTiny : isCompactTile ? styles.heatmapNameSmall : undefined}
+            changeClassName={isCompactTile ? styles.heatmapChangeSmall : undefined}
+            style={{ width: '100%', height: '100%', padding: isCompactTile ? '7px 9px' : '9px 10px' }}
+            active={isActive}
+            onClick={() => handleHeatmapClick(item.id as number)}
+          />
+        </foreignObject>
+      )
+    },
+    [handleHeatmapClick, openEtfCardId, openStockCardId, selectedId],
+  )
 
   return (
     <div className={styles.viewport}>
@@ -716,7 +740,7 @@ export function JarooHomeScreen() {
 
           {homeHoldings.map((item) => {
             const isEtf = item.kind === 'etf'
-            const open = isEtf ? isEtfCardOpen : openStockCardId === item.id
+            const open = isEtf ? openEtfCardId === item.id : openStockCardId === item.id
             const valueToneClass = getValueToneClass(item)
             const holdingIdentifierText = getHoldingIdentifierText(item)
 
@@ -735,7 +759,7 @@ export function JarooHomeScreen() {
                 )}
                 onClick={() => {
                   if (isEtf) {
-                    toggleEtfCard()
+                    toggleEtfCard(item.id)
                     return
                   }
 
