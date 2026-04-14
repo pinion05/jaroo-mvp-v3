@@ -237,6 +237,7 @@ curl "http://localhost:3040/api/wisereport/global/NVDA/slim/v1.1"
 
 | Method | Primary Path | Query | 설명 |
 | --- | --- | --- | --- |
+| `GET` | `/api/quotes/current` | `codes?`, `tickers?`, `tradeDate?` | Home 화면용 KR/US 현재가 배치 조회. 부분 실패 시 `data.missing` 에 누락 사유 포함 |
 | `GET` | `/api/us-stock/financials/:ticker` | 없음 | 미국주식 통합 재무 데이터 |
 | `GET` | `/api/us-stock/consensus/:ticker` | 없음 | 미국주식 통합 컨센서스 / 애널리스트 데이터 |
 | `GET` | `/api/us-stock/news/:ticker` | `limit?` | 미국주식 뉴스 및 감성 데이터 |

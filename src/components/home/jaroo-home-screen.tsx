@@ -1,9 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react'
+import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Treemap, type PieLabelRenderProps, type TreemapNode } from 'recharts'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
+import { prefetchAndPersistDeepScanSlimSummary } from '@/lib/deepscan-slim'
+import { applyCurrentQuotesToHomeHoldings, buildHomeCurrentQuoteQuery, type CurrentQuoteItem } from '@/lib/home-current-quotes'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 import {
@@ -56,7 +59,11 @@ function getHoldingChangeValue(item: HomeHolding) {
 function getValueToneClass(item: HomeHolding) {
   const changeValue = getHoldingChangeValue(item)
 
-  if (changeValue !== null && changeValue > 0) {
+  if (changeValue === null) {
+    return undefined
+  }
+
+  if (changeValue > 0) {
     return styles.valuePositive
   }
 
@@ -89,14 +96,6 @@ function getHoldingIdentifierText(item: HomeHolding) {
   )
 
   return identifiers.length > 0 ? identifiers.join(' · ') : item.identifierLabel
-}
-
-function handleHoldingActionClick(item: HomeHolding, event: MouseEvent<HTMLAnchorElement>) {
-  event.stopPropagation()
-
-  if (item.actionHref === '/deepscan' && item.kind === 'stock') {
-    persistDeepScanTarget(item)
-  }
 }
 
 function buildPortfolioSummary(holdings: HomeHolding[], isAppliedPortfolio: boolean): PortfolioSummary {
@@ -374,18 +373,135 @@ function actionToneClass(item: HomeHolding) {
 }
 
 export function JarooHomeScreen() {
-  const frameRef = useRef<HTMLDivElement | null>(null)
+  const router = useRouter()
+  const frameRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<Record<number, HTMLDivElement | null>>({})
+
   const [view, setView] = useState<ViewMode>('donut')
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [openStockCardId, setOpenStockCardId] = useState<number | null>(null)
   const [openEtfCardId, setOpenEtfCardId] = useState<number | null>(null)
   const [openSheet, setOpenSheet] = useState<SheetMode>(null)
-  const { holdings: homeHoldings, isAppliedPortfolio } = useSyncExternalStore(
+  const [liveQuoteSnapshot, setLiveQuoteSnapshot] = useState<{ query: string; items: CurrentQuoteItem[] }>({ query: '', items: [] })
+  const [usdKrwRate, setUsdKrwRate] = useState<number | null>(null)
+  const { holdings: rawHomeHoldings, isAppliedPortfolio } = useSyncExternalStore(
     subscribeAppliedPortfolio,
     getAppliedPortfolioSnapshot,
     () => ({ holdings: defaultHomeHoldings, isAppliedPortfolio: false }),
   )
+  const quoteQuery = useMemo(() => buildHomeCurrentQuoteQuery(rawHomeHoldings), [rawHomeHoldings])
+  const hasUsHomeHoldings = useMemo(
+    () => rawHomeHoldings.some((holding) => holding.marketTone === 'nasdaq' || Boolean(holding.identifierTicker)),
+    [rawHomeHoldings],
+  )
+  const homeHoldings = useMemo(
+    () =>
+      applyCurrentQuotesToHomeHoldings(
+        rawHomeHoldings,
+        quoteQuery && liveQuoteSnapshot.query === quoteQuery ? liveQuoteSnapshot.items : [],
+        { usdKrwRate: hasUsHomeHoldings ? usdKrwRate : null },
+      ),
+    [hasUsHomeHoldings, liveQuoteSnapshot, quoteQuery, rawHomeHoldings, usdKrwRate],
+  )
+
+  useEffect(() => {
+    if (!hasUsHomeHoldings) {
+      return
+    }
+
+    let cancelled = false
+
+    fetch('/api/market/fx/usd-krw', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((payload) => {
+        if (cancelled) {
+          return
+        }
+
+        const nextRate = Number(payload?.data?.rate)
+        setUsdKrwRate(Number.isFinite(nextRate) && nextRate > 0 ? nextRate : null)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUsdKrwRate(null)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [hasUsHomeHoldings])
+
+  useEffect(() => {
+    if (!quoteQuery) {
+      return
+    }
+
+    let cancelled = false
+
+    fetch(`/api/quotes/current?${quoteQuery}`, { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((payload) => {
+        if (cancelled) {
+          return
+        }
+
+        const nextItems: CurrentQuoteItem[] = Array.isArray(payload?.data?.items) ? payload.data.items : []
+        setLiveQuoteSnapshot({ query: quoteQuery, items: nextItems })
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setLiveQuoteSnapshot({ query: quoteQuery, items: [] })
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [quoteQuery])
+
+  const selectedHolding = selectedId === null ? null : homeHoldings.find((item) => item.id === selectedId) ?? null
+  const prefetchedDeepScanHolding = useMemo(() => {
+    if (openStockCardId !== null) {
+      const openedHolding = homeHoldings.find((item) => item.id === openStockCardId) ?? null
+      return openedHolding?.kind === 'stock' ? openedHolding : null
+    }
+
+    return selectedHolding?.kind === 'stock' ? selectedHolding : null
+  }, [homeHoldings, openStockCardId, selectedHolding])
+
+  useEffect(() => {
+    if (!prefetchedDeepScanHolding) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void prefetchAndPersistDeepScanSlimSummary(prefetchedDeepScanHolding)
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [prefetchedDeepScanHolding])
+
+  const handleHoldingActionClick = useCallback(async (item: HomeHolding, event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    if (!item.actionHref) {
+      return
+    }
+
+    if (item.actionHref === '/deepscan' && item.kind === 'stock') {
+      persistDeepScanTarget(item)
+      await Promise.race([
+        prefetchAndPersistDeepScanSlimSummary(item),
+        new Promise((resolve) => window.setTimeout(resolve, 500)),
+      ]).catch(() => undefined)
+    }
+
+    router.push(item.actionHref)
+  }, [router])
 
   const donutChartData = useMemo<DonutChartDatum[]>(
     () => homeHoldings.map((item) => ({ ...item, value: Math.max(item.donutPercent, 0.01) })),
@@ -396,7 +512,6 @@ export function JarooHomeScreen() {
     [homeHoldings],
   )
   const heatmapChartHeight = Math.max(234, 234 + Math.max(0, heatmapChartData.length - 5) * 34)
-  const selectedHolding = selectedId === null ? null : homeHoldings.find((item) => item.id === selectedId) ?? null
   const summaryData = useMemo(() => buildPortfolioSummary(homeHoldings, isAppliedPortfolio), [homeHoldings, isAppliedPortfolio])
   const defaultDeepScanHolding = useMemo(() => {
     if (selectedHolding?.kind === 'stock') {

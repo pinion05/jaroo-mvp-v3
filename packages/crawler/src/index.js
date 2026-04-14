@@ -12,6 +12,9 @@ import {
   getIndexSMA,
   getUSMarketIndicators,
 } from './crawlers/us-market-indicators.js';
+import {
+  getCurrentQuotes,
+} from './crawlers/current-quotes.js';
 
 const require = createRequire(import.meta.url);
 
@@ -130,4 +133,5 @@ export {
   getIndexPrevClose,
   getIndexSMA,
   getUSMarketIndicators,
+  getCurrentQuotes,
 };

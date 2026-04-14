@@ -23,6 +23,7 @@ import {
   getMarketCap,
   getMarketSnapshot,
   getTickerNames,
+  getCurrentQuotes,
   getUSConsensus,
   getUSFilings,
   getUSFinancials,
@@ -2181,6 +2182,33 @@ const endpointDefinitions = [
     handler: async (req) => {
       const { startDate, endDate } = requireQueryValues(req, ['startDate', 'endDate']);
       return getInvestorVolume(req.params.ticker, startDate, endDate);
+    },
+  },
+  {
+    id: 'quotes-current',
+    resource: 'market.quotes.current',
+    description: 'Home 화면용 현재가 묶음 데이터를 반환합니다.',
+    primaryPath: '/api/quotes/current',
+    aliases: ['/crawl/quotes/current'],
+    params: [],
+    query: ['codes(optional, csv)', 'tickers(optional, csv)', 'tradeDate(optional, YYYY-MM-DD)'],
+    count: (data) => Array.isArray(data?.items) ? data.items.length : 0,
+    handler: async (req) => {
+      const codes = parseCsvQuery(req.query.codes);
+      const tickers = parseCsvQuery(req.query.tickers);
+      const tradeDate = parseOptionalIsoDateQuery(req, 'tradeDate');
+
+      if (codes.length === 0 && tickers.length === 0) {
+        throw new HttpError(400, 'missing query: codes_or_tickers', {
+          requiredAnyOf: ['codes', 'tickers'],
+        });
+      }
+
+      return getCurrentQuotes({
+        codes,
+        tickers,
+        tradeDate,
+      });
     },
   },
   {
