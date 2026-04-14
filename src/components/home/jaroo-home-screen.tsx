@@ -382,17 +382,55 @@ export function JarooHomeScreen() {
   const [openStockCardId, setOpenStockCardId] = useState<number | null>(null)
   const [openEtfCardId, setOpenEtfCardId] = useState<number | null>(null)
   const [openSheet, setOpenSheet] = useState<SheetMode>(null)
-  const [liveQuoteItems, setLiveQuoteItems] = useState<CurrentQuoteItem[]>([])
+  const [liveQuoteSnapshot, setLiveQuoteSnapshot] = useState<{ query: string; items: CurrentQuoteItem[] }>({ query: '', items: [] })
+  const [usdKrwRate, setUsdKrwRate] = useState<number | null>(null)
   const { holdings: rawHomeHoldings, isAppliedPortfolio } = useSyncExternalStore(
     subscribeAppliedPortfolio,
     getAppliedPortfolioSnapshot,
     () => ({ holdings: defaultHomeHoldings, isAppliedPortfolio: false }),
   )
   const quoteQuery = useMemo(() => buildHomeCurrentQuoteQuery(rawHomeHoldings), [rawHomeHoldings])
-  const homeHoldings = useMemo(
-    () => applyCurrentQuotesToHomeHoldings(rawHomeHoldings, quoteQuery ? liveQuoteItems : []),
-    [liveQuoteItems, quoteQuery, rawHomeHoldings],
+  const hasUsHomeHoldings = useMemo(
+    () => rawHomeHoldings.some((holding) => holding.marketTone === 'nasdaq' || Boolean(holding.identifierTicker)),
+    [rawHomeHoldings],
   )
+  const homeHoldings = useMemo(
+    () =>
+      applyCurrentQuotesToHomeHoldings(
+        rawHomeHoldings,
+        quoteQuery && liveQuoteSnapshot.query === quoteQuery ? liveQuoteSnapshot.items : [],
+        { usdKrwRate: hasUsHomeHoldings ? usdKrwRate : null },
+      ),
+    [hasUsHomeHoldings, liveQuoteSnapshot, quoteQuery, rawHomeHoldings, usdKrwRate],
+  )
+
+  useEffect(() => {
+    if (!hasUsHomeHoldings) {
+      return
+    }
+
+    let cancelled = false
+
+    fetch('/api/market/fx/usd-krw', { cache: 'no-store' })
+      .then((response) => response.json())
+      .then((payload) => {
+        if (cancelled) {
+          return
+        }
+
+        const nextRate = Number(payload?.data?.rate)
+        setUsdKrwRate(Number.isFinite(nextRate) && nextRate > 0 ? nextRate : null)
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setUsdKrwRate(null)
+        }
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [hasUsHomeHoldings])
 
   useEffect(() => {
     if (!quoteQuery) {
@@ -408,11 +446,12 @@ export function JarooHomeScreen() {
           return
         }
 
-        setLiveQuoteItems(Array.isArray(payload?.data?.items) ? payload.data.items : [])
+        const nextItems: CurrentQuoteItem[] = Array.isArray(payload?.data?.items) ? payload.data.items : []
+        setLiveQuoteSnapshot({ query: quoteQuery, items: nextItems })
       })
       .catch(() => {
         if (!cancelled) {
-          setLiveQuoteItems([])
+          setLiveQuoteSnapshot({ query: quoteQuery, items: [] })
         }
       })
 

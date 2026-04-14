@@ -12,6 +12,10 @@ export type CurrentQuoteItem = {
   status?: string | null
 }
 
+export type CurrentQuoteFxOptions = {
+  usdKrwRate?: number | null
+}
+
 function upsertMetric(
   metrics: HomeHolding['metrics'],
   label: string,
@@ -35,12 +39,77 @@ function upsertMetric(
   return nextMetrics
 }
 
-function resolveHoldingCurrency(holding: HomeHolding, quoteItem?: CurrentQuoteItem) {
+function inferCurrencyFromMoneyText(value: string | undefined) {
+  const normalized = value?.trim().toUpperCase() ?? ''
+
+  if (!normalized) {
+    return null
+  }
+
+  if (normalized.includes('$') || normalized.includes('USD')) {
+    return 'USD' as const
+  }
+
+  if (normalized.includes('₩') || normalized.includes('원') || normalized.includes('KRW')) {
+    return 'KRW' as const
+  }
+
+  return null
+}
+
+function resolveQuoteCurrency(holding: HomeHolding, quoteItem?: CurrentQuoteItem) {
   if (quoteItem?.currency === 'USD' || holding.marketTone === 'nasdaq') {
     return 'USD' as const
   }
 
   return 'KRW' as const
+}
+
+function resolveAveragePriceCurrency(holding: HomeHolding, quoteCurrency: 'KRW' | 'USD') {
+  if (holding.averagePriceCurrency === 'KRW' || holding.averagePriceCurrency === 'USD') {
+    return holding.averagePriceCurrency
+  }
+
+  const explicitCurrency = inferCurrencyFromMoneyText(holding.averagePrice)
+  if (explicitCurrency) {
+    return explicitCurrency
+  }
+
+  if (quoteCurrency === 'KRW') {
+    return 'KRW' as const
+  }
+
+  return holding.marketTone === 'nasdaq' ? null : quoteCurrency
+}
+
+function convertMoneyAmount(
+  value: number | null,
+  fromCurrency: 'KRW' | 'USD' | null,
+  toCurrency: 'KRW' | 'USD',
+  options: CurrentQuoteFxOptions,
+) {
+  if (value === null || fromCurrency === null) {
+    return null
+  }
+
+  if (fromCurrency === toCurrency) {
+    return value
+  }
+
+  const usdKrwRate = options.usdKrwRate
+  if (typeof usdKrwRate !== 'number' || !Number.isFinite(usdKrwRate) || usdKrwRate <= 0) {
+    return null
+  }
+
+  if (fromCurrency === 'KRW' && toCurrency === 'USD') {
+    return value / usdKrwRate
+  }
+
+  if (fromCurrency === 'USD' && toCurrency === 'KRW') {
+    return value * usdKrwRate
+  }
+
+  return null
 }
 
 function formatMoney(value: number, currency: 'KRW' | 'USD') {
@@ -79,11 +148,6 @@ function formatPercent(value: number | null) {
 }
 
 function computeHoldingBaseValue(holding: HomeHolding) {
-  const evaluationAmountValue = parseOcrNumber(holding.evaluationAmount ?? '')
-  if (evaluationAmountValue !== null && evaluationAmountValue > 0) {
-    return evaluationAmountValue
-  }
-
   const shareCount = parseOcrNumber(holding.shares)
   const averagePriceValue = parseOcrNumber(holding.averagePrice)
 
@@ -197,7 +261,11 @@ export function buildHomeCurrentQuoteQuery(holdings: HomeHolding[]) {
   return searchParams.toString()
 }
 
-export function applyCurrentQuotesToHomeHoldings(holdings: HomeHolding[], quoteItems: CurrentQuoteItem[]) {
+export function applyCurrentQuotesToHomeHoldings(
+  holdings: HomeHolding[],
+  quoteItems: CurrentQuoteItem[],
+  options: CurrentQuoteFxOptions = {},
+) {
   const quoteMap = new Map<string, CurrentQuoteItem>()
 
   for (const quoteItem of quoteItems) {
@@ -229,18 +297,20 @@ export function applyCurrentQuotesToHomeHoldings(holdings: HomeHolding[], quoteI
       }
     }
 
-    const currency = resolveHoldingCurrency(holding, quoteItem)
-    const livePriceText = formatMoney(quoteItem.price, currency)
+    const quoteCurrency = resolveQuoteCurrency(holding, quoteItem)
+    const averagePriceCurrency = resolveAveragePriceCurrency(holding, quoteCurrency)
+    const livePriceText = formatMoney(quoteItem.price, quoteCurrency)
     const shareCount = parseOcrNumber(holding.shares)
     const averagePriceValue = parseOcrNumber(holding.averagePrice)
     const evaluationAmountValue = shareCount === null ? null : quoteItem.price * shareCount
-    const costBasisValue = shareCount === null || averagePriceValue === null ? null : shareCount * averagePriceValue
+    const rawCostBasisValue = shareCount === null || averagePriceValue === null ? null : shareCount * averagePriceValue
+    const costBasisValue = convertMoneyAmount(rawCostBasisValue, averagePriceCurrency, quoteCurrency, options)
     const pnlValue = evaluationAmountValue === null || costBasisValue === null ? null : evaluationAmountValue - costBasisValue
     const changeValue = pnlValue === null || costBasisValue === null || costBasisValue === 0
       ? null
       : (pnlValue / costBasisValue) * 100
-    const evaluationAmountText = evaluationAmountValue === null ? '-' : formatMoney(evaluationAmountValue, currency)
-    const pnlText = formatSignedMoney(pnlValue, currency)
+    const evaluationAmountText = evaluationAmountValue === null ? '-' : formatMoney(evaluationAmountValue, quoteCurrency)
+    const pnlText = formatSignedMoney(pnlValue, quoteCurrency)
     const changeText = formatPercent(changeValue)
     const metricTone = deriveMetricTone(changeValue)
     const baseMetaLine = holding.metaLine
@@ -269,9 +339,15 @@ export function applyCurrentQuotesToHomeHoldings(holdings: HomeHolding[], quoteI
       ),
     }, changeValue)
 
+    const normalizedWeightValue = convertMoneyAmount(evaluationAmountValue, quoteCurrency, 'KRW', options)
+      ?? convertMoneyAmount(rawCostBasisValue, averagePriceCurrency, 'KRW', options)
+      ?? evaluationAmountValue
+      ?? computeHoldingBaseValue(nextHolding)
+      ?? 1
+
     return {
       holding: nextHolding,
-      weightValue: evaluationAmountValue ?? computeHoldingBaseValue(nextHolding) ?? 1,
+      weightValue: normalizedWeightValue,
     }
   })
 
