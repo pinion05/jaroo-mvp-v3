@@ -426,10 +426,10 @@ function normalizeDateValue(value) {
         return value.toISOString().slice(0, 10);
     }
     const text = String(value);
-    if (/^\\d{4}-\\d{2}-\\d{2}$/.test(text)) {
+    if (/^\d{4}-\d{2}-\d{2}$/.test(text)) {
         return text;
     }
-    if (/^\\d{8}$/.test(text)) {
+    if (/^\d{8}$/.test(text)) {
         return `${text.slice(0, 4)}-${text.slice(4, 6)}-${text.slice(6, 8)}`;
     }
     return text;
@@ -683,12 +683,12 @@ async function runTriggerBatch(requestedMode = 'morning', options = {}) {
         }
 
         const rawData = await withKrxRetry(
-            () => runBatch('morning', logLevel, null, injectedFunctions),
+            () => runBatch(requestedMode, logLevel, null, injectedFunctions),
             { label: `runTriggerBatch(${requestedMode})` }
         );
 
         if (rawData?.metadata) {
-            rawData.metadata.trigger_mode = 'morning';
+            rawData.metadata.trigger_mode = requestedMode;
         }
 
         const stocks = [];
@@ -732,6 +732,13 @@ module.exports = {
         findNearestUsableSnapshotDate,
         createCachedSnapshotFetcher,
         isRetryableKrxError,
-        withKrxRetry
+        withKrxRetry,
+        normalizeDateValue,
+        setCachedTrigger(moduleValue) {
+            cachedTrigger = moduleValue;
+        },
+        resetCachedTrigger() {
+            cachedTrigger = null;
+        }
     }
 };
