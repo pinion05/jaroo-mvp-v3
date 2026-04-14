@@ -8,7 +8,12 @@ import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { JarooShell } from '@/components/jaroo-shell'
-import { DEEPSCAN_TARGET_EVENT, DEEPSCAN_TARGET_STORAGE_KEY, resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
+import {
+  DEEPSCAN_TARGET_EVENT,
+  DEEPSCAN_TARGET_STORAGE_KEY,
+  resolveDeepScanTargetServerSnapshot,
+  resolveDeepScanTargetSession,
+} from '@/lib/jaroo-home-data'
 import { cn } from '@/lib/utils'
 
 type TabValue = 'analysis' | 'strategy'
@@ -184,7 +189,7 @@ export default function DeepScanPage() {
   const targetSession = useSyncExternalStore(
     subscribeDeepScanTarget,
     resolveDeepScanTargetSession,
-    resolveDeepScanTargetSession,
+    resolveDeepScanTargetServerSnapshot,
   )
   const viewModel = targetSession.viewModel
 

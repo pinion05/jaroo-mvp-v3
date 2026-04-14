@@ -4,8 +4,12 @@ import assert from 'node:assert/strict'
 import {
   APPLIED_HOME_PORTFOLIO_STORAGE_KEY,
   buildHomeHoldingsFromOcrRows,
+  homeHoldings,
   persistAppliedHomePortfolio,
+  persistDeepScanTarget,
   readAppliedHomePortfolio,
+  resolveDeepScanTargetServerSnapshot,
+  resolveDeepScanTargetSession,
 } from './jaroo-home-data'
 
 function installWindowMock() {
@@ -260,6 +264,26 @@ test('applied home portfolio handoff는 미국 종목 OCR 평단의 KRW 통화 �
     assert.equal(holding?.averagePriceCurrency, 'KRW')
     assert.equal(holding?.averagePrice, '79,577.3278원')
     assert.equal(holding?.metaLine, '티커 PYPL · 종목코드 US70450Y1038 · 평단 79,577.3278원')
+  } finally {
+    restoreWindow()
+  }
+})
+
+test('deepscan server snapshot helper는 storage가 있어도 placeholder를 유지하고 client snapshot은 session target을 읽는다', () => {
+  const restoreWindow = installWindowMock()
+
+  try {
+    const persisted = persistDeepScanTarget(homeHoldings[0])
+
+    assert.equal(persisted, true)
+
+    const serverSnapshot = resolveDeepScanTargetServerSnapshot()
+    const clientSnapshot = resolveDeepScanTargetSession()
+
+    assert.equal(serverSnapshot.holding.name, '종목 미선택')
+    assert.equal(serverSnapshot.viewModel.holding.name, '종목 미선택')
+    assert.equal(clientSnapshot.holding.name, homeHoldings[0].name)
+    assert.equal(clientSnapshot.viewModel.holding.name, homeHoldings[0].name)
   } finally {
     restoreWindow()
   }

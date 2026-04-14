@@ -826,6 +826,10 @@ export function readDeepScanTarget(): HomeHolding | null {
   return readDeepScanTargetSession()?.holding ?? null
 }
 
+export function resolveDeepScanTargetServerSnapshot(): DeepScanTargetSession {
+  return DEEPSCAN_SERVER_SNAPSHOT
+}
+
 export function resolveDeepScanTargetSession() {
   if (typeof window === 'undefined') {
     return DEEPSCAN_SERVER_SNAPSHOT
