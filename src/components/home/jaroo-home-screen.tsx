@@ -59,7 +59,11 @@ function getHoldingChangeValue(item: HomeHolding) {
 function getValueToneClass(item: HomeHolding) {
   const changeValue = getHoldingChangeValue(item)
 
-  if (changeValue !== null && changeValue > 0) {
+  if (changeValue === null) {
+    return undefined
+  }
+
+  if (changeValue > 0) {
     return styles.valuePositive
   }
 
