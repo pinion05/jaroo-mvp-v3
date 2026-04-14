@@ -8,12 +8,113 @@ function getPlaywrightChromium() {
 }
 
 const USD_KRW_URL = 'https://kr.investing.com/currencies/usd-krw';
+const USD_KRW_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+const USD_KRW_REDIS_CACHE_KEY = 'crawler:usd-krw-rate';
+
+let sharedRedisClientPromise = null;
+let sharedRedisClientUrl = null;
+
+function logUsdKrwRedisWarning(stage, error) {
+  const message = error instanceof Error ? error.message : String(error);
+  console.warn(`[usd-krw-rate] Redis cache ${stage} failed:`, message);
+}
+
+function isCacheableUsdKrwRate(data) {
+  return Boolean(data) && Number.isFinite(data.rate);
+}
+
+async function getRedisClientFromEnv() {
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) {
+    return null;
+  }
+
+  if (!sharedRedisClientPromise || sharedRedisClientUrl !== redisUrl) {
+    sharedRedisClientUrl = redisUrl;
+    sharedRedisClientPromise = (async () => {
+      try {
+        const { createClient } = require('redis');
+        const client = createClient({
+          url: redisUrl,
+          socket: {
+            connectTimeout: 1000,
+            reconnectStrategy: () => false,
+          },
+        });
+        client.on('error', (error) => {
+          logUsdKrwRedisWarning('client error', error);
+        });
+        await client.connect();
+        return client;
+      } catch (error) {
+        sharedRedisClientPromise = null;
+        logUsdKrwRedisWarning('initialization', error);
+        return null;
+      }
+    })();
+  }
+
+  return sharedRedisClientPromise;
+}
+
+async function resolveRedisClient(getRedisClient) {
+  if (typeof getRedisClient !== 'function') {
+    return null;
+  }
+
+  try {
+    return await getRedisClient();
+  } catch (error) {
+    logUsdKrwRedisWarning('resolution', error);
+    return null;
+  }
+}
+
+async function readUsdKrwRateFromRedis({ client, cacheKey }) {
+  if (!client || typeof client.get !== 'function') {
+    return null;
+  }
+
+  try {
+    const cachedValue = await client.get(cacheKey);
+    if (!cachedValue) {
+      return null;
+    }
+
+    const parsed = JSON.parse(cachedValue);
+    return isCacheableUsdKrwRate(parsed) ? parsed : null;
+  } catch (error) {
+    logUsdKrwRedisWarning('read', error);
+    return null;
+  }
+}
+
+async function writeUsdKrwRateToRedis({ client, cacheKey, data, ttlSeconds }) {
+  if (!client || !isCacheableUsdKrwRate(data)) {
+    return;
+  }
+
+  const serialized = JSON.stringify(data);
+
+  try {
+    if (typeof client.setEx === 'function') {
+      await client.setEx(cacheKey, ttlSeconds, serialized);
+      return;
+    }
+
+    if (typeof client.set === 'function') {
+      await client.set(cacheKey, serialized, { EX: ttlSeconds });
+    }
+  } catch (error) {
+    logUsdKrwRedisWarning('write', error);
+  }
+}
 
 /**
- * USD/KRW 환율 데이터 추출
+ * USD/KRW 환율 데이터 원본 추출
  * @returns {Promise<{rate: number, change: number, changePercent: number, timestamp: string}>}
  */
-async function fetchUsdKrwRate() {
+async function fetchUsdKrwRateFromSource() {
   let browser;
   try {
     const chromium = getPlaywrightChromium();
@@ -73,6 +174,56 @@ async function fetchUsdKrwRate() {
   }
 }
 
+function createUsdKrwRateFetcher({
+  fetcher = fetchUsdKrwRateFromSource,
+  now = Date.now,
+  ttlMs = USD_KRW_CACHE_TTL_MS,
+  getRedisClient = getRedisClientFromEnv,
+  redisCacheKey = USD_KRW_REDIS_CACHE_KEY,
+} = {}) {
+  let cache = null;
+
+  return async function fetchUsdKrwRate() {
+    if (cache && (now() - cache.cachedAt) < ttlMs) {
+      return cache.data;
+    }
+
+    const redisClient = await resolveRedisClient(getRedisClient);
+    const redisCachedData = await readUsdKrwRateFromRedis({
+      client: redisClient,
+      cacheKey: redisCacheKey,
+    });
+
+    if (redisCachedData) {
+      cache = {
+        data: redisCachedData,
+        cachedAt: now(),
+      };
+      return redisCachedData;
+    }
+
+    const data = await fetcher();
+
+    if (isCacheableUsdKrwRate(data)) {
+      cache = {
+        data,
+        cachedAt: now(),
+      };
+
+      await writeUsdKrwRateToRedis({
+        client: redisClient,
+        cacheKey: redisCacheKey,
+        data,
+        ttlSeconds: Math.max(1, Math.floor(ttlMs / 1000)),
+      });
+    }
+
+    return data;
+  };
+}
+
+const fetchUsdKrwRate = createUsdKrwRateFetcher();
+
 /**
  * 환율 데이터 포맷팅
  */
@@ -107,4 +258,10 @@ if (require.main === module) {
     });
 }
 
-module.exports = { fetchUsdKrwRate, formatRateData };
+module.exports = {
+  USD_KRW_CACHE_TTL_MS,
+  createUsdKrwRateFetcher,
+  fetchUsdKrwRate,
+  fetchUsdKrwRateFromSource,
+  formatRateData,
+};
