@@ -1,20 +1,13 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useState, useSyncExternalStore, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { JarooShell } from '@/components/jaroo-shell'
-import {
-  buildDeepScanSlimSummaryKey,
-  fetchDeepScanSlimSummary,
-  readCachedDeepScanSlimSummary,
-  resolveDeepScanSlimRequest,
-  type DeepScanSlimSummary,
-} from '@/lib/deepscan-slim'
 import { DEEPSCAN_TARGET_EVENT, DEEPSCAN_TARGET_STORAGE_KEY, resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
 import { cn } from '@/lib/utils'
 
@@ -180,8 +173,6 @@ function subscribeDeepScanTarget(callback: () => void) {
 export default function DeepScanPage() {
   const [tab, setTab] = useState<TabValue>('analysis')
   const [selectedAxis, setSelectedAxis] = useState(0)
-  const [liveSlimSummary, setLiveSlimSummary] = useState<{ key: string; summary: DeepScanSlimSummary } | null>(null)
-  const [isSlimLoading, setIsSlimLoading] = useState(false)
   const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>({
     why: false,
     news: false,
@@ -196,53 +187,6 @@ export default function DeepScanPage() {
     resolveDeepScanTargetSession,
   )
   const viewModel = targetSession.viewModel
-  const slimRequest = resolveDeepScanSlimRequest(viewModel.holding)
-  const slimRequestKey = slimRequest ? buildDeepScanSlimSummaryKey(slimRequest) : null
-  const cachedSlimSummary = slimRequestKey ? readCachedDeepScanSlimSummary() : null
-  const displayedSlimSummary = slimRequestKey && liveSlimSummary?.key === slimRequestKey
-    ? liveSlimSummary.summary
-    : cachedSlimSummary?.key === slimRequestKey
-      ? cachedSlimSummary.summary
-      : null
-
-  useEffect(() => {
-    if (!slimRequest || !slimRequestKey) {
-      return
-    }
-
-    const hasCachedSummary = cachedSlimSummary?.key === slimRequestKey
-
-    let cancelled = false
-    const timeoutId = window.setTimeout(() => {
-      if (!hasCachedSummary) {
-        setIsSlimLoading(true)
-      }
-
-      fetchDeepScanSlimSummary(slimRequest)
-        .then((summary) => {
-          if (!summary || cancelled) {
-            return
-          }
-
-          setLiveSlimSummary({
-            key: slimRequestKey,
-            summary,
-          })
-          setIsSlimLoading(false)
-        })
-        .catch(() => {
-          if (!cancelled) {
-            setLiveSlimSummary((current) => (current?.key === slimRequestKey ? null : current))
-            setIsSlimLoading(false)
-          }
-        })
-    }, 0)
-
-    return () => {
-      cancelled = true
-      window.clearTimeout(timeoutId)
-    }
-  }, [cachedSlimSummary?.key, slimRequest, slimRequestKey])
 
   const scrollContentToTop = () => {
     const container = document.querySelector<HTMLElement>("[data-slot='jaroo-shell-main']")
@@ -329,54 +273,6 @@ export default function DeepScanPage() {
               </span>
             </div>
           </Card>
-
-          {isSlimLoading && !displayedSlimSummary ? (
-            <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
-              <p className='text-[11px] font-medium tracking-[0.05em] text-[color:var(--jaroo-primary)]'>실데이터 요약</p>
-              <p className='mt-2 text-sm font-semibold text-[color:var(--jaroo-ink)]'>실데이터 요약 불러오는 중…</p>
-              <p className='mt-1 text-xs text-[color:var(--jaroo-muted)]'>KR/US 원천 데이터를 불러온 뒤 핵심 지표를 채우고 있어요.</p>
-            </Card>
-          ) : null}
-
-          {displayedSlimSummary ? (
-            <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
-              <div className='flex items-center justify-between gap-3'>
-                <div>
-                  <p className='text-[11px] font-medium tracking-[0.05em] text-[color:var(--jaroo-primary)]'>실데이터 요약</p>
-                  <p className='mt-1 text-sm font-semibold text-[color:var(--jaroo-ink)]'>
-                    {displayedSlimSummary.header.name} · {displayedSlimSummary.header.identifier}
-                  </p>
-                </div>
-                {displayedSlimSummary.header.currentPriceText ? (
-                  <Badge className='rounded-[8px] bg-[#eef5ff] px-3 py-1 text-[11px] text-[color:var(--jaroo-primary-strong)]'>
-                    현재가 {displayedSlimSummary.header.currentPriceText}
-                  </Badge>
-                ) : null}
-              </div>
-
-              <div className='mt-4 grid grid-cols-2 gap-2'>
-                {displayedSlimSummary.metrics.map((metric) => (
-                  <div key={metric.label} className='rounded-[16px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
-                    <p className='text-[11px] text-[color:var(--jaroo-muted)]'>{metric.label}</p>
-                    <p className='mt-1 text-sm font-semibold text-[color:var(--jaroo-ink)]'>{metric.value}</p>
-                  </div>
-                ))}
-              </div>
-
-              {displayedSlimSummary.highlights.length > 0 ? (
-                <div className='mt-4 space-y-2'>
-                  {displayedSlimSummary.highlights.map((highlight) => (
-                    <div key={`${highlight.title}-${highlight.meta || ''}`} className='rounded-[16px] border border-[color:var(--jaroo-border)] px-3 py-3'>
-                      <p className='text-sm font-medium text-[color:var(--jaroo-ink)]'>{highlight.title}</p>
-                      {highlight.meta ? (
-                        <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>{highlight.meta}</p>
-                      ) : null}
-                    </div>
-                  ))}
-                </div>
-              ) : null}
-            </Card>
-          ) : null}
 
           <SectionToggle
             label='AI 분석 결과'
