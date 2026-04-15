@@ -67,3 +67,28 @@ test('deepscan canonical proxy GET은 crawler 응답 전에 실패하면 local J
     },
   })
 })
+
+test('deepscan canonical proxy GET은 crawler 응답 이후 body read 실패를 local JSON error로 변환하지 않는다', async (t) => {
+  const originalFetch = globalThis.fetch
+  const streamError = new Error('stream broke')
+
+  globalThis.fetch = (async () => {
+    return {
+      status: 502,
+      headers: new Headers({
+        'content-type': 'application/json; charset=utf-8',
+      }),
+      text: async () => {
+        throw streamError
+      },
+    } as Response
+  }) as typeof fetch
+
+  t.after(() => {
+    globalThis.fetch = originalFetch
+  })
+
+  await assert.rejects(GET(new NextRequest('http://localhost/api/deepscan?market=KR&code=005930')), {
+    message: 'stream broke',
+  })
+})

@@ -32,18 +32,12 @@ export function buildDeepScanCanonicalUpstreamPath(searchParams: URLSearchParams
 }
 
 export async function GET(request: NextRequest) {
+  let response: Response
+
   try {
     const upstreamPath = buildDeepScanCanonicalUpstreamPath(request.nextUrl.searchParams)
     const upstreamUrl = buildCrawlerUrl(getCrawlerBaseUrl(), upstreamPath)
-    const response = await fetch(upstreamUrl, { cache: 'no-store' })
-    const body = await response.text()
-
-    return new NextResponse(body, {
-      status: response.status,
-      headers: {
-        'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
-      },
-    })
+    response = await fetch(upstreamUrl, { cache: 'no-store' })
   } catch (error) {
     return NextResponse.json(
       {
@@ -57,4 +51,13 @@ export async function GET(request: NextRequest) {
       { status: 400 },
     )
   }
+
+  const body = await response.text()
+
+  return new NextResponse(body, {
+    status: response.status,
+    headers: {
+      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+    },
+  })
 }
