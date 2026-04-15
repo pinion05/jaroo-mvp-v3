@@ -15,17 +15,15 @@ export type DeepScanCanonicalTargetSession = {
   holding: DeepScanCanonicalHolding
   selectedAt?: string
 }
-
-const CANONICAL_QUERY_KEYS = [
-  'code',
-  'ticker',
-  'name',
-  'shares',
-  'averagePrice',
-  'evaluationAmount',
-  'selectedAt',
-  'from',
-] as const
+type CanonicalQueryKey =
+  | 'code'
+  | 'ticker'
+  | 'name'
+  | 'shares'
+  | 'averagePrice'
+  | 'evaluationAmount'
+  | 'selectedAt'
+  | 'from'
 
 const MAJOR_BLOCK_KEYS = [
   'hero',
@@ -51,7 +49,7 @@ function normalizeText(value: unknown) {
   return normalized || undefined
 }
 
-function setQueryValue(searchParams: URLSearchParams, key: (typeof CANONICAL_QUERY_KEYS)[number], value: unknown) {
+function setQueryValue(searchParams: URLSearchParams, key: CanonicalQueryKey, value: unknown) {
   const normalizedValue = normalizeText(value)
   if (!normalizedValue) {
     return
