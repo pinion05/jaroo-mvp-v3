@@ -13,6 +13,8 @@ const MAJOR_BLOCK_KEYS = Object.freeze([
   'portfolioSimulation',
 ]);
 const SOURCE_TYPES = new Set(['ocr', 'holding', 'report', 'news', 'market', 'system']);
+const FALLBACK_GENERATED_AT = '1970-01-01T00:00:00.000Z';
+const INTERNAL_SERVICE_ERROR_CODE = 'internal-service-error';
 
 function normalizeText(value) {
   if (typeof value !== 'string') {
@@ -56,20 +58,71 @@ function normalizeInput(rawInput = {}) {
   };
 }
 
+function safeCloneRawInput(rawInput) {
+  try {
+    return structuredClone(rawInput);
+  } catch {
+    return null;
+  }
+}
+
+function safeNormalizeInput(rawInput = {}) {
+  try {
+    return normalizeInput(rawInput);
+  } catch {
+    return normalizeInput({
+      selectedAt: safeReadText(rawInput, 'selectedAt'),
+      sourceContext: {
+        from: safeReadSourceType(rawInput),
+        sessionKey: safeReadNestedText(rawInput, 'sourceContext', 'sessionKey'),
+        appliedAt: safeReadNestedText(rawInput, 'sourceContext', 'appliedAt'),
+      },
+    });
+  }
+}
+
+function safeReadText(target, key) {
+  try {
+    return normalizeText(target?.[key]);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeReadNestedText(target, parentKey, childKey) {
+  try {
+    const parentValue = target?.[parentKey];
+
+    if (!parentValue || typeof parentValue !== 'object') {
+      return undefined;
+    }
+
+    return normalizeText(parentValue[childKey]);
+  } catch {
+    return undefined;
+  }
+}
+
+function safeReadSourceType(rawInput) {
+  try {
+    const rawSourceContext = rawInput?.sourceContext;
+    return rawSourceContext && SOURCE_TYPES.has(rawSourceContext.from) ? rawSourceContext.from : 'system';
+  } catch {
+    return 'system';
+  }
+}
+
+function deriveGeneratedAt(input) {
+  return input.sourceContext.appliedAt ?? input.selectedAt ?? FALLBACK_GENERATED_AT;
+}
+
 function createDebugId(input) {
   const identifier = input.instrument.code ?? input.instrument.ticker ?? 'missing';
   return `deepscan:${input.instrument.market ?? 'NA'}:${identifier}`;
 }
 
-function createBlockStatus(blockState) {
-  return {
-    hero: blockState,
-    committee: blockState,
-    insights: blockState,
-    strategy: blockState,
-    sellNow: blockState,
-    portfolioSimulation: blockState,
-  };
+function createBlockStatus(blocks) {
+  return Object.fromEntries(MAJOR_BLOCK_KEYS.map((key) => [key, blocks[key]?.blockState ?? 'missing']));
 }
 
 function createDeepScanSourceRef({ type = 'system', id, label, at, note } = {}) {
@@ -162,6 +215,7 @@ function createBlockSourceRefs(input, blockId) {
 
 function createInputInvalidPayload(rawInput = {}) {
   const input = normalizeInput(rawInput);
+  const generatedAt = deriveGeneratedAt(input);
   const metadataSourceRefs = createBaseSourceRefs(input);
   const invalidError = createDeepScanBlockError({
     code: 'input-invalid',
@@ -173,9 +227,7 @@ function createInputInvalidPayload(rawInput = {}) {
     reason: 'input-invalid',
     label: 'instrument code or ticker required',
   };
-
-  return {
-    input,
+  const blocks = {
     hero: {
       ...createBlockedBlockMeta({
         sourceRefs: createBlockSourceRefs(input, 'hero'),
@@ -246,8 +298,13 @@ function createInputInvalidPayload(rawInput = {}) {
       deltaLabel: '0p',
       caption: '포트폴리오 시뮬레이션을 계산할 수 없습니다.',
     },
+  };
+
+  return {
+    input,
+    ...blocks,
     metadata: {
-      generatedAt: new Date().toISOString(),
+      generatedAt,
       version: DEEP_SCAN_VERSION,
       degraded: true,
       errorCode: 'input-invalid',
@@ -256,10 +313,117 @@ function createInputInvalidPayload(rawInput = {}) {
         valid: false,
         reason: 'instrument identifier missing',
         missing: ['instrument.code', 'instrument.ticker'],
-        raw: rawInput,
+        raw: safeCloneRawInput(rawInput),
       },
       sourceRefs: metadataSourceRefs,
-      blockStatus: createBlockStatus('blocked'),
+      blockStatus: createBlockStatus(blocks),
+    },
+  };
+}
+
+function createInternalErrorPayload(rawInput = {}) {
+  const input = safeNormalizeInput(rawInput);
+  const generatedAt = deriveGeneratedAt(input);
+  const metadataSourceRefs = createBaseSourceRefs(input);
+  const internalError = createDeepScanBlockError({
+    code: INTERNAL_SERVICE_ERROR_CODE,
+    message: 'unexpected internal crawler service failure',
+    retryable: true,
+  });
+  const internalFallback = {
+    used: true,
+    reason: INTERNAL_SERVICE_ERROR_CODE,
+    label: 'canonical internal error payload',
+  };
+  const blocks = {
+    hero: {
+      ...createErrorBlockMeta({
+        sourceRefs: createBlockSourceRefs(input, 'hero'),
+        fallback: internalFallback,
+        error: internalError,
+      }),
+      headline: 'DeepScan payload 생성 중 오류가 발생했습니다',
+      body: 'Crawler 서비스 내부 오류로 canonical error payload를 반환했습니다.',
+      statusText: '서비스 오류',
+      score: 0,
+      scoreLabel: 'N/A',
+      scoreDelta: '0',
+    },
+    committee: {
+      ...createErrorBlockMeta({
+        sourceRefs: createBlockSourceRefs(input, 'committee'),
+        fallback: internalFallback,
+        error: internalError,
+      }),
+      axes: [],
+    },
+    insights: {
+      ...createErrorBlockMeta({
+        sourceRefs: createBlockSourceRefs(input, 'insights'),
+        fallback: internalFallback,
+        error: internalError,
+      }),
+      sectionLabel: '서비스 오류',
+      items: [],
+      summaryTags: [],
+    },
+    strategy: {
+      ...createErrorBlockMeta({
+        sourceRefs: createBlockSourceRefs(input, 'strategy'),
+        fallback: internalFallback,
+        error: internalError,
+      }),
+      weekSignal: 'Unavailable',
+      weekSignalTone: 'neutral',
+      weekBadgeText: 'Error',
+      scenarioLabel: '서비스 오류',
+      scenarioProbability: '0%',
+      scenarioPeriod: 'N/A',
+      scenarioCondition: '내부 오류로 전략 시나리오를 계산할 수 없습니다.',
+      currentPriceText: 'N/A',
+      targetPriceText: 'N/A',
+      scenarioDetails: [],
+      otherScenarios: [],
+      otherScenarioTags: [],
+    },
+    sellNow: {
+      ...createErrorBlockMeta({
+        sourceRefs: createBlockSourceRefs(input, 'sellNow'),
+        fallback: internalFallback,
+        error: internalError,
+      }),
+      realizedText: '내부 오류로 sell-now canonical block을 만들 수 없습니다.',
+      rows: [],
+    },
+    portfolioSimulation: {
+      ...createErrorBlockMeta({
+        sourceRefs: createBlockSourceRefs(input, 'portfolioSimulation'),
+        fallback: internalFallback,
+        error: internalError,
+      }),
+      beforeScore: 0,
+      afterScore: 0,
+      deltaLabel: '0p',
+      caption: '내부 오류로 포트폴리오 시뮬레이션을 계산할 수 없습니다.',
+    },
+  };
+
+  return {
+    input,
+    ...blocks,
+    metadata: {
+      generatedAt,
+      version: DEEP_SCAN_VERSION,
+      degraded: true,
+      errorCode: INTERNAL_SERVICE_ERROR_CODE,
+      debugId: createDebugId(input),
+      inputValidity: {
+        valid: false,
+        reason: 'internal payload assembly failure',
+        raw: safeCloneRawInput(rawInput),
+      },
+      sourceRefs: metadataSourceRefs,
+      blockStatus: createBlockStatus(blocks),
     },
   };
 }
@@ -382,138 +546,145 @@ function createCommitteeAxes(input) {
 }
 
 export async function buildJarooDeepScanPayload(rawInput = {}) {
-  const input = normalizeInput(rawInput);
+  try {
+    const input = normalizeInput(rawInput);
 
-  if (!input.instrument.code && !input.instrument.ticker) {
-    return createInputInvalidPayload(rawInput);
-  }
+    if (!input.instrument.code && !input.instrument.ticker) {
+      return createInputInvalidPayload(rawInput);
+    }
 
-  const generatedAt = new Date().toISOString();
-  const dateLabel = (input.selectedAt ?? generatedAt).slice(0, 10);
-  const instrumentIdentifier = input.instrument.code ?? input.instrument.ticker;
-
-  return {
-    input,
-    hero: {
-      ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'hero') }),
-      headline: `${input.instrument.name} baseline DeepScan summary`,
-      body: `Crawler baseline placeholder payload for ${instrumentIdentifier}. Live endpoint wiring lands in Task 3.`,
-      statusText: 'Baseline placeholder content',
-      score: 61,
-      scoreLabel: '61 / 100',
-      scoreDelta: '+0',
-    },
-    committee: {
-      ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'committee') }),
-      axes: createCommitteeAxes(input),
-    },
-    insights: {
-      ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'insights') }),
-      sectionLabel: 'Baseline insights',
-      items: [
-        {
-          sourceType: input.sourceContext.from,
-          sourceLabel: 'Input context',
-          date: dateLabel,
-          label: '입력',
-          title: `${input.instrument.name} 보유 맥락`,
-          body: '입력 컨텍스트를 canonical payload에 고정 형식으로 담았습니다.',
-        },
-        {
-          sourceType: 'system',
-          sourceLabel: 'Crawler baseline',
-          date: generatedAt.slice(0, 10),
-          label: '서비스',
-          title: 'Deterministic placeholder synthesis',
-          body: 'Task 2 baseline service emits deterministic placeholders only inside the crawler service.',
-        },
-        {
-          sourceType: 'market',
-          sourceLabel: 'Market placeholder',
-          date: dateLabel,
-          label: '시장',
-          title: `${input.instrument.market ?? 'Unknown'} market stub`,
-          body: '실제 시장/뉴스/리포트 연결 전까지는 canonical fallback 문구만 제공합니다.',
-        },
-      ],
-      summaryTags: ['baseline', 'deterministic', 'crawler-owned'],
-    },
-    strategy: {
-      ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'strategy') }),
-      weekSignal: 'Hold and verify',
-      weekSignalTone: 'neutral',
-      weekBadgeText: 'Baseline',
-      scenarioLabel: 'Endpoint wiring pending',
-      scenarioProbability: '62%',
-      scenarioPeriod: '1-2 weeks',
-      scenarioCondition: 'Canonical payload is available, but live crawler synthesis is not connected yet.',
-      currentPriceText: `Average price ${input.holding?.averagePrice ?? 'N/A'}`,
-      targetPriceText: 'Target TBD',
-      scenarioDetails: [
-        'Crawler service owns the canonical schema and placeholder copy.',
-        'No page heuristic text is reused in this baseline payload.',
-        'Task 3 will attach an endpoint to deliver this payload over HTTP.',
-      ],
-      otherScenarios: [
-        {
-          label: 'Conservative follow-up',
-          probability: '24%',
-          condition: 'Keep the current position until live data sources are connected.',
-        },
-        {
-          label: 'Fast re-check',
-          probability: '14%',
-          condition: 'Rebuild the canonical payload after endpoint and upstream integrations land.',
-        },
-      ],
-      otherScenarioTags: ['baseline', 'integration pending'],
-    },
-    sellNow: {
-      ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'sellNow') }),
-      realizedText: 'Baseline sell-now block uses deterministic placeholders and holding fields only.',
-      rows: [
-        {
-          label: '보유 수량',
-          value: input.holding?.shares ?? 'N/A',
-          tag: 'holding',
-          tagTone: 'positive',
-          emphasis: true,
-        },
-        {
-          label: '평균 단가',
-          value: input.holding?.averagePrice ?? 'N/A',
-          tag: 'avg',
-          tagTone: 'danger',
-          valueTone: 'danger',
-        },
-        {
-          label: '평가 금액',
-          value: input.holding?.evaluationAmount ?? 'N/A',
-          tag: 'snapshot',
-          tagTone: 'positive',
-        },
-      ],
-    },
-    portfolioSimulation: {
-      ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'portfolioSimulation') }),
-      beforeScore: 58,
-      afterScore: 64,
-      deltaLabel: '+6p',
-      caption: 'Baseline simulation placeholder: removing the position would slightly improve diversification in this stub.',
-    },
-    metadata: {
-      generatedAt,
-      version: DEEP_SCAN_VERSION,
-      degraded: true,
-      debugId: createDebugId(input),
-      inputValidity: {
-        valid: true,
-        raw: rawInput,
+    const generatedAt = deriveGeneratedAt(input);
+    const dateLabel = (input.selectedAt ?? generatedAt).slice(0, 10);
+    const instrumentIdentifier = input.instrument.code ?? input.instrument.ticker;
+    const blocks = {
+      hero: {
+        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'hero') }),
+        headline: `${input.instrument.name} baseline DeepScan summary`,
+        body: `Crawler baseline placeholder payload for ${instrumentIdentifier}. Live endpoint wiring lands in Task 3.`,
+        statusText: 'Baseline placeholder content',
+        score: 61,
+        scoreLabel: '61 / 100',
+        scoreDelta: '+0',
       },
-      sourceRefs: createBaseSourceRefs(input),
-      blockStatus: createBlockStatus('ok'),
-    },
-  };
+      committee: {
+        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'committee') }),
+        axes: createCommitteeAxes(input),
+      },
+      insights: {
+        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'insights') }),
+        sectionLabel: 'Baseline insights',
+        items: [
+          {
+            sourceType: input.sourceContext.from,
+            sourceLabel: 'Input context',
+            date: dateLabel,
+            label: '입력',
+            title: `${input.instrument.name} 보유 맥락`,
+            body: '입력 컨텍스트를 canonical payload에 고정 형식으로 담았습니다.',
+          },
+          {
+            sourceType: 'system',
+            sourceLabel: 'Crawler baseline',
+            date: generatedAt.slice(0, 10),
+            label: '서비스',
+            title: 'Deterministic placeholder synthesis',
+            body: 'Task 2 baseline service emits deterministic placeholders only inside the crawler service.',
+          },
+          {
+            sourceType: 'market',
+            sourceLabel: 'Market placeholder',
+            date: dateLabel,
+            label: '시장',
+            title: `${input.instrument.market ?? 'Unknown'} market stub`,
+            body: '실제 시장/뉴스/리포트 연결 전까지는 canonical fallback 문구만 제공합니다.',
+          },
+        ],
+        summaryTags: ['baseline', 'deterministic', 'crawler-owned'],
+      },
+      strategy: {
+        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'strategy') }),
+        weekSignal: 'Hold and verify',
+        weekSignalTone: 'neutral',
+        weekBadgeText: 'Baseline',
+        scenarioLabel: 'Endpoint wiring pending',
+        scenarioProbability: '62%',
+        scenarioPeriod: '1-2 weeks',
+        scenarioCondition: 'Canonical payload is available, but live crawler synthesis is not connected yet.',
+        currentPriceText: `Average price ${input.holding?.averagePrice ?? 'N/A'}`,
+        targetPriceText: 'Target TBD',
+        scenarioDetails: [
+          'Crawler service owns the canonical schema and placeholder copy.',
+          'No page heuristic text is reused in this baseline payload.',
+          'Task 3 will attach an endpoint to deliver this payload over HTTP.',
+        ],
+        otherScenarios: [
+          {
+            label: 'Conservative follow-up',
+            probability: '24%',
+            condition: 'Keep the current position until live data sources are connected.',
+          },
+          {
+            label: 'Fast re-check',
+            probability: '14%',
+            condition: 'Rebuild the canonical payload after endpoint and upstream integrations land.',
+          },
+        ],
+        otherScenarioTags: ['baseline', 'integration pending'],
+      },
+      sellNow: {
+        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'sellNow') }),
+        realizedText: 'Baseline sell-now block uses deterministic placeholders and holding fields only.',
+        rows: [
+          {
+            label: '보유 수량',
+            value: input.holding?.shares ?? 'N/A',
+            tag: 'holding',
+            tagTone: 'positive',
+            emphasis: true,
+          },
+          {
+            label: '평균 단가',
+            value: input.holding?.averagePrice ?? 'N/A',
+            tag: 'avg',
+            tagTone: 'danger',
+            valueTone: 'danger',
+          },
+          {
+            label: '평가 금액',
+            value: input.holding?.evaluationAmount ?? 'N/A',
+            tag: 'snapshot',
+            tagTone: 'positive',
+          },
+        ],
+      },
+      portfolioSimulation: {
+        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'portfolioSimulation') }),
+        beforeScore: 58,
+        afterScore: 64,
+        deltaLabel: '+6p',
+        caption: 'Baseline simulation placeholder: removing the position would slightly improve diversification in this stub.',
+      },
+    };
+
+    return {
+      input,
+      ...blocks,
+      metadata: {
+        generatedAt,
+        version: DEEP_SCAN_VERSION,
+        degraded: true,
+        debugId: createDebugId(input),
+        inputValidity: {
+          valid: true,
+          raw: safeCloneRawInput(rawInput),
+        },
+        sourceRefs: createBaseSourceRefs(input),
+        blockStatus: createBlockStatus(blocks),
+      },
+    };
+  } catch {
+    return createInternalErrorPayload(rawInput);
+  }
 }
 
 export {
