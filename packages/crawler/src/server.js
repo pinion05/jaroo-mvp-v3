@@ -175,36 +175,76 @@ function mapJarooDeepScanPayloadToInternalError(payload) {
     reason: 'internal-service-error',
     label: 'canonical internal error payload',
   };
-  const blockStatus = Object.fromEntries(DEEPSCAN_MAJOR_BLOCK_KEYS.map((key) => [key, 'error']));
-  const blocks = Object.fromEntries(DEEPSCAN_MAJOR_BLOCK_KEYS.map((key) => {
+  const createErrorBlock = (key, content) => {
     const block = safePayload[key] && typeof safePayload[key] === 'object' ? safePayload[key] : {};
 
-    return [
-      key,
-      {
-        ...block,
-        blockState: 'error',
-        sourceRefs: Array.isArray(block.sourceRefs) ? block.sourceRefs : [],
-        fallback,
-        error,
-      },
-    ];
-  }));
+    return {
+      blockState: 'error',
+      sourceRefs: Array.isArray(block.sourceRefs) ? block.sourceRefs : [],
+      fallback,
+      error,
+      ...content,
+    };
+  };
+  const blocks = {
+    hero: createErrorBlock('hero', {
+      headline: 'DeepScan payload 생성 중 오류가 발생했습니다',
+      body: 'Crawler 서비스 내부 오류로 canonical error payload를 반환했습니다.',
+      statusText: '서비스 오류',
+      score: 0,
+      scoreLabel: 'N/A',
+      scoreDelta: '0',
+    }),
+    committee: createErrorBlock('committee', {
+      axes: [],
+    }),
+    insights: createErrorBlock('insights', {
+      sectionLabel: '서비스 오류',
+      items: [],
+      summaryTags: [],
+    }),
+    strategy: createErrorBlock('strategy', {
+      weekSignal: 'Unavailable',
+      weekSignalTone: 'neutral',
+      weekBadgeText: 'Error',
+      scenarioLabel: '서비스 오류',
+      scenarioProbability: '0%',
+      scenarioPeriod: 'N/A',
+      scenarioCondition: '내부 오류로 전략 시나리오를 계산할 수 없습니다.',
+      currentPriceText: 'N/A',
+      targetPriceText: 'N/A',
+      scenarioDetails: [],
+      otherScenarios: [],
+      otherScenarioTags: [],
+    }),
+    sellNow: createErrorBlock('sellNow', {
+      realizedText: '내부 오류로 sell-now canonical block을 만들 수 없습니다.',
+      rows: [],
+    }),
+    portfolioSimulation: createErrorBlock('portfolioSimulation', {
+      beforeScore: 0,
+      afterScore: 0,
+      deltaLabel: '0p',
+      caption: '내부 오류로 포트폴리오 시뮬레이션을 계산할 수 없습니다.',
+    }),
+  };
 
   return {
-    ...safePayload,
     input: safeInput,
     ...blocks,
     metadata: {
-      ...safeMetadata,
+      generatedAt: safeMetadata.generatedAt ?? safeInput.selectedAt ?? '1970-01-01T00:00:00.000Z',
+      version: safeMetadata.version ?? 'deepscan-payload-baseline-v1',
       degraded: true,
       errorCode: 'internal-service-error',
+      debugId: safeMetadata.debugId ?? `deepscan:${safeInput.instrument?.market ?? 'NA'}:${safeInput.instrument?.code ?? safeInput.instrument?.ticker ?? 'missing'}`,
       inputValidity: {
-        ...(safeMetadata.inputValidity && typeof safeMetadata.inputValidity === 'object' ? safeMetadata.inputValidity : {}),
         valid: false,
         reason: 'internal payload assembly failure',
+        raw: safeMetadata.inputValidity && typeof safeMetadata.inputValidity === 'object' ? safeMetadata.inputValidity.raw ?? safeInput : safeInput,
       },
-      blockStatus,
+      sourceRefs: Array.isArray(safeMetadata.sourceRefs) ? safeMetadata.sourceRefs : [],
+      blockStatus: Object.fromEntries(DEEPSCAN_MAJOR_BLOCK_KEYS.map((key) => [key, 'error'])),
     },
   };
 }

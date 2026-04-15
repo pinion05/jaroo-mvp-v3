@@ -113,7 +113,19 @@ test('GET /api/deepscan maps thrown errors to a raw canonical internal service e
 
     assert.equal(Object.prototype.hasOwnProperty.call(body, 'ok'), false);
     assert.equal(body.metadata.errorCode, 'internal-service-error');
+    assert.equal(body.metadata.inputValidity.valid, false);
+    assert.equal(body.metadata.inputValidity.reason, 'internal payload assembly failure');
     assert.equal(body.hero.blockState, 'error');
+    assert.equal(body.hero.headline, 'DeepScan payload 생성 중 오류가 발생했습니다');
+    assert.equal(body.hero.body, 'Crawler 서비스 내부 오류로 canonical error payload를 반환했습니다.');
+    assert.equal(body.hero.statusText, '서비스 오류');
+    assert.deepEqual(body.committee.axes, []);
+    assert.equal(body.insights.sectionLabel, '서비스 오류');
+    assert.deepEqual(body.insights.items, []);
+    assert.equal(body.strategy.weekSignal, 'Unavailable');
+    assert.equal(body.strategy.scenarioCondition, '내부 오류로 전략 시나리오를 계산할 수 없습니다.');
+    assert.equal(body.sellNow.realizedText, '내부 오류로 sell-now canonical block을 만들 수 없습니다.');
+    assert.equal(body.portfolioSimulation.caption, '내부 오류로 포트폴리오 시뮬레이션을 계산할 수 없습니다.');
     assert.equal(body.input.instrument.name, '삼성전자');
     assert.equal(body.input.sourceContext.from, 'holding');
   } finally {
