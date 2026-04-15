@@ -67,7 +67,7 @@ test('GET /api/deepscan returns raw canonical payload and builds input from quer
   assert.equal(body.input.sourceContext.from, 'holding');
 });
 
-test('GET /crawl/deepscan returns raw input-invalid payload with HTTP 400', async () => {
+test('GET /api/deepscan returns raw input-invalid payload with HTTP 400 on the primary path', async () => {
   const { app } = await import('../src/server.js');
 
   const body = await withServer(app, async (baseUrl) => {
@@ -75,7 +75,7 @@ test('GET /crawl/deepscan returns raw input-invalid payload with HTTP 400', asyn
       name: '삼성전자',
       from: 'holding',
     });
-    const response = await fetch(`${baseUrl}/crawl/deepscan?${params.toString()}`);
+    const response = await fetch(`${baseUrl}/api/deepscan?${params.toString()}`);
 
     assert.equal(response.status, 400);
     return response.json();
@@ -88,31 +88,24 @@ test('GET /crawl/deepscan returns raw input-invalid payload with HTTP 400', asyn
   assert.equal(body.hero.blockState, 'blocked');
 });
 
-test('GET /api/deepscan maps canonical internal service error payloads to HTTP 500', async () => {
-  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+test('GET /api/deepscan maps thrown errors to a raw canonical internal service error payload', async () => {
   const { app, endpointDefinitions } = await import('../src/server.js');
   const definition = endpointDefinitions.find((item) => item.id === 'deepscan-canonical');
 
   assert.ok(definition);
 
-  const rawInput = {
-    selectedAt: '2026-04-16T00:00:00.000Z',
-  };
-
-  Object.defineProperty(rawInput, 'instrument', {
-    enumerable: true,
-    get() {
-      throw new Error('boom');
-    },
-  });
-
-  const fixture = await buildJarooDeepScanPayload(rawInput);
   const originalHandler = definition.handler;
-  definition.handler = async () => fixture;
+  definition.handler = async () => {
+    throw new Error('boom');
+  };
 
   try {
     const body = await withServer(app, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/api/deepscan`);
+      const params = new URLSearchParams({
+        name: '삼성전자',
+        from: 'holding',
+      });
+      const response = await fetch(`${baseUrl}/api/deepscan?${params.toString()}`);
 
       assert.equal(response.status, 500);
       return response.json();
@@ -121,6 +114,8 @@ test('GET /api/deepscan maps canonical internal service error payloads to HTTP 5
     assert.equal(Object.prototype.hasOwnProperty.call(body, 'ok'), false);
     assert.equal(body.metadata.errorCode, 'internal-service-error');
     assert.equal(body.hero.blockState, 'error');
+    assert.equal(body.input.instrument.name, '삼성전자');
+    assert.equal(body.input.sourceContext.from, 'holding');
   } finally {
     definition.handler = originalHandler;
   }

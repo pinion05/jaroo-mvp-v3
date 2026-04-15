@@ -110,10 +110,16 @@ function parseSingleQueryValue(value) {
   return normalizedValue == null ? undefined : String(normalizedValue).trim() || undefined;
 }
 
+const DEEPSCAN_MAJOR_BLOCK_KEYS = Object.freeze([
+  'hero',
+  'committee',
+  'insights',
+  'strategy',
+  'sellNow',
+  'portfolioSimulation',
+]);
+
 function buildJarooDeepScanInputFromQuery(req) {
-  const instrument = {};
-  const holding = {};
-  const sourceContext = {};
   const market = parseSingleQueryValue(req.query.market);
   const code = parseSingleQueryValue(req.query.code);
   const ticker = parseSingleQueryValue(req.query.ticker);
@@ -123,19 +129,8 @@ function buildJarooDeepScanInputFromQuery(req) {
   const evaluationAmount = parseSingleQueryValue(req.query.evaluationAmount);
   const selectedAt = parseSingleQueryValue(req.query.selectedAt);
   const from = parseSingleQueryValue(req.query.from);
+  const holding = {};
 
-  if (market) {
-    instrument.market = market;
-  }
-  if (code) {
-    instrument.code = code;
-  }
-  if (ticker) {
-    instrument.ticker = ticker;
-  }
-  if (name) {
-    instrument.name = name;
-  }
   if (shares) {
     holding.shares = shares;
   }
@@ -145,16 +140,79 @@ function buildJarooDeepScanInputFromQuery(req) {
   if (evaluationAmount) {
     holding.evaluationAmount = evaluationAmount;
   }
-  if (from) {
-    sourceContext.from = from;
-  }
 
   return {
-    ...(Object.keys(instrument).length > 0 ? { instrument } : {}),
+    instrument: {
+      name: name ?? '알 수 없는 종목',
+      ...(code ? { code } : {}),
+      ...(ticker ? { ticker } : {}),
+      ...(market ? { market } : {}),
+    },
     ...(Object.keys(holding).length > 0 ? { holding } : {}),
     ...(selectedAt ? { selectedAt } : {}),
-    ...(Object.keys(sourceContext).length > 0 ? { sourceContext } : {}),
+    sourceContext: {
+      from: from ?? 'system',
+    },
   };
+}
+
+function mapJarooDeepScanPayloadToInternalError(payload) {
+  const safePayload = payload && typeof payload === 'object' ? payload : {};
+  const safeMetadata = safePayload.metadata && typeof safePayload.metadata === 'object' ? safePayload.metadata : {};
+  const safeInput = safePayload.input && typeof safePayload.input === 'object'
+    ? safePayload.input
+    : {
+        instrument: { name: '알 수 없는 종목' },
+        sourceContext: { from: 'system' },
+      };
+  const error = {
+    code: 'internal-service-error',
+    message: 'unexpected internal crawler service failure',
+    retryable: true,
+  };
+  const fallback = {
+    used: true,
+    reason: 'internal-service-error',
+    label: 'canonical internal error payload',
+  };
+  const blockStatus = Object.fromEntries(DEEPSCAN_MAJOR_BLOCK_KEYS.map((key) => [key, 'error']));
+  const blocks = Object.fromEntries(DEEPSCAN_MAJOR_BLOCK_KEYS.map((key) => {
+    const block = safePayload[key] && typeof safePayload[key] === 'object' ? safePayload[key] : {};
+
+    return [
+      key,
+      {
+        ...block,
+        blockState: 'error',
+        sourceRefs: Array.isArray(block.sourceRefs) ? block.sourceRefs : [],
+        fallback,
+        error,
+      },
+    ];
+  }));
+
+  return {
+    ...safePayload,
+    input: safeInput,
+    ...blocks,
+    metadata: {
+      ...safeMetadata,
+      degraded: true,
+      errorCode: 'internal-service-error',
+      inputValidity: {
+        ...(safeMetadata.inputValidity && typeof safeMetadata.inputValidity === 'object' ? safeMetadata.inputValidity : {}),
+        valid: false,
+        reason: 'internal payload assembly failure',
+      },
+      blockStatus,
+    },
+  };
+}
+
+async function buildJarooDeepScanRawFailurePayload(req) {
+  const input = buildJarooDeepScanInputFromQuery(req);
+  const payload = await buildJarooDeepScanPayload(input);
+  return mapJarooDeepScanPayloadToInternalError(payload);
 }
 
 function isValidIsoDate(value) {
@@ -272,7 +330,20 @@ function sendSuccess(req, res, definition, matchedPath, data) {
   });
 }
 
-function sendFailure(req, res, definition, matchedPath, error) {
+async function sendFailure(req, res, definition, matchedPath, error) {
+  if (typeof definition.failureHandler === 'function') {
+    try {
+      const failure = await definition.failureHandler(req, error);
+
+      if (failure?.raw === true) {
+        res.status(Number(failure.status) || 500).json(failure.body);
+        return;
+      }
+    } catch {
+      // Fall through to the standard envelope when custom failure mapping fails.
+    }
+  }
+
   const status = Number(error?.status) || 500;
   res.status(status).json({
     ok: false,
@@ -2276,6 +2347,11 @@ const endpointDefinitions = [
 
       return 200;
     },
+    failureHandler: async (req) => ({
+      raw: true,
+      status: 500,
+      body: await buildJarooDeepScanRawFailurePayload(req),
+    }),
     handler: async (req) => buildJarooDeepScanPayload(buildJarooDeepScanInputFromQuery(req)),
   },
   {
@@ -2370,7 +2446,7 @@ for (const definition of endpointDefinitions) {
         const data = await definition.handler(req);
         sendSuccess(req, res, definition, matchedPath, data);
       } catch (error) {
-        sendFailure(req, res, definition, matchedPath, error);
+        await sendFailure(req, res, definition, matchedPath, error);
       }
     });
   }
