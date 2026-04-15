@@ -35,18 +35,4 @@ export type JarooQuoteSnapshot = {
   asOf?: string
 }
 
-export type JarooDeepScanInput = {
-  instrument: JarooInstrumentRef
-  holding?: {
-    shares?: string
-    averagePrice?: string
-    evaluationAmount?: string
-  }
-}
-
-export type JarooDeepScanSummary = {
-  title: string
-  score?: number
-  status?: string
-  generatedAt?: string
-}
+export * from './deepscan'
