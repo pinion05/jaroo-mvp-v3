@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import {
   WISEREPORT_GLOBAL_ROUTES,
   WISEREPORT_KR_PAGES,
+  buildJarooDeepScanPayload,
   crawlWiseReportGlobal,
   crawlWiseReportGlobalDomainData,
   crawlWiseReportKrPage,
@@ -109,6 +110,53 @@ function parseSingleQueryValue(value) {
   return normalizedValue == null ? undefined : String(normalizedValue).trim() || undefined;
 }
 
+function buildJarooDeepScanInputFromQuery(req) {
+  const instrument = {};
+  const holding = {};
+  const sourceContext = {};
+  const market = parseSingleQueryValue(req.query.market);
+  const code = parseSingleQueryValue(req.query.code);
+  const ticker = parseSingleQueryValue(req.query.ticker);
+  const name = parseSingleQueryValue(req.query.name);
+  const shares = parseSingleQueryValue(req.query.shares);
+  const averagePrice = parseSingleQueryValue(req.query.averagePrice);
+  const evaluationAmount = parseSingleQueryValue(req.query.evaluationAmount);
+  const selectedAt = parseSingleQueryValue(req.query.selectedAt);
+  const from = parseSingleQueryValue(req.query.from);
+
+  if (market) {
+    instrument.market = market;
+  }
+  if (code) {
+    instrument.code = code;
+  }
+  if (ticker) {
+    instrument.ticker = ticker;
+  }
+  if (name) {
+    instrument.name = name;
+  }
+  if (shares) {
+    holding.shares = shares;
+  }
+  if (averagePrice) {
+    holding.averagePrice = averagePrice;
+  }
+  if (evaluationAmount) {
+    holding.evaluationAmount = evaluationAmount;
+  }
+  if (from) {
+    sourceContext.from = from;
+  }
+
+  return {
+    ...(Object.keys(instrument).length > 0 ? { instrument } : {}),
+    ...(Object.keys(holding).length > 0 ? { holding } : {}),
+    ...(selectedAt ? { selectedAt } : {}),
+    ...(Object.keys(sourceContext).length > 0 ? { sourceContext } : {}),
+  };
+}
+
 function isValidIsoDate(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return false;
@@ -195,13 +243,27 @@ function buildMeta(definition, matchedPath, data) {
   };
 }
 
+function resolveSuccessStatus(definition, data) {
+  if (typeof definition.successStatus === 'function') {
+    return Number(definition.successStatus(data)) || 200;
+  }
+
+  if (Number.isFinite(definition.successStatus)) {
+    return definition.successStatus;
+  }
+
+  return 200;
+}
+
 function sendSuccess(req, res, definition, matchedPath, data) {
+  const status = resolveSuccessStatus(definition, data);
+
   if (definition.rawSuccess === true) {
-    res.json(data);
+    res.status(status).json(data);
     return;
   }
 
-  res.json({
+  res.status(status).json({
     ok: true,
     data,
     count: resolveCount(definition, data),
@@ -2183,6 +2245,38 @@ const endpointDefinitions = [
       const { startDate, endDate } = requireQueryValues(req, ['startDate', 'endDate']);
       return getInvestorVolume(req.params.ticker, startDate, endDate);
     },
+  },
+  {
+    id: 'deepscan-canonical',
+    resource: 'jaroo.deepscan.canonical',
+    description: 'DeepScan canonical payload를 raw body로 반환합니다.',
+    primaryPath: '/api/deepscan',
+    aliases: ['/crawl/deepscan'],
+    params: [],
+    query: [
+      'market(optional)',
+      'code(optional)',
+      'ticker(optional)',
+      'name(optional)',
+      'shares(optional)',
+      'averagePrice(optional)',
+      'evaluationAmount(optional)',
+      'selectedAt(optional)',
+      'from(optional)',
+    ],
+    rawSuccess: true,
+    successStatus: (payload) => {
+      if (payload?.metadata?.errorCode === 'input-invalid') {
+        return 400;
+      }
+
+      if (payload?.metadata?.errorCode === 'internal-service-error') {
+        return 500;
+      }
+
+      return 200;
+    },
+    handler: async (req) => buildJarooDeepScanPayload(buildJarooDeepScanInputFromQuery(req)),
   },
   {
     id: 'quotes-current',
