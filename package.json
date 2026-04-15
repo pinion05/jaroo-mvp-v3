@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "npm run dev:web",
+    "dev": "node scripts/dev-stack.cjs",
     "build": "npm run build:web",
     "build:instrument-universe": "python scripts/build-instrument-universe.py",
     "start": "npm run start:web",
+    "test": "node --test tests/*.test.mjs && npm run test:crawler && npm run test:instrument-core",
     "lint": "npm run lint:web",
     "dev:web": "next dev",
     "build:web": "next build",
