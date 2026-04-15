@@ -4,6 +4,11 @@ export type DeepScanBlockState = (typeof DEEP_SCAN_BLOCK_STATES)[number]
 export const DEEP_SCAN_SOURCE_TYPES = ['ocr', 'holding', 'report', 'news', 'market', 'system'] as const
 export type DeepScanSourceType = (typeof DEEP_SCAN_SOURCE_TYPES)[number]
 
+export type JarooDeepScanCommitteeMemberTone = 'positive' | 'neutral' | 'warning'
+export type JarooDeepScanCommitteeMemberIconTone = 'blue' | 'green' | 'amber' | 'red' | 'purple' | 'teal'
+export type JarooDeepScanSellNowTagTone = 'positive' | 'danger'
+export type JarooDeepScanSellNowValueTone = 'danger'
+
 export const JAROO_DEEP_SCAN_TOP_LEVEL_KEYS = [
   'input',
   'hero',
@@ -48,7 +53,7 @@ export type JarooDeepScanInputInstrument = {
   code?: string
   ticker?: string
   market?: string
-  kind?: string
+  kind?: import('./index').JarooInstrumentKind
 }
 
 export type JarooDeepScanInputHolding = {
@@ -58,7 +63,7 @@ export type JarooDeepScanInputHolding = {
 }
 
 export type JarooDeepScanInputSourceContext = {
-  from: string
+  from: DeepScanSourceType
   sessionKey?: string
   appliedAt?: string
 }
@@ -76,8 +81,8 @@ export type JarooDeepScanCommitteeMember = {
   reason: string
   score: number
   scoreLabel: string
-  tone: string
-  iconTone: string
+  tone: JarooDeepScanCommitteeMemberTone
+  iconTone: JarooDeepScanCommitteeMemberIconTone
 }
 
 export type JarooDeepScanCommitteeAxis = {
@@ -108,10 +113,10 @@ export type JarooDeepScanStrategyScenario = {
 export type JarooDeepScanSellNowRow = {
   label: string
   value: string
-  tag: string
-  tagTone: string
-  valueTone: string
-  emphasis: string
+  tag?: string
+  tagTone?: JarooDeepScanSellNowTagTone
+  valueTone?: JarooDeepScanSellNowValueTone
+  emphasis?: boolean
 }
 
 export type JarooDeepScanHeroBlock = DeepScanBlockMeta & {
@@ -160,12 +165,19 @@ export type JarooDeepScanPortfolioSimulationBlock = DeepScanBlockMeta & {
   caption: string
 }
 
-export type JarooDeepScanInputValidity = {
-  valid: boolean
-  reason?: string
-  missing?: string[]
-  raw?: unknown
-}
+export type JarooDeepScanInputValidity =
+  | {
+      valid: true
+      raw?: unknown
+      reason?: never
+      missing?: never
+    }
+  | {
+      valid: false
+      reason: string
+      missing?: string[]
+      raw?: unknown
+    }
 
 export type JarooDeepScanBlockStatus = {
   hero: DeepScanBlockState

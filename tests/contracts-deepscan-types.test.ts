@@ -1,9 +1,85 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { DEEP_SCAN_BLOCK_STATES, JAROO_DEEP_SCAN_TOP_LEVEL_KEYS, type JarooDeepScanPayload } from '../packages/contracts/src/deepscan.ts'
+import {
+  DEEP_SCAN_BLOCK_STATES,
+  JAROO_DEEP_SCAN_TOP_LEVEL_KEYS,
+  type DeepScanSourceType,
+  type JarooDeepScanCommitteeMember,
+  type JarooDeepScanInputInstrument,
+  type JarooDeepScanInputSourceContext,
+  type JarooDeepScanInputValidity,
+  type JarooDeepScanPayload as BarrelJarooDeepScanPayload,
+  type JarooDeepScanSellNowRow,
+  type JarooInstrumentKind,
+} from '../packages/contracts/src/index.ts'
+import {
+  DEEP_SCAN_BLOCK_STATES as directDeepScanBlockStates,
+  JAROO_DEEP_SCAN_TOP_LEVEL_KEYS as directTopLevelKeys,
+} from '../packages/contracts/src/deepscan.ts'
 
-const samplePayload: JarooDeepScanPayload = {
+type Assert<T extends true> = T
+
+type IsExact<A, B> =
+  (<T>() => T extends A ? 1 : 2) extends (<T>() => T extends B ? 1 : 2)
+    ? (<T>() => T extends B ? 1 : 2) extends (<T>() => T extends A ? 1 : 2)
+      ? true
+      : false
+    : false
+
+type ExpectedInputValidity =
+  | {
+      valid: true
+      raw?: unknown
+      reason?: never
+      missing?: never
+    }
+  | {
+      valid: false
+      reason: string
+      missing?: string[]
+      raw?: unknown
+    }
+
+type _BarrelPayloadMatchesDirect = Assert<
+  IsExact<BarrelJarooDeepScanPayload, import('../packages/contracts/src/deepscan.ts').JarooDeepScanPayload>
+>
+type _InputInstrumentKindUsesSharedType = Assert<
+  IsExact<JarooDeepScanInputInstrument['kind'], JarooInstrumentKind | undefined>
+>
+type _InputSourceContextFromUsesSourceDomain = Assert<
+  IsExact<JarooDeepScanInputSourceContext['from'], DeepScanSourceType>
+>
+type _CommitteeMemberToneIsFinite = Assert<
+  IsExact<JarooDeepScanCommitteeMember['tone'], 'positive' | 'neutral' | 'warning'>
+>
+type _CommitteeMemberIconToneIsFinite = Assert<
+  IsExact<JarooDeepScanCommitteeMember['iconTone'], 'blue' | 'green' | 'amber' | 'red' | 'purple' | 'teal'>
+>
+type _SellNowRowTagToneIsFinite = Assert<
+  IsExact<JarooDeepScanSellNowRow['tagTone'], 'positive' | 'danger' | undefined>
+>
+type _SellNowRowValueToneIsFinite = Assert<
+  IsExact<JarooDeepScanSellNowRow['valueTone'], 'danger' | undefined>
+>
+type _SellNowRowEmphasisIsBoolean = Assert<IsExact<JarooDeepScanSellNowRow['emphasis'], boolean | undefined>>
+
+type _InputValidityAvoidsContradictoryStates = Assert<IsExact<JarooDeepScanInputValidity, ExpectedInputValidity>>
+
+const EXPECTED_TOP_LEVEL_KEYS = [
+  'input',
+  'hero',
+  'committee',
+  'insights',
+  'strategy',
+  'sellNow',
+  'portfolioSimulation',
+  'metadata',
+] as const
+
+const CONTENT_BLOCK_KEYS = ['hero', 'committee', 'insights', 'strategy', 'sellNow', 'portfolioSimulation'] as const
+
+const samplePayload: BarrelJarooDeepScanPayload = {
   input: {
     instrument: {
       name: '삼성전자',
@@ -52,7 +128,7 @@ const samplePayload: JarooDeepScanPayload = {
             score: 64,
             scoreLabel: '64점',
             tone: 'neutral',
-            iconTone: 'slate',
+            iconTone: 'blue',
           },
         ],
       },
@@ -82,7 +158,7 @@ const samplePayload: JarooDeepScanPayload = {
   },
   strategy: {
     weekSignal: '보유',
-    weekSignalTone: 'neutral',
+    weekSignalTone: 'text-[color:var(--jaroo-warning)]',
     weekBadgeText: '중립',
     scenarioLabel: '기본 시나리오',
     scenarioProbability: '55%',
@@ -108,12 +184,11 @@ const samplePayload: JarooDeepScanPayload = {
     realizedText: '지금 매도 시 수익률 +2%',
     rows: [
       {
-        label: '예상 수익',
-        value: '+14,000원',
-        tag: '기본',
-        tagTone: 'neutral',
-        valueTone: 'positive',
-        emphasis: 'high',
+        label: '종목 코드',
+        value: '005930',
+        tag: '확인',
+        tagTone: 'positive',
+        emphasis: true,
       },
     ],
     blockState: 'ok',
@@ -154,25 +229,20 @@ const samplePayload: JarooDeepScanPayload = {
   },
 }
 
-test('JarooDeepScanPayload exposes canonical top-level blocks', () => {
-  assert.deepEqual(JAROO_DEEP_SCAN_TOP_LEVEL_KEYS, [
-    'input',
-    'hero',
-    'committee',
-    'insights',
-    'strategy',
-    'sellNow',
-    'portfolioSimulation',
-    'metadata',
-  ])
+test('deepscan barrel re-exports canonical constants', () => {
+  assert.equal(DEEP_SCAN_BLOCK_STATES, directDeepScanBlockStates)
+  assert.equal(JAROO_DEEP_SCAN_TOP_LEVEL_KEYS, directTopLevelKeys)
+})
 
+test('JarooDeepScanPayload exposes canonical top-level blocks', () => {
+  assert.deepEqual(JAROO_DEEP_SCAN_TOP_LEVEL_KEYS, EXPECTED_TOP_LEVEL_KEYS)
   assert.deepEqual(Object.keys(samplePayload), JAROO_DEEP_SCAN_TOP_LEVEL_KEYS)
 })
 
 test('major blocks share common meta fields and metadata keeps structured input validity', () => {
   assert.deepEqual(DEEP_SCAN_BLOCK_STATES, ['ok', 'error', 'blocked'])
 
-  for (const blockKey of ['hero', 'committee', 'insights', 'strategy', 'sellNow', 'portfolioSimulation'] as const) {
+  for (const blockKey of CONTENT_BLOCK_KEYS) {
     const block = samplePayload[blockKey]
     assert.ok(DEEP_SCAN_BLOCK_STATES.includes(block.blockState))
     assert.ok(Array.isArray(block.sourceRefs))
