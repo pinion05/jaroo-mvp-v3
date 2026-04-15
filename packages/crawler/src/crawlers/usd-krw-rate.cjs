@@ -38,7 +38,6 @@ async function getRedisClientFromEnv() {
           url: redisUrl,
           socket: {
             connectTimeout: 1000,
-            reconnectStrategy: () => false,
           },
         });
         client.on('error', (error) => {

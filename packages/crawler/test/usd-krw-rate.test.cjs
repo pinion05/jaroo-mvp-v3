@@ -126,6 +126,61 @@ test('fetchUsdKrwRate reads from Redis cache before live fetch when memory cache
   assert.strictEqual(second, first);
 });
 
+test('fetchUsdKrwRate keeps Redis default reconnect behavior enabled', async () => {
+  const Module = require('node:module');
+  const originalLoad = Module._load;
+  const originalRedisUrl = process.env.REDIS_URL;
+  let createClientOptions = null;
+
+  Module._load = function patchedLoad(request, parent, isMain) {
+    if (request === 'redis') {
+      return {
+        createClient(options) {
+          createClientOptions = options;
+          return {
+            on() {},
+            async connect() {},
+            async get() {
+              return null;
+            },
+            async setEx() {},
+          };
+        },
+      };
+    }
+
+    return originalLoad.call(this, request, parent, isMain);
+  };
+
+  process.env.REDIS_URL = 'redis://unit-test-default-reconnect';
+
+  try {
+    const fetchUsdKrwRate = createUsdKrwRateFetcher({
+      fetcher: async () => ({
+        rate: 1351.3,
+        change: 0.1,
+        changePercent: 0.01,
+        timestamp: '2026-04-15T01:50:00.000Z',
+      }),
+      now: () => 80_000,
+    });
+
+    await fetchUsdKrwRate();
+
+    assert.ok(createClientOptions);
+    assert.equal(createClientOptions.url, 'redis://unit-test-default-reconnect');
+    assert.equal(createClientOptions.socket?.connectTimeout, 1000);
+    assert.equal(createClientOptions.socket?.reconnectStrategy, undefined);
+  } finally {
+    Module._load = originalLoad;
+    if (originalRedisUrl === undefined) {
+      delete process.env.REDIS_URL;
+    } else {
+      process.env.REDIS_URL = originalRedisUrl;
+    }
+  }
+});
+
 test('fetchUsdKrwRate writes successful live fetches to Redis with a 24 hour TTL', async () => {
   const redisWrites = [];
   const livePayload = {
