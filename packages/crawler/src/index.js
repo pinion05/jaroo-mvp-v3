@@ -97,6 +97,10 @@ export {
 } from './crawlers/us-stock-report.js';
 
 export {
+  buildJarooDeepScanPayload,
+} from './services/deepscan-payload.js';
+
+export {
   SOURCES,
   WISEREPORT_GLOBAL_ROUTES,
   WISEREPORT_KR_PAGES,
