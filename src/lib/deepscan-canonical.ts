@@ -1,6 +1,6 @@
 import type { JarooDeepScanPayload } from '../../packages/contracts/src/deepscan'
 
-import type { HomeHolding, HomeMarketTone } from './jaroo-home-data'
+import type { HomeHolding } from './jaroo-home-data'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -17,7 +17,6 @@ export type DeepScanCanonicalTargetSession = {
 }
 
 const CANONICAL_QUERY_KEYS = [
-  'market',
   'code',
   'ticker',
   'name',
@@ -52,41 +51,6 @@ function normalizeText(value: unknown) {
   return normalized || undefined
 }
 
-function isKnownMarketTone(value: unknown): value is HomeMarketTone {
-  return value === 'kospi' || value === 'kosdaq' || value === 'etf' || value === 'nasdaq'
-}
-
-function resolveCanonicalMarket(holding: DeepScanCanonicalHolding) {
-  const market = normalizeText(holding.market)?.toUpperCase()
-  const marketTone = isKnownMarketTone(holding.marketTone) ? holding.marketTone : undefined
-  const code = normalizeText(holding.code) ?? normalizeText(holding.identifierCode)
-  const ticker = normalizeText(holding.ticker) ?? normalizeText(holding.identifierTicker)
-
-  if (
-    marketTone === 'nasdaq'
-    || market === 'US'
-    || market === 'NASDAQ'
-    || market === 'NYSE'
-    || market === 'AMEX'
-  ) {
-    return 'US'
-  }
-
-  if (market === 'KR' || market === 'KOSPI' || market === 'KOSDAQ' || marketTone === 'kospi' || marketTone === 'kosdaq') {
-    return 'KR'
-  }
-
-  if (code) {
-    return 'KR'
-  }
-
-  if (ticker) {
-    return 'US'
-  }
-
-  return undefined
-}
-
 function setQueryValue(searchParams: URLSearchParams, key: (typeof CANONICAL_QUERY_KEYS)[number], value: unknown) {
   const normalizedValue = normalizeText(value)
   if (!normalizedValue) {
@@ -94,6 +58,14 @@ function setQueryValue(searchParams: URLSearchParams, key: (typeof CANONICAL_QUE
   }
 
   searchParams.set(key, normalizedValue)
+}
+
+function isStringArray(value: unknown) {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
+function hasOptionalStringFields(record: UnknownRecord, keys: readonly string[]) {
+  return keys.every((key) => record[key] === undefined || typeof record[key] === 'string')
 }
 
 function isBlockMeta(block: unknown) {
@@ -121,19 +93,111 @@ function isBlockMeta(block: unknown) {
   return true
 }
 
-function isCanonicalPayload(payload: unknown): payload is JarooDeepScanPayload {
-  const record = asRecord(payload)
-  if (!record) {
+function hasRequiredStringFields(value: unknown, keys: readonly string[]) {
+  const record = asRecord(value)
+  return !!record && keys.every((key) => typeof record[key] === 'string')
+}
+
+function hasRequiredNumberFields(value: unknown, keys: readonly string[]) {
+  const record = asRecord(value)
+  return !!record && keys.every((key) => typeof record[key] === 'number')
+}
+
+function isCanonicalInput(input: unknown) {
+  const record = asRecord(input)
+  const instrument = asRecord(record?.instrument)
+  const holding = record?.holding === undefined ? undefined : asRecord(record.holding)
+  const sourceContext = asRecord(record?.sourceContext)
+
+  if (!record || !instrument || typeof instrument.name !== 'string' || !instrument.name.trim()) {
     return false
   }
 
-  const input = asRecord(record.input)
-  const instrument = asRecord(input?.instrument)
-  const metadata = asRecord(record.metadata)
+  if (!hasOptionalStringFields(instrument, ['code', 'ticker', 'market', 'kind'])) {
+    return false
+  }
+
+  if (record.selectedAt !== undefined && typeof record.selectedAt !== 'string') {
+    return false
+  }
+
+  if (!sourceContext || typeof sourceContext.from !== 'string' || !sourceContext.from.trim()) {
+    return false
+  }
+
+  if (!hasOptionalStringFields(sourceContext, ['sessionKey', 'appliedAt'])) {
+    return false
+  }
+
+  if (record.holding !== undefined && !holding) {
+    return false
+  }
+
+  if (holding && !hasOptionalStringFields(holding, ['shares', 'averagePrice', 'evaluationAmount'])) {
+    return false
+  }
+
+  return true
+}
+
+function isCanonicalHeroBlock(block: unknown) {
+  return isBlockMeta(block)
+    && hasRequiredStringFields(block, ['headline', 'body', 'statusText', 'scoreLabel', 'scoreDelta'])
+    && hasRequiredNumberFields(block, ['score'])
+}
+
+function isCanonicalCommitteeBlock(block: unknown) {
+  const record = asRecord(block)
+  return isBlockMeta(block) && !!record && Array.isArray(record.axes)
+}
+
+function isCanonicalInsightsBlock(block: unknown) {
+  const record = asRecord(block)
+  return isBlockMeta(block)
+    && !!record
+    && typeof record.sectionLabel === 'string'
+    && Array.isArray(record.items)
+    && isStringArray(record.summaryTags)
+}
+
+function isCanonicalStrategyBlock(block: unknown) {
+  const record = asRecord(block)
+  return isBlockMeta(block)
+    && hasRequiredStringFields(block, [
+      'weekSignal',
+      'weekSignalTone',
+      'weekBadgeText',
+      'scenarioLabel',
+      'scenarioProbability',
+      'scenarioPeriod',
+      'scenarioCondition',
+      'currentPriceText',
+      'targetPriceText',
+    ])
+    && !!record
+    && isStringArray(record.scenarioDetails)
+    && Array.isArray(record.otherScenarios)
+    && isStringArray(record.otherScenarioTags)
+}
+
+function isCanonicalSellNowBlock(block: unknown) {
+  const record = asRecord(block)
+  return isBlockMeta(block) && !!record && typeof record.realizedText === 'string' && Array.isArray(record.rows)
+}
+
+function isCanonicalPortfolioSimulationBlock(block: unknown) {
+  return isBlockMeta(block)
+    && hasRequiredStringFields(block, ['deltaLabel', 'caption'])
+    && hasRequiredNumberFields(block, ['beforeScore', 'afterScore'])
+}
+
+function isCanonicalPayload(payload: unknown): payload is JarooDeepScanPayload {
+  const record = asRecord(payload)
+  const metadata = asRecord(record?.metadata)
   const inputValidity = asRecord(metadata?.inputValidity)
   const blockStatus = asRecord(metadata?.blockStatus)
 
-  if (!input || !instrument || typeof instrument.name !== 'string' || !instrument.name.trim()) {
+  if (!record || !isCanonicalInput(record.input)) {
     return false
   }
 
@@ -152,11 +216,18 @@ function isCanonicalPayload(payload: unknown): payload is JarooDeepScanPayload {
     return false
   }
 
-  for (const key of MAJOR_BLOCK_KEYS) {
-    if (!isBlockMeta(record[key])) {
-      return false
-    }
+  if (
+    !isCanonicalHeroBlock(record.hero)
+    || !isCanonicalCommitteeBlock(record.committee)
+    || !isCanonicalInsightsBlock(record.insights)
+    || !isCanonicalStrategyBlock(record.strategy)
+    || !isCanonicalSellNowBlock(record.sellNow)
+    || !isCanonicalPortfolioSimulationBlock(record.portfolioSimulation)
+  ) {
+    return false
+  }
 
+  for (const key of MAJOR_BLOCK_KEYS) {
     if (!BLOCK_STATES.has(String(blockStatus[key]))) {
       return false
     }
@@ -173,7 +244,6 @@ export function buildDeepScanCanonicalQuery(targetSession: DeepScanCanonicalTarg
   const searchParams = new URLSearchParams()
   const { holding } = targetSession
 
-  setQueryValue(searchParams, 'market', resolveCanonicalMarket(holding))
   setQueryValue(searchParams, 'code', normalizeText(holding.code) ?? normalizeText(holding.identifierCode))
   setQueryValue(searchParams, 'ticker', normalizeText(holding.ticker) ?? normalizeText(holding.identifierTicker))
   setQueryValue(searchParams, 'name', holding.name)
