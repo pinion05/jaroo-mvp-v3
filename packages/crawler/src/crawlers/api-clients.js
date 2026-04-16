@@ -26,6 +26,23 @@ const BASE_URLS = Object.freeze({
   finnhub: 'https://finnhub.io/api/v1',
   secEdgar: 'https://data.sec.gov',
 });
+const PROVIDER_CONFIG = Object.freeze({
+  polygon: {
+    configured: Boolean(POLYGON_API_KEY),
+  },
+  fmp: {
+    configured: Boolean(FMP_API_KEY),
+  },
+  finnhub: {
+    configured: Boolean(FINNHUB_API_KEY),
+  },
+  secEdgar: {
+    configured: true,
+  },
+  yahooChart: {
+    configured: true,
+  },
+});
 
 // ── Rate Limiter ──────────────────────────────────────
 // 각 API별 다음 호출 가능 시간을 추적하여 최소 호출 간격 보장
@@ -111,9 +128,12 @@ export function getProviderCooldownRemaining(apiName) {
 }
 
 export function getProviderStatus(apiName) {
+  const configured = PROVIDER_CONFIG[apiName]?.configured ?? true;
   const cooldownRemainingMs = getProviderCooldownRemaining(apiName);
   return {
     apiName,
+    configured,
+    available: configured && cooldownRemainingMs === 0,
     cooldownRemainingMs,
     exhausted: cooldownRemainingMs > 0,
   };
