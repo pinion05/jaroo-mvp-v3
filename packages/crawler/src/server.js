@@ -309,12 +309,11 @@ function requireQueryValues(req, keys) {
   return values;
 }
 
-function buildRequestInfo(req, definition, matchedPath) {
+function buildRequestInfo(req, definition) {
   return {
     method: req.method,
     path: req.originalUrl,
     primaryPath: definition.primaryPath,
-    aliasOf: matchedPath === definition.primaryPath ? null : definition.primaryPath,
     params: normalizeObject(req.params),
     query: normalizeObject(req.query),
   };
@@ -327,7 +326,7 @@ function resolveMetaExtra(definition, data) {
   return definition.meta || {};
 }
 
-function buildMeta(definition, matchedPath, data) {
+function buildMeta(definition, data) {
   return {
     service: SERVICE_NAME,
     version: SERVICE_VERSION,
@@ -335,8 +334,6 @@ function buildMeta(definition, matchedPath, data) {
     routeId: definition.id,
     description: definition.description,
     generatedAt: new Date().toISOString(),
-    aliases: definition.aliases,
-    deprecatedAliasUsed: matchedPath === definition.primaryPath ? null : matchedPath,
     ...resolveMetaExtra(definition, data),
   };
 }
@@ -353,7 +350,7 @@ function resolveSuccessStatus(definition, data) {
   return 200;
 }
 
-function sendSuccess(req, res, definition, matchedPath, data) {
+function sendSuccess(req, res, definition, data) {
   const status = resolveSuccessStatus(definition, data);
 
   if (definition.rawSuccess === true) {
@@ -365,12 +362,12 @@ function sendSuccess(req, res, definition, matchedPath, data) {
     ok: true,
     data,
     count: resolveCount(definition, data),
-    request: buildRequestInfo(req, definition, matchedPath),
-    meta: buildMeta(definition, matchedPath, data),
+    request: buildRequestInfo(req, definition),
+    meta: buildMeta(definition, data),
   });
 }
 
-async function sendFailure(req, res, definition, matchedPath, error) {
+async function sendFailure(req, res, definition, error) {
   if (typeof definition.failureHandler === 'function') {
     try {
       const failure = await definition.failureHandler(req, error);
@@ -389,8 +386,8 @@ async function sendFailure(req, res, definition, matchedPath, error) {
     ok: false,
     data: null,
     count: 0,
-    request: buildRequestInfo(req, definition, matchedPath),
-    meta: buildMeta(definition, matchedPath, null),
+    request: buildRequestInfo(req, definition),
+    meta: buildMeta(definition, null),
     error: {
       message: error?.message || 'unknown error',
       details: error instanceof HttpError ? error.details : null,
@@ -404,7 +401,6 @@ function buildCatalogEntries() {
     resource: definition.resource,
     description: definition.description,
     primaryPath: definition.primaryPath,
-    aliases: definition.aliases,
     params: definition.params,
     query: definition.query,
   }));
@@ -1873,7 +1869,6 @@ const endpointDefinitions = [
     resource: 'system.health',
     description: '서버 생존 상태와 기본 런타임 정보를 반환합니다.',
     primaryPath: '/health',
-    aliases: [],
     params: [],
     query: [],
     count: 1,
@@ -1891,7 +1886,6 @@ const endpointDefinitions = [
     resource: 'system.catalog',
     description: '이 서버가 제공하는 data provider API 카탈로그를 반환합니다.',
     primaryPath: '/api/catalog',
-    aliases: ['/crawlers'],
     params: [],
     query: [],
     count: (data) => Array.isArray(data?.endpoints) ? data.endpoints.length : 0,
@@ -1907,14 +1901,12 @@ const endpointDefinitions = [
     resource: 'wisereport.kr.aggregate',
     description: '한국 상장사 WiseReport/FnGuide 10개 페이지의 구조화 aggregate 데이터를 반환합니다.',
     primaryPath: '/api/wisereport/kr/:code',
-    aliases: ['/crawl/wisereport/kr/:code'],
     params: ['code'],
     query: [],
     count: (data) => Object.keys(normalizeWiseReportKrAggregate(data).pages || {}).length,
     meta: (data) => ({
       pageRouteCount: WISEREPORT_KR_PAGE_ROUTES.length,
       pageKeys: Object.keys(normalizeWiseReportKrAggregate(data).pages || {}),
-      aliasNotice: 'The /crawl/wisereport/kr/:code alias remains supported for backward compatibility and now returns the structured aggregate payload.',
     }),
     handler: async (req) => buildWiseReportKrAggregatePayload(await getCrawl(req.params.code), req.params.code),
   },
@@ -1923,7 +1915,6 @@ const endpointDefinitions = [
     resource: 'wisereport.kr.aggregate.slim.v1',
     description: '한국 상장사 WiseReport/FnGuide 10개 페이지의 비즈니스 전용 slim aggregate 데이터를 raw JSON으로 반환합니다.',
     primaryPath: '/api/wisereport/kr/:code/slim/v1',
-    aliases: [],
     params: ['code'],
     query: [],
     rawSuccess: true,
@@ -1934,7 +1925,6 @@ const endpointDefinitions = [
     resource: 'wisereport.kr.aggregate.slim.v1.1',
     description: '한국 상장사 WiseReport/FnGuide 10개 페이지의 slim v1.1 데이터를 raw JSON으로 반환합니다. parser-created spacer column, UI control text, non-business tab sections를 정리합니다.',
     primaryPath: '/api/wisereport/kr/:code/slim/v1.1',
-    aliases: [],
     params: ['code'],
     query: [],
     rawSuccess: true,
@@ -1945,7 +1935,6 @@ const endpointDefinitions = [
     resource: route.resource,
     description: route.description,
     primaryPath: `/api/wisereport/kr/:code/${route.slug}`,
-    aliases: [],
     params: ['code'],
     query: [],
     count: 1,
@@ -1961,7 +1950,6 @@ const endpointDefinitions = [
     resource: 'market.overview.kr',
     description: '국내 시장 요약 텍스트(KOSPI/KOSDAQ)를 반환합니다.',
     primaryPath: '/api/market/overview/kr',
-    aliases: ['/crawl/market'],
     params: [],
     query: [],
     handler: async () => crawlMarketData(),
@@ -1971,7 +1959,6 @@ const endpointDefinitions = [
     resource: 'market.fx.usd-krw',
     description: 'USD/KRW 환율 스냅샷을 반환합니다.',
     primaryPath: '/api/market/fx/usd-krw',
-    aliases: ['/crawl/usd-krw'],
     params: [],
     query: [],
     count: 1,
@@ -1982,7 +1969,6 @@ const endpointDefinitions = [
     resource: 'market.indicators',
     description: 'VKOSPI, ADR, US VIX를 한 번에 반환합니다.',
     primaryPath: '/api/market/indicators',
-    aliases: ['/crawl/indicators/all'],
     params: [],
     query: [],
     handler: async () => fetchAllMarketIndicators(),
@@ -1992,7 +1978,6 @@ const endpointDefinitions = [
     resource: 'market.indicators.vkospi',
     description: 'VKOSPI 단일 지표를 반환합니다.',
     primaryPath: '/api/market/indicators/vkospi',
-    aliases: ['/crawl/indicators/vkospi'],
     params: [],
     query: [],
     count: 1,
@@ -2003,7 +1988,6 @@ const endpointDefinitions = [
     resource: 'market.indicators.adr',
     description: 'ADR 선행 지표를 반환합니다.',
     primaryPath: '/api/market/indicators/adr',
-    aliases: ['/crawl/indicators/adr'],
     params: [],
     query: [],
     count: 1,
@@ -2014,7 +1998,6 @@ const endpointDefinitions = [
     resource: 'market.indicators.us-vix',
     description: 'US VIX 단일 지표를 반환합니다.',
     primaryPath: '/api/market/indicators/us-vix',
-    aliases: ['/crawl/indicators/us-vix'],
     params: [],
     query: [],
     count: 1,
@@ -2025,7 +2008,6 @@ const endpointDefinitions = [
     resource: 'wisereport.global.company',
     description: 'WiseReport Global 미국주식 페이지 원문/보조 데이터를 수집합니다.',
     primaryPath: '/api/wisereport/global/:ticker',
-    aliases: ['/crawl/wisereport/global/:ticker'],
     params: ['ticker'],
     query: ['routes(optional, comma-separated)'],
     meta: () => ({ wisereportGlobalRouteCount: WISEREPORT_GLOBAL_ROUTES.length }),
@@ -2039,7 +2021,6 @@ const endpointDefinitions = [
     resource: 'wisereport.global.domain',
     description: 'WiseReport Global 미국주식 도메인 정규화 데이터를 반환합니다.',
     primaryPath: '/api/wisereport/global/:ticker/domain',
-    aliases: ['/crawl/wisereport/global/:ticker/domain'],
     params: ['ticker'],
     query: [],
     handler: async (req) => crawlWiseReportGlobalDomainData(req.params.ticker),
@@ -2049,7 +2030,6 @@ const endpointDefinitions = [
     resource: 'wisereport.global.company.slim.v1',
     description: 'WiseReport Global 미국주식 Company 5개 route의 비즈니스 전용 slim aggregate 데이터를 raw JSON으로 반환합니다.',
     primaryPath: '/api/wisereport/global/:ticker/slim/v1',
-    aliases: [],
     params: ['ticker'],
     query: [],
     rawSuccess: true,
@@ -2063,7 +2043,6 @@ const endpointDefinitions = [
     resource: 'wisereport.global.company.slim.v1.1',
     description: 'WiseReport Global 미국주식 Company 5개 route의 계약형 slim v1.1 aggregate 데이터를 raw JSON으로 반환합니다.',
     primaryPath: '/api/wisereport/global/:ticker/slim/v1.1',
-    aliases: [],
     params: ['ticker'],
     query: [],
     rawSuccess: true,
@@ -2077,7 +2056,6 @@ const endpointDefinitions = [
     resource: 'us-stock.financials',
     description: '미국주식 통합 재무 데이터를 반환합니다.',
     primaryPath: '/api/us-stock/financials/:ticker',
-    aliases: [],
     params: ['ticker'],
     query: [],
     handler: async (req) => getUSFinancials(req.params.ticker),
@@ -2087,7 +2065,6 @@ const endpointDefinitions = [
     resource: 'us-stock.consensus',
     description: '미국주식 통합 컨센서스/애널리스트 데이터를 반환합니다.',
     primaryPath: '/api/us-stock/consensus/:ticker',
-    aliases: [],
     params: ['ticker'],
     query: [],
     handler: async (req) => getUSConsensus(req.params.ticker),
@@ -2097,7 +2074,6 @@ const endpointDefinitions = [
     resource: 'us-stock.news',
     description: '미국주식 뉴스 및 감성 데이터를 반환합니다.',
     primaryPath: '/api/us-stock/news/:ticker',
-    aliases: [],
     params: ['ticker'],
     query: ['limit(optional, default=10)'],
     handler: async (req) => {
@@ -2125,7 +2101,6 @@ const endpointDefinitions = [
     resource: 'us-stock.filings',
     description: '미국주식 공시 데이터를 반환합니다.',
     primaryPath: '/api/us-stock/filings/:ticker',
-    aliases: [],
     params: ['ticker'],
     query: [
       'limit(optional, default=10)',
@@ -2176,7 +2151,6 @@ const endpointDefinitions = [
     resource: 'us-stock.company-facts',
     description: '미국주식 SEC company facts 데이터를 반환합니다.',
     primaryPath: '/api/us-stock/company-facts/:ticker',
-    aliases: [],
     params: ['ticker'],
     query: [],
     handler: async (req) => getCompanyFacts(req.params.ticker),
@@ -2186,7 +2160,6 @@ const endpointDefinitions = [
     resource: 'us-stock.company-facts.taxonomies',
     description: '미국주식 SEC company facts에서 사용 가능한 taxonomy 목록을 반환합니다.',
     primaryPath: '/api/us-stock/company-facts/:ticker/taxonomies',
-    aliases: [],
     params: ['ticker'],
     query: [],
     count: (data) => Array.isArray(data?.taxonomies) ? data.taxonomies.length : 0,
@@ -2197,7 +2170,6 @@ const endpointDefinitions = [
     resource: 'us-stock.company-facts.taxonomy-concepts',
     description: '미국주식 SEC company facts의 taxonomy별 concept 목록을 반환합니다.',
     primaryPath: '/api/us-stock/company-facts/:ticker/taxonomies/:taxonomy/concepts',
-    aliases: [],
     params: ['ticker', 'taxonomy'],
     query: [],
     count: (data) => Array.isArray(data?.concepts) ? data.concepts.length : 0,
@@ -2217,7 +2189,6 @@ const endpointDefinitions = [
     resource: 'us-stock.company-facts.concept',
     description: '미국주식 SEC company facts의 단일 concept 상세 데이터를 반환합니다.',
     primaryPath: '/api/us-stock/company-facts/:ticker/taxonomies/:taxonomy/concepts/:concept',
-    aliases: [],
     params: ['ticker', 'taxonomy', 'concept'],
     query: [],
     count: 1,
@@ -2238,7 +2209,6 @@ const endpointDefinitions = [
     resource: 'us-market.indicators',
     description: '미국 시장 지표(S&P 500, NASDAQ, VIX, SMA)를 반환합니다.',
     primaryPath: '/api/us-market/indicators',
-    aliases: [],
     params: [],
     query: [],
     handler: async () => getUSMarketIndicators(),
@@ -2248,7 +2218,6 @@ const endpointDefinitions = [
     resource: 'us-stock.report',
     description: '미국주식 리포트용 통합 원시 데이터를 반환합니다.',
     primaryPath: '/api/us-stock/report/:ticker',
-    aliases: [],
     params: ['ticker'],
     query: [
       'includeFinancials(optional, default=true)',
@@ -2323,7 +2292,6 @@ const endpointDefinitions = [
     resource: 'krx.ohlcv',
     description: 'KRX 종목 OHLCV 시계열을 반환합니다.',
     primaryPath: '/api/krx/ohlcv/:ticker',
-    aliases: ['/crawl/krx/ohlcv/:ticker'],
     params: ['ticker'],
     query: ['startDate(required, YYYYMMDD)', 'endDate(required, YYYYMMDD)'],
     handler: async (req) => {
@@ -2336,7 +2304,6 @@ const endpointDefinitions = [
     resource: 'krx.index.ohlcv',
     description: 'KRX 지수 OHLCV 시계열을 반환합니다.',
     primaryPath: '/api/krx/index/:indexCode',
-    aliases: ['/crawl/krx/index/:indexCode'],
     params: ['indexCode'],
     query: ['startDate(required, YYYYMMDD)', 'endDate(required, YYYYMMDD)'],
     handler: async (req) => {
@@ -2349,7 +2316,6 @@ const endpointDefinitions = [
     resource: 'krx.investor-volume',
     description: 'KRX 투자자별 거래량 시계열을 반환합니다.',
     primaryPath: '/api/krx/investor-volume/:ticker',
-    aliases: ['/crawl/krx/investor-volume/:ticker'],
     params: ['ticker'],
     query: ['startDate(required, YYYYMMDD)', 'endDate(required, YYYYMMDD)'],
     handler: async (req) => {
@@ -2362,7 +2328,6 @@ const endpointDefinitions = [
     resource: 'jaroo.deepscan.canonical',
     description: 'DeepScan canonical payload를 raw body로 반환합니다.',
     primaryPath: '/api/deepscan',
-    aliases: ['/crawl/deepscan'],
     params: [],
     query: [
       'market(optional)',
@@ -2399,7 +2364,6 @@ const endpointDefinitions = [
     resource: 'market.quotes.current',
     description: 'Home 화면용 현재가 묶음 데이터를 반환합니다.',
     primaryPath: '/api/quotes/current',
-    aliases: ['/crawl/quotes/current'],
     params: [],
     query: ['codes(optional, csv)', 'tickers(optional, csv)', 'tradeDate(optional, YYYY-MM-DD)'],
     count: (data) => Array.isArray(data?.items) ? data.items.length : 0,
@@ -2426,7 +2390,6 @@ const endpointDefinitions = [
     resource: 'krx.market.snapshot',
     description: '특정 거래일의 KRX 시장 스냅샷을 반환합니다.',
     primaryPath: '/api/krx/market/snapshot',
-    aliases: ['/crawl/krx/market-snapshot'],
     params: [],
     query: ['tradeDate(required, YYYYMMDD)', 'market(optional, default=ALL)'],
     handler: async (req) => {
@@ -2440,7 +2403,6 @@ const endpointDefinitions = [
     resource: 'krx.market.cap',
     description: '특정 거래일의 KRX 시가총액 데이터를 반환합니다.',
     primaryPath: '/api/krx/market/cap',
-    aliases: ['/crawl/krx/market-cap'],
     params: [],
     query: ['tradeDate(required, YYYYMMDD)', 'market(optional, default=ALL)'],
     handler: async (req) => {
@@ -2454,7 +2416,6 @@ const endpointDefinitions = [
     resource: 'krx.tickers',
     description: 'KRX 시장별 티커-종목명 맵을 반환합니다.',
     primaryPath: '/api/krx/tickers',
-    aliases: ['/crawl/krx/ticker-names'],
     params: [],
     query: ['market(optional, default=ALL)'],
     handler: async (req) => {
@@ -2467,7 +2428,6 @@ const endpointDefinitions = [
     resource: 'krx.batches.trigger',
     description: 'krx-js-client trigger batch를 실행한 결과를 반환합니다.',
     primaryPath: '/api/krx/batches/trigger',
-    aliases: ['/crawl/krx/trigger-batch'],
     params: [],
     query: ['mode(optional, default=morning)'],
     handler: async (req) => {
@@ -2478,18 +2438,14 @@ const endpointDefinitions = [
 ];
 
 for (const definition of endpointDefinitions) {
-  const paths = [definition.primaryPath, ...definition.aliases];
-
-  for (const matchedPath of paths) {
-    app.get(matchedPath, async (req, res) => {
-      try {
-        const data = await definition.handler(req);
-        sendSuccess(req, res, definition, matchedPath, data);
-      } catch (error) {
-        await sendFailure(req, res, definition, matchedPath, error);
-      }
-    });
-  }
+  app.get(definition.primaryPath, async (req, res) => {
+    try {
+      const data = await definition.handler(req);
+      sendSuccess(req, res, definition, data);
+    } catch (error) {
+      await sendFailure(req, res, definition, error);
+    }
+  });
 }
 
 app.use((req, res) => {
@@ -2501,7 +2457,6 @@ app.use((req, res) => {
       method: req.method,
       path: req.originalUrl,
       primaryPath: null,
-      aliasOf: null,
       params: normalizeObject(req.params),
       query: normalizeObject(req.query),
     },
@@ -2512,8 +2467,6 @@ app.use((req, res) => {
       routeId: 'not-found',
       description: '등록되지 않은 엔드포인트입니다.',
       generatedAt: new Date().toISOString(),
-      aliases: [],
-      deprecatedAliasUsed: null,
     },
     error: {
       message: 'not found',
@@ -2532,7 +2485,6 @@ app.use((error, req, res, _next) => {
       method: req.method,
       path: req.originalUrl,
       primaryPath: null,
-      aliasOf: null,
       params: normalizeObject(req.params),
       query: normalizeObject(req.query),
     },
@@ -2543,8 +2495,6 @@ app.use((error, req, res, _next) => {
       routeId: 'unhandled-error',
       description: '처리되지 않은 서버 오류입니다.',
       generatedAt: new Date().toISOString(),
-      aliases: [],
-      deprecatedAliasUsed: null,
     },
     error: {
       message: error?.message || 'unknown error',

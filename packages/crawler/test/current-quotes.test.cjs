@@ -21,7 +21,7 @@ test('quotes-current endpoint definition is registered', async () => {
 
   assert.ok(definition);
   assert.equal(definition.primaryPath, '/api/quotes/current');
-  assert.deepEqual(definition.aliases, ['/crawl/quotes/current']);
+  assert.equal('aliases' in definition, false);
   assert.ok(definition.query.includes('codes(optional, csv)'));
   assert.ok(definition.query.includes('tickers(optional, csv)'));
 });
@@ -70,4 +70,17 @@ test('GET /api/quotes/current rejects empty query', async () => {
 
   assert.equal(body.ok, false);
   assert.equal(body.error.message, 'missing query: codes_or_tickers');
+});
+
+test('GET /crawl/quotes/current returns not found after alias removal', async () => {
+  const { app } = await import('../src/server.js');
+
+  const body = await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/crawl/quotes/current?codes=005930`);
+    assert.equal(response.status, 404);
+    return response.json();
+  });
+
+  assert.equal(body.ok, false);
+  assert.equal(body.error.message, 'not found');
 });

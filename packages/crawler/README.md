@@ -1,7 +1,7 @@
 # @jaroo/crawler
 
 Jaroo V3 모노레포 내부에서 사용하는 crawler workspace package다. 기존 `jaroo-mvp-v3-crawler`의 현재 스냅샷을 PR1 foundation 작업으로 내부 패키지화했다.
-신규 public surface는 `/api/*` 기준이며, 일부 레거시 경로만 `/crawl/*` alias로 유지한다.
+모든 public HTTP surface는 `/api/*` 기준으로만 제공한다.
 
 ## 1. 빠른 시작
 
@@ -111,7 +111,6 @@ npm run dev
     "method": "GET",
     "path": "/api/market/fx/usd-krw",
     "primaryPath": "/api/market/fx/usd-krw",
-    "aliasOf": null,
     "params": {},
     "query": {}
   },
@@ -121,9 +120,7 @@ npm run dev
     "resource": "market.fx.usd-krw",
     "routeId": "market-fx-usd-krw",
     "description": "USD/KRW 환율 스냅샷을 반환합니다.",
-    "generatedAt": "2026-04-09T00:00:00.000Z",
-    "aliases": ["/crawl/usd-krw"],
-    "deprecatedAliasUsed": null
+    "generatedAt": "2026-04-09T00:00:00.000Z"
   }
 }
 ```
@@ -149,24 +146,24 @@ npm run dev
 
 ### 4.1 시스템
 
-| Method | Primary Path | Alias | 설명 |
-| --- | --- | --- | --- |
-| `GET` | `/health` | 없음 | 서버 생존 상태와 런타임 정보 |
-| `GET` | `/api/catalog` | `/crawlers` | 전체 API 카탈로그와 WiseReport Global route 목록 |
+| Method | Primary Path | 설명 |
+| --- | --- | --- |
+| `GET` | `/health` | 서버 생존 상태와 런타임 정보 |
+| `GET` | `/api/catalog` | 전체 API 카탈로그와 WiseReport Global route 목록 |
 
 ### 4.2 WiseReport KR
 
 #### Aggregate / slim
 
-| Method | Primary Path | Alias | 성공 응답 | 설명 |
-| --- | --- | --- | --- | --- |
-| `GET` | `/api/wisereport/kr/:code` | `/crawl/wisereport/kr/:code` | envelope | KR WiseReport/FnGuide 10개 페이지 aggregate |
-| `GET` | `/api/wisereport/kr/:code/slim/v1` | 없음 | raw JSON | KR slim v1 aggregate |
-| `GET` | `/api/wisereport/kr/:code/slim/v1.1` | 없음 | raw JSON | KR slim v1.1 aggregate |
+| Method | Primary Path | 성공 응답 | 설명 |
+| --- | --- | --- | --- |
+| `GET` | `/api/wisereport/kr/:code` | envelope | KR WiseReport/FnGuide 10개 페이지 aggregate |
+| `GET` | `/api/wisereport/kr/:code/slim/v1` | raw JSON | KR slim v1 aggregate |
+| `GET` | `/api/wisereport/kr/:code/slim/v1.1` | raw JSON | KR slim v1.1 aggregate |
 
 #### Page endpoints
 
-아래 10개 페이지 엔드포인트는 모두 alias 없이 `/api/*` 만 제공합니다.
+아래 10개 페이지 엔드포인트는 모두 `/api/*` 로 제공합니다.
 
 | Method | Path | Source | 설명 |
 | --- | --- | --- | --- |
@@ -191,12 +188,12 @@ curl "http://localhost:3040/api/wisereport/kr/005930/company-overview"
 
 ### 4.3 WiseReport Global
 
-| Method | Primary Path | Alias | Query | 성공 응답 | 설명 |
-| --- | --- | --- | --- | --- | --- |
-| `GET` | `/api/wisereport/global/:ticker` | `/crawl/wisereport/global/:ticker` | `routes?` | envelope | WiseReport Global aggregate |
-| `GET` | `/api/wisereport/global/:ticker/domain` | `/crawl/wisereport/global/:ticker/domain` | 없음 | envelope | WiseReport Global domain 정규화 데이터 |
-| `GET` | `/api/wisereport/global/:ticker/slim/v1` | 없음 | 없음 | raw JSON | Company 5개 route 기준 slim v1 |
-| `GET` | `/api/wisereport/global/:ticker/slim/v1.1` | 없음 | 없음 | raw JSON | Company 5개 route 기준 slim v1.1 |
+| Method | Primary Path | Query | 성공 응답 | 설명 |
+| --- | --- | --- | --- | --- |
+| `GET` | `/api/wisereport/global/:ticker` | `routes?` | envelope | WiseReport Global aggregate |
+| `GET` | `/api/wisereport/global/:ticker/domain` | 없음 | envelope | WiseReport Global domain 정규화 데이터 |
+| `GET` | `/api/wisereport/global/:ticker/slim/v1` | 없음 | raw JSON | Company 5개 route 기준 slim v1 |
+| `GET` | `/api/wisereport/global/:ticker/slim/v1.1` | 없음 | raw JSON | Company 5개 route 기준 slim v1.1 |
 
 `/api/wisereport/global/:ticker` 의 `routes` 는 선택 수집용 comma-separated query 입니다. 미지정 시 전체 route set을 수집합니다. route id 목록은 `/api/catalog` 의 `wisereportGlobalRoutes` 에도 포함됩니다.
 
@@ -222,18 +219,16 @@ curl "http://localhost:3040/api/wisereport/global/NVDA/slim/v1.1"
 
 ### 4.4 Market
 
-| Method | Primary Path | Alias | 설명 |
-| --- | --- | --- | --- |
-| `GET` | `/api/market/overview/kr` | `/crawl/market` | 국내 시장 요약 텍스트 |
-| `GET` | `/api/market/fx/usd-krw` | `/crawl/usd-krw` | USD/KRW 환율 |
-| `GET` | `/api/market/indicators` | `/crawl/indicators/all` | VKOSPI + ADR + US VIX |
-| `GET` | `/api/market/indicators/vkospi` | `/crawl/indicators/vkospi` | VKOSPI |
-| `GET` | `/api/market/indicators/adr` | `/crawl/indicators/adr` | ADR |
-| `GET` | `/api/market/indicators/us-vix` | `/crawl/indicators/us-vix` | US VIX |
+| Method | Primary Path | 설명 |
+| --- | --- | --- |
+| `GET` | `/api/market/overview/kr` | 국내 시장 요약 텍스트 |
+| `GET` | `/api/market/fx/usd-krw` | USD/KRW 환율 |
+| `GET` | `/api/market/indicators` | VKOSPI + ADR + US VIX |
+| `GET` | `/api/market/indicators/vkospi` | VKOSPI |
+| `GET` | `/api/market/indicators/adr` | ADR |
+| `GET` | `/api/market/indicators/us-vix` | US VIX |
 
 ### 4.5 US Stock / US Market
-
-아래 엔드포인트는 모두 `/crawl/*` alias가 없습니다.
 
 | Method | Primary Path | Query | 설명 |
 | --- | --- | --- | --- |
@@ -258,15 +253,15 @@ curl "http://localhost:3040/api/wisereport/global/NVDA/slim/v1.1"
 
 ### 4.6 KRX
 
-| Method | Primary Path | Alias | Query | 설명 |
-| --- | --- | --- | --- | --- |
-| `GET` | `/api/krx/ohlcv/:ticker` | `/crawl/krx/ohlcv/:ticker` | `startDate`, `endDate` | 종목 OHLCV |
-| `GET` | `/api/krx/index/:indexCode` | `/crawl/krx/index/:indexCode` | `startDate`, `endDate` | 지수 OHLCV |
-| `GET` | `/api/krx/investor-volume/:ticker` | `/crawl/krx/investor-volume/:ticker` | `startDate`, `endDate` | 투자자별 거래량 |
-| `GET` | `/api/krx/market/snapshot` | `/crawl/krx/market-snapshot` | `tradeDate`, `market?` | 시장 스냅샷 |
-| `GET` | `/api/krx/market/cap` | `/crawl/krx/market-cap` | `tradeDate`, `market?` | 시가총액 데이터 |
-| `GET` | `/api/krx/tickers` | `/crawl/krx/ticker-names` | `market?` | 티커-종목명 맵 |
-| `GET` | `/api/krx/batches/trigger` | `/crawl/krx/trigger-batch` | `mode?` | trigger batch 실행 |
+| Method | Primary Path | Query | 설명 |
+| --- | --- | --- | --- |
+| `GET` | `/api/krx/ohlcv/:ticker` | `startDate`, `endDate` | 종목 OHLCV |
+| `GET` | `/api/krx/index/:indexCode` | `startDate`, `endDate` | 지수 OHLCV |
+| `GET` | `/api/krx/investor-volume/:ticker` | `startDate`, `endDate` | 투자자별 거래량 |
+| `GET` | `/api/krx/market/snapshot` | `tradeDate`, `market?` | 시장 스냅샷 |
+| `GET` | `/api/krx/market/cap` | `tradeDate`, `market?` | 시가총액 데이터 |
+| `GET` | `/api/krx/tickers` | `market?` | 티커-종목명 맵 |
+| `GET` | `/api/krx/batches/trigger` | `mode?` | trigger batch 실행 |
 
 메모:
 
@@ -274,38 +269,12 @@ curl "http://localhost:3040/api/wisereport/global/NVDA/slim/v1.1"
 - 예시는 관례적으로 `YYYYMMDD` 를 사용합니다.
 - `market` 기본값은 `ALL`, `mode` 기본값은 `morning` 입니다.
 
-## 5. 호환성 정책
+## 5. 라우팅 정책
 
-신규 호출은 `primaryPath`, 즉 `/api/*` 사용을 권장합니다.
-
-유지 중인 alias:
-
-- `/crawlers` → `/api/catalog`
-- `/crawl/wisereport/kr/:code` → `/api/wisereport/kr/:code`
-- `/crawl/market` → `/api/market/overview/kr`
-- `/crawl/usd-krw` → `/api/market/fx/usd-krw`
-- `/crawl/indicators/all` → `/api/market/indicators`
-- `/crawl/indicators/vkospi` → `/api/market/indicators/vkospi`
-- `/crawl/indicators/adr` → `/api/market/indicators/adr`
-- `/crawl/indicators/us-vix` → `/api/market/indicators/us-vix`
-- `/crawl/wisereport/global/:ticker` → `/api/wisereport/global/:ticker`
-- `/crawl/wisereport/global/:ticker/domain` → `/api/wisereport/global/:ticker/domain`
-- `/crawl/krx/ohlcv/:ticker` → `/api/krx/ohlcv/:ticker`
-- `/crawl/krx/index/:indexCode` → `/api/krx/index/:indexCode`
-- `/crawl/krx/investor-volume/:ticker` → `/api/krx/investor-volume/:ticker`
-- `/crawl/krx/market-snapshot` → `/api/krx/market/snapshot`
-- `/crawl/krx/market-cap` → `/api/krx/market/cap`
-- `/crawl/krx/ticker-names` → `/api/krx/tickers`
-- `/crawl/krx/trigger-batch` → `/api/krx/batches/trigger`
-
-다음 범주는 `/crawl/*` alias를 제공하지 않습니다.
-
-- WiseReport KR slim: `/api/wisereport/kr/:code/slim/v1`, `/api/wisereport/kr/:code/slim/v1.1`
-- WiseReport KR page endpoints 10종
-- WiseReport Global slim: `/api/wisereport/global/:ticker/slim/v1`, `/api/wisereport/global/:ticker/slim/v1.1`
-- US routes: `/api/us-stock/*`, `/api/us-market/*`
-
-envelope 응답에서는 `request.aliasOf` 와 `meta.deprecatedAliasUsed` 로 alias 사용 여부를 추적할 수 있습니다.
+- crawler HTTP 엔드포인트는 모두 `primaryPath`, 즉 `/api/*` 경로만 지원합니다.
+- `/api/catalog` 역시 alias 없이 단일 경로로만 노출됩니다.
+- envelope 응답의 `request` 는 `method`, `path`, `primaryPath`, `params`, `query`만 포함합니다.
+- envelope 응답의 `meta` 는 `service`, `version`, `resource`, `routeId`, `description`, `generatedAt`와 route별 추가 메타만 포함합니다.
 
 ## 6. 예시 샘플
 
@@ -315,6 +284,6 @@ envelope 응답에서는 `request.aliasOf` 와 `meta.deprecatedAliasUsed` 로 al
 
 ## 7. 운영 메모
 
-- 현재 제공 리소스와 alias를 빠르게 확인하려면 `/api/catalog` 를 보면 됩니다.
+- 현재 제공 리소스를 빠르게 확인하려면 `/api/catalog` 를 보면 됩니다.
 - smoke test는 `/health`, `/api/catalog`, `/api/market/fx/usd-krw` 부터 확인하는 편이 안전합니다.
 - 실서비스에서는 `.env` 를 커밋하지 말고 별도 secret 관리 체계를 권장합니다.

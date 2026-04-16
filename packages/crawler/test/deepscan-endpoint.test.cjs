@@ -21,7 +21,7 @@ test('deepscan-canonical endpoint definition is registered', async () => {
 
   assert.ok(definition);
   assert.equal(definition.primaryPath, '/api/deepscan');
-  assert.deepEqual(definition.aliases, ['/crawl/deepscan']);
+  assert.equal('aliases' in definition, false);
   assert.deepEqual(definition.query, [
     'market(optional)',
     'code(optional)',
@@ -86,6 +86,20 @@ test('GET /api/deepscan returns raw input-invalid payload with HTTP 400 on the p
   assert.equal(body.metadata.inputValidity.valid, false);
   assert.deepEqual(body.metadata.inputValidity.missing, ['instrument.code', 'instrument.ticker']);
   assert.equal(body.hero.blockState, 'blocked');
+});
+
+test('GET /crawl/deepscan returns not found after alias removal', async () => {
+  const { app } = await import('../src/server.js');
+
+  const body = await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/crawl/deepscan?code=005930`);
+
+    assert.equal(response.status, 404);
+    return response.json();
+  });
+
+  assert.equal(body.ok, false);
+  assert.equal(body.error.message, 'not found');
 });
 
 test('GET /api/deepscan maps thrown errors to a raw canonical internal service error payload', async () => {
