@@ -340,30 +340,22 @@ test('buildWiseReportKrSlimPayload keeps only slim business fields', async () =>
   assert.deepEqual(collectForbiddenKeyHits(slim), []);
 });
 
-test('GET explicit-source KR slim v1 path returns raw json without envelope', async () => {
-  const { app, endpointDefinitions, buildWiseReportKrSlimPayload } = await import('../src/server.js');
-  const fixture = buildWiseReportKrSlimPayload(createAggregateFixture(), '005930');
+test('GET explicit-source KR slim v1 path is disabled after archive', async () => {
+  const { app, endpointDefinitions, archivedEndpointDefinitions } = await import('../src/server.js');
   const definition = endpointDefinitions.find((entry) => entry.id === 'wisereport-kr-slim-v1');
+  const archivedDefinition = archivedEndpointDefinitions.find((entry) => entry.id === 'wisereport-kr-slim-v1');
 
-  assert.ok(definition, 'slim endpoint definition should exist');
+  assert.equal(definition, undefined);
+  assert.ok(archivedDefinition);
 
-  const originalHandler = definition.handler;
-  definition.handler = async () => fixture;
+  const responseBody = await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/005930/slim/v1`);
+    assert.equal(response.status, 404);
+    return response.json();
+  });
 
-  try {
-    const responseBody = await withServer(app, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/005930/slim/v1`);
-      assert.equal(response.status, 200);
-      return response.json();
-    });
-
-    assert.deepEqual(responseBody, fixture);
-    assert.equal(Object.hasOwn(responseBody, 'ok'), false);
-    assert.equal(Object.hasOwn(responseBody, 'data'), false);
-    assert.equal(Object.hasOwn(responseBody, 'meta'), false);
-  } finally {
-    definition.handler = originalHandler;
-  }
+  assert.equal(responseBody.ok, false);
+  assert.equal(responseBody.error.message, 'not found');
 });
 
 test('buildWiseReportKrSlimPayloadV11 removes parser artifacts but preserves genuine source-empty annotations', async () => {

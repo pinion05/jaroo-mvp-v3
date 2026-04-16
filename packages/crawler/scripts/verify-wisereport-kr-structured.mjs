@@ -63,29 +63,10 @@ const page = await crawlWiseReportKrPage(code, 'company-overview', { waitAfterLo
 const aggregate = await getCrawl(code, { concurrency: 2, waitAfterLoadMs: 1200 });
 
 const httpSmoke = await withServer(async (baseUrl) => {
-  const companyOverview = await fetchJson(`${baseUrl}/api/source/wisereport/kr/companies/${code}/company-overview`);
-  const aggregateResponse = await fetchJson(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/${code}`);
-  const slimResponse = await fetchJson(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/${code}/slim/v1`);
+  const slimResponse = await fetchJson(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/${code}/slim/v1.1`);
   return {
     baseUrl,
-    companyOverview: {
-      status: companyOverview.status,
-      ok: companyOverview.ok,
-      count: companyOverview.body?.count,
-      resource: companyOverview.body?.meta?.resource,
-      dataKeys: Object.keys(companyOverview.body?.data || {}),
-      normalizedKeys: Object.keys(companyOverview.body?.data?.normalized || {}),
-      qualityKeys: Object.keys(companyOverview.body?.data?.quality || {}),
-    },
-    aggregate: {
-      status: aggregateResponse.status,
-      ok: aggregateResponse.ok,
-      count: aggregateResponse.body?.count,
-      resource: aggregateResponse.body?.meta?.resource,
-      pageKeys: Object.keys(aggregateResponse.body?.data?.pages || {}),
-      qualityKeys: Object.keys(aggregateResponse.body?.data?.quality || {}),
-    },
-    slimV1: {
+    slimV11: {
       status: slimResponse.status,
       contentType: slimResponse.headers['content-type'] || null,
       topLevelKeys: Object.keys(slimResponse.body || {}),

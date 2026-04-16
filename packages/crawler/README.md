@@ -130,18 +130,15 @@ npm run dev
 
 - 일부 엔드포인트는 route별 계산 규칙을 따릅니다.
   - 예: `/api/source/system/catalog` 는 endpoint 개수
-  - 예: `/api/source/wisereport-fnguide/kr/companies/:code` 는 aggregate에 담긴 페이지 개수
 - 별도 규칙이 없으면 배열은 `length`, 객체는 top-level key 수, 스칼라는 `1`, `null` 은 `0` 으로 추론합니다.
 - 실패 응답은 `count: 0` 입니다.
 
-성공 시 raw JSON을 그대로 반환하는 slim 엔드포인트는 아래 4개뿐입니다.
+성공 시 raw JSON을 그대로 반환하는 활성 WiseReport slim 엔드포인트는 아래 2개입니다.
 
-- `/api/source/wisereport-fnguide/kr/companies/:code/slim/v1`
 - `/api/source/wisereport-fnguide/kr/companies/:code/slim/v1.1`
-- `/api/source/wisereport-global/us/companies/:ticker/slim/v1`
 - `/api/source/wisereport-global/us/companies/:ticker/slim/v1.1`
 
-위 4개도 실패 시에는 공통 에러 envelope를 사용합니다.
+위 2개도 실패 시에는 공통 에러 envelope를 사용합니다.
 
 ## 4. API
 
@@ -154,49 +151,40 @@ npm run dev
 
 ### 4.2 WiseReport KR
 
-#### Aggregate / slim
+WiseReport KR public surface는 slim v1.1 하나만 활성화되어 있습니다.
 
 | Method | Primary Path | 성공 응답 | 설명 |
 | --- | --- | --- | --- |
-| `GET` | `/api/source/wisereport-fnguide/kr/companies/:code` | envelope | KR WiseReport/FnGuide 10개 페이지 aggregate |
-| `GET` | `/api/source/wisereport-fnguide/kr/companies/:code/slim/v1` | raw JSON | KR slim v1 aggregate |
 | `GET` | `/api/source/wisereport-fnguide/kr/companies/:code/slim/v1.1` | raw JSON | KR slim v1.1 aggregate |
 
-#### Page endpoints
+아래 KR WiseReport/FnGuide 경로는 archive 처리되어 비활성화되었습니다.
 
-아래 10개 페이지 엔드포인트는 모두 `/api/*` 로 제공합니다.
-
-| Method | Path | Source | 설명 |
-| --- | --- | --- | --- |
-| `GET` | `/api/source/wisereport/kr/companies/:code/company-overview` | WiseReport | 기업개요 |
-| `GET` | `/api/source/wisereport/kr/companies/:code/financial-analysis` | WiseReport | 재무분석 |
-| `GET` | `/api/source/wisereport/kr/companies/:code/investment-indicators` | WiseReport | 투자지표 |
-| `GET` | `/api/source/wisereport/kr/companies/:code/consensus` | WiseReport | 컨센서스 |
-| `GET` | `/api/source/wisereport/kr/companies/:code/shareholding` | WiseReport | 지분현황 |
-| `GET` | `/api/source/wisereport/kr/companies/:code/recent-reports` | WiseReport | 최근리포트 |
-| `GET` | `/api/source/fnguide/kr/companies/:code/fnguide-finance` | FnGuide | 재무제표 |
-| `GET` | `/api/source/fnguide/kr/companies/:code/relative-return` | FnGuide | 상대수익률 |
-| `GET` | `/api/source/fnguide/kr/companies/:code/opinion` | FnGuide | 투자의견 |
-| `GET` | `/api/source/fnguide/kr/companies/:code/style-analysis` | FnGuide | 스타일분석 |
+- aggregate: `/api/source/wisereport-fnguide/kr/companies/:code`
+- deprecated slim: `/api/source/wisereport-fnguide/kr/companies/:code/slim/v1`
+- page routes: `/api/source/wisereport/kr/companies/:code/*`
+- FnGuide page routes: `/api/source/fnguide/kr/companies/:code/*`
 
 예시:
 
 ```bash
-curl "http://localhost:3040/api/source/wisereport-fnguide/kr/companies/005930"
-curl "http://localhost:3040/api/source/wisereport-fnguide/kr/companies/005930/slim/v1"
-curl "http://localhost:3040/api/source/wisereport/kr/companies/005930/company-overview"
+curl "http://localhost:3040/api/source/wisereport-fnguide/kr/companies/005930/slim/v1.1"
 ```
 
 ### 4.3 WiseReport Global
 
+WiseReport Global public surface도 slim v1.1 하나만 활성화되어 있습니다.
+
 | Method | Primary Path | Query | 성공 응답 | 설명 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/source/wisereport-global/us/companies/:ticker` | `routes?` | envelope | WiseReport Global aggregate |
-| `GET` | `/api/source/wisereport-global/us/companies/:ticker/domain` | 없음 | envelope | WiseReport Global domain 정규화 데이터 |
-| `GET` | `/api/source/wisereport-global/us/companies/:ticker/slim/v1` | 없음 | raw JSON | Company 5개 route 기준 slim v1 |
 | `GET` | `/api/source/wisereport-global/us/companies/:ticker/slim/v1.1` | 없음 | raw JSON | Company 5개 route 기준 slim v1.1 |
 
-`/api/source/wisereport-global/us/companies/:ticker` 의 `routes` 는 선택 수집용 comma-separated query 입니다. 미지정 시 전체 route set을 수집합니다. route id 목록은 `/api/source/system/catalog` 의 `wisereportGlobalRoutes` 에도 포함됩니다.
+route id 목록은 `/api/source/system/catalog` 의 `wisereportGlobalRoutes` 에 포함됩니다.
+
+아래 WiseReport Global 경로는 archive 처리되어 비활성화되었습니다.
+
+- aggregate: `/api/source/wisereport-global/us/companies/:ticker`
+- domain: `/api/source/wisereport-global/us/companies/:ticker/domain`
+- deprecated slim: `/api/source/wisereport-global/us/companies/:ticker/slim/v1`
 
 현재 route id는 다음 19개입니다.
 
@@ -207,14 +195,11 @@ curl "http://localhost:3040/api/source/wisereport/kr/companies/005930/company-ov
 - Theme: `theme-theme-list`
 - GlobalEconomy: `global-economy-synthesis`, `global-economy-overview`, `global-economy-compare`
 
-Global slim v1 / v1.1 은 위 전체 route를 쓰지 않고 Company 5개 route만 사용합니다.
+Global slim v1.1 은 위 전체 route를 쓰지 않고 Company 5개 route만 사용합니다.
 
 예시:
 
 ```bash
-curl "http://localhost:3040/api/source/wisereport-global/us/companies/NVDA"
-curl "http://localhost:3040/api/source/wisereport-global/us/companies/NVDA?routes=company-snap,company-finance"
-curl "http://localhost:3040/api/source/wisereport-global/us/companies/NVDA/domain"
 curl "http://localhost:3040/api/source/wisereport-global/us/companies/NVDA/slim/v1.1"
 ```
 

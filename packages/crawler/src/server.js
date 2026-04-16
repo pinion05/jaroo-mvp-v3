@@ -397,7 +397,7 @@ async function sendFailure(req, res, definition, error) {
 }
 
 function buildCatalogEntries() {
-  return endpointDefinitions.map((definition) => ({
+  return activeEndpointDefinitions.map((definition) => ({
     id: definition.id,
     resource: definition.resource,
     description: definition.description,
@@ -1911,6 +1911,8 @@ const endpointDefinitions = [
     description: '한국 상장사 WiseReport/FnGuide 10개 페이지의 구조화 aggregate 데이터를 반환합니다.',
     primaryPath: buildDataSourcePath('wisereport-fnguide', '/kr/companies/:code'),
     dataSources: ['wisereport', 'fnguide'],
+    archived: true,
+    archiveReason: 'Retired: only slim v1.1 WiseReport endpoints remain active.',
     params: ['code'],
     query: [],
     count: (data) => Object.keys(normalizeWiseReportKrAggregate(data).pages || {}).length,
@@ -1926,6 +1928,8 @@ const endpointDefinitions = [
     description: '한국 상장사 WiseReport/FnGuide 10개 페이지의 비즈니스 전용 slim aggregate 데이터를 raw JSON으로 반환합니다.',
     primaryPath: buildDataSourcePath('wisereport-fnguide', '/kr/companies/:code/slim/v1'),
     dataSources: ['wisereport', 'fnguide'],
+    archived: true,
+    archiveReason: 'Retired: only slim v1.1 WiseReport endpoints remain active.',
     params: ['code'],
     query: [],
     rawSuccess: true,
@@ -1948,6 +1952,8 @@ const endpointDefinitions = [
     description: route.description,
     primaryPath: buildDataSourcePath(route.sourceType === 'fnguide' ? 'fnguide' : 'wisereport', `/kr/companies/:code/${route.slug}`),
     dataSources: [route.sourceType],
+    archived: true,
+    archiveReason: 'Retired: KR page-level WiseReport/FnGuide endpoints are disabled in favor of slim v1.1 only.',
     params: ['code'],
     query: [],
     count: 1,
@@ -2028,6 +2034,8 @@ const endpointDefinitions = [
     description: 'WiseReport Global 미국주식 페이지 원문/보조 데이터를 수집합니다.',
     primaryPath: buildDataSourcePath('wisereport-global', '/us/companies/:ticker'),
     dataSources: ['wisereport-global'],
+    archived: true,
+    archiveReason: 'Retired: only slim v1.1 WiseReport endpoints remain active.',
     params: ['ticker'],
     query: ['routes(optional, comma-separated)'],
     meta: () => ({ wisereportGlobalRouteCount: WISEREPORT_GLOBAL_ROUTES.length }),
@@ -2042,6 +2050,8 @@ const endpointDefinitions = [
     description: 'WiseReport Global 미국주식 도메인 정규화 데이터를 반환합니다.',
     primaryPath: buildDataSourcePath('wisereport-global', '/us/companies/:ticker/domain'),
     dataSources: ['wisereport-global'],
+    archived: true,
+    archiveReason: 'Retired: only slim v1.1 WiseReport endpoints remain active.',
     params: ['ticker'],
     query: [],
     handler: async (req) => crawlWiseReportGlobalDomainData(req.params.ticker),
@@ -2052,6 +2062,8 @@ const endpointDefinitions = [
     description: 'WiseReport Global 미국주식 Company 5개 route의 비즈니스 전용 slim aggregate 데이터를 raw JSON으로 반환합니다.',
     primaryPath: buildDataSourcePath('wisereport-global', '/us/companies/:ticker/slim/v1'),
     dataSources: ['wisereport-global'],
+    archived: true,
+    archiveReason: 'Retired: only slim v1.1 WiseReport endpoints remain active.',
     params: ['ticker'],
     query: [],
     rawSuccess: true,
@@ -2479,7 +2491,15 @@ const endpointDefinitions = [
   },
 ];
 
-for (const definition of endpointDefinitions) {
+const activeEndpointDefinitions = Object.freeze(
+  endpointDefinitions.filter((definition) => definition.archived !== true),
+);
+
+const archivedEndpointDefinitions = Object.freeze(
+  endpointDefinitions.filter((definition) => definition.archived === true),
+);
+
+for (const definition of activeEndpointDefinitions) {
   app.get(definition.primaryPath, async (req, res) => {
     try {
       const data = await definition.handler(req);
@@ -2555,11 +2575,12 @@ if (isDirectExecution) {
 
 export {
   app,
+  archivedEndpointDefinitions,
   buildWiseReportGlobalSlimPayloadV1,
   buildWiseReportGlobalSlimPayloadV11,
   buildWiseReportKrSlimPayload,
   buildWiseReportKrSlimPayloadV11,
-  endpointDefinitions,
+  activeEndpointDefinitions as endpointDefinitions,
   slimWiseReportKrValue,
   slimWiseReportKrValueV11,
 };

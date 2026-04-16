@@ -240,6 +240,20 @@ function createGlobalDomainFixture() {
   };
 }
 
+async function withServer(app, run) {
+  const server = await new Promise((resolve) => {
+    const instance = app.listen(0, () => resolve(instance));
+  });
+
+  try {
+    const address = server.address();
+    const baseUrl = `http://127.0.0.1:${address.port}`;
+    return await run(baseUrl);
+  } finally {
+    await new Promise((resolve, reject) => server.close((error) => (error ? reject(error) : resolve())));
+  }
+}
+
 function collectKeyHits(value, forbiddenKeys, path = '$', hits = []) {
   if (Array.isArray(value)) {
     value.forEach((item, index) => collectKeyHits(item, forbiddenKeys, `${path}[${index}]`, hits));
@@ -363,15 +377,16 @@ test('buildWiseReportGlobalSlimPayloadV1 strips wrappers, noise, and non-company
   assert.equal('earnings' in payload.pages, false);
 });
 
-test('wisereport-global-slim-v1 endpoint is registered as raw JSON route', async () => {
-  const { endpointDefinitions } = await import('../src/server.js');
+test('wisereport-global slim v1 endpoint is archived', async () => {
+  const { endpointDefinitions, archivedEndpointDefinitions } = await import('../src/server.js');
   const definition = endpointDefinitions.find((item) => item.id === 'wisereport-global-slim-v1');
+  const archivedDefinition = archivedEndpointDefinitions.find((item) => item.id === 'wisereport-global-slim-v1');
 
-  assert.ok(definition);
-  assert.equal(definition.resource, 'wisereport.global.company.slim.v1');
-  assert.equal(definition.primaryPath, '/api/source/wisereport-global/us/companies/:ticker/slim/v1');
-  assert.equal(definition.rawSuccess, true);
-  assert.deepEqual(definition.dataSources, ['wisereport-global']);
+  assert.equal(definition, undefined);
+  assert.ok(archivedDefinition);
+  assert.equal(archivedDefinition.resource, 'wisereport.global.company.slim.v1');
+  assert.equal(archivedDefinition.primaryPath, '/api/source/wisereport-global/us/companies/:ticker/slim/v1');
+  assert.equal(archivedDefinition.archived, true);
 });
 
 test('buildWiseReportGlobalSlimPayloadV1 dedupes storyless news by title', async () => {
@@ -589,7 +604,7 @@ test('buildWiseReportGlobalSlimPayloadV11 provides consensus definitions and joi
   });
 });
 
-test('wisereport-global-slim-v1.1 endpoint is registered as raw JSON route', async () => {
+test('wisereport-global-slim-v1.1 endpoint is registered as the only active global WiseReport route', async () => {
   const { endpointDefinitions } = await import('../src/server.js');
   const definition = endpointDefinitions.find((item) => item.id === 'wisereport-global-slim-v1.1');
 
@@ -598,4 +613,30 @@ test('wisereport-global-slim-v1.1 endpoint is registered as raw JSON route', asy
   assert.equal(definition.primaryPath, '/api/source/wisereport-global/us/companies/:ticker/slim/v1.1');
   assert.equal(definition.rawSuccess, true);
   assert.deepEqual(definition.dataSources, ['wisereport-global']);
+});
+
+test('GET global WiseReport slim v1.1 path returns raw json without envelope', async () => {
+  const { app, endpointDefinitions, buildWiseReportGlobalSlimPayloadV11 } = await import('../src/server.js');
+  const fixture = buildWiseReportGlobalSlimPayloadV11(createGlobalDomainFixture(), 'NVDA');
+  const definition = endpointDefinitions.find((entry) => entry.id === 'wisereport-global-slim-v1.1');
+
+  assert.ok(definition, 'global slim v1.1 endpoint definition should exist');
+
+  const originalHandler = definition.handler;
+  definition.handler = async () => fixture;
+
+  try {
+    const responseBody = await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/source/wisereport-global/us/companies/NVDA/slim/v1.1`);
+      assert.equal(response.status, 200);
+      return response.json();
+    });
+
+    assert.deepEqual(responseBody, fixture);
+    assert.equal(Object.hasOwn(responseBody, 'ok'), false);
+    assert.equal(Object.hasOwn(responseBody, 'data'), false);
+    assert.equal(Object.hasOwn(responseBody, 'meta'), false);
+  } finally {
+    definition.handler = originalHandler;
+  }
 });

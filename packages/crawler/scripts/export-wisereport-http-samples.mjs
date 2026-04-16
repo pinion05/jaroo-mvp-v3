@@ -29,33 +29,23 @@ async function fetchJson(url) {
 }
 
 const result = await withServer(async (baseUrl) => {
-  const aggregate = await fetchJson(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/${code}`);
-  const companyOverview = await fetchJson(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/${code}/company-overview`);
-  const relativeReturn = await fetchJson(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/${code}/relative-return`);
-  return { baseUrl, aggregate, companyOverview, relativeReturn };
+  const slimV11 = await fetchJson(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/${code}/slim/v1.1`);
+  return { baseUrl, slimV11 };
 });
 
 await mkdir(outDir, { recursive: true });
 const files = {
-  aggregate: path.join(outDir, `wisereport-kr-aggregate-${code}.json`),
-  companyOverview: path.join(outDir, `wisereport-kr-company-overview-${code}.json`),
-  relativeReturn: path.join(outDir, `wisereport-kr-relative-return-${code}.json`),
+  slimV11: path.join(outDir, `wisereport-kr-slim-v11-${code}.json`),
   manifest: path.join(outDir, `wisereport-kr-http-samples-${code}.json`),
 };
 
-await writeFile(files.aggregate, `${JSON.stringify(result.aggregate, null, 2)}
-`);
-await writeFile(files.companyOverview, `${JSON.stringify(result.companyOverview, null, 2)}
-`);
-await writeFile(files.relativeReturn, `${JSON.stringify(result.relativeReturn, null, 2)}
+await writeFile(files.slimV11, `${JSON.stringify(result.slimV11, null, 2)}
 `);
 await writeFile(files.manifest, `${JSON.stringify({
   code,
   files,
   summary: {
-    aggregateCount: result.aggregate?.count ?? null,
-    companyOverviewCount: result.companyOverview?.count ?? null,
-    relativeReturnCount: result.relativeReturn?.count ?? null,
+    slimV11TopLevelKeys: Object.keys(result.slimV11 || {}),
   },
 }, null, 2)}
 `);
