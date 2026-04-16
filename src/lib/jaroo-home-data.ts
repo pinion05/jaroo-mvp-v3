@@ -437,6 +437,10 @@ const HOME_HOLDING_CODE_BY_NAME = new Map(
     .map((item) => [normalizeStockName(item.name), item.code as string]),
 )
 
+function readTrimmedString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : undefined
+}
+
 function normalizeAppliedInstrumentCode(value: unknown) {
   if (typeof value !== 'string') {
     return undefined
@@ -497,10 +501,6 @@ function resolveAppliedAveragePriceCurrency(
   return evaluationAmountCurrency ?? 'KRW'
 }
 
-function sanitizeAppliedHomePortfolioRowsForStorage(input: unknown): AppliedHomePortfolioRow[] {
-  return sanitizeAppliedHomePortfolioRows(input)
-}
-
 function sanitizeAppliedHomePortfolioRows(input: unknown): AppliedHomePortfolioRow[] {
   if (!Array.isArray(input)) {
     return []
@@ -515,17 +515,17 @@ function sanitizeAppliedHomePortfolioRows(input: unknown): AppliedHomePortfolioR
           : undefined
       const resolvedKind: AppliedHomePortfolioRow['resolvedKind'] =
         item.resolvedKind === 'stock' || item.resolvedKind === 'etf' ? item.resolvedKind : undefined
-      const resolvedMarket = typeof item.resolvedMarket === 'string' ? item.resolvedMarket.trim() : undefined
+      const resolvedMarket = readTrimmedString(item.resolvedMarket)
       const averagePriceCurrency = resolveAppliedAveragePriceCurrency(item, resolvedMarketTone, resolvedMarket)
 
       return {
-        name: typeof item.name === 'string' ? item.name.trim() : '',
-        quantity: typeof item.quantity === 'string' ? item.quantity.trim() : '',
-        averagePrice: typeof item.averagePrice === 'string' ? item.averagePrice.trim() : '',
+        name: readTrimmedString(item.name) ?? '',
+        quantity: readTrimmedString(item.quantity) ?? '',
+        averagePrice: readTrimmedString(item.averagePrice) ?? '',
         averagePriceCurrency,
         code: normalizeAppliedInstrumentCode(item.code),
         ticker: normalizeAppliedInstrumentCode(item.ticker),
-        resolvedName: typeof item.resolvedName === 'string' ? item.resolvedName.trim() : undefined,
+        resolvedName: readTrimmedString(item.resolvedName),
         resolvedCode: normalizeAppliedInstrumentCode(item.resolvedCode),
         resolvedTicker: normalizeAppliedInstrumentCode(item.resolvedTicker),
         resolvedMarket,
@@ -721,13 +721,19 @@ function buildOpinionText(name: string, kind: HomeHolding['kind'], profitRateVal
   return `${name} 손실 구간을 OCR에서 반영했어요. 회복 신호가 있는지 딥스캔으로 추가 확인해보세요.`
 }
 
+function cacheDeepScanSnapshot(snapshotKey: string, snapshot: DeepScanTargetSession) {
+  cachedDeepScanSnapshotKey = snapshotKey
+  cachedDeepScanSnapshot = snapshot
+  return snapshot
+}
+
 export function persistAppliedHomePortfolio(session: AppliedHomePortfolioSession) {
   if (typeof window === 'undefined') {
     return false
   }
 
   try {
-    const sanitizedRows = sanitizeAppliedHomePortfolioRowsForStorage(session.rows)
+    const sanitizedRows = sanitizeAppliedHomePortfolioRows(session.rows)
 
     window.sessionStorage.setItem(
       APPLIED_HOME_PORTFOLIO_STORAGE_KEY,
@@ -844,30 +850,15 @@ export function resolveDeepScanTargetSession() {
   }
 
   const storedTarget = readDeepScanTargetSession()
-
-  if (storedTarget) {
-    cachedDeepScanSnapshotKey = snapshotKey
-    cachedDeepScanSnapshot = storedTarget
-    return storedTarget
-  }
-
   const appliedPortfolio = readAppliedHomePortfolio()
+  const appliedHolding = appliedPortfolio?.rows.length
+    ? pickDeepScanDefaultHolding(buildHomeHoldingsFromOcrRows(appliedPortfolio.rows))
+    : null
+  const resolvedSnapshot = storedTarget
+    ?? (appliedHolding ? buildDeepScanTargetSession(appliedHolding) : null)
+    ?? DEEPSCAN_SERVER_SNAPSHOT
 
-  if (appliedPortfolio?.rows.length) {
-    const appliedHolding = pickDeepScanDefaultHolding(buildHomeHoldingsFromOcrRows(appliedPortfolio.rows))
-
-    if (appliedHolding) {
-      const nextSnapshot = buildDeepScanTargetSession(appliedHolding)
-      cachedDeepScanSnapshotKey = snapshotKey
-      cachedDeepScanSnapshot = nextSnapshot
-      return nextSnapshot
-    }
-  }
-
-  cachedDeepScanSnapshotKey = snapshotKey
-  cachedDeepScanSnapshot = DEEPSCAN_SERVER_SNAPSHOT
-
-  return DEEPSCAN_SERVER_SNAPSHOT
+  return cacheDeepScanSnapshot(snapshotKey, resolvedSnapshot)
 }
 
 export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): HomeHolding[] {

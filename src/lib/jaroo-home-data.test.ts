@@ -288,3 +288,35 @@ test('deepscan server snapshot helper는 storage가 있어도 placeholder를 유
     restoreWindow()
   }
 })
+
+test('deepscan client snapshot은 explicit target이 없으면 applied home portfolio의 기본 종목으로 fallback한다', () => {
+  const restoreWindow = installWindowMock()
+
+  try {
+    const persisted = persistAppliedHomePortfolio({
+      broker: '테스트증권',
+      rows: [
+        {
+          name: '삼성전자',
+          quantity: '10주',
+          averagePrice: '80,000원',
+          resolvedName: '삼성전자',
+          resolvedCode: '005930',
+          resolvedMarket: 'KOSPI',
+          resolvedMarketTone: 'kospi',
+          resolvedKind: 'stock',
+        },
+      ],
+    })
+
+    assert.equal(persisted, true)
+
+    const snapshot = resolveDeepScanTargetSession()
+
+    assert.equal(snapshot.holding.name, '삼성전자')
+    assert.equal(snapshot.holding.code, '005930')
+    assert.equal(snapshot.viewModel.holding.name, '삼성전자')
+  } finally {
+    restoreWindow()
+  }
+})
