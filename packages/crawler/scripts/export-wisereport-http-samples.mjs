@@ -29,9 +29,9 @@ async function fetchJson(url) {
 }
 
 const result = await withServer(async (baseUrl) => {
-  const aggregate = await fetchJson(`${baseUrl}/api/wisereport/kr/${code}`);
-  const companyOverview = await fetchJson(`${baseUrl}/api/wisereport/kr/${code}/company-overview`);
-  const relativeReturn = await fetchJson(`${baseUrl}/api/wisereport/kr/${code}/relative-return`);
+  const aggregate = await fetchJson(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/${code}`);
+  const companyOverview = await fetchJson(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/${code}/company-overview`);
+  const relativeReturn = await fetchJson(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/${code}/relative-return`);
   return { baseUrl, aggregate, companyOverview, relativeReturn };
 });
 

@@ -109,8 +109,8 @@ npm run dev
   "count": 1,
   "request": {
     "method": "GET",
-    "path": "/api/market/fx/usd-krw",
-    "primaryPath": "/api/market/fx/usd-krw",
+    "path": "/api/source/investing/market/fx/usd-krw",
+    "primaryPath": "/api/source/investing/market/fx/usd-krw",
     "params": {},
     "query": {}
   },
@@ -120,7 +120,8 @@ npm run dev
     "resource": "market.fx.usd-krw",
     "routeId": "market-fx-usd-krw",
     "description": "USD/KRW 환율 스냅샷을 반환합니다.",
-    "generatedAt": "2026-04-09T00:00:00.000Z"
+    "generatedAt": "2026-04-09T00:00:00.000Z",
+    "dataSources": ["investing"]
   }
 }
 ```
@@ -128,17 +129,17 @@ npm run dev
 `count` 는 모든 엔드포인트에 동일 규칙으로 고정된 값이 아닙니다.
 
 - 일부 엔드포인트는 route별 계산 규칙을 따릅니다.
-  - 예: `/api/catalog` 는 endpoint 개수
-  - 예: `/api/wisereport/kr/:code` 는 aggregate에 담긴 페이지 개수
+  - 예: `/api/source/system/catalog` 는 endpoint 개수
+  - 예: `/api/source/wisereport-fnguide/kr/companies/:code` 는 aggregate에 담긴 페이지 개수
 - 별도 규칙이 없으면 배열은 `length`, 객체는 top-level key 수, 스칼라는 `1`, `null` 은 `0` 으로 추론합니다.
 - 실패 응답은 `count: 0` 입니다.
 
 성공 시 raw JSON을 그대로 반환하는 slim 엔드포인트는 아래 4개뿐입니다.
 
-- `/api/wisereport/kr/:code/slim/v1`
-- `/api/wisereport/kr/:code/slim/v1.1`
-- `/api/wisereport/global/:ticker/slim/v1`
-- `/api/wisereport/global/:ticker/slim/v1.1`
+- `/api/source/wisereport-fnguide/kr/companies/:code/slim/v1`
+- `/api/source/wisereport-fnguide/kr/companies/:code/slim/v1.1`
+- `/api/source/wisereport-global/us/companies/:ticker/slim/v1`
+- `/api/source/wisereport-global/us/companies/:ticker/slim/v1.1`
 
 위 4개도 실패 시에는 공통 에러 envelope를 사용합니다.
 
@@ -148,8 +149,8 @@ npm run dev
 
 | Method | Primary Path | 설명 |
 | --- | --- | --- |
-| `GET` | `/health` | 서버 생존 상태와 런타임 정보 |
-| `GET` | `/api/catalog` | 전체 API 카탈로그와 WiseReport Global route 목록 |
+| `GET` | `/api/source/system/health` | 서버 생존 상태와 런타임 정보 |
+| `GET` | `/api/source/system/catalog` | 전체 API 카탈로그와 WiseReport Global route 목록 |
 
 ### 4.2 WiseReport KR
 
@@ -157,9 +158,9 @@ npm run dev
 
 | Method | Primary Path | 성공 응답 | 설명 |
 | --- | --- | --- | --- |
-| `GET` | `/api/wisereport/kr/:code` | envelope | KR WiseReport/FnGuide 10개 페이지 aggregate |
-| `GET` | `/api/wisereport/kr/:code/slim/v1` | raw JSON | KR slim v1 aggregate |
-| `GET` | `/api/wisereport/kr/:code/slim/v1.1` | raw JSON | KR slim v1.1 aggregate |
+| `GET` | `/api/source/wisereport-fnguide/kr/companies/:code` | envelope | KR WiseReport/FnGuide 10개 페이지 aggregate |
+| `GET` | `/api/source/wisereport-fnguide/kr/companies/:code/slim/v1` | raw JSON | KR slim v1 aggregate |
+| `GET` | `/api/source/wisereport-fnguide/kr/companies/:code/slim/v1.1` | raw JSON | KR slim v1.1 aggregate |
 
 #### Page endpoints
 
@@ -167,35 +168,35 @@ npm run dev
 
 | Method | Path | Source | 설명 |
 | --- | --- | --- | --- |
-| `GET` | `/api/wisereport/kr/:code/company-overview` | WiseReport | 기업개요 |
-| `GET` | `/api/wisereport/kr/:code/financial-analysis` | WiseReport | 재무분석 |
-| `GET` | `/api/wisereport/kr/:code/investment-indicators` | WiseReport | 투자지표 |
-| `GET` | `/api/wisereport/kr/:code/consensus` | WiseReport | 컨센서스 |
-| `GET` | `/api/wisereport/kr/:code/shareholding` | WiseReport | 지분현황 |
-| `GET` | `/api/wisereport/kr/:code/recent-reports` | WiseReport | 최근리포트 |
-| `GET` | `/api/wisereport/kr/:code/fnguide-finance` | FnGuide | 재무제표 |
-| `GET` | `/api/wisereport/kr/:code/relative-return` | FnGuide | 상대수익률 |
-| `GET` | `/api/wisereport/kr/:code/opinion` | FnGuide | 투자의견 |
-| `GET` | `/api/wisereport/kr/:code/style-analysis` | FnGuide | 스타일분석 |
+| `GET` | `/api/source/wisereport/kr/companies/:code/company-overview` | WiseReport | 기업개요 |
+| `GET` | `/api/source/wisereport/kr/companies/:code/financial-analysis` | WiseReport | 재무분석 |
+| `GET` | `/api/source/wisereport/kr/companies/:code/investment-indicators` | WiseReport | 투자지표 |
+| `GET` | `/api/source/wisereport/kr/companies/:code/consensus` | WiseReport | 컨센서스 |
+| `GET` | `/api/source/wisereport/kr/companies/:code/shareholding` | WiseReport | 지분현황 |
+| `GET` | `/api/source/wisereport/kr/companies/:code/recent-reports` | WiseReport | 최근리포트 |
+| `GET` | `/api/source/fnguide/kr/companies/:code/fnguide-finance` | FnGuide | 재무제표 |
+| `GET` | `/api/source/fnguide/kr/companies/:code/relative-return` | FnGuide | 상대수익률 |
+| `GET` | `/api/source/fnguide/kr/companies/:code/opinion` | FnGuide | 투자의견 |
+| `GET` | `/api/source/fnguide/kr/companies/:code/style-analysis` | FnGuide | 스타일분석 |
 
 예시:
 
 ```bash
-curl "http://localhost:3040/api/wisereport/kr/005930"
-curl "http://localhost:3040/api/wisereport/kr/005930/slim/v1"
-curl "http://localhost:3040/api/wisereport/kr/005930/company-overview"
+curl "http://localhost:3040/api/source/wisereport-fnguide/kr/companies/005930"
+curl "http://localhost:3040/api/source/wisereport-fnguide/kr/companies/005930/slim/v1"
+curl "http://localhost:3040/api/source/wisereport/kr/companies/005930/company-overview"
 ```
 
 ### 4.3 WiseReport Global
 
 | Method | Primary Path | Query | 성공 응답 | 설명 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/wisereport/global/:ticker` | `routes?` | envelope | WiseReport Global aggregate |
-| `GET` | `/api/wisereport/global/:ticker/domain` | 없음 | envelope | WiseReport Global domain 정규화 데이터 |
-| `GET` | `/api/wisereport/global/:ticker/slim/v1` | 없음 | raw JSON | Company 5개 route 기준 slim v1 |
-| `GET` | `/api/wisereport/global/:ticker/slim/v1.1` | 없음 | raw JSON | Company 5개 route 기준 slim v1.1 |
+| `GET` | `/api/source/wisereport-global/us/companies/:ticker` | `routes?` | envelope | WiseReport Global aggregate |
+| `GET` | `/api/source/wisereport-global/us/companies/:ticker/domain` | 없음 | envelope | WiseReport Global domain 정규화 데이터 |
+| `GET` | `/api/source/wisereport-global/us/companies/:ticker/slim/v1` | 없음 | raw JSON | Company 5개 route 기준 slim v1 |
+| `GET` | `/api/source/wisereport-global/us/companies/:ticker/slim/v1.1` | 없음 | raw JSON | Company 5개 route 기준 slim v1.1 |
 
-`/api/wisereport/global/:ticker` 의 `routes` 는 선택 수집용 comma-separated query 입니다. 미지정 시 전체 route set을 수집합니다. route id 목록은 `/api/catalog` 의 `wisereportGlobalRoutes` 에도 포함됩니다.
+`/api/source/wisereport-global/us/companies/:ticker` 의 `routes` 는 선택 수집용 comma-separated query 입니다. 미지정 시 전체 route set을 수집합니다. route id 목록은 `/api/source/system/catalog` 의 `wisereportGlobalRoutes` 에도 포함됩니다.
 
 현재 route id는 다음 19개입니다.
 
@@ -211,38 +212,38 @@ Global slim v1 / v1.1 은 위 전체 route를 쓰지 않고 Company 5개 route�
 예시:
 
 ```bash
-curl "http://localhost:3040/api/wisereport/global/NVDA"
-curl "http://localhost:3040/api/wisereport/global/NVDA?routes=company-snap,company-finance"
-curl "http://localhost:3040/api/wisereport/global/NVDA/domain"
-curl "http://localhost:3040/api/wisereport/global/NVDA/slim/v1.1"
+curl "http://localhost:3040/api/source/wisereport-global/us/companies/NVDA"
+curl "http://localhost:3040/api/source/wisereport-global/us/companies/NVDA?routes=company-snap,company-finance"
+curl "http://localhost:3040/api/source/wisereport-global/us/companies/NVDA/domain"
+curl "http://localhost:3040/api/source/wisereport-global/us/companies/NVDA/slim/v1.1"
 ```
 
 ### 4.4 Market
 
 | Method | Primary Path | 설명 |
 | --- | --- | --- |
-| `GET` | `/api/market/overview/kr` | 국내 시장 요약 텍스트 |
-| `GET` | `/api/market/fx/usd-krw` | USD/KRW 환율 |
-| `GET` | `/api/market/indicators` | VKOSPI + ADR + US VIX |
-| `GET` | `/api/market/indicators/vkospi` | VKOSPI |
-| `GET` | `/api/market/indicators/adr` | ADR |
-| `GET` | `/api/market/indicators/us-vix` | US VIX |
+| `GET` | `/api/source/naver-finance/kr/market/overview` | 국내 시장 요약 텍스트 |
+| `GET` | `/api/source/investing/market/fx/usd-krw` | USD/KRW 환율 |
+| `GET` | `/api/source/stockplus-adrinfo-investing/market/indicators` | VKOSPI + ADR + US VIX |
+| `GET` | `/api/source/stockplus/market/indicators/vkospi` | VKOSPI |
+| `GET` | `/api/source/adrinfo/market/indicators/adr` | ADR |
+| `GET` | `/api/source/investing/us/market/indicators/vix` | US VIX |
 
 ### 4.5 US Stock / US Market
 
 | Method | Primary Path | Query | 설명 |
 | --- | --- | --- | --- |
-| `GET` | `/api/quotes/current` | `codes?`, `tickers?`, `tradeDate?` | Home 화면용 KR/US 현재가 배치 조회. 부분 실패 시 `data.missing` 에 누락 사유 포함 |
-| `GET` | `/api/us-stock/financials/:ticker` | 없음 | 미국주식 통합 재무 데이터 |
-| `GET` | `/api/us-stock/consensus/:ticker` | 없음 | 미국주식 통합 컨센서스 / 애널리스트 데이터 |
-| `GET` | `/api/us-stock/news/:ticker` | `limit?` | 미국주식 뉴스 및 감성 데이터 |
-| `GET` | `/api/us-stock/filings/:ticker` | `limit?`, `filingTypes?`, `from?`, `to?` | 미국주식 공시 데이터 |
-| `GET` | `/api/us-stock/company-facts/:ticker` | 없음 | SEC company facts 원시 데이터 |
-| `GET` | `/api/us-stock/company-facts/:ticker/taxonomies` | 없음 | taxonomy 목록 |
-| `GET` | `/api/us-stock/company-facts/:ticker/taxonomies/:taxonomy/concepts` | 없음 | taxonomy별 concept 목록 |
-| `GET` | `/api/us-stock/company-facts/:ticker/taxonomies/:taxonomy/concepts/:concept` | 없음 | 단일 concept 상세 |
-| `GET` | `/api/us-market/indicators` | 없음 | 미국 시장 지표(S&P 500, NASDAQ, VIX, SMA) |
-| `GET` | `/api/us-stock/report/:ticker` | `includeFinancials?`, `includeConsensus?`, `includeNews?`, `includeFilings?`, `includeMarketIndicators?`, `newsLimit?`, `filingsLimit?` | 미국주식 리포트용 raw aggregator |
+| `GET` | `/api/source/krx-polygon-fmp/market/quotes/current` | `codes?`, `tickers?`, `tradeDate?` | Home 화면용 KR/US 현재가 배치 조회. 부분 실패 시 `data.missing` 에 누락 사유 포함 |
+| `GET` | `/api/source/fmp-polygon-finnhub-wisereport-global/us/stocks/:ticker/financials` | 없음 | 미국주식 통합 재무 데이터 |
+| `GET` | `/api/source/fmp-finnhub-wisereport-global/us/stocks/:ticker/consensus` | 없음 | 미국주식 통합 컨센서스 / 애널리스트 데이터 |
+| `GET` | `/api/source/polygon-finnhub-wisereport-global/us/stocks/:ticker/news` | `limit?` | 미국주식 뉴스 및 감성 데이터 |
+| `GET` | `/api/source/finnhub-sec-edgar/us/stocks/:ticker/filings` | `limit?`, `filingTypes?`, `from?`, `to?` | 미국주식 공시 데이터 |
+| `GET` | `/api/source/sec-edgar/us/stocks/:ticker/company-facts` | 없음 | SEC company facts 원시 데이터 |
+| `GET` | `/api/source/sec-edgar/us/stocks/:ticker/company-facts/taxonomies` | 없음 | taxonomy 목록 |
+| `GET` | `/api/source/sec-edgar/us/stocks/:ticker/company-facts/taxonomies/:taxonomy/concepts` | 없음 | taxonomy별 concept 목록 |
+| `GET` | `/api/source/sec-edgar/us/stocks/:ticker/company-facts/taxonomies/:taxonomy/concepts/:concept` | 없음 | 단일 concept 상세 |
+| `GET` | `/api/source/polygon-yahoo/us/market/indicators` | 없음 | 미국 시장 지표(S&P 500, NASDAQ, VIX, SMA) |
+| `GET` | `/api/source/fmp-polygon-finnhub-sec-edgar-yahoo-wisereport-global/us/stocks/:ticker/report` | `includeFinancials?`, `includeConsensus?`, `includeNews?`, `includeFilings?`, `includeMarketIndicators?`, `newsLimit?`, `filingsLimit?` | 미국주식 리포트용 raw aggregator |
 
 쿼리 규칙:
 
@@ -255,13 +256,13 @@ curl "http://localhost:3040/api/wisereport/global/NVDA/slim/v1.1"
 
 | Method | Primary Path | Query | 설명 |
 | --- | --- | --- | --- |
-| `GET` | `/api/krx/ohlcv/:ticker` | `startDate`, `endDate` | 종목 OHLCV |
-| `GET` | `/api/krx/index/:indexCode` | `startDate`, `endDate` | 지수 OHLCV |
-| `GET` | `/api/krx/investor-volume/:ticker` | `startDate`, `endDate` | 투자자별 거래량 |
-| `GET` | `/api/krx/market/snapshot` | `tradeDate`, `market?` | 시장 스냅샷 |
-| `GET` | `/api/krx/market/cap` | `tradeDate`, `market?` | 시가총액 데이터 |
-| `GET` | `/api/krx/tickers` | `market?` | 티커-종목명 맵 |
-| `GET` | `/api/krx/batches/trigger` | `mode?` | trigger batch 실행 |
+| `GET` | `/api/source/krx-js-client/kr/stocks/:ticker/ohlcv` | `startDate`, `endDate` | 종목 OHLCV |
+| `GET` | `/api/source/krx-js-client/kr/indexes/:indexCode/ohlcv` | `startDate`, `endDate` | 지수 OHLCV |
+| `GET` | `/api/source/krx-js-client/kr/stocks/:ticker/investor-volume` | `startDate`, `endDate` | 투자자별 거래량 |
+| `GET` | `/api/source/krx-js-client/kr/market/snapshot` | `tradeDate`, `market?` | 시장 스냅샷 |
+| `GET` | `/api/source/krx-js-client/kr/market/cap` | `tradeDate`, `market?` | 시가총액 데이터 |
+| `GET` | `/api/source/krx-js-client/kr/market/tickers` | `market?` | 티커-종목명 맵 |
+| `GET` | `/api/source/krx-js-client/kr/batches/trigger` | `mode?` | trigger batch 실행 |
 
 메모:
 
@@ -272,9 +273,10 @@ curl "http://localhost:3040/api/wisereport/global/NVDA/slim/v1.1"
 ## 5. 라우팅 정책
 
 - crawler HTTP 엔드포인트는 모두 `primaryPath`, 즉 `/api/*` 경로만 지원합니다.
-- `/api/catalog` 역시 alias 없이 단일 경로로만 노출됩니다.
+- path 규칙은 기본적으로 `/api/source/<data-source-slug>/...` 입니다.
+- `/api/source/system/catalog` 역시 alias 없이 단일 경로로만 노출됩니다.
 - envelope 응답의 `request` 는 `method`, `path`, `primaryPath`, `params`, `query`만 포함합니다.
-- envelope 응답의 `meta` 는 `service`, `version`, `resource`, `routeId`, `description`, `generatedAt`와 route별 추가 메타만 포함합니다.
+- envelope 응답의 `meta` 는 `service`, `version`, `resource`, `routeId`, `description`, `generatedAt`, `dataSources`와 route별 추가 메타를 포함합니다.
 
 ## 6. 예시 샘플
 
@@ -284,6 +286,6 @@ curl "http://localhost:3040/api/wisereport/global/NVDA/slim/v1.1"
 
 ## 7. 운영 메모
 
-- 현재 제공 리소스를 빠르게 확인하려면 `/api/catalog` 를 보면 됩니다.
-- smoke test는 `/health`, `/api/catalog`, `/api/market/fx/usd-krw` 부터 확인하는 편이 안전합니다.
+- 현재 제공 리소스를 빠르게 확인하려면 `/api/source/system/catalog` 를 보면 됩니다.
+- smoke test는 `/api/source/system/health`, `/api/source/system/catalog`, `/api/source/investing/market/fx/usd-krw` 부터 확인하는 편이 안전합니다.
 - 실서비스에서는 `.env` 를 커밋하지 말고 별도 secret 관리 체계를 권장합니다.

@@ -20,15 +20,16 @@ test('catalog endpoint definition omits alias metadata', async () => {
   const definition = endpointDefinitions.find((item) => item.id === 'catalog');
 
   assert.ok(definition);
-  assert.equal(definition.primaryPath, '/api/catalog');
+  assert.equal(definition.primaryPath, '/api/source/system/catalog');
   assert.equal('aliases' in definition, false);
+  assert.deepEqual(definition.dataSources, ['system']);
 });
 
-test('GET /api/catalog returns endpoint entries without aliases', async () => {
+test('GET /api/source/system/catalog returns endpoint entries with explicit data sources', async () => {
   const { app } = await import('../src/server.js');
 
   const body = await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/catalog`);
+    const response = await fetch(`${baseUrl}/api/source/system/catalog`);
     assert.equal(response.status, 200);
     return response.json();
   });
@@ -37,13 +38,14 @@ test('GET /api/catalog returns endpoint entries without aliases', async () => {
   assert.ok(Array.isArray(body.data.endpoints));
   assert.ok(body.data.endpoints.length > 0);
   assert.equal('aliases' in body.data.endpoints[0], false);
+  assert.ok(Array.isArray(body.data.endpoints[0].dataSources));
 });
 
-test('GET /crawlers returns not found after alias removal', async () => {
+test('GET /api/catalog returns not found after source-path migration', async () => {
   const { app } = await import('../src/server.js');
 
   const body = await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/crawlers`);
+    const response = await fetch(`${baseUrl}/api/catalog`);
     assert.equal(response.status, 404);
     return response.json();
   });

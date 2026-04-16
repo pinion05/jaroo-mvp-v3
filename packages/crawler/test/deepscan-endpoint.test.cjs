@@ -20,8 +20,9 @@ test('deepscan-canonical endpoint definition is registered', async () => {
   const definition = endpointDefinitions.find((item) => item.id === 'deepscan-canonical');
 
   assert.ok(definition);
-  assert.equal(definition.primaryPath, '/api/deepscan');
+  assert.equal(definition.primaryPath, '/api/source/wisereport-fnguide-krx-polygon-fmp-deepscan-package/deepscan/canonical');
   assert.equal('aliases' in definition, false);
+  assert.deepEqual(definition.dataSources, ['wisereport', 'fnguide', 'krx-js-client', 'polygon', 'fmp', 'deepscan-kr-package']);
   assert.deepEqual(definition.query, [
     'market(optional)',
     'code(optional)',
@@ -35,7 +36,7 @@ test('deepscan-canonical endpoint definition is registered', async () => {
   ]);
 });
 
-test('GET /api/deepscan returns raw canonical payload and builds input from query params', async () => {
+test('GET explicit-source deepscan path returns raw canonical payload and builds input from query params', async () => {
   const { app } = await import('../src/server.js');
 
   const body = await withServer(app, async (baseUrl) => {
@@ -49,7 +50,7 @@ test('GET /api/deepscan returns raw canonical payload and builds input from quer
       selectedAt: '2026-04-15T09:00:00.000Z',
       from: 'holding',
     });
-    const response = await fetch(`${baseUrl}/api/deepscan?${params.toString()}`);
+    const response = await fetch(`${baseUrl}/api/source/wisereport-fnguide-krx-polygon-fmp-deepscan-package/deepscan/canonical?${params.toString()}`);
 
     assert.equal(response.status, 200);
     return response.json();
@@ -67,7 +68,7 @@ test('GET /api/deepscan returns raw canonical payload and builds input from quer
   assert.equal(body.input.sourceContext.from, 'holding');
 });
 
-test('GET /api/deepscan returns raw input-invalid payload with HTTP 400 on the primary path', async () => {
+test('GET explicit-source deepscan path returns raw input-invalid payload with HTTP 400 on the primary path', async () => {
   const { app } = await import('../src/server.js');
 
   const body = await withServer(app, async (baseUrl) => {
@@ -75,7 +76,7 @@ test('GET /api/deepscan returns raw input-invalid payload with HTTP 400 on the p
       name: '삼성전자',
       from: 'holding',
     });
-    const response = await fetch(`${baseUrl}/api/deepscan?${params.toString()}`);
+    const response = await fetch(`${baseUrl}/api/source/wisereport-fnguide-krx-polygon-fmp-deepscan-package/deepscan/canonical?${params.toString()}`);
 
     assert.equal(response.status, 400);
     return response.json();
@@ -88,11 +89,11 @@ test('GET /api/deepscan returns raw input-invalid payload with HTTP 400 on the p
   assert.equal(body.hero.blockState, 'blocked');
 });
 
-test('GET /crawl/deepscan returns not found after alias removal', async () => {
+test('GET /api/deepscan returns not found after source-path migration', async () => {
   const { app } = await import('../src/server.js');
 
   const body = await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/crawl/deepscan?code=005930`);
+    const response = await fetch(`${baseUrl}/api/deepscan?code=005930`);
 
     assert.equal(response.status, 404);
     return response.json();
@@ -102,7 +103,7 @@ test('GET /crawl/deepscan returns not found after alias removal', async () => {
   assert.equal(body.error.message, 'not found');
 });
 
-test('GET /api/deepscan maps thrown errors to a raw canonical internal service error payload', async () => {
+test('GET explicit-source deepscan path maps thrown errors to a raw canonical internal service error payload', async () => {
   const { app, endpointDefinitions } = await import('../src/server.js');
   const definition = endpointDefinitions.find((item) => item.id === 'deepscan-canonical');
 
@@ -119,7 +120,7 @@ test('GET /api/deepscan maps thrown errors to a raw canonical internal service e
         name: '삼성전자',
         from: 'holding',
       });
-      const response = await fetch(`${baseUrl}/api/deepscan?${params.toString()}`);
+      const response = await fetch(`${baseUrl}/api/source/wisereport-fnguide-krx-polygon-fmp-deepscan-package/deepscan/canonical?${params.toString()}`);
 
       assert.equal(response.status, 500);
       return response.json();

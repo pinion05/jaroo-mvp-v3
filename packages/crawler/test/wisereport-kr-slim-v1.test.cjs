@@ -340,7 +340,7 @@ test('buildWiseReportKrSlimPayload keeps only slim business fields', async () =>
   assert.deepEqual(collectForbiddenKeyHits(slim), []);
 });
 
-test('GET /api/wisereport/kr/:code/slim/v1 returns raw json without envelope', async () => {
+test('GET explicit-source KR slim v1 path returns raw json without envelope', async () => {
   const { app, endpointDefinitions, buildWiseReportKrSlimPayload } = await import('../src/server.js');
   const fixture = buildWiseReportKrSlimPayload(createAggregateFixture(), '005930');
   const definition = endpointDefinitions.find((entry) => entry.id === 'wisereport-kr-slim-v1');
@@ -352,7 +352,7 @@ test('GET /api/wisereport/kr/:code/slim/v1 returns raw json without envelope', a
 
   try {
     const responseBody = await withServer(app, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/api/wisereport/kr/005930/slim/v1`);
+      const response = await fetch(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/005930/slim/v1`);
       assert.equal(response.status, 200);
       return response.json();
     });
@@ -398,7 +398,7 @@ test('buildWiseReportKrSlimPayloadV11 removes parser artifacts but preserves gen
   assert.deepEqual(collectForbiddenKeyHits(slim), []);
 });
 
-test('GET /api/wisereport/kr/:code/slim/v1.1 returns raw json without envelope', async () => {
+test('GET explicit-source KR slim v1.1 path returns raw json without envelope', async () => {
   const { app, endpointDefinitions, buildWiseReportKrSlimPayloadV11 } = await import('../src/server.js');
   const fixture = buildWiseReportKrSlimPayloadV11(createAggregateFixtureV11(), '005930');
   const definition = endpointDefinitions.find((entry) => entry.id === 'wisereport-kr-slim-v1.1');
@@ -410,7 +410,7 @@ test('GET /api/wisereport/kr/:code/slim/v1.1 returns raw json without envelope',
 
   try {
     const responseBody = await withServer(app, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/api/wisereport/kr/005930/slim/v1.1`);
+      const response = await fetch(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/005930/slim/v1.1`);
       assert.equal(response.status, 200);
       return response.json();
     });

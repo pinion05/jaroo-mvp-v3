@@ -4,7 +4,7 @@ import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 
 export function buildQuotesCurrentUpstreamUrl(baseUrl: string, searchParams: URLSearchParams) {
   const query = searchParams.toString()
-  return buildCrawlerUrl(baseUrl, `/api/quotes/current${query ? `?${query}` : ''}`)
+  return buildCrawlerUrl(baseUrl, `/api/source/krx-polygon-fmp/market/quotes/current${query ? `?${query}` : ''}`)
 }
 
 export async function GET(request: NextRequest) {

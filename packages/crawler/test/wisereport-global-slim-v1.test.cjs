@@ -369,8 +369,9 @@ test('wisereport-global-slim-v1 endpoint is registered as raw JSON route', async
 
   assert.ok(definition);
   assert.equal(definition.resource, 'wisereport.global.company.slim.v1');
-  assert.equal(definition.primaryPath, '/api/wisereport/global/:ticker/slim/v1');
+  assert.equal(definition.primaryPath, '/api/source/wisereport-global/us/companies/:ticker/slim/v1');
   assert.equal(definition.rawSuccess, true);
+  assert.deepEqual(definition.dataSources, ['wisereport-global']);
 });
 
 test('buildWiseReportGlobalSlimPayloadV1 dedupes storyless news by title', async () => {
@@ -594,6 +595,7 @@ test('wisereport-global-slim-v1.1 endpoint is registered as raw JSON route', asy
 
   assert.ok(definition);
   assert.equal(definition.resource, 'wisereport.global.company.slim.v1.1');
-  assert.equal(definition.primaryPath, '/api/wisereport/global/:ticker/slim/v1.1');
+  assert.equal(definition.primaryPath, '/api/source/wisereport-global/us/companies/:ticker/slim/v1.1');
   assert.equal(definition.rawSuccess, true);
+  assert.deepEqual(definition.dataSources, ['wisereport-global']);
 });

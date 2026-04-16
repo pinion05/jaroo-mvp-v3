@@ -28,7 +28,7 @@ export function buildDeepScanCanonicalUpstreamPath(searchParams: URLSearchParams
   }
 
   const query = upstreamSearchParams.toString()
-  return `/api/deepscan${query ? `?${query}` : ''}`
+  return `/api/source/wisereport-fnguide-krx-polygon-fmp-deepscan-package/deepscan/canonical${query ? `?${query}` : ''}`
 }
 
 export async function GET(request: NextRequest) {

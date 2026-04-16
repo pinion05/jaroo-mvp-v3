@@ -20,13 +20,14 @@ test('quotes-current endpoint definition is registered', async () => {
   const definition = endpointDefinitions.find((item) => item.id === 'quotes-current');
 
   assert.ok(definition);
-  assert.equal(definition.primaryPath, '/api/quotes/current');
+  assert.equal(definition.primaryPath, '/api/source/krx-polygon-fmp/market/quotes/current');
   assert.equal('aliases' in definition, false);
+  assert.deepEqual(definition.dataSources, ['krx-js-client', 'polygon', 'fmp']);
   assert.ok(definition.query.includes('codes(optional, csv)'));
   assert.ok(definition.query.includes('tickers(optional, csv)'));
 });
 
-test('GET /api/quotes/current returns standard success envelope with item-based count', async () => {
+test('GET explicit-source quotes path returns standard success envelope with item-based count', async () => {
   const { app, endpointDefinitions } = await import('../src/server.js');
   const definition = endpointDefinitions.find((item) => item.id === 'quotes-current');
   assert.ok(definition);
@@ -45,7 +46,7 @@ test('GET /api/quotes/current returns standard success envelope with item-based 
 
   try {
     const body = await withServer(app, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/api/quotes/current?codes=005930&tickers=AAPL`);
+      const response = await fetch(`${baseUrl}/api/source/krx-polygon-fmp/market/quotes/current?codes=005930&tickers=AAPL`);
       assert.equal(response.status, 200);
       return response.json();
     });
@@ -59,11 +60,11 @@ test('GET /api/quotes/current returns standard success envelope with item-based 
   }
 });
 
-test('GET /api/quotes/current rejects empty query', async () => {
+test('GET explicit-source quotes path rejects empty query', async () => {
   const { app } = await import('../src/server.js');
 
   const body = await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/api/quotes/current`);
+    const response = await fetch(`${baseUrl}/api/source/krx-polygon-fmp/market/quotes/current`);
     assert.equal(response.status, 400);
     return response.json();
   });
@@ -72,11 +73,11 @@ test('GET /api/quotes/current rejects empty query', async () => {
   assert.equal(body.error.message, 'missing query: codes_or_tickers');
 });
 
-test('GET /crawl/quotes/current returns not found after alias removal', async () => {
+test('GET /api/quotes/current returns not found after source-path migration', async () => {
   const { app } = await import('../src/server.js');
 
   const body = await withServer(app, async (baseUrl) => {
-    const response = await fetch(`${baseUrl}/crawl/quotes/current?codes=005930`);
+    const response = await fetch(`${baseUrl}/api/quotes/current?codes=005930`);
     assert.equal(response.status, 404);
     return response.json();
   });

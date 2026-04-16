@@ -333,12 +333,14 @@ test('slim route definitions return raw JSON success without the standard envelo
   const definitionV11 = endpointDefinitions.find((item) => item.id === 'wisereport-kr-slim-v1.1');
 
   assert.ok(definitionV1);
-  assert.equal(definitionV1.primaryPath, '/api/wisereport/kr/:code/slim/v1');
+  assert.equal(definitionV1.primaryPath, '/api/source/wisereport-fnguide/kr/companies/:code/slim/v1');
   assert.equal(definitionV1.rawSuccess, true);
   assert.equal(definitionV1.resource, 'wisereport.kr.aggregate.slim.v1');
+  assert.deepEqual(definitionV1.dataSources, ['wisereport', 'fnguide']);
 
   assert.ok(definitionV11);
-  assert.equal(definitionV11.primaryPath, '/api/wisereport/kr/:code/slim/v1.1');
+  assert.equal(definitionV11.primaryPath, '/api/source/wisereport-fnguide/kr/companies/:code/slim/v1.1');
   assert.equal(definitionV11.rawSuccess, true);
   assert.equal(definitionV11.resource, 'wisereport.kr.aggregate.slim.v1.1');
+  assert.deepEqual(definitionV11.dataSources, ['wisereport', 'fnguide']);
 });
