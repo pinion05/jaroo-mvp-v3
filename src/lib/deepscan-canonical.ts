@@ -49,9 +49,29 @@ function normalizeText(value: unknown) {
   return normalized || undefined
 }
 
+function isPlaceholderSentinel(value: string) {
+  const normalizedValue = value.replace(/[−–—]/g, '-').trim()
+
+  if (/^-+$/.test(normalizedValue)) {
+    return true
+  }
+
+  return normalizedValue.toLowerCase().replace(/[./\s]/g, '') === 'na'
+}
+
 function setQueryValue(searchParams: URLSearchParams, key: CanonicalQueryKey, value: unknown) {
   const normalizedValue = normalizeText(value)
   if (!normalizedValue) {
+    return
+  }
+
+  searchParams.set(key, normalizedValue)
+}
+
+function setHoldingMetricQueryValue(searchParams: URLSearchParams, key: Extract<CanonicalQueryKey, 'averagePrice' | 'evaluationAmount'>, value: unknown) {
+  const normalizedValue = normalizeText(value)
+
+  if (!normalizedValue || isPlaceholderSentinel(normalizedValue)) {
     return
   }
 
@@ -246,8 +266,8 @@ export function buildDeepScanCanonicalQuery(targetSession: DeepScanCanonicalTarg
   setQueryValue(searchParams, 'ticker', normalizeText(holding.ticker) ?? normalizeText(holding.identifierTicker))
   setQueryValue(searchParams, 'name', holding.name)
   setQueryValue(searchParams, 'shares', holding.shares)
-  setQueryValue(searchParams, 'averagePrice', holding.averagePrice)
-  setQueryValue(searchParams, 'evaluationAmount', holding.evaluationAmount)
+  setHoldingMetricQueryValue(searchParams, 'averagePrice', holding.averagePrice)
+  setHoldingMetricQueryValue(searchParams, 'evaluationAmount', holding.evaluationAmount)
   setQueryValue(searchParams, 'selectedAt', targetSession.selectedAt)
   searchParams.set('from', 'home-handoff')
 

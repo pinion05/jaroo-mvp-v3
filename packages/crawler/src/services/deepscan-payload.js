@@ -1,9 +1,13 @@
-const DEEP_SCAN_VERSION = 'deepscan-payload-baseline-v1';
-const PLACEHOLDER_FALLBACK = Object.freeze({
-  used: true,
-  reason: 'baseline-placeholder',
-  label: 'temporary deterministic content',
-});
+import { createRequire } from 'node:module';
+import { getCurrentQuotes } from '../crawlers/current-quotes.js';
+import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
+import { scoreDeepScanKrEvidence } from './deepscan-kr-score.js';
+import { invokeDeepScanKrPackage } from './deepscan-kr-package-adapter.js';
+
+const require = createRequire(import.meta.url);
+const { WISEREPORT_KR_PAGES, getCrawl } = require('../crawlers/wisereport-kr.cjs');
+
+const DEEP_SCAN_VERSION = 'deepscan-payload-kr-v2';
 const MAJOR_BLOCK_KEYS = Object.freeze([
   'hero',
   'committee',
@@ -25,12 +29,20 @@ function normalizeText(value) {
   return normalized || undefined;
 }
 
+function normalizeSourceType(value) {
+  if (value === 'home-handoff') {
+    return 'holding';
+  }
+
+  return SOURCE_TYPES.has(value) ? value : 'system';
+}
+
 function normalizeInput(rawInput = {}) {
   const safeInput = rawInput && typeof rawInput === 'object' ? rawInput : {};
   const rawInstrument = safeInput.instrument && typeof safeInput.instrument === 'object' ? safeInput.instrument : {};
   const rawHolding = safeInput.holding && typeof safeInput.holding === 'object' ? safeInput.holding : null;
   const rawSourceContext = safeInput.sourceContext && typeof safeInput.sourceContext === 'object' ? safeInput.sourceContext : {};
-  const sourceFrom = SOURCE_TYPES.has(rawSourceContext.from) ? rawSourceContext.from : 'system';
+  const sourceFrom = normalizeSourceType(rawSourceContext.from);
 
   const normalizedHolding = rawHolding
     ? {
@@ -106,7 +118,7 @@ function safeReadNestedText(target, parentKey, childKey) {
 function safeReadSourceType(rawInput) {
   try {
     const rawSourceContext = rawInput?.sourceContext;
-    return rawSourceContext && SOURCE_TYPES.has(rawSourceContext.from) ? rawSourceContext.from : 'system';
+    return normalizeSourceType(rawSourceContext?.from);
   } catch {
     return 'system';
   }
@@ -161,7 +173,7 @@ function createErrorBlockMeta({ sourceRefs = [], fallback, error } = {}) {
   };
 }
 
-function createOkBlockMeta({ sourceRefs = [], fallback = PLACEHOLDER_FALLBACK } = {}) {
+function createOkBlockMeta({ sourceRefs = [], fallback = null } = {}) {
   return {
     blockState: 'ok',
     sourceRefs: [...sourceRefs],
@@ -182,9 +194,9 @@ function createBaseSourceRefs(input) {
     }),
     createDeepScanSourceRef({
       type: 'system',
-      id: 'deepscan-payload-baseline',
-      label: 'crawler baseline payload service',
-      note: 'Task 2 deterministic placeholder content',
+      id: 'deepscan-payload-service',
+      label: 'crawler deepscan payload service',
+      note: 'KR evidence-backed payload assembly',
     }),
   ];
 
@@ -202,13 +214,14 @@ function createBaseSourceRefs(input) {
   return sourceRefs;
 }
 
-function createBlockSourceRefs(input, blockId) {
+function createBlockSourceRefs(input, blockId, additionalSourceRefs = []) {
   return [
     ...createBaseSourceRefs(input),
+    ...additionalSourceRefs,
     createDeepScanSourceRef({
       type: 'system',
       id: `deepscan-block:${blockId}`,
-      label: `${blockId} baseline block`,
+      label: `${blockId} payload block`,
     }),
   ];
 }
@@ -428,121 +441,759 @@ function createInternalErrorPayload(rawInput = {}) {
   };
 }
 
-function createCommitteeAxes(input) {
-  const instrumentLabel = input.instrument.code ?? input.instrument.ticker ?? input.instrument.name;
+function asObject(value) {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
+}
+
+function hasOwn(target, key) {
+  return Object.prototype.hasOwnProperty.call(target, key);
+}
+
+function isKrInput(input) {
+  const market = normalizeText(input.instrument.market)?.toUpperCase();
+  const code = normalizeText(input.instrument.code);
+  return market === 'KR' || market === 'KOSPI' || market === 'KOSDAQ' || /^\d{6}$/.test(code ?? '');
+}
+
+function normalizeTradeDate(value) {
+  const normalized = normalizeText(value);
+
+  if (!normalized) {
+    return undefined;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/.test(normalized)) {
+    return normalized;
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}T/.test(normalized)) {
+    return normalized.slice(0, 10);
+  }
+
+  return undefined;
+}
+
+function normalizeWiseReportKrAggregate(rawAggregate) {
+  if (rawAggregate && typeof rawAggregate === 'object' && rawAggregate.pages && typeof rawAggregate.pages === 'object') {
+    return rawAggregate;
+  }
+
+  return {
+    pages: rawAggregate && typeof rawAggregate === 'object' ? rawAggregate : {},
+  };
+}
+
+function extractWiseReportKrNormalizedPage(pagePayload) {
+  if (pagePayload && typeof pagePayload === 'object' && pagePayload.normalized && typeof pagePayload.normalized === 'object') {
+    return pagePayload.normalized;
+  }
+
+  return pagePayload;
+}
+
+function isWiseReportKrTablePayload(value) {
+  return Boolean(value)
+    && typeof value === 'object'
+    && !Array.isArray(value)
+    && Array.isArray(value.rows);
+}
+
+function slimWiseReportKrValue(value) {
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => slimWiseReportKrValue(item))
+      .filter((item) => item !== undefined);
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  if (isWiseReportKrTablePayload(value)) {
+    const tablePayload = {
+      rows: slimWiseReportKrValue(value.rows),
+    };
+
+    if (value.status != null) {
+      tablePayload.status = value.status;
+    }
+    if (value.note != null) {
+      tablePayload.note = value.note;
+    }
+    if (value.dataAvailability && typeof value.dataAvailability === 'object') {
+      if (tablePayload.status == null && value.dataAvailability.status != null) {
+        tablePayload.status = value.dataAvailability.status;
+      }
+      if (tablePayload.note == null && value.dataAvailability.note != null) {
+        tablePayload.note = value.dataAvailability.note;
+      }
+    }
+
+    return tablePayload;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value)
+      .filter(([, nested]) => nested !== undefined)
+      .map(([key, nested]) => [key, slimWiseReportKrValue(nested)]),
+  );
+}
+
+function pickWiseReportKrCompany(rawAggregate, code) {
+  const normalizedAggregate = normalizeWiseReportKrAggregate(rawAggregate);
+
+  for (const page of WISEREPORT_KR_PAGES) {
+    const company = extractWiseReportKrNormalizedPage(normalizedAggregate.pages?.[page.id])?.company;
+    if (company && typeof company === 'object') {
+      return {
+        code: String(company.code || code || ''),
+        name: normalizeText(company.name) ?? null,
+      };
+    }
+  }
+
+  return {
+    code: String(code || ''),
+    name: null,
+  };
+}
+
+function buildWiseReportKrSlimPayload(rawAggregate, code) {
+  const normalizedAggregate = normalizeWiseReportKrAggregate(rawAggregate);
+  const slimPages = Object.fromEntries(WISEREPORT_KR_PAGES.map((page) => {
+    const pagePayload = normalizedAggregate.pages?.[page.id];
+    const normalizedPage = extractWiseReportKrNormalizedPage(pagePayload);
+
+    if (!normalizedPage || typeof normalizedPage !== 'object') {
+      return [page.id, null];
+    }
+
+    const {
+      company: _company,
+      sourceType: _sourceType,
+      sourceKey: _sourceKey,
+      bodyTextHead: _bodyTextHead,
+      ...businessPayload
+    } = normalizedPage;
+
+    return [page.id, slimWiseReportKrValue(businessPayload)];
+  }));
+
+  return {
+    code: String(code || ''),
+    company: pickWiseReportKrCompany(rawAggregate, code),
+    pages: slimPages,
+  };
+}
+
+async function captureSource(sourceId, load) {
+  try {
+    return {
+      value: await load(),
+      issue: null,
+    };
+  } catch (error) {
+    return {
+      value: null,
+      issue: {
+        sourceId,
+        message: normalizeText(error?.message) ?? `${sourceId} unavailable`,
+      },
+    };
+  }
+}
+
+function shouldInvokeKrPackage(rawInput, input) {
+  const safeRawInput = asObject(rawInput);
+  const packageOptions = asObject(safeRawInput.packageOptions ?? safeRawInput.deepscanPackageOptions);
+  const packageInput = buildKrPackageInvocationInput(input);
+  const explicitToggle = normalizeText(process.env.DEEPSCAN_KR_PACKAGE_ENABLE)?.toLowerCase();
+  const explicitEnable = safeRawInput.invokePackage === true || packageOptions.invoke === true || explicitToggle === '1' || explicitToggle === 'true';
+  const explicitDisable = safeRawInput.invokePackage === false || packageOptions.invoke === false || explicitToggle === '0' || explicitToggle === 'false' || explicitToggle === 'off' || explicitToggle === 'no';
+
+  if (explicitDisable) {
+    return false;
+  }
+
+  if (!packageInput) {
+    return false;
+  }
+
+  const sshHost = normalizeText(packageOptions.sshHost) ?? normalizeText(process.env.DEEPSCAN_KR_PACKAGE_SSH_HOST);
+  const identityPath = normalizeText(packageOptions.identityPath) ?? normalizeText(process.env.DEEPSCAN_KR_PACKAGE_SSH_IDENTITY);
+  const knownHostsPath = normalizeText(packageOptions.knownHostsPath) ?? normalizeText(process.env.DEEPSCAN_KR_PACKAGE_SSH_KNOWN_HOSTS);
+  const remoteDir = normalizeText(packageOptions.remoteDir) ?? normalizeText(process.env.DEEPSCAN_KR_PACKAGE_REMOTE_DIR);
+  const runtimeConfigured = Boolean(sshHost && identityPath && knownHostsPath && remoteDir);
+
+  return explicitEnable || runtimeConfigured;
+}
+
+function buildKrPackageInvocationInput(input) {
+  if (!isKrInput(input) || !input.instrument.code) {
+    return null;
+  }
+
+  const evidenceSeed = buildDeepScanKrEvidencePacket(input, {});
+  if (evidenceSeed.holding.shares === null || evidenceSeed.holding.averagePrice === null) {
+    return null;
+  }
+
+  return {
+    stockCode: input.instrument.code,
+    holdingQty: String(evidenceSeed.holding.shares),
+    avgPrice: String(evidenceSeed.holding.averagePrice),
+  };
+}
+
+async function maybeResolveKrPackageResult(rawInput, input) {
+  const packageInput = buildKrPackageInvocationInput(input);
+  if (!shouldInvokeKrPackage(rawInput, input)) {
+    return {
+      value: null,
+      issue: null,
+    };
+  }
+
+  const safeRawInput = asObject(rawInput);
+  const packageOptions = asObject(safeRawInput.packageOptions ?? safeRawInput.deepscanPackageOptions);
+
+  try {
+    const result = await invokeDeepScanKrPackage(
+      packageInput,
+      {
+        timeoutMs: 1_500,
+        maxRetries: 0,
+        enableSnapshots: false,
+        ...packageOptions,
+      },
+    );
+
+    if (!result?.ok) {
+      return {
+        value: null,
+        issue: {
+          sourceId: 'package-result',
+          message: normalizeText(result?.error?.code) ?? 'package-result unavailable',
+        },
+      };
+    }
+
+    return {
+      value: result.data,
+      issue: null,
+    };
+  } catch (error) {
+    return {
+      value: null,
+      issue: {
+        sourceId: 'package-result',
+        message: normalizeText(error?.message) ?? 'package-result unavailable',
+      },
+    };
+  }
+}
+
+async function resolveKrSourceBundle(rawInput, input) {
+  const safeRawInput = asObject(rawInput);
+
+  if (hasOwn(safeRawInput, 'sources')) {
+    return {
+      sources: asObject(safeRawInput.sources),
+      sourceIssues: [],
+    };
+  }
+
+  if (!isKrInput(input) || !input.instrument.code) {
+    return {
+      sources: {},
+      sourceIssues: [],
+    };
+  }
+
+  const tradeDate = normalizeTradeDate(input.selectedAt ?? input.sourceContext.appliedAt);
+  const [slimResult, quotesResult, packageResult] = await Promise.all([
+    captureSource('slim', async () => buildWiseReportKrSlimPayload(await getCrawl(input.instrument.code), input.instrument.code)),
+    captureSource('current-quote', async () => getCurrentQuotes({
+      codes: input.instrument.code ? [input.instrument.code] : [],
+      tickers: input.instrument.ticker ? [input.instrument.ticker] : [],
+      ...(tradeDate ? { tradeDate } : {}),
+    })),
+    maybeResolveKrPackageResult(rawInput, input),
+  ]);
+
+  return {
+    sources: {
+      ...(slimResult.value ? { slim: slimResult.value } : {}),
+      ...(quotesResult.value ? { quotes: quotesResult.value } : {}),
+      ...(packageResult.value ? { packageResult: packageResult.value } : {}),
+    },
+    sourceIssues: [slimResult.issue, quotesResult.issue, packageResult.issue].filter(Boolean),
+  };
+}
+
+function formatNumber(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 'N/A';
+  }
+
+  return Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100);
+}
+
+function formatSignedNumber(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 'N/A';
+  }
+
+  const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+  return `${sign}${formatNumber(Math.abs(value))}`;
+}
+
+function formatSignedPercent(value) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 'N/A';
+  }
+
+  const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+  return `${sign}${formatNumber(Math.abs(value))}%`;
+}
+
+function formatCurrencyValue(value, currency) {
+  return typeof value === 'number' && Number.isFinite(value)
+    ? `${formatNumber(value)}${currency ? ` ${currency}` : ''}`
+    : 'N/A';
+}
+
+function getScoreTone(score) {
+  if (score >= 70) {
+    return 'positive';
+  }
+  if (score >= 55) {
+    return 'neutral';
+  }
+  return 'warning';
+}
+
+function getScoreIconTone(score) {
+  if (score >= 70) {
+    return 'green';
+  }
+  if (score >= 55) {
+    return 'blue';
+  }
+  return 'amber';
+}
+
+function getWeekSignal(decisionBand, heroScore) {
+  switch (decisionBand) {
+    case 'hold':
+      return heroScore >= 70 ? '관찰 지속' : '보유 유지';
+    case 'trim':
+      return '일부 차익 검토';
+    case 'exit-watch':
+      return '이탈 준비';
+    case 'exit-now':
+      return '축소 우선';
+    default:
+      return '근거 보강 필요';
+  }
+}
+
+function getWeekSignalTone(decisionBand) {
+  switch (decisionBand) {
+    case 'hold':
+      return 'positive';
+    case 'trim':
+      return 'neutral';
+    case 'exit-watch':
+      return 'warning';
+    case 'exit-now':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+
+function getScenarioLabel(decisionBand) {
+  switch (decisionBand) {
+    case 'hold':
+      return '보유 유지 시나리오';
+    case 'trim':
+      return '일부 차익 시나리오';
+    case 'exit-watch':
+      return '축소 대기 시나리오';
+    case 'exit-now':
+      return '즉시 축소 시나리오';
+    default:
+      return '근거 부족 시나리오';
+  }
+}
+
+function createCommitteeMember(shortLabel, title, score, reason) {
+  return {
+    shortLabel,
+    title,
+    reason,
+    score,
+    scoreLabel: String(score),
+    tone: getScoreTone(score),
+    iconTone: getScoreIconTone(score),
+  };
+}
+
+function createCommitteeAxes(evidence, scored) {
+  const businessQualityReason = evidence.sourceCoverage.hasPackageResult
+    ? `회사개요·재무·리포트 근거를 합산했습니다. 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건, package-result 확보 기준입니다.`
+    : `회사개요·재무·리포트 근거를 합산했습니다. 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건 기준입니다.`;
+
   return [
     {
       label: 'Business Quality',
-      score: 63,
-      scoreText: '63 / 100',
-      axisStatusText: 'Baseline placeholder view',
-      subtitle: `${instrumentLabel} 기본 체력 신호`,
-      avgLabel: '위원 평균 63',
+      score: scored.committee.businessQuality.score,
+      scoreText: `${scored.committee.businessQuality.score} / 100`,
+      axisStatusText: `${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages} KR 페이지 반영`,
+      subtitle: '기업 체력과 리포트 확보 범위를 반영한 점수',
+      avgLabel: `위원 평균 ${scored.committee.businessQuality.score}`,
       members: [
-        {
-          shortLabel: '제품력',
-          title: '제품/서비스 경쟁력',
-          reason: `${input.instrument.name}의 제품 경쟁력 평가는 baseline placeholder로 고정되었습니다.`,
-          score: 64,
-          scoreLabel: '64',
-          tone: 'positive',
-          iconTone: 'green',
-        },
-        {
-          shortLabel: '이익체력',
-          title: '이익 체력',
-          reason: '실제 재무 파이프라인 연결 전까지는 deterministic placeholder 의견만 제공합니다.',
-          score: 61,
-          scoreLabel: '61',
-          tone: 'neutral',
-          iconTone: 'blue',
-        },
-        {
-          shortLabel: '리스크',
-          title: '사업 리스크 통제',
-          reason: '리포트/뉴스 결합 전이라 리스크 사유는 canonical placeholder 문구로 제한됩니다.',
-          score: 63,
-          scoreLabel: '63',
-          tone: 'warning',
-          iconTone: 'amber',
-        },
+        createCommitteeMember(
+          '수익성',
+          '수익성/기본체력',
+          scored.committee.businessQuality.profitability,
+          businessQualityReason,
+        ),
+        createCommitteeMember(
+          '밸류',
+          '밸류에이션',
+          scored.committee.businessQuality.valuation,
+          `컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 현재가 ${evidence.currentQuote ? '확보' : '없음'}를 반영했습니다.`,
+        ),
+        createCommitteeMember(
+          '지배',
+          '지분/안정성',
+          scored.committee.businessQuality.ownershipStability,
+          `보유 맥락 ${evidence.holding.hasHoldingContext ? '확인' : '없음'}, 스타일/지분 페이지 ${evidence.reportSignals.styleAnalysisAvailable || evidence.pageCoverage.availablePageIds.includes('shareholding') ? '일부 확보' : '부족'} 상태입니다.`,
+        ),
       ],
     },
     {
       label: 'Market Timing',
-      score: 58,
-      scoreText: '58 / 100',
-      axisStatusText: 'Need live market wiring',
-      subtitle: '시장 타이밍 신호 대기',
-      avgLabel: '위원 평균 58',
+      score: scored.committee.marketTiming.score,
+      scoreText: `${scored.committee.marketTiming.score} / 100`,
+      axisStatusText: evidence.currentQuote ? '현재가·리포트 모멘텀 반영' : '현재가 근거 부족',
+      subtitle: '현재가, 컨센서스, 최근 리포트 흐름 기반 신호',
+      avgLabel: `위원 평균 ${scored.committee.marketTiming.score}`,
       members: [
-        {
-          shortLabel: '수급',
-          title: '수급 흐름',
-          reason: '실시간 수급 연결 전이라 baseline 방향성만 표시합니다.',
-          score: 57,
-          scoreLabel: '57',
-          tone: 'neutral',
-          iconTone: 'teal',
-        },
-        {
-          shortLabel: '변동성',
-          title: '변동성 압력',
-          reason: '시장 변동성은 향후 canonical endpoint에서 실측치로 교체됩니다.',
-          score: 56,
-          scoreLabel: '56',
-          tone: 'warning',
-          iconTone: 'red',
-        },
-        {
-          shortLabel: '모멘텀',
-          title: '모멘텀 확인',
-          reason: '페이지 heuristic 없이 crawler 내부 placeholder만 사용합니다.',
-          score: 61,
-          scoreLabel: '61',
-          tone: 'positive',
-          iconTone: 'purple',
-        },
+        createCommitteeMember(
+          '트렌드',
+          '트렌드',
+          scored.committee.marketTiming.trend,
+          `상대수익률 ${evidence.reportSignals.relativeReturnAvailable ? '확보' : '없음'}, 스타일 분석 ${evidence.reportSignals.styleAnalysisAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportsAvailable ? '확보' : '없음'} 기준입니다.`,
+        ),
+        createCommitteeMember(
+          '컨센',
+          '컨센서스 모멘텀',
+          scored.committee.marketTiming.consensusMomentum,
+          `컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건을 반영했습니다.`,
+        ),
+        createCommitteeMember(
+          '가격',
+          '가격 위치',
+          scored.committee.marketTiming.priceLocation,
+          evidence.currentQuote
+            ? `현재가 ${formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency)}와 평단 ${formatNumber(evidence.holding.averagePrice)} 비교 기준입니다.`
+            : '현재가가 없어 가격 위치 점수는 보수적으로 계산했습니다.',
+        ),
       ],
     },
     {
       label: 'Position Fit',
-      score: 66,
-      scoreText: '66 / 100',
-      axisStatusText: 'Holding-aware baseline',
-      subtitle: '보유 맥락 반영 placeholder',
-      avgLabel: '위원 평균 66',
+      score: scored.committee.positionFit.score,
+      scoreText: `${scored.committee.positionFit.score} / 100`,
+      axisStatusText: evidence.holding.hasHoldingContext ? '보유 맥락 반영' : '보유 맥락 부족',
+      subtitle: '현재 포지션의 손익과 입력 완성도를 반영한 점수',
+      avgLabel: `위원 평균 ${scored.committee.positionFit.score}`,
       members: [
-        {
-          shortLabel: '보유량',
-          title: '보유 수량 적합도',
-          reason: `현재 보유 수량 ${input.holding?.shares ?? 'N/A'} 기준 baseline 의견입니다.`,
-          score: 68,
-          scoreLabel: '68',
-          tone: 'positive',
-          iconTone: 'green',
-        },
-        {
-          shortLabel: '평단',
-          title: '평균 단가 부담',
-          reason: `평균 단가 ${input.holding?.averagePrice ?? 'N/A'} 기준 placeholder 평가입니다.`,
-          score: 64,
-          scoreLabel: '64',
-          tone: 'neutral',
-          iconTone: 'blue',
-        },
-        {
-          shortLabel: '집중도',
-          title: '포지션 집중도',
-          reason: '포트폴리오 맥락 연동 전이라 고정 문구를 사용합니다.',
-          score: 66,
-          scoreLabel: '66',
-          tone: 'warning',
-          iconTone: 'amber',
-        },
+        createCommitteeMember(
+          '평단',
+          '평단 격차',
+          scored.committee.positionFit.avgPriceGap,
+          evidence.currentQuote && evidence.holding.averagePrice !== null
+            ? `현재가 ${formatNumber(evidence.currentQuote.price)} 대비 평단 ${formatNumber(evidence.holding.averagePrice)} 간격을 반영했습니다.`
+            : '현재가 또는 평단이 부족해 평단 격차 점수를 보수적으로 계산했습니다.',
+        ),
+        createCommitteeMember(
+          '여지',
+          '상방 버퍼',
+          scored.committee.positionFit.upsideBuffer,
+          `컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportsAvailable ? '확보' : '없음'} 반영입니다.`,
+        ),
+        createCommitteeMember(
+          '입력',
+          '입력 완성도',
+          scored.committee.positionFit.holdingCompleteness,
+          evidence.holding.hasFullSellNowInputs
+            ? '보유 수량, 평단, 현재가가 모두 확인되어 sell-now 계산이 가능합니다.'
+            : '보유 수량·평단·현재가 중 일부가 없어 sell-now 계산이 제한됩니다.',
+        ),
       ],
     },
   ];
+}
+
+function createEvidenceFallback(evidence, sourceIssues) {
+  const missingSources = evidence.missingSources.filter((sourceId) => sourceId !== 'package-result');
+  const blockingSourceIssues = sourceIssues.filter((issue) => issue.sourceId !== 'package-result');
+
+  if (missingSources.length === 0 && blockingSourceIssues.length === 0) {
+    return null;
+  }
+
+  const labels = [...missingSources, ...blockingSourceIssues.map((issue) => issue.sourceId)].filter(Boolean);
+  return {
+    used: true,
+    reason: 'missing-sources',
+    label: labels.length > 0 ? `missing:${labels.join(',')}` : 'missing-sources',
+  };
+}
+
+function createEvidenceSourceRefs(input, evidence, sources, sourceIssues) {
+  const sourceRefs = [];
+  const identifier = input.instrument.code ?? input.instrument.ticker ?? input.instrument.name;
+
+  if (sources.slim) {
+    sourceRefs.push(createDeepScanSourceRef({
+      type: 'report',
+      id: `wisereport-kr-slim:${identifier}`,
+      label: 'KR slim report evidence',
+      note: `pages:${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages}`,
+    }));
+  }
+
+  if (evidence.currentQuote) {
+    sourceRefs.push(createDeepScanSourceRef({
+      type: 'market',
+      id: `current-quote:${identifier}`,
+      label: 'current quote',
+      at: evidence.currentQuote.asOf ?? input.selectedAt,
+      note: evidence.currentQuote.source ?? undefined,
+    }));
+  } else if (sources.quotes) {
+    sourceRefs.push(createDeepScanSourceRef({
+      type: 'market',
+      id: `current-quote:${identifier}`,
+      label: 'current quote lookup',
+      note: 'no matching current quote',
+    }));
+  }
+
+  if (sources.packageResult) {
+    sourceRefs.push(createDeepScanSourceRef({
+      type: 'report',
+      id: `package-result:${identifier}`,
+      label: 'KR package supplemental evidence',
+      at: sources.packageResult.timestamp,
+      note: normalizeText(sources.packageResult.listingMarket) ?? undefined,
+    }));
+  }
+
+  for (const missingSource of evidence.missingSources) {
+    sourceRefs.push(createDeepScanSourceRef({
+      type: 'system',
+      id: `missing-source:${missingSource}:${identifier}`,
+      label: `${missingSource} missing`,
+    }));
+  }
+
+  for (const issue of sourceIssues) {
+    sourceRefs.push(createDeepScanSourceRef({
+      type: 'system',
+      id: `source-issue:${issue.sourceId}:${identifier}`,
+      label: `${issue.sourceId} unavailable`,
+      note: issue.message,
+    }));
+  }
+
+  return sourceRefs;
+}
+
+function buildInsights(input, evidence, scored, generatedAt, sourceIssues) {
+  const dateLabel = (input.selectedAt ?? generatedAt).slice(0, 10);
+  const items = [
+    {
+      sourceType: evidence.currentQuote ? 'market' : 'system',
+      sourceLabel: 'Current quote',
+      date: evidence.currentQuote?.asOf ?? dateLabel,
+      label: '현재가',
+      title: `${input.instrument.name} 현재가 근거`,
+      body: evidence.currentQuote
+        ? `${formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency)} 확인`
+        : '현재가 근거 없음',
+    },
+    {
+      sourceType: 'report',
+      sourceLabel: 'KR report pages',
+      date: dateLabel,
+      label: '리포트',
+      title: 'KR 리포트 페이지 범위',
+      body: evidence.pageCoverage.availableCount > 0
+        ? `KR 리포트 페이지 ${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages} 확보`
+        : 'KR 리포트 페이지 근거 없음',
+    },
+    {
+      sourceType: evidence.holding.hasHoldingContext ? 'holding' : 'system',
+      sourceLabel: 'Holding context',
+      date: dateLabel,
+      label: '보유',
+      title: '보유 포지션 맥락',
+      body: evidence.holding.hasHoldingContext
+        ? (evidence.holding.hasFullSellNowInputs
+          ? `보유 ${formatNumber(evidence.holding.shares)}주 / 평단 ${formatNumber(evidence.holding.averagePrice)} 확인`
+          : '보유 맥락 일부 확인')
+        : 'KR 보유 맥락 없음',
+    },
+  ];
+
+  if (sourceIssues.length > 0 || evidence.missingSources.length > 0) {
+    items.push({
+      sourceType: 'system',
+      sourceLabel: 'Source coverage',
+      date: generatedAt.slice(0, 10),
+      label: '소스',
+      title: '누락 또는 실패한 소스',
+      body: [
+        ...evidence.missingSources.map((sourceId) => `${sourceId} 없음`),
+        ...sourceIssues.map((issue) => `${issue.sourceId} 실패`),
+      ].join(' / '),
+    });
+  }
+
+  return {
+    sectionLabel: 'KR evidence snapshot',
+    items,
+    summaryTags: [
+      `score:${scored.hero.score}`,
+      `reports:${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages}`,
+      `decision:${scored.sellNow.decisionBand}`,
+    ],
+  };
+}
+
+function buildStrategy(input, evidence, scored) {
+  const decisionBand = scored.sellNow.decisionBand;
+  const currentPriceText = evidence.currentQuote
+    ? formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency)
+    : '현재가 근거 없음';
+  const scenarioDetails = [
+    ...evidence.topFacts,
+    ...evidence.topRisks.slice(0, 2),
+    ...scored.hero.penalties.map((penalty) => `패널티: ${penalty}`),
+  ].slice(0, 4);
+
+  return {
+    weekSignal: getWeekSignal(decisionBand, scored.hero.score),
+    weekSignalTone: getWeekSignalTone(decisionBand),
+    weekBadgeText: scored.hero.statusText,
+    scenarioLabel: getScenarioLabel(decisionBand),
+    scenarioProbability: `${Math.max(5, scored.hero.score)}%`,
+    scenarioPeriod: evidence.currentQuote?.asOf ? `${evidence.currentQuote.asOf} 기준 1-2주` : '1-2 weeks',
+    scenarioCondition: evidence.topRisks[0] ?? '추가 리스크 없음',
+    currentPriceText,
+    targetPriceText: evidence.reportSignals.consensusAvailable || evidence.sourceCoverage.hasPackageResult
+      ? '컨센서스/패키지 보조 근거 확인'
+      : '목표가 근거 없음',
+    scenarioDetails: scenarioDetails.length > 0 ? scenarioDetails : ['확보된 근거가 부족합니다.'],
+    otherScenarios: [
+      {
+        label: '근거 유지',
+        probability: `${Math.max(10, 100 - scored.hero.score)}%`,
+        condition: evidence.topFacts[0] ?? '핵심 근거를 다시 확보합니다.',
+      },
+      {
+        label: '리스크 재점검',
+        probability: `${Math.max(10, evidence.missingSources.length * 10)}%`,
+        condition: evidence.topRisks[0] ?? '추가 리스크를 다시 확인합니다.',
+      },
+    ],
+    otherScenarioTags: [decisionBand, evidence.currentQuote ? 'quote:ok' : 'quote:missing'],
+  };
+}
+
+function buildSellNow(evidence, scored) {
+  if (!scored.sellNow.available) {
+    return {
+      realizedText: '현재가 또는 보유 평단 근거가 부족해 즉시 매도 판단을 계산하지 못했습니다.',
+      rows: [
+        {
+          label: '판단 상태',
+          value: 'blocked',
+          tag: 'decision',
+          tagTone: 'warning',
+          emphasis: true,
+        },
+        {
+          label: '현재가',
+          value: evidence.currentQuote ? formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency) : '현재가 근거 없음',
+          tag: 'quote',
+          tagTone: evidence.currentQuote ? 'positive' : 'warning',
+        },
+        {
+          label: '평단',
+          value: evidence.holding.averagePrice !== null ? formatNumber(evidence.holding.averagePrice) : '평단 근거 없음',
+          tag: 'avg',
+          tagTone: evidence.holding.averagePrice !== null ? 'neutral' : 'warning',
+        },
+      ],
+    };
+  }
+
+  const currency = evidence.currentQuote?.currency ?? 'KRW';
+  return {
+    realizedText: `현재가 기준 평가손익 ${formatSignedNumber(scored.sellNow.evaluationPnL)} ${currency} (${formatSignedPercent(scored.sellNow.evaluationPnLPct)}). 즉시 매도 판단은 ${scored.sellNow.decisionBand} 입니다.`,
+    rows: [
+      {
+        label: '판단 밴드',
+        value: scored.sellNow.decisionBand,
+        tag: 'decision',
+        tagTone: 'positive',
+        emphasis: true,
+      },
+      {
+        label: '현재가',
+        value: formatCurrencyValue(scored.sellNow.currentPrice, currency),
+        tag: 'quote',
+        tagTone: 'positive',
+      },
+      {
+        label: '평단',
+        value: formatNumber(scored.sellNow.averagePrice),
+        tag: 'avg',
+        tagTone: 'neutral',
+      },
+      {
+        label: '평가손익',
+        value: `${formatSignedNumber(scored.sellNow.evaluationPnL)} ${currency} / ${formatSignedPercent(scored.sellNow.evaluationPnLPct)}`,
+        tag: 'pnl',
+        tagTone: scored.sellNow.evaluationPnL >= 0 ? 'positive' : 'danger',
+      },
+    ],
+  };
+}
+
+function buildPortfolioSimulation(scored) {
+  if (!scored.portfolioSimulation.available) {
+    return {
+      beforeScore: 0,
+      afterScore: 0,
+      deltaLabel: 'N/A',
+      caption: '현재가 또는 보유 근거가 부족해 포트폴리오 시뮬레이션을 계산할 수 없습니다.',
+    };
+  }
+
+  return {
+    beforeScore: scored.portfolioSimulation.beforeScore,
+    afterScore: scored.portfolioSimulation.afterScore,
+    deltaLabel: scored.portfolioSimulation.deltaLabel,
+    caption: `${scored.sellNow.decisionBand} 판단 기준 포지션 제거 시 포트폴리오 점수 ${scored.portfolioSimulation.beforeScore} → ${scored.portfolioSimulation.afterScore}.`,
+  };
 }
 
 export async function buildJarooDeepScanPayload(rawInput = {}) {
@@ -554,115 +1205,59 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     }
 
     const generatedAt = deriveGeneratedAt(input);
-    const dateLabel = (input.selectedAt ?? generatedAt).slice(0, 10);
-    const instrumentIdentifier = input.instrument.code ?? input.instrument.ticker;
+    const { sources, sourceIssues } = await resolveKrSourceBundle(rawInput, input);
+    const evidence = isKrInput(input)
+      ? buildDeepScanKrEvidencePacket(input, sources)
+      : buildDeepScanKrEvidencePacket(input, {});
+    const scored = scoreDeepScanKrEvidence(evidence);
+    const evidenceSourceRefs = createEvidenceSourceRefs(input, evidence, sources, sourceIssues);
+    const blockFallback = createEvidenceFallback(evidence, sourceIssues);
+    const insights = buildInsights(input, evidence, scored, generatedAt, sourceIssues);
+    const strategy = buildStrategy(input, evidence, scored);
+    const sellNow = buildSellNow(evidence, scored);
+    const portfolioSimulation = buildPortfolioSimulation(scored);
+    const heroBodyParts = [...evidence.topFacts];
+
+    for (const risk of evidence.topRisks.slice(0, 2)) {
+      heroBodyParts.push(`주의: ${risk}`);
+    }
+    if (evidence.pageCoverage.availableCount === 0 && !heroBodyParts.some((part) => part.includes('KR 리포트 페이지 근거 없음'))) {
+      heroBodyParts.push('주의: KR 리포트 페이지 근거 없음');
+    }
+    if (heroBodyParts.length === 0 && evidence.missingSources.length > 0) {
+      heroBodyParts.push(`누락 소스: ${evidence.missingSources.join(', ')}`);
+    }
+
+    const hero = {
+      ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'hero', evidenceSourceRefs), fallback: blockFallback }),
+      headline: `${input.instrument.name} KR DeepScan ${scored.hero.score}점`,
+      body: heroBodyParts.join(' · '),
+      statusText: scored.hero.statusText,
+      score: scored.hero.score,
+      scoreLabel: `${scored.hero.scoreLabel} · ${scored.hero.score} / 100`,
+      scoreDelta: scored.hero.penalties.length > 0 ? `-${scored.hero.penalties.length}` : '+0',
+    };
     const blocks = {
-      hero: {
-        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'hero') }),
-        headline: `${input.instrument.name} baseline DeepScan summary`,
-        body: `Crawler baseline placeholder payload for ${instrumentIdentifier}. Live endpoint wiring lands in Task 3.`,
-        statusText: 'Baseline placeholder content',
-        score: 61,
-        scoreLabel: '61 / 100',
-        scoreDelta: '+0',
-      },
+      hero,
       committee: {
-        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'committee') }),
-        axes: createCommitteeAxes(input),
+        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'committee', evidenceSourceRefs), fallback: blockFallback }),
+        axes: createCommitteeAxes(evidence, scored),
       },
       insights: {
-        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'insights') }),
-        sectionLabel: 'Baseline insights',
-        items: [
-          {
-            sourceType: input.sourceContext.from,
-            sourceLabel: 'Input context',
-            date: dateLabel,
-            label: '입력',
-            title: `${input.instrument.name} 보유 맥락`,
-            body: '입력 컨텍스트를 canonical payload에 고정 형식으로 담았습니다.',
-          },
-          {
-            sourceType: 'system',
-            sourceLabel: 'Crawler baseline',
-            date: generatedAt.slice(0, 10),
-            label: '서비스',
-            title: 'Deterministic placeholder synthesis',
-            body: 'Task 2 baseline service emits deterministic placeholders only inside the crawler service.',
-          },
-          {
-            sourceType: 'market',
-            sourceLabel: 'Market placeholder',
-            date: dateLabel,
-            label: '시장',
-            title: `${input.instrument.market ?? 'Unknown'} market stub`,
-            body: '실제 시장/뉴스/리포트 연결 전까지는 canonical fallback 문구만 제공합니다.',
-          },
-        ],
-        summaryTags: ['baseline', 'deterministic', 'crawler-owned'],
+        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'insights', evidenceSourceRefs), fallback: blockFallback }),
+        ...insights,
       },
       strategy: {
-        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'strategy') }),
-        weekSignal: 'Hold and verify',
-        weekSignalTone: 'neutral',
-        weekBadgeText: 'Baseline',
-        scenarioLabel: 'Endpoint wiring pending',
-        scenarioProbability: '62%',
-        scenarioPeriod: '1-2 weeks',
-        scenarioCondition: 'Canonical payload is available, but live crawler synthesis is not connected yet.',
-        currentPriceText: `Average price ${input.holding?.averagePrice ?? 'N/A'}`,
-        targetPriceText: 'Target TBD',
-        scenarioDetails: [
-          'Crawler service owns the canonical schema and placeholder copy.',
-          'No page heuristic text is reused in this baseline payload.',
-          'Task 3 will attach an endpoint to deliver this payload over HTTP.',
-        ],
-        otherScenarios: [
-          {
-            label: 'Conservative follow-up',
-            probability: '24%',
-            condition: 'Keep the current position until live data sources are connected.',
-          },
-          {
-            label: 'Fast re-check',
-            probability: '14%',
-            condition: 'Rebuild the canonical payload after endpoint and upstream integrations land.',
-          },
-        ],
-        otherScenarioTags: ['baseline', 'integration pending'],
+        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'strategy', evidenceSourceRefs), fallback: blockFallback }),
+        ...strategy,
       },
       sellNow: {
-        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'sellNow') }),
-        realizedText: 'Baseline sell-now block uses deterministic placeholders and holding fields only.',
-        rows: [
-          {
-            label: '보유 수량',
-            value: input.holding?.shares ?? 'N/A',
-            tag: 'holding',
-            tagTone: 'positive',
-            emphasis: true,
-          },
-          {
-            label: '평균 단가',
-            value: input.holding?.averagePrice ?? 'N/A',
-            tag: 'avg',
-            tagTone: 'danger',
-            valueTone: 'danger',
-          },
-          {
-            label: '평가 금액',
-            value: input.holding?.evaluationAmount ?? 'N/A',
-            tag: 'snapshot',
-            tagTone: 'positive',
-          },
-        ],
+        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'sellNow', evidenceSourceRefs), fallback: blockFallback }),
+        ...sellNow,
       },
       portfolioSimulation: {
-        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'portfolioSimulation') }),
-        beforeScore: 58,
-        afterScore: 64,
-        deltaLabel: '+6p',
-        caption: 'Baseline simulation placeholder: removing the position would slightly improve diversification in this stub.',
+        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'portfolioSimulation', evidenceSourceRefs), fallback: blockFallback }),
+        ...portfolioSimulation,
       },
     };
 
@@ -672,13 +1267,13 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
       metadata: {
         generatedAt,
         version: DEEP_SCAN_VERSION,
-        degraded: true,
+        degraded: blockFallback !== null,
         debugId: createDebugId(input),
         inputValidity: {
           valid: true,
           raw: safeCloneRawInput(rawInput),
         },
-        sourceRefs: createBaseSourceRefs(input),
+        sourceRefs: [...createBaseSourceRefs(input), ...evidenceSourceRefs],
         blockStatus: createBlockStatus(blocks),
       },
     };
@@ -688,11 +1283,13 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
 }
 
 export {
+  buildKrPackageInvocationInput,
   createDeepScanSourceRef,
   createDeepScanBlockError,
   createBlockedBlockMeta,
   createErrorBlockMeta,
   createOkBlockMeta,
   createInputInvalidPayload,
+  maybeResolveKrPackageResult,
   MAJOR_BLOCK_KEYS,
 };

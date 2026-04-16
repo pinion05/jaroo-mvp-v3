@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card'
 import { JarooShell } from '@/components/jaroo-shell'
 import { mergeStocks, newStocks, type MergeChoiceId } from '@/lib/jaroo-data'
 import { persistAppliedHomePortfolio } from '@/lib/jaroo-home-data'
-import { OCR_MERGE_RESULT_STORAGE_KEY, sanitizeOcrRows, type OcrRow } from '@/lib/screenshot-ocr'
+import { computeAveragePrice, OCR_MERGE_RESULT_STORAGE_KEY, sanitizeOcrRows, type OcrRow } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 
 const defaultSelections = Object.fromEntries(mergeStocks.map((item) => [item.id, item.defaultChoice])) as Record<string, MergeChoiceId>
@@ -21,6 +21,33 @@ type MergeResultRow = OcrRow & {
 type MergeResultSession = {
   broker: string
   rows: MergeResultRow[]
+}
+
+function isMissingAveragePrice(value: string) {
+  const normalizedValue = value.replace(/[−–—]/g, '-').trim()
+
+  if (!normalizedValue) {
+    return true
+  }
+
+  if (/^-+$/.test(normalizedValue)) {
+    return true
+  }
+
+  return normalizedValue.toLowerCase().replace(/[./\s]/g, '') === 'na'
+}
+
+export function prepareMergeRowsForApply<T extends OcrRow>(rows: T[]) {
+  return rows.map((row) => {
+    if (!isMissingAveragePrice(row.averagePrice)) {
+      return { ...row }
+    }
+
+    return {
+      ...row,
+      averagePrice: computeAveragePrice(row.quantity, row.profitRate, row.evaluationAmount),
+    }
+  })
 }
 
 function MergeMetricChip({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
@@ -127,9 +154,10 @@ export default function JarooMergeScreen() {
     setIsApplying(true)
 
     try {
+      const preparedRows = prepareMergeRowsForApply(mergeResult.rows)
       const persisted = persistAppliedHomePortfolio({
         broker: mergeResult.broker,
-        rows: mergeResult.rows,
+        rows: preparedRows,
       })
 
       if (!persisted) {

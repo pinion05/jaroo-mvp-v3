@@ -170,8 +170,8 @@ test('buildDeepScanCanonicalQuery는 identifier fallback을 지원한다', () =>
       ticker: ' ',
       identifierTicker: 'AAPL',
       shares: '-',
-      averagePrice: '',
-      evaluationAmount: undefined,
+      averagePrice: '-',
+      evaluationAmount: 'N/A',
     },
     selectedAt: undefined,
   }))

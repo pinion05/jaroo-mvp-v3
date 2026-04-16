@@ -101,6 +101,20 @@ export {
 } from './services/deepscan-payload.js';
 
 export {
+  buildDeepScanKrPackageCommand,
+  parseDeepScanKrPackageStdout,
+  invokeDeepScanKrPackage,
+} from './services/deepscan-kr-package-adapter.js';
+
+export {
+  buildDeepScanKrEvidencePacket,
+} from './services/deepscan-kr-evidence.js';
+
+export {
+  scoreDeepScanKrEvidence,
+} from './services/deepscan-kr-score.js';
+
+export {
   SOURCES,
   WISEREPORT_GLOBAL_ROUTES,
   WISEREPORT_KR_PAGES,
