@@ -412,6 +412,10 @@ function buildDataSourcePath(sourceSlug, suffix = '') {
   return `/api/source/${sourceSlug}${suffix}`;
 }
 
+function buildMajorPath(suffix = '') {
+  return `/api/major${suffix}`;
+}
+
 const WISEREPORT_KR_ROUTE_DESCRIPTIONS = Object.freeze({
   'company-overview': '한국 상장사 WiseReport 기업개요 구조화 데이터를 반환합니다.',
   'financial-analysis': '한국 상장사 WiseReport 재무분석 구조화 데이터를 반환합니다.',
@@ -1939,7 +1943,7 @@ const endpointDefinitions = [
     id: 'wisereport-kr-slim-v1.1',
     resource: 'wisereport.kr.aggregate.slim.v1.1',
     description: '한국 상장사 WiseReport/FnGuide 10개 페이지의 slim v1.1 데이터를 raw JSON으로 반환합니다. parser-created spacer column, UI control text, non-business tab sections를 정리합니다.',
-    primaryPath: buildDataSourcePath('wisereport-fnguide', '/kr/companies/:code/slim/v1.1'),
+    primaryPath: buildMajorPath('/wisereport-fnguide/kr/companies/:code/slim/v1.1'),
     dataSources: ['wisereport', 'fnguide'],
     params: ['code'],
     query: [],
@@ -1978,7 +1982,7 @@ const endpointDefinitions = [
     id: 'market-fx-usd-krw',
     resource: 'market.fx.usd-krw',
     description: 'USD/KRW 환율 스냅샷을 반환합니다.',
-    primaryPath: buildDataSourcePath('investing', '/market/fx/usd-krw'),
+    primaryPath: buildMajorPath('/market/fx/usd-krw'),
     dataSources: ['investing'],
     params: [],
     query: [],
@@ -2076,7 +2080,7 @@ const endpointDefinitions = [
     id: 'wisereport-global-slim-v1.1',
     resource: 'wisereport.global.company.slim.v1.1',
     description: 'WiseReport Global 미국주식 Company 5개 route의 계약형 slim v1.1 aggregate 데이터를 raw JSON으로 반환합니다.',
-    primaryPath: buildDataSourcePath('wisereport-global', '/us/companies/:ticker/slim/v1.1'),
+    primaryPath: buildMajorPath('/wisereport-global/us/companies/:ticker/slim/v1.1'),
     dataSources: ['wisereport-global'],
     params: ['ticker'],
     query: [],

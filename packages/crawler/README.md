@@ -109,8 +109,8 @@ npm run dev
   "count": 1,
   "request": {
     "method": "GET",
-    "path": "/api/source/investing/market/fx/usd-krw",
-    "primaryPath": "/api/source/investing/market/fx/usd-krw",
+    "path": "/api/major/market/fx/usd-krw",
+    "primaryPath": "/api/major/market/fx/usd-krw",
     "params": {},
     "query": {}
   },
@@ -135,8 +135,8 @@ npm run dev
 
 성공 시 raw JSON을 그대로 반환하는 활성 WiseReport slim 엔드포인트는 아래 2개입니다.
 
-- `/api/source/wisereport-fnguide/kr/companies/:code/slim/v1.1`
-- `/api/source/wisereport-global/us/companies/:ticker/slim/v1.1`
+- `/api/major/wisereport-fnguide/kr/companies/:code/slim/v1.1`
+- `/api/major/wisereport-global/us/companies/:ticker/slim/v1.1`
 
 위 2개도 실패 시에는 공통 에러 envelope를 사용합니다.
 
@@ -153,19 +153,19 @@ npm run dev
 
 | Method | Primary Path | 성공 응답 | 설명 |
 | --- | --- | --- | --- |
-| `GET` | `/api/source/wisereport-fnguide/kr/companies/:code/slim/v1.1` | raw JSON | KR slim v1.1 aggregate |
+| `GET` | `/api/major/wisereport-fnguide/kr/companies/:code/slim/v1.1` | raw JSON | KR slim v1.1 aggregate |
 
 예시:
 
 ```bash
-curl "http://localhost:3040/api/source/wisereport-fnguide/kr/companies/005930/slim/v1.1"
+curl "http://localhost:3040/api/major/wisereport-fnguide/kr/companies/005930/slim/v1.1"
 ```
 
 ### 4.3 WiseReport Global
 
 | Method | Primary Path | Query | 성공 응답 | 설명 |
 | --- | --- | --- | --- | --- |
-| `GET` | `/api/source/wisereport-global/us/companies/:ticker/slim/v1.1` | 없음 | raw JSON | Company 5개 route 기준 slim v1.1 |
+| `GET` | `/api/major/wisereport-global/us/companies/:ticker/slim/v1.1` | 없음 | raw JSON | Company 5개 route 기준 slim v1.1 |
 
 route id 목록은 `/api/source/system/catalog` 의 `wisereportGlobalRoutes` 에 포함됩니다.
 
@@ -183,7 +183,7 @@ Global slim v1.1 은 위 전체 route를 쓰지 않고 Company 5개 route만 사
 예시:
 
 ```bash
-curl "http://localhost:3040/api/source/wisereport-global/us/companies/NVDA/slim/v1.1"
+curl "http://localhost:3040/api/major/wisereport-global/us/companies/NVDA/slim/v1.1"
 ```
 
 ### 4.4 Market
@@ -191,7 +191,7 @@ curl "http://localhost:3040/api/source/wisereport-global/us/companies/NVDA/slim/
 | Method | Primary Path | 설명 |
 | --- | --- | --- |
 | `GET` | `/api/source/naver-finance/kr/market/overview` | 국내 시장 요약 텍스트 |
-| `GET` | `/api/source/investing/market/fx/usd-krw` | USD/KRW 환율 |
+| `GET` | `/api/major/market/fx/usd-krw` | USD/KRW 환율 |
 | `GET` | `/api/source/stockplus-adrinfo-investing/market/indicators` | VKOSPI + ADR + US VIX |
 | `GET` | `/api/source/stockplus/market/indicators/vkospi` | VKOSPI |
 | `GET` | `/api/source/adrinfo/market/indicators/adr` | ADR |
@@ -255,5 +255,5 @@ curl "http://localhost:3040/api/source/wisereport-global/us/companies/NVDA/slim/
 ## 7. 운영 메모
 
 - 현재 제공 리소스를 빠르게 확인하려면 `/api/source/system/catalog` 를 보면 됩니다.
-- smoke test는 `/api/source/system/health`, `/api/source/system/catalog`, `/api/source/investing/market/fx/usd-krw` 부터 확인하는 편이 안전합니다.
+- smoke test는 `/api/source/system/health`, `/api/source/system/catalog`, `/api/major/market/fx/usd-krw` 부터 확인하는 편이 안전합니다.
 - 실서비스에서는 `.env` 를 커밋하지 말고 별도 secret 관리 체계를 권장합니다.

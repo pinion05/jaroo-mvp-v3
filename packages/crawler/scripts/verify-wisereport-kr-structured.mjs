@@ -63,7 +63,7 @@ const page = await crawlWiseReportKrPage(code, 'company-overview', { waitAfterLo
 const aggregate = await getCrawl(code, { concurrency: 2, waitAfterLoadMs: 1200 });
 
 const httpSmoke = await withServer(async (baseUrl) => {
-  const slimResponse = await fetchJson(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/${code}/slim/v1.1`);
+  const slimResponse = await fetchJson(`${baseUrl}/api/major/wisereport-fnguide/kr/companies/${code}/slim/v1.1`);
   return {
     baseUrl,
     slimV11: {

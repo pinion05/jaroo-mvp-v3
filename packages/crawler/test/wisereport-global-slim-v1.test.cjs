@@ -610,7 +610,7 @@ test('wisereport-global-slim-v1.1 endpoint is registered as the only active glob
 
   assert.ok(definition);
   assert.equal(definition.resource, 'wisereport.global.company.slim.v1.1');
-  assert.equal(definition.primaryPath, '/api/source/wisereport-global/us/companies/:ticker/slim/v1.1');
+  assert.equal(definition.primaryPath, '/api/major/wisereport-global/us/companies/:ticker/slim/v1.1');
   assert.equal(definition.rawSuccess, true);
   assert.deepEqual(definition.dataSources, ['wisereport-global']);
 });
@@ -627,7 +627,7 @@ test('GET global WiseReport slim v1.1 path returns raw json without envelope', a
 
   try {
     const responseBody = await withServer(app, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/api/source/wisereport-global/us/companies/NVDA/slim/v1.1`);
+      const response = await fetch(`${baseUrl}/api/major/wisereport-global/us/companies/NVDA/slim/v1.1`);
       assert.equal(response.status, 200);
       return response.json();
     });
@@ -639,4 +639,17 @@ test('GET global WiseReport slim v1.1 path returns raw json without envelope', a
   } finally {
     definition.handler = originalHandler;
   }
+});
+
+test('GET old source global WiseReport slim v1.1 path returns not found after major-path migration', async () => {
+  const { app } = await import('../src/server.js');
+
+  const body = await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/source/wisereport-global/us/companies/NVDA/slim/v1.1`);
+    assert.equal(response.status, 404);
+    return response.json();
+  });
+
+  assert.equal(body.ok, false);
+  assert.equal(body.error.message, 'not found');
 });

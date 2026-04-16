@@ -29,7 +29,7 @@ async function fetchJson(url) {
 }
 
 const result = await withServer(async (baseUrl) => {
-  const slimV11 = await fetchJson(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/${code}/slim/v1.1`);
+  const slimV11 = await fetchJson(`${baseUrl}/api/major/wisereport-fnguide/kr/companies/${code}/slim/v1.1`);
   return { baseUrl, slimV11 };
 });
 

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 
 export function buildUsdKrwFxUpstreamUrl(baseUrl: string) {
-  return buildCrawlerUrl(baseUrl, '/api/source/investing/market/fx/usd-krw')
+  return buildCrawlerUrl(baseUrl, '/api/major/market/fx/usd-krw')
 }
 
 export async function GET() {

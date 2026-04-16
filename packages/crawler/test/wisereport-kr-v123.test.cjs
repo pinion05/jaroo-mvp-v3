@@ -339,7 +339,7 @@ test('only KR slim v1.1 route remains active while v1 is archived', async () => 
   assert.equal(archivedDefinitionV1.archived, true);
 
   assert.ok(definitionV11);
-  assert.equal(definitionV11.primaryPath, '/api/source/wisereport-fnguide/kr/companies/:code/slim/v1.1');
+  assert.equal(definitionV11.primaryPath, '/api/major/wisereport-fnguide/kr/companies/:code/slim/v1.1');
   assert.equal(definitionV11.rawSuccess, true);
   assert.equal(definitionV11.resource, 'wisereport.kr.aggregate.slim.v1.1');
   assert.deepEqual(definitionV11.dataSources, ['wisereport', 'fnguide']);

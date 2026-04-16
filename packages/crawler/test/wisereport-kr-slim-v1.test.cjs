@@ -402,7 +402,7 @@ test('GET explicit-source KR slim v1.1 path returns raw json without envelope', 
 
   try {
     const responseBody = await withServer(app, async (baseUrl) => {
-      const response = await fetch(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/005930/slim/v1.1`);
+      const response = await fetch(`${baseUrl}/api/major/wisereport-fnguide/kr/companies/005930/slim/v1.1`);
       assert.equal(response.status, 200);
       return response.json();
     });
@@ -414,4 +414,17 @@ test('GET explicit-source KR slim v1.1 path returns raw json without envelope', 
   } finally {
     definition.handler = originalHandler;
   }
+});
+
+test('GET old source KR slim v1.1 path returns not found after major-path migration', async () => {
+  const { app } = await import('../src/server.js');
+
+  const body = await withServer(app, async (baseUrl) => {
+    const response = await fetch(`${baseUrl}/api/source/wisereport-fnguide/kr/companies/005930/slim/v1.1`);
+    assert.equal(response.status, 404);
+    return response.json();
+  });
+
+  assert.equal(body.ok, false);
+  assert.equal(body.error.message, 'not found');
 });
