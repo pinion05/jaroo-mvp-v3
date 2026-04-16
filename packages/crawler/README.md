@@ -140,6 +140,8 @@ npm run dev
 
 위 2개도 실패 시에는 공통 에러 envelope를 사용합니다.
 
+자세한 payload schema는 [`../../docs/api/major-wisereport-return-types.md`](../../docs/api/major-wisereport-return-types.md) 를 참고하세요.
+
 ## 4. API
 
 ### 4.1 시스템
