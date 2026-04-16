@@ -151,18 +151,9 @@ npm run dev
 
 ### 4.2 WiseReport KR
 
-WiseReport KR public surface는 slim v1.1 하나만 활성화되어 있습니다.
-
 | Method | Primary Path | 성공 응답 | 설명 |
 | --- | --- | --- | --- |
 | `GET` | `/api/source/wisereport-fnguide/kr/companies/:code/slim/v1.1` | raw JSON | KR slim v1.1 aggregate |
-
-아래 KR WiseReport/FnGuide 경로는 archive 처리되어 비활성화되었습니다.
-
-- aggregate: `/api/source/wisereport-fnguide/kr/companies/:code`
-- deprecated slim: `/api/source/wisereport-fnguide/kr/companies/:code/slim/v1`
-- page routes: `/api/source/wisereport/kr/companies/:code/*`
-- FnGuide page routes: `/api/source/fnguide/kr/companies/:code/*`
 
 예시:
 
@@ -172,19 +163,11 @@ curl "http://localhost:3040/api/source/wisereport-fnguide/kr/companies/005930/sl
 
 ### 4.3 WiseReport Global
 
-WiseReport Global public surface도 slim v1.1 하나만 활성화되어 있습니다.
-
 | Method | Primary Path | Query | 성공 응답 | 설명 |
 | --- | --- | --- | --- | --- |
 | `GET` | `/api/source/wisereport-global/us/companies/:ticker/slim/v1.1` | 없음 | raw JSON | Company 5개 route 기준 slim v1.1 |
 
 route id 목록은 `/api/source/system/catalog` 의 `wisereportGlobalRoutes` 에 포함됩니다.
-
-아래 WiseReport Global 경로는 archive 처리되어 비활성화되었습니다.
-
-- aggregate: `/api/source/wisereport-global/us/companies/:ticker`
-- domain: `/api/source/wisereport-global/us/companies/:ticker/domain`
-- deprecated slim: `/api/source/wisereport-global/us/companies/:ticker/slim/v1`
 
 현재 route id는 다음 19개입니다.
 
