@@ -9,7 +9,7 @@ import { Card } from '@/components/ui/card'
 import { JarooShell } from '@/components/jaroo-shell'
 import { mergeStocks, newStocks, type MergeChoiceId } from '@/lib/jaroo-data'
 import { persistAppliedHomePortfolio } from '@/lib/jaroo-home-data'
-import { OCR_MERGE_RESULT_STORAGE_KEY, sanitizeOcrRows, type OcrRow } from '@/lib/screenshot-ocr'
+import { computeAveragePrice, OCR_MERGE_RESULT_STORAGE_KEY, sanitizeOcrRows, type OcrRow } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 
 const defaultSelections = Object.fromEntries(mergeStocks.map((item) => [item.id, item.defaultChoice])) as Record<string, MergeChoiceId>
@@ -23,6 +23,33 @@ type MergeResultSession = {
   rows: MergeResultRow[]
 }
 
+function isMissingAveragePrice(value: string) {
+  const normalizedValue = value.replace(/[−–—]/g, '-').trim()
+
+  if (!normalizedValue) {
+    return true
+  }
+
+  if (/^-+$/.test(normalizedValue)) {
+    return true
+  }
+
+  return normalizedValue.toLowerCase().replace(/[./\s]/g, '') === 'na'
+}
+
+export function prepareMergeRowsForApply<T extends OcrRow>(rows: T[]) {
+  return rows.map((row) => {
+    if (!isMissingAveragePrice(row.averagePrice)) {
+      return { ...row }
+    }
+
+    return {
+      ...row,
+      averagePrice: computeAveragePrice(row.quantity, row.profitRate, row.evaluationAmount),
+    }
+  })
+}
+
 function MergeMetricChip({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
   return (
     <div className='rounded-[14px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
@@ -33,12 +60,23 @@ function MergeMetricChip({ label, value, valueClassName }: { label: string; valu
 }
 
 function MergeResultRowCard({ row, isLast }: { row: MergeResultRow; isLast: boolean }) {
+  const resolvedIdentifier = [row.resolvedTicker, row.resolvedCode].filter(Boolean).join(' · ')
+  const resolvedMeta = [row.resolvedMarket, resolvedIdentifier].filter(Boolean).join(' · ')
+
   return (
     <div className={cn('px-4 py-3', !isLast && 'border-b border-[color:var(--jaroo-border)]')}>
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
           <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.name || '-'}</p>
           {row.fileName ? <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.fileName}</p> : null}
+          {row.resolvedName || resolvedMeta ? (
+            <div className='mt-1 space-y-0.5'>
+              {row.resolvedName ? (
+                <p className='truncate text-[10px] font-medium text-[color:var(--jaroo-primary)]'>확정 종목: {row.resolvedName}</p>
+              ) : null}
+              {resolvedMeta ? <p className='truncate text-[10px] text-[color:var(--jaroo-muted)]'>{resolvedMeta}</p> : null}
+            </div>
+          ) : null}
         </div>
         <p className='shrink-0 text-[11px] font-medium text-[color:var(--jaroo-primary)]'>{row.profitRate || '-'}</p>
       </div>
@@ -116,9 +154,10 @@ export default function JarooMergeScreen() {
     setIsApplying(true)
 
     try {
+      const preparedRows = prepareMergeRowsForApply(mergeResult.rows)
       const persisted = persistAppliedHomePortfolio({
         broker: mergeResult.broker,
-        rows: mergeResult.rows,
+        rows: preparedRows,
       })
 
       if (!persisted) {

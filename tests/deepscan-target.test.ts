@@ -1,7 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
+import type { JarooDeepScanPayload } from '../packages/contracts/src/deepscan'
+
 import { buildDeepScanViewModel, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding } from '../src/lib/deepscan-target.ts'
+import { buildDeepScanHeroCard, buildDeepScanPageHeader, getDeepScanBlockNotice } from '../src/lib/deepscan-page-projection.ts'
 import { sanitizeOcrRows } from '../src/lib/screenshot-ocr.ts'
 
 const sampleHolding = {
@@ -120,4 +123,176 @@ test('placeholder holding avoids falling back to samsung mock text', () => {
 
   assert.equal(viewModel.holding.name, '종목 미선택')
   assert.doesNotMatch(viewModel.body, /삼성전자|HBM/)
+})
+
+function createCanonicalPayload(overrides: Partial<JarooDeepScanPayload> = {}): JarooDeepScanPayload {
+  const payload: JarooDeepScanPayload = {
+    input: {
+      instrument: {
+        name: '카카오',
+        code: '035720',
+        ticker: '035720.KS',
+        market: 'KR',
+        kind: 'stock',
+      },
+      holding: {
+        shares: '8주',
+        averagePrice: '43,000원',
+        evaluationAmount: '344,000원',
+      },
+      selectedAt: '2026-04-15T15:00:00.000Z',
+      sourceContext: {
+        from: 'holding',
+        sessionKey: 'session-1',
+        appliedAt: '2026-04-15T15:00:00.000Z',
+      },
+    },
+    hero: {
+      blockState: 'ok',
+      sourceRefs: [],
+      fallback: null,
+      error: null,
+      headline: '카카오 canonical headline',
+      body: '카카오 canonical body',
+      statusText: 'canonical ok',
+      score: 61,
+      scoreLabel: '61 / 100',
+      scoreDelta: '+0',
+    },
+    committee: {
+      blockState: 'ok',
+      sourceRefs: [],
+      fallback: null,
+      error: null,
+      axes: [],
+    },
+    insights: {
+      blockState: 'ok',
+      sourceRefs: [],
+      fallback: null,
+      error: null,
+      sectionLabel: 'Baseline insights',
+      items: [],
+      summaryTags: [],
+    },
+    strategy: {
+      blockState: 'ok',
+      sourceRefs: [],
+      fallback: null,
+      error: null,
+      weekSignal: 'Hold and verify',
+      weekSignalTone: 'neutral',
+      weekBadgeText: 'Baseline',
+      scenarioLabel: 'Endpoint wiring pending',
+      scenarioProbability: '62%',
+      scenarioPeriod: '1-2 weeks',
+      scenarioCondition: 'Canonical payload is available.',
+      currentPriceText: '43,000원',
+      targetPriceText: 'Target TBD',
+      scenarioDetails: [],
+      otherScenarios: [],
+      otherScenarioTags: [],
+    },
+    sellNow: {
+      blockState: 'ok',
+      sourceRefs: [],
+      fallback: null,
+      error: null,
+      realizedText: 'Sell now baseline',
+      rows: [],
+    },
+    portfolioSimulation: {
+      blockState: 'ok',
+      sourceRefs: [],
+      fallback: null,
+      error: null,
+      beforeScore: 58,
+      afterScore: 64,
+      deltaLabel: '+6p',
+      caption: 'Baseline simulation placeholder',
+    },
+    metadata: {
+      generatedAt: '2026-04-15T15:00:00.000Z',
+      version: 'test-v1',
+      degraded: false,
+      debugId: 'debug-1',
+      inputValidity: { valid: true },
+      sourceRefs: [],
+      blockStatus: {
+        hero: 'ok',
+        committee: 'ok',
+        insights: 'ok',
+        strategy: 'ok',
+        sellNow: 'ok',
+        portfolioSimulation: 'ok',
+      },
+    },
+  }
+
+  return {
+    ...payload,
+    ...overrides,
+    metadata: {
+      ...payload.metadata,
+      ...overrides.metadata,
+      blockStatus: {
+        ...payload.metadata.blockStatus,
+        ...overrides.metadata?.blockStatus,
+      },
+    },
+  }
+}
+
+test('deepscan page projection uses canonical payload hero and header instead of heuristic holding copy', () => {
+  const payload = createCanonicalPayload()
+  const header = buildDeepScanPageHeader({ holding: sampleHolding, selectedAt: '2026-04-15T15:00:00.000Z' }, payload)
+  const hero = buildDeepScanHeroCard({ holding: sampleHolding, selectedAt: '2026-04-15T15:00:00.000Z' }, 'success', payload)
+
+  assert.equal(header.name, '카카오')
+  assert.match(header.identifierText, /035720/)
+  assert.equal(hero.headline, '카카오 canonical headline')
+  assert.equal(hero.body, '카카오 canonical body')
+  assert.equal(hero.statusText, 'canonical ok')
+  assert.equal(hero.scoreLabel, '61 / 100')
+  assert.doesNotMatch(hero.body, /NAVER|삼성전자|HBM|반도체 업황/)
+})
+
+test('deepscan page projection exposes an explicit loading hero while canonical payload is pending', () => {
+  const hero = buildDeepScanHeroCard({ holding: sampleHolding, selectedAt: '2026-04-15T15:00:00.000Z' }, 'loading', null)
+
+  assert.match(hero.headline, /불러오는 중/)
+  assert.match(hero.body, /canonical payload/i)
+  assert.equal(hero.statusText, '로딩 중')
+  assert.equal(hero.scoreLabel, 'Loading')
+  assert.equal(hero.scoreDelta, '불러오는 중')
+})
+
+test('deepscan page projection surfaces canonical blocked block fallback instead of heuristic section copy', () => {
+  const notice = getDeepScanBlockNotice(
+    {
+      blockState: 'blocked',
+      sourceRefs: [],
+      fallback: {
+        used: true,
+        reason: 'input-invalid',
+        label: '입력 확인 필요',
+      },
+      error: {
+        code: 'input-invalid',
+        message: '종목 코드 또는 티커가 필요합니다.',
+        retryable: false,
+      },
+    },
+    {
+      badge: 'Blocked',
+      title: '위원회 분석을 표시할 수 없어요',
+      body: '위원회 데이터를 아직 표시할 수 없어요.',
+    },
+  )
+
+  assert.deepEqual(notice, {
+    badge: 'Blocked',
+    title: '입력 확인 필요',
+    body: '종목 코드 또는 티커가 필요합니다.',
+  })
 })

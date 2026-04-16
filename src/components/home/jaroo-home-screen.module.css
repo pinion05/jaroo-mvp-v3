@@ -724,6 +724,12 @@
   display: inline-block;
 }
 
+.uploadCtaButton {
+  margin-top: 10px;
+  padding: 11px 12px;
+  border-radius: 10px;
+}
+
 .bottomNav {
   display: flex;
   border-top: 0.5px solid #eee;

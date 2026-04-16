@@ -3,11 +3,22 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "node scripts/dev-stack.cjs",
+    "build": "npm run build:web",
     "build:instrument-universe": "python scripts/build-instrument-universe.py",
-    "start": "next start",
-    "lint": "eslint"
+    "start": "npm run start:web",
+    "test": "node --test tests/*.test.mjs && npm run test:crawler && npm run test:instrument-core",
+    "lint": "npm run lint:web",
+    "dev:web": "next dev",
+    "build:web": "next build",
+    "start:web": "next start",
+    "lint:web": "eslint src tests eslint.config.mjs next.config.ts",
+    "dev:crawler": "npm --prefix packages/crawler run dev",
+    "start:crawler": "npm --prefix packages/crawler run start",
+    "check:crawler": "npm --prefix packages/crawler run check",
+    "test:crawler": "npm --prefix packages/crawler run test",
+    "check:instrument-core": "npm --prefix packages/instrument-core run check",
+    "test:instrument-core": "npm --prefix packages/instrument-core run test"
   },
   "dependencies": {
     "@base-ui/react": "^1.3.0",
@@ -31,5 +42,8 @@
     "eslint-config-next": "16.2.3",
     "tailwindcss": "^4",
     "typescript": "^5"
-  }
+  },
+  "workspaces": [
+    "packages/*"
+  ]
 }

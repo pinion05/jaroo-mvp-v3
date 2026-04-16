@@ -1,0 +1,12 @@
+{
+  "name": "@jaroo/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared Jaroo V3 placeholder contracts for OCR, instruments, quotes, and deepscan",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "types": "./src/index.ts",
+  "sideEffects": false
+}

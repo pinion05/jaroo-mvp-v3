@@ -1,0 +1,16 @@
+{
+  "repo_path": "/home/pinion/kr-us-stock-name-ticker-maps",
+  "files": {
+    "data/kr/kr-stock-name-to-code.json": 65583,
+    "data/kr/kr-stock-name-to-code.txt": 52254,
+    "data/us/us-stock-name-ko-to-ticker-exact.json": 259297,
+    "data/us/us-stock-name-en-to-ticker-exact.json": 543512,
+    "data/us/us-stock-name-exact-report.json": 1264,
+    "data/us/us-stock-name-ko-to-ticker-coverage100.json": 427292,
+    "data/us/us-stock-name-en-to-ticker-coverage100.json": 411949,
+    "data/us/us-stock-ticker-to-ko-en-coverage100.json": 1589881,
+    "data/us/us-stock-name-coverage100-report.json": 1609,
+    "data/us/us-stock-name-ko-to-tickers-exact-multimap.json": 502540,
+    "data/us/us-stock-name-en-to-tickers-exact-multimap.json": 403043
+  }
+}

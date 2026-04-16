@@ -16,10 +16,13 @@ type InstrumentUniverseEntry = {
   aliases?: string[]
 }
 
+type SearchTermSource = 'name' | 'alias' | 'code' | 'ticker'
+
 type IndexedSearchTerm = {
   normalized: string
   tokens: string[]
   grams: Map<string, number>
+  source: SearchTermSource
 }
 
 type IndexedInstrument = InstrumentUniverseEntry & {
@@ -43,7 +46,8 @@ export type ResolvedInstrument = {
 }
 
 const CODE_PATTERN = /\b\d{6}\b/
-const PURE_TICKER_PATTERN = /^[A-Z]{1,5}$/
+const STRUCTURED_TICKER_PATTERN = /^[A-Z]{1,5}$/
+const PURE_TICKER_QUERY_PATTERN = /^[A-Z]{3,5}$/
 const MIN_CONFIDENCE = 0.62
 const MIN_CANDIDATE_CONFIDENCE = 0.45
 
@@ -194,15 +198,24 @@ function uniqueStrings(values: Array<string | undefined>) {
   return [...new Set(values.map((value) => value?.trim()).filter((value): value is string => Boolean(value)))]
 }
 
-const rawUniverse = instrumentUniverse as InstrumentUniverseEntry[]
-
-const indexedUniverse: IndexedInstrument[] = rawUniverse.map((entry) => {
-  const searchCandidates = uniqueStrings([entry.name, entry.code, entry.ticker, ...(entry.aliases ?? [])])
-  const searchTerms = searchCandidates.map((candidate) => ({
+function toIndexedSearchTerm(candidate: string, source: SearchTermSource): IndexedSearchTerm {
+  return {
     normalized: collapseNormalizedValue(candidate),
     tokens: tokenizeNormalizedValue(candidate),
     grams: buildGramMap(candidate),
-  }))
+    source,
+  }
+}
+
+const rawUniverse = instrumentUniverse as InstrumentUniverseEntry[]
+
+const indexedUniverse: IndexedInstrument[] = rawUniverse.map((entry) => {
+  const searchTerms = [
+    ...uniqueStrings([entry.name]).map((candidate) => toIndexedSearchTerm(candidate, 'name')),
+    ...uniqueStrings([entry.code]).map((candidate) => toIndexedSearchTerm(candidate, 'code')),
+    ...uniqueStrings([entry.ticker]).map((candidate) => toIndexedSearchTerm(candidate, 'ticker')),
+    ...uniqueStrings(entry.aliases ?? []).map((candidate) => toIndexedSearchTerm(candidate, 'alias')),
+  ]
 
   return {
     ...entry,
@@ -257,6 +270,8 @@ function dedupeResolvedInstruments(candidates: ResolvedInstrument[]) {
 }
 
 function extractStructuredIdentifiers(query: string) {
+  const normalizedTokens = tokenizeNormalizedValue(query)
+  const ignoreSingleCharacterEmbeddedTickers = normalizedTokens.length > 1
   const code = query.match(CODE_PATTERN)?.[0] ?? ''
   const tickerTokens = Array.from(
     new Set(
@@ -264,7 +279,8 @@ function extractStructuredIdentifiers(query: string) {
         .toUpperCase()
         .split(/[^0-9A-Z가-힣]+/)
         .map((token) => token.trim())
-        .filter((token) => PURE_TICKER_PATTERN.test(token)),
+        .filter((token) => STRUCTURED_TICKER_PATTERN.test(token))
+        .filter((token) => !ignoreSingleCharacterEmbeddedTickers || token.length > 1),
     ),
   )
 
@@ -272,6 +288,10 @@ function extractStructuredIdentifiers(query: string) {
     code,
     tickerTokens,
   }
+}
+
+function isPureTickerLikeQuery(query: string) {
+  return PURE_TICKER_QUERY_PATTERN.test(normalizeIdentifier(query))
 }
 
 function compareRankedInstrumentMatches(left: RankedInstrumentMatch, right: RankedInstrumentMatch) {
@@ -305,6 +325,7 @@ function scoreSearchTerm(
   queryTokens: string[],
   queryGrams: Map<string, number>,
   term: IndexedSearchTerm,
+  isPureTickerQuery: boolean,
 ) {
   if (!queryCollapsed || !term.normalized) {
     return 0
@@ -316,7 +337,15 @@ function scoreSearchTerm(
 
   const queryContainsTerm = queryCollapsed.includes(term.normalized)
   const termContainsQuery = term.normalized.includes(queryCollapsed)
-  const containsScore = queryContainsTerm || termContainsQuery ? Math.min(queryCollapsed.length, term.normalized.length) / Math.max(queryCollapsed.length, term.normalized.length) : 0
+
+  if (isPureTickerQuery && term.source === 'ticker' && queryCollapsed.length > term.normalized.length) {
+    return 0
+  }
+
+  const containsScore =
+    queryContainsTerm || termContainsQuery
+      ? Math.min(queryCollapsed.length, term.normalized.length) / Math.max(queryCollapsed.length, term.normalized.length)
+      : 0
   const prefixScore = queryCollapsed.startsWith(term.normalized) || term.normalized.startsWith(queryCollapsed) ? 1 : 0
   const levenshteinScore = levenshteinSimilarity(queryCollapsed, term.normalized)
   const semanticScore = cosineSimilarity(queryGrams, term.grams)
@@ -374,6 +403,7 @@ export function searchHoldingInstrumentCandidates(identifier: string, limit = 5,
   const queryCollapsed = collapseNormalizedValue(identifier)
   const queryTokens = tokenizeNormalizedValue(identifier)
   const queryGrams = buildGramMap(identifier)
+  const pureTickerLikeQuery = isPureTickerLikeQuery(identifier)
 
   if (!queryCollapsed) {
     return []
@@ -385,7 +415,7 @@ export function searchHoldingInstrumentCandidates(identifier: string, limit = 5,
     let entryBestScore = 0
 
     for (const term of entry.searchTerms) {
-      entryBestScore = Math.max(entryBestScore, scoreSearchTerm(queryCollapsed, queryTokens, queryGrams, term))
+      entryBestScore = Math.max(entryBestScore, scoreSearchTerm(queryCollapsed, queryTokens, queryGrams, term, pureTickerLikeQuery))
     }
 
     if (entryBestScore < minConfidence) {
