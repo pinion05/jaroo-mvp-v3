@@ -1,43 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
+import { buildDeepScanPayloadFromSearchParams, buildRawInputFromSearchParams } from '@/lib/deepscan-runtime/build-payload'
 
-const ALLOWED_DEEPSCAN_CANONICAL_QUERY_KEYS = [
-  'market',
-  'code',
-  'ticker',
-  'name',
-  'shares',
-  'averagePrice',
-  'evaluationAmount',
-  'selectedAt',
-  'from',
-] as const
+export const runtime = 'nodejs'
 
-export function buildDeepScanCanonicalUpstreamPath(searchParams: URLSearchParams) {
-  const upstreamSearchParams = new URLSearchParams()
-
-  for (const key of ALLOWED_DEEPSCAN_CANONICAL_QUERY_KEYS) {
-    const value = searchParams.get(key)?.trim()
-
-    if (!value) {
-      continue
-    }
-
-    upstreamSearchParams.set(key, value)
-  }
-
-  const query = upstreamSearchParams.toString()
-  return `/api/source/wisereport-fnguide-krx-polygon-fmp-deepscan-package/deepscan/canonical${query ? `?${query}` : ''}`
+export function buildDeepScanCanonicalInput(searchParams: URLSearchParams) {
+  return buildRawInputFromSearchParams(searchParams)
 }
 
-export async function GET(request: NextRequest) {
-  let response: Response
-
+export async function createDeepScanCanonicalResponse(
+  searchParams: URLSearchParams,
+  builder: typeof buildDeepScanPayloadFromSearchParams = buildDeepScanPayloadFromSearchParams,
+) {
   try {
-    const upstreamPath = buildDeepScanCanonicalUpstreamPath(request.nextUrl.searchParams)
-    const upstreamUrl = buildCrawlerUrl(getCrawlerBaseUrl(), upstreamPath)
-    response = await fetch(upstreamUrl, { cache: 'no-store' })
+    const payload = await builder(searchParams)
+    return NextResponse.json(payload)
   } catch (error) {
     return NextResponse.json(
       {
@@ -45,19 +22,14 @@ export async function GET(request: NextRequest) {
         data: null,
         count: 0,
         error: {
-          message: error instanceof Error ? error.message : 'crawler proxy failed',
+          message: error instanceof Error ? error.message : 'deepscan builder failed',
         },
       },
       { status: 400 },
     )
   }
+}
 
-  const body = await response.text()
-
-  return new NextResponse(body, {
-    status: response.status,
-    headers: {
-      'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
-    },
-  })
+export async function GET(request: NextRequest) {
+  return createDeepScanCanonicalResponse(request.nextUrl.searchParams)
 }
