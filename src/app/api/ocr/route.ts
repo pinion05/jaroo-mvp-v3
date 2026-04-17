@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { sanitizeOcrRows } from '@/lib/screenshot-ocr'
-import { extractAppleVisionOcrRows } from '@/lib/server/apple-vision-ocr'
 
 export const dynamic = 'force-dynamic'
 
@@ -81,22 +80,6 @@ export function extractOpenRouterErrorStatus(result: OpenRouterResponse | null |
   return typeof result?.error?.code === 'number' && Number.isInteger(result.error.code) ? result.error.code : 502
 }
 
-function shouldAttemptAppleVisionFallback(status: number, upstreamErrorMessage: string) {
-  if (status >= 500) {
-    return true
-  }
-
-  const normalizedError = upstreamErrorMessage.toLowerCase()
-
-  return (
-    status === 403
-    || normalizedError.includes('key limit exceeded')
-    || normalizedError.includes('invalid image')
-    || normalizedError.includes('image format is illegal')
-    || normalizedError.includes('cannot be opened')
-  )
-}
-
 function extractTextContent(content: string | Array<{ type?: string; text?: string }> | undefined) {
   if (typeof content === 'string') {
     return content
@@ -116,6 +99,10 @@ export async function POST(request: Request) {
   const apiKey = process.env.OPENROUTER_API_KEY
   const model = process.env.OCR_MODEL || 'qwen/qwen3.5-flash-02-23'
 
+  if (!apiKey) {
+    return NextResponse.json({ error: 'OPENROUTER_API_KEY is not configured.' }, { status: 500 })
+  }
+
   const body = (await request.json().catch(() => null)) as
     | {
         imageDataUrl?: unknown
@@ -130,22 +117,6 @@ export async function POST(request: Request) {
 
   if (!imageDataUrl.startsWith('data:image/')) {
     return NextResponse.json({ error: 'A valid imageDataUrl is required.' }, { status: 400 })
-  }
-
-  const fallbackToAppleVision = async () => {
-    try {
-      const rows = await extractAppleVisionOcrRows(imageDataUrl, fileName)
-      return NextResponse.json({ rows })
-    } catch (fallbackError) {
-      return NextResponse.json(
-        { error: fallbackError instanceof Error ? fallbackError.message : 'Apple Vision OCR failed.' },
-        { status: 502 },
-      )
-    }
-  }
-
-  if (!apiKey) {
-    return fallbackToAppleVision()
   }
 
   const upstreamResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -189,23 +160,18 @@ export async function POST(request: Request) {
 
   const result = (await upstreamResponse.json().catch(() => null)) as OpenRouterResponse | null
   const upstreamErrorMessage = extractOpenRouterErrorMessage(result)
-  const upstreamStatus = !upstreamResponse.ok ? upstreamResponse.status || 502 : extractOpenRouterErrorStatus(result)
 
   if (!upstreamResponse.ok || upstreamErrorMessage) {
-    if (shouldAttemptAppleVisionFallback(upstreamStatus, upstreamErrorMessage)) {
-      return fallbackToAppleVision()
-    }
-
     return NextResponse.json(
       { error: upstreamErrorMessage || 'OpenRouter OCR request failed.' },
-      { status: upstreamStatus },
+      { status: !upstreamResponse.ok ? upstreamResponse.status || 502 : extractOpenRouterErrorStatus(result) },
     )
   }
 
   const rawContent = extractTextContent(result?.choices?.[0]?.message?.content)
 
   if (!rawContent) {
-    return fallbackToAppleVision()
+    return NextResponse.json({ error: 'OpenRouter returned an empty OCR response.' }, { status: 502 })
   }
 
   let parsed: unknown
@@ -213,7 +179,7 @@ export async function POST(request: Request) {
   try {
     parsed = JSON.parse(rawContent)
   } catch {
-    return fallbackToAppleVision()
+    return NextResponse.json({ error: 'OpenRouter returned invalid JSON.' }, { status: 502 })
   }
 
   const rows = sanitizeOcrRows((parsed as { rows?: unknown })?.rows)
