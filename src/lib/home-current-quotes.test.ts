@@ -227,6 +227,65 @@ test('home current quote hydrate는 FX가 없으면 KRW 평단 미국 종목의 
   assert.equal(updated.metrics.some((metric) => metric.label === '수익률' && metric.value === '-' && metric.tone === 'neutral'), true)
 })
 
+
+test('home current quote hydrate infers KRW cost basis for US holdings when uncoded average price matches FX-adjusted quote range', () => {
+  const [updated] = applyCurrentQuotesToHomeHoldings(
+    [createHolding({
+      name: 'Tesla, Inc.',
+      code: 'TSLA',
+      shortName: 'Tesla',
+      donutLabel: 'TSLA',
+      shares: '5주',
+      averagePrice: '484,779.9799',
+      market: 'NASDAQ',
+      marketTone: 'nasdaq',
+      identifierTicker: 'TSLA',
+      identifierCode: 'US88160R1014',
+      metaLine: '티커 TSLA · 종목코드 US88160R1014 · 평단 484,779.9799',
+      metrics: [
+        { label: '보유 수량', value: '5주', tone: 'neutral' },
+        { label: '수익률', value: '-', tone: 'neutral' },
+        { label: '평가 금액', value: '-', tone: 'neutral' },
+      ],
+    })],
+    [{ market: 'US', code: null, ticker: 'TSLA', price: 388.9, currency: 'USD', asOf: '2026-04-17T13:30:00Z', source: 'polygon', status: 'ok' }],
+    { usdKrwRate: 1400 },
+  )
+
+  assert.equal(updated.evaluationAmount, '$1,944.50')
+  assert.equal(updated.change, '+12.3%')
+  assert.equal(updated.pnl, '+$213.14')
+  assert.equal(updated.metrics.some((metric) => metric.label === '수익률' && metric.value === '+12.3%' && metric.tone === 'positive'), true)
+})
+
+test('home current quote hydrate infers FX-required for US holdings when uncoded average price appears KRW-like but FX is unavailable', () => {
+  const [updated] = applyCurrentQuotesToHomeHoldings(
+    [createHolding({
+      name: 'Tesla, Inc.',
+      code: 'TSLA',
+      shortName: 'Tesla',
+      donutLabel: 'TSLA',
+      shares: '5주',
+      averagePrice: '484,779.9799',
+      market: 'NASDAQ',
+      marketTone: 'nasdaq',
+      identifierTicker: 'TSLA',
+      identifierCode: 'US88160R1014',
+      metaLine: '티커 TSLA · 종목코드 US88160R1014 · 평단 484,779.9799',
+      metrics: [
+        { label: '보유 수량', value: '5주', tone: 'neutral' },
+        { label: '수익률', value: '-', tone: 'neutral' },
+        { label: '평가 금액', value: '-', tone: 'neutral' },
+      ],
+    })],
+    [{ market: 'US', code: null, ticker: 'TSLA', price: 388.9, currency: 'USD', asOf: '2026-04-17T13:30:00Z', source: 'polygon', status: 'ok' }],
+  )
+
+  assert.equal(updated.evaluationAmount, '$1,944.50')
+  assert.equal(updated.change, '-')
+  assert.equal(updated.pnl, '-')
+})
+
 test('home current quote hydrate는 혼합 KR/USD 포트폴리오 비중을 KRW 기준으로 정규화한다', () => {
   const [krHolding, usHolding] = applyCurrentQuotesToHomeHoldings(
     [

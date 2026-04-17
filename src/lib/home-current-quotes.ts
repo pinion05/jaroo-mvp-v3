@@ -65,7 +65,12 @@ function resolveQuoteCurrency(holding: HomeHolding, quoteItem?: CurrentQuoteItem
   return 'KRW' as const
 }
 
-function resolveAveragePriceCurrency(holding: HomeHolding, quoteCurrency: 'KRW' | 'USD') {
+export function resolveAveragePriceCurrency(
+  holding: HomeHolding,
+  quoteCurrency: 'KRW' | 'USD',
+  quoteItem?: CurrentQuoteItem,
+  options: CurrentQuoteFxOptions = {},
+) {
   if (holding.averagePriceCurrency === 'KRW' || holding.averagePriceCurrency === 'USD') {
     return holding.averagePriceCurrency
   }
@@ -79,7 +84,26 @@ function resolveAveragePriceCurrency(holding: HomeHolding, quoteCurrency: 'KRW' 
     return 'KRW' as const
   }
 
-  return holding.marketTone === 'nasdaq' ? null : quoteCurrency
+  if (holding.marketTone !== 'nasdaq') {
+    return quoteCurrency
+  }
+
+  const averagePriceValue = parseOcrNumber(holding.averagePrice)
+  const quotePrice = typeof quoteItem?.price === 'number' && Number.isFinite(quoteItem.price) ? quoteItem.price : null
+  if (averagePriceValue === null || quotePrice === null || quotePrice <= 0) {
+    return null
+  }
+
+  const usdKrwRate = options.usdKrwRate
+  if (typeof usdKrwRate === 'number' && Number.isFinite(usdKrwRate) && usdKrwRate > 0) {
+    const krwComparablePrice = quotePrice * usdKrwRate
+    const usdRelativeDistance = Math.abs(averagePriceValue - quotePrice) / Math.max(Math.abs(quotePrice), 1)
+    const krwRelativeDistance = Math.abs(averagePriceValue - krwComparablePrice) / Math.max(Math.abs(krwComparablePrice), 1)
+
+    return krwRelativeDistance < usdRelativeDistance ? 'KRW' : 'USD'
+  }
+
+  return averagePriceValue > quotePrice * 20 ? 'KRW' : 'USD'
 }
 
 function convertMoneyAmount(
@@ -349,7 +373,7 @@ export function applyCurrentQuotesToHomeHoldings(
     }
 
     const quoteCurrency = resolveQuoteCurrency(holding, quoteItem)
-    const averagePriceCurrency = resolveAveragePriceCurrency(holding, quoteCurrency)
+    const averagePriceCurrency = resolveAveragePriceCurrency(holding, quoteCurrency, quoteItem, options)
     const livePriceText = formatMoney(quoteItem.price, quoteCurrency)
     const shareCount = parseOcrNumber(holding.shares)
     const averagePriceValue = parseOcrNumber(holding.averagePrice)

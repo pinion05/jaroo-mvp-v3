@@ -11,6 +11,7 @@ import {
   buildHomeCurrentQuoteQuery,
   buildHomeHoldingErrorCard,
   buildQuoteLookupKey,
+  resolveAveragePriceCurrency,
   type CurrentQuoteItem,
   type HomeHoldingQuoteErrorKind,
 } from '@/lib/home-current-quotes'
@@ -481,7 +482,8 @@ export function JarooHomeScreen() {
             continue
           }
 
-          const requiresFx = homeHolding.marketTone === 'nasdaq' && item.averagePriceCurrency === 'KRW'
+          const averagePriceCurrency = resolveAveragePriceCurrency(homeHolding, 'USD', quoteItem, { usdKrwRate: nextFxRate })
+          const requiresFx = averagePriceCurrency === 'KRW'
           if (requiresFx && (fxFetchFailed || nextFxRate === null)) {
             nextFailureKinds[itemKey] = 'fx-required'
             clearItemQuote({ code: item.code, ticker: item.ticker, name: item.name, market: item.market })
