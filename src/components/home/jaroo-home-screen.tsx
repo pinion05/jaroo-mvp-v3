@@ -354,7 +354,6 @@ export function JarooHomeScreen() {
   const [liveQuoteSnapshot, setLiveQuoteSnapshot] = useState<{ query: string; items: CurrentQuoteItem[] }>({ query: '', items: [] })
   const [usdKrwRate, setUsdKrwRate] = useState<number | null>(null)
   const [quoteFailureKinds, setQuoteFailureKinds] = useState<Record<string, HomeHoldingQuoteErrorKind>>({})
-  const lastQuoteRunKeyRef = useRef<string | null>(null)
   const [quoteSummaryMessage, setQuoteSummaryMessage] = useState<string | null>(null)
   const [refreshVersion, setRefreshVersion] = useState(0)
 
@@ -401,14 +400,7 @@ export function JarooHomeScreen() {
     if (!quoteSurfaceEnabled) {
       return
     }
-
-    if (lastQuoteRunKeyRef.current === quoteRunKey) {
-      return
-    }
-
-    lastQuoteRunKeyRef.current = quoteRunKey
-
-    let cancelled = false
+    const abortController = new AbortController()
 
     const clearAllKnownQuotes = () => {
       for (const item of portfolioBaseItemsRef.current) {
@@ -426,7 +418,7 @@ export function JarooHomeScreen() {
 
       if (hasUsHomeHoldings) {
         try {
-          const fxResponse = await fetch('/api/market/fx/usd-krw', { cache: 'no-store' })
+          const fxResponse = await fetch('/api/market/fx/usd-krw', { cache: 'no-store', signal: abortController.signal })
           const fxPayload = await fxResponse.json()
           const parsedRate = Number(fxPayload?.data?.rate)
           if (fxResponse.ok && Number.isFinite(parsedRate) && parsedRate > 0) {
@@ -440,10 +432,10 @@ export function JarooHomeScreen() {
       }
 
       try {
-        const response = await fetch(`/api/quotes/current?${quoteQuery}`, { cache: 'no-store' })
+        const response = await fetch(`/api/quotes/current?${quoteQuery}`, { cache: 'no-store', signal: abortController.signal })
         const payload = await response.json()
 
-        if (cancelled) {
+        if (abortController.signal.aborted) {
           return
         }
 
@@ -523,8 +515,8 @@ export function JarooHomeScreen() {
             : null,
         )
         setQuoteStatus('success')
-      } catch {
-        if (cancelled) {
+      } catch (error) {
+        if (abortController.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
           return
         }
 
@@ -540,7 +532,7 @@ export function JarooHomeScreen() {
     void hydrateQuotes()
 
     return () => {
-      cancelled = true
+      abortController.abort()
     }
   }, [clearItemQuote, hasUsHomeHoldings, patchQuote, quoteRunKey, quoteSurfaceEnabled, quoteQuery, setQuoteStatus])
 
