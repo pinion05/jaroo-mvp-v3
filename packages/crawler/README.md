@@ -18,8 +18,7 @@ cp .env.example .env
 npm run dev
 ```
 
-표준 npm 스크립트는 `node --env-file=.env` 를 사용하므로, `.env` 파일이 반드시 존재해야 합니다.
-아직 설정할 값이 없다면 `.env.example` 기반으로 만든 빈/기본값 파일로 시작해도 됩니다.
+표준 npm 스크립트는 먼저 저장소 루트의 `.env.local`, `.env.cookie`, 그 다음 `packages/crawler/.env`를 순서대로 읽습니다 (`--env-file-if-exists`). 따라서 로컬에서는 루트 env 파일만 있어도 바로 실행할 수 있고, crawler 전용 override가 필요할 때만 `packages/crawler/.env`를 추가하면 됩니다.
 
 기본 포트는 `3040`입니다.
 
