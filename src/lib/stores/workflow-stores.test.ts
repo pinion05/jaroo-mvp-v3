@@ -168,6 +168,7 @@ test('OCR review store restart clears rows, candidates, and request state', () =
   useOcrReviewStore.getState().setRows([row])
   useOcrReviewStore.getState().setCandidates(row.id, [{ id: 'candidate-1', resolvedName: 'Microsoft Corporation', resolvedTicker: 'MSFT', source: 'local' }])
   useOcrReviewStore.getState().setRequestStatus('error', 'resolve failed')
+  useOcrReviewStore.getState().setResolveStatus('error', 'candidate failed')
 
   useOcrReviewStore.getState().resetForRestart()
 
@@ -175,7 +176,42 @@ test('OCR review store restart clears rows, candidates, and request state', () =
   assert.deepEqual(state.rows, [])
   assert.deepEqual(state.candidatesByRowId, {})
   assert.equal(state.requestStatus, 'idle')
+  assert.equal(state.resolveStatus, 'idle')
   assert.equal(state.errorMessage, null)
+  assert.equal(state.resolveErrorMessage, null)
+})
+
+test('OCR review store supports candidate replacement and manual row patching', () => {
+  const row = createReviewRow({
+    id: 'manual-row',
+    resolvedName: undefined,
+    resolvedTicker: undefined,
+    resolvedCode: undefined,
+    resolvedMarket: undefined,
+    resolvedMarketTone: undefined,
+    resolvedKind: undefined,
+    resolutionState: 'manual-required',
+    selectedCandidateId: null,
+  })
+
+  useOcrReviewStore.getState().setRows([row])
+  useOcrReviewStore.getState().replaceCandidates({
+    [row.id]: [{ id: 'candidate-2', resolvedName: 'Microsoft Corporation', resolvedTicker: 'MSFT', source: 'ticker-map' }],
+  })
+  useOcrReviewStore.getState().patchRow(row.id, {
+    resolvedTicker: 'MSFT',
+    resolvedMarket: 'NASDAQ',
+    resolvedMarketTone: 'nasdaq',
+    resolvedKind: 'stock',
+    resolutionState: 'resolved',
+  })
+  useOcrReviewStore.getState().setResolveStatus('success')
+
+  const state = useOcrReviewStore.getState()
+  assert.equal(state.candidatesByRowId[row.id]?.[0]?.id, 'candidate-2')
+  assert.equal(state.rows[0]?.resolvedTicker, 'MSFT')
+  assert.equal(state.rows[0]?.resolutionState, 'resolved')
+  assert.equal(state.resolveStatus, 'success')
 })
 
 test('merge selector excludes error rows from applicable payload', () => {

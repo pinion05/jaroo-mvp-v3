@@ -50,6 +50,7 @@ export type ResolveCandidate = {
 
 export type OcrReviewRow = ResolvedReviewRow & {
   id: string
+  raw?: OcrExtractedRow
   sourceFileName?: string
   sourceUploadId?: string
   rowIndex?: number
