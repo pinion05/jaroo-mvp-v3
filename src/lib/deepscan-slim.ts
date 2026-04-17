@@ -34,7 +34,7 @@ type CachedDeepScanSlimSummary = {
 
 type UnknownRecord = Record<string, unknown>
 
-const DEEPSCAN_SLIM_SUMMARY_STORAGE_KEY = 'jaroo:deepscan-slim-summary'
+let cachedDeepScanSlimSummary: CachedDeepScanSlimSummary | null = null
 
 function asRecord(value: unknown): UnknownRecord | null {
   return value && typeof value === 'object' ? (value as UnknownRecord) : null
@@ -178,41 +178,16 @@ export function buildDeepScanSlimSummaryKey(request: DeepScanSlimRequest) {
 }
 
 export function readCachedDeepScanSlimSummary(): CachedDeepScanSlimSummary | null {
-  if (typeof window === 'undefined') {
-    return null
-  }
-
-  try {
-    const raw = window.sessionStorage.getItem(DEEPSCAN_SLIM_SUMMARY_STORAGE_KEY)
-    if (!raw) {
-      return null
-    }
-
-    const parsed = JSON.parse(raw) as Partial<CachedDeepScanSlimSummary>
-    if (!parsed || typeof parsed !== 'object' || typeof parsed.key !== 'string' || !parsed.summary) {
-      return null
-    }
-
-    return {
-      key: parsed.key,
-      summary: parsed.summary as DeepScanSlimSummary,
-    }
-  } catch {
-    return null
-  }
+  return cachedDeepScanSlimSummary
 }
 
 export function persistCachedDeepScanSlimSummary(entry: CachedDeepScanSlimSummary) {
-  if (typeof window === 'undefined') {
-    return false
-  }
+  cachedDeepScanSlimSummary = entry
+  return true
+}
 
-  try {
-    window.sessionStorage.setItem(DEEPSCAN_SLIM_SUMMARY_STORAGE_KEY, JSON.stringify(entry))
-    return true
-  } catch {
-    return false
-  }
+export function clearCachedDeepScanSlimSummary() {
+  cachedDeepScanSlimSummary = null
 }
 
 export async function fetchDeepScanSlimSummary(request: DeepScanSlimRequest, fetcher: typeof fetch = fetch) {
@@ -246,10 +221,6 @@ export async function prefetchAndPersistDeepScanSlimSummary(target: Pick<HomeHol
   }
   persistCachedDeepScanSlimSummary(entry)
   return entry
-}
-
-export {
-  DEEPSCAN_SLIM_SUMMARY_STORAGE_KEY,
 }
 
 export type {

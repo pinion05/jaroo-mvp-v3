@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   buildDeepScanSlimSummaryKey,
+  clearCachedDeepScanSlimSummary,
   fetchDeepScanSlimSummary,
   normalizeDeepScanSlimPayload,
   prefetchAndPersistDeepScanSlimSummary,
@@ -79,67 +80,35 @@ test('holding에서 deepscan slim 요청과 key를 만든다', () => {
   assert.equal(buildDeepScanSlimSummaryKey(usRequest!), 'US:AAPL')
 })
 
-test('deepscan slim summary를 fetch 후 sessionStorage에 캐시한다', async () => {
-  const storage = new Map<string, string>()
-  const originalWindow = globalThis.window
-  const mockWindow = {
-    sessionStorage: {
-      getItem(key: string) {
-        return storage.get(key) ?? null
-      },
-      setItem(key: string, value: string) {
-        storage.set(key, value)
-      },
-      removeItem(key: string) {
-        storage.delete(key)
-      },
-      clear() {
-        storage.clear()
-      },
-      key(index: number) {
-        return [...storage.keys()][index] ?? null
-      },
-      get length() {
-        return storage.size
-      },
-    },
-  } as unknown as Window & typeof globalThis
-  Object.defineProperty(globalThis, 'window', {
-    value: mockWindow,
-    configurable: true,
-  })
+test('deepscan slim summary를 fetch 후 메모리 캐시에 저장한다', async () => {
+  clearCachedDeepScanSlimSummary()
 
-  try {
-    const summary = await fetchDeepScanSlimSummary(
-      { market: 'KR', identifier: '005930' },
-      async () => new Response(JSON.stringify({
-        company: { code: '005930', name: '삼성전자' },
-        pages: {
-          'investment-indicators': { metrics: [{ rows: [{ '항목': 'ROE', latest: '10.85' }] }] },
-          opinion: { reportSummaries: [] },
-        },
-      }), { status: 200 }),
-    )
+  const summary = await fetchDeepScanSlimSummary(
+    { market: 'KR', identifier: '005930' },
+    async () => new Response(JSON.stringify({
+      company: { code: '005930', name: '삼성전자' },
+      pages: {
+        'investment-indicators': { metrics: [{ rows: [{ '항목': 'ROE', latest: '10.85' }] }] },
+        opinion: { reportSummaries: [] },
+      },
+    }), { status: 200 }),
+  )
 
-    assert.equal(summary?.header.identifier, '005930')
+  assert.equal(summary?.header.identifier, '005930')
 
-    const cached = await prefetchAndPersistDeepScanSlimSummary(
-      { code: '005930', identifierCode: '005930', identifierTicker: undefined } as never,
-      async () => new Response(JSON.stringify({
-        company: { code: '005930', name: '삼성전자' },
-        pages: {
-          'investment-indicators': { metrics: [{ rows: [{ '항목': 'ROE', latest: '10.85' }] }] },
-          opinion: { reportSummaries: [] },
-        },
-      }), { status: 200 }),
-    )
+  const cached = await prefetchAndPersistDeepScanSlimSummary(
+    { code: '005930', identifierCode: '005930', identifierTicker: undefined } as never,
+    async () => new Response(JSON.stringify({
+      company: { code: '005930', name: '삼성전자' },
+      pages: {
+        'investment-indicators': { metrics: [{ rows: [{ '항목': 'ROE', latest: '10.85' }] }] },
+        opinion: { reportSummaries: [] },
+      },
+    }), { status: 200 }),
+  )
 
-    assert.equal(cached?.key, 'KR:005930')
-    assert.equal(readCachedDeepScanSlimSummary()?.summary.header.name, '삼성전자')
-  } finally {
-    Object.defineProperty(globalThis, 'window', {
-      value: originalWindow,
-      configurable: true,
-    })
-  }
+  assert.equal(cached?.key, 'KR:005930')
+  assert.equal(readCachedDeepScanSlimSummary()?.summary.header.name, '삼성전자')
+
+  clearCachedDeepScanSlimSummary()
 })

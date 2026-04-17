@@ -6,11 +6,10 @@ import { useRouter } from 'next/navigation'
 import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { JarooShell } from '@/components/jaroo-shell'
-import { type AppliedHomePortfolioRow, persistAppliedHomePortfolio } from '@/lib/jaroo-home-data'
-import { computeAveragePrice, OCR_MERGE_RESULT_STORAGE_KEY } from '@/lib/screenshot-ocr'
+import { type AppliedHomePortfolioRow } from '@/lib/jaroo-home-data'
+import { computeAveragePrice } from '@/lib/screenshot-ocr'
 import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
-import { useOcrUploadStore } from '@/lib/stores/use-ocr-upload-store'
 import { usePortfolioStore } from '@/lib/stores/use-portfolio-store'
 import {
   createMergeRowId,
@@ -154,7 +153,6 @@ function MergeResultRowCard({ row, isLast }: { row: MergeRow; isLast: boolean })
 export default function JarooMergeScreen() {
   const router = useRouter()
   const reviewRows = useOcrReviewStore((state) => state.rows)
-  const workflowBroker = useOcrUploadStore((state) => state.input?.broker ?? '')
   const mergeRows = useMergeStore((state) => state.rows)
   const setMergeRows = useMergeStore((state) => state.setRows)
   const applyStatus = useMergeStore((state) => state.applyStatus)
@@ -216,17 +214,6 @@ export default function JarooMergeScreen() {
 
     try {
       replacePortfolioItems(normalizedItems)
-      const compatibilityRows = buildAppliedHomePortfolioRowsFromConfirmedHoldings(applicableHoldings)
-      const persisted = persistAppliedHomePortfolio({
-        broker: workflowBroker || 'ocr-merge',
-        rows: compatibilityRows,
-      })
-
-      if (!persisted) {
-        throw new Error('포트폴리오 저장에 실패했어요.')
-      }
-
-      window.sessionStorage.removeItem(OCR_MERGE_RESULT_STORAGE_KEY)
       markApplied()
       router.push('/home')
     } catch (error) {

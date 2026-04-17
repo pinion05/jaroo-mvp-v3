@@ -9,7 +9,6 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { JarooShell } from '@/components/jaroo-shell'
 import {
-  OCR_MERGE_RESULT_STORAGE_KEY,
   buildMergedOcrResult,
   buildOcrSourceRows,
   computeAveragePrice,
@@ -716,31 +715,7 @@ export default function OcrPage() {
       return
     }
 
-    try {
-      sessionStorage.setItem(
-        OCR_MERGE_RESULT_STORAGE_KEY,
-        JSON.stringify({
-          broker: session.broker,
-          rows: previewRows.map(({ name, quantity, profitRate, evaluationAmount, averagePrice, resolvedName, resolvedCode, resolvedTicker, resolvedMarket, resolvedMarketTone, resolvedKind, sourceFileName }) => ({
-            name,
-            quantity,
-            profitRate,
-            evaluationAmount,
-            averagePrice,
-            resolvedName,
-            resolvedCode,
-            resolvedTicker,
-            resolvedMarket,
-            resolvedMarketTone,
-            resolvedKind,
-            fileName: sourceFileName,
-          })),
-        }),
-      )
-      router.push('/merge')
-    } catch {
-      setRequestStatus('error', '확정된 결과를 다음 단계로 넘기는 데 실패했어요. 다시 시도해주세요.')
-    }
+    router.push('/merge')
   }
 
   return (
