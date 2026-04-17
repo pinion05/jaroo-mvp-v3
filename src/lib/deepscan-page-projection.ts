@@ -25,6 +25,15 @@ export type DeepScanBlockNotice = {
   body: string
 }
 
+const DEEP_SCAN_BLOCK_LABELS = {
+  hero: '핵심 요약',
+  committee: 'AI 분석 결과',
+  insights: '인사이트',
+  strategy: '전략',
+  sellNow: '지금 팔면',
+  portfolioSimulation: '포트폴리오 점수 변화',
+} as const
+
 function normalizeText(value: unknown) {
   if (typeof value !== 'string') {
     return undefined
@@ -137,5 +146,30 @@ export function getDeepScanBlockNotice(
     badge: block.blockState === 'error' ? 'Error' : block.blockState === 'blocked' ? 'Blocked' : fallback.badge,
     title: block.fallback?.label ?? fallback.title,
     body: block.error?.message ?? block.fallback?.reason ?? fallback.body,
+  }
+}
+
+export function buildDeepScanPartialSuccessNotice(payload: JarooDeepScanPayload | null): DeepScanBlockNotice | null {
+  if (!payload) {
+    return null
+  }
+
+  const degradedBlocks = Object.entries(payload.metadata.blockStatus)
+    .filter(([, blockState]) => blockState !== 'ok')
+    .map(([key]) => DEEP_SCAN_BLOCK_LABELS[key as keyof typeof DEEP_SCAN_BLOCK_LABELS])
+    .filter(Boolean)
+
+  if (degradedBlocks.length === 0) {
+    return null
+  }
+
+  const summary = degradedBlocks.length > 1
+    ? `${degradedBlocks.slice(0, -1).join(', ')}, ${degradedBlocks.at(-1)}`
+    : degradedBlocks[0]
+
+  return {
+    badge: 'Partial',
+    title: '일부 분석 결과만 표시 중이에요',
+    body: `${summary} 블록은 오류 또는 보완 필요 상태로 표시됩니다.`,
   }
 }

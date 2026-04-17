@@ -9,6 +9,7 @@ type DeepScanStoreState = {
   requestStatus: WorkflowAsyncStatus
   errorMessage: string | null
   activePayload: JarooDeepScanPayload | null
+  activeTargetKey: string | null
   lastSuccessful: DeepScanResultCacheEntry | null
 }
 
@@ -26,30 +27,72 @@ const initialState: DeepScanStoreState = {
   requestStatus: 'idle',
   errorMessage: null,
   activePayload: null,
+  activeTargetKey: null,
   lastSuccessful: null,
 }
 
 export const useDeepScanStore = create<DeepScanStoreState & DeepScanStoreActions>()((set, get) => ({
   ...initialState,
-  setTarget: (target) => set({ target }),
-  startRequest: () => set({ requestStatus: 'loading', errorMessage: null, activePayload: null }),
+  setTarget: (target) =>
+    set((state) => {
+      const previousTargetKey = state.target ? getDeepScanTargetKey(state.target) : null
+      const nextTargetKey = target ? getDeepScanTargetKey(target) : null
+
+      if (previousTargetKey === nextTargetKey) {
+        return { target }
+      }
+
+      return {
+        target,
+        requestStatus: 'idle',
+        errorMessage: null,
+        activePayload: null,
+        activeTargetKey: null,
+      }
+    }),
+  startRequest: () => {
+    const { target } = get()
+    set({
+      requestStatus: 'loading',
+      errorMessage: null,
+      activePayload: null,
+      activeTargetKey: target ? getDeepScanTargetKey(target) : null,
+    })
+  },
   finishSuccess: (payload, completedAt = new Date().toISOString()) => {
     const { target } = get()
+    const targetKey = target ? getDeepScanTargetKey(target) : null
     set({
       requestStatus: 'success',
       errorMessage: null,
       activePayload: payload,
-      lastSuccessful: target
+      activeTargetKey: targetKey,
+      lastSuccessful: target && targetKey
         ? {
-            targetKey: getDeepScanTargetKey(target),
+            targetKey,
             payload,
             completedAt,
           }
         : null,
     })
   },
-  finishError: (errorMessage) => set({ requestStatus: 'error', errorMessage, activePayload: null }),
-  abandonInFlight: () => set((state) => ({ requestStatus: 'idle', errorMessage: null, activePayload: null, lastSuccessful: state.lastSuccessful })),
+  finishError: (errorMessage) => {
+    const { target } = get()
+    set({
+      requestStatus: 'error',
+      errorMessage,
+      activePayload: null,
+      activeTargetKey: target ? getDeepScanTargetKey(target) : null,
+    })
+  },
+  abandonInFlight: () =>
+    set((state) => ({
+      requestStatus: 'idle',
+      errorMessage: null,
+      activePayload: null,
+      activeTargetKey: null,
+      lastSuccessful: state.lastSuccessful,
+    })),
   clear: () => set(initialState),
 }))
 

@@ -1,27 +1,30 @@
 'use client'
 
-import type { JarooDeepScanCommitteeAxis, JarooDeepScanInsightItem, JarooDeepScanPayload } from '../../../packages/contracts/src/deepscan'
+import type { JarooDeepScanCommitteeAxis, JarooDeepScanInsightItem } from '../../../packages/contracts/src/deepscan'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useState, useSyncExternalStore, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { JarooShell } from '@/components/jaroo-shell'
-import { buildDeepScanCanonicalQuery, fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
-import { buildDeepScanHeroCard, buildDeepScanPageHeader, getDeepScanBlockNotice, type DeepScanPageFetchState } from '@/lib/deepscan-page-projection'
+import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import {
-  DEEPSCAN_TARGET_EVENT,
-  DEEPSCAN_TARGET_STORAGE_KEY,
-  resolveDeepScanTargetServerSnapshot,
-  resolveDeepScanTargetSession,
-} from '@/lib/jaroo-home-data'
+  buildDeepScanHeroCard,
+  buildDeepScanPageHeader,
+  buildDeepScanPartialSuccessNotice,
+  getDeepScanBlockNotice,
+  type DeepScanPageFetchState,
+} from '@/lib/deepscan-page-projection'
+import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
+import { getDeepScanTargetKey } from '@/lib/workflow-types'
 import { cn } from '@/lib/utils'
 
 type TabValue = 'analysis' | 'strategy'
 type SectionKey = 'why' | 'news' | 'scenarioDetail' | 'otherScenarios' | 'sellNow' | 'pfSim'
+type HomeMarketTone = DeepScanCanonicalTargetSession['holding']['marketTone']
 
 const axisToneStyles = {
   positive: {
@@ -229,26 +232,6 @@ function SectionToggle({
   )
 }
 
-function subscribeDeepScanTarget(callback: () => void) {
-  if (typeof window === 'undefined') {
-    return () => {}
-  }
-
-  const handleStorage = (event: StorageEvent) => {
-    if (event.key === null || event.key === DEEPSCAN_TARGET_STORAGE_KEY) {
-      callback()
-    }
-  }
-
-  window.addEventListener('storage', handleStorage)
-  window.addEventListener(DEEPSCAN_TARGET_EVENT, callback)
-
-  return () => {
-    window.removeEventListener('storage', handleStorage)
-    window.removeEventListener(DEEPSCAN_TARGET_EVENT, callback)
-  }
-}
-
 export default function DeepScanPage() {
   const [tab, setTab] = useState<TabValue>('analysis')
   const [selectedAxis, setSelectedAxis] = useState(0)
@@ -260,99 +243,154 @@ export default function DeepScanPage() {
     sellNow: false,
     pfSim: false,
   })
-  const targetSession = useSyncExternalStore(
-    subscribeDeepScanTarget,
-    resolveDeepScanTargetSession,
-    resolveDeepScanTargetServerSnapshot,
+  const target = useDeepScanStore((state) => state.target)
+  const requestStatus = useDeepScanStore((state) => state.requestStatus)
+  const errorMessage = useDeepScanStore((state) => state.errorMessage)
+  const activePayload = useDeepScanStore((state) => state.activePayload)
+  const activeTargetKey = useDeepScanStore((state) => state.activeTargetKey)
+  const lastSuccessful = useDeepScanStore((state) => state.lastSuccessful)
+  const startRequest = useDeepScanStore((state) => state.startRequest)
+  const finishSuccess = useDeepScanStore((state) => state.finishSuccess)
+  const finishError = useDeepScanStore((state) => state.finishError)
+  const abandonInFlight = useDeepScanStore((state) => state.abandonInFlight)
+
+  const targetKey = useMemo(() => (target ? getDeepScanTargetKey(target) : null), [target])
+  const requestSeed = useMemo<DeepScanCanonicalTargetSession | null>(
+    () =>
+      target
+        ? {
+            holding: {
+              name: target.name,
+              code: target.code,
+              identifierCode: target.code,
+              ticker: target.ticker,
+              identifierTicker: target.ticker,
+              shares: String(target.quantity),
+              averagePrice: String(target.averagePrice),
+              evaluationAmount: typeof target.evaluationAmount === 'number' ? String(target.evaluationAmount) : undefined,
+              market: target.market ?? target.marketTone?.toUpperCase() ?? '미확인',
+              marketTone: (target.marketTone ?? (target.kind === 'etf' ? 'etf' : 'kospi')) as HomeMarketTone,
+            },
+            selectedAt: undefined,
+          }
+        : null,
+    [target],
   )
-  const [payloadState, setPayloadState] = useState<{
-    requestKey: string
-    payload: JarooDeepScanPayload | null
-    error: boolean
-  }>({
-    requestKey: '',
-    payload: null,
-    error: false,
-  })
-  const requestSeed = useMemo<DeepScanCanonicalTargetSession>(
-    () => ({
-      holding: {
-        name: targetSession.holding.name,
-        code: targetSession.holding.code,
-        identifierCode: targetSession.holding.identifierCode,
-        ticker: targetSession.holding.identifierTicker,
-        identifierTicker: targetSession.holding.identifierTicker,
-        shares: targetSession.holding.shares,
-        averagePrice: targetSession.holding.averagePrice,
-        evaluationAmount: targetSession.holding.evaluationAmount,
-        market: targetSession.holding.market,
-        marketTone: targetSession.holding.marketTone,
-      },
-      selectedAt: targetSession.selectedAt,
-    }),
-    [
-      targetSession.holding.name,
-      targetSession.holding.code,
-      targetSession.holding.identifierCode,
-      targetSession.holding.identifierTicker,
-      targetSession.holding.shares,
-      targetSession.holding.averagePrice,
-      targetSession.holding.evaluationAmount,
-      targetSession.holding.market,
-      targetSession.holding.marketTone,
-      targetSession.selectedAt,
-    ],
-  )
-  const requestKey = useMemo(() => buildDeepScanCanonicalQuery(requestSeed).toString(), [requestSeed])
+  const currentPayload = targetKey && activeTargetKey === targetKey ? activePayload : null
+  const reusablePayload = targetKey && lastSuccessful?.targetKey === targetKey ? lastSuccessful.payload : null
+  const payload = requestStatus === 'success' ? currentPayload : requestStatus === 'idle' ? (currentPayload ?? reusablePayload) : null
+  const fetchState: DeepScanPageFetchState = !target
+    ? 'idle'
+    : requestStatus === 'loading'
+      ? 'loading'
+      : requestStatus === 'error'
+        ? 'error'
+        : payload
+          ? 'success'
+          : 'idle'
 
   useEffect(() => {
-    let cancelled = false
+    if (!target || requestStatus === 'loading' || requestStatus === 'error' || payload) {
+      return
+    }
 
-    void fetchDeepScanCanonicalPayload(requestSeed)
-      .then((nextPayload) => {
-        if (cancelled) {
+    startRequest()
+  }, [payload, requestStatus, startRequest, target])
+
+  useEffect(() => {
+    if (!requestSeed || requestStatus !== 'loading') {
+      return
+    }
+
+    const controller = new AbortController()
+    let settled = false
+
+    const run = async () => {
+      try {
+        const nextPayload = await fetchDeepScanCanonicalPayload(
+          requestSeed,
+          (input, init) => fetch(input, { ...init, signal: controller.signal }),
+        )
+
+        if (controller.signal.aborted) {
           return
         }
 
-        setPayloadState({
-          requestKey,
-          payload: nextPayload,
-          error: !nextPayload,
-        })
-      })
-      .catch(() => {
-        if (cancelled) {
+        settled = true
+
+        if (!nextPayload) {
+          finishError('DeepScan 데이터를 표시할 수 없어요. 잠시 후 다시 시도해주세요.')
           return
         }
 
-        setPayloadState({
-          requestKey,
-          payload: null,
-          error: true,
-        })
-      })
+        finishSuccess(nextPayload)
+      } catch (error) {
+        if (controller.signal.aborted) {
+          return
+        }
+
+        settled = true
+        finishError(error instanceof Error ? error.message : 'DeepScan 데이터를 표시할 수 없어요. 잠시 후 다시 시도해주세요.')
+      }
+    }
+
+    void run()
 
     return () => {
-      cancelled = true
-    }
-  }, [requestKey, requestSeed])
+      controller.abort()
 
-  const payload = payloadState.requestKey === requestKey && !payloadState.error ? payloadState.payload : null
-  const fetchState: DeepScanPageFetchState = payloadState.requestKey !== requestKey
-    ? 'loading'
-    : payloadState.error
-      ? 'error'
-      : payload
-        ? 'success'
-        : 'idle'
+      if (!settled) {
+        abandonInFlight()
+      }
+    }
+  }, [abandonInFlight, finishError, finishSuccess, requestSeed, requestStatus])
 
   const scrollContentToTop = () => {
     const container = document.querySelector<HTMLElement>("[data-slot='jaroo-shell-main']")
     container?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  const handleRetry = useCallback(() => {
+    startRequest()
+    scrollContentToTop()
+  }, [startRequest])
+
+  const missingTargetTitle = '분석할 종목이 없습니다'
+
+  if (!requestSeed) {
+    return (
+      <JarooShell
+        title='DeepScan'
+        backHref='/home'
+        showBottomNav={false}
+        mainClassName='px-4 pt-4 pb-6'
+      >
+        <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-5 shadow-none'>
+          <span className='inline-flex rounded-full bg-[color:var(--jaroo-warning-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-warning)]'>
+            Empty
+          </span>
+          <h1 className='mt-3 text-xl font-semibold text-[color:var(--jaroo-ink)]'>{missingTargetTitle}</h1>
+          <p className='mt-2 text-sm leading-6 text-[color:var(--jaroo-muted)]'>
+            홈에서 분석할 종목을 선택한 뒤 다시 들어와 주세요.
+          </p>
+          <div className='mt-5'>
+            <Link
+              href='/home'
+              className={buttonVariants({
+                className: 'h-12 w-full rounded-[22px] bg-[color:var(--jaroo-primary)] text-white hover:bg-[color:var(--jaroo-primary-strong)]',
+              })}
+            >
+              /home 으로 가기
+            </Link>
+          </div>
+        </Card>
+      </JarooShell>
+    )
+  }
+
   const pageHeader = buildDeepScanPageHeader(requestSeed, payload)
   const heroCard = buildDeepScanHeroCard(requestSeed, fetchState, payload)
+  const partialSuccessNotice = buildDeepScanPartialSuccessNotice(payload)
   const weekTone = resolveWeekToneClasses(payload?.strategy.weekSignalTone ?? 'neutral')
   const analysisLoadingNotice = {
     badge: 'Loading',
@@ -367,7 +405,7 @@ export default function DeepScanPage() {
   const requestErrorNotice = {
     badge: 'Error',
     title: 'DeepScan 데이터를 표시할 수 없어요',
-    body: 'canonical payload 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
+    body: errorMessage ?? 'canonical payload 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
   }
 
   const handleTabChange = (value: TabValue) => {
@@ -431,7 +469,21 @@ export default function DeepScanPage() {
               <p className='text-[11px] font-medium tracking-[0.05em] text-[color:var(--jaroo-primary)]'>
                 AI 9인 위원회 종합 분석
               </p>
-              <span className={cn('text-xs font-medium', heroCard.statusToneClass)}>{heroCard.statusText}</span>
+              <div className='flex items-center gap-2'>
+                <span className={cn('text-xs font-medium', heroCard.statusToneClass)}>{heroCard.statusText}</span>
+                <button
+                  type='button'
+                  onClick={handleRetry}
+                  disabled={fetchState === 'loading'}
+                  className={buttonVariants({
+                    variant: 'outline',
+                    className:
+                      'h-8 rounded-[10px] border-[color:var(--jaroo-primary)]/20 bg-white/80 px-3 text-[11px] font-medium text-[color:var(--jaroo-primary)] hover:bg-white disabled:pointer-events-none disabled:opacity-60',
+                  })}
+                >
+                  {fetchState === 'error' ? '다시 시도' : '재분석'}
+                </button>
+              </div>
             </div>
             <h1 className='mt-3 text-[28px] font-semibold leading-tight text-[color:var(--jaroo-primary-strong)]'>
               {heroCard.headline}
@@ -446,6 +498,38 @@ export default function DeepScanPage() {
               <span className='ml-auto text-xs text-[color:var(--jaroo-primary)]'>{heroCard.scoreDelta}</span>
             </div>
           </Card>
+
+          {fetchState === 'error' ? (
+            <Card className='rounded-[24px] border border-[color:var(--jaroo-danger)]/20 bg-[color:var(--jaroo-danger-soft)] p-4 shadow-none'>
+              <div className='flex items-start justify-between gap-3'>
+                <div>
+                  <p className='text-sm font-semibold text-[color:var(--jaroo-danger)]'>{requestErrorNotice.title}</p>
+                  <p className='mt-1 text-xs leading-5 text-[color:var(--jaroo-danger)]/80'>{requestErrorNotice.body}</p>
+                </div>
+                <button
+                  type='button'
+                  onClick={handleRetry}
+                  className={buttonVariants({
+                    variant: 'outline',
+                    className:
+                      'h-8 rounded-[10px] border-[color:var(--jaroo-danger)]/20 bg-white px-3 text-[11px] font-medium text-[color:var(--jaroo-danger)] hover:bg-white',
+                  })}
+                >
+                  다시 시도
+                </button>
+              </div>
+            </Card>
+          ) : null}
+
+          {partialSuccessNotice ? (
+            <Card className='rounded-[24px] border border-[color:var(--jaroo-warning)]/20 bg-[color:var(--jaroo-warning-soft)] p-4 shadow-none'>
+              <span className='inline-flex rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-warning)]'>
+                {partialSuccessNotice.badge}
+              </span>
+              <p className='mt-3 text-sm font-semibold text-[color:var(--jaroo-warning)]'>{partialSuccessNotice.title}</p>
+              <p className='mt-1 text-xs leading-5 text-[color:var(--jaroo-warning)]/80'>{partialSuccessNotice.body}</p>
+            </Card>
+          ) : null}
 
           <SectionToggle
             label='AI 분석 결과'
@@ -652,6 +736,38 @@ export default function DeepScanPage() {
         </TabsContent>
 
         <TabsContent value='strategy' className='mt-0 space-y-4 py-4'>
+          {fetchState === 'error' ? (
+            <Card className='rounded-[24px] border border-[color:var(--jaroo-danger)]/20 bg-[color:var(--jaroo-danger-soft)] p-4 shadow-none'>
+              <div className='flex items-start justify-between gap-3'>
+                <div>
+                  <p className='text-sm font-semibold text-[color:var(--jaroo-danger)]'>{requestErrorNotice.title}</p>
+                  <p className='mt-1 text-xs leading-5 text-[color:var(--jaroo-danger)]/80'>{requestErrorNotice.body}</p>
+                </div>
+                <button
+                  type='button'
+                  onClick={handleRetry}
+                  className={buttonVariants({
+                    variant: 'outline',
+                    className:
+                      'h-8 rounded-[10px] border-[color:var(--jaroo-danger)]/20 bg-white px-3 text-[11px] font-medium text-[color:var(--jaroo-danger)] hover:bg-white',
+                  })}
+                >
+                  다시 시도
+                </button>
+              </div>
+            </Card>
+          ) : null}
+
+          {partialSuccessNotice ? (
+            <Card className='rounded-[24px] border border-[color:var(--jaroo-warning)]/20 bg-[color:var(--jaroo-warning-soft)] p-4 shadow-none'>
+              <span className='inline-flex rounded-full bg-white/80 px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-warning)]'>
+                {partialSuccessNotice.badge}
+              </span>
+              <p className='mt-3 text-sm font-semibold text-[color:var(--jaroo-warning)]'>{partialSuccessNotice.title}</p>
+              <p className='mt-1 text-xs leading-5 text-[color:var(--jaroo-warning)]/80'>{partialSuccessNotice.body}</p>
+            </Card>
+          ) : null}
+
           {fetchState !== 'success' || !payload ? (
             <SectionStatusCard notice={fetchState === 'error' ? requestErrorNotice : strategyLoadingNotice} />
           ) : payload.strategy.blockState !== 'ok' ? (

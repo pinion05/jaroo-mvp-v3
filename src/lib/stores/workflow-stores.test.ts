@@ -290,6 +290,39 @@ test('deep scan store reuses the last successful result only for the same target
     false,
   )
   assert.equal(useDeepScanStore.getState().lastSuccessful?.targetKey, getDeepScanTargetKey(target))
+  assert.equal(useDeepScanStore.getState().activeTargetKey, getDeepScanTargetKey(target))
+})
+
+test('deep scan store resets active request state when the target key changes', () => {
+  const firstTarget: DeepScanTargetInput = {
+    code: '005930',
+    market: 'KOSPI',
+    marketTone: 'kospi',
+    kind: 'stock',
+    name: '삼성전자',
+    quantity: 10,
+    averagePrice: 70000,
+  }
+  const secondTarget: DeepScanTargetInput = {
+    ticker: 'AAPL',
+    market: 'NASDAQ',
+    marketTone: 'nasdaq',
+    kind: 'stock',
+    name: 'Apple',
+    quantity: 2,
+    averagePrice: 210,
+  }
+
+  useDeepScanStore.getState().setTarget(firstTarget)
+  useDeepScanStore.getState().startRequest()
+  useDeepScanStore.getState().finishSuccess(createDeepScanPayload(), '2026-04-17T01:10:00.000Z')
+  useDeepScanStore.getState().setTarget(secondTarget)
+
+  assert.equal(useDeepScanStore.getState().requestStatus, 'idle')
+  assert.equal(useDeepScanStore.getState().errorMessage, null)
+  assert.equal(useDeepScanStore.getState().activePayload, null)
+  assert.equal(useDeepScanStore.getState().activeTargetKey, null)
+  assert.equal(useDeepScanStore.getState().lastSuccessful?.targetKey, getDeepScanTargetKey(firstTarget))
 })
 
 test('upload store keeps the current screenshot handoff payload', () => {

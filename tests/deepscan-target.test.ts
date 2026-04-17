@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import type { JarooDeepScanPayload } from '../packages/contracts/src/deepscan'
 
 import { buildDeepScanViewModel, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding } from '../src/lib/deepscan-target'
-import { buildDeepScanHeroCard, buildDeepScanPageHeader, getDeepScanBlockNotice } from '../src/lib/deepscan-page-projection'
+import { buildDeepScanHeroCard, buildDeepScanPageHeader, buildDeepScanPartialSuccessNotice, getDeepScanBlockNotice } from '../src/lib/deepscan-page-projection'
 import { sanitizeOcrRows } from '../src/lib/screenshot-ocr'
 
 const sampleHolding = {
@@ -125,7 +125,13 @@ test('placeholder holding avoids falling back to samsung mock text', () => {
   assert.doesNotMatch(viewModel.body, /삼성전자|HBM/)
 })
 
-function createCanonicalPayload(overrides: Partial<JarooDeepScanPayload> = {}): JarooDeepScanPayload {
+type CanonicalPayloadOverrides = Omit<Partial<JarooDeepScanPayload>, 'metadata'> & {
+  metadata?: Partial<JarooDeepScanPayload['metadata']> & {
+    blockStatus?: Partial<JarooDeepScanPayload['metadata']['blockStatus']>
+  }
+}
+
+function createCanonicalPayload(overrides: CanonicalPayloadOverrides = {}): JarooDeepScanPayload {
   const payload: JarooDeepScanPayload = {
     input: {
       instrument: {
@@ -294,5 +300,28 @@ test('deepscan page projection surfaces canonical blocked block fallback instead
     badge: 'Blocked',
     title: '입력 확인 필요',
     body: '종목 코드 또는 티커가 필요합니다.',
+  })
+})
+
+test('deepscan page projection exposes a page-level partial-success notice when some blocks degrade', () => {
+  const payload = createCanonicalPayload({
+    metadata: {
+      blockStatus: {
+        hero: 'ok',
+        committee: 'error',
+        insights: 'ok',
+        strategy: 'blocked',
+        sellNow: 'ok',
+        portfolioSimulation: 'ok',
+      },
+    },
+  })
+
+  const notice = buildDeepScanPartialSuccessNotice(payload)
+
+  assert.deepEqual(notice, {
+    badge: 'Partial',
+    title: '일부 분석 결과만 표시 중이에요',
+    body: 'AI 분석 결과, 전략 블록은 오류 또는 보완 필요 상태로 표시됩니다.',
   })
 })
