@@ -8,6 +8,7 @@
     "build:instrument-universe": "python scripts/build-instrument-universe.py",
     "start": "npm run start:web",
     "test": "node --test tests/*.test.mjs && npm run test:crawler && npm run test:instrument-core",
+    "test:web:ts": "npx -y tsx --test $(find src tests -name '*.test.ts' | sort)",
     "lint": "npm run lint:web",
     "dev:web": "next dev",
     "build:web": "next build",

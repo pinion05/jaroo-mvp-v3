@@ -290,11 +290,20 @@ test('isDeepScanPayloadReady는 blocked canonical payload도 render 가능한 pa
       scoreDelta: '0',
     },
     metadata: {
+      generatedAt: '2026-04-15T15:00:00.000Z',
+      version: 'test-v1',
       errorCode: 'input-invalid',
       degraded: true,
+      debugId: 'debug-1',
       inputValidity: { valid: false, reason: 'instrument code or ticker is required', missing: ['instrument.code', 'instrument.ticker'] },
+      sourceRefs: [],
       blockStatus: {
         hero: 'blocked',
+        committee: 'ok',
+        insights: 'ok',
+        strategy: 'ok',
+        sellNow: 'ok',
+        portfolioSimulation: 'ok',
       },
     },
   })

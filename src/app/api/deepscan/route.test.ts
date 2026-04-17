@@ -73,15 +73,20 @@ test('deepscan canonical proxy GET은 crawler 응답 이후 body read 실패를 
   const streamError = new Error('stream broke')
 
   globalThis.fetch = (async () => {
-    return {
+    const response = new Response('', {
       status: 502,
-      headers: new Headers({
+      headers: {
         'content-type': 'application/json; charset=utf-8',
-      }),
-      text: async () => {
+      },
+    })
+
+    Object.defineProperty(response, 'text', {
+      value: async () => {
         throw streamError
       },
-    } as Response
+    })
+
+    return response
   }) as typeof fetch
 
   t.after(() => {

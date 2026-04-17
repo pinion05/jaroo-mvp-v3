@@ -3,9 +3,9 @@ import assert from 'node:assert/strict'
 
 import type { JarooDeepScanPayload } from '../packages/contracts/src/deepscan'
 
-import { buildDeepScanViewModel, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding } from '../src/lib/deepscan-target.ts'
-import { buildDeepScanHeroCard, buildDeepScanPageHeader, getDeepScanBlockNotice } from '../src/lib/deepscan-page-projection.ts'
-import { sanitizeOcrRows } from '../src/lib/screenshot-ocr.ts'
+import { buildDeepScanViewModel, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding } from '../src/lib/deepscan-target'
+import { buildDeepScanHeroCard, buildDeepScanPageHeader, getDeepScanBlockNotice } from '../src/lib/deepscan-page-projection'
+import { sanitizeOcrRows } from '../src/lib/screenshot-ocr'
 
 const sampleHolding = {
   id: 7,

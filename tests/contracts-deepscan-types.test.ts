@@ -12,11 +12,11 @@ import {
   type JarooDeepScanPayload as BarrelJarooDeepScanPayload,
   type JarooDeepScanSellNowRow,
   type JarooInstrumentKind,
-} from '../packages/contracts/src/index.ts'
+} from '../packages/contracts/src/index'
 import {
   DEEP_SCAN_BLOCK_STATES as directDeepScanBlockStates,
   JAROO_DEEP_SCAN_TOP_LEVEL_KEYS as directTopLevelKeys,
-} from '../packages/contracts/src/deepscan.ts'
+} from '../packages/contracts/src/deepscan'
 
 type Assert<T extends true> = T
 
@@ -42,7 +42,7 @@ type ExpectedInputValidity =
     }
 
 type _BarrelPayloadMatchesDirect = Assert<
-  IsExact<BarrelJarooDeepScanPayload, import('../packages/contracts/src/deepscan.ts').JarooDeepScanPayload>
+  IsExact<BarrelJarooDeepScanPayload, import('../packages/contracts/src/deepscan').JarooDeepScanPayload>
 >
 type _InputInstrumentKindUsesSharedType = Assert<
   IsExact<JarooDeepScanInputInstrument['kind'], JarooInstrumentKind | undefined>
