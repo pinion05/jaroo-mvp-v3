@@ -3,6 +3,7 @@ import { parseOcrNumber } from './screenshot-ocr'
 
 export type WorkflowMarketTone = 'kospi' | 'kosdaq' | 'nasdaq' | 'etf'
 export type WorkflowInstrumentKind = 'stock' | 'etf'
+export type WorkflowMoneyCurrency = 'KRW' | 'USD'
 export type WorkflowAsyncStatus = 'idle' | 'loading' | 'success' | 'error'
 export type OcrReviewResolutionState = 'unresolved' | 'resolved' | 'manual-required' | 'error'
 export type MergeRowStatus = 'ready' | 'error'
@@ -74,6 +75,7 @@ export type ConfirmedHolding = {
   averagePriceText: string
   averagePriceValue?: number
   sourceFileName?: string
+  averagePriceCurrency?: WorkflowMoneyCurrency
 }
 
 export type MergeRow = ConfirmedHolding & {
@@ -96,6 +98,7 @@ export type PortfolioNormalizedItem = {
   currentPrice?: number
   currentProfitRate?: number
   evaluationAmount?: number
+  averagePriceCurrency?: WorkflowMoneyCurrency
   identifierLabel?: string
 }
 
@@ -111,6 +114,7 @@ export type DeepScanTargetInput = {
   currentPrice?: number
   currentProfitRate?: number
   evaluationAmount?: number
+  averagePriceCurrency?: WorkflowMoneyCurrency
   identifierLabel?: string
 }
 
@@ -146,7 +150,28 @@ export function buildIdentifierLabel(ticker?: string, code?: string) {
   return identifiers.length > 0 ? identifiers.join(' · ') : undefined
 }
 
+function inferMoneyCurrencyFromText(value: string | undefined) {
+  const normalizedValue = value?.trim().toUpperCase() ?? ''
+
+  if (!normalizedValue) {
+    return undefined
+  }
+
+  if (normalizedValue.includes('$') || normalizedValue.includes('USD')) {
+    return 'USD' as const
+  }
+
+  if (normalizedValue.includes('₩') || normalizedValue.includes('KRW') || normalizedValue.includes('원')) {
+    return 'KRW' as const
+  }
+
+  return undefined
+}
+
 export function toConfirmedHolding(row: OcrReviewRow): ConfirmedHolding {
+  const averagePriceCurrency = inferMoneyCurrencyFromText(row.averagePrice)
+    ?? (row.resolvedMarketTone === 'nasdaq' ? undefined : 'KRW')
+
   return {
     displayName: row.resolvedName?.trim() || row.name.trim(),
     ticker: row.resolvedTicker?.trim() || row.ticker?.trim() || undefined,
@@ -162,6 +187,7 @@ export function toConfirmedHolding(row: OcrReviewRow): ConfirmedHolding {
     evaluationAmountValue: parseOcrNumber(row.evaluationAmount) ?? undefined,
     averagePriceText: row.averagePrice,
     averagePriceValue: parseOcrNumber(row.averagePrice) ?? undefined,
+    averagePriceCurrency,
     sourceFileName: row.sourceFileName,
   }
 }
@@ -186,6 +212,7 @@ export function getApplicableConfirmedHoldings(rows: MergeRow[]): ConfirmedHoldi
     evaluationAmountValue: row.evaluationAmountValue,
     averagePriceText: row.averagePriceText,
     averagePriceValue: row.averagePriceValue,
+    averagePriceCurrency: row.averagePriceCurrency,
     sourceFileName: row.sourceFileName,
   }))
 }
@@ -209,6 +236,7 @@ export function toPortfolioNormalizedItem(holding: ConfirmedHolding): PortfolioN
     quantity: holding.quantityValue,
     averagePrice: holding.averagePriceValue,
     evaluationAmount: holding.evaluationAmountValue,
+    averagePriceCurrency: holding.averagePriceCurrency,
     identifierLabel: buildIdentifierLabel(holding.ticker, holding.code),
   }
 }
@@ -230,6 +258,7 @@ export function toDeepScanTargetInput(item: PortfolioNormalizedItem): DeepScanTa
     currentPrice: item.currentPrice,
     currentProfitRate: item.currentProfitRate,
     evaluationAmount: item.evaluationAmount,
+    averagePriceCurrency: item.averagePriceCurrency,
     identifierLabel: item.identifierLabel ?? buildIdentifierLabel(item.ticker, item.code),
   }
 }

@@ -1,4 +1,5 @@
 import { buildDeepScanTargetSession, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding, type DeepScanTargetSession } from '@/lib/deepscan-target'
+import type { PortfolioNormalizedItem } from '@/lib/workflow-types'
 import { normalizeStockName, parseOcrNumber, type OcrRow } from '@/lib/screenshot-ocr'
 
 export type HomeBadgeTone = 'amber' | 'red' | 'green'
@@ -859,6 +860,47 @@ export function resolveDeepScanTargetSession() {
     ?? DEEPSCAN_SERVER_SNAPSHOT
 
   return cacheDeepScanSnapshot(snapshotKey, resolvedSnapshot)
+}
+
+function formatAveragePriceFromPortfolioItem(item: PortfolioNormalizedItem) {
+  if (item.averagePriceCurrency === 'USD') {
+    return formatCurrencyValue(String(item.averagePrice), 'USD')
+  }
+
+  if (item.averagePriceCurrency === 'KRW') {
+    return formatCurrencyValue(String(item.averagePrice), 'KRW')
+  }
+
+  if (item.marketTone === 'nasdaq') {
+    return item.averagePrice.toFixed(4)
+  }
+
+  return formatCurrencyValue(String(item.averagePrice), 'KRW')
+}
+
+function buildAppliedRowFromPortfolioItem(item: PortfolioNormalizedItem): AppliedHomePortfolioRow {
+  return {
+    name: item.name,
+    quantity: `${item.quantity}주`,
+    averagePrice: formatAveragePriceFromPortfolioItem(item),
+    averagePriceCurrency: item.averagePriceCurrency,
+    code: item.code,
+    ticker: item.ticker,
+    resolvedName: item.name,
+    resolvedCode: item.code,
+    resolvedTicker: item.ticker,
+    resolvedMarket: item.market,
+    resolvedMarketTone: item.marketTone,
+    resolvedKind: item.kind,
+  }
+}
+
+export function buildHomeHoldingsFromPortfolioItems(items: PortfolioNormalizedItem[]): HomeHolding[] {
+  if (items.length === 0) {
+    return []
+  }
+
+  return buildHomeHoldingsFromOcrRows(items.map((item) => buildAppliedRowFromPortfolioItem(item)))
 }
 
 export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): HomeHolding[] {

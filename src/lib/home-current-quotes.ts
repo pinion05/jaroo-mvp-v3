@@ -226,7 +226,9 @@ function applyLiveTone(holding: HomeHolding, changeValue: number | null) {
   }
 }
 
-function buildQuoteLookupKey(item: Pick<HomeHolding, 'marketTone' | 'identifierCode' | 'identifierTicker' | 'code'>) {
+export type HomeHoldingQuoteErrorKind = 'quote-unavailable' | 'fx-required' | 'holding-invalid'
+
+export function buildQuoteLookupKey(item: Pick<HomeHolding, 'marketTone' | 'identifierCode' | 'identifierTicker' | 'code'>) {
   if (item.marketTone === 'nasdaq' || item.identifierTicker) {
     return item.identifierTicker?.trim().toUpperCase() || undefined
   }
@@ -259,6 +261,55 @@ export function buildHomeCurrentQuoteQuery(holdings: HomeHolding[]) {
   }
 
   return searchParams.toString()
+}
+
+export function buildHomeHoldingErrorCard(holding: HomeHolding, kind: HomeHoldingQuoteErrorKind): HomeHolding {
+  const label = kind === 'fx-required'
+    ? '환율 오류'
+    : kind === 'holding-invalid'
+      ? '데이터 오류'
+      : '시세 오류'
+  const description = kind === 'fx-required'
+    ? 'USD/KRW 환율을 불러오지 못해 이 종목의 수익률을 계산하지 못했어요.'
+    : kind === 'holding-invalid'
+      ? '이 종목의 데이터 형식이 올바르지 않아 홈에서 계산할 수 없어요.'
+      : '현재 시세를 불러오지 못해 이 종목의 손익을 계산하지 못했어요.'
+
+  return {
+    ...holding,
+    badge: label,
+    badgeTone: 'red',
+    cardTone: 'danger',
+    signalTone: holding.kind === 'etf' ? 'etf' : 'danger',
+    change: label,
+    pnl: '-',
+    centerScore: '오류',
+    centerScoreColor: '#F09595',
+    centerBadge: label,
+    centerBadgeTone: 'red',
+    heatmapChange: undefined,
+    heatmapMeta: kind === 'fx-required' ? '수익률 대기' : '재시도 필요',
+    heatmapBadge: label,
+    heatmapBadgeTone: 'red',
+    blink: holding.kind === 'etf' ? undefined : true,
+    opinionLabel: '오류 안내',
+    opinionText: description,
+    opinionBackground: '#FFF0F0',
+    opinionBorder: '#F7C1C1',
+    opinionTextColor: '#791F1F',
+    metaLine: `${holding.metaLine} · ${label}`,
+    metrics: upsertMetric(
+      upsertMetric(
+        upsertMetric(holding.metrics, '현재가', '-', 'danger'),
+        '평가 금액',
+        '-',
+        'danger',
+      ),
+      '수익률',
+      kind === 'fx-required' ? '환율 필요' : '-',
+      'danger',
+    ),
+  }
 }
 
 export function applyCurrentQuotesToHomeHoldings(
