@@ -320,3 +320,31 @@ test('deepscan client snapshot은 explicit target이 없으면 applied home port
     restoreWindow()
   }
 })
+
+test('home holdings builder maps manual KR/US market selections to home market tones', () => {
+  const [krHolding, usHolding] = buildHomeHoldingsFromOcrRows([
+    {
+      name: '삼성전자',
+      quantity: '10주',
+      averagePrice: '80,000원',
+      resolvedName: '삼성전자',
+      resolvedCode: '005930',
+      resolvedMarket: 'KR',
+      resolvedKind: 'stock',
+    },
+    {
+      name: '팔란티어',
+      quantity: '3주',
+      averagePrice: '$95.00',
+      resolvedName: 'Palantir Technologies Inc.',
+      resolvedTicker: 'PLTR',
+      resolvedMarket: 'US',
+      resolvedKind: 'stock',
+    },
+  ])
+
+  assert.equal(krHolding?.market, 'KR')
+  assert.equal(krHolding?.marketTone, 'kospi')
+  assert.equal(usHolding?.market, 'US')
+  assert.equal(usHolding?.marketTone, 'nasdaq')
+})

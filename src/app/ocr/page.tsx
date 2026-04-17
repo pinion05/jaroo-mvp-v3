@@ -114,6 +114,14 @@ function inferMarketTone(market?: string) {
     return undefined
   }
 
+  if (normalized === 'KR') {
+    return 'kospi'
+  }
+
+  if (normalized === 'US') {
+    return 'nasdaq'
+  }
+
   if (normalized.includes('KOSDAQ')) {
     return 'kosdaq'
   }
@@ -368,7 +376,11 @@ function OcrResolvedRowCard({
             </label>
             <label className='space-y-1'>
               <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>시장</span>
-              <input value={row.resolvedMarket ?? ''} onChange={(event) => onManualFieldChange('resolvedMarket', event.target.value)} placeholder='KOSPI / NASDAQ' className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]' />
+              <select value={row.resolvedMarket ?? ''} onChange={(event) => onManualFieldChange('resolvedMarket', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]'>
+                <option value=''>선택</option>
+                <option value='KR'>KR</option>
+                <option value='US'>US</option>
+              </select>
             </label>
             <label className='space-y-1'>
               <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>종목 유형</span>
