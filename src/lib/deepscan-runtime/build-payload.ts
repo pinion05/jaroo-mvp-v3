@@ -459,7 +459,7 @@ const US_AGENT_META: Record<UsMemberKey, Pick<DeepScanAgentResult, 'label' | 'sh
   'portfolio-fit': { label: 'Position Fit', shortLabel: 'FIT', iconTone: 'teal' },
 }
 
-function buildUsAgentResultsFromLlm(results: Record<UsMemberKey, { score: number; reason: string; confidence: 'low' | 'medium' | 'high' }>): DeepScanAgentResult[] {
+function buildUsAgentResultsFromLlm(results: Partial<Record<UsMemberKey, { score: number; reason: string; confidence: 'low' | 'medium' | 'high' }>>): DeepScanAgentResult[] {
   return (Object.entries(results) as Array<[UsMemberKey, { score: number; reason: string; confidence: 'low' | 'medium' | 'high' }]>)
     .map(([key, result]) => ({
       key,
@@ -868,10 +868,17 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
   let agentResults: DeepScanAgentResult[]
   let llmDebugId: string | undefined
 
+  let llmErrors: Array<{ member: string; error: string }> = []
+
   try {
     const llm = await scoreUsCommitteeFromGeneratedDump(rawInput, ticker)
     agentResults = buildUsAgentResultsFromLlm(llm.results)
     llmDebugId = llm.artifacts.manifest.requestId
+    llmErrors = llm.errors
+
+    if (agentResults.length === 0) {
+      throw new Error(llm.errors.map((entry) => `${entry.member}: ${entry.error}`).join(' | ') || 'US LLM runtime returned no successful members')
+    }
   } catch (error) {
     return createUsRuntimeFailurePayload(
       rawInput,
@@ -890,13 +897,13 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
   const strategy = buildUsStrategy(heroScore, facts, rawInput)
   const sellNow = buildUsSellNow(heroScore, facts, rawInput)
   const portfolioSimulation = buildUsPortfolioSimulation(heroScore, sellNow)
-  const degraded = agentResults.some((agent) => agent.confidence === 'low')
+  const degraded = agentResults.some((agent) => agent.confidence === 'low') || llmErrors.length > 0
   const sourceContextFrom = normalizeSourceFrom(rawInput.sourceContext.from)
   const sourceRefsWithPayload = [
     ...sourceRefs,
     createSourceRef('report', `us-slim:${ticker}`, 'WiseReport Global slim v1.1', facts.consensus?.asOfDate),
     createSourceRef('market', `us-price:${ticker}`, 'latest price from slim snapshot'),
-    createSourceRef('system', `us-llm:${ticker}`, 'OpenRouter US committee runtime', llmDebugId),
+    createSourceRef('system', `us-llm:${ticker}`, 'OpenRouter US committee runtime', llmDebugId ?? (llmErrors.length > 0 ? `${llmErrors.length} member failures` : undefined)),
   ]
 
   const payload = {
@@ -912,7 +919,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
       sourceContext: { from: sourceContextFrom },
     },
     hero: {
-      ...createBlockMeta('ok', sourceRefsWithPayload, degraded ? { fallback: createFallback('weak-data-degradation', '일부 근거 부족') } : undefined),
+      ...createBlockMeta('ok', sourceRefsWithPayload, degraded ? { fallback: createFallback('weak-data-degradation', llmErrors.length > 0 ? `일부 위원 실패 ${llmErrors.length}건` : '일부 근거 부족') } : undefined),
       headline: `${name} US DeepScan ${heroScore}점`,
       body: [
         `현재가 ${formatCurrency(facts.currentPrice, facts.currency)} 확인`,
@@ -925,7 +932,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
       scoreDelta: degraded ? '-1' : '+0',
     },
     committee: {
-      ...createBlockMeta('ok', sourceRefsWithPayload, degraded ? { fallback: createFallback('weak-data-degradation', '일부 위원은 low-confidence') } : undefined),
+      ...createBlockMeta('ok', sourceRefsWithPayload, degraded ? { fallback: createFallback('weak-data-degradation', llmErrors.length > 0 ? `일부 위원 실패 ${llmErrors.length}건` : '일부 위원은 low-confidence') } : undefined),
       axes,
     },
     insights: {
