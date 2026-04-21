@@ -1,3 +1,5 @@
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { join } from 'node:path'
 import type { DeepScanRawInputForDump } from './us-dump-contract-runtime'
 import { generateUsDumpContractArtifacts } from './us-dump-contract-runtime'
 
@@ -199,6 +201,7 @@ export async function scoreUsCommitteeMember(
     throw new Error('OPENROUTER_API_KEY is not configured.')
   }
 
+  const t0 = Date.now()
   let upstreamResponse: Response
   try {
     upstreamResponse = await fetch(OPENROUTER_URL, {
@@ -261,11 +264,30 @@ export async function scoreUsCommitteeMember(
     throw new Error(`OpenRouter returned invalid committee schema for ${member}`)
   }
 
+  const elapsed = Date.now() - t0
+  const logEntry = {
+    member,
+    model,
+    elapsed_ms: elapsed,
+    status: upstreamResponse.status,
+    raw_content: rawContent,
+    parsed,
+    coerced,
+    timestamp: new Date().toISOString(),
+  }
+
+  // Write individual member log
+  const logDir = join(process.cwd(), '.omx', 'context', 'committee-debug-logs')
+  mkdirSync(logDir, { recursive: true })
+  writeFileSync(join(logDir, `${member}.json`), JSON.stringify(logEntry, null, 2))
+
   return coerced
 }
 
 export async function scoreUsCommitteeFromGeneratedDump(rawInput: DeepScanRawInputForDump, ticker: string) {
+  const totalT0 = Date.now()
   const artifacts = await generateUsDumpContractArtifacts(rawInput, ticker)
+  const dumpElapsed = Date.now() - totalT0
   const shared = artifacts.runtimeShape.shared
   const members = artifacts.runtimeShape.members as Record<UsMemberKey, unknown>
 
@@ -279,6 +301,19 @@ export async function scoreUsCommitteeFromGeneratedDump(rawInput: DeepScanRawInp
       return [member, result] as const
     }),
   )
+
+  const totalElapsed = Date.now() - totalT0
+  const summaryLog = {
+    ticker,
+    model: process.env.DEEPSCAN_LLM_MODEL || process.env.OCR_MODEL || 'qwen/qwen3.5-flash-02-23',
+    dump_generation_ms: dumpElapsed,
+    total_llm_ms: totalElapsed - dumpElapsed,
+    total_ms: totalElapsed,
+    members: Object.fromEntries(results.map(([k, v]) => [k, { score: v.score, confidence: v.confidence, reason_preview: v.reason.slice(0, 80) }])),
+    timestamp: new Date().toISOString(),
+  }
+  const logDir = join(process.cwd(), '.omx', 'context', 'committee-debug-logs')
+  writeFileSync(join(logDir, '_summary.json'), JSON.stringify(summaryLog, null, 2))
 
   return {
     artifacts,
