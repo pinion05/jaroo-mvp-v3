@@ -244,6 +244,8 @@ def main():
         ownership_total_direct_events = ownership_counts.get('totalDirectEvents', 0)
         ownership_recent_filings = ownership.get('recentFilings') or []
         ohlc_series = ohlc.get('series') or []
+        per_value = metrics.get('per') if isinstance(metrics, dict) else None
+        per_quality = None if per_value is not None else quality('missing', reason_codes=['missing_metric_per'], severity='medium', actionability='caution')
         labels = ['시가총액','자산총계','자본총계','매출액','영업이익','당기순이익','영업활동현금흐름','CAPEX','Free Cash Flow','매출총이익률','영업이익률','순이익률','ROA','BPS']
         rowmap = {label: row_index(fs_rows, label) for label in labels}
 
@@ -287,7 +289,7 @@ def main():
         member['valuation'] = {**make_member_base('valuation', 'business-quality', instrument), 'facts': {
             'currentPrice': mk('quotes', {'kind': 'field', 'path': '$.data.items[0].price'}, {'amount': quote_item['price'], 'currency': quote_item.get('currency'), 'asOf': quote_item.get('asOf'), 'kind': 'market_quote'}),
             'marketCapSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['시가총액'][0]}].cells"}, map_cell_record_to_series(rowmap['시가총액'][1]['cells'])),
-            'per': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].per'}, metrics['per']),
+            'per': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].per'}, per_value, per_quality),
             'pbr': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].pbr'}, metrics['pbr']),
             'eps': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].eps'}, metrics['eps']),
             'bpsSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['BPS'][0]}].cells"}, map_cell_record_to_series(rowmap['BPS'][1]['cells'])),
