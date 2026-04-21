@@ -33,7 +33,7 @@ export type DebugSourceSelector =
   | { kind: 'runtime_input'; path: string }
 
 export type DebugSource = {
-  sourceAlias: 'slim' | 'quotes' | 'financials' | 'consensus' | 'news' | 'market' | 'report' | 'runtime-input'
+  sourceAlias: 'slim' | 'quotes' | 'financials' | 'consensus' | 'news' | 'market' | 'report' | 'ownership' | 'ohlc' | 'runtime-input'
   rawFile: string
   requestPath: string
   selector: DebugSourceSelector

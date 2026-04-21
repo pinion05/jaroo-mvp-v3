@@ -217,6 +217,8 @@ def main():
             'news': f'/api/source/polygon-finnhub-wisereport-global/us/stocks/{ticker}/news?limit=3',
             'market': '/api/source/polygon-yahoo/us/market/indicators',
             'report': f'/api/source/fmp-polygon-finnhub-sec-edgar-yahoo-wisereport-global/us/stocks/{ticker}/report?newsLimit=3&filingsLimit=2',
+            'ownership': f'/api/source/sec-edgar/us/stocks/{ticker}/ownership-flow?limit=6&recentDays=180',
+            'ohlc': f'/api/source/fmp/us/stocks/{ticker}/ohlc?limit=60',
         }
         raw = {key: fetch_json(path) for key, path in paths.items()}
         for key, value in raw.items():
@@ -229,12 +231,19 @@ def main():
         news = raw['news']['data']
         market = raw['market']['data']
         report = raw['report']['data']
+        ownership = raw['ownership']['data']
+        ohlc = raw['ohlc']['data']
         fs_rows = slim['pages']['snap']['financialSummary']['rows']
         metrics = slim['pages']['analysis']['metrics'][0]
         returns = slim['pages']['analysis']['returns'][0]
         obs = slim['pages']['consensus']['observations'][-1]
         price_row = slim['pages']['snap']['priceVolume']['rows'][-1]
         quote_item = quotes['items'][0]
+        ownership_summary = ownership.get('summary') or {}
+        ownership_counts = ownership_summary.get('counts') if isinstance(ownership_summary.get('counts'), dict) else {}
+        ownership_total_direct_events = ownership_counts.get('totalDirectEvents', 0)
+        ownership_recent_filings = ownership.get('recentFilings') or []
+        ohlc_series = ohlc.get('series') or []
         labels = ['시가총액','자산총계','자본총계','매출액','영업이익','당기순이익','영업활동현금흐름','CAPEX','Free Cash Flow','매출총이익률','영업이익률','순이익률','ROA','BPS']
         rowmap = {label: row_index(fs_rows, label) for label in labels}
 
@@ -304,8 +313,16 @@ def main():
             'returns1y': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.returns[0].1y'}, returns['1y']),
             'nasdaqChangePct': mk('market', {'kind': 'field', 'path': '$.data.summary.nasdaqChangePct'}, market['summary']['nasdaqChangePct']),
             'sp500Above200Sma': mk('market', {'kind': 'field', 'path': '$.data.summary.sp500Above200Sma'}, market['summary']['sp500Above200Sma']),
-            'ohlcSeries': mk('slim', {'kind': 'derived', 'note': 'not available in current US-first source set'}, None, quality('missing', reason_codes=['no_ohlc_series'], severity='medium', actionability='caution')),
-        }}
+            'ohlcSeries': mk(
+                'ohlc',
+                {'kind': 'slice', 'path': '$.data.series', 'start': 0, 'end': min(len(ohlc_series), 60)},
+                ohlc_series if len(ohlc_series) > 0 else None,
+                quality('present', derivation_kind='direct', reason_codes=['fmp_primary_ohlc'], severity='low', actionability='usable') if len(ohlc_series) > 0 else quality('missing', reason_codes=['no_ohlc_series'], severity='medium', actionability='caution'),
+                notes=['FMP primary OHLC series'] if len(ohlc_series) > 0 else None,
+            ),
+        }, 'issues': [x for x in [
+            issue('facts.ohlcSeries', 'missing', reason_codes=['no_ohlc_series'], severity='medium', actionability='caution') if len(ohlc_series) == 0 else None,
+        ] if x]}
         member['estimate-revision'] = {**make_member_base('estimate-revision', 'market-timing', instrument), 'facts': {
             'spotPriceConsensus': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val1'}, {'amount': obs['metrics']['val1'], 'currency': slim['company']['currency'], 'kind': 'consensus_spot'}, quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
             'spotPriceMarket': mk('quotes', {'kind': 'field', 'path': '$.data.items[0].price'}, {'amount': quote_item['price'], 'currency': quote_item.get('currency'), 'asOf': quote_item.get('asOf'), 'kind': 'market_quote'}),
@@ -341,10 +358,25 @@ def main():
             'roe': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].roe'}, metrics['roe']),
         }}
         member['ownership-flow'] = {**make_member_base('ownership-flow', 'position-fit', instrument), 'facts': {
-            'directOwnershipFlow': mk('consensus', {'kind': 'derived', 'note': 'not available in current US-first source set'}, None, quality('unavailable', derivation_kind='proxy', reason_codes=['no_direct_flow_data'], severity='high', actionability='do_not_use')),
+            'directOwnershipFlow': mk(
+                'ownership',
+                {'kind': 'field', 'path': '$.data.summary'},
+                {
+                    'source': ownership_summary.get('source') or ownership.get('source'),
+                    'recentDays': ownership_summary.get('recentDays') or ownership.get('recentDays'),
+                    'signal': ownership_summary.get('signal'),
+                    'counts': ownership_summary.get('counts'),
+                    'latestDates': ownership_summary.get('latestDates'),
+                    'filings': ownership_recent_filings[:4],
+                } if ownership_total_direct_events > 0 else None,
+                quality('present', derivation_kind='direct', reason_codes=['sec_direct_disclosure_summary'], severity='medium', actionability='caution') if ownership_total_direct_events > 0 else quality('missing', derivation_kind='direct', reason_codes=['no_recent_direct_ownership_filings'], severity='medium', actionability='caution'),
+                notes=['SEC direct filing activity summary'] if ownership_total_direct_events > 0 else None,
+            ),
             'proxyPeerContext': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.peerGroup'}, {'memberCount': len((slim['pages']['analysis'].get('peerGroup') or {}).get('members', [])) if isinstance(slim['pages']['analysis'].get('peerGroup'), dict) else None, 'availabilityStatus': ((slim['pages']['analysis'].get('peerGroup') or {}).get('availability') or {}).get('status') if isinstance(slim['pages']['analysis'].get('peerGroup'), dict) else None}, quality('present', derivation_kind='proxy', reason_codes=['peer_context_only'])),
             'peerMembers': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.peers'}, slim['pages']['analysis'].get('peers'), quality('present', derivation_kind='proxy', reason_codes=['peer_context_only'])),
-        }, 'issues': [issue('facts.directOwnershipFlow', 'unavailable', reason_codes=['no_direct_flow_data'], derivation_kind='proxy', severity='high', actionability='do_not_use')]}
+        }, 'issues': [x for x in [
+            issue('facts.directOwnershipFlow', 'missing', reason_codes=['no_recent_direct_ownership_filings'], derivation_kind='direct', severity='medium', actionability='caution') if ownership_total_direct_events == 0 else None,
+        ] if x]}
         member['portfolio-fit'] = {**make_member_base('portfolio-fit', 'position-fit', instrument), 'holdingContext': holding_context, 'facts': {
             'currentPrice': mk('quotes', {'kind': 'field', 'path': '$.data.items[0].price'}, {'amount': quote_item['price'], 'currency': quote_item.get('currency'), 'asOf': quote_item.get('asOf'), 'kind': 'market_quote'}),
             'marketCapSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{row_index(fs_rows,'시가총액')[0]}].cells"}, map_cell_record_to_series(row_index(fs_rows,'시가총액')[1]['cells'])),

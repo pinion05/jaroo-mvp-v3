@@ -89,6 +89,37 @@ type UsDeepScanFacts = {
   consensus?: ReturnType<typeof decodeUsConsensusObservation>
 }
 
+type RuntimeDumpQuality = {
+  availability?: string
+  derivationKind?: string
+  actionability?: string
+  reasonCode?: string[]
+}
+
+type RuntimeDumpFact<T = unknown> = {
+  value?: T
+  quality?: RuntimeDumpQuality
+  notes?: string[]
+}
+
+type GeneratedDumpSignalSummary = {
+  momentum: {
+    availability: string
+    pointCount: number
+    latestDate?: string
+    latestClose?: number
+    primarySource: 'fmp' | 'unknown'
+  } | null
+  ownershipFlow: {
+    availability: string
+    summary?: string
+    direction?: string
+    eventCount: number
+    latestEventDate?: string
+    primarySource: string
+  } | null
+}
+
 function asRecord(value: unknown): UnknownRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : null
 }
@@ -131,6 +162,60 @@ function parseNumberish(value: unknown) {
 
   const parsed = Number(cleaned)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function readRuntimeDumpFact<T>(memberDump: unknown, factKey: string): RuntimeDumpFact<T> | null {
+  const facts = asRecord(asRecord(memberDump)?.facts)
+  const fact = asRecord(facts?.[factKey])
+  if (!fact) {
+    return null
+  }
+
+  return {
+    value: fact.value as T,
+    quality: asRecord(fact.quality) as RuntimeDumpQuality | undefined,
+    notes: Array.isArray(fact.notes) ? fact.notes.filter((note): note is string => typeof note === 'string') : undefined,
+  }
+}
+
+export function summarizeGeneratedDumpSignals(runtimeShape: unknown): GeneratedDumpSignalSummary {
+  const members = asRecord(asRecord(runtimeShape)?.members)
+  const momentumDump = members?.momentum
+  const ownershipDump = members?.['ownership-flow']
+
+  const ohlcFact = readRuntimeDumpFact<Array<Record<string, unknown>>>(momentumDump, 'ohlcSeries')
+  const ohlcSeries = Array.isArray(ohlcFact?.value) ? ohlcFact.value : []
+  const latestOhlc = asRecord(ohlcSeries[0])
+  const directOwnershipFact = readRuntimeDumpFact<Record<string, unknown>>(ownershipDump, 'directOwnershipFlow')
+  const ownershipValue = asRecord(directOwnershipFact?.value)
+  const ownershipSignal = asRecord(ownershipValue?.signal)
+  const ownershipCounts = asRecord(ownershipValue?.counts)
+  const ownershipLatestDates = asRecord(ownershipValue?.latestDates)
+  const ohlcReasonCodes = Array.isArray(ohlcFact?.quality?.reasonCode)
+    ? ohlcFact?.quality?.reasonCode
+    : []
+
+  return {
+    momentum: ohlcFact
+      ? {
+          availability: normalizeText(ohlcFact.quality?.availability) ?? 'missing',
+          pointCount: ohlcSeries.length,
+          latestDate: normalizeText(latestOhlc?.date) ?? undefined,
+          latestClose: asFiniteNumber(latestOhlc?.close) ?? undefined,
+          primarySource: ohlcReasonCodes.includes('fmp_primary_ohlc') ? 'fmp' : 'unknown',
+        }
+      : null,
+    ownershipFlow: directOwnershipFact
+      ? {
+          availability: normalizeText(directOwnershipFact.quality?.availability) ?? 'missing',
+          summary: normalizeText(ownershipSignal?.summary) ?? undefined,
+          direction: normalizeText(ownershipSignal?.direction) ?? undefined,
+          eventCount: asFiniteNumber(ownershipCounts?.totalDirectEvents) ?? 0,
+          latestEventDate: normalizeText(ownershipLatestDates?.latestEvent) ?? undefined,
+          primarySource: normalizeText(ownershipValue?.source) ?? 'unknown',
+        }
+      : null,
+  }
 }
 
 function clamp(value: number, min = 0, max = 100) {
@@ -561,25 +646,60 @@ function buildHeroScore(agentResults: DeepScanAgentResult[]) {
   return clamp(weightedTotal / 100)
 }
 
-function buildUsInsights(facts: UsDeepScanFacts, agentResults: DeepScanAgentResult[]): { sectionLabel: string; items: JarooDeepScanInsightItem[]; summaryTags: string[] } {
-  const items = facts.news.slice(0, 3).map((item) => ({
+function buildUsInsights(
+  facts: UsDeepScanFacts,
+  agentResults: DeepScanAgentResult[],
+  generatedSignals: GeneratedDumpSignalSummary,
+): { sectionLabel: string; items: JarooDeepScanInsightItem[]; summaryTags: string[] } {
+  const items: JarooDeepScanInsightItem[] = []
+
+  if (generatedSignals.ownershipFlow?.availability === 'present' && generatedSignals.ownershipFlow.eventCount > 0) {
+    items.push({
+      sourceType: 'report',
+      sourceLabel: 'Ownership Flow',
+      date: generatedSignals.ownershipFlow.latestEventDate ?? '최근 공시 기준',
+      label: 'Ownership',
+      title: generatedSignals.ownershipFlow.summary ?? '최근 direct ownership/flow 공시가 포착됐어요.',
+      body: `${generatedSignals.ownershipFlow.primarySource} 기준 최근 공시 ${generatedSignals.ownershipFlow.eventCount}건 · 방향 ${generatedSignals.ownershipFlow.direction ?? 'mixed'}`,
+    })
+  }
+
+  if (generatedSignals.momentum?.availability === 'present' && generatedSignals.momentum.pointCount > 0) {
+    items.push({
+      sourceType: 'market',
+      sourceLabel: 'OHLC',
+      date: generatedSignals.momentum.latestDate ?? '최근 시세 기준',
+      label: 'OHLC',
+      title: `FMP OHLC ${generatedSignals.momentum.pointCount}개 봉을 반영했어요.`,
+      body: `최신 종가 ${formatCurrency(generatedSignals.momentum.latestClose, facts.currency)} · ${generatedSignals.momentum.latestDate ?? '최근'} 기준`,
+    })
+  }
+
+  items.push(...facts.news.slice(0, Math.max(0, 3 - items.length)).map((item) => ({
     sourceType: 'news' as const,
     sourceLabel: 'US News',
     date: item.publishedAt ?? '발행시각 미확인',
     label: '뉴스',
     title: item.title,
     body: `${facts.companyName} 관련 최근 헤드라인입니다.`,
-  }))
+  })))
 
   const tags = agentResults
     .filter((agent) => agent.score >= 70 || agent.score <= 40)
     .slice(0, 3)
     .map((agent) => `${agent.label}:${agent.score}`)
 
+  if (generatedSignals.ownershipFlow?.availability === 'present' && generatedSignals.ownershipFlow.eventCount > 0) {
+    tags.unshift(`Ownership:${generatedSignals.ownershipFlow.eventCount}`)
+  }
+  if (generatedSignals.momentum?.availability === 'present' && generatedSignals.momentum.pointCount > 0) {
+    tags.unshift(`OHLC:${generatedSignals.momentum.pointCount}`)
+  }
+
   return {
     sectionLabel: '이번 주 체크포인트',
-    items,
-    summaryTags: tags,
+    items: items.slice(0, 3),
+    summaryTags: tags.slice(0, 3),
   }
 }
 
@@ -869,12 +989,14 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
   let llmDebugId: string | undefined
 
   let llmErrors: Array<{ member: string; error: string }> = []
+  let generatedSignals: GeneratedDumpSignalSummary = { momentum: null, ownershipFlow: null }
 
   try {
     const llm = await scoreUsCommitteeFromGeneratedDump(rawInput, ticker)
     agentResults = buildUsAgentResultsFromLlm(llm.results)
     llmDebugId = llm.artifacts.manifest.requestId
     llmErrors = llm.errors
+    generatedSignals = summarizeGeneratedDumpSignals(llm.artifacts.runtimeShape)
 
     if (agentResults.length === 0) {
       throw new Error(llm.errors.map((entry) => `${entry.member}: ${entry.error}`).join(' | ') || 'US LLM runtime returned no successful members')
@@ -893,7 +1015,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
 
   const heroScore = buildHeroScore(agentResults)
   const axes = buildAxes(agentResults)
-  const insights = buildUsInsights(facts, agentResults)
+  const insights = buildUsInsights(facts, agentResults, generatedSignals)
   const strategy = buildUsStrategy(heroScore, facts, rawInput)
   const sellNow = buildUsSellNow(heroScore, facts, rawInput)
   const portfolioSimulation = buildUsPortfolioSimulation(heroScore, sellNow)
@@ -903,8 +1025,25 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
     ...sourceRefs,
     createSourceRef('report', `us-slim:${ticker}`, 'WiseReport Global slim v1.1', facts.consensus?.asOfDate),
     createSourceRef('market', `us-price:${ticker}`, 'latest price from slim snapshot'),
+    ...(generatedSignals.momentum?.availability === 'present'
+      ? [createSourceRef('market', `us-ohlc:${ticker}`, `FMP OHLC ${generatedSignals.momentum.pointCount} bars`, generatedSignals.momentum.latestDate)]
+      : []),
+    ...(generatedSignals.ownershipFlow?.availability === 'present'
+      ? [createSourceRef('report', `us-ownership:${ticker}`, generatedSignals.ownershipFlow.summary ?? 'SEC ownership/flow summary', generatedSignals.ownershipFlow.latestEventDate)]
+      : []),
     createSourceRef('system', `us-llm:${ticker}`, 'OpenRouter US committee runtime', llmDebugId ?? (llmErrors.length > 0 ? `${llmErrors.length} member failures` : undefined)),
   ]
+
+  const heroBodyParts = [
+    `현재가 ${formatCurrency(facts.currentPrice, facts.currency)} 확인`,
+    `forward PER ${formatNumber(facts.consensus?.forwardPer ?? facts.per, 1)} / PBR ${formatNumber(facts.consensus?.forwardPbr ?? facts.pbr, 1)}`,
+    generatedSignals.momentum?.availability === 'present'
+      ? `FMP OHLC ${generatedSignals.momentum.pointCount}개 반영`
+      : `최근 뉴스 ${facts.news.length}건 반영`,
+    generatedSignals.ownershipFlow?.availability === 'present' && generatedSignals.ownershipFlow.eventCount > 0
+      ? `${generatedSignals.ownershipFlow.primarySource} ownership 공시 ${generatedSignals.ownershipFlow.eventCount}건`
+      : null,
+  ].filter((part): part is string => Boolean(part))
 
   const payload = {
     input: {
@@ -921,11 +1060,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
     hero: {
       ...createBlockMeta('ok', sourceRefsWithPayload, degraded ? { fallback: createFallback('weak-data-degradation', llmErrors.length > 0 ? `일부 위원 실패 ${llmErrors.length}건` : '일부 근거 부족') } : undefined),
       headline: `${name} US DeepScan ${heroScore}점`,
-      body: [
-        `현재가 ${formatCurrency(facts.currentPrice, facts.currency)} 확인`,
-        `forward PER ${formatNumber(facts.consensus?.forwardPer ?? facts.per, 1)} / PBR ${formatNumber(facts.consensus?.forwardPbr ?? facts.pbr, 1)}`,
-        `최근 뉴스 ${facts.news.length}건 반영`,
-      ].join(' · '),
+      body: heroBodyParts.join(' · '),
       statusText: axisStatus(heroScore),
       score: heroScore,
       scoreLabel: `${heroScore >= 70 ? 'strong' : heroScore >= 55 ? 'moderate' : 'caution'} · ${heroScore} / 100`,

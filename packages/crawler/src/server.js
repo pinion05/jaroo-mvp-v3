@@ -30,6 +30,8 @@ import {
   getUSFinancials,
   getUSMarketIndicators,
   getUSNews,
+  getUSOhlc,
+  getUSOwnershipFlow,
   getUSStockReportData,
   runTriggerBatch,
 } from './index.js';
@@ -2109,6 +2111,75 @@ const endpointDefinitions = [
     params: ['ticker'],
     query: [],
     handler: async (req) => getUSConsensus(req.params.ticker),
+  },
+  {
+    id: 'us-stock-ownership-flow',
+    resource: 'us-stock.ownership-flow',
+    description: '미국주식 ownership/flow direct filing activity 요약을 반환합니다.',
+    primaryPath: buildDataSourcePath('sec-edgar', '/us/stocks/:ticker/ownership-flow'),
+    dataSources: ['sec-edgar'],
+    params: ['ticker'],
+    query: ['limit(optional, default=12)', 'recentDays(optional, default=180)'],
+    count: (data) => Array.isArray(data?.recentFilings) ? data.recentFilings.length : 0,
+    handler: async (req) => {
+      const limitRaw = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
+      const recentDaysRaw = Array.isArray(req.query.recentDays) ? req.query.recentDays[0] : req.query.recentDays;
+      const options = {};
+
+      if (limitRaw != null && String(limitRaw).trim()) {
+        const limit = Number(limitRaw);
+        if (!Number.isInteger(limit) || limit < 1) {
+          throw new HttpError(400, 'invalid query: limit', {
+            key: 'limit',
+            value: String(limitRaw),
+            expected: 'positive integer',
+          });
+        }
+        options.limit = limit;
+      }
+
+      if (recentDaysRaw != null && String(recentDaysRaw).trim()) {
+        const recentDays = Number(recentDaysRaw);
+        if (!Number.isInteger(recentDays) || recentDays < 1) {
+          throw new HttpError(400, 'invalid query: recentDays', {
+            key: 'recentDays',
+            value: String(recentDaysRaw),
+            expected: 'positive integer',
+          });
+        }
+        options.recentDays = recentDays;
+      }
+
+      return getUSOwnershipFlow(req.params.ticker, options);
+    },
+  },
+  {
+    id: 'us-stock-ohlc',
+    resource: 'us-stock.ohlc',
+    description: '미국주식 FMP-primary OHLC 시계열을 반환합니다.',
+    primaryPath: buildDataSourcePath('fmp', '/us/stocks/:ticker/ohlc'),
+    dataSources: ['fmp'],
+    params: ['ticker'],
+    query: ['limit(optional, default=60)'],
+    count: (data) => Array.isArray(data?.series) ? data.series.length : 0,
+    handler: async (req) => {
+      const limitRaw = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;
+      const options = {};
+
+      if (limitRaw != null && String(limitRaw).trim()) {
+        const limit = Number(limitRaw);
+        if (!Number.isInteger(limit) || limit < 1) {
+          throw new HttpError(400, 'invalid query: limit', {
+            key: 'limit',
+            value: String(limitRaw),
+            expected: 'positive integer',
+          });
+        }
+        options.limit = limit;
+      }
+
+      return getUSOhlc(req.params.ticker, options);
+    },
   },
   {
     id: 'us-stock-news',

@@ -75,6 +75,17 @@ export {
 } from './crawlers/us-consensus.js';
 
 export {
+  normalizeFmpOhlcPoint,
+  normalizeFmpOhlcSeries,
+  getUSOhlc,
+} from './crawlers/us-ohlc.js';
+
+export {
+  summarizeOwnershipFlowFromFilings,
+  getUSOwnershipFlow,
+} from './crawlers/us-ownership-flow.js';
+
+export {
   getPolygonNews,
   getFinnhubNews,
   getNewsSentiment,
