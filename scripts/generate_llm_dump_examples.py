@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import json
 import pathlib
 import re
@@ -7,7 +8,13 @@ from datetime import datetime, timezone
 from urllib.request import Request, urlopen
 
 BASE_URL = 'http://127.0.0.1:3040'
-TICKERS = sys.argv[1:] or ['NVDA']
+
+
+def parse_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('tickers', nargs='*', default=['NVDA'])
+    parser.add_argument('--runtime-input-file')
+    return parser.parse_args()
 
 
 def now_stamp():
@@ -149,14 +156,56 @@ def write_json(path, data):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
 
 
+def parse_numberish(value):
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str):
+        return None
+    normalized = value.strip().replace(',', '')
+    normalized = re.sub(r'[^0-9.+-]', '', normalized)
+    if not normalized:
+        return None
+    try:
+        return float(normalized)
+    except ValueError:
+        return None
+
+
+def load_runtime_input(path):
+    if not path:
+        return None
+    value = json.loads(pathlib.Path(path).read_text())
+    return value if isinstance(value, dict) else None
+
+
+def build_holding_context(runtime_input, quote_price):
+    holding = runtime_input.get('holding') if isinstance(runtime_input, dict) else None
+    source_codes = ['provided_runtime_input'] if isinstance(holding, dict) else ['example_holding']
+    shares = parse_numberish((holding or {}).get('shares')) if isinstance(holding, dict) else 12.0
+    average_price = parse_numberish((holding or {}).get('averagePrice')) if isinstance(holding, dict) else 185.0
+    evaluation_amount = parse_numberish((holding or {}).get('evaluationAmount')) if isinstance(holding, dict) else None
+    if evaluation_amount is None and shares is not None and quote_price is not None:
+        evaluation_amount = round(float(quote_price) * shares, 2)
+    return {
+        'shares': shares,
+        'averagePrice': average_price,
+        'evaluationAmount': evaluation_amount,
+        'reasonCodes': source_codes if isinstance(holding, dict) else source_codes + ['derived_from_example_defaults'],
+        'inputProvided': isinstance(holding, dict),
+    }
+
+
 def make_member_base(name, axis, instrument):
     return {'member': name, 'axis': axis, 'instrument': instrument, 'issues': []}
 
 
 def main():
+    args = parse_args()
+    tickers = args.tickers or ['NVDA']
+    runtime_input = load_runtime_input(args.runtime_input_file)
     stamp = now_stamp()
     root = pathlib.Path('.omx/context') / f'llm-deepscan-us-dump-contract-{stamp}'
-    for ticker in TICKERS:
+    for ticker in tickers:
         ticker_dir = root / ticker
         raw_dir = ticker_dir / 'raw'
         proc_dir = ticker_dir / 'processed'
@@ -198,10 +247,11 @@ def main():
                 notes,
             )
 
+        holding_input = build_holding_context(runtime_input, quote_item.get('price'))
         holding_context = {
-            'shares': mk('runtime-input', {'kind': 'runtime_input', 'path': '$.holding.shares'}, 12, quality('present', input_origin='runtime_input', reason_codes=['example_holding'])),
-            'averagePrice': mk('runtime-input', {'kind': 'runtime_input', 'path': '$.holding.averagePrice'}, 185.0, quality('present', input_origin='runtime_input', reason_codes=['example_holding'])),
-            'evaluationAmount': mk('runtime-input', {'kind': 'derived', 'note': 'quote price * example shares'}, round(float(quote_item['price']) * 12, 2), quality('present', derivation_kind='derived', input_origin='runtime_input', reason_codes=['derived_from_example_holding'])),
+            'shares': mk('runtime-input', {'kind': 'runtime_input', 'path': '$.holding.shares'}, holding_input['shares'], quality('present' if holding_input['shares'] is not None else 'missing', input_origin='runtime_input', reason_codes=holding_input['reasonCodes'])),
+            'averagePrice': mk('runtime-input', {'kind': 'runtime_input', 'path': '$.holding.averagePrice'}, holding_input['averagePrice'], quality('present' if holding_input['averagePrice'] is not None else 'missing', input_origin='runtime_input', reason_codes=holding_input['reasonCodes'])),
+            'evaluationAmount': mk('runtime-input', {'kind': 'derived', 'note': 'quote price * runtime shares'} if holding_input['inputProvided'] is False else {'kind': 'runtime_input', 'path': '$.holding.evaluationAmount'}, holding_input['evaluationAmount'], quality('present' if holding_input['evaluationAmount'] is not None else 'missing', derivation_kind='derived' if holding_input['inputProvided'] is False else None, input_origin='runtime_input', reason_codes=['derived_from_runtime_holding'] if holding_input['inputProvided'] is False else holding_input['reasonCodes'])),
         }
 
         instrument = {
@@ -310,7 +360,7 @@ def main():
         shared_runtime = strip_provenance(shared_debug)
         member_runtime = {k: strip_provenance(v) for k, v in member.items()}
         axis_runtime = {k: strip_provenance(v) for k, v in axis.items()}
-        write_json(raw_dir / 'runtime-input.json', {'holdingContext': holding_context})
+        write_json(raw_dir / 'runtime-input.json', {'holdingContext': holding_context, 'rawInput': runtime_input or {}})
         runtime_snapshot_path = 'processed/runtime-shape.json'
         runtime_shape = {'shared': shared_runtime, 'members': member_runtime, 'axes': axis_runtime}
         import hashlib

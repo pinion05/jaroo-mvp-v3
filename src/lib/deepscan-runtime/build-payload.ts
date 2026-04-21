@@ -12,6 +12,7 @@ import type {
   JarooDeepScanStrategyBlock,
 } from '../../../packages/contracts/src/deepscan'
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
+import { scoreUsCommitteeFromGeneratedDump, type UsMemberKey } from './llm-committee'
 import { decodeUsConsensusObservation } from './us-consensus'
 import { buildJarooDeepScanPayload as buildCrawlerDeepScanPayload } from '../../../packages/crawler/src/services/deepscan-payload.js'
 
@@ -134,14 +135,6 @@ function parseNumberish(value: unknown) {
 
 function clamp(value: number, min = 0, max = 100) {
   return Math.min(max, Math.max(min, Math.round(value)))
-}
-
-function ratio(numerator?: number | null, denominator?: number | null) {
-  if (typeof numerator !== 'number' || !Number.isFinite(numerator) || typeof denominator !== 'number' || !Number.isFinite(denominator) || denominator === 0) {
-    return null
-  }
-
-  return numerator / denominator
 }
 
 function signedPercent(value?: number | null) {
@@ -454,159 +447,28 @@ function verdictForScore(score: number): DeepScanAgentResult['verdict'] {
   return 'negative'
 }
 
-function confidenceForMissing(presentCount: number, expectedCount: number): DeepScanAgentResult['confidence'] {
-  const ratioPresent = expectedCount === 0 ? 1 : presentCount / expectedCount
-  if (ratioPresent >= 0.75) {
-    return 'high'
-  }
-  if (ratioPresent >= 0.4) {
-    return 'medium'
-  }
-  return 'low'
+const US_AGENT_META: Record<UsMemberKey, Pick<DeepScanAgentResult, 'label' | 'shortLabel' | 'iconTone'>> = {
+  valuation: { label: 'Valuation', shortLabel: 'VAL', iconTone: 'blue' },
+  growth: { label: 'Growth', shortLabel: 'GRW', iconTone: 'green' },
+  'profitability-quality': { label: 'Profitability', shortLabel: 'PQL', iconTone: 'teal' },
+  momentum: { label: 'Momentum', shortLabel: 'MOM', iconTone: 'amber' },
+  'estimate-revision': { label: 'Revision', shortLabel: 'REV', iconTone: 'purple' },
+  'event-risk': { label: 'Event Risk', shortLabel: 'EVT', iconTone: 'red' },
+  'financial-safety': { label: 'Safety', shortLabel: 'SAFE', iconTone: 'purple' },
+  'ownership-flow': { label: 'Ownership', shortLabel: 'OWN', iconTone: 'amber' },
+  'portfolio-fit': { label: 'Position Fit', shortLabel: 'FIT', iconTone: 'teal' },
 }
 
-function createAgentResult(input: Omit<DeepScanAgentResult, 'confidence' | 'verdict'> & { presentCount: number; expectedCount: number }) : DeepScanAgentResult {
-  const roundedScore = clamp(input.score)
-  return {
-    key: input.key,
-    label: input.label,
-    shortLabel: input.shortLabel,
-    score: roundedScore,
-    reason: input.reason,
-    confidence: confidenceForMissing(input.presentCount, input.expectedCount),
-    verdict: verdictForScore(roundedScore),
-    iconTone: input.iconTone,
-  }
-}
-
-function buildUsAgentResults(rawInput: DeepScanRawInput, facts: UsDeepScanFacts): DeepScanAgentResult[] {
-  const shares = parseNumberish(rawInput.holding?.shares)
-  const averagePrice = parseNumberish(rawInput.holding?.averagePrice)
-  const evaluationAmount = parseNumberish(rawInput.holding?.evaluationAmount)
-  const currentPrice = facts.currentPrice ?? facts.consensus?.spotPrice
-  const gapPct = typeof currentPrice === 'number' && typeof averagePrice === 'number' && averagePrice > 0
-    ? ((currentPrice - averagePrice) / averagePrice) * 100
-    : null
-  const equityRatio = ratio(facts.totalEquity, facts.totalAssets)
-  const margin = ratio(facts.operatingIncome, facts.revenue)
-
-  return [
-    createAgentResult({
-      key: 'valuation',
-      label: 'Valuation',
-      shortLabel: 'VAL',
-      score:
-        55
-        + (typeof facts.per === 'number' ? (facts.per < 20 ? 12 : facts.per < 35 ? 4 : -10) : 0)
-        + (typeof facts.pbr === 'number' ? (facts.pbr < 8 ? 8 : facts.pbr < 18 ? 2 : -8) : 0)
-        + (typeof facts.roe === 'number' ? (facts.roe > 20 ? 5 : 0) : 0),
-      reason: `PER ${formatNumber(facts.per, 1)} · PBR ${formatNumber(facts.pbr, 1)} · ROE ${formatNumber(facts.roe, 1)} 기준으로 밸류에이션 매력을 점검했어요.`,
-      presentCount: [facts.per, facts.pbr, facts.roe].filter((value) => typeof value === 'number').length,
-      expectedCount: 3,
-      iconTone: 'blue',
-    }),
-    createAgentResult({
-      key: 'growth',
-      label: 'Growth',
-      shortLabel: 'GRW',
-      score:
-        50
-        + (typeof facts.epsGrowth === 'number' ? clamp(facts.epsGrowth / 8, -12, 20) : 0)
-        + (typeof facts.consensus?.forecastRevenueRevisionPct === 'number' ? clamp(facts.consensus.forecastRevenueRevisionPct * 8, -10, 10) : 0),
-      reason: `EPS 성장률 ${signedPercent(facts.epsGrowth)} · 매출 추정 조정 ${signedPercent(facts.consensus?.forecastRevenueRevisionPct)} 흐름을 반영했어요.`,
-      presentCount: [facts.epsGrowth, facts.consensus?.forecastRevenueRevisionPct].filter((value) => typeof value === 'number').length,
-      expectedCount: 2,
-      iconTone: 'green',
-    }),
-    createAgentResult({
-      key: 'profitability-quality',
-      label: 'Profitability',
-      shortLabel: 'PQL',
-      score:
-        48
-        + (typeof margin === 'number' ? clamp(margin * 80, -10, 20) : 0)
-        + (typeof facts.roe === 'number' ? clamp(facts.roe / 4, -10, 20) : 0),
-      reason: `영업이익률 ${signedPercent(typeof margin === 'number' ? margin * 100 : null)} · ROE ${formatNumber(facts.roe, 1)} 기준으로 수익성 품질을 봤어요.`,
-      presentCount: [margin, facts.roe].filter((value) => typeof value === 'number').length,
-      expectedCount: 2,
-      iconTone: 'teal',
-    }),
-    createAgentResult({
-      key: 'financial-safety',
-      label: 'Safety',
-      shortLabel: 'SAFE',
-      score:
-        50
-        + (typeof equityRatio === 'number' ? clamp(equityRatio * 50, -10, 20) : 0)
-        + (typeof facts.totalAssets === 'number' && typeof facts.totalEquity === 'number' ? 5 : 0),
-      reason: `자본비율 ${signedPercent(typeof equityRatio === 'number' ? equityRatio * 100 : null)} 기준으로 재무 안정성을 점검했어요.`,
-      presentCount: [equityRatio, facts.totalAssets, facts.totalEquity].filter((value) => typeof value === 'number').length,
-      expectedCount: 3,
-      iconTone: 'purple',
-    }),
-    createAgentResult({
-      key: 'momentum',
-      label: 'Momentum',
-      shortLabel: 'MOM',
-      score:
-        50
-        + (typeof facts.returns1w === 'number' ? clamp(facts.returns1w, -10, 10) : 0)
-        + (typeof facts.returns3m === 'number' ? clamp(facts.returns3m / 2, -15, 15) : 0)
-        + (typeof facts.returns1y === 'number' ? clamp(facts.returns1y / 10, -15, 15) : 0),
-      reason: `1주 ${signedPercent(facts.returns1w)} · 3개월 ${signedPercent(facts.returns3m)} · 1년 ${signedPercent(facts.returns1y)} 수익률 흐름을 반영했어요.`,
-      presentCount: [facts.returns1w, facts.returns3m, facts.returns1y].filter((value) => typeof value === 'number').length,
-      expectedCount: 3,
-      iconTone: 'amber',
-    }),
-    createAgentResult({
-      key: 'estimate-revision',
-      label: 'Revision',
-      shortLabel: 'REV',
-      score:
-        50
-        + (typeof facts.consensus?.forecastRevenueRevisionPct === 'number' ? clamp(facts.consensus.forecastRevenueRevisionPct * 12, -12, 12) : 0)
-        + (typeof facts.consensus?.forecastEpsRevisionPct === 'number' ? clamp(facts.consensus.forecastEpsRevisionPct * 14, -14, 14) : 0)
-        + (typeof facts.consensus?.forecastBpsRevisionPct === 'number' ? clamp(facts.consensus.forecastBpsRevisionPct * 8, -8, 8) : 0),
-      reason: `매출/이익/BPS 추정치 조정률 ${signedPercent(facts.consensus?.forecastRevenueRevisionPct)} / ${signedPercent(facts.consensus?.forecastEpsRevisionPct)} / ${signedPercent(facts.consensus?.forecastBpsRevisionPct)}를 사용했어요.`,
-      presentCount: [facts.consensus?.forecastRevenueRevisionPct, facts.consensus?.forecastEpsRevisionPct, facts.consensus?.forecastBpsRevisionPct].filter((value) => typeof value === 'number').length,
-      expectedCount: 3,
-      iconTone: 'green',
-    }),
-    createAgentResult({
-      key: 'ownership-flow',
-      label: 'Ownership',
-      shortLabel: 'OWN',
-      score: 50,
-      reason: '현재 US slim 샘플은 직접적인 기관/내부자/숏 포지션 데이터를 충분히 주지 않아 neutral 기본값으로 유지했어요.',
-      presentCount: 0,
-      expectedCount: 1,
-      iconTone: 'blue',
-    }),
-    createAgentResult({
-      key: 'event-risk',
-      label: 'Event Risk',
-      shortLabel: 'EVT',
-      score: 55 - Math.min(facts.news.length * 2, 12),
-      reason: `최근 뉴스 ${facts.news.length}건을 event-risk 신호로 반영했어요.`,
-      presentCount: facts.news.length > 0 ? 1 : 0,
-      expectedCount: 1,
-      iconTone: 'red',
-    }),
-    createAgentResult({
-      key: 'portfolio-fit',
-      label: 'Portfolio Fit',
-      shortLabel: 'FIT',
-      score:
-        52
-        + (typeof gapPct === 'number' ? clamp(gapPct / 2, -16, 16) : 0)
-        + (typeof shares === 'number' ? 5 : 0)
-        + (typeof evaluationAmount === 'number' ? 5 : 0),
-      reason: `평단 대비 괴리 ${signedPercent(gapPct)} · 보유수량 ${formatNumber(shares)} · 평가금액 ${formatCurrency(evaluationAmount, facts.currency)} 기준으로 포지션 적합성을 봤어요.`,
-      presentCount: [gapPct, shares, evaluationAmount].filter((value) => typeof value === 'number').length,
-      expectedCount: 3,
-      iconTone: 'teal',
-    }),
-  ]
+function buildUsAgentResultsFromLlm(results: Record<UsMemberKey, { score: number; reason: string; confidence: 'low' | 'medium' | 'high' }>): DeepScanAgentResult[] {
+  return (Object.entries(results) as Array<[UsMemberKey, { score: number; reason: string; confidence: 'low' | 'medium' | 'high' }]>)
+    .map(([key, result]) => ({
+      key,
+      ...US_AGENT_META[key],
+      score: clamp(result.score),
+      reason: result.reason,
+      confidence: result.confidence,
+      verdict: verdictForScore(clamp(result.score)),
+    }))
 }
 
 function memberTone(agent: DeepScanAgentResult): JarooDeepScanCommitteeMember['tone'] {
@@ -825,6 +687,74 @@ function buildUsPortfolioSimulation(heroScore: number, sellNow: JarooDeepScanSel
   }
 }
 
+function createUsRuntimeFailurePayload(rawInput: DeepScanRawInput, ticker: string, name: string, generatedAt: string, sourceRefs: DeepScanSourceRef[], code: string, message: string): JarooDeepScanPayload {
+  const sourceContextFrom = normalizeSourceFrom(rawInput.sourceContext.from)
+  const fallback = createFallback(code, 'US LLM runtime 실패')
+  const error = createError(code, message, true)
+
+  return {
+    input: {
+      instrument: {
+        name,
+        ticker,
+        market: 'US',
+        kind: rawInput.instrument.kind,
+      },
+      holding: rawInput.holding,
+      selectedAt: rawInput.selectedAt,
+      sourceContext: { from: sourceContextFrom },
+    },
+    hero: {
+      ...createBlockMeta('error', sourceRefs, { fallback, error }),
+      headline: `${name} US DeepScan LLM 분석에 실패했어요`,
+      body: 'US LLM committee runtime을 완료하지 못해 DeepScan canonical payload 생성을 중단했어요.',
+      statusText: '요청 실패',
+      score: 0,
+      scoreLabel: 'Error · 0 / 100',
+      scoreDelta: '+0',
+    },
+    committee: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), axes: [] },
+    insights: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), sectionLabel: '이번 주 체크포인트', items: [], summaryTags: [] },
+    strategy: {
+      ...createBlockMeta('blocked', sourceRefs, { fallback, error }),
+      weekSignal: '대기',
+      weekSignalTone: 'warning',
+      weekBadgeText: 'LLM 실패',
+      scenarioLabel: '데이터 재요청 필요',
+      scenarioProbability: '0%',
+      scenarioPeriod: '대기',
+      scenarioCondition: '잠시 후 다시 시도해주세요.',
+      currentPriceText: 'N/A',
+      targetPriceText: 'N/A',
+      scenarioDetails: ['US LLM committee runtime 재요청이 필요해요.'],
+      otherScenarios: [],
+      otherScenarioTags: [],
+    },
+    sellNow: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), realizedText: '데이터가 없어 즉시 매도 판단을 계산하지 않았어요.', rows: [] },
+    portfolioSimulation: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), beforeScore: 0, afterScore: 0, deltaLabel: 'blocked:+0', caption: '데이터가 없어 포트폴리오 점수 변화를 계산하지 않았어요.' },
+    metadata: {
+      generatedAt,
+      version: 'deepscan-runtime-v1',
+      degraded: true,
+      errorCode: error.code,
+      debugId: `deepscan:US:${ticker}:llm`,
+      inputValidity: {
+        valid: true,
+        raw: buildInputValidityRaw(rawInput),
+      },
+      sourceRefs,
+      blockStatus: {
+        hero: 'error',
+        committee: 'blocked',
+        insights: 'blocked',
+        strategy: 'blocked',
+        sellNow: 'blocked',
+        portfolioSimulation: 'blocked',
+      },
+    },
+  } satisfies JarooDeepScanPayload
+}
+
 async function fetchUsSlimPayload(ticker: string) {
   const upstreamUrl = buildCrawlerUrl(getCrawlerBaseUrl(), `/api/major/wisereport-global/us/companies/${encodeURIComponent(ticker)}/slim/v1.1`)
   const response = await fetch(upstreamUrl, { cache: 'no-store' })
@@ -935,7 +865,25 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
   }
 
   const facts = findUsFacts(slimPayload, ticker)
-  const agentResults = buildUsAgentResults(rawInput, facts)
+  let agentResults: DeepScanAgentResult[]
+  let llmDebugId: string | undefined
+
+  try {
+    const llm = await scoreUsCommitteeFromGeneratedDump(rawInput, ticker)
+    agentResults = buildUsAgentResultsFromLlm(llm.results)
+    llmDebugId = llm.artifacts.manifest.requestId
+  } catch (error) {
+    return createUsRuntimeFailurePayload(
+      rawInput,
+      ticker,
+      name,
+      generatedAt,
+      [...sourceRefs, createSourceRef('system', 'deepscan-runtime-us-llm', 'US LLM committee runtime')],
+      'us-llm-runtime-failed',
+      error instanceof Error ? error.message : 'US LLM runtime failed',
+    )
+  }
+
   const heroScore = buildHeroScore(agentResults)
   const axes = buildAxes(agentResults)
   const insights = buildUsInsights(facts, agentResults)
@@ -948,6 +896,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
     ...sourceRefs,
     createSourceRef('report', `us-slim:${ticker}`, 'WiseReport Global slim v1.1', facts.consensus?.asOfDate),
     createSourceRef('market', `us-price:${ticker}`, 'latest price from slim snapshot'),
+    createSourceRef('system', `us-llm:${ticker}`, 'OpenRouter US committee runtime', llmDebugId),
   ]
 
   const payload = {
@@ -990,7 +939,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
       generatedAt,
       version: 'deepscan-runtime-v1',
       degraded,
-      debugId: `deepscan:US:${ticker}`,
+      debugId: llmDebugId ?? `deepscan:US:${ticker}:llm`,
       inputValidity: {
         valid: true,
         raw: buildInputValidityRaw(rawInput),
