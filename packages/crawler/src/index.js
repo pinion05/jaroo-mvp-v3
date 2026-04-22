@@ -75,6 +75,7 @@ export {
 } from './crawlers/us-consensus.js';
 
 export {
+  DEFAULT_US_OHLC_LIMIT,
   normalizeFmpOhlcPoint,
   normalizeFmpOhlcSeries,
   getUSOhlc,

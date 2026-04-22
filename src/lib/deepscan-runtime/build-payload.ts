@@ -108,7 +108,7 @@ type GeneratedDumpSignalSummary = {
     pointCount: number
     latestDate?: string
     latestClose?: number
-    primarySource: 'fmp' | 'unknown'
+    primarySource: 'polygon' | 'fmp' | 'unknown'
   } | null
   ownershipFlow: {
     availability: string
@@ -202,7 +202,11 @@ export function summarizeGeneratedDumpSignals(runtimeShape: unknown): GeneratedD
           pointCount: ohlcSeries.length,
           latestDate: normalizeText(latestOhlc?.date) ?? undefined,
           latestClose: asFiniteNumber(latestOhlc?.close) ?? undefined,
-          primarySource: ohlcReasonCodes.includes('fmp_primary_ohlc') ? 'fmp' : 'unknown',
+          primarySource: ohlcReasonCodes.includes('polygon_primary_ohlc')
+            ? 'polygon'
+            : ohlcReasonCodes.includes('fmp_primary_ohlc')
+              ? 'fmp'
+              : 'unknown',
         }
       : null,
     ownershipFlow: directOwnershipFact

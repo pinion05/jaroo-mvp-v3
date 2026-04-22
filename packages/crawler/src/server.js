@@ -31,6 +31,7 @@ import {
   getUSMarketIndicators,
   getUSNews,
   getUSOhlc,
+  DEFAULT_US_OHLC_LIMIT,
   getUSOwnershipFlow,
   getUSStockReportData,
   runTriggerBatch,
@@ -2156,11 +2157,11 @@ const endpointDefinitions = [
   {
     id: 'us-stock-ohlc',
     resource: 'us-stock.ohlc',
-    description: '미국주식 FMP-primary OHLC 시계열을 반환합니다.',
-    primaryPath: buildDataSourcePath('fmp', '/us/stocks/:ticker/ohlc'),
-    dataSources: ['fmp'],
+    description: '미국주식 Polygon-primary OHLC 시계열을 반환합니다.',
+    primaryPath: buildDataSourcePath('polygon', '/us/stocks/:ticker/ohlc'),
+    dataSources: ['polygon'],
     params: ['ticker'],
-    query: ['limit(optional, default=60)'],
+    query: [`limit(optional, default=${DEFAULT_US_OHLC_LIMIT})`],
     count: (data) => Array.isArray(data?.series) ? data.series.length : 0,
     handler: async (req) => {
       const limitRaw = Array.isArray(req.query.limit) ? req.query.limit[0] : req.query.limit;

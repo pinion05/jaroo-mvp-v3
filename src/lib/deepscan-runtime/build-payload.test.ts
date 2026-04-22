@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { summarizeGeneratedDumpSignals } from './build-payload'
 
-test('summarizeGeneratedDumpSignals surfaces FMP OHLC and direct ownership flow summaries', () => {
+test('summarizeGeneratedDumpSignals surfaces Polygon OHLC and direct ownership flow summaries', () => {
   const summary = summarizeGeneratedDumpSignals({
     members: {
       momentum: {
@@ -13,7 +13,7 @@ test('summarizeGeneratedDumpSignals surfaces FMP OHLC and direct ownership flow 
               { date: '2026-04-20', close: 273.05 },
               { date: '2026-04-17', close: 270.23 },
             ],
-            quality: { availability: 'present', derivationKind: 'direct', reasonCode: ['fmp_primary_ohlc'] },
+            quality: { availability: 'present', derivationKind: 'direct', reasonCode: ['polygon_primary_ohlc'] },
           },
         },
       },
@@ -46,7 +46,7 @@ test('summarizeGeneratedDumpSignals surfaces FMP OHLC and direct ownership flow 
       pointCount: 2,
       latestDate: '2026-04-20',
       latestClose: 273.05,
-      primarySource: 'fmp',
+      primarySource: 'polygon',
     },
     ownershipFlow: {
       availability: 'present',

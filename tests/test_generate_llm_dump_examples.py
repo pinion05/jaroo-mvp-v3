@@ -175,7 +175,7 @@ class GenerateLlmDumpExamplesTest(unittest.TestCase):
                     'recentFilings': [],
                 }
             },
-            '/api/source/fmp/us/stocks/IONQ/ohlc?limit=60': {
+            '/api/source/polygon/us/stocks/IONQ/ohlc?limit=252': {
                 'data': {
                     'series': [
                         {'date': '2026-04-20', 'close': 41.2},
@@ -196,6 +196,7 @@ class GenerateLlmDumpExamplesTest(unittest.TestCase):
         self.assertEqual(valuation_runtime['facts']['per']['quality']['availability'], 'missing')
         self.assertEqual(valuation_runtime['facts']['per']['quality']['reasonCode'], ['missing_metric_per'])
         self.assertEqual(manifest['instrument']['ticker'], 'IONQ')
+        self.assertEqual(manifest['sourceAliases']['ohlc']['requestPath'], '/api/source/polygon/us/stocks/IONQ/ohlc?limit=252')
 
     def test_main_keeps_existing_per_shape_when_metric_exists(self):
         raw_by_path = {
@@ -224,12 +225,15 @@ class GenerateLlmDumpExamplesTest(unittest.TestCase):
             '/api/source/polygon-yahoo/us/market/indicators': {'data': {'summary': {'nasdaqChangePct': 1.5, 'sp500Above200Sma': 0.75}}},
             '/api/source/fmp-polygon-finnhub-sec-edgar-yahoo-wisereport-global/us/stocks/IONQ/report?newsLimit=3&filingsLimit=2': {'data': {'hero': {}, 'axes': {}}},
             '/api/source/sec-edgar/us/stocks/IONQ/ownership-flow?limit=6&recentDays=180': {'data': {'source': 'sec-submissions', 'recentDays': 180, 'summary': {'source': 'sec-submissions', 'recentDays': 180, 'signal': {'status': 'quiet', 'direction': 'quiet', 'summary': '최근 180일 direct ownership/flow 공시 없음'}, 'counts': {'totalDirectEvents': 0}, 'latestDates': {}}, 'recentFilings': []}},
-            '/api/source/fmp/us/stocks/IONQ/ohlc?limit=60': {'data': {'series': [{'date': '2026-04-20', 'close': 41.2}]}}}
+            '/api/source/polygon/us/stocks/IONQ/ohlc?limit=252': {'data': {'series': [{'date': '2026-04-20', 'close': 41.2}]}}}
         writes = self.run_main_with_raw(raw_by_path)
         valuation_runtime = next(data for path, data in writes.items() if path.endswith('processed/member-valuation-runtime.json'))
 
         self.assertEqual(valuation_runtime['facts']['per']['value'], 88.4)
         self.assertNotIn('quality', valuation_runtime['facts']['per'])
+
+        manifest = next(data for path, data in writes.items() if path.endswith('manifest.json'))
+        self.assertEqual(manifest['sourceAliases']['ohlc']['requestPath'], '/api/source/polygon/us/stocks/IONQ/ohlc?limit=252')
 
 
 if __name__ == '__main__':

@@ -14,9 +14,14 @@ test('US ownership-flow and OHLC endpoint definitions are registered', async () 
   assert.ok(ownershipDefinition.query.includes('recentDays(optional, default=180)'));
 
   assert.ok(ohlcDefinition);
-  assert.equal(ohlcDefinition.primaryPath, '/api/source/fmp/us/stocks/:ticker/ohlc');
-  assert.deepEqual(ohlcDefinition.dataSources, ['fmp']);
-  assert.ok(ohlcDefinition.query.includes('limit(optional, default=60)'));
+  assert.equal(ohlcDefinition.primaryPath, '/api/source/polygon/us/stocks/:ticker/ohlc');
+  assert.deepEqual(ohlcDefinition.dataSources, ['polygon']);
+  assert.ok(ohlcDefinition.query.includes('limit(optional, default=252)'));
+
+  const { getUSOhlc } = await import('../src/crawlers/us-ohlc.js');
+  const missingTicker = await getUSOhlc('');
+  assert.equal(missingTicker.provider, 'polygon');
+  assert.equal(missingTicker.source, 'polygon-v2-aggs-ticker-range-day');
 });
 
 test('summarizeOwnershipFlowFromFilings reports direct filing activity without proxy semantics', async () => {
@@ -43,6 +48,17 @@ test('summarizeOwnershipFlowFromFilings reports direct filing activity without p
 
 test('normalizeFmpOhlcSeries preserves newest-first OHLC points and applies limits', async () => {
   const { normalizeFmpOhlcSeries } = await import('../src/crawlers/us-ohlc.js');
+
+  const defaultLimited = normalizeFmpOhlcSeries(Array.from({ length: 300 }, (_, index) => ({
+    symbol: 'AAPL',
+    date: `2026-04-${String((index % 30) + 1).padStart(2, '0')}`,
+    open: index + 1,
+    high: index + 2,
+    low: index,
+    close: index + 1.5,
+    volume: index + 1000,
+  })));
+  assert.equal(defaultLimited.length, 252);
 
   const series = normalizeFmpOhlcSeries([
     { symbol: 'AAPL', date: '2026-04-20', open: '270.33', high: 274.275, low: 270.29, close: 273.05, volume: '34667241', change: '2.72', changePercent: '1.00618', vwap: '272.54' },

@@ -8,6 +8,7 @@ from datetime import datetime, timezone
 from urllib.request import Request, urlopen
 
 BASE_URL = 'http://127.0.0.1:3040'
+US_OHLC_DAILY_LOOKBACK_BARS = 252
 
 
 def parse_args():
@@ -218,7 +219,7 @@ def main():
             'market': '/api/source/polygon-yahoo/us/market/indicators',
             'report': f'/api/source/fmp-polygon-finnhub-sec-edgar-yahoo-wisereport-global/us/stocks/{ticker}/report?newsLimit=3&filingsLimit=2',
             'ownership': f'/api/source/sec-edgar/us/stocks/{ticker}/ownership-flow?limit=6&recentDays=180',
-            'ohlc': f'/api/source/fmp/us/stocks/{ticker}/ohlc?limit=60',
+            'ohlc': f'/api/source/polygon/us/stocks/{ticker}/ohlc?limit={US_OHLC_DAILY_LOOKBACK_BARS}',
         }
         raw = {key: fetch_json(path) for key, path in paths.items()}
         for key, value in raw.items():
@@ -317,10 +318,10 @@ def main():
             'sp500Above200Sma': mk('market', {'kind': 'field', 'path': '$.data.summary.sp500Above200Sma'}, market['summary']['sp500Above200Sma']),
             'ohlcSeries': mk(
                 'ohlc',
-                {'kind': 'slice', 'path': '$.data.series', 'start': 0, 'end': min(len(ohlc_series), 60)},
+                {'kind': 'slice', 'path': '$.data.series', 'start': 0, 'end': min(len(ohlc_series), US_OHLC_DAILY_LOOKBACK_BARS)},
                 ohlc_series if len(ohlc_series) > 0 else None,
-                quality('present', derivation_kind='direct', reason_codes=['fmp_primary_ohlc'], severity='low', actionability='usable') if len(ohlc_series) > 0 else quality('missing', reason_codes=['no_ohlc_series'], severity='medium', actionability='caution'),
-                notes=['FMP primary OHLC series'] if len(ohlc_series) > 0 else None,
+                quality('present', derivation_kind='direct', reason_codes=['polygon_primary_ohlc'], severity='low', actionability='usable') if len(ohlc_series) > 0 else quality('missing', reason_codes=['no_ohlc_series'], severity='medium', actionability='caution'),
+                notes=['Polygon primary OHLC series'] if len(ohlc_series) > 0 else None,
             ),
         }, 'issues': [x for x in [
             issue('facts.ohlcSeries', 'missing', reason_codes=['no_ohlc_series'], severity='medium', actionability='caution') if len(ohlc_series) == 0 else None,
