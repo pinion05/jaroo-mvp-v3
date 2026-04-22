@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { summarizeGeneratedDumpSignals } from './build-payload'
+import { describeMomentumProvenance, summarizeGeneratedDumpSignals } from './build-payload'
 
 test('summarizeGeneratedDumpSignals surfaces Polygon OHLC and direct ownership flow summaries', () => {
   const summary = summarizeGeneratedDumpSignals({
@@ -85,4 +85,24 @@ test('summarizeGeneratedDumpSignals preserves missing availability when direct f
   assert.equal(summary.momentum?.pointCount, 0)
   assert.equal(summary.ownershipFlow?.availability, 'missing')
   assert.equal(summary.ownershipFlow?.eventCount, 0)
+})
+
+test('describeMomentumProvenance는 provider별 OHLC 문구를 맞춘다', () => {
+  assert.deepEqual(describeMomentumProvenance('polygon', 252), {
+    insightTitle: 'Polygon OHLC 252개 봉을 반영했어요.',
+    sourceRefLabel: 'Polygon OHLC 252 bars',
+    heroBodyText: 'Polygon OHLC 252개 반영',
+  })
+
+  assert.deepEqual(describeMomentumProvenance('fmp', 120), {
+    insightTitle: 'FMP OHLC 120개 봉을 반영했어요.',
+    sourceRefLabel: 'FMP OHLC 120 bars',
+    heroBodyText: 'FMP OHLC 120개 반영',
+  })
+
+  assert.deepEqual(describeMomentumProvenance('unknown', 80), {
+    insightTitle: 'OHLC 80개 봉을 반영했어요.',
+    sourceRefLabel: 'OHLC 80 bars',
+    heroBodyText: 'OHLC 80개 반영',
+  })
 })

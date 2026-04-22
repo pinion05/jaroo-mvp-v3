@@ -155,7 +155,7 @@ test('buildDeepScanCanonicalQuery는 canonical proxy whitelist 순서대로 quer
 
   assert.equal(
     query.toString(),
-    'code=005930&ticker=005930.KS&name=%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90&shares=10%EC%A3%BC&averagePrice=70%2C000%EC%9B%90&evaluationAmount=750%2C000%EC%9B%90&selectedAt=2026-04-15T15%3A00%3A00.000Z&from=home-handoff',
+    'code=005930&ticker=005930.KS&market=KOSPI&name=%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90&shares=10%EC%A3%BC&averagePrice=70%2C000%EC%9B%90&evaluationAmount=750%2C000%EC%9B%90&selectedAt=2026-04-15T15%3A00%3A00.000Z&from=home-handoff',
   )
 })
 
@@ -176,7 +176,24 @@ test('buildDeepScanCanonicalQuery는 identifier fallback을 지원한다', () =>
     selectedAt: undefined,
   }))
 
-  assert.equal(query.toString(), 'ticker=AAPL&name=Apple&shares=-&from=home-handoff')
+  assert.equal(query.toString(), 'ticker=AAPL&market=US&name=Apple&shares=-&from=home-handoff')
+})
+
+test('buildDeepScanCanonicalQuery는 미국 홈 보유종목을 US market으로 canonicalize한다', () => {
+  const query = buildDeepScanCanonicalQuery(createTargetSession({
+    holding: {
+      name: 'Apple',
+      market: 'NASDAQ',
+      marketTone: 'nasdaq',
+      code: 'US0378331005',
+      ticker: 'AAPL',
+      shares: '10주',
+      averagePrice: '$100.00',
+      evaluationAmount: '$1,000.00',
+    },
+  }))
+
+  assert.equal(query.get('market'), 'US')
 })
 
 test('fetchDeepScanCanonicalPayload는 canonical body를 그대로 파싱해 반환한다', async () => {
@@ -193,7 +210,7 @@ test('fetchDeepScanCanonicalPayload는 canonical body를 그대로 파싱해 반
     })
   })
 
-  assert.equal(calledUrl, '/api/deepscan?code=005930&ticker=005930.KS&name=%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90&shares=10%EC%A3%BC&averagePrice=70%2C000%EC%9B%90&evaluationAmount=750%2C000%EC%9B%90&selectedAt=2026-04-15T15%3A00%3A00.000Z&from=home-handoff')
+  assert.equal(calledUrl, '/api/deepscan?code=005930&ticker=005930.KS&market=KOSPI&name=%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90&shares=10%EC%A3%BC&averagePrice=70%2C000%EC%9B%90&evaluationAmount=750%2C000%EC%9B%90&selectedAt=2026-04-15T15%3A00%3A00.000Z&from=home-handoff')
   assert.deepEqual(calledInit, { cache: 'no-store' })
   assert.deepEqual(fetched, payload)
 })

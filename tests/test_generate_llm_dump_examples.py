@@ -1,6 +1,7 @@
 import argparse
 import importlib.util
 import pathlib
+import json
 import unittest
 from unittest import mock
 
@@ -31,6 +32,37 @@ def make_row(label: str, value: str) -> dict:
 
 
 class GenerateLlmDumpExamplesTest(unittest.TestCase):
+    def test_fetch_json_prefers_jaroo_crawler_base_url_then_fallback_env(self):
+        requested_urls = []
+
+        class FakeResponse:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, exc_type, exc, tb):
+                return False
+
+            def read(self):
+                return json.dumps({'ok': True}).encode('utf-8')
+
+        def fake_urlopen(request, timeout=60):
+            requested_urls.append(request.full_url)
+            return FakeResponse()
+
+        with mock.patch.object(MODULE, 'urlopen', side_effect=fake_urlopen):
+            with mock.patch.dict('os.environ', {'CRAWLER_BASE_URL': 'http://fallback:4040/', 'JAROO_CRAWLER_BASE_URL': 'http://preferred:5050/'}, clear=False):
+                self.assertEqual(MODULE.fetch_json('/health'), {'ok': True})
+            with mock.patch.dict('os.environ', {'CRAWLER_BASE_URL': 'http://fallback:4040/'}, clear=True):
+                self.assertEqual(MODULE.fetch_json('/health'), {'ok': True})
+            with mock.patch.dict('os.environ', {}, clear=True):
+                self.assertEqual(MODULE.fetch_json('/health'), {'ok': True})
+
+        self.assertEqual(requested_urls, [
+            'http://preferred:5050/health',
+            'http://fallback:4040/health',
+            'http://127.0.0.1:3040/health',
+        ])
+
     def run_main_with_raw(self, raw_by_path):
         writes = {}
         with mock.patch.object(MODULE, 'parse_args', return_value=argparse.Namespace(tickers=['IONQ'], runtime_input_file=None)), \

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 import argparse
 import json
+import os
 import pathlib
 import re
 import sys
@@ -26,8 +27,13 @@ def canonical_json(value):
     return json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(',', ':'))
 
 
+def get_base_url():
+    configured = os.getenv('JAROO_CRAWLER_BASE_URL') or os.getenv('CRAWLER_BASE_URL') or BASE_URL
+    return configured.rstrip('/')
+
+
 def fetch_json(path: str):
-    req = Request(f'{BASE_URL}{path}', headers={'Accept': 'application/json'})
+    req = Request(f'{get_base_url()}{path}', headers={'Accept': 'application/json'})
     with urlopen(req, timeout=60) as response:
         return json.loads(response.read().decode('utf-8'))
 

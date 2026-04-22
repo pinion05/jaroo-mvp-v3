@@ -178,6 +178,8 @@ function readRuntimeDumpFact<T>(memberDump: unknown, factKey: string): RuntimeDu
   }
 }
 
+type GeneratedMomentumPrimarySource = NonNullable<GeneratedDumpSignalSummary['momentum']>['primarySource']
+
 export function summarizeGeneratedDumpSignals(runtimeShape: unknown): GeneratedDumpSignalSummary {
   const members = asRecord(asRecord(runtimeShape)?.members)
   const momentumDump = members?.momentum
@@ -219,6 +221,28 @@ export function summarizeGeneratedDumpSignals(runtimeShape: unknown): GeneratedD
           primarySource: normalizeText(ownershipValue?.source) ?? 'unknown',
         }
       : null,
+  }
+}
+
+function formatMomentumProviderLabel(primarySource: GeneratedMomentumPrimarySource) {
+  switch (primarySource) {
+    case 'polygon':
+      return 'Polygon'
+    case 'fmp':
+      return 'FMP'
+    default:
+      return null
+  }
+}
+
+export function describeMomentumProvenance(primarySource: GeneratedMomentumPrimarySource, pointCount: number) {
+  const providerLabel = formatMomentumProviderLabel(primarySource)
+  const ohlcLabel = providerLabel ? `${providerLabel} OHLC` : 'OHLC'
+
+  return {
+    insightTitle: `${ohlcLabel} ${pointCount}개 봉을 반영했어요.`,
+    sourceRefLabel: `${ohlcLabel} ${pointCount} bars`,
+    heroBodyText: `${ohlcLabel} ${pointCount}개 반영`,
   }
 }
 
@@ -669,12 +693,13 @@ function buildUsInsights(
   }
 
   if (generatedSignals.momentum?.availability === 'present' && generatedSignals.momentum.pointCount > 0) {
+    const momentumProvenance = describeMomentumProvenance(generatedSignals.momentum.primarySource, generatedSignals.momentum.pointCount)
     items.push({
       sourceType: 'market',
       sourceLabel: 'OHLC',
       date: generatedSignals.momentum.latestDate ?? '최근 시세 기준',
       label: 'OHLC',
-      title: `FMP OHLC ${generatedSignals.momentum.pointCount}개 봉을 반영했어요.`,
+      title: momentumProvenance.insightTitle,
       body: `최신 종가 ${formatCurrency(generatedSignals.momentum.latestClose, facts.currency)} · ${generatedSignals.momentum.latestDate ?? '최근'} 기준`,
     })
   }
@@ -1025,12 +1050,15 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
   const portfolioSimulation = buildUsPortfolioSimulation(heroScore, sellNow)
   const degraded = agentResults.some((agent) => agent.confidence === 'low') || llmErrors.length > 0
   const sourceContextFrom = normalizeSourceFrom(rawInput.sourceContext.from)
+  const momentumProvenance = generatedSignals.momentum
+    ? describeMomentumProvenance(generatedSignals.momentum.primarySource, generatedSignals.momentum.pointCount)
+    : null
   const sourceRefsWithPayload = [
     ...sourceRefs,
     createSourceRef('report', `us-slim:${ticker}`, 'WiseReport Global slim v1.1', facts.consensus?.asOfDate),
     createSourceRef('market', `us-price:${ticker}`, 'latest price from slim snapshot'),
     ...(generatedSignals.momentum?.availability === 'present'
-      ? [createSourceRef('market', `us-ohlc:${ticker}`, `FMP OHLC ${generatedSignals.momentum.pointCount} bars`, generatedSignals.momentum.latestDate)]
+      ? [createSourceRef('market', `us-ohlc:${ticker}`, momentumProvenance?.sourceRefLabel ?? `OHLC ${generatedSignals.momentum.pointCount} bars`, generatedSignals.momentum.latestDate)]
       : []),
     ...(generatedSignals.ownershipFlow?.availability === 'present'
       ? [createSourceRef('report', `us-ownership:${ticker}`, generatedSignals.ownershipFlow.summary ?? 'SEC ownership/flow summary', generatedSignals.ownershipFlow.latestEventDate)]
@@ -1042,7 +1070,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
     `현재가 ${formatCurrency(facts.currentPrice, facts.currency)} 확인`,
     `forward PER ${formatNumber(facts.consensus?.forwardPer ?? facts.per, 1)} / PBR ${formatNumber(facts.consensus?.forwardPbr ?? facts.pbr, 1)}`,
     generatedSignals.momentum?.availability === 'present'
-      ? `FMP OHLC ${generatedSignals.momentum.pointCount}개 반영`
+      ? (momentumProvenance?.heroBodyText ?? `OHLC ${generatedSignals.momentum.pointCount}개 반영`)
       : `최근 뉴스 ${facts.news.length}건 반영`,
     generatedSignals.ownershipFlow?.availability === 'present' && generatedSignals.ownershipFlow.eventCount > 0
       ? `${generatedSignals.ownershipFlow.primarySource} ownership 공시 ${generatedSignals.ownershipFlow.eventCount}건`
