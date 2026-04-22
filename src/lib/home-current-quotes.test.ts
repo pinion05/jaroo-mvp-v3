@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import type { HomeHolding } from '@/lib/jaroo-home-data'
-import { applyCurrentQuotesToHomeHoldings, buildHomeCurrentQuoteQuery } from './home-current-quotes'
+import { applyCurrentQuotesToHomeHoldings, buildHomeCurrentQuoteQuery, buildQuoteLookupKey, requiresFxConversion } from './home-current-quotes'
 
 function createHolding(overrides: Partial<HomeHolding> = {}): HomeHolding {
   return {
@@ -78,6 +78,24 @@ test('home current quote query는 KR code와 US ticker를 분리해 dedupe한다
   assert.equal(query, 'codes=005930&tickers=AAPL')
 })
 
+test('KR holding이 보조 ticker를 가져도 quote lookup/query는 code를 우선한다', () => {
+  const krHolding = createHolding({
+    identifierCode: '005930',
+    identifierTicker: '005930.KS',
+    code: '005930',
+  })
+
+  assert.equal(buildQuoteLookupKey(krHolding), '005930')
+  assert.equal(buildHomeCurrentQuoteQuery([krHolding]), 'codes=005930')
+})
+
+test('FX는 USD quote에 KRW cost basis가 필요한 경우에만 요구한다', () => {
+  assert.equal(requiresFxConversion('USD', 'KRW'), true)
+  assert.equal(requiresFxConversion('USD', 'USD'), false)
+  assert.equal(requiresFxConversion('KRW', 'KRW'), false)
+  assert.equal(requiresFxConversion('KRW', null), false)
+})
+
 test('home current quote hydrate는 KR live quote로 평가금액/손익/수익률/비중을 다시 계산한다', () => {
   const [updated] = applyCurrentQuotesToHomeHoldings(
     [
@@ -112,6 +130,23 @@ test('home current quote hydrate는 KR live quote로 평가금액/손익/수익�
   assert.equal(updated.metaLine, '평단 80,000원 · 평가금액 852,000원 · 현재가 85,200원')
   assert.equal(updated.heatmapWeight, '89%')
   assert.ok(updated.donutPercent > 0.89 && updated.donutPercent < 0.9)
+})
+
+test('home current quote hydrate는 KR holding의 보조 ticker가 있어도 KR code quote로 갱신한다', () => {
+  const [updated] = applyCurrentQuotesToHomeHoldings(
+    [
+      createHolding({
+        identifierCode: '005930',
+        identifierTicker: '005930.KS',
+        code: '005930',
+      }),
+    ],
+    [{ market: 'KR', code: '005930', ticker: null, price: 85200, currency: 'KRW', asOf: '2026-04-14', source: 'krx', status: 'ok' }],
+  )
+
+  assert.equal(updated.evaluationAmount, '852,000원')
+  assert.equal(updated.change, '+6.5%')
+  assert.equal(updated.metrics.some((metric) => metric.label === '현재가' && metric.value === '85,200원'), true)
 })
 
 test('home current quote hydrate는 US live quote로 평가금액/손익/수익률을 다시 계산한다', () => {
