@@ -2,16 +2,19 @@ from __future__ import annotations
 
 import csv
 import gzip
+import html
 import io
 import json
 import re
 import urllib.request
+import urllib.parse
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_PATH = ROOT / 'src/lib/data/instrument-universe.json'
 SEC_URL = 'https://www.sec.gov/files/company_tickers.json'
 KRX_URL = 'https://github.com/FinanceData/stock_master/raw/master/stock_master.csv.gz'
+WISE_ETF_LOOKUP_URL = 'https://comp.wisereport.co.kr/ETF/lookup.aspx'
 USER_AGENT = 'JarooMVP/4.0 contact@jaroo.app'
 
 US_ALIAS_SEEDS = {
@@ -33,14 +36,18 @@ KR_ALIAS_SEEDS_BY_CODE = {
     '035420': ['네이버', 'naver'],
     '003720': ['삼영'],
     '067160': ['아프리카TV', '아프리카티비', 'SOOP', '숲'],
+    '148020': ['KBSTAR 200'],
     '100840': ['SNT에너지', 'SNT 에너지', 'LST에너지', 'LST 에너지', 'S&TC'],
+    '152100': ['ARIRANG 200'],
     '323410': ['카뱅'],
     '373220': ['엘지에너지솔루션', 'lg에너지솔루션'],
 }
 
 KR_NAME_OVERRIDES_BY_CODE = {
     '067160': 'SOOP',
+    '148020': 'KBSTAR 200',
     '100840': 'SNT에너지',
+    '152100': 'ARIRANG 200',
 }
 
 KR_MANUAL_ENTRIES = [
@@ -102,6 +109,21 @@ def fetch_bytes(url: str) -> bytes:
         return response.read()
 
 
+def fetch_text(url: str) -> str:
+    return fetch_bytes(url).decode('utf-8', 'ignore')
+
+
+def post_form(url: str, form: dict[str, str], referer: str | None = None) -> str:
+    encoded_form = urllib.parse.urlencode(form).encode('utf-8')
+    headers = {'User-Agent': USER_AGENT}
+    if referer:
+        headers['Referer'] = referer
+
+    request = urllib.request.Request(url, data=encoded_form, headers=headers)
+    with urllib.request.urlopen(request, timeout=60) as response:
+        return response.read().decode('utf-8', 'ignore')
+
+
 def simplify_us_title(title: str) -> list[str]:
     cleaned = re.sub(r'\s+', ' ', title).strip()
     simplified = re.sub(
@@ -138,6 +160,17 @@ def build_kr_aliases(name: str, code: str) -> list[str]:
     return sorted(alias for alias in aliases if alias and alias != name)
 
 
+def parse_wisereport_lookup_rows(html_text: str) -> list[tuple[str, str, str]]:
+    return [
+        tuple(html.unescape(value).strip() for value in row)
+        for row in re.findall(
+            r'<tr>\s*<td class="c1 center">([^<]+)</td>\s*<td class="c2 center"><a [^>]*>([^<]+)</a></td>\s*<td class="c3 txt"[^>]*><a [^>]*>([^<]+)</a></td>\s*</tr>',
+            html_text,
+            re.S,
+        )
+    ]
+
+
 def build_kr_entries() -> list[dict[str, object]]:
     raw = fetch_bytes(KRX_URL)
     with gzip.GzipFile(fileobj=io.BytesIO(raw)) as gz:
@@ -165,6 +198,55 @@ def build_kr_entries() -> list[dict[str, object]]:
                 'kind': 'stock',
                 'locale': 'KR',
                 'aliases': build_kr_aliases(name, code),
+            }
+        )
+
+    return entries
+
+
+def build_kr_etf_entries() -> list[dict[str, object]]:
+    lookup_html = fetch_text(WISE_ETF_LOOKUP_URL)
+    view_state_match = re.search(r'id="__VIEWSTATE" value="([^"]+)"', lookup_html)
+    view_state_generator_match = re.search(r'id="__VIEWSTATEGENERATOR" value="([^"]+)"', lookup_html)
+
+    if not view_state_match or not view_state_generator_match:
+        raise RuntimeError('Failed to locate WiseReport ETF lookup form state.')
+
+    etf_lookup_html = post_form(
+        WISE_ETF_LOOKUP_URL,
+        {
+            '__VIEWSTATE': view_state_match.group(1),
+            '__VIEWSTATEGENERATOR': view_state_generator_match.group(1),
+            'cmp_typ': '5',
+            'ord_col': '',
+            'ord_typ': '',
+            'index': '0',
+        },
+        referer=WISE_ETF_LOOKUP_URL,
+    )
+
+    rows = parse_wisereport_lookup_rows(etf_lookup_html)
+    entries: list[dict[str, object]] = []
+
+    for kind, code, raw_name in rows:
+        if kind.upper() != 'ETF':
+            continue
+
+        normalized_code = code.strip().upper()
+        name = KR_NAME_OVERRIDES_BY_CODE.get(normalized_code, raw_name.strip())
+
+        if not normalized_code or not name:
+            continue
+
+        entries.append(
+            {
+                'name': name,
+                'code': normalized_code,
+                'market': 'ETF',
+                'marketTone': 'etf',
+                'kind': 'etf',
+                'locale': 'KR',
+                'aliases': build_kr_aliases(name, normalized_code),
             }
         )
 
@@ -222,8 +304,9 @@ def dedupe_entries(entries: list[dict[str, object]]) -> list[dict[str, object]]:
 
 def main() -> None:
     kr_entries = build_kr_entries()
+    kr_etf_entries = build_kr_etf_entries()
     us_entries = build_us_entries()
-    universe = dedupe_entries([*kr_entries, *us_entries, *MANUAL_ENTRIES])
+    universe = dedupe_entries([*kr_entries, *kr_etf_entries, *us_entries, *MANUAL_ENTRIES])
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(json.dumps(universe, ensure_ascii=False), encoding='utf-8')
     print(
@@ -232,6 +315,7 @@ def main() -> None:
                 'output': str(OUTPUT_PATH),
                 'totalCount': len(universe),
                 'krCount': len([entry for entry in universe if entry.get('locale') == 'KR']),
+                'krEtfCount': len([entry for entry in universe if entry.get('locale') == 'KR' and entry.get('kind') == 'etf']),
                 'usCount': len([entry for entry in universe if entry.get('locale') == 'US']),
             },
             ensure_ascii=False,

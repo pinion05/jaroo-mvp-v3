@@ -48,6 +48,7 @@ export type ResolvedInstrument = {
 const CODE_PATTERN = /\b\d{6}\b/
 const STRUCTURED_TICKER_PATTERN = /^[A-Z]{1,5}$/
 const PURE_TICKER_QUERY_PATTERN = /^[A-Z]{3,5}$/
+const EMBEDDED_TICKER_STOPWORDS = new Set(['ETF', 'ETN'])
 const MIN_CONFIDENCE = 0.62
 const MIN_CANDIDATE_CONFIDENCE = 0.45
 
@@ -293,6 +294,7 @@ function extractStructuredIdentifiers(query: string) {
         .split(/[^0-9A-Z가-힣]+/)
         .map((token) => token.trim())
         .filter((token) => STRUCTURED_TICKER_PATTERN.test(token))
+        .filter((token) => !EMBEDDED_TICKER_STOPWORDS.has(token))
         .filter((token) => !ignoreSingleCharacterEmbeddedTickers || token.length > 1),
     ),
   )

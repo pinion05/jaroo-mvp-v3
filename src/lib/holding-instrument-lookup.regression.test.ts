@@ -25,6 +25,15 @@ test('pure ticker exact miss 는 더 짧은 ticker prefix/contains fuzzy 로 붙
   assert.equal(candidates.length, 0)
 })
 
+test('한국 ETF/ETN 자연어 query 안의 generic suffix token 은 미국 ticker 로 해석하지 않는다', () => {
+  const query = '삼성 인버스 코스피 200 선물 ETN'
+  const resolved = resolveHoldingInstrument(query)
+  const candidates = searchHoldingInstrumentCandidates(query, 3)
+
+  assert.equal(resolved, null)
+  assert.ok(candidates.every((candidate) => candidate.ticker !== 'ETN'))
+})
+
 test('대표적인 한국 종목 별칭은 종목코드까지 안정적으로 매핑한다', () => {
   const cases = [
     { query: '네이버', expectedName: 'NAVER', expectedCode: '035420' },
@@ -52,6 +61,27 @@ test('대표적인 한국 종목 별칭은 종목코드까지 안정적으로 �
 
     assert.equal(resolved?.name, expectedName, query)
     assert.equal(resolved?.code, expectedCode, query)
+    assert.equal(resolved?.locale, 'KR', query)
+  }
+})
+
+test('대표적인 한국 ETF 이름과 리브랜딩 별칭도 코드까지 매핑한다', () => {
+  const cases = [
+    { query: 'KODEX 200', expectedName: 'KODEX 200', expectedCode: '069500' },
+    { query: 'TIGER 200', expectedName: 'TIGER 200', expectedCode: '102110' },
+    { query: 'KBSTAR 200', expectedName: 'KBSTAR 200', expectedCode: '148020' },
+    { query: 'HANARO 200', expectedName: 'HANARO 200', expectedCode: '293180' },
+    { query: 'ARIRANG 200', expectedName: 'ARIRANG 200', expectedCode: '152100' },
+    { query: 'KODEX 레버리지', expectedName: 'KODEX 레버리지', expectedCode: '122630' },
+    { query: 'TIGER 미국S&P500', expectedName: 'TIGER 미국S&P500', expectedCode: '360750' },
+  ]
+
+  for (const { query, expectedName, expectedCode } of cases) {
+    const resolved = resolveHoldingInstrument(query)
+
+    assert.equal(resolved?.name, expectedName, query)
+    assert.equal(resolved?.code, expectedCode, query)
+    assert.equal(resolved?.kind, 'etf', query)
     assert.equal(resolved?.locale, 'KR', query)
   }
 })
