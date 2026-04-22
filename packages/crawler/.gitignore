@@ -1,0 +1,8 @@
+node_modules/
+.env
+.env.local
+.secrets/
+playwright-report/
+coverage/
+.DS_Store
+.omx/

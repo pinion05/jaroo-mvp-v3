@@ -25,6 +25,7 @@ type TickerMapResolvers = {
 
 const TICKER_MAP_REPO_ROOT_ENV = 'TICKER_MAP_REPO_ROOT'
 const DEFAULT_TICKER_MAP_REPO_NAME = 'kr-us-stock-name-ticker-maps'
+const WORKSPACE_INSTRUMENT_CORE_RELATIVE_PATH = path.join('packages', 'instrument-core')
 
 let cachedResolversPromise: Promise<TickerMapResolvers | null> | null = null
 const warnedTickerMapMessages = new Set<string>()
@@ -56,6 +57,9 @@ function getDefaultTickerMapRepoCandidates() {
   const cwd = process.cwd()
 
   return [
+    path.resolve(cwd, WORKSPACE_INSTRUMENT_CORE_RELATIVE_PATH),
+    path.resolve(cwd, '..', WORKSPACE_INSTRUMENT_CORE_RELATIVE_PATH),
+    path.resolve(cwd, '..', '..', WORKSPACE_INSTRUMENT_CORE_RELATIVE_PATH),
     homeDir ? path.join(homeDir, DEFAULT_TICKER_MAP_REPO_NAME) : '',
     path.resolve(cwd, '..', DEFAULT_TICKER_MAP_REPO_NAME),
     path.resolve(cwd, '..', '..', DEFAULT_TICKER_MAP_REPO_NAME),

@@ -1,0 +1,53 @@
+{
+  "generatedAt": "2026-04-10T15:35:42.504490Z",
+  "secTickerCount": 10426,
+  "naverTickerCount": 6892,
+  "generatedTickerCount": 4050,
+  "fullTickerCoverageCount": 10426,
+  "fullTickerCoveragePct": 100.0,
+  "koSourceBreakdown": {
+    "naver": 6376,
+    "generated": 4050
+  },
+  "koExactUniqueNameCount": 9409,
+  "koExactCollisionNameCount": 408,
+  "koCoverage100UniqueKeyCount": 10426,
+  "koCoverage100TickerCount": 10426,
+  "koCoverage100TickerPct": 100.0,
+  "enExactUniqueNameCount": 6604,
+  "enExactCollisionNameCount": 1457,
+  "enCoverage100UniqueKeyCount": 10426,
+  "enCoverage100TickerCount": 10426,
+  "enCoverage100TickerPct": 100.0,
+  "note": [
+    "정확히 같은 이름이 여러 티커에 걸리는 경우 coverage100 맵에서는 한국어는 (TICKER), 영어는 [TICKER]를 붙여 고유키를 만들었다.",
+    "ticker->(영문,한글) 파일은 10426개 전 티커를 모두 포함한다.",
+    "한글명 source는 naver 또는 generated 로 구분했다."
+  ],
+  "examples": {
+    "PLTR": {
+      "ticker": "PLTR",
+      "name_en": "Palantir Technologies Inc.",
+      "name_ko": "팔란티어 테크놀로지스",
+      "ko_source": "naver"
+    },
+    "AAPL": {
+      "ticker": "AAPL",
+      "name_en": "Apple Inc.",
+      "name_ko": "애플",
+      "ko_source": "naver"
+    },
+    "MSFT": {
+      "ticker": "MSFT",
+      "name_en": "MICROSOFT CORP",
+      "name_ko": "마이크로소프트",
+      "ko_source": "naver"
+    },
+    "XRP": {
+      "ticker": "XRP",
+      "name_en": "Bitwise XRP ETF",
+      "name_ko": "비트와이즈 XRP ETF",
+      "ko_source": "generated"
+    }
+  }
+}

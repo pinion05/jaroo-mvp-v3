@@ -1,6 +1,5 @@
 'use client'
 
-import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -10,19 +9,20 @@ import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { JarooShell } from '@/components/jaroo-shell'
 import {
-  OCR_MERGE_RESULT_STORAGE_KEY,
-  SCREENSHOT_OCR_STORAGE_KEY,
   buildMergedOcrResult,
   buildOcrSourceRows,
+  computeAveragePrice,
   resolveMergedOcrRows,
   sanitizeOcrInstrumentCandidateLists,
   sanitizeOcrRows,
   type OcrInstrumentCandidate,
   type OcrRow,
   type OcrSourceRow,
-  type ScreenshotUploadImage,
   type ScreenshotUploadSession,
 } from '@/lib/screenshot-ocr'
+import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
+import { useOcrUploadStore } from '@/lib/stores/use-ocr-upload-store'
+import type { OcrReviewRow, ResolveCandidate } from '@/lib/workflow-types'
 import { cn } from '@/lib/utils'
 
 type OcrRequestState = 'idle' | 'loading' | 'success' | 'error'
@@ -39,6 +39,16 @@ type ResolvedInstrumentRowsResult = {
   rows: OcrSourceRow[]
   candidatesByRowId: Record<string, OcrInstrumentCandidate[]>
 }
+
+type ManualEditableField =
+  | 'name'
+  | 'resolvedTicker'
+  | 'resolvedCode'
+  | 'resolvedMarket'
+  | 'resolvedKind'
+  | 'quantity'
+  | 'profitRate'
+  | 'evaluationAmount'
 
 type UploadStatus = {
   state: UploadRequestState
@@ -58,53 +68,6 @@ const uploadStateLabel: Record<UploadRequestState, string> = {
   loading: '분석 중',
   success: '완료',
   error: '실패',
-}
-
-function buildLegacyCompatibleSession(rawSession: string): ScreenshotUploadSession | null {
-  try {
-    const parsed = JSON.parse(rawSession) as
-      | Partial<ScreenshotUploadSession>
-      | {
-          fileName?: unknown
-          imageDataUrl?: unknown
-          broker?: unknown
-        }
-
-    if (Array.isArray((parsed as Partial<ScreenshotUploadSession>).uploads)) {
-      const uploads = (parsed as Partial<ScreenshotUploadSession>).uploads?.filter(
-        (item): item is ScreenshotUploadImage =>
-          typeof item?.id === 'string' && typeof item?.fileName === 'string' && typeof item?.imageDataUrl === 'string',
-      )
-
-      if (uploads && uploads.length > 0 && typeof parsed.broker === 'string') {
-        return {
-          broker: parsed.broker,
-          uploads,
-        }
-      }
-    }
-
-    if (
-      typeof (parsed as { fileName?: unknown }).fileName === 'string' &&
-      typeof (parsed as { imageDataUrl?: unknown }).imageDataUrl === 'string' &&
-      typeof (parsed as { broker?: unknown }).broker === 'string'
-    ) {
-      return {
-        broker: (parsed as { broker: string }).broker,
-        uploads: [
-          {
-            id: 'legacy-upload-0',
-            fileName: (parsed as { fileName: string }).fileName,
-            imageDataUrl: (parsed as { imageDataUrl: string }).imageDataUrl,
-          },
-        ],
-      }
-    }
-  } catch {
-    return null
-  }
-
-  return null
 }
 
 function OcrMetricChip({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
@@ -144,15 +107,76 @@ async function resolveInstrumentRows(rows: OcrSourceRow[]): Promise<ResolvedInst
   }
 }
 
-function formatCandidateScore(score?: number) {
-  if (typeof score !== 'number' || !Number.isFinite(score)) {
-    return ''
+function inferMarketTone(market?: string) {
+  const normalized = market?.trim().toUpperCase()
+
+  if (!normalized) {
+    return undefined
   }
 
-  return `${Math.round(score * 100)}%`
+  if (normalized === 'KR') {
+    return 'kospi'
+  }
+
+  if (normalized === 'US') {
+    return 'nasdaq'
+  }
+
+  if (normalized.includes('KOSDAQ')) {
+    return 'kosdaq'
+  }
+
+  if (normalized.includes('KOSPI') || normalized.includes('KRX')) {
+    return 'kospi'
+  }
+
+  if (normalized.includes('NASDAQ') || normalized.includes('NYSE') || normalized.includes('AMEX')) {
+    return 'nasdaq'
+  }
+
+  if (normalized.includes('ETF')) {
+    return 'etf'
+  }
+
+  return undefined
 }
 
-function applyInstrumentCandidate(row: OcrSourceRow, candidate?: OcrInstrumentCandidate) {
+function hasResolvedIdentifier(row: Pick<OcrReviewRow, 'resolvedName' | 'resolvedTicker' | 'resolvedCode'>) {
+  return Boolean(row.resolvedName?.trim() || row.resolvedTicker?.trim() || row.resolvedCode?.trim())
+}
+
+function isManualRowComplete(row: OcrReviewRow) {
+  return Boolean(
+    row.name.trim()
+    && (row.resolvedTicker?.trim() || row.resolvedCode?.trim())
+    && row.resolvedMarket?.trim()
+    && row.resolvedKind
+    && row.quantity.trim()
+    && row.profitRate.trim()
+    && row.evaluationAmount.trim(),
+  )
+}
+
+function toReviewRow(row: OcrSourceRow): OcrReviewRow {
+  return {
+    ...row,
+    raw: {
+      name: row.name,
+      quantity: row.quantity,
+      profitRate: row.profitRate,
+      evaluationAmount: row.evaluationAmount,
+      averagePrice: row.averagePrice,
+      code: row.code,
+      ticker: row.ticker,
+    },
+    sourceFileName: row.fileName,
+    sourceUploadId: row.uploadId,
+    resolutionState: hasResolvedIdentifier(row) ? 'resolved' : 'unresolved',
+    selectedCandidateId: null,
+  }
+}
+
+function applyReviewCandidate(row: OcrReviewRow, candidate?: ResolveCandidate) {
   if (!candidate) {
     return row
   }
@@ -168,16 +192,25 @@ function applyInstrumentCandidate(row: OcrSourceRow, candidate?: OcrInstrumentCa
   }
 }
 
+function formatCandidateScore(score?: number) {
+  if (typeof score !== 'number' || !Number.isFinite(score)) {
+    return ''
+  }
+
+  return `${Math.round(score * 100)}%`
+}
+
 type OcrResolvedRowCardProps = {
-  row: OcrSourceRow
+  row: OcrReviewRow
   isLast: boolean
   identifierStatus: InstrumentResolveState
-  candidates: OcrInstrumentCandidate[]
+  candidates: ResolveCandidate[]
   isExpanded: boolean
   selectedCandidateId?: string
   onToggleExpand: () => void
   onSelectCandidate: (candidateId: string) => void
   onClearCandidateSelection: () => void
+  onManualFieldChange: (field: ManualEditableField, value: string) => void
 }
 
 function OcrResolvedRowCard({
@@ -190,6 +223,7 @@ function OcrResolvedRowCard({
   onToggleExpand,
   onSelectCandidate,
   onClearCandidateSelection,
+  onManualFieldChange,
 }: OcrResolvedRowCardProps) {
   const identifierName = row.resolvedName?.trim()
   const identifierMeta = [row.resolvedMarket?.trim(), row.resolvedTicker?.trim(), row.resolvedCode?.trim()].filter(Boolean).join(' · ')
@@ -201,6 +235,7 @@ function OcrResolvedRowCard({
         : '식별자 미확인'
   const hasCandidatePicker = candidates.length > 1
   const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId)
+  const needsManualConfirmation = row.resolutionState === 'manual-required'
 
   return (
     <div className={cn(!isLast && 'border-b border-[color:var(--jaroo-border)]')}>
@@ -215,7 +250,7 @@ function OcrResolvedRowCard({
         <div className='flex items-start justify-between gap-3'>
           <div className='min-w-0'>
             <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.name || '-'}</p>
-            <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.fileName}</p>
+            <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.sourceFileName}</p>
           </div>
           <p className='shrink-0 text-[11px] font-medium text-[color:var(--jaroo-primary)]'>{row.profitRate || '-'}</p>
         </div>
@@ -318,48 +353,96 @@ function OcrResolvedRowCard({
           </div>
         </div>
       ) : null}
+
+      {needsManualConfirmation ? (
+        <div className='border-t border-[color:var(--jaroo-border)] bg-[#FFF8E8] px-4 py-3'>
+          <div className='mb-3 rounded-[16px] border border-[#F5D185] bg-white px-3 py-2'>
+            <p className='text-[11px] font-semibold text-[#854F0B]'>자동 후보가 없어요</p>
+            <p className='mt-1 text-[10px] leading-5 text-[#8A6520]'>종목명, ticker/code, market/kind, 보유 수량, 수익률, 평가 금액을 직접 확인해 주세요.</p>
+          </div>
+
+          <div className='grid grid-cols-1 gap-2 sm:grid-cols-2'>
+            <label className='space-y-1'>
+              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>종목명</span>
+              <input value={row.name} onChange={(event) => onManualFieldChange('name', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]' />
+            </label>
+            <label className='space-y-1'>
+              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>Ticker</span>
+              <input value={row.resolvedTicker ?? ''} onChange={(event) => onManualFieldChange('resolvedTicker', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]' />
+            </label>
+            <label className='space-y-1'>
+              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>Code</span>
+              <input value={row.resolvedCode ?? ''} onChange={(event) => onManualFieldChange('resolvedCode', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]' />
+            </label>
+            <label className='space-y-1'>
+              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>시장</span>
+              <select value={row.resolvedMarket ?? ''} onChange={(event) => onManualFieldChange('resolvedMarket', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]'>
+                <option value=''>선택</option>
+                <option value='KR'>KR</option>
+                <option value='US'>US</option>
+              </select>
+            </label>
+            <label className='space-y-1'>
+              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>종목 유형</span>
+              <select value={row.resolvedKind ?? ''} onChange={(event) => onManualFieldChange('resolvedKind', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]'>
+                <option value=''>선택</option>
+                <option value='stock'>stock</option>
+                <option value='etf'>etf</option>
+              </select>
+            </label>
+            <label className='space-y-1'>
+              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>보유 수량</span>
+              <input value={row.quantity} onChange={(event) => onManualFieldChange('quantity', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]' />
+            </label>
+            <label className='space-y-1'>
+              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>수익률</span>
+              <input value={row.profitRate} onChange={(event) => onManualFieldChange('profitRate', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]' />
+            </label>
+            <label className='space-y-1'>
+              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>평가 금액</span>
+              <input value={row.evaluationAmount} onChange={(event) => onManualFieldChange('evaluationAmount', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]' />
+            </label>
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }
 
 export default function OcrPage() {
   const router = useRouter()
-  const [session, setSession] = useState<ScreenshotUploadSession | null>(null)
-  const [requestState, setRequestState] = useState<OcrRequestState>('idle')
-  const [errorMessage, setErrorMessage] = useState('')
+  const session = useOcrUploadStore((state) => state.input)
+  const clearUploadInput = useOcrUploadStore((state) => state.clear)
+  const reviewRows = useOcrReviewStore((state) => state.rows)
+  const instrumentCandidatesByRowId = useOcrReviewStore((state) => state.candidatesByRowId)
+  const requestState = useOcrReviewStore((state) => state.requestStatus) as OcrRequestState
+  const instrumentResolveState = useOcrReviewStore((state) => state.resolveStatus) as InstrumentResolveState
+  const errorMessage = useOcrReviewStore((state) => state.errorMessage ?? '')
+  const instrumentResolveError = useOcrReviewStore((state) => state.resolveErrorMessage ?? '')
+  const setReviewRows = useOcrReviewStore((state) => state.setRows)
+  const patchReviewRow = useOcrReviewStore((state) => state.patchRow)
+  const replaceCandidates = useOcrReviewStore((state) => state.replaceCandidates)
+  const selectCandidate = useOcrReviewStore((state) => state.selectCandidate)
+  const setRequestStatus = useOcrReviewStore((state) => state.setRequestStatus)
+  const setResolveStatus = useOcrReviewStore((state) => state.setResolveStatus)
+  const resetReviewState = useOcrReviewStore((state) => state.resetForRestart)
   const [uploadStatuses, setUploadStatuses] = useState<Record<string, UploadStatus>>({})
   const [baseMergedRows, setBaseMergedRows] = useState<OcrSourceRow[]>([])
-  const [resolvedInstrumentRows, setResolvedInstrumentRows] = useState<OcrSourceRow[]>([])
-  const [instrumentCandidatesByRowId, setInstrumentCandidatesByRowId] = useState<Record<string, OcrInstrumentCandidate[]>>({})
-  const [selectedInstrumentCandidateIds, setSelectedInstrumentCandidateIds] = useState<Record<string, string>>({})
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
-  const [instrumentResolveState, setInstrumentResolveState] = useState<InstrumentResolveState>('idle')
-  const [instrumentResolveError, setInstrumentResolveError] = useState('')
   const [conflicts, setConflicts] = useState<ReturnType<typeof buildMergedOcrResult>['conflicts']>([])
   const [conflictSelections, setConflictSelections] = useState<Record<string, string>>({})
 
   useEffect(() => {
-    const rawSession = sessionStorage.getItem(SCREENSHOT_OCR_STORAGE_KEY)
-    sessionStorage.removeItem(SCREENSHOT_OCR_STORAGE_KEY)
-
-    if (!rawSession) {
-      setRequestState('error')
-      setErrorMessage('먼저 /screenshot 에서 분석할 스크린샷을 선택해주세요.')
+    if (!session) {
+      setRequestStatus('error', '먼저 /screenshot 에서 분석할 스크린샷을 선택해주세요.')
+      setResolveStatus('idle')
+      setUploadStatuses({})
       return
     }
 
-    const parsedSession = buildLegacyCompatibleSession(rawSession)
-
-    if (!parsedSession) {
-      setRequestState('error')
-      setErrorMessage('업로드 정보가 손상되었어요. 다시 스크린샷을 선택해주세요.')
-      return
-    }
-
-    setSession(parsedSession)
     setUploadStatuses(
       Object.fromEntries(
-        parsedSession.uploads.map((upload) => [
+        session.uploads.map((upload) => [
           upload.id,
           {
             state: 'idle',
@@ -369,18 +452,14 @@ export default function OcrPage() {
         ]),
       ),
     )
-  }, [])
+  }, [session, setRequestStatus, setResolveStatus])
 
   const runOcrBatch = useCallback(async (currentSession: ScreenshotUploadSession) => {
-    setRequestState('loading')
-    setErrorMessage('')
+    setRequestStatus('loading')
+    setResolveStatus('idle')
+    resetReviewState()
     setBaseMergedRows([])
-    setResolvedInstrumentRows([])
-    setInstrumentCandidatesByRowId({})
-    setSelectedInstrumentCandidateIds({})
     setExpandedRowId(null)
-    setInstrumentResolveState('idle')
-    setInstrumentResolveError('')
     setConflicts([])
     setConflictSelections({})
 
@@ -464,6 +543,7 @@ export default function OcrPage() {
     const mergedResult = buildMergedOcrResult(sourceRows)
     setBaseMergedRows(mergedResult.mergedRows)
     setConflicts(mergedResult.conflicts)
+    setReviewRows(resolveMergedOcrRows(mergedResult.mergedRows, mergedResult.conflicts, {}).map(toReviewRow))
 
     setConflictSelections((currentSelections) => {
       const nextSelections = Object.fromEntries(
@@ -480,13 +560,12 @@ export default function OcrPage() {
     })
 
     if (hasErrors) {
-      setRequestState('error')
-      setErrorMessage('일부 스크린샷 분석에 실패했어요. 실패한 항목을 확인하고 다시 시도해주세요.')
+      setRequestStatus('error', '일부 스크린샷 분석에 실패했어요. 실패한 항목을 확인하고 다시 시도해주세요.')
       return
     }
 
-    setRequestState('success')
-  }, [])
+    setRequestStatus('success')
+  }, [resetReviewState, setRequestStatus, setResolveStatus, setReviewRows])
 
   useEffect(() => {
     if (!session) {
@@ -500,20 +579,17 @@ export default function OcrPage() {
 
   useEffect(() => {
     if (requestState !== 'success' || resolvedRows.length === 0) {
-      setResolvedInstrumentRows([])
-      setInstrumentCandidatesByRowId({})
-      setSelectedInstrumentCandidateIds({})
+      setReviewRows([])
+      replaceCandidates({})
       setExpandedRowId(null)
-      setInstrumentResolveState('idle')
-      setInstrumentResolveError('')
+      setResolveStatus('idle')
       return
     }
 
     let isCancelled = false
 
-    setResolvedInstrumentRows(resolvedRows)
-    setInstrumentResolveState('loading')
-    setInstrumentResolveError('')
+    setReviewRows(resolvedRows.map(toReviewRow))
+    setResolveStatus('loading')
 
     void resolveInstrumentRows(resolvedRows)
       .then((result) => {
@@ -521,59 +597,49 @@ export default function OcrPage() {
           return
         }
 
-        setResolvedInstrumentRows(result.rows)
-        setInstrumentCandidatesByRowId(result.candidatesByRowId)
-        setSelectedInstrumentCandidateIds((current) => {
-          const retainedSelections = Object.fromEntries(
-            Object.entries(current).filter(([rowId, candidateId]) => result.candidatesByRowId[rowId]?.some((candidate) => candidate.id === candidateId)),
-          )
+        const nextRows = result.rows.map((row) => {
+          const candidates = result.candidatesByRowId[row.id] ?? []
+          const firstCandidate = candidates[0]
+          const manuallyRequired = !hasResolvedIdentifier(row) && candidates.length === 0
 
-          for (const row of result.rows) {
-            if (retainedSelections[row.id]) {
-              continue
-            }
-
-            const hasResolvedIdentifier = Boolean(row.resolvedTicker || row.resolvedCode || row.resolvedName)
-            const firstCandidate = result.candidatesByRowId[row.id]?.[0]
-
-            if (!hasResolvedIdentifier && firstCandidate) {
-              retainedSelections[row.id] = firstCandidate.id
-            }
-          }
-
-          return retainedSelections
+          return {
+            ...toReviewRow(row),
+            selectedCandidateId: !hasResolvedIdentifier(row) && firstCandidate ? firstCandidate.id : null,
+            resolutionState: manuallyRequired ? 'manual-required' : 'resolved',
+          } satisfies OcrReviewRow
         })
+
+        setReviewRows(nextRows)
+        replaceCandidates(result.candidatesByRowId)
         setExpandedRowId((current) => (current && result.candidatesByRowId[current]?.length > 1 ? current : null))
-        setInstrumentResolveState('success')
+        setResolveStatus('success')
       })
       .catch((error) => {
         if (isCancelled) {
           return
         }
 
-        setResolvedInstrumentRows(resolvedRows)
-        setInstrumentCandidatesByRowId({})
-        setSelectedInstrumentCandidateIds({})
+        setReviewRows(resolvedRows.map(toReviewRow))
+        replaceCandidates({})
         setExpandedRowId(null)
-        setInstrumentResolveState('error')
-        setInstrumentResolveError(error instanceof Error ? error.message : '종목 식별자 확인에 실패했어요.')
+        setResolveStatus('error', error instanceof Error ? error.message : '종목 식별자 확인에 실패했어요.')
       })
 
     return () => {
       isCancelled = true
     }
-  }, [requestState, resolvedRows])
+  }, [replaceCandidates, requestState, resolvedRows, setResolveStatus, setReviewRows])
 
   const previewRows = useMemo(() => {
-    const baseRows = resolvedInstrumentRows.length > 0 ? resolvedInstrumentRows : resolvedRows
+    const baseRows = reviewRows.length > 0 ? reviewRows : resolvedRows.map(toReviewRow)
 
     return baseRows.map((row) =>
-      applyInstrumentCandidate(
+      applyReviewCandidate(
         row,
-        instrumentCandidatesByRowId[row.id]?.find((candidate) => candidate.id === selectedInstrumentCandidateIds[row.id]),
+        instrumentCandidatesByRowId[row.id]?.find((candidate) => candidate.id === row.selectedCandidateId),
       ),
     )
-  }, [instrumentCandidatesByRowId, resolvedInstrumentRows, resolvedRows, selectedInstrumentCandidateIds])
+  }, [instrumentCandidatesByRowId, resolvedRows, reviewRows])
 
   const completedUploadCount = useMemo(
     () => session?.uploads.filter((upload) => uploadStatuses[upload.id]?.state === 'success').length ?? 0,
@@ -583,6 +649,10 @@ export default function OcrPage() {
   const unresolvedConflictCount = useMemo(
     () => conflicts.filter((conflict) => !conflictSelections[conflict.key]).length,
     [conflictSelections, conflicts],
+  )
+  const invalidManualRowIds = useMemo(
+    () => previewRows.filter((row) => row.resolutionState === 'manual-required' && !isManualRowComplete(row)).map((row) => row.id),
+    [previewRows],
   )
 
   const summaryText = useMemo(() => {
@@ -613,39 +683,51 @@ export default function OcrPage() {
     return '업로드된 스크린샷을 준비 중이에요'
   }, [completedUploadCount, conflicts.length, instrumentResolveState, requestState, resolvedRows.length, session?.uploads.length, unresolvedConflictCount])
 
-  const canContinue = requestState === 'success' && instrumentResolveState === 'success' && unresolvedConflictCount === 0 && previewRows.length > 0
+  const canContinue =
+    requestState === 'success'
+    && instrumentResolveState === 'success'
+    && unresolvedConflictCount === 0
+    && previewRows.length > 0
+    && invalidManualRowIds.length === 0
+
+  const handleManualFieldChange = useCallback((rowId: string, field: ManualEditableField, value: string) => {
+    const currentRow = reviewRows.find((row) => row.id === rowId)
+
+    if (!currentRow) {
+      return
+    }
+
+    const normalizedValue = value.trim()
+    const nextRow: OcrReviewRow = {
+      ...currentRow,
+      name: field === 'name' ? value : currentRow.name,
+      resolvedName: field === 'name' ? value.trim() || currentRow.resolvedName : currentRow.resolvedName,
+      resolvedTicker: field === 'resolvedTicker' ? normalizedValue || undefined : currentRow.resolvedTicker,
+      resolvedCode: field === 'resolvedCode' ? normalizedValue || undefined : currentRow.resolvedCode,
+      resolvedMarket: field === 'resolvedMarket' ? normalizedValue || undefined : currentRow.resolvedMarket,
+      resolvedKind:
+        field === 'resolvedKind'
+          ? normalizedValue === 'stock' || normalizedValue === 'etf'
+            ? normalizedValue
+            : undefined
+          : currentRow.resolvedKind,
+      quantity: field === 'quantity' ? value : currentRow.quantity,
+      profitRate: field === 'profitRate' ? value : currentRow.profitRate,
+      evaluationAmount: field === 'evaluationAmount' ? value : currentRow.evaluationAmount,
+    }
+
+    nextRow.resolvedMarketTone = inferMarketTone(nextRow.resolvedMarket)
+    nextRow.averagePrice = computeAveragePrice(nextRow.quantity, nextRow.profitRate, nextRow.evaluationAmount)
+    nextRow.resolutionState = isManualRowComplete(nextRow) ? 'resolved' : 'manual-required'
+    patchReviewRow(rowId, nextRow)
+  }, [patchReviewRow, reviewRows])
 
   const handleContinue = () => {
     if (!canContinue || !session) {
       return
     }
 
-    try {
-      sessionStorage.setItem(
-        OCR_MERGE_RESULT_STORAGE_KEY,
-        JSON.stringify({
-          broker: session.broker,
-          rows: previewRows.map(({ name, quantity, profitRate, evaluationAmount, averagePrice, resolvedName, resolvedCode, resolvedTicker, resolvedMarket, resolvedMarketTone, resolvedKind, fileName }) => ({
-            name,
-            quantity,
-            profitRate,
-            evaluationAmount,
-            averagePrice,
-            resolvedName,
-            resolvedCode,
-            resolvedTicker,
-            resolvedMarket,
-            resolvedMarketTone,
-            resolvedKind,
-            fileName,
-          })),
-        }),
-      )
-      router.push('/merge')
-    } catch {
-      setErrorMessage('확정된 결과를 다음 단계로 넘기는 데 실패했어요. 다시 시도해주세요.')
-      setRequestState('error')
-    }
+    router.push('/merge')
   }
 
   return (
@@ -805,21 +887,13 @@ export default function OcrPage() {
                   identifierStatus={instrumentResolveState}
                   candidates={instrumentCandidatesByRowId[item.id] ?? []}
                   isExpanded={expandedRowId === item.id}
-                  selectedCandidateId={selectedInstrumentCandidateIds[item.id]}
+                  selectedCandidateId={item.selectedCandidateId ?? undefined}
                   onToggleExpand={() => setExpandedRowId((current) => (current === item.id ? null : item.id))}
-                  onSelectCandidate={(candidateId) =>
-                    setSelectedInstrumentCandidateIds((current) => ({
-                      ...current,
-                      [item.id]: candidateId,
-                    }))
-                  }
+                  onSelectCandidate={(candidateId) => selectCandidate(item.id, candidateId)}
                   onClearCandidateSelection={() =>
-                    setSelectedInstrumentCandidateIds((current) => {
-                      const nextSelections = { ...current }
-                      delete nextSelections[item.id]
-                      return nextSelections
-                    })
+                    selectCandidate(item.id, null)
                   }
+                  onManualFieldChange={(field, value) => handleManualFieldChange(item.id, field, value)}
                 />
               )
             })}
@@ -862,13 +936,18 @@ export default function OcrPage() {
         </Button>
       ) : null}
 
-      <Link
-        href='/screenshot'
+      <button
+        type='button'
+        onClick={() => {
+          clearUploadInput()
+          resetReviewState()
+          router.push('/screenshot')
+        }}
         className='flex items-center justify-center gap-2 rounded-[20px] border border-[#B5D4F4] bg-[color:var(--jaroo-accent)] px-4 py-3 text-center text-[12px] font-medium text-[color:var(--jaroo-primary)] transition hover:bg-[#d9eafb]'
       >
         <ScanSearch className='size-4' />
         <span>스크린샷 다시 선택하기</span>
-      </Link>
+      </button>
 
       <Button
         type='button'

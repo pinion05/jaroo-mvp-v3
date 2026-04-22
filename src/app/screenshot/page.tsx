@@ -8,10 +8,12 @@ import { JarooShell } from '@/components/jaroo-shell'
 import { Button } from '@/components/ui/button'
 import {
   MAX_SCREENSHOT_UPLOADS,
-  SCREENSHOT_OCR_STORAGE_KEY,
   type ScreenshotUploadImage,
-  type ScreenshotUploadSession,
 } from '@/lib/screenshot-ocr'
+import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
+import { useMergeStore } from '@/lib/stores/use-merge-store'
+import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
+import { useOcrUploadStore } from '@/lib/stores/use-ocr-upload-store'
 import { cn } from '@/lib/utils'
 
 const MAX_TOTAL_IMAGE_DATA_URL_LENGTH = 4_000_000
@@ -37,6 +39,10 @@ function readFileAsDataUrl(file: File) {
 
 export default function ScreenshotPage() {
   const router = useRouter()
+  const setUploadInput = useOcrUploadStore((state) => state.setInput)
+  const clearReviewState = useOcrReviewStore((state) => state.resetForRestart)
+  const clearMergeState = useMergeStore((state) => state.resetForBackNav)
+  const clearDeepScanState = useDeepScanStore((state) => state.clear)
   const [uploads, setUploads] = useState<ScreenshotUploadImage[]>([])
   const [isPreparing, setIsPreparing] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
@@ -111,13 +117,16 @@ export default function ScreenshotPage() {
 
     setIsPreparing(true)
 
-    const payload: ScreenshotUploadSession = {
+    const payload = {
       broker: PERSISTED_SCREENSHOT_BROKER,
       uploads,
     }
 
     try {
-      sessionStorage.setItem(SCREENSHOT_OCR_STORAGE_KEY, JSON.stringify(payload))
+      clearReviewState()
+      clearMergeState()
+      clearDeepScanState()
+      setUploadInput(payload)
       router.push('/ocr')
     } catch {
       setIsPreparing(false)

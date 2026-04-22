@@ -1,0 +1,74 @@
+{
+  "name": "deepscan-kr-real-ai-v1-plan",
+  "repo": "/home/pinion/worktrees/jaroo-v3-monorepo-foundation",
+  "branch": "feat/deepscan-canonical-payload",
+  "scope": {
+    "market": "KR",
+    "blocks_required_real_output": [
+      "hero",
+      "committee",
+      "insights",
+      "strategy",
+      "sellNow",
+      "portfolioSimulation"
+    ],
+    "package_input": ["stockCode", "holdingQty", "avgPrice"]
+  },
+  "policies": {
+    "composition_owner": "crawler",
+    "app_route": "proxy/cache only",
+    "page": "render only",
+    "numeric_scores": "deterministic local crawler code",
+    "llm_role": "text generation only",
+    "source_refs": "local quantitative evidence first; remote package only as supplemental system-derived ref"
+  },
+  "services": [
+    "packages/crawler/src/services/deepscan-kr-evidence.js",
+    "packages/crawler/src/services/deepscan-kr-package-adapter.js",
+    "packages/crawler/src/services/deepscan-kr-score.js",
+    "packages/crawler/src/services/deepscan-kr-copy.js",
+    "packages/crawler/src/services/deepscan-payload.js"
+  ],
+  "tasks": [
+    {
+      "id": "A",
+      "title": "package adapter 추가",
+      "outputs": ["ssh invocation", "timeout/retry", "cache", "raw package snapshot"]
+    },
+    {
+      "id": "B",
+      "title": "KR evidence extractor 추가",
+      "outputs": ["aggregate/slim normalize", "current quote normalize", "evidence packet"]
+    },
+    {
+      "id": "C",
+      "title": "deterministic score engine 추가",
+      "outputs": ["committee axis score", "hero score", "sellNow decision", "portfolio proxy score"]
+    },
+    {
+      "id": "D",
+      "title": "text generator 추가",
+      "outputs": ["hero/body", "insights text", "strategy text", "sellNow text", "portfolio caption"]
+    },
+    {
+      "id": "E",
+      "title": "canonical composer 교체",
+      "outputs": ["real payload", "blockState/sourceRefs/fallback/error"]
+    },
+    {
+      "id": "F",
+      "title": "검증",
+      "outputs": ["unit tests", "route tests", "lint/build", "HTTP smoke", "Playwright smoke"]
+    }
+  ],
+  "runtime_rules": {
+    "missing_identifier": "400 invalid payload",
+    "code_only": {
+      "ok": ["hero", "committee", "insights", "strategy"],
+      "blocked": ["sellNow", "portfolioSimulation"]
+    },
+    "full_input": {
+      "ok": ["hero", "committee", "insights", "strategy", "sellNow", "portfolioSimulation"]
+    }
+  }
+}

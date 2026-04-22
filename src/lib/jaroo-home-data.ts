@@ -1,5 +1,6 @@
 import { buildDeepScanTargetSession, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding, type DeepScanTargetSession } from '@/lib/deepscan-target'
-import { computeAveragePrice, normalizeStockName, parseOcrNumber, sanitizeOcrRows, type OcrRow } from '@/lib/screenshot-ocr'
+import type { PortfolioNormalizedItem } from '@/lib/workflow-types'
+import { normalizeStockName, parseOcrNumber, type OcrRow } from '@/lib/screenshot-ocr'
 
 export type HomeBadgeTone = 'amber' | 'red' | 'green'
 export type HomeCardTone = 'danger' | 'warning' | 'halt' | 'profit' | 'etf'
@@ -7,6 +8,7 @@ export type HomeMetricTone = 'danger' | 'warning' | 'positive' | 'locked' | 'neu
 export type HomeMarketTone = 'kospi' | 'kosdaq' | 'etf' | 'nasdaq'
 export type HomeActionTone = 'blue' | 'red' | 'green'
 export type MomentumStageTone = 'danger' | 'muted' | 'positive'
+export type AveragePriceCurrency = 'KRW' | 'USD'
 
 export type HomeHolding = {
   id: number
@@ -17,6 +19,7 @@ export type HomeHolding = {
   donutLabel: string
   shares: string
   averagePrice: string
+  averagePriceCurrency?: AveragePriceCurrency
   evaluationAmount?: string
   market: string
   marketTone: HomeMarketTone
@@ -58,6 +61,23 @@ export type HomeHolding = {
   actionSubLabel?: string
   actionCredits?: string
   actionHref: string | null
+}
+
+export type AppliedHomePortfolioRow = Pick<
+  OcrRow,
+  | 'name'
+  | 'quantity'
+  | 'averagePrice'
+  | 'resolvedName'
+  | 'resolvedCode'
+  | 'resolvedTicker'
+  | 'resolvedMarket'
+  | 'resolvedMarketTone'
+  | 'resolvedKind'
+  | 'code'
+  | 'ticker'
+> & {
+  averagePriceCurrency?: AveragePriceCurrency
 }
 
 export const homeHoldings: HomeHolding[] = [
@@ -407,7 +427,7 @@ let cachedDeepScanSnapshot: DeepScanTargetSession | null = null
 
 export type AppliedHomePortfolioSession = {
   broker: string
-  rows: OcrRow[]
+  rows: AppliedHomePortfolioRow[]
   appliedAt?: string
 }
 
@@ -418,6 +438,105 @@ const HOME_HOLDING_CODE_BY_NAME = new Map(
     .map((item) => [normalizeStockName(item.name), item.code as string]),
 )
 
+function readTrimmedString(value: unknown) {
+  return typeof value === 'string' ? value.trim() : undefined
+}
+
+function normalizeAppliedInstrumentCode(value: unknown) {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const normalized = value.trim().replace(/\s+/g, '').toUpperCase()
+  return normalized.length > 0 ? normalized : undefined
+}
+
+function normalizeAveragePriceCurrency(value: unknown): AveragePriceCurrency | undefined {
+  return value === 'KRW' || value === 'USD' ? value : undefined
+}
+
+function inferCurrencyFromMoneyText(value: unknown): AveragePriceCurrency | undefined {
+  if (typeof value !== 'string') {
+    return undefined
+  }
+
+  const normalized = value.trim().toUpperCase()
+
+  if (!normalized) {
+    return undefined
+  }
+
+  if (normalized.includes('$') || normalized.includes('USD')) {
+    return 'USD'
+  }
+
+  if (normalized.includes('₩') || normalized.includes('원') || normalized.includes('KRW')) {
+    return 'KRW'
+  }
+
+  return undefined
+}
+
+function isUsResolvedMarket(resolvedMarketTone: AppliedHomePortfolioRow['resolvedMarketTone'], resolvedMarket: string | undefined) {
+  return resolvedMarketTone === 'nasdaq' || /(nasdaq|nyse|amex|us)/i.test(resolvedMarket ?? '')
+}
+
+function resolveAppliedAveragePriceCurrency(
+  item: Record<string, unknown>,
+  resolvedMarketTone: AppliedHomePortfolioRow['resolvedMarketTone'],
+  resolvedMarket: string | undefined,
+): AveragePriceCurrency | undefined {
+  const explicitCurrency = normalizeAveragePriceCurrency(item.averagePriceCurrency)
+    ?? inferCurrencyFromMoneyText(item.averagePrice)
+
+  if (explicitCurrency) {
+    return explicitCurrency
+  }
+
+  const evaluationAmountCurrency = inferCurrencyFromMoneyText(item.evaluationAmount)
+
+  if (isUsResolvedMarket(resolvedMarketTone, resolvedMarket)) {
+    return evaluationAmountCurrency
+  }
+
+  return evaluationAmountCurrency ?? 'KRW'
+}
+
+function sanitizeAppliedHomePortfolioRows(input: unknown): AppliedHomePortfolioRow[] {
+  if (!Array.isArray(input)) {
+    return []
+  }
+
+  return input
+    .filter((item): item is Record<string, unknown> => typeof item === 'object' && item !== null)
+    .map((item): AppliedHomePortfolioRow => {
+      const resolvedMarketTone: AppliedHomePortfolioRow['resolvedMarketTone'] =
+        item.resolvedMarketTone === 'kospi' || item.resolvedMarketTone === 'kosdaq' || item.resolvedMarketTone === 'nasdaq' || item.resolvedMarketTone === 'etf'
+          ? item.resolvedMarketTone
+          : undefined
+      const resolvedKind: AppliedHomePortfolioRow['resolvedKind'] =
+        item.resolvedKind === 'stock' || item.resolvedKind === 'etf' ? item.resolvedKind : undefined
+      const resolvedMarket = readTrimmedString(item.resolvedMarket)
+      const averagePriceCurrency = resolveAppliedAveragePriceCurrency(item, resolvedMarketTone, resolvedMarket)
+
+      return {
+        name: readTrimmedString(item.name) ?? '',
+        quantity: readTrimmedString(item.quantity) ?? '',
+        averagePrice: readTrimmedString(item.averagePrice) ?? '',
+        averagePriceCurrency,
+        code: normalizeAppliedInstrumentCode(item.code),
+        ticker: normalizeAppliedInstrumentCode(item.ticker),
+        resolvedName: readTrimmedString(item.resolvedName),
+        resolvedCode: normalizeAppliedInstrumentCode(item.resolvedCode),
+        resolvedTicker: normalizeAppliedInstrumentCode(item.resolvedTicker),
+        resolvedMarket,
+        resolvedMarketTone,
+        resolvedKind,
+      }
+    })
+    .filter((item) => item.name.length > 0 || item.quantity.length > 0 || item.averagePrice.length > 0)
+}
+
 function formatNumber(value: number, maximumFractionDigits = 0) {
   return value.toLocaleString('ko-KR', {
     minimumFractionDigits: 0,
@@ -425,14 +544,28 @@ function formatNumber(value: number, maximumFractionDigits = 0) {
   })
 }
 
-function formatCurrencyValue(value: string) {
+function formatCurrencyValue(value: string, currency?: AveragePriceCurrency) {
   const parsedValue = parseOcrNumber(value)
 
   if (parsedValue === null) {
     return value.trim() || '-'
   }
 
-  return `${formatNumber(parsedValue)}원`
+  if (currency === 'USD') {
+    return `$${parsedValue.toLocaleString('en-US', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 4,
+    })}`
+  }
+
+  if (currency === 'KRW') {
+    return `${formatNumber(parsedValue, Number.isInteger(parsedValue) ? 0 : 4)}원`
+  }
+
+  return parsedValue.toLocaleString('ko-KR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 4,
+  })
 }
 
 function formatQuantityValue(value: string) {
@@ -445,22 +578,31 @@ function formatQuantityValue(value: string) {
   return `${formatNumber(parsedValue)}주`
 }
 
-function formatPercentValue(value: string) {
-  const parsedValue = parseOcrNumber(value)
-
-  if (parsedValue === null) {
-    return value.trim() || '-'
-  }
-
-  return `${parsedValue > 0 ? '+' : ''}${formatNumber(parsedValue, 2)}%`
-}
-
-function formatSignedCurrencyValue(value: number | null) {
+function formatSignedCurrencyValue(value: number | null, currency: 'KRW' | 'USD' = 'KRW') {
   if (value === null || !Number.isFinite(value)) {
     return '-'
   }
 
+  if (currency === 'USD') {
+    return `${value > 0 ? '+' : value < 0 ? '-' : ''}$${Math.abs(value).toLocaleString('en-US', {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    })}`
+  }
+
   return `${value > 0 ? '+' : value < 0 ? '-' : ''}${formatNumber(Math.abs(value))}원`
+}
+
+function computeHoldingBaseAmount(quantity: string, averagePrice: string) {
+  const quantityValue = parseOcrNumber(quantity)
+  const averagePriceValue = parseOcrNumber(averagePrice)
+
+  if (quantityValue === null || averagePriceValue === null) {
+    return null
+  }
+
+  const baseAmount = quantityValue * averagePriceValue
+  return Number.isFinite(baseAmount) && baseAmount > 0 ? baseAmount : null
 }
 
 function inferHoldingKind(name: string): HomeHolding['kind'] {
@@ -492,7 +634,7 @@ function buildHoldingIdentifierLabel(ticker?: string, code?: string) {
   return identifiers.length > 0 ? identifiers.join(' · ') : undefined
 }
 
-function buildHoldingMetaLine(ticker: string | undefined, code: string | undefined, averagePrice: string, evaluationAmount: string) {
+function buildHoldingMetaLine(ticker: string | undefined, code: string | undefined, averagePrice: string, evaluationAmount?: string) {
   const parts: string[] = []
 
   if (ticker) {
@@ -503,7 +645,11 @@ function buildHoldingMetaLine(ticker: string | undefined, code: string | undefin
     parts.push(`종목코드 ${code}`)
   }
 
-  parts.push(`평단 ${averagePrice}`, `평가금액 ${evaluationAmount}`)
+  parts.push(`평단 ${averagePrice}`)
+
+  if (evaluationAmount && evaluationAmount !== '-') {
+    parts.push(`평가금액 ${evaluationAmount}`)
+  }
 
   return parts.join(' · ')
 }
@@ -576,21 +722,10 @@ function buildOpinionText(name: string, kind: HomeHolding['kind'], profitRateVal
   return `${name} 손실 구간을 OCR에서 반영했어요. 회복 신호가 있는지 딥스캔으로 추가 확인해보세요.`
 }
 
-function computeProfitAmountValue(profitRateValue: number | null, evaluationAmountValue: number | null) {
-  if (profitRateValue === null || evaluationAmountValue === null) {
-    return null
-  }
-
-  const divisor = 1 + profitRateValue / 100
-
-  if (!Number.isFinite(divisor) || divisor === 0) {
-    return null
-  }
-
-  const principal = evaluationAmountValue / divisor
-  const profitAmount = evaluationAmountValue - principal
-
-  return Number.isFinite(profitAmount) ? profitAmount : null
+function cacheDeepScanSnapshot(snapshotKey: string, snapshot: DeepScanTargetSession) {
+  cachedDeepScanSnapshotKey = snapshotKey
+  cachedDeepScanSnapshot = snapshot
+  return snapshot
 }
 
 export function persistAppliedHomePortfolio(session: AppliedHomePortfolioSession) {
@@ -599,11 +734,13 @@ export function persistAppliedHomePortfolio(session: AppliedHomePortfolioSession
   }
 
   try {
+    const sanitizedRows = sanitizeAppliedHomePortfolioRows(session.rows)
+
     window.sessionStorage.setItem(
       APPLIED_HOME_PORTFOLIO_STORAGE_KEY,
       JSON.stringify({
         broker: session.broker,
-        rows: sanitizeOcrRows(session.rows),
+        rows: sanitizedRows,
         appliedAt: session.appliedAt ?? new Date().toISOString(),
       }),
     )
@@ -632,7 +769,7 @@ export function readAppliedHomePortfolio(): AppliedHomePortfolioSession | null {
       return null
     }
 
-    const rows = sanitizeOcrRows(parsedValue.rows)
+    const rows = sanitizeAppliedHomePortfolioRows(parsedValue.rows)
 
     if (rows.length === 0) {
       return null
@@ -696,6 +833,10 @@ export function readDeepScanTarget(): HomeHolding | null {
   return readDeepScanTargetSession()?.holding ?? null
 }
 
+export function resolveDeepScanTargetServerSnapshot(): DeepScanTargetSession {
+  return DEEPSCAN_SERVER_SNAPSHOT
+}
+
 export function resolveDeepScanTargetSession() {
   if (typeof window === 'undefined') {
     return DEEPSCAN_SERVER_SNAPSHOT
@@ -710,58 +851,97 @@ export function resolveDeepScanTargetSession() {
   }
 
   const storedTarget = readDeepScanTargetSession()
-
-  if (storedTarget) {
-    cachedDeepScanSnapshotKey = snapshotKey
-    cachedDeepScanSnapshot = storedTarget
-    return storedTarget
-  }
-
   const appliedPortfolio = readAppliedHomePortfolio()
+  const appliedHolding = appliedPortfolio?.rows.length
+    ? pickDeepScanDefaultHolding(buildHomeHoldingsFromOcrRows(appliedPortfolio.rows))
+    : null
+  const resolvedSnapshot = storedTarget
+    ?? (appliedHolding ? buildDeepScanTargetSession(appliedHolding) : null)
+    ?? DEEPSCAN_SERVER_SNAPSHOT
 
-  if (appliedPortfolio?.rows.length) {
-    const appliedHolding = pickDeepScanDefaultHolding(buildHomeHoldingsFromOcrRows(appliedPortfolio.rows))
-
-    if (appliedHolding) {
-      const nextSnapshot = buildDeepScanTargetSession(appliedHolding)
-      cachedDeepScanSnapshotKey = snapshotKey
-      cachedDeepScanSnapshot = nextSnapshot
-      return nextSnapshot
-    }
-  }
-
-  cachedDeepScanSnapshotKey = snapshotKey
-  cachedDeepScanSnapshot = DEEPSCAN_SERVER_SNAPSHOT
-
-  return DEEPSCAN_SERVER_SNAPSHOT
+  return cacheDeepScanSnapshot(snapshotKey, resolvedSnapshot)
 }
 
-export function buildHomeHoldingsFromOcrRows(rows: OcrRow[]): HomeHolding[] {
-  const sanitizedRows = sanitizeOcrRows(rows)
+function formatAveragePriceFromPortfolioItem(item: PortfolioNormalizedItem) {
+  if (item.averagePriceCurrency === 'USD') {
+    return formatCurrencyValue(String(item.averagePrice), 'USD')
+  }
+
+  if (item.averagePriceCurrency === 'KRW') {
+    return formatCurrencyValue(String(item.averagePrice), 'KRW')
+  }
+
+  if (item.marketTone === 'nasdaq') {
+    return item.averagePrice.toFixed(4)
+  }
+
+  return formatCurrencyValue(String(item.averagePrice), 'KRW')
+}
+
+function buildAppliedRowFromPortfolioItem(item: PortfolioNormalizedItem): AppliedHomePortfolioRow {
+  return {
+    name: item.name,
+    quantity: `${item.quantity}주`,
+    averagePrice: formatAveragePriceFromPortfolioItem(item),
+    averagePriceCurrency: item.averagePriceCurrency,
+    code: item.code,
+    ticker: item.ticker,
+    resolvedName: item.name,
+    resolvedCode: item.code,
+    resolvedTicker: item.ticker,
+    resolvedMarket: item.market,
+    resolvedMarketTone: item.marketTone,
+    resolvedKind: item.kind,
+  }
+}
+
+export function buildHomeHoldingsFromPortfolioItems(items: PortfolioNormalizedItem[]): HomeHolding[] {
+  if (items.length === 0) {
+    return []
+  }
+
+  return buildHomeHoldingsFromOcrRows(items.map((item) => buildAppliedRowFromPortfolioItem(item)))
+}
+
+export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): HomeHolding[] {
+  const sanitizedRows = sanitizeAppliedHomePortfolioRows(rows)
 
   if (sanitizedRows.length === 0) {
     return []
   }
 
-  const weights = sanitizedRows.map((row) => {
-    const evaluationAmountValue = parseOcrNumber(row.evaluationAmount)
-    return evaluationAmountValue !== null && evaluationAmountValue > 0 ? evaluationAmountValue : 1
-  })
-  const totalWeight = weights.reduce((sum, value) => sum + value, 0) || sanitizedRows.length
-
-  return sanitizedRows.map((row, index) => {
+  const preparedRows = sanitizedRows.map((row, index) => {
     const kind = row.resolvedKind ?? inferHoldingKind(row.resolvedName || row.name)
-    const profitRateValue = parseOcrNumber(row.profitRate)
-    const evaluationAmountValue = parseOcrNumber(row.evaluationAmount)
-    const tone = deriveHoldingTone(profitRateValue)
-    const averagePrice = formatCurrencyValue(row.averagePrice || computeAveragePrice(row.quantity, row.profitRate, row.evaluationAmount))
-    const evaluationAmount = formatCurrencyValue(row.evaluationAmount)
-    const shares = formatQuantityValue(row.quantity)
-    const change = formatPercentValue(row.profitRate)
-    const pnl = formatSignedCurrencyValue(computeProfitAmountValue(profitRateValue, evaluationAmountValue))
-    const donutPercent = weights[index] / totalWeight
     const displayName = row.resolvedName?.trim() || row.name.trim() || `인식 종목 ${index + 1}`
     const market = row.resolvedMarket?.trim() || (kind === 'etf' ? 'ETF' : 'OCR')
+    const marketTone = resolveHomeMarketTone(row.resolvedMarketTone, market, kind)
+    const displayCurrency: AveragePriceCurrency | undefined = row.averagePriceCurrency
+      ?? inferCurrencyFromMoneyText(row.averagePrice)
+      ?? (marketTone === 'nasdaq' ? undefined : 'KRW')
+    const averagePriceRaw = row.averagePrice
+
+    return {
+      row,
+      kind,
+      displayName,
+      market,
+      marketTone,
+      averagePriceCurrency: displayCurrency,
+      averagePrice: formatCurrencyValue(averagePriceRaw, displayCurrency),
+      baseAmountValue: computeHoldingBaseAmount(row.quantity, averagePriceRaw),
+    }
+  })
+
+  const weights = preparedRows.map((item) => item.baseAmountValue ?? 1)
+  const totalWeight = weights.reduce((sum, value) => sum + value, 0) || sanitizedRows.length
+
+  return preparedRows.map(({ row, kind, displayName, market, marketTone, averagePriceCurrency, averagePrice }, index) => {
+    const tone = deriveHoldingTone(null)
+    const shares = formatQuantityValue(row.quantity)
+    const change = '-'
+    const placeholderCurrency = averagePriceCurrency ?? (marketTone === 'nasdaq' ? 'USD' : 'KRW')
+    const pnl = formatSignedCurrencyValue(null, placeholderCurrency)
+    const donutPercent = weights[index] / totalWeight
     const identifierTicker = row.resolvedTicker?.trim() || row.ticker || undefined
     const identifierCode = row.resolvedCode?.trim() || row.code || HOME_HOLDING_CODE_BY_NAME.get(normalizeStockName(displayName)) || undefined
     const identifierLabel = buildHoldingIdentifierLabel(identifierTicker, identifierCode)
@@ -776,9 +956,9 @@ export function buildHomeHoldingsFromOcrRows(rows: OcrRow[]): HomeHolding[] {
       donutLabel: displayName.replace(/\s+/g, '').slice(0, 10) || displayName,
       shares,
       averagePrice,
-      evaluationAmount,
+      averagePriceCurrency,
       market,
-      marketTone: resolveHomeMarketTone(row.resolvedMarketTone, market, kind),
+      marketTone,
       identifierTicker,
       identifierCode,
       identifierLabel,
@@ -797,21 +977,21 @@ export function buildHomeHoldingsFromOcrRows(rows: OcrRow[]): HomeHolding[] {
       donutPercent,
       heatmapWeight: `${Math.round(donutPercent * 100)}%`,
       heatmapBackground: kind === 'etf' ? '#1E4D8C' : tone.heatmapBackground,
-      heatmapChange: change,
-      heatmapMeta: kind === 'etf' ? 'ETF' : row.resolvedMarketTone === 'nasdaq' ? market : undefined,
+      heatmapChange: undefined,
+      heatmapMeta: kind === 'etf' ? 'ETF' : marketTone === 'nasdaq' ? market : undefined,
       heatmapBadge: tone.badge,
       heatmapBadgeTone: tone.badgeTone,
       blink: tone.cardTone === 'danger' && kind !== 'etf',
       opinionLabel: kind === 'etf' ? 'OCR 요약' : 'AI 간략 의견',
-      opinionText: buildOpinionText(displayName, kind, profitRateValue),
+      opinionText: buildOpinionText(displayName, kind, null),
       opinionBackground: kind === 'etf' ? '#f0f7ff' : tone.cardTone === 'profit' ? '#F0FAF4' : tone.cardTone === 'danger' ? '#FFF0F0' : '#f8f8f6',
       opinionBorder: kind === 'etf' ? '#B5D4F4' : tone.cardTone === 'danger' ? '#F7C1C1' : 'transparent',
       opinionTextColor: kind === 'etf' ? '#0C447C' : tone.cardTone === 'profit' ? '#27500A' : tone.cardTone === 'danger' ? '#791F1F' : '#555',
-      metaLine: buildHoldingMetaLine(identifierTicker, identifierCode, averagePrice, evaluationAmount),
+      metaLine: buildHoldingMetaLine(identifierTicker, identifierCode, averagePrice),
       metrics: [
         { label: '보유 수량', value: shares, tone: 'neutral' },
-        { label: '수익률', value: change, tone: tone.metricTone },
-        { label: '평가 금액', value: evaluationAmount, tone: 'neutral' },
+        { label: '수익률', value: change, tone: 'neutral' },
+        { label: '평가 금액', value: '-', tone: 'neutral' },
       ],
       actionLabel: kind === 'etf' ? 'ETF 분석' : '딥스캔',
       actionSubLabel: kind === 'etf' ? '섹터 구성 + 회복 시나리오' : 'AI 9인 위원회 분석',

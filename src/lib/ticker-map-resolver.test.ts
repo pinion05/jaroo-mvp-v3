@@ -6,22 +6,23 @@ import { fileURLToPath } from 'node:url'
 import { resetTickerMapResolverCacheForTests, searchTickerMapCandidates } from './ticker-map-resolver'
 
 const fixtureRepoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../tests/fixtures/ticker-map')
+const mutableProcessEnv = process.env as Record<string, string | undefined>
 
 function restoreEnvValue(key: string, value: string | undefined) {
   if (typeof value === 'undefined') {
-    delete process.env[key]
+    delete mutableProcessEnv[key]
     return
   }
 
-  process.env[key] = value
+  mutableProcessEnv[key] = value
 }
 
 test('ticker-map fuzzy search는 fixture repo root에서 후보를 반환한다', async () => {
   const previousRepoRoot = process.env.TICKER_MAP_REPO_ROOT
   const previousNodeEnv = process.env.NODE_ENV
 
-  process.env.TICKER_MAP_REPO_ROOT = fixtureRepoRoot
-  delete process.env.NODE_ENV
+  mutableProcessEnv.TICKER_MAP_REPO_ROOT = fixtureRepoRoot
+  delete mutableProcessEnv.NODE_ENV
   resetTickerMapResolverCacheForTests()
 
   try {
@@ -41,8 +42,8 @@ test('production에서는 명시적 repo root 없이 fallback discovery를 사�
   const previousRepoRoot = process.env.TICKER_MAP_REPO_ROOT
   const previousNodeEnv = process.env.NODE_ENV
 
-  delete process.env.TICKER_MAP_REPO_ROOT
-  process.env.NODE_ENV = 'production'
+  delete mutableProcessEnv.TICKER_MAP_REPO_ROOT
+  mutableProcessEnv.NODE_ENV = 'production'
   resetTickerMapResolverCacheForTests()
 
   try {

@@ -1,26 +1,35 @@
 'use client'
 
 import Link from 'next/link'
-import { useCallback, useMemo, useRef, useState, useSyncExternalStore, type MouseEvent } from 'react'
+import { useRouter } from 'next/navigation'
+import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Treemap, type PieLabelRenderProps, type TreemapNode } from 'recharts'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
+import { prefetchAndPersistDeepScanSlimSummary } from '@/lib/deepscan-slim'
+import {
+  applyCurrentQuotesToHomeHoldings,
+  buildHomeCurrentQuoteQuery,
+  buildHomeHoldingErrorCard,
+  buildQuoteLookupKey,
+  resolveAveragePriceCurrency,
+  type CurrentQuoteItem,
+  type HomeHoldingQuoteErrorKind,
+} from '@/lib/home-current-quotes'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 import {
-  APPLIED_HOME_PORTFOLIO_EVENT,
-  APPLIED_HOME_PORTFOLIO_STORAGE_KEY,
-  buildHomeHoldingsFromOcrRows,
+  buildHomeHoldingsFromPortfolioItems,
   homeForecast as defaultHomeForecast,
-  homeHoldings as defaultHomeHoldings,
   momentumSignals as defaultMomentumSignals,
   momentumStages as defaultMomentumStages,
-  persistDeepScanTarget,
   portfolioScoreBreakdown as defaultPortfolioScoreBreakdown,
-  readAppliedHomePortfolio,
   type HomeBadgeTone,
   type HomeHolding,
   type HomeMetricTone,
 } from '@/lib/jaroo-home-data'
+import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
+import { usePortfolioStore } from '@/lib/stores/use-portfolio-store'
+import { toDeepScanTargetInput } from '@/lib/workflow-types'
 import styles from './jaroo-home-screen.module.css'
 
 const DONUT_CHART_SIZE = 210
@@ -45,6 +54,15 @@ type PortfolioSummary = {
   momentumStages: typeof defaultMomentumStages
 }
 
+type PortfolioStoreItem = ReturnType<typeof usePortfolioStore.getState>['items'][number]
+
+function stripPortfolioQuoteFields(item: PortfolioStoreItem) {
+  const { currentPrice, currentProfitRate, ...baseItem } = item
+  void currentPrice
+  void currentProfitRate
+  return baseItem
+}
+
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
@@ -56,7 +74,11 @@ function getHoldingChangeValue(item: HomeHolding) {
 function getValueToneClass(item: HomeHolding) {
   const changeValue = getHoldingChangeValue(item)
 
-  if (changeValue !== null && changeValue > 0) {
+  if (changeValue === null) {
+    return undefined
+  }
+
+  if (changeValue > 0) {
     return styles.valuePositive
   }
 
@@ -89,14 +111,6 @@ function getHoldingIdentifierText(item: HomeHolding) {
   )
 
   return identifiers.length > 0 ? identifiers.join(' · ') : item.identifierLabel
-}
-
-function handleHoldingActionClick(item: HomeHolding, event: MouseEvent<HTMLAnchorElement>) {
-  event.stopPropagation()
-
-  if (item.actionHref === '/deepscan' && item.kind === 'stock') {
-    persistDeepScanTarget(item)
-  }
 }
 
 function buildPortfolioSummary(holdings: HomeHolding[], isAppliedPortfolio: boolean): PortfolioSummary {
@@ -254,59 +268,6 @@ function HeatmapTile({
   )
 }
 
-const defaultAppliedPortfolioSnapshot = { holdings: defaultHomeHoldings, isAppliedPortfolio: false } as const
-
-let cachedAppliedPortfolioRaw: string | null | undefined
-let cachedAppliedPortfolioSnapshot: { holdings: HomeHolding[]; isAppliedPortfolio: boolean } = defaultAppliedPortfolioSnapshot
-
-function getAppliedPortfolioSnapshot() {
-  if (typeof window === 'undefined') {
-    return defaultAppliedPortfolioSnapshot
-  }
-
-  const rawValue = window.sessionStorage.getItem(APPLIED_HOME_PORTFOLIO_STORAGE_KEY)
-
-  if (rawValue === cachedAppliedPortfolioRaw) {
-    return cachedAppliedPortfolioSnapshot
-  }
-
-  cachedAppliedPortfolioRaw = rawValue
-
-  if (!rawValue) {
-    cachedAppliedPortfolioSnapshot = defaultAppliedPortfolioSnapshot
-    return cachedAppliedPortfolioSnapshot
-  }
-
-  const appliedPortfolio = readAppliedHomePortfolio()
-
-  if (appliedPortfolio?.rows.length) {
-    cachedAppliedPortfolioSnapshot = {
-      holdings: buildHomeHoldingsFromOcrRows(appliedPortfolio.rows),
-      isAppliedPortfolio: true,
-    }
-    return cachedAppliedPortfolioSnapshot
-  }
-
-  cachedAppliedPortfolioSnapshot = defaultAppliedPortfolioSnapshot
-  return cachedAppliedPortfolioSnapshot
-}
-
-function subscribeAppliedPortfolio(onStoreChange: () => void) {
-  if (typeof window === 'undefined') {
-    return () => {}
-  }
-
-  const handleChange = () => onStoreChange()
-
-  window.addEventListener('storage', handleChange)
-  window.addEventListener(APPLIED_HOME_PORTFOLIO_EVENT, handleChange)
-
-  return () => {
-    window.removeEventListener('storage', handleChange)
-    window.removeEventListener(APPLIED_HOME_PORTFOLIO_EVENT, handleChange)
-  }
-}
-
 function badgeToneClass(tone: HomeBadgeTone) {
   switch (tone) {
     case 'red':
@@ -374,18 +335,288 @@ function actionToneClass(item: HomeHolding) {
 }
 
 export function JarooHomeScreen() {
-  const frameRef = useRef<HTMLDivElement | null>(null)
+  const router = useRouter()
+  const frameRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<Record<number, HTMLDivElement | null>>({})
+
+  const portfolioItems = usePortfolioStore((state) => state.items)
+  const quoteStatus = usePortfolioStore((state) => state.quoteStatus)
+  const quoteErrorMessage = usePortfolioStore((state) => state.quoteErrorMessage)
+  const setQuoteStatus = usePortfolioStore((state) => state.setQuoteStatus)
+  const patchQuote = usePortfolioStore((state) => state.patchQuote)
+  const clearItemQuote = usePortfolioStore((state) => state.clearItemQuote)
+  const setDeepScanTarget = useDeepScanStore((state) => state.setTarget)
+
   const [view, setView] = useState<ViewMode>('donut')
   const [selectedId, setSelectedId] = useState<number | null>(null)
   const [openStockCardId, setOpenStockCardId] = useState<number | null>(null)
   const [openEtfCardId, setOpenEtfCardId] = useState<number | null>(null)
   const [openSheet, setOpenSheet] = useState<SheetMode>(null)
-  const { holdings: homeHoldings, isAppliedPortfolio } = useSyncExternalStore(
-    subscribeAppliedPortfolio,
-    getAppliedPortfolioSnapshot,
-    () => ({ holdings: defaultHomeHoldings, isAppliedPortfolio: false }),
+  const [liveQuoteSnapshot, setLiveQuoteSnapshot] = useState<{ query: string; items: CurrentQuoteItem[] }>({ query: '', items: [] })
+  const [usdKrwRate, setUsdKrwRate] = useState<number | null>(null)
+  const [quoteFailureKinds, setQuoteFailureKinds] = useState<Record<string, HomeHoldingQuoteErrorKind>>({})
+  const [quoteSummaryMessage, setQuoteSummaryMessage] = useState<string | null>(null)
+  const [refreshVersion, setRefreshVersion] = useState(0)
+
+  const portfolioBaseItems = useMemo(() => portfolioItems.map((item) => stripPortfolioQuoteFields(item)), [portfolioItems])
+  const portfolioSignature = useMemo(
+    () => portfolioBaseItems.map((item) => [item.code, item.ticker, item.name, item.market, item.quantity, item.averagePrice, item.averagePriceCurrency].filter(Boolean).join('|')).join('||'),
+    [portfolioBaseItems],
   )
+  const hasPortfolioItems = portfolioBaseItems.length > 0
+  const isAppliedPortfolio = hasPortfolioItems
+  const rawHomeHoldings = useMemo(() => buildHomeHoldingsFromPortfolioItems(portfolioBaseItems), [portfolioBaseItems])
+  const portfolioBaseItemsRef = useRef(portfolioBaseItems)
+  const rawHomeHoldingsRef = useRef(rawHomeHoldings)
+  const quoteQuery = useMemo(() => buildHomeCurrentQuoteQuery(rawHomeHoldings), [rawHomeHoldings])
+  const quoteSurfaceEnabled = hasPortfolioItems && Boolean(quoteQuery)
+  const quoteRunKey = `${portfolioSignature}::${quoteQuery}::${refreshVersion}`
+  const hasUsHomeHoldings = useMemo(
+    () => rawHomeHoldings.some((holding) => holding.marketTone === 'nasdaq' || Boolean(holding.identifierTicker)),
+    [rawHomeHoldings],
+  )
+
+  const redirectReasonMessage = '홈 포트폴리오가 없어 /ocr 로 이동합니다.'
+
+  useEffect(() => {
+    if (hasPortfolioItems) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      router.replace('/ocr')
+    }, 350)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [hasPortfolioItems, router])
+
+  useEffect(() => {
+    portfolioBaseItemsRef.current = portfolioBaseItems
+    rawHomeHoldingsRef.current = rawHomeHoldings
+  }, [portfolioBaseItems, rawHomeHoldings])
+
+  useEffect(() => {
+    if (!quoteSurfaceEnabled) {
+      return
+    }
+    const abortController = new AbortController()
+
+    const clearAllKnownQuotes = () => {
+      for (const item of portfolioBaseItemsRef.current) {
+        clearItemQuote({ code: item.code, ticker: item.ticker, name: item.name, market: item.market })
+      }
+    }
+
+    const hydrateQuotes = async () => {
+      setQuoteStatus('loading')
+      setQuoteSummaryMessage(null)
+      setQuoteFailureKinds({})
+
+      let nextFxRate: number | null = null
+      let fxFetchFailed = false
+
+      if (hasUsHomeHoldings) {
+        try {
+          const fxResponse = await fetch('/api/market/fx/usd-krw', { cache: 'no-store', signal: abortController.signal })
+          const fxPayload = await fxResponse.json()
+          const parsedRate = Number(fxPayload?.data?.rate)
+          if (fxResponse.ok && Number.isFinite(parsedRate) && parsedRate > 0) {
+            nextFxRate = parsedRate
+          } else {
+            fxFetchFailed = true
+          }
+        } catch {
+          fxFetchFailed = true
+        }
+      }
+
+      try {
+        const response = await fetch(`/api/quotes/current?${quoteQuery}`, { cache: 'no-store', signal: abortController.signal })
+        const payload = await response.json()
+
+        if (abortController.signal.aborted) {
+          return
+        }
+
+        if (!response.ok) {
+          clearAllKnownQuotes()
+          setLiveQuoteSnapshot({ query: quoteQuery, items: [] })
+          setUsdKrwRate(nextFxRate)
+          setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.')
+          return
+        }
+
+        const nextItems: CurrentQuoteItem[] = Array.isArray(payload?.data?.items) ? payload.data.items : []
+        const okItems = nextItems.filter((item) => item.status === 'ok' && typeof item.price === 'number')
+        const nextHoldings = applyCurrentQuotesToHomeHoldings(rawHomeHoldingsRef.current, okItems, { usdKrwRate: hasUsHomeHoldings ? nextFxRate : null })
+        const nextHoldingsById = new Map(nextHoldings.map((holding) => [holding.id, holding]))
+        const responseByLookupKey = new Map<string, CurrentQuoteItem>()
+        for (const item of nextItems) {
+          const lookupKey = item.market === 'US'
+            ? item.ticker?.trim().toUpperCase()
+            : item.code?.trim()
+          if (lookupKey) {
+            responseByLookupKey.set(lookupKey, item)
+          }
+        }
+
+        const nextFailureKinds: Record<string, HomeHoldingQuoteErrorKind> = {}
+
+        for (const [index, item] of portfolioBaseItemsRef.current.entries()) {
+          const homeHolding = rawHomeHoldingsRef.current[index]
+          const itemKey = `${item.code ?? ''}|${item.ticker ?? ''}|${item.name}|${item.market ?? ''}`
+          const lookupKey = homeHolding ? buildQuoteLookupKey(homeHolding) : undefined
+          const quoteItem = lookupKey ? responseByLookupKey.get(lookupKey) : undefined
+
+          if (!homeHolding || !homeHolding.name.trim()) {
+            nextFailureKinds[itemKey] = 'holding-invalid'
+            clearItemQuote({ code: item.code, ticker: item.ticker, name: item.name, market: item.market })
+            continue
+          }
+
+          if (!quoteItem || quoteItem.status !== 'ok' || typeof quoteItem.price !== 'number') {
+            nextFailureKinds[itemKey] = 'quote-unavailable'
+            clearItemQuote({ code: item.code, ticker: item.ticker, name: item.name, market: item.market })
+            continue
+          }
+
+          const averagePriceCurrency = resolveAveragePriceCurrency(homeHolding, 'USD', quoteItem, { usdKrwRate: nextFxRate })
+          const requiresFx = averagePriceCurrency === 'KRW'
+          if (requiresFx && (fxFetchFailed || nextFxRate === null)) {
+            nextFailureKinds[itemKey] = 'fx-required'
+            clearItemQuote({ code: item.code, ticker: item.ticker, name: item.name, market: item.market })
+            continue
+          }
+
+          const enrichedHolding = nextHoldingsById.get(homeHolding.id)
+          patchQuote(
+            { code: item.code, ticker: item.ticker, name: item.name, market: item.market },
+            {
+              currentPrice: quoteItem.price,
+              currentProfitRate: parseOcrNumber(enrichedHolding?.change ?? '') ?? undefined,
+            },
+          )
+        }
+
+        setLiveQuoteSnapshot({ query: quoteQuery, items: nextItems })
+        setUsdKrwRate(nextFxRate)
+        setQuoteFailureKinds(nextFailureKinds)
+
+        const failureCount = Object.keys(nextFailureKinds).length
+        if (failureCount === rawHomeHoldingsRef.current.length) {
+          setQuoteSummaryMessage(null)
+          setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.')
+          return
+        }
+
+        setQuoteSummaryMessage(
+          failureCount > 0
+            ? '일부 종목의 시세를 불러오지 못해 오류 카드로 표시했어요.'
+            : null,
+        )
+        setQuoteStatus('success')
+      } catch (error) {
+        if (abortController.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
+          return
+        }
+
+        clearAllKnownQuotes()
+        setLiveQuoteSnapshot({ query: quoteQuery, items: [] })
+        setUsdKrwRate(nextFxRate)
+        setQuoteFailureKinds({})
+        setQuoteSummaryMessage(null)
+        setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.')
+      }
+    }
+
+    void hydrateQuotes()
+
+    return () => {
+      abortController.abort()
+    }
+  }, [clearItemQuote, hasUsHomeHoldings, patchQuote, quoteRunKey, quoteSurfaceEnabled, quoteQuery, setQuoteStatus])
+
+  const homeHoldings = useMemo(() => {
+    const quoteApplied = applyCurrentQuotesToHomeHoldings(
+      rawHomeHoldings,
+      quoteQuery && liveQuoteSnapshot.query === quoteQuery ? liveQuoteSnapshot.items.filter((item) => item.status === 'ok' && typeof item.price === 'number') : [],
+      { usdKrwRate: hasUsHomeHoldings ? usdKrwRate : null },
+    )
+
+    return quoteApplied.map((holding, index) => {
+      const item = portfolioBaseItems[index]
+      if (!item) {
+        return buildHomeHoldingErrorCard(holding, 'holding-invalid')
+      }
+
+      const itemKey = `${item.code ?? ''}|${item.ticker ?? ''}|${item.name}|${item.market ?? ''}`
+      const failureKind = quoteSurfaceEnabled ? quoteFailureKinds[itemKey] : undefined
+      return failureKind ? buildHomeHoldingErrorCard(holding, failureKind) : holding
+    })
+  }, [hasUsHomeHoldings, liveQuoteSnapshot, portfolioBaseItems, quoteFailureKinds, quoteQuery, quoteSurfaceEnabled, rawHomeHoldings, usdKrwRate])
+
+  const selectedHolding = selectedId === null ? null : homeHoldings.find((item) => item.id === selectedId) ?? null
+  const prefetchedDeepScanHolding = useMemo(() => {
+    if (openStockCardId !== null) {
+      const openedHolding = homeHoldings.find((item) => item.id === openStockCardId) ?? null
+      return openedHolding?.kind === 'stock' ? openedHolding : null
+    }
+
+    return selectedHolding?.kind === 'stock' ? selectedHolding : null
+  }, [homeHoldings, openStockCardId, selectedHolding])
+
+  useEffect(() => {
+    if (!prefetchedDeepScanHolding) {
+      return
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      void prefetchAndPersistDeepScanSlimSummary(prefetchedDeepScanHolding)
+    }, 0)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [prefetchedDeepScanHolding])
+
+  const handleQuoteRefresh = useCallback(() => {
+    if (quoteStatus === 'loading') {
+      return
+    }
+
+    setRefreshVersion((value) => value + 1)
+  }, [quoteStatus])
+
+  const navigateToDeepScanForHolding = useCallback(async (holdingId: number, actionHref: string) => {
+    const item = portfolioItems[holdingId]
+    const holding = homeHoldings.find((entry) => entry.id === holdingId)
+
+    if (!item || !holding || actionHref !== '/deepscan' || holding.kind !== 'stock') {
+      router.push(actionHref)
+      return
+    }
+
+    setDeepScanTarget(toDeepScanTargetInput(item))
+    await Promise.race([
+      prefetchAndPersistDeepScanSlimSummary(holding),
+      new Promise((resolve) => window.setTimeout(resolve, 500)),
+    ]).catch(() => undefined)
+
+    router.push(actionHref)
+  }, [homeHoldings, portfolioItems, router, setDeepScanTarget])
+
+  const handleHoldingActionClick = useCallback(async (item: HomeHolding, event: MouseEvent<HTMLAnchorElement>) => {
+    event.preventDefault()
+    event.stopPropagation()
+
+    if (!item.actionHref) {
+      return
+    }
+
+    await navigateToDeepScanForHolding(item.id, item.actionHref)
+  }, [navigateToDeepScanForHolding])
 
   const donutChartData = useMemo<DonutChartDatum[]>(
     () => homeHoldings.map((item) => ({ ...item, value: Math.max(item.donutPercent, 0.01) })),
@@ -396,7 +627,6 @@ export function JarooHomeScreen() {
     [homeHoldings],
   )
   const heatmapChartHeight = Math.max(234, 234 + Math.max(0, heatmapChartData.length - 5) * 34)
-  const selectedHolding = selectedId === null ? null : homeHoldings.find((item) => item.id === selectedId) ?? null
   const summaryData = useMemo(() => buildPortfolioSummary(homeHoldings, isAppliedPortfolio), [homeHoldings, isAppliedPortfolio])
   const defaultDeepScanHolding = useMemo(() => {
     if (selectedHolding?.kind === 'stock') {
@@ -548,6 +778,21 @@ export function JarooHomeScreen() {
     },
     [handleHeatmapClick, openEtfCardId, openStockCardId, selectedId],
   )
+
+  if (!hasPortfolioItems) {
+    return (
+      <div className={styles.viewport}>
+        <div className={styles.frame}>
+          <div className={styles.body}>
+            <div className={styles.forecastCard}>
+              <div className={styles.forecastLabel}>REDIRECTING</div>
+              <div className={styles.forecastText}>{redirectReasonMessage ?? '홈 포트폴리오를 확인하는 중이에요.'}</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className={styles.viewport}>
@@ -736,7 +981,27 @@ export function JarooHomeScreen() {
         </div>
 
         <div className={styles.body}>
-          <div className={styles.sectionLabel}>종목별 현황</div>
+          {quoteSurfaceEnabled && quoteStatus === 'error' ? (
+            <div className={styles.forecastCard}>
+              <div className={styles.forecastLabel}>QUOTE ERROR</div>
+              <div className={styles.forecastText}>{quoteErrorMessage ?? '현재 시세를 불러오지 못했어요. 다시 시도해주세요.'}</div>
+              <button type='button' className={cn(styles.detailButton, styles.buttonBlue, styles.uploadCtaButton)} onClick={handleQuoteRefresh}>
+                시세 다시 불러오기
+              </button>
+            </div>
+          ) : null}
+          {quoteSurfaceEnabled && quoteSummaryMessage ? (
+            <div className={styles.forecastCard}>
+              <div className={styles.forecastLabel}>PARTIAL SUCCESS</div>
+              <div className={styles.forecastText}>{quoteSummaryMessage}</div>
+            </div>
+          ) : null}
+          <div className='mb-3 flex items-center justify-between gap-3'>
+            <div className={styles.sectionLabel}>종목별 현황</div>
+            <button type='button' className={cn(styles.detailButton, styles.buttonBlue)} onClick={handleQuoteRefresh}>
+              {quoteSurfaceEnabled && quoteStatus === 'loading' ? '시세 갱신 중...' : '시세 새로고침'}
+            </button>
+          </div>
 
           {homeHoldings.map((item) => {
             const isEtf = item.kind === 'etf'
@@ -862,9 +1127,10 @@ export function JarooHomeScreen() {
             <Link
               href={summaryData.forecast.href}
               className={styles.forecastMore}
-              onClick={() => {
+              onClick={(event) => {
                 if (summaryData.forecast.href === '/deepscan' && defaultDeepScanHolding) {
-                  persistDeepScanTarget(defaultDeepScanHolding)
+                  event.preventDefault()
+                  void navigateToDeepScanForHolding(defaultDeepScanHolding.id, summaryData.forecast.href)
                 }
               }}
             >

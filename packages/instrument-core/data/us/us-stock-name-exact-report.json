@@ -1,0 +1,39 @@
+{
+  "generatedAt": "2026-04-10T14:38:16.532772Z",
+  "sources": {
+    "sec": "https://www.sec.gov/files/company_tickers.json",
+    "naver": [
+      "https://api.stock.naver.com/stock/exchange/NASDAQ/marketValue?page=1&pageSize=100",
+      "https://api.stock.naver.com/stock/exchange/NYSE/marketValue?page=1&pageSize=100",
+      "https://api.stock.naver.com/stock/exchange/AMEX/marketValue?page=1&pageSize=100"
+    ]
+  },
+  "secCount": 10426,
+  "naverExchangeCounts": {
+    "NASDAQ": 3845,
+    "NYSE": 2734,
+    "AMEX": 313
+  },
+  "naverTotalCount": 6892,
+  "matchedTickerCount": 6376,
+  "unmatchedTickerCount": 4050,
+  "matchedRate": 61.15,
+  "koMapCount": 7241,
+  "enMapCount": 14985,
+  "koAmbiguousCount": 53,
+  "enAmbiguousCount": 2073,
+  "examples": {
+    "팔란티어": "PLTR",
+    "브로드컴": "AVGO",
+    "비자": "V",
+    "마이크로소프트": "MSFT",
+    "Apple Inc.": "AAPL",
+    "MICROSOFT CORP": "MSFT",
+    "NVIDIA Corp": "NVDA"
+  },
+  "notes": [
+    "영어 맵은 SEC title + Naver stockNameEng exact alias를 사용했다.",
+    "한국어 맵은 Naver stockName 기반 exact/보수적 축약 alias를 사용했다.",
+    "한국어 맵은 Naver coverage 범위까지만 생성되므로 미국 전체 종목 100% 커버는 아니다."
+  ]
+}
