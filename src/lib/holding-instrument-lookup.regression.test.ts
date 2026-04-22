@@ -25,12 +25,15 @@ test('pure ticker exact miss 는 더 짧은 ticker prefix/contains fuzzy 로 붙
   assert.equal(candidates.length, 0)
 })
 
-test('한국 ETF/ETN 자연어 query 안의 generic suffix token 은 미국 ticker 로 해석하지 않는다', () => {
+test('한국 ETF/ETN 자연어 query 안의 generic suffix token 은 미국 ticker 오인 없이 국내 상품으로 붙는다', () => {
   const query = '삼성 인버스 코스피 200 선물 ETN'
   const resolved = resolveHoldingInstrument(query)
   const candidates = searchHoldingInstrumentCandidates(query, 3)
 
-  assert.equal(resolved, null)
+  assert.equal(resolved?.name, '삼성 인버스 코스피 200 선물 ETN')
+  assert.equal(resolved?.code, '530092')
+  assert.equal(resolved?.market, 'ETN')
+  assert.equal(resolved?.locale, 'KR')
   assert.ok(candidates.every((candidate) => candidate.ticker !== 'ETN'))
 })
 
@@ -82,6 +85,24 @@ test('대표적인 한국 ETF 이름과 리브랜딩 별칭도 코드까지 매�
     assert.equal(resolved?.name, expectedName, query)
     assert.equal(resolved?.code, expectedCode, query)
     assert.equal(resolved?.kind, 'etf', query)
+    assert.equal(resolved?.locale, 'KR', query)
+  }
+})
+
+test('대표적인 한국 ETN 이름도 코드까지 매핑한다', () => {
+  const cases = [
+    { query: '삼성 인버스 코스피 200 선물 ETN', expectedName: '삼성 인버스 코스피 200 선물 ETN', expectedCode: '530092' },
+    { query: '신한 레버리지 코스피 200 선물 ETN', expectedName: '신한 레버리지 코스피 200 선물 ETN', expectedCode: '500069' },
+    { query: 'N2 코스피 200 TR ETN', expectedName: 'N2 코스피 200 TR ETN', expectedCode: '550084' },
+  ]
+
+  for (const { query, expectedName, expectedCode } of cases) {
+    const resolved = resolveHoldingInstrument(query)
+
+    assert.equal(resolved?.name, expectedName, query)
+    assert.equal(resolved?.code, expectedCode, query)
+    assert.equal(resolved?.kind, 'etf', query)
+    assert.equal(resolved?.market, 'ETN', query)
     assert.equal(resolved?.locale, 'KR', query)
   }
 })

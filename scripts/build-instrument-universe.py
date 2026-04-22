@@ -162,12 +162,17 @@ def build_kr_aliases(name: str, code: str) -> list[str]:
 
 def parse_wisereport_lookup_rows(html_text: str) -> list[tuple[str, str, str]]:
     return [
-        tuple(html.unescape(value).strip() for value in row)
+        (
+            html.unescape(kind).strip(),
+            html.unescape(code).strip(),
+            html.unescape(title or anchor_name).strip(),
+        )
         for row in re.findall(
-            r'<tr>\s*<td class="c1 center">([^<]+)</td>\s*<td class="c2 center"><a [^>]*>([^<]+)</a></td>\s*<td class="c3 txt"[^>]*><a [^>]*>([^<]+)</a></td>\s*</tr>',
+            r'<tr>\s*<td class="c1 center">([^<]+)</td>\s*<td class="c2 center"><a [^>]*>([^<]+)</a></td>\s*<td class="c3 txt"[^>]*title="([^"]*)"[^>]*><a [^>]*>([^<]*)</a></td>\s*</tr>',
             html_text,
             re.S,
         )
+        for kind, code, title, anchor_name in [row]
     ]
 
 
@@ -204,7 +209,7 @@ def build_kr_entries() -> list[dict[str, object]]:
     return entries
 
 
-def build_kr_etf_entries() -> list[dict[str, object]]:
+def build_kr_exchange_product_entries(product_type: str, cmp_typ: str) -> list[dict[str, object]]:
     lookup_html = fetch_text(WISE_ETF_LOOKUP_URL)
     view_state_match = re.search(r'id="__VIEWSTATE" value="([^"]+)"', lookup_html)
     view_state_generator_match = re.search(r'id="__VIEWSTATEGENERATOR" value="([^"]+)"', lookup_html)
@@ -212,12 +217,12 @@ def build_kr_etf_entries() -> list[dict[str, object]]:
     if not view_state_match or not view_state_generator_match:
         raise RuntimeError('Failed to locate WiseReport ETF lookup form state.')
 
-    etf_lookup_html = post_form(
+    lookup_result_html = post_form(
         WISE_ETF_LOOKUP_URL,
         {
             '__VIEWSTATE': view_state_match.group(1),
             '__VIEWSTATEGENERATOR': view_state_generator_match.group(1),
-            'cmp_typ': '5',
+            'cmp_typ': cmp_typ,
             'ord_col': '',
             'ord_typ': '',
             'index': '0',
@@ -225,11 +230,11 @@ def build_kr_etf_entries() -> list[dict[str, object]]:
         referer=WISE_ETF_LOOKUP_URL,
     )
 
-    rows = parse_wisereport_lookup_rows(etf_lookup_html)
+    rows = parse_wisereport_lookup_rows(lookup_result_html)
     entries: list[dict[str, object]] = []
 
     for kind, code, raw_name in rows:
-        if kind.upper() != 'ETF':
+        if kind.upper() != product_type.upper():
             continue
 
         normalized_code = code.strip().upper()
@@ -242,7 +247,7 @@ def build_kr_etf_entries() -> list[dict[str, object]]:
             {
                 'name': name,
                 'code': normalized_code,
-                'market': 'ETF',
+                'market': product_type.upper(),
                 'marketTone': 'etf',
                 'kind': 'etf',
                 'locale': 'KR',
@@ -304,9 +309,10 @@ def dedupe_entries(entries: list[dict[str, object]]) -> list[dict[str, object]]:
 
 def main() -> None:
     kr_entries = build_kr_entries()
-    kr_etf_entries = build_kr_etf_entries()
+    kr_etf_entries = build_kr_exchange_product_entries('ETF', '5')
+    kr_etn_entries = build_kr_exchange_product_entries('ETN', '25')
     us_entries = build_us_entries()
-    universe = dedupe_entries([*kr_entries, *kr_etf_entries, *us_entries, *MANUAL_ENTRIES])
+    universe = dedupe_entries([*kr_entries, *kr_etf_entries, *kr_etn_entries, *us_entries, *MANUAL_ENTRIES])
     OUTPUT_PATH.parent.mkdir(parents=True, exist_ok=True)
     OUTPUT_PATH.write_text(json.dumps(universe, ensure_ascii=False), encoding='utf-8')
     print(
@@ -315,7 +321,8 @@ def main() -> None:
                 'output': str(OUTPUT_PATH),
                 'totalCount': len(universe),
                 'krCount': len([entry for entry in universe if entry.get('locale') == 'KR']),
-                'krEtfCount': len([entry for entry in universe if entry.get('locale') == 'KR' and entry.get('kind') == 'etf']),
+                'krEtfCount': len([entry for entry in universe if entry.get('locale') == 'KR' and entry.get('market') == 'ETF']),
+                'krEtnCount': len([entry for entry in universe if entry.get('locale') == 'KR' and entry.get('market') == 'ETN']),
                 'usCount': len([entry for entry in universe if entry.get('locale') == 'US']),
             },
             ensure_ascii=False,
