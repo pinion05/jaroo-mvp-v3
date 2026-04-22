@@ -26,6 +26,44 @@ US_ALIAS_SEEDS = {
     'SPY': ['spdr s&p 500', 'spy etf'],
 }
 
+KR_ALIAS_SEEDS_BY_CODE = {
+    '005930': ['삼전'],
+    '005380': ['현대차'],
+    '005490': ['포스코홀딩스', '포스코 홀딩스', 'POSCO홀딩스', 'POSCO 홀딩스', 'posco holdings'],
+    '035420': ['네이버', 'naver'],
+    '003720': ['삼영'],
+    '067160': ['아프리카TV', '아프리카티비', 'SOOP', '숲'],
+    '100840': ['SNT에너지', 'SNT 에너지', 'LST에너지', 'LST 에너지', 'S&TC'],
+    '323410': ['카뱅'],
+    '373220': ['엘지에너지솔루션', 'lg에너지솔루션'],
+}
+
+KR_NAME_OVERRIDES_BY_CODE = {
+    '067160': 'SOOP',
+    '100840': 'SNT에너지',
+}
+
+KR_MANUAL_ENTRIES = [
+    {
+        'name': '카카오뱅크',
+        'code': '323410',
+        'market': 'KOSPI',
+        'marketTone': 'kospi',
+        'kind': 'stock',
+        'locale': 'KR',
+        'aliases': ['카뱅'],
+    },
+    {
+        'name': 'LG에너지솔루션',
+        'code': '373220',
+        'market': 'KOSPI',
+        'marketTone': 'kospi',
+        'kind': 'stock',
+        'locale': 'KR',
+        'aliases': ['엘지에너지솔루션', 'lg에너지솔루션'],
+    },
+]
+
 MANUAL_ENTRIES = [
     {
         'name': 'KODEX 200',
@@ -54,6 +92,7 @@ MANUAL_ENTRIES = [
         'locale': 'US',
         'aliases': ['spdr s&p 500 etf', 's&p500 etf'],
     },
+    *KR_MANUAL_ENTRIES,
 ]
 
 
@@ -80,6 +119,25 @@ def simplify_us_title(title: str) -> list[str]:
     return [variant for variant in variants if variant]
 
 
+def build_kr_aliases(name: str, code: str) -> list[str]:
+    aliases = set(KR_ALIAS_SEEDS_BY_CODE.get(code, []))
+
+    if name.startswith('SK'):
+        aliases.add(name.removeprefix('SK').strip())
+
+    if name.startswith('LG'):
+        aliases.add(f'엘지{name.removeprefix("LG")}')
+        aliases.add(name.lower())
+
+    if ' ' in name:
+        aliases.add(name.replace(' ', ''))
+
+    if name.endswith('자동차'):
+        aliases.add(f'{name.removesuffix("자동차")}차')
+
+    return sorted(alias for alias in aliases if alias and alias != name)
+
+
 def build_kr_entries() -> list[dict[str, object]]:
     raw = fetch_bytes(KRX_URL)
     with gzip.GzipFile(fileobj=io.BytesIO(raw)) as gz:
@@ -90,19 +148,14 @@ def build_kr_entries() -> list[dict[str, object]]:
 
     for row in reader:
         symbol = str(row.get('Symbol') or '').strip()
-        name = str(row.get('Name') or '').strip()
+        raw_name = str(row.get('Name') or '').strip()
         market = str(row.get('Market') or '').strip().upper()
 
-        if not symbol or not name or market not in {'KOSPI', 'KOSDAQ', 'KONEX'}:
+        if not symbol or not raw_name or market not in {'KOSPI', 'KOSDAQ', 'KONEX'}:
             continue
 
         code = symbol.zfill(6)
-        aliases = []
-        if name.startswith('SK'):
-            aliases.append(name.removeprefix('SK').strip())
-        if ' ' in name:
-            aliases.append(name.replace(' ', ''))
-
+        name = KR_NAME_OVERRIDES_BY_CODE.get(code, raw_name)
         entries.append(
             {
                 'name': name,
@@ -111,7 +164,7 @@ def build_kr_entries() -> list[dict[str, object]]:
                 'marketTone': 'kosdaq' if market == 'KOSDAQ' else 'kospi',
                 'kind': 'stock',
                 'locale': 'KR',
-                'aliases': sorted({alias for alias in aliases if alias and alias != name}),
+                'aliases': build_kr_aliases(name, code),
             }
         )
 

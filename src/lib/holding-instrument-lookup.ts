@@ -225,6 +225,7 @@ const indexedUniverse: IndexedInstrument[] = rawUniverse.map((entry) => {
 
 const codeIndex = new Map<string, IndexedInstrument>()
 const tickerIndex = new Map<string, IndexedInstrument>()
+const exactSearchTermIndex = new Map<string, IndexedInstrument[]>()
 
 for (const entry of indexedUniverse) {
   if (entry.code) {
@@ -233,6 +234,18 @@ for (const entry of indexedUniverse) {
 
   if (entry.ticker) {
     tickerIndex.set(normalizeIdentifier(entry.ticker), entry)
+  }
+
+  for (const term of entry.searchTerms) {
+    if (!term.normalized) {
+      continue
+    }
+
+    const existingEntries = exactSearchTermIndex.get(term.normalized) ?? []
+    if (!existingEntries.includes(entry)) {
+      existingEntries.push(entry)
+      exactSearchTermIndex.set(term.normalized, existingEntries)
+    }
   }
 }
 
@@ -296,6 +309,21 @@ function isPureTickerLikeQuery(query: string) {
 
 function compareRankedInstrumentMatches(left: RankedInstrumentMatch, right: RankedInstrumentMatch) {
   return right.score - left.score || left.entry.name.localeCompare(right.entry.name, 'ko-KR')
+}
+
+function getSearchTermSourcePriority(source: SearchTermSource) {
+  switch (source) {
+    case 'name':
+      return 0
+    case 'alias':
+      return 1
+    case 'code':
+      return 2
+    case 'ticker':
+      return 3
+    default:
+      return 4
+  }
 }
 
 function insertRankedInstrumentMatch(matches: RankedInstrumentMatch[], nextMatch: RankedInstrumentMatch, limit: number) {
@@ -364,6 +392,29 @@ function resolveByExactIdentifier(query: string) {
   return codeIndex.get(normalizedIdentifier) ?? tickerIndex.get(normalizedIdentifier) ?? null
 }
 
+function resolveByExactSearchTerm(query: string, limit: number) {
+  const normalizedQuery = collapseNormalizedValue(query)
+
+  if (!normalizedQuery) {
+    return []
+  }
+
+  const exactMatches = exactSearchTermIndex.get(normalizedQuery) ?? []
+
+  return exactMatches
+    .map((entry) => ({
+      entry,
+      priority: Math.min(
+        ...entry.searchTerms
+          .filter((term) => term.normalized === normalizedQuery)
+          .map((term) => getSearchTermSourcePriority(term.source)),
+      ),
+    }))
+    .sort((left, right) => left.priority - right.priority || left.entry.name.localeCompare(right.entry.name, 'ko-KR'))
+    .slice(0, limit)
+    .map(({ entry }) => toResolvedInstrument(entry, 1))
+}
+
 export function getInstrumentUniverseStats() {
   const krCount = indexedUniverse.filter((entry) => entry.locale === 'KR').length
   const usCount = indexedUniverse.filter((entry) => entry.locale === 'US').length
@@ -384,6 +435,11 @@ export function searchHoldingInstrumentCandidates(identifier: string, limit = 5,
 
   if (directMatch) {
     return [toResolvedInstrument(directMatch, 1)]
+  }
+
+  const exactTermMatches = resolveByExactSearchTerm(identifier, limit)
+  if (exactTermMatches.length > 0) {
+    return exactTermMatches
   }
 
   const { code, tickerTokens } = extractStructuredIdentifiers(identifier)
