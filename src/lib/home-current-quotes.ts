@@ -259,6 +259,17 @@ function applyLiveTone(holding: HomeHolding, changeValue: number | null) {
 
 export type HomeHoldingQuoteErrorKind = 'quote-unavailable' | 'fx-required' | 'holding-invalid'
 
+export function shouldTreatQuoteFailureAsErrorCard(
+  holding: Pick<HomeHolding, 'kind'>,
+  kind: HomeHoldingQuoteErrorKind,
+) {
+  if (kind === 'quote-unavailable' && holding.kind === 'etf') {
+    return false
+  }
+
+  return true
+}
+
 export function buildQuoteLookupKey(item: Pick<HomeHolding, 'marketTone' | 'identifierCode' | 'identifierTicker' | 'code'>) {
   if (item.marketTone === 'nasdaq') {
     return item.identifierTicker?.trim().toUpperCase() || undefined

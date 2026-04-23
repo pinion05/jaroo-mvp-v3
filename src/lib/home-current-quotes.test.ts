@@ -2,7 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import type { HomeHolding } from '@/lib/jaroo-home-data'
-import { applyCurrentQuotesToHomeHoldings, buildHomeCurrentQuoteQuery, buildQuoteLookupKey, requiresFxConversion } from './home-current-quotes'
+import {
+  applyCurrentQuotesToHomeHoldings,
+  buildHomeCurrentQuoteQuery,
+  buildQuoteLookupKey,
+  requiresFxConversion,
+  shouldTreatQuoteFailureAsErrorCard,
+} from './home-current-quotes'
 
 function createHolding(overrides: Partial<HomeHolding> = {}): HomeHolding {
   return {
@@ -94,6 +100,12 @@ test('FX는 USD quote에 KRW cost basis가 필요한 경우에만 요구한다',
   assert.equal(requiresFxConversion('USD', 'USD'), false)
   assert.equal(requiresFxConversion('KRW', 'KRW'), false)
   assert.equal(requiresFxConversion('KRW', null), false)
+})
+
+test('quote-unavailable는 ETF/ETN holding에서 오류 카드로 승격하지 않는다', () => {
+  assert.equal(shouldTreatQuoteFailureAsErrorCard(createHolding({ kind: 'stock' }), 'quote-unavailable'), true)
+  assert.equal(shouldTreatQuoteFailureAsErrorCard(createHolding({ kind: 'etf' }), 'quote-unavailable'), false)
+  assert.equal(shouldTreatQuoteFailureAsErrorCard(createHolding({ kind: 'etf' }), 'fx-required'), true)
 })
 
 test('home current quote hydrate는 KR live quote로 평가금액/손익/수익률/비중을 다시 계산한다', () => {

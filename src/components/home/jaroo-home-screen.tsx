@@ -12,6 +12,7 @@ import {
   buildHomeHoldingErrorCard,
   buildQuoteLookupKey,
   requiresFxConversion,
+  shouldTreatQuoteFailureAsErrorCard,
   resolveAveragePriceCurrency,
   type CurrentQuoteItem,
   type HomeHoldingQuoteErrorKind,
@@ -478,7 +479,9 @@ export function JarooHomeScreen() {
           }
 
           if (!quoteItem || quoteItem.status !== 'ok' || typeof quoteItem.price !== 'number') {
-            nextFailureKinds[itemKey] = 'quote-unavailable'
+            if (shouldTreatQuoteFailureAsErrorCard(homeHolding, 'quote-unavailable')) {
+              nextFailureKinds[itemKey] = 'quote-unavailable'
+            }
             clearItemQuote({ code: item.code, ticker: item.ticker, name: item.name, market: item.market })
             continue
           }
