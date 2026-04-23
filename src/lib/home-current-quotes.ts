@@ -203,7 +203,9 @@ function deriveMetricTone(changeValue: number | null): HomeHolding['metrics'][nu
 }
 
 function applyLiveTone(holding: HomeHolding, changeValue: number | null) {
-  if (holding.kind === 'etf' || changeValue === null) {
+  const isEtnHolding = holding.market?.trim().toUpperCase() === 'ETN'
+
+  if ((holding.kind === 'etf' && !isEtnHolding) || changeValue === null) {
     return holding
   }
 

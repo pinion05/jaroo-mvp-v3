@@ -108,6 +108,83 @@ test('quote-unavailable는 ETF/ETN holding에서 오류 카드로 승격하지 �
   assert.equal(shouldTreatQuoteFailureAsErrorCard(createHolding({ kind: 'etf' }), 'fx-required'), true)
 })
 
+test('home current quote hydrate는 ETN holding의 live 수익률에 맞춰 badge를 갱신한다', () => {
+  const [updated] = applyCurrentQuotesToHomeHoldings(
+    [createHolding({
+      kind: 'etf',
+      name: '삼성 인버스 코스피 200 선물 ETN',
+      code: '530092',
+      shortName: '삼성인버스',
+      donutLabel: '삼성인버스ETN',
+      shares: '10주',
+      averagePrice: '3,000원',
+      market: 'ETN',
+      marketTone: 'etf',
+      identifierCode: '530092',
+      badge: '인식 완료',
+      badgeTone: 'amber',
+      cardTone: 'warning',
+      signalTone: 'etf',
+      centerBadge: '인식 완료',
+      centerBadgeTone: 'amber',
+      centerScore: '-',
+      heatmapBackground: '#1E4D8C',
+      heatmapBadge: '인식 완료',
+      heatmapBadgeTone: 'amber',
+      metrics: [
+        { label: '보유 수량', value: '10주', tone: 'neutral' },
+        { label: '수익률', value: '-', tone: 'neutral' },
+        { label: '평가 금액', value: '-', tone: 'neutral' },
+      ],
+    })],
+    [{ market: 'KR', code: '530092', ticker: null, price: 3475, currency: 'KRW', asOf: '2026-04-23', source: 'wisereport-etn', status: 'ok' }],
+  )
+
+  assert.equal(updated.change, '+15.8%')
+  assert.equal(updated.badge, '수익 중')
+  assert.equal(updated.badgeTone, 'green')
+  assert.equal(updated.cardTone, 'profit')
+  assert.equal(updated.centerBadge, '수익 중')
+})
+
+test('home current quote hydrate는 ETF holding의 badge는 placeholder 상태를 유지한다', () => {
+  const [updated] = applyCurrentQuotesToHomeHoldings(
+    [createHolding({
+      kind: 'etf',
+      name: 'TIGER 200',
+      code: '102110',
+      shortName: 'TIGER200',
+      donutLabel: 'TIGER200',
+      shares: '10주',
+      averagePrice: '40,000원',
+      market: 'ETF',
+      marketTone: 'etf',
+      identifierCode: '102110',
+      badge: '인식 완료',
+      badgeTone: 'amber',
+      cardTone: 'warning',
+      signalTone: 'etf',
+      centerBadge: '인식 완료',
+      centerBadgeTone: 'amber',
+      centerScore: '-',
+      heatmapBackground: '#1E4D8C',
+      heatmapBadge: '인식 완료',
+      heatmapBadgeTone: 'amber',
+      metrics: [
+        { label: '보유 수량', value: '10주', tone: 'neutral' },
+        { label: '수익률', value: '-', tone: 'neutral' },
+        { label: '평가 금액', value: '-', tone: 'neutral' },
+      ],
+    })],
+    [{ market: 'KR', code: '102110', ticker: null, price: 43000, currency: 'KRW', asOf: '2026-04-23', source: 'wisereport-etf', status: 'ok' }],
+  )
+
+  assert.equal(updated.change, '+7.5%')
+  assert.equal(updated.badge, '인식 완료')
+  assert.equal(updated.cardTone, 'warning')
+  assert.equal(updated.centerBadge, '인식 완료')
+})
+
 test('home current quote hydrate는 KR live quote로 평가금액/손익/수익률/비중을 다시 계산한다', () => {
   const [updated] = applyCurrentQuotesToHomeHoldings(
     [
