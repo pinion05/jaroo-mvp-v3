@@ -214,6 +214,24 @@ test('OCR review store supports candidate replacement and manual row patching', 
   assert.equal(state.resolveStatus, 'success')
 })
 
+test('OCR review store can remove one row and its candidate cache without resetting others', () => {
+  const firstRow = createReviewRow({ id: 'row-1' })
+  const secondRow = createReviewRow({ id: 'row-2', name: '엔비디아', resolvedName: 'NVIDIA CORP' })
+
+  useOcrReviewStore.getState().setRows([firstRow, secondRow])
+  useOcrReviewStore.getState().replaceCandidates({
+    [firstRow.id]: [{ id: 'candidate-1', resolvedName: 'Microsoft Corporation', resolvedTicker: 'MSFT', source: 'local' }],
+    [secondRow.id]: [{ id: 'candidate-2', resolvedName: 'NVIDIA CORP', resolvedTicker: 'NVDA', source: 'local' }],
+  })
+
+  useOcrReviewStore.getState().removeRow(firstRow.id)
+
+  const state = useOcrReviewStore.getState()
+  assert.deepEqual(state.rows.map((row) => row.id), ['row-2'])
+  assert.equal(state.candidatesByRowId[firstRow.id], undefined)
+  assert.equal(state.candidatesByRowId[secondRow.id]?.[0]?.id, 'candidate-2')
+})
+
 test('merge selector excludes error rows from applicable payload', () => {
   useMergeStore.getState().setRows([
     createMergeRow(),

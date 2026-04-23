@@ -15,6 +15,7 @@ type OcrReviewStoreActions = {
   setRows: (rows: OcrReviewRow[]) => void
   upsertRow: (row: OcrReviewRow) => void
   patchRow: (rowId: string, patch: Partial<OcrReviewRow>) => void
+  removeRow: (rowId: string) => void
   setCandidates: (rowId: string, candidates: ResolveCandidate[]) => void
   replaceCandidates: (candidatesByRowId: Record<string, ResolveCandidate[]>) => void
   selectCandidate: (rowId: string, candidateId: string | null) => void
@@ -44,6 +45,13 @@ export const useOcrReviewStore = create<OcrReviewStoreState & OcrReviewStoreActi
   patchRow: (rowId, patch) =>
     set((state) => ({
       rows: state.rows.map((row) => (row.id === rowId ? { ...row, ...patch } : row)),
+    })),
+  removeRow: (rowId) =>
+    set((state) => ({
+      rows: state.rows.filter((row) => row.id !== rowId),
+      candidatesByRowId: Object.fromEntries(
+        Object.entries(state.candidatesByRowId).filter(([candidateRowId]) => candidateRowId !== rowId),
+      ),
     })),
   setCandidates: (rowId, candidates) =>
     set((state) => ({
