@@ -248,6 +248,18 @@ test('merge selector excludes error rows from applicable payload', () => {
   assert.equal(applicable[0]?.displayName, 'Microsoft Corporation')
 })
 
+test('merge store reset clears stale rows before rebuilding from updated OCR review state', () => {
+  useMergeStore.getState().setRows([createMergeRow()])
+  useMergeStore.getState().setApplyStatus('error', 'stale merge rows')
+
+  useMergeStore.getState().resetForBackNav()
+
+  const state = useMergeStore.getState()
+  assert.deepEqual(state.rows, [])
+  assert.equal(state.applyStatus, 'idle')
+  assert.equal(state.errorMessage, null)
+})
+
 test('portfolio store can normalize confirmed holdings and clear failed quote fields for one item', () => {
   const first = toPortfolioNormalizedItem(toConfirmedHolding(createReviewRow({ id: 'review-1' })))
   const second = toPortfolioNormalizedItem(

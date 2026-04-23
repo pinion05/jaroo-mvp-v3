@@ -20,6 +20,7 @@ import {
   type OcrSourceRow,
   type ScreenshotUploadSession,
 } from '@/lib/screenshot-ocr'
+import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
 import { useOcrUploadStore } from '@/lib/stores/use-ocr-upload-store'
 import type { OcrReviewRow, ResolveCandidate } from '@/lib/workflow-types'
@@ -440,6 +441,7 @@ export default function OcrPage() {
   const setRequestStatus = useOcrReviewStore((state) => state.setRequestStatus)
   const setResolveStatus = useOcrReviewStore((state) => state.setResolveStatus)
   const resetReviewState = useOcrReviewStore((state) => state.resetForRestart)
+  const resetMergeState = useMergeStore((state) => state.resetForBackNav)
   const [uploadStatuses, setUploadStatuses] = useState<Record<string, UploadStatus>>({})
   const [baseMergedRows, setBaseMergedRows] = useState<OcrSourceRow[]>([])
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
@@ -777,6 +779,7 @@ export default function OcrPage() {
       return
     }
 
+    resetMergeState()
     router.push('/merge')
   }
 
