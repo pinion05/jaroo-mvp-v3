@@ -19,6 +19,7 @@ const MAJOR_BLOCK_KEYS = Object.freeze([
 const SOURCE_TYPES = new Set(['ocr', 'holding', 'report', 'news', 'market', 'system']);
 const FALLBACK_GENERATED_AT = '1970-01-01T00:00:00.000Z';
 const INTERNAL_SERVICE_ERROR_CODE = 'internal-service-error';
+const MIN_PACKAGE_REASON_LENGTH = 8;
 
 function normalizeText(value) {
   if (typeof value !== 'string') {
@@ -869,7 +870,7 @@ function splitNarrativeText(value) {
   return collectStructuredStrings(value)
     .flatMap((entry) => entry.split(/[\n\r]+|(?<=[.!?。])\s+/))
     .map((entry) => normalizeText(entry))
-    .filter((entry) => entry && entry.length >= 12);
+    .filter((entry) => entry && entry.length >= MIN_PACKAGE_REASON_LENGTH);
 }
 
 function createKrBusinessQualityReasonOverrides(packageResult) {
