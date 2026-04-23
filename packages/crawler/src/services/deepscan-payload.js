@@ -21,6 +21,12 @@ const SOURCE_TYPES = new Set(['ocr', 'holding', 'report', 'news', 'market', 'sys
 const FALLBACK_GENERATED_AT = '1970-01-01T00:00:00.000Z';
 const INTERNAL_SERVICE_ERROR_CODE = 'internal-service-error';
 const MIN_PACKAGE_REASON_LENGTH = 8;
+const DEEPSCAN_KR_DUMP_CACHE_TTL_MS = 5 * 60 * 1000;
+const DEEPSCAN_KR_DUMP_CACHE_PREFIX = 'crawler:deepscan-kr:wisereport-dump';
+
+let sharedRedisClientPromise = null;
+let sharedRedisClientUrl = null;
+const deepscanKrDumpInflight = new Map();
 
 function normalizeText(value) {
   if (typeof value !== 'string') {
@@ -29,6 +35,161 @@ function normalizeText(value) {
 
   const normalized = value.trim();
   return normalized || undefined;
+}
+
+function isObjectRecord(value) {
+  return Boolean(value) && typeof value === 'object' && !Array.isArray(value);
+}
+
+function readDeepscanDumpCacheToggle(rawInput = {}) {
+  const options = isObjectRecord(rawInput.cacheOptions) ? rawInput.cacheOptions : {};
+  const explicit = options.dumpCacheEnabled;
+  if (typeof explicit === 'boolean') {
+    return explicit;
+  }
+
+  const raw = normalizeText(process.env.DEEPSCAN_KR_DUMP_CACHE_ENABLED)?.toLowerCase();
+  if (!raw) {
+    return true;
+  }
+
+  return !['0', 'false', 'off', 'no'].includes(raw);
+}
+
+function readDeepscanDumpCacheTtl(rawInput = {}) {
+  const options = isObjectRecord(rawInput.cacheOptions) ? rawInput.cacheOptions : {};
+  const explicit = Number(options.dumpCacheTtlMs);
+  if (Number.isInteger(explicit) && explicit > 0) {
+    return explicit;
+  }
+
+  const raw = Number(process.env.DEEPSCAN_KR_DUMP_CACHE_TTL_MS);
+  return Number.isInteger(raw) && raw > 0 ? raw : DEEPSCAN_KR_DUMP_CACHE_TTL_MS;
+}
+
+function shouldForceRefreshDeepscanDump(rawInput = {}) {
+  const options = isObjectRecord(rawInput.cacheOptions) ? rawInput.cacheOptions : {};
+  return options.forceRefresh === true || options.dumpForceRefresh === true;
+}
+
+function getDeepscanDumpCacheKeyPrefix(rawInput = {}) {
+  const options = isObjectRecord(rawInput.cacheOptions) ? rawInput.cacheOptions : {};
+  return normalizeText(options.dumpCacheKeyPrefix) ?? DEEPSCAN_KR_DUMP_CACHE_PREFIX;
+}
+
+function logDeepscanDumpCache(loggerFn, message) {
+  if (typeof loggerFn === 'function') {
+    loggerFn(message);
+    return;
+  }
+
+  console.log(`[deepscan-dump-cache] ${message}`);
+}
+
+function logDeepscanDumpCacheWarning(loggerFn, stage, error) {
+  const message = error instanceof Error ? error.message : String(error);
+  if (typeof loggerFn === 'function') {
+    loggerFn(`deepscan dump cache ${stage} failed: ${message}`);
+    return;
+  }
+
+  console.warn(`[deepscan-dump-cache] ${stage} failed: ${message}`);
+}
+
+async function getRedisClientFromEnv(rawInput = {}) {
+  const options = isObjectRecord(rawInput.cacheOptions) ? rawInput.cacheOptions : {};
+  if (typeof options.getRedisClient === 'function') {
+    return options.getRedisClient();
+  }
+
+  const redisUrl = process.env.REDIS_URL;
+  if (!redisUrl) {
+    return null;
+  }
+
+  if (!sharedRedisClientPromise || sharedRedisClientUrl !== redisUrl) {
+    sharedRedisClientUrl = redisUrl;
+    sharedRedisClientPromise = (async () => {
+      try {
+        const { createClient } = require('redis');
+        const client = createClient({
+          url: redisUrl,
+          socket: {
+            connectTimeout: 1000,
+          },
+        });
+        client.on('error', (error) => {
+          logDeepscanDumpCacheWarning(options.onCacheWarn, 'client error', error);
+        });
+        await client.connect();
+        return client;
+      } catch (error) {
+        sharedRedisClientPromise = null;
+        logDeepscanDumpCacheWarning(options.onCacheWarn, 'initialization', error);
+        return null;
+      }
+    })();
+  }
+
+  return sharedRedisClientPromise;
+}
+
+async function resolveDeepscanDumpRedisClient(rawInput = {}) {
+  try {
+    return await getRedisClientFromEnv(rawInput);
+  } catch (error) {
+    const options = isObjectRecord(rawInput.cacheOptions) ? rawInput.cacheOptions : {};
+    logDeepscanDumpCacheWarning(options.onCacheWarn, 'resolution', error);
+    return null;
+  }
+}
+
+async function readDeepscanDumpFromRedis(client, cacheKey, rawInput = {}) {
+  if (!client || typeof client.get !== 'function') {
+    return null;
+  }
+
+  const options = isObjectRecord(rawInput.cacheOptions) ? rawInput.cacheOptions : {};
+
+  try {
+    const cachedValue = await client.get(cacheKey);
+    if (!cachedValue) {
+      return null;
+    }
+
+    const parsed = JSON.parse(cachedValue);
+    const data = isObjectRecord(parsed) ? parsed.data : null;
+    return isObjectRecord(data) ? data : null;
+  } catch (error) {
+    logDeepscanDumpCacheWarning(options.onCacheWarn, 'read', error);
+    return null;
+  }
+}
+
+async function writeDeepscanDumpToRedis(client, cacheKey, data, ttlMs, rawInput = {}) {
+  if (!client) {
+    return;
+  }
+
+  const options = isObjectRecord(rawInput.cacheOptions) ? rawInput.cacheOptions : {};
+  const ttlSeconds = Math.max(1, Math.floor(ttlMs / 1000));
+  const payload = JSON.stringify({
+    cachedAt: new Date().toISOString(),
+    data,
+  });
+
+  try {
+    if (typeof client.setEx === 'function') {
+      await client.setEx(cacheKey, ttlSeconds, payload);
+      return;
+    }
+
+    if (typeof client.set === 'function') {
+      await client.set(cacheKey, payload, { EX: ttlSeconds });
+    }
+  } catch (error) {
+    logDeepscanDumpCacheWarning(options.onCacheWarn, 'write', error);
+  }
 }
 
 function normalizeSourceType(value) {
@@ -588,6 +749,53 @@ function buildWiseReportKrSlimPayload(rawAggregate, code) {
   };
 }
 
+async function fetchKrWiseReportSlimDumpForDeepScan(rawInput, input) {
+  if (!isKrInput(input) || !input.instrument.code) {
+    return null;
+  }
+
+  const cacheEnabled = readDeepscanDumpCacheToggle(rawInput);
+  const forceRefresh = shouldForceRefreshDeepscanDump(rawInput);
+  const ttlMs = readDeepscanDumpCacheTtl(rawInput);
+  const cacheKey = `${getDeepscanDumpCacheKeyPrefix(rawInput)}:${input.instrument.code}`;
+  const cacheOptions = isObjectRecord(rawInput.cacheOptions) ? rawInput.cacheOptions : {};
+  const redisClient = cacheEnabled ? await resolveDeepscanDumpRedisClient(rawInput) : null;
+
+  if (cacheEnabled && !forceRefresh) {
+    const cached = await readDeepscanDumpFromRedis(redisClient, cacheKey, rawInput);
+    if (cached) {
+      logDeepscanDumpCache(cacheOptions.onCacheInfo, `hit:${input.instrument.code}`);
+      return cached;
+    }
+  }
+
+  if (cacheEnabled && !forceRefresh && deepscanKrDumpInflight.has(cacheKey)) {
+    logDeepscanDumpCache(cacheOptions.onCacheInfo, `inflight:${input.instrument.code}`);
+    return deepscanKrDumpInflight.get(cacheKey);
+  }
+
+  logDeepscanDumpCache(cacheOptions.onCacheInfo, `${forceRefresh ? 'refresh' : 'miss'}:${input.instrument.code}`);
+
+  const getCrawlFn = typeof cacheOptions.getKrCrawl === 'function' ? cacheOptions.getKrCrawl : getCrawl;
+  const pending = (async () => {
+    try {
+      const aggregate = await getCrawlFn(input.instrument.code);
+      const slimDump = buildWiseReportKrSlimPayload(aggregate, input.instrument.code);
+
+      if (cacheEnabled) {
+        await writeDeepscanDumpToRedis(redisClient, cacheKey, slimDump, ttlMs, rawInput);
+      }
+
+      return slimDump;
+    } finally {
+      deepscanKrDumpInflight.delete(cacheKey);
+    }
+  })();
+
+  deepscanKrDumpInflight.set(cacheKey, pending);
+  return pending;
+}
+
 async function captureSource(sourceId, load) {
   try {
     return {
@@ -727,7 +935,7 @@ async function resolveKrSourceBundle(rawInput, input) {
 
   const tradeDate = normalizeTradeDate(input.selectedAt ?? input.sourceContext.appliedAt);
   const [slimResult, quotesResult, packageResult] = await Promise.all([
-    captureSource('slim', async () => buildWiseReportKrSlimPayload(await getCrawl(input.instrument.code), input.instrument.code)),
+    captureSource('slim', async () => fetchKrWiseReportSlimDumpForDeepScan(rawInput, input)),
     captureSource('current-quote', async () => getCurrentQuotes({
       codes: input.instrument.code ? [input.instrument.code] : [],
       tickers: input.instrument.ticker ? [input.instrument.ticker] : [],
@@ -1472,6 +1680,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
 }
 
 export {
+  fetchKrWiseReportSlimDumpForDeepScan,
   buildKrPackageInvocationInput,
   createDeepScanSourceRef,
   createDeepScanBlockError,

@@ -25,6 +25,7 @@ import {
   momentumSignals as defaultMomentumSignals,
   momentumStages as defaultMomentumStages,
   portfolioScoreBreakdown as defaultPortfolioScoreBreakdown,
+  persistDeepScanTarget,
   type HomeBadgeTone,
   type HomeHolding,
   type HomeMetricTone,
@@ -599,6 +600,12 @@ export function JarooHomeScreen() {
   const navigateToDeepScanForHolding = useCallback(async (holdingId: number, actionHref: string) => {
     const item = portfolioItems[holdingId]
     const holding = homeHoldings.find((entry) => entry.id === holdingId)
+
+    if (holding?.kind === 'etf' && actionHref === '/etf') {
+      persistDeepScanTarget(holding)
+      router.push(actionHref)
+      return
+    }
 
     if (!item || !holding || actionHref !== '/deepscan' || holding.kind !== 'stock') {
       router.push(actionHref)

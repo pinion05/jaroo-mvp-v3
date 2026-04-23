@@ -325,6 +325,24 @@ test('deepscan server snapshot helper는 storage가 있어도 placeholder를 유
   }
 })
 
+test('persistDeepScanTarget는 ETF holding도 client session target으로 복원한다', () => {
+  const restoreWindow = installWindowMock()
+
+  try {
+    const persisted = persistDeepScanTarget(homeHoldings[4]!)
+
+    assert.equal(persisted, true)
+
+    const clientSnapshot = resolveDeepScanTargetSession()
+
+    assert.equal(clientSnapshot.holding.kind, 'etf')
+    assert.equal(clientSnapshot.holding.name, homeHoldings[4]?.name)
+    assert.equal(clientSnapshot.holding.code, homeHoldings[4]?.code)
+  } finally {
+    restoreWindow()
+  }
+})
+
 test('deepscan client snapshot은 explicit target이 없으면 applied home portfolio의 기본 종목으로 fallback한다', () => {
   const restoreWindow = installWindowMock()
 

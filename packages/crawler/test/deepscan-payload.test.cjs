@@ -135,6 +135,35 @@ function collectStrings(value, bucket = []) {
   return bucket;
 }
 
+function createFakeRedis(nowRef) {
+  const store = new Map();
+
+  return {
+    async get(key) {
+      const entry = store.get(key);
+      if (!entry) {
+        return null;
+      }
+
+      if (entry.expiresAt <= nowRef.value) {
+        store.delete(key);
+        return null;
+      }
+
+      return entry.value;
+    },
+    async setEx(key, ttlSeconds, value) {
+      store.set(key, {
+        value,
+        expiresAt: nowRef.value + ttlSeconds * 1000,
+      });
+    },
+    dump() {
+      return new Map(store);
+    },
+  };
+}
+
 test('buildJarooDeepScanPayload returns input-invalid payload when code/ticker missing', async () => {
   const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
   const rawInput = {
@@ -519,6 +548,100 @@ test('buildJarooDeepScanPayload blocks downstream KR blocks when one committee a
     }
     process.env.DEEPSCAN_KR_LLM_ENABLE = originalEnable ?? 'false';
   }
+});
+
+test('fetchKrWiseReportSlimDumpForDeepScan caches only deepscan KR slim dump in Redis', async () => {
+  const { fetchKrWiseReportSlimDumpForDeepScan } = await import('../src/services/deepscan-payload.js');
+  const nowRef = { value: 1_000 };
+  const fakeRedis = createFakeRedis(nowRef);
+  let crawlCount = 0;
+
+  const rawInput = {
+    cacheOptions: {
+      dumpCacheKeyPrefix: 'test:deepscan-dump',
+      dumpCacheTtlMs: 10_000,
+      onCacheInfo() {},
+      getRedisClient: async () => fakeRedis,
+      getKrCrawl: async (code) => {
+        crawlCount += 1;
+        return {
+          company: { code, name: '삼성전자' },
+          pages: {
+            'company-overview': {
+              normalized: {
+                company: { code, name: '삼성전자' },
+                summary: { market: 'KOSPI' },
+              },
+            },
+          },
+        };
+      },
+    },
+  };
+  const input = {
+    instrument: {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KR',
+    },
+    sourceContext: {
+      from: 'holding',
+    },
+  };
+
+  const first = await fetchKrWiseReportSlimDumpForDeepScan(rawInput, input);
+  const second = await fetchKrWiseReportSlimDumpForDeepScan(rawInput, input);
+
+  assert.deepEqual(second, first);
+  assert.equal(crawlCount, 1);
+  assert.equal(fakeRedis.dump().size, 1);
+});
+
+test('fetchKrWiseReportSlimDumpForDeepScan refreshes Redis dump cache after TTL expiry', async () => {
+  const { fetchKrWiseReportSlimDumpForDeepScan } = await import('../src/services/deepscan-payload.js');
+  const nowRef = { value: 2_000 };
+  const fakeRedis = createFakeRedis(nowRef);
+  let crawlCount = 0;
+
+  const rawInput = {
+    cacheOptions: {
+      dumpCacheKeyPrefix: 'test:deepscan-dump-ttl',
+      dumpCacheTtlMs: 1_000,
+      onCacheInfo() {},
+      getRedisClient: async () => fakeRedis,
+      getKrCrawl: async (code) => {
+        crawlCount += 1;
+        return {
+          company: { code, name: '삼성전자' },
+          pages: {
+            'company-overview': {
+              normalized: {
+                company: { code, name: '삼성전자' },
+                summary: { marketCap: String(crawlCount) },
+              },
+            },
+          },
+        };
+      },
+    },
+  };
+  const input = {
+    instrument: {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KR',
+    },
+    sourceContext: {
+      from: 'holding',
+    },
+  };
+
+  await fetchKrWiseReportSlimDumpForDeepScan(rawInput, input);
+  nowRef.value = 4_000;
+  const refreshed = await fetchKrWiseReportSlimDumpForDeepScan(rawInput, input);
+
+  assert.equal(crawlCount, 2);
+  assert.equal(refreshed.pages['company-overview'].summary.marketCap, '2');
 });
 
 test('buildKrPackageInvocationInput converts deepscan holding handoff strings into package input fields', async () => {
