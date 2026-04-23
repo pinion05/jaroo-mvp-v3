@@ -1,8 +1,9 @@
 import { createRequire } from 'node:module';
 import { getCurrentQuotes } from '../crawlers/current-quotes.js';
 import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
-import { scoreDeepScanKrEvidence } from './deepscan-kr-score.js';
+import { scoreDeepScanKrEvidence, scoreDeepScanKrFromCommittee } from './deepscan-kr-score.js';
 import { invokeDeepScanKrPackage } from './deepscan-kr-package-adapter.js';
+import { buildKrCommitteeAxesFromLlmResults, scoreDeepScanKrCommitteeFromDump } from './deepscan-kr-committee-runtime.js';
 
 const require = createRequire(import.meta.url);
 const { WISEREPORT_KR_PAGES, getCrawl } = require('../crawlers/wisereport-kr.cjs');
@@ -19,6 +20,7 @@ const MAJOR_BLOCK_KEYS = Object.freeze([
 const SOURCE_TYPES = new Set(['ocr', 'holding', 'report', 'news', 'market', 'system']);
 const FALLBACK_GENERATED_AT = '1970-01-01T00:00:00.000Z';
 const INTERNAL_SERVICE_ERROR_CODE = 'internal-service-error';
+const MIN_PACKAGE_REASON_LENGTH = 8;
 
 function normalizeText(value) {
   if (typeof value !== 'string') {
@@ -693,6 +695,19 @@ async function maybeResolveKrPackageResult(rawInput, input) {
   }
 }
 
+function shouldInvokeKrCommitteeLlm() {
+  const explicitToggle = normalizeText(process.env.DEEPSCAN_KR_LLM_ENABLE)?.toLowerCase();
+  if (['0', 'false', 'off', 'no'].includes(explicitToggle ?? '')) {
+    return false;
+  }
+
+  if (process.env.OPENROUTER_API_KEY) {
+    return true;
+  }
+
+  return ['1', 'true', 'on', 'yes'].includes(explicitToggle ?? '');
+}
+
 async function resolveKrSourceBundle(rawInput, input) {
   const safeRawInput = asObject(rawInput);
 
@@ -840,10 +855,71 @@ function createCommitteeMember(shortLabel, title, score, reason) {
   };
 }
 
-function createCommitteeAxes(evidence, scored) {
+function collectStructuredStrings(value, bucket = []) {
+  if (typeof value === 'string') {
+    const normalized = normalizeText(value);
+    if (normalized) {
+      bucket.push(normalized);
+    }
+    return bucket;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectStructuredStrings(item, bucket);
+    }
+    return bucket;
+  }
+
+  if (value && typeof value === 'object') {
+    for (const nestedValue of Object.values(value)) {
+      collectStructuredStrings(nestedValue, bucket);
+    }
+  }
+
+  return bucket;
+}
+
+function splitNarrativeText(value) {
+  return collectStructuredStrings(value)
+    .flatMap((entry) => entry.split(/[\n\r]+|(?<=[.!?。])\s+/))
+    .map((entry) => normalizeText(entry))
+    .filter((entry) => entry && entry.length >= MIN_PACKAGE_REASON_LENGTH);
+}
+
+function createKrBusinessQualityReasonOverrides(packageResult) {
+  if (!packageResult || typeof packageResult !== 'object') {
+    return [];
+  }
+
+  const candidateTexts = [
+    ...splitNarrativeText(packageResult.boardAnalysis?.boardOpinions),
+    ...splitNarrativeText(packageResult.marketScoreSnapshot),
+    ...splitNarrativeText(packageResult.reportContent),
+  ];
+
+  const uniqueTexts = [];
+  const seen = new Set();
+
+  for (const text of candidateTexts) {
+    if (!text || seen.has(text)) {
+      continue;
+    }
+
+    seen.add(text);
+    uniqueTexts.push(text);
+  }
+
+  return uniqueTexts;
+}
+
+function createCommitteeAxes(evidence, scored, packageResult) {
   const businessQualityReason = evidence.sourceCoverage.hasPackageResult
     ? `회사개요·재무·리포트 근거를 합산했습니다. 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건, package-result 확보 기준입니다.`
     : `회사개요·재무·리포트 근거를 합산했습니다. 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건 기준입니다.`;
+  const businessQualityReasonOverrides = createKrBusinessQualityReasonOverrides(packageResult);
+  let businessQualityReasonIndex = 0;
+  const nextBusinessQualityReason = (fallbackReason) => businessQualityReasonOverrides[businessQualityReasonIndex++] ?? fallbackReason;
 
   return [
     {
@@ -858,19 +934,19 @@ function createCommitteeAxes(evidence, scored) {
           '수익성',
           '수익성/기본체력',
           scored.committee.businessQuality.profitability,
-          businessQualityReason,
+          nextBusinessQualityReason(businessQualityReason),
         ),
         createCommitteeMember(
           '밸류',
           '밸류에이션',
           scored.committee.businessQuality.valuation,
-          `컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 현재가 ${evidence.currentQuote ? '확보' : '없음'}를 반영했습니다.`,
+          nextBusinessQualityReason(`컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 현재가 ${evidence.currentQuote ? '확보' : '없음'}를 반영했습니다.`),
         ),
         createCommitteeMember(
           '지배',
           '지분/안정성',
           scored.committee.businessQuality.ownershipStability,
-          `보유 맥락 ${evidence.holding.hasHoldingContext ? '확인' : '없음'}, 스타일/지분 페이지 ${evidence.reportSignals.styleAnalysisAvailable || evidence.pageCoverage.availablePageIds.includes('shareholding') ? '일부 확보' : '부족'} 상태입니다.`,
+          nextBusinessQualityReason(`보유 맥락 ${evidence.holding.hasHoldingContext ? '확인' : '없음'}, 스타일/지분 페이지 ${evidence.reportSignals.styleAnalysisAvailable || evidence.pageCoverage.availablePageIds.includes('shareholding') ? '일부 확보' : '부족'} 상태입니다.`),
         ),
       ],
     },
@@ -1209,9 +1285,45 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     const evidence = isKrInput(input)
       ? buildDeepScanKrEvidencePacket(input, sources)
       : buildDeepScanKrEvidencePacket(input, {});
-    const scored = scoreDeepScanKrEvidence(evidence);
+    const deterministicScored = scoreDeepScanKrEvidence(evidence);
+    let scored = deterministicScored;
     const evidenceSourceRefs = createEvidenceSourceRefs(input, evidence, sources, sourceIssues);
-    const blockFallback = createEvidenceFallback(evidence, sourceIssues);
+    const llmSourceRefs = [];
+    let llmCommitteeErrors = [];
+    let llmCommitteeBlocked = false;
+    let committeeAxes = createCommitteeAxes(evidence, deterministicScored, sources.packageResult);
+    const llmAttempted = isKrInput(input) && shouldInvokeKrCommitteeLlm();
+
+    if (llmAttempted) {
+      const llmCommittee = await scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources);
+      llmCommitteeErrors = llmCommittee.errors;
+      llmSourceRefs.push(createDeepScanSourceRef({
+        type: 'system',
+        id: `kr-llm:${input.instrument.code ?? input.instrument.name}`,
+        label: 'KR LLM committee runtime',
+        note: llmCommittee.requestId,
+      }));
+
+      if (Object.keys(llmCommittee.results).length > 0) {
+        const llmCommitteeShape = buildKrCommitteeAxesFromLlmResults(evidence, llmCommittee.results);
+        committeeAxes = llmCommitteeShape.axes;
+        scored = scoreDeepScanKrFromCommittee(evidence, llmCommitteeShape.committeeScores);
+        llmCommitteeBlocked = Object.values(llmCommitteeShape.coverage).some((axis) => axis.omitted === true);
+      } else {
+        committeeAxes = [];
+        llmCommitteeBlocked = true;
+      }
+    }
+
+    const combinedSourceRefs = [...evidenceSourceRefs, ...llmSourceRefs];
+    const llmFallback = llmCommitteeErrors.length > 0 || llmCommitteeBlocked
+      ? {
+          used: true,
+          reason: llmCommitteeBlocked ? 'kr-committee-coverage-blocked' : 'weak-data-degradation',
+          label: llmCommitteeBlocked ? '일부 KR 위원 축 근거가 부족합니다.' : `일부 KR 위원 실패 ${llmCommitteeErrors.length}건`,
+        }
+      : null;
+    const blockFallback = llmFallback ?? createEvidenceFallback(evidence, sourceIssues);
     const insights = buildInsights(input, evidence, scored, generatedAt, sourceIssues);
     const strategy = buildStrategy(input, evidence, scored);
     const sellNow = buildSellNow(evidence, scored);
@@ -1229,35 +1341,112 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     }
 
     const hero = {
-      ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'hero', evidenceSourceRefs), fallback: blockFallback }),
-      headline: `${input.instrument.name} KR DeepScan ${scored.hero.score}점`,
-      body: heroBodyParts.join(' · '),
-      statusText: scored.hero.statusText,
-      score: scored.hero.score,
-      scoreLabel: `${scored.hero.scoreLabel} · ${scored.hero.score} / 100`,
-      scoreDelta: scored.hero.penalties.length > 0 ? `-${scored.hero.penalties.length}` : '+0',
+      ...(llmCommitteeBlocked
+        ? createBlockedBlockMeta({
+            sourceRefs: createBlockSourceRefs(input, 'hero', combinedSourceRefs),
+            fallback: blockFallback,
+            error: createDeepScanBlockError({
+              code: 'kr-committee-coverage-blocked',
+              message: 'KR hero block is blocked because committee axis coverage is insufficient.',
+              retryable: true,
+            }),
+          })
+        : createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'hero', combinedSourceRefs), fallback: blockFallback })),
+      headline: llmCommitteeBlocked ? `${input.instrument.name} KR DeepScan 위원회 재시도 필요` : `${input.instrument.name} KR DeepScan ${scored.hero.score}점`,
+      body: llmCommitteeBlocked ? 'KR committee axis coverage가 부족해 상위 점수를 계산하지 않았습니다.' : heroBodyParts.join(' · '),
+      statusText: llmCommitteeBlocked ? '재시도 필요' : scored.hero.statusText,
+      score: llmCommitteeBlocked ? 0 : scored.hero.score,
+      scoreLabel: llmCommitteeBlocked ? 'N/A' : `${scored.hero.scoreLabel} · ${scored.hero.score} / 100`,
+      scoreDelta: llmCommitteeBlocked ? '0' : (scored.hero.penalties.length > 0 ? `-${scored.hero.penalties.length}` : '+0'),
     };
     const blocks = {
       hero,
       committee: {
-        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'committee', evidenceSourceRefs), fallback: blockFallback }),
-        axes: createCommitteeAxes(evidence, scored),
+        ...(llmCommitteeBlocked
+          ? createBlockedBlockMeta({
+              sourceRefs: createBlockSourceRefs(input, 'committee', combinedSourceRefs),
+              fallback: blockFallback,
+              error: createDeepScanBlockError({
+                code: 'kr-committee-coverage-blocked',
+                message: 'KR committee axis coverage is insufficient for downstream computation.',
+                retryable: true,
+              }),
+            })
+          : createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'committee', combinedSourceRefs), fallback: blockFallback })),
+        axes: committeeAxes,
       },
       insights: {
-        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'insights', evidenceSourceRefs), fallback: blockFallback }),
+        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'insights', combinedSourceRefs), fallback: blockFallback }),
         ...insights,
       },
       strategy: {
-        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'strategy', evidenceSourceRefs), fallback: blockFallback }),
-        ...strategy,
+        ...(llmCommitteeBlocked
+          ? createBlockedBlockMeta({
+              sourceRefs: createBlockSourceRefs(input, 'strategy', combinedSourceRefs),
+              fallback: blockFallback,
+              error: createDeepScanBlockError({
+                code: 'kr-committee-coverage-blocked',
+                message: 'KR strategy block is blocked because committee axis coverage is insufficient.',
+                retryable: true,
+              }),
+            })
+          : createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'strategy', combinedSourceRefs), fallback: blockFallback })),
+        ...(llmCommitteeBlocked
+          ? {
+              weekSignal: '근거 부족',
+              weekSignalTone: 'neutral',
+              weekBadgeText: '위원회 재계산 필요',
+              scenarioLabel: '근거 부족 시나리오',
+              scenarioProbability: '0%',
+              scenarioPeriod: '대기',
+              scenarioCondition: '위원회 축 근거가 부족해 전략 시나리오를 계산하지 않았습니다.',
+              currentPriceText: 'N/A',
+              targetPriceText: 'N/A',
+              scenarioDetails: ['KR LLM committee 재시도가 필요합니다.'],
+              otherScenarios: [],
+              otherScenarioTags: [],
+            }
+          : strategy),
       },
       sellNow: {
-        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'sellNow', evidenceSourceRefs), fallback: blockFallback }),
-        ...sellNow,
+        ...(llmCommitteeBlocked
+          ? createBlockedBlockMeta({
+              sourceRefs: createBlockSourceRefs(input, 'sellNow', combinedSourceRefs),
+              fallback: blockFallback,
+              error: createDeepScanBlockError({
+                code: 'kr-committee-coverage-blocked',
+                message: 'KR sell-now block is blocked because committee axis coverage is insufficient.',
+                retryable: true,
+              }),
+            })
+          : createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'sellNow', combinedSourceRefs), fallback: blockFallback })),
+        ...(llmCommitteeBlocked
+          ? {
+              realizedText: '위원회 축 근거가 부족해 즉시 매도 판단을 계산하지 않았습니다.',
+              rows: [],
+            }
+          : sellNow),
       },
       portfolioSimulation: {
-        ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'portfolioSimulation', evidenceSourceRefs), fallback: blockFallback }),
-        ...portfolioSimulation,
+        ...(llmCommitteeBlocked
+          ? createBlockedBlockMeta({
+              sourceRefs: createBlockSourceRefs(input, 'portfolioSimulation', combinedSourceRefs),
+              fallback: blockFallback,
+              error: createDeepScanBlockError({
+                code: 'kr-committee-coverage-blocked',
+                message: 'KR portfolio simulation is blocked because committee axis coverage is insufficient.',
+                retryable: true,
+              }),
+            })
+          : createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'portfolioSimulation', combinedSourceRefs), fallback: blockFallback })),
+        ...(llmCommitteeBlocked
+          ? {
+              beforeScore: 0,
+              afterScore: 0,
+              deltaLabel: 'N/A',
+              caption: '위원회 축 근거가 부족해 포트폴리오 시뮬레이션을 계산하지 않았습니다.',
+            }
+          : portfolioSimulation),
       },
     };
 
@@ -1267,13 +1456,13 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
       metadata: {
         generatedAt,
         version: DEEP_SCAN_VERSION,
-        degraded: blockFallback !== null,
+        degraded: blockFallback !== null || llmCommitteeErrors.length > 0 || llmCommitteeBlocked,
         debugId: createDebugId(input),
         inputValidity: {
           valid: true,
           raw: safeCloneRawInput(rawInput),
         },
-        sourceRefs: [...createBaseSourceRefs(input), ...evidenceSourceRefs],
+        sourceRefs: [...createBaseSourceRefs(input), ...combinedSourceRefs],
         blockStatus: createBlockStatus(blocks),
       },
     };

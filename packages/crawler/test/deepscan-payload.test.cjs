@@ -1,6 +1,8 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 
+process.env.DEEPSCAN_KR_LLM_ENABLE = 'false';
+
 const TOP_LEVEL_KEYS = [
   'committee',
   'hero',
@@ -210,24 +212,24 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
   assert.equal(payload.metadata.degraded, false);
   assert.notEqual(payload.metadata.inputValidity.raw, rawInput);
   assert.equal(payload.metadata.inputValidity.raw.holding.shares, '12');
-  assert.equal(payload.hero.score, 79);
+  assert.equal(payload.hero.score, 76);
   assert.equal(payload.hero.statusText, '우세');
   assert.match(payload.hero.headline, /삼성전자/);
-  assert.match(payload.hero.headline, /79/);
+  assert.match(payload.hero.headline, /76/);
   assert.match(payload.hero.body, /현재가 85200 KRW 확인/);
   assert.equal(payload.hero.fallback, null);
   assert.equal(payload.committee.axes.length, 3);
-  assert.equal(payload.committee.axes[0].score, 70);
-  assert.equal(payload.committee.axes[1].score, 85);
+  assert.equal(payload.committee.axes[0].score, 65);
+  assert.equal(payload.committee.axes[1].score, 83);
   assert.equal(payload.committee.axes[2].score, 84);
-  assert.deepEqual(payload.insights.summaryTags, ['score:79', 'reports:6/10', 'decision:hold']);
+  assert.deepEqual(payload.insights.summaryTags, ['score:76', 'reports:6/10', 'decision:hold']);
   assert.equal(payload.strategy.weekSignal, '관찰 지속');
   assert.equal(payload.strategy.currentPriceText, '85200 KRW');
   assert.equal(payload.strategy.targetPriceText, '컨센서스/패키지 보조 근거 확인');
   assert.equal(payload.sellNow.realizedText, '현재가 기준 평가손익 +170400 KRW (+20%). 즉시 매도 판단은 hold 입니다.');
   assert.equal(payload.sellNow.rows.length, 4);
-  assert.equal(payload.portfolioSimulation.beforeScore, 83);
-  assert.equal(payload.portfolioSimulation.afterScore, 85);
+  assert.equal(payload.portfolioSimulation.beforeScore, 82);
+  assert.equal(payload.portfolioSimulation.afterScore, 84);
   assert.equal(payload.portfolioSimulation.deltaLabel, 'hold:+2');
 
   const allStrings = collectStrings(payload).join('\n');
@@ -305,6 +307,218 @@ test('buildJarooDeepScanPayload keeps position-fit evidence when the handoff use
   assert.match(positionFitAxis.members[0].reason, /현재가 85200 대비 평단 71000/);
   assert.equal(positionFitAxis.members[2].reason, '보유 수량, 평단, 현재가가 모두 확인되어 sell-now 계산이 가능합니다.');
   assert.match(payload.sellNow.realizedText, /\+170400 KRW/);
+});
+
+test('buildJarooDeepScanPayload uses package-derived KR committee wording when available', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+
+  const payload = await buildJarooDeepScanPayload({
+    instrument: {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KR',
+    },
+    holding: {
+      shares: '12',
+      averagePrice: '71000',
+      evaluationAmount: '1022400',
+    },
+    selectedAt: '2026-04-14T00:00:00.000Z',
+    sources: {
+      ...createStrongKrSources(),
+      packageResult: {
+        stockCode: '005930',
+        listingMarket: 'KOSPI',
+        timestamp: '2026-04-15T12:00:00.000Z',
+        reportContent: '패키지 요약: 메모리 수요와 서버 투자 확대가 실적 체력을 지지합니다.',
+        marketScoreSnapshot: {
+          totalScore: 81,
+          summary: '밸류에이션은 과열보다 재평가 구간에 가깝습니다.',
+        },
+        boardAnalysis: {
+          boardOpinions: [
+            { analyst: 'A', summary: '재무 구조와 현금창출력이 안정적이라 downside가 제한적입니다.' },
+            { analyst: 'B', summary: 'HBM 증설과 AI 수요가 성장 가시성을 높여줍니다.' },
+            { analyst: 'C', summary: '기관 수급은 변동성이 있지만 추세 훼손 신호는 아직 약합니다.' },
+          ],
+          boardMarketEvaluation: '평단 대비 현재가는 부담이 크지 않고 시나리오 대응 여지가 남아 있습니다.',
+        },
+      },
+    },
+  });
+
+  const reasons = payload.committee.axes.flatMap((axis) => axis.members.map((member) => member.reason));
+  assert.ok(reasons.some((reason) => reason.includes('재무 구조와 현금창출력')))
+  assert.ok(reasons.some((reason) => reason.includes('HBM 증설과 AI 수요')))
+  assert.ok(reasons.some((reason) => reason.includes('기관 수급은 변동성이 있지만')))
+  assert.doesNotMatch(reasons[0], /최근 리포트 2건 기준입니다/)
+  const marketTimingAxis = payload.committee.axes.find((axis) => axis.label === 'Market Timing');
+  assert.ok(marketTimingAxis);
+  assert.match(marketTimingAxis.members[2].reason, /현재가 85200 KRW와 평단 71000 비교 기준/)
+  const positionFitAxis = payload.committee.axes.find((axis) => axis.label === 'Position Fit');
+  assert.ok(positionFitAxis);
+  assert.equal(positionFitAxis.members[2].reason, '보유 수량, 평단, 현재가가 모두 확인되어 sell-now 계산이 가능합니다.');
+});
+
+test('buildJarooDeepScanPayload can surface dump-backed KR LLM committee scores and reasons', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+  const originalFetch = global.fetch;
+  const originalKey = process.env.OPENROUTER_API_KEY;
+  const originalEnable = process.env.DEEPSCAN_KR_LLM_ENABLE;
+  process.env.OPENROUTER_API_KEY = 'test-key';
+  process.env.DEEPSCAN_KR_LLM_ENABLE = 'true';
+
+  const memberScores = {
+    profitability: 77,
+    valuation: 72,
+    ownershipStability: 65,
+    trend: 81,
+    consensusMomentum: 74,
+    priceLocation: 68,
+    avgPriceGap: 59,
+    upsideBuffer: 66,
+    holdingCompleteness: 88,
+  };
+
+  global.fetch = (async (_url, init) => {
+    const body = JSON.parse(String(init?.body ?? '{}'));
+    const userMessage = Array.isArray(body?.messages) ? body.messages.find((message) => message.role === 'user') : null;
+    const content = typeof userMessage?.content === 'string' ? userMessage.content : '';
+    const match = content.match(/\"member\":\"([^\"]+)\"/);
+    const memberKey = match?.[1];
+    const score = memberScores[memberKey];
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            score,
+            reason: `${memberKey} 덤프 근거를 반영한 한국어 이유입니다.`,
+            confidence: 'medium',
+          }),
+        },
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  try {
+    const payload = await buildJarooDeepScanPayload({
+      instrument: {
+        name: '삼성전자',
+        code: '005930',
+        market: 'KR',
+      },
+      holding: {
+        shares: '12',
+        averagePrice: '71000',
+        evaluationAmount: '1022400',
+      },
+      selectedAt: '2026-04-14T00:00:00.000Z',
+      sourceContext: {
+        from: 'holding',
+        sessionKey: 'session-1',
+        appliedAt: '2026-04-15T00:00:00.000Z',
+      },
+      sources: createStrongKrSources(),
+    });
+
+    assert.equal(payload.committee.blockState, 'ok');
+    assert.equal(payload.committee.axes.length, 3);
+    assert.equal(payload.committee.axes[0].members[0].reason.includes('덤프 근거'), true);
+    assert.equal(payload.committee.axes[0].score, 72);
+    assert.equal(payload.committee.axes[1].score, 75);
+    assert.equal(payload.committee.axes[2].score, 68);
+    assert.equal(payload.hero.score, 72);
+    assert.equal(payload.metadata.degraded, false);
+    assert.equal(payload.metadata.sourceRefs.some((ref) => ref.id.startsWith('kr-llm:')), true);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey) {
+      process.env.OPENROUTER_API_KEY = originalKey;
+    } else {
+      delete process.env.OPENROUTER_API_KEY;
+    }
+    process.env.DEEPSCAN_KR_LLM_ENABLE = originalEnable ?? 'false';
+  }
+});
+
+test('buildJarooDeepScanPayload blocks downstream KR blocks when one committee axis has 0/3 valid members', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+  const originalFetch = global.fetch;
+  const originalKey = process.env.OPENROUTER_API_KEY;
+  const originalEnable = process.env.DEEPSCAN_KR_LLM_ENABLE;
+  process.env.OPENROUTER_API_KEY = 'test-key';
+  process.env.DEEPSCAN_KR_LLM_ENABLE = 'true';
+
+  global.fetch = (async (_url, init) => {
+    const body = JSON.parse(String(init?.body ?? '{}'));
+    const userMessage = Array.isArray(body?.messages) ? body.messages.find((message) => message.role === 'user') : null;
+    const content = typeof userMessage?.content === 'string' ? userMessage.content : '';
+    const match = content.match(/\"member\":\"([^\"]+)\"/);
+    const memberKey = match?.[1];
+
+    if (['profitability', 'valuation', 'ownershipStability'].includes(memberKey)) {
+      return new Response(JSON.stringify({ error: { message: 'axis failed', code: 502 } }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      });
+    }
+
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            score: 70,
+            reason: `${memberKey} reason`,
+            confidence: 'medium',
+          }),
+        },
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  try {
+    const payload = await buildJarooDeepScanPayload({
+      instrument: {
+        name: '삼성전자',
+        code: '005930',
+        market: 'KR',
+      },
+      holding: {
+        shares: '12',
+        averagePrice: '71000',
+        evaluationAmount: '1022400',
+      },
+      selectedAt: '2026-04-14T00:00:00.000Z',
+      sourceContext: {
+        from: 'holding',
+        sessionKey: 'session-1',
+        appliedAt: '2026-04-15T00:00:00.000Z',
+      },
+      sources: createStrongKrSources(),
+    });
+
+    assert.equal(payload.committee.blockState, 'blocked');
+    assert.equal(payload.committee.axes.some((axis) => axis.label === 'Business Quality'), false);
+    assert.equal(payload.hero.blockState, 'blocked');
+    assert.equal(payload.strategy.blockState, 'blocked');
+    assert.equal(payload.sellNow.blockState, 'blocked');
+    assert.equal(payload.portfolioSimulation.blockState, 'blocked');
+    assert.equal(payload.metadata.degraded, true);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey) {
+      process.env.OPENROUTER_API_KEY = originalKey;
+    } else {
+      delete process.env.OPENROUTER_API_KEY;
+    }
+    process.env.DEEPSCAN_KR_LLM_ENABLE = originalEnable ?? 'false';
+  }
 });
 
 test('buildKrPackageInvocationInput converts deepscan holding handoff strings into package input fields', async () => {

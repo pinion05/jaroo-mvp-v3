@@ -1,11 +1,6 @@
-import { mkdirSync, writeFileSync } from 'node:fs'
-import { join } from 'node:path'
 import type { DeepScanRawInputForDump } from './us-dump-contract-runtime'
 import { generateUsDumpContractArtifacts } from './us-dump-contract-runtime'
-
-const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-const COMMITTEE_LOG_DIR = join(process.cwd(), '.omx', 'context', 'committee-debug-logs')
-const EMPTY_RESPONSE_RETRY_DELAY_MS = 2000
+import { scoreCommitteeMember, scoreCommitteeMembers } from '../../../packages/deepscan-runtime-core/src/committee-llm.js'
 
 export const US_MEMBER_KEYS = [
   'valuation',
@@ -31,26 +26,6 @@ export type CommitteeLlmVerdict = {
 export type CommitteeMemberError = {
   member: UsMemberKey
   error: string
-}
-
-type OpenRouterResponse = {
-  choices?: Array<{
-    message?: {
-      content?: string | Array<{ type?: string; text?: string }>
-    }
-  }>
-  error?: {
-    message?: string
-    code?: number
-  }
-}
-
-type CommitteeAttemptResult = {
-  upstreamResponse: Response
-  result: OpenRouterResponse | null
-  rawContent: string
-  parsed: unknown
-  elapsedMs: number
 }
 
 const COMMITTEE_SCHEMA = {
@@ -111,100 +86,6 @@ const MEMBER_PROMPTS: Record<UsMemberKey, { role: string; focus: string }> = {
   },
 }
 
-function ensureCommitteeLogDir() {
-  mkdirSync(COMMITTEE_LOG_DIR, { recursive: true })
-}
-
-function writeCommitteeLog(filename: string, payload: unknown) {
-  ensureCommitteeLogDir()
-  writeFileSync(join(COMMITTEE_LOG_DIR, filename), JSON.stringify(payload, null, 2))
-}
-
-function delay(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms))
-}
-
-function extractTextContent(content: string | Array<{ type?: string; text?: string }> | undefined) {
-  if (typeof content === 'string') {
-    return content
-  }
-
-  if (Array.isArray(content)) {
-    return content
-      .map((part) => (typeof part.text === 'string' ? part.text : ''))
-      .join('')
-      .trim()
-  }
-
-  return ''
-}
-
-function extractOpenRouterErrorMessage(result: OpenRouterResponse | null | undefined) {
-  return typeof result?.error?.message === 'string' ? result.error.message.trim() : ''
-}
-
-function extractOpenRouterErrorStatus(result: OpenRouterResponse | null | undefined) {
-  return typeof result?.error?.code === 'number' && Number.isInteger(result.error.code) ? result.error.code : 502
-}
-
-function clampScore(score: number) {
-  return Math.min(100, Math.max(0, Math.round(score)))
-}
-
-function normalizeConfidence(value: unknown): CommitteeLlmVerdict['confidence'] | null {
-  if (typeof value !== 'string') {
-    return null
-  }
-
-  const normalized = value.trim().toLowerCase()
-  if (normalized === 'high' || normalized === 'medium' || normalized === 'low') {
-    return normalized
-  }
-  if (['strong', 'confident'].includes(normalized)) {
-    return 'high'
-  }
-  if (['mixed', 'moderate', 'mid'].includes(normalized)) {
-    return 'medium'
-  }
-  if (['weak', 'caution', 'uncertain'].includes(normalized)) {
-    return 'low'
-  }
-  return null
-}
-
-function coerceCommitteeResult(value: unknown): CommitteeLlmVerdict | null {
-  const record = value && typeof value === 'object' ? value as Record<string, unknown> : null
-  if (!record) {
-    return null
-  }
-
-  let maybeWrapped: Record<string, unknown> = record
-  for (const key of ['result', 'data', 'output', 'analysis', 'committee_result']) {
-    if (maybeWrapped[key] && typeof maybeWrapped[key] === 'object' && !Array.isArray(maybeWrapped[key])) {
-      maybeWrapped = maybeWrapped[key] as Record<string, unknown>
-      break
-    }
-  }
-
-  const scoreRaw = maybeWrapped.score ?? maybeWrapped.value ?? maybeWrapped.rating
-  const score = typeof scoreRaw === 'number' ? scoreRaw : typeof scoreRaw === 'string' ? Number(scoreRaw) : NaN
-  const reason = [maybeWrapped.reason, maybeWrapped.summary, maybeWrapped.analysis, maybeWrapped.rationale, maybeWrapped.thesis]
-    .find((item): item is string => typeof item === 'string' && item.trim().length > 0)?.trim() ?? ''
-  const confidence = normalizeConfidence(maybeWrapped.confidence ?? maybeWrapped.certainty) ?? 'medium'
-  const warningsSource = maybeWrapped.warnings ?? maybeWrapped.caveats
-  if (!Number.isFinite(score) || !reason) {
-    return null
-  }
-  return {
-    score: clampScore(score),
-    reason,
-    confidence,
-    ...(Array.isArray(warningsSource)
-      ? { warnings: warningsSource.filter((item): item is string => typeof item === 'string' && item.trim().length > 0) }
-      : {}),
-  }
-}
-
 function systemPromptForMember(member: UsMemberKey) {
   const prompt = MEMBER_PROMPTS[member]
   return [
@@ -217,132 +98,15 @@ function systemPromptForMember(member: UsMemberKey) {
   ].join(' ')
 }
 
-async function requestCommitteeAttempt(
-  member: UsMemberKey,
-  dumps: { shared: unknown; memberDump: unknown },
-  apiKey: string,
-  model: string,
-): Promise<CommitteeAttemptResult> {
-  const startedAt = Date.now()
-  let upstreamResponse: Response
-  try {
-    upstreamResponse = await fetch(OPENROUTER_URL, {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'HTTP-Referer': 'http://localhost:3312',
-        'X-Title': 'jaroo-mvp-v3 DeepScan Committee',
-      },
-      signal: AbortSignal.timeout(45000),
-      body: JSON.stringify({
-        model,
-        temperature: 0.1,
-        provider: {
-          require_parameters: true,
-        },
-        response_format: {
-          type: 'json_schema',
-          json_schema: COMMITTEE_SCHEMA,
-        },
-        messages: [
-          {
-            role: 'system',
-            content: systemPromptForMember(member),
-          },
-          {
-            role: 'user',
-            content: `sharedContext=${JSON.stringify(dumps.shared)}\nmemberContext=${JSON.stringify(dumps.memberDump)}`,
-          },
-        ],
-      }),
-    })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'OpenRouter committee request failed'
-    throw new Error(`OpenRouter request failed for ${member}: ${message}`)
-  }
-
-  const result = (await upstreamResponse.json().catch(() => null)) as OpenRouterResponse | null
-  const upstreamErrorMessage = extractOpenRouterErrorMessage(result)
-
-  if (!upstreamResponse.ok || upstreamErrorMessage) {
-    throw new Error(upstreamErrorMessage || `OpenRouter committee request failed (${!upstreamResponse.ok ? upstreamResponse.status : extractOpenRouterErrorStatus(result)})`)
-  }
-
-  const rawContent = extractTextContent(result?.choices?.[0]?.message?.content)
-  let parsed: unknown = null
-  if (rawContent) {
-    try {
-      parsed = JSON.parse(rawContent) as unknown
-    } catch {
-      throw new Error(`OpenRouter returned invalid JSON for ${member}`)
-    }
-  }
-
-  return {
-    upstreamResponse,
-    result,
-    rawContent,
-    parsed,
-    elapsedMs: Date.now() - startedAt,
-  }
-}
-
-function logEmptyResponseFailure(member: UsMemberKey, status: number, elapsedMs: number, emptyContent: boolean) {
-  writeCommitteeLog(`${member}-failure.json`, {
-    member,
-    empty_content: emptyContent,
-    status,
-    elapsed_ms: elapsedMs,
-    timestamp: new Date().toISOString(),
-  })
-}
-
 export async function scoreUsCommitteeMember(
   member: UsMemberKey,
   dumps: { shared: unknown; memberDump: unknown },
 ): Promise<CommitteeLlmVerdict> {
-  const apiKey = process.env.OPENROUTER_API_KEY
-  const model = process.env.DEEPSCAN_LLM_MODEL || process.env.OCR_MODEL || 'qwen/qwen3.5-flash-02-23'
-
-  if (!apiKey) {
-    throw new Error('OPENROUTER_API_KEY is not configured.')
-  }
-
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const attemptResult = await requestCommitteeAttempt(member, dumps, apiKey, model)
-    const { upstreamResponse, rawContent, parsed, elapsedMs } = attemptResult
-
-    if (!rawContent || parsed === null) {
-      if (attempt === 0) {
-        await delay(EMPTY_RESPONSE_RETRY_DELAY_MS)
-        continue
-      }
-
-      logEmptyResponseFailure(member, upstreamResponse.status, elapsedMs, rawContent.length === 0)
-      throw new Error(`OpenRouter returned ${rawContent ? 'null' : 'empty'} committee response for ${member}`)
-    }
-
-    const coerced = coerceCommitteeResult(parsed)
-    if (!coerced) {
-      throw new Error(`OpenRouter returned invalid committee schema for ${member}`)
-    }
-
-    writeCommitteeLog(`${member}.json`, {
-      member,
-      model,
-      elapsed_ms: elapsedMs,
-      status: upstreamResponse.status,
-      raw_content: rawContent,
-      parsed,
-      coerced,
-      timestamp: new Date().toISOString(),
-    })
-
-    return coerced
-  }
-
-  throw new Error(`OpenRouter retry loop exhausted for ${member}`)
+  return scoreCommitteeMember(member, dumps, {
+    schemaName: COMMITTEE_SCHEMA.name,
+    title: 'jaroo-mvp-v3 DeepScan Committee',
+    systemPrompt: (memberKey: string) => systemPromptForMember(memberKey as UsMemberKey),
+  }) as Promise<CommitteeLlmVerdict>
 }
 
 export async function scoreUsCommitteeFromGeneratedDump(rawInput: DeepScanRawInputForDump, ticker: string) {
@@ -352,43 +116,19 @@ export async function scoreUsCommitteeFromGeneratedDump(rawInput: DeepScanRawInp
   const shared = artifacts.runtimeShape.shared
   const members = artifacts.runtimeShape.members as Record<UsMemberKey, unknown>
 
-  const settled = await Promise.allSettled(
-    US_MEMBER_KEYS.map(async (member) => {
-      const memberDump = members[member]
-      if (typeof memberDump === 'undefined') {
-        throw new Error(`Missing generated runtime dump for ${member}`)
-      }
-      const result = await scoreUsCommitteeMember(member, { shared, memberDump })
-      return [member, result] as const
-    }),
-  )
-
-  const results: Partial<Record<UsMemberKey, CommitteeLlmVerdict>> = {}
-  const errors: CommitteeMemberError[] = []
-
-  settled.forEach((entry, index) => {
-    const member = US_MEMBER_KEYS[index]
-    if (entry.status === 'fulfilled') {
-      const [fulfilledMember, result] = entry.value
-      results[fulfilledMember] = result
-      return
-    }
-
-    const reason = entry.reason instanceof Error ? entry.reason.message : String(entry.reason)
-    errors.push({ member, error: reason })
-  })
+  const { results, errors } = await scoreCommitteeMembers({
+    memberKeys: [...US_MEMBER_KEYS],
+    shared,
+    members,
+    options: {
+      schemaName: COMMITTEE_SCHEMA.name,
+      title: 'jaroo-mvp-v3 DeepScan Committee',
+      systemPrompt: (memberKey: string) => systemPromptForMember(memberKey as UsMemberKey),
+      summaryKey: ticker,
+    },
+  }) as { results: Partial<Record<UsMemberKey, CommitteeLlmVerdict>>; errors: CommitteeMemberError[] }
 
   const totalElapsed = Date.now() - totalT0
-  writeCommitteeLog('_summary.json', {
-    ticker,
-    model: process.env.DEEPSCAN_LLM_MODEL || process.env.OCR_MODEL || 'qwen/qwen3.5-flash-02-23',
-    dump_generation_ms: dumpElapsed,
-    total_llm_ms: totalElapsed - dumpElapsed,
-    total_ms: totalElapsed,
-    members: Object.fromEntries(Object.entries(results).map(([key, value]) => [key, { score: value?.score, confidence: value?.confidence, reason_preview: value?.reason.slice(0, 80) }])),
-    errors,
-    timestamp: new Date().toISOString(),
-  })
 
   return {
     artifacts,

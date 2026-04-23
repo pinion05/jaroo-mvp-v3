@@ -82,15 +82,15 @@ test('scoreDeepScanKrEvidence scores strong evidence deterministically and is pu
   assert.deepEqual(scored, {
     committee: {
       businessQuality: {
-        score: 70,
-        profitability: 61,
-        valuation: 85,
-        ownershipStability: 65,
+        score: 65,
+        profitability: 56,
+        valuation: 80,
+        ownershipStability: 60,
       },
       marketTiming: {
-        score: 85,
+        score: 83,
         trend: 90,
-        consensusMomentum: 86,
+        consensusMomentum: 81,
         priceLocation: 75,
       },
       positionFit: {
@@ -101,7 +101,7 @@ test('scoreDeepScanKrEvidence scores strong evidence deterministically and is pu
       },
     },
     hero: {
-      score: 79,
+      score: 76,
       scoreLabel: 'strong',
       statusText: '우세',
       penalties: [],
@@ -116,12 +116,28 @@ test('scoreDeepScanKrEvidence scores strong evidence deterministically and is pu
     },
     portfolioSimulation: {
       available: true,
-      beforeScore: 83,
-      afterScore: 85,
+      beforeScore: 82,
+      afterScore: 84,
       delta: 2,
       deltaLabel: 'hold:+2',
     },
   });
+});
+
+test('scoreDeepScanKrEvidence no longer awards hidden package-presence-only numeric bonuses', async () => {
+  const { scoreDeepScanKrEvidence } = await import('../src/services/deepscan-kr-score.js');
+
+  const withPackage = scoreDeepScanKrEvidence(createStrongEvidencePacket());
+  const withoutPackage = scoreDeepScanKrEvidence({
+    ...createStrongEvidencePacket(),
+    sourceCoverage: {
+      ...createStrongEvidencePacket().sourceCoverage,
+      hasPackageResult: false,
+    },
+  });
+
+  assert.deepEqual(withPackage.committee, withoutPackage.committee);
+  assert.deepEqual(withPackage.hero, withoutPackage.hero);
 });
 
 test('scoreDeepScanKrEvidence applies missing-data penalties and blocks sell-now/simulation without quote and coverage', async () => {
