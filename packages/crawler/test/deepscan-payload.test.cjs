@@ -350,6 +350,12 @@ test('buildJarooDeepScanPayload uses package-derived KR committee wording when a
   assert.ok(reasons.some((reason) => reason.includes('HBM 증설과 AI 수요')))
   assert.ok(reasons.some((reason) => reason.includes('기관 수급은 변동성이 있지만')))
   assert.doesNotMatch(reasons[0], /최근 리포트 2건 기준입니다/)
+  const marketTimingAxis = payload.committee.axes.find((axis) => axis.label === 'Market Timing');
+  assert.ok(marketTimingAxis);
+  assert.match(marketTimingAxis.members[2].reason, /현재가 85200 KRW와 평단 71000 비교 기준/)
+  const positionFitAxis = payload.committee.axes.find((axis) => axis.label === 'Position Fit');
+  assert.ok(positionFitAxis);
+  assert.equal(positionFitAxis.members[2].reason, '보유 수량, 평단, 현재가가 모두 확인되어 sell-now 계산이 가능합니다.');
 });
 
 test('buildKrPackageInvocationInput converts deepscan holding handoff strings into package input fields', async () => {
