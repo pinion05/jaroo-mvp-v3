@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   APPLIED_HOME_PORTFOLIO_STORAGE_KEY,
   buildHomeHoldingsFromOcrRows,
+  buildHomeHoldingsFromPortfolioItems,
   homeHoldings,
   persistAppliedHomePortfolio,
   persistDeepScanTarget,
@@ -153,6 +154,7 @@ test('persistAppliedHomePortfolio는 averagePrice가 비어 있으면 OCR profit
       { label: '보유 수량', value: '10주', tone: 'neutral' },
       { label: '수익률', value: '-', tone: 'neutral' },
       { label: '평가 금액', value: '-', tone: 'neutral' },
+      { label: '현재가', value: '-', tone: 'neutral' },
     ])
   } finally {
     restoreWindow()
@@ -226,6 +228,39 @@ test('home holdings builder는 applied row에 섞여 들어온 OCR evaluation/pr
     { label: '보유 수량', value: '10주', tone: 'neutral' },
     { label: '수익률', value: '-', tone: 'neutral' },
     { label: '평가 금액', value: '-', tone: 'neutral' },
+    { label: '현재가', value: '-', tone: 'neutral' },
+  ])
+})
+
+test('home holdings builder preserves portfolio-store live quote fields on remount', () => {
+  const [holding] = buildHomeHoldingsFromPortfolioItems([
+    {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KOSPI',
+      marketTone: 'kospi',
+      kind: 'stock',
+      quantity: 10,
+      averagePrice: 80000,
+      averagePriceCurrency: 'KRW',
+      currentPrice: 85200,
+      currentPriceCurrency: 'KRW',
+      currentProfitRate: 6.5,
+      evaluationAmount: undefined,
+      identifierLabel: '005930',
+    },
+  ])
+
+  assert.equal(holding?.averagePrice, '80,000원')
+  assert.equal(holding?.evaluationAmount, '852,000원')
+  assert.equal(holding?.change, '+6.5%')
+  assert.equal(holding?.badge, '수익 중')
+  assert.match(holding?.metaLine ?? '', /현재가 85,200원/)
+  assert.deepEqual(holding?.metrics, [
+    { label: '보유 수량', value: '10주', tone: 'neutral' },
+    { label: '수익률', value: '+6.5%', tone: 'positive' },
+    { label: '평가 금액', value: '852,000원', tone: 'neutral' },
+    { label: '현재가', value: '85,200원', tone: 'neutral' },
   ])
 })
 

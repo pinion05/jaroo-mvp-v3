@@ -59,9 +59,10 @@ type PortfolioSummary = {
 type PortfolioStoreItem = ReturnType<typeof usePortfolioStore.getState>['items'][number]
 
 function stripPortfolioQuoteFields(item: PortfolioStoreItem) {
-  const { currentPrice, currentProfitRate, ...baseItem } = item
+  const { currentPrice, currentProfitRate, currentPriceCurrency, ...baseItem } = item
   void currentPrice
   void currentProfitRate
+  void currentPriceCurrency
   return baseItem
 }
 
@@ -500,6 +501,7 @@ export function JarooHomeScreen() {
             { code: item.code, ticker: item.ticker, name: item.name, market: item.market },
             {
               currentPrice: quoteItem.price,
+              currentPriceCurrency: quoteCurrency,
               currentProfitRate: parseOcrNumber(enrichedHolding?.change ?? '') ?? undefined,
             },
           )

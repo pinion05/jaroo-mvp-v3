@@ -97,6 +97,7 @@ export type PortfolioNormalizedItem = {
   averagePrice: number
   currentPrice?: number
   currentProfitRate?: number
+  currentPriceCurrency?: WorkflowMoneyCurrency
   evaluationAmount?: number
   averagePriceCurrency?: WorkflowMoneyCurrency
   identifierLabel?: string
@@ -113,6 +114,7 @@ export type DeepScanTargetInput = {
   averagePrice: number
   currentPrice?: number
   currentProfitRate?: number
+  currentPriceCurrency?: WorkflowMoneyCurrency
   evaluationAmount?: number
   averagePriceCurrency?: WorkflowMoneyCurrency
   identifierLabel?: string
@@ -257,6 +259,7 @@ export function toDeepScanTargetInput(item: PortfolioNormalizedItem): DeepScanTa
     averagePrice: item.averagePrice,
     currentPrice: item.currentPrice,
     currentProfitRate: item.currentProfitRate,
+    currentPriceCurrency: item.currentPriceCurrency,
     evaluationAmount: item.evaluationAmount,
     averagePriceCurrency: item.averagePriceCurrency,
     identifierLabel: item.identifierLabel ?? buildIdentifierLabel(item.ticker, item.code),
