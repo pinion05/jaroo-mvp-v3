@@ -232,6 +232,25 @@ test('OCR review store can remove one row and its candidate cache without resett
   assert.equal(state.candidatesByRowId[secondRow.id]?.[0]?.id, 'candidate-2')
 })
 
+test('OCR review store reuses state references for identical rows and candidate maps', () => {
+  const row = createReviewRow({ id: 'row-stable' })
+  const candidates = [{ id: 'candidate-1', resolvedName: 'Microsoft Corporation', resolvedTicker: 'MSFT', source: 'local' }] as const
+
+  useOcrReviewStore.getState().setRows([row])
+  useOcrReviewStore.getState().replaceCandidates({ [row.id]: [...candidates] })
+
+  const stateBefore = useOcrReviewStore.getState()
+  const rowsBefore = stateBefore.rows
+  const candidatesBefore = stateBefore.candidatesByRowId
+
+  useOcrReviewStore.getState().setRows(rowsBefore)
+  useOcrReviewStore.getState().replaceCandidates(candidatesBefore)
+
+  const stateAfter = useOcrReviewStore.getState()
+  assert.equal(stateAfter.rows, rowsBefore)
+  assert.equal(stateAfter.candidatesByRowId, candidatesBefore)
+})
+
 test('merge selector excludes error rows from applicable payload', () => {
   useMergeStore.getState().setRows([
     createMergeRow(),

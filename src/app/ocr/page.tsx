@@ -230,6 +230,16 @@ function filterConflictSelections(
   )
 }
 
+function areSameSelectionMap(left: Record<string, string>, right: Record<string, string>) {
+  const leftKeys = Object.keys(left)
+  const rightKeys = Object.keys(right)
+
+  return (
+    leftKeys.length === rightKeys.length
+    && leftKeys.every((key) => right[key] === left[key])
+  )
+}
+
 function formatCandidateScore(score?: number) {
   if (typeof score !== 'number' || !Number.isFinite(score)) {
     return ''
@@ -663,7 +673,10 @@ export default function OcrPage() {
   )
 
   useEffect(() => {
-    setConflictSelections((currentSelections) => filterConflictSelections(visibleConflicts, currentSelections))
+    setConflictSelections((currentSelections) => {
+      const nextSelections = filterConflictSelections(visibleConflicts, currentSelections)
+      return areSameSelectionMap(currentSelections, nextSelections) ? currentSelections : nextSelections
+    })
   }, [visibleConflicts])
 
   useEffect(() => {

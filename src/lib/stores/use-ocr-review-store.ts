@@ -33,9 +33,27 @@ const initialState: OcrReviewStoreState = {
   resolveErrorMessage: null,
 }
 
+function areSameRows(left: OcrReviewRow[], right: OcrReviewRow[]) {
+  return left.length === right.length && left.every((row, index) => row === right[index])
+}
+
+function areSameCandidateMap(
+  left: Record<string, ResolveCandidate[]>,
+  right: Record<string, ResolveCandidate[]>,
+) {
+  const leftKeys = Object.keys(left)
+  const rightKeys = Object.keys(right)
+
+  return (
+    leftKeys.length === rightKeys.length
+    && leftKeys.every((key) => Object.prototype.hasOwnProperty.call(right, key) && left[key] === right[key])
+  )
+}
+
 export const useOcrReviewStore = create<OcrReviewStoreState & OcrReviewStoreActions>()((set) => ({
   ...initialState,
-  setRows: (rows) => set({ rows }),
+  setRows: (rows) =>
+    set((state) => (areSameRows(state.rows, rows) ? state : { rows })),
   upsertRow: (row) =>
     set((state) => ({
       rows: state.rows.some((item) => item.id === row.id)
@@ -60,7 +78,8 @@ export const useOcrReviewStore = create<OcrReviewStoreState & OcrReviewStoreActi
         [rowId]: candidates,
       },
     })),
-  replaceCandidates: (candidatesByRowId) => set({ candidatesByRowId }),
+  replaceCandidates: (candidatesByRowId) =>
+    set((state) => (areSameCandidateMap(state.candidatesByRowId, candidatesByRowId) ? state : { candidatesByRowId })),
   selectCandidate: (rowId, candidateId) =>
     set((state) => ({
       rows: state.rows.map((row) =>
