@@ -963,12 +963,11 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
   const weights = preparedRows.map((item) => item.baseAmountValue ?? 1)
   const totalWeight = weights.reduce((sum, value) => sum + value, 0) || sanitizedRows.length
 
-  return preparedRows.map(({ row, kind, displayName, market, marketTone, averagePriceCurrency, averagePrice, currentPriceText }, index) => {
+  return preparedRows.map(({ row, kind, displayName, market, marketTone, averagePriceCurrency, averagePrice, currentPriceText, baseAmountValue }, index) => {
     const tone = deriveHoldingTone(row.currentProfitRate ?? null)
     const shares = formatQuantityValue(row.quantity)
     const change = formatPercentValue(row.currentProfitRate ?? null)
     const placeholderCurrency = averagePriceCurrency ?? (marketTone === 'nasdaq' ? 'USD' : 'KRW')
-    const pnl = formatSignedCurrencyValue(null, placeholderCurrency)
     const donutPercent = weights[index] / totalWeight
     const identifierTicker = row.resolvedTicker?.trim() || row.ticker || undefined
     const identifierCode = row.resolvedCode?.trim() || row.code || HOME_HOLDING_CODE_BY_NAME.get(normalizeStockName(displayName)) || undefined
@@ -978,6 +977,13 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
     const evaluationAmount = typeof row.currentPrice === 'number' && quantityValue !== null
       ? formatCurrencyValue(String(quantityValue * row.currentPrice), row.currentPriceCurrency ?? placeholderCurrency)
       : undefined
+    const evaluationAmountValue = typeof row.currentPrice === 'number' && quantityValue !== null
+      ? quantityValue * row.currentPrice
+      : null
+    const pnl = formatSignedCurrencyValue(
+      evaluationAmountValue !== null && baseAmountValue !== null ? evaluationAmountValue - baseAmountValue : null,
+      row.currentPriceCurrency ?? placeholderCurrency,
+    )
 
     return {
       id: index,

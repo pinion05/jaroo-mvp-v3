@@ -254,6 +254,7 @@ test('home holdings builder preserves portfolio-store live quote fields on remou
   assert.equal(holding?.averagePrice, '80,000원')
   assert.equal(holding?.evaluationAmount, '852,000원')
   assert.equal(holding?.change, '+6.5%')
+  assert.equal(holding?.pnl, '+52,000원')
   assert.equal(holding?.badge, '수익 중')
   assert.match(holding?.metaLine ?? '', /현재가 85,200원/)
   assert.deepEqual(holding?.metrics, [
