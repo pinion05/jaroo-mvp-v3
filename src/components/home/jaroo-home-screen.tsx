@@ -368,7 +368,7 @@ export function JarooHomeScreen() {
   )
   const hasPortfolioItems = portfolioBaseItems.length > 0
   const isAppliedPortfolio = hasPortfolioItems
-  const rawHomeHoldings = useMemo(() => buildHomeHoldingsFromPortfolioItems(portfolioBaseItems), [portfolioBaseItems])
+  const rawHomeHoldings = useMemo(() => buildHomeHoldingsFromPortfolioItems(portfolioItems), [portfolioItems])
   const portfolioBaseItemsRef = useRef(portfolioBaseItems)
   const rawHomeHoldingsRef = useRef(rawHomeHoldings)
   const quoteQuery = useMemo(() => buildHomeCurrentQuoteQuery(rawHomeHoldings), [rawHomeHoldings])
