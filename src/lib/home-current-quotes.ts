@@ -202,11 +202,81 @@ function deriveMetricTone(changeValue: number | null): HomeHolding['metrics'][nu
   return changeValue <= -20 ? 'danger' : 'warning'
 }
 
+function deriveExchangeProductBadge(changeValue: number | null) {
+  if (changeValue === null) {
+    return null
+  }
+
+  if (changeValue >= 0) {
+    return {
+      badge: '수익 중' as const,
+      badgeTone: 'green' as const,
+    }
+  }
+
+  return {
+    badge: '손실 중' as const,
+    badgeTone: 'red' as const,
+  }
+}
+
 function applyLiveTone(holding: HomeHolding, changeValue: number | null) {
   const isEtnHolding = /ETN/i.test(holding.market ?? '')
 
-  if ((holding.kind === 'etf' && !isEtnHolding) || changeValue === null) {
+  if (changeValue === null) {
     return holding
+  }
+
+  if (holding.kind === 'etf') {
+    const exchangeProductBadge = deriveExchangeProductBadge(changeValue)
+    if (!exchangeProductBadge) {
+      return holding
+    }
+
+    const nextHolding = {
+      ...holding,
+      badge: exchangeProductBadge.badge,
+      badgeTone: exchangeProductBadge.badgeTone,
+      centerBadge: exchangeProductBadge.badge,
+      centerBadgeTone: exchangeProductBadge.badgeTone,
+      heatmapBadge: exchangeProductBadge.badge,
+      heatmapBadgeTone: exchangeProductBadge.badgeTone,
+    }
+
+    if (!isEtnHolding) {
+      return nextHolding
+    }
+
+    if (changeValue >= 0) {
+      return {
+        ...nextHolding,
+        cardTone: 'profit' as const,
+        signalTone: 'positive' as const,
+        centerScoreColor: '#9FE1CB',
+        heatmapBackground: '#1A7A5E',
+        blink: undefined,
+      }
+    }
+
+    if (changeValue <= -20) {
+      return {
+        ...nextHolding,
+        cardTone: 'danger' as const,
+        signalTone: 'danger' as const,
+        centerScoreColor: '#F09595',
+        heatmapBackground: '#C13030',
+        blink: true,
+      }
+    }
+
+    return {
+      ...nextHolding,
+      cardTone: 'warning' as const,
+      signalTone: 'warning' as const,
+      centerScoreColor: '#FAC775',
+      heatmapBackground: '#BC7010',
+      blink: undefined,
+    }
   }
 
   if (changeValue >= 0) {
