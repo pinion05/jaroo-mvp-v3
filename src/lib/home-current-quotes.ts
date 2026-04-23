@@ -106,6 +106,13 @@ export function resolveAveragePriceCurrency(
   return averagePriceValue > quotePrice * 20 ? 'KRW' : 'USD'
 }
 
+export function requiresFxConversion(
+  quoteCurrency: 'KRW' | 'USD',
+  averagePriceCurrency: 'KRW' | 'USD' | null,
+) {
+  return quoteCurrency === 'USD' && averagePriceCurrency === 'KRW'
+}
+
 function convertMoneyAmount(
   value: number | null,
   fromCurrency: 'KRW' | 'USD' | null,
@@ -252,8 +259,19 @@ function applyLiveTone(holding: HomeHolding, changeValue: number | null) {
 
 export type HomeHoldingQuoteErrorKind = 'quote-unavailable' | 'fx-required' | 'holding-invalid'
 
+export function shouldTreatQuoteFailureAsErrorCard(
+  holding: Pick<HomeHolding, 'kind'>,
+  kind: HomeHoldingQuoteErrorKind,
+) {
+  if (kind === 'quote-unavailable' && holding.kind === 'etf') {
+    return false
+  }
+
+  return true
+}
+
 export function buildQuoteLookupKey(item: Pick<HomeHolding, 'marketTone' | 'identifierCode' | 'identifierTicker' | 'code'>) {
-  if (item.marketTone === 'nasdaq' || item.identifierTicker) {
+  if (item.marketTone === 'nasdaq') {
     return item.identifierTicker?.trim().toUpperCase() || undefined
   }
 
@@ -268,7 +286,7 @@ export function buildHomeCurrentQuoteQuery(holdings: HomeHolding[]) {
     const key = buildQuoteLookupKey(holding)
     if (!key) continue
 
-    if (holding.marketTone === 'nasdaq' || holding.identifierTicker) {
+    if (holding.marketTone === 'nasdaq') {
       tickers.add(key)
       continue
     }

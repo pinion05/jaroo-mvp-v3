@@ -11,6 +11,8 @@ import {
   buildHomeCurrentQuoteQuery,
   buildHomeHoldingErrorCard,
   buildQuoteLookupKey,
+  requiresFxConversion,
+  shouldTreatQuoteFailureAsErrorCard,
   resolveAveragePriceCurrency,
   type CurrentQuoteItem,
   type HomeHoldingQuoteErrorKind,
@@ -477,13 +479,16 @@ export function JarooHomeScreen() {
           }
 
           if (!quoteItem || quoteItem.status !== 'ok' || typeof quoteItem.price !== 'number') {
-            nextFailureKinds[itemKey] = 'quote-unavailable'
+            if (shouldTreatQuoteFailureAsErrorCard(homeHolding, 'quote-unavailable')) {
+              nextFailureKinds[itemKey] = 'quote-unavailable'
+            }
             clearItemQuote({ code: item.code, ticker: item.ticker, name: item.name, market: item.market })
             continue
           }
 
-          const averagePriceCurrency = resolveAveragePriceCurrency(homeHolding, 'USD', quoteItem, { usdKrwRate: nextFxRate })
-          const requiresFx = averagePriceCurrency === 'KRW'
+          const quoteCurrency = quoteItem.currency === 'USD' || homeHolding.marketTone === 'nasdaq' ? 'USD' : 'KRW'
+          const averagePriceCurrency = resolveAveragePriceCurrency(homeHolding, quoteCurrency, quoteItem, { usdKrwRate: nextFxRate })
+          const requiresFx = requiresFxConversion(quoteCurrency, averagePriceCurrency)
           if (requiresFx && (fxFetchFailed || nextFxRate === null)) {
             nextFailureKinds[itemKey] = 'fx-required'
             clearItemQuote({ code: item.code, ticker: item.ticker, name: item.name, market: item.market })

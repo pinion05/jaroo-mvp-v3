@@ -172,3 +172,69 @@ test('getCurrentQuotes preserves KR success while reporting explicit US provider
     fmp: { apiName: 'fmp', configured: false, available: false, cooldownRemainingMs: 0, exhausted: false },
   });
 });
+
+test('getKrxCurrentQuotes falls back to WiseReport ETF quotes when KRX snapshot misses an ETF code', async () => {
+  const { getKrxCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+
+  const result = await getKrxCurrentQuotes(['102110'], {
+    krxTradeDateResolver: async () => '20260423',
+    krxSnapshotFetcher: async () => [{ code: '005930', 종가: '85200' }],
+    krExchangeProductTypeResolver: (code) => (code === '102110' ? 'ETF' : null),
+    krExchangeProductQuoteFetcher: async (code, productType, tradeDate) => ({
+      market: 'KR',
+      code,
+      ticker: null,
+      price: 43000,
+      currency: 'KRW',
+      asOf: '2026-04-23',
+      source: productType === 'ETF' ? 'wisereport-etf' : 'wisereport-etn',
+      status: 'ok',
+      tradeDate,
+    }),
+  });
+
+  assert.deepEqual(result.items, [{
+    market: 'KR',
+    code: '102110',
+    ticker: null,
+    price: 43000,
+    currency: 'KRW',
+    asOf: '2026-04-23',
+    source: 'wisereport-etf',
+    status: 'ok',
+    tradeDate: '20260423',
+  }]);
+  assert.deepEqual(result.missing, []);
+});
+
+test('getKrxCurrentQuotes falls back to WiseReport ETN quotes when KRX snapshot misses an ETN code', async () => {
+  const { getKrxCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+
+  const result = await getKrxCurrentQuotes(['530092'], {
+    krxTradeDateResolver: async () => '20260423',
+    krxSnapshotFetcher: async () => [{ code: '005930', 종가: '85200' }],
+    krExchangeProductTypeResolver: (code) => (code === '530092' ? 'ETN' : null),
+    krExchangeProductQuoteFetcher: async (code, productType) => ({
+      market: 'KR',
+      code,
+      ticker: null,
+      price: 4145,
+      currency: 'KRW',
+      asOf: '2026-04-23',
+      source: productType === 'ETN' ? 'wisereport-etn' : 'wisereport-etf',
+      status: 'ok',
+    }),
+  });
+
+  assert.deepEqual(result.items, [{
+    market: 'KR',
+    code: '530092',
+    ticker: null,
+    price: 4145,
+    currency: 'KRW',
+    asOf: '2026-04-23',
+    source: 'wisereport-etn',
+    status: 'ok',
+  }]);
+  assert.deepEqual(result.missing, []);
+});

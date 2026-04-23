@@ -24,3 +24,85 @@ test('pure ticker exact miss 는 더 짧은 ticker prefix/contains fuzzy 로 붙
   assert.equal(resolved, null)
   assert.equal(candidates.length, 0)
 })
+
+test('한국 ETF/ETN 자연어 query 안의 generic suffix token 은 미국 ticker 오인 없이 국내 상품으로 붙는다', () => {
+  const query = '삼성 인버스 코스피 200 선물 ETN'
+  const resolved = resolveHoldingInstrument(query)
+  const candidates = searchHoldingInstrumentCandidates(query, 3)
+
+  assert.equal(resolved?.name, '삼성 인버스 코스피 200 선물 ETN')
+  assert.equal(resolved?.code, '530092')
+  assert.equal(resolved?.market, 'ETN')
+  assert.equal(resolved?.locale, 'KR')
+  assert.ok(candidates.every((candidate) => candidate.ticker !== 'ETN'))
+})
+
+test('대표적인 한국 종목 별칭은 종목코드까지 안정적으로 매핑한다', () => {
+  const cases = [
+    { query: '네이버', expectedName: 'NAVER', expectedCode: '035420' },
+    { query: 'SOOP', expectedName: 'SOOP', expectedCode: '067160' },
+    { query: 'soop', expectedName: 'SOOP', expectedCode: '067160' },
+    { query: '숲', expectedName: 'SOOP', expectedCode: '067160' },
+    { query: '아프리카TV', expectedName: 'SOOP', expectedCode: '067160' },
+    { query: '삼영', expectedName: '삼영화학공업', expectedCode: '003720' },
+    { query: 'LST에너지', expectedName: 'SNT에너지', expectedCode: '100840' },
+    { query: 'LST 에너지', expectedName: 'SNT에너지', expectedCode: '100840' },
+    { query: 'SNT에너지', expectedName: 'SNT에너지', expectedCode: '100840' },
+    { query: 'SNT 에너지', expectedName: 'SNT에너지', expectedCode: '100840' },
+    { query: '현대차', expectedName: '현대자동차', expectedCode: '005380' },
+    { query: '포스코홀딩스', expectedName: '포스코', expectedCode: '005490' },
+    { query: 'POSCO홀딩스', expectedName: '포스코', expectedCode: '005490' },
+    { query: 'LG에너지솔루션', expectedName: 'LG에너지솔루션', expectedCode: '373220' },
+    { query: '엘지에너지솔루션', expectedName: 'LG에너지솔루션', expectedCode: '373220' },
+    { query: '카카오뱅크', expectedName: '카카오뱅크', expectedCode: '323410' },
+    { query: '카뱅', expectedName: '카카오뱅크', expectedCode: '323410' },
+    { query: '삼전', expectedName: '삼성전자', expectedCode: '005930' },
+  ]
+
+  for (const { query, expectedName, expectedCode } of cases) {
+    const resolved = resolveHoldingInstrument(query)
+
+    assert.equal(resolved?.name, expectedName, query)
+    assert.equal(resolved?.code, expectedCode, query)
+    assert.equal(resolved?.locale, 'KR', query)
+  }
+})
+
+test('대표적인 한국 ETF 이름과 리브랜딩 별칭도 코드까지 매핑한다', () => {
+  const cases = [
+    { query: 'KODEX 200', expectedName: 'KODEX 200', expectedCode: '069500' },
+    { query: 'TIGER 200', expectedName: 'TIGER 200', expectedCode: '102110' },
+    { query: 'KBSTAR 200', expectedName: 'KBSTAR 200', expectedCode: '148020' },
+    { query: 'HANARO 200', expectedName: 'HANARO 200', expectedCode: '293180' },
+    { query: 'ARIRANG 200', expectedName: 'ARIRANG 200', expectedCode: '152100' },
+    { query: 'KODEX 레버리지', expectedName: 'KODEX 레버리지', expectedCode: '122630' },
+    { query: 'TIGER 미국S&P500', expectedName: 'TIGER 미국S&P500', expectedCode: '360750' },
+  ]
+
+  for (const { query, expectedName, expectedCode } of cases) {
+    const resolved = resolveHoldingInstrument(query)
+
+    assert.equal(resolved?.name, expectedName, query)
+    assert.equal(resolved?.code, expectedCode, query)
+    assert.equal(resolved?.kind, 'etf', query)
+    assert.equal(resolved?.locale, 'KR', query)
+  }
+})
+
+test('대표적인 한국 ETN 이름도 코드까지 매핑한다', () => {
+  const cases = [
+    { query: '삼성 인버스 코스피 200 선물 ETN', expectedName: '삼성 인버스 코스피 200 선물 ETN', expectedCode: '530092' },
+    { query: '신한 레버리지 코스피 200 선물 ETN', expectedName: '신한 레버리지 코스피 200 선물 ETN', expectedCode: '500069' },
+    { query: 'N2 코스피 200 TR ETN', expectedName: 'N2 코스피 200 TR ETN', expectedCode: '550084' },
+  ]
+
+  for (const { query, expectedName, expectedCode } of cases) {
+    const resolved = resolveHoldingInstrument(query)
+
+    assert.equal(resolved?.name, expectedName, query)
+    assert.equal(resolved?.code, expectedCode, query)
+    assert.equal(resolved?.kind, 'etf', query)
+    assert.equal(resolved?.market, 'ETN', query)
+    assert.equal(resolved?.locale, 'KR', query)
+  }
+})

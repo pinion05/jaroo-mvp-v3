@@ -1,4 +1,7 @@
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { fmpFetch, getProviderStatus, polygonFetch } from './api-clients.js';
 
 const require = createRequire(import.meta.url);
@@ -12,6 +15,15 @@ const KRX_DEPENDENCY_ERROR_PATTERNS = [
   /Failed to init client/i,
   /krx-js-client/i,
 ];
+
+const WISE_ETF_NAV_DATA_URL = 'https://comp.wisereport.co.kr/ETF/GetNAVData.aspx';
+const CURRENT_QUOTES_DIR = path.dirname(fileURLToPath(import.meta.url));
+const KR_EXCHANGE_PRODUCT_UNIVERSE_PATH = path.resolve(
+  CURRENT_QUOTES_DIR,
+  '../../../../src/lib/data/instrument-universe.json',
+);
+
+let cachedKrExchangeProductTypeByCode = null;
 
 function uniqueStrings(values, transform = (value) => value) {
   const seen = new Set();
@@ -31,6 +43,12 @@ function todayIsoDate() {
   return new Date().toISOString().slice(0, 10);
 }
 
+function shiftIsoDateDays(value, days) {
+  const nextDate = new Date(`${value}T00:00:00Z`);
+  nextDate.setUTCDate(nextDate.getUTCDate() + days);
+  return nextDate.toISOString().slice(0, 10);
+}
+
 function isoDateToYyyymmdd(value) {
   return String(value || '').replace(/-/g, '');
 }
@@ -43,6 +61,18 @@ function yyyymmddToIsoDate(value) {
 
 function getErrorMessage(error, fallback) {
   return error instanceof Error ? error.message : fallback;
+}
+
+function getFetchImpl(fetchImpl) {
+  if (typeof fetchImpl === 'function') {
+    return fetchImpl;
+  }
+
+  if (typeof globalThis.fetch === 'function') {
+    return globalThis.fetch.bind(globalThis);
+  }
+
+  throw new Error('fetch implementation unavailable');
 }
 
 function isKrxDependencyError(error) {
@@ -64,6 +94,83 @@ function classifyKrxFailure(error) {
   return {
     reason: 'runtime-unavailable',
     message: getErrorMessage(error, 'krx runtime unavailable'),
+  };
+}
+
+function loadKrExchangeProductTypeByCode() {
+  if (cachedKrExchangeProductTypeByCode) {
+    return cachedKrExchangeProductTypeByCode;
+  }
+
+  try {
+    const universe = JSON.parse(fs.readFileSync(KR_EXCHANGE_PRODUCT_UNIVERSE_PATH, 'utf8'));
+    cachedKrExchangeProductTypeByCode = new Map(
+      (Array.isArray(universe) ? universe : [])
+        .filter((item) => item?.locale === 'KR' && (item?.market === 'ETF' || item?.market === 'ETN') && item?.code)
+        .map((item) => [String(item.code).trim(), item.market]),
+    );
+  } catch {
+    cachedKrExchangeProductTypeByCode = new Map();
+  }
+
+  return cachedKrExchangeProductTypeByCode;
+}
+
+function resolveKrExchangeProductType(code, options = {}) {
+  if (typeof options.krExchangeProductTypeResolver === 'function') {
+    return options.krExchangeProductTypeResolver(code);
+  }
+
+  return loadKrExchangeProductTypeByCode().get(code) ?? null;
+}
+
+async function getKrExchangeProductQuote(code, productType, tradeDate, options = {}) {
+  if (typeof options.krExchangeProductQuoteFetcher === 'function') {
+    return options.krExchangeProductQuoteFetcher(code, productType, tradeDate);
+  }
+
+  const fetchImpl = getFetchImpl(options.fetchImpl);
+  const endDate = yyyymmddToIsoDate(tradeDate) ?? todayIsoDate();
+  const startDate = shiftIsoDateDays(endDate, -120);
+  const searchParams = new URLSearchParams({
+    startDT: startDate,
+    endDT: endDate,
+    dataType: 'D',
+    cmp_cd: code,
+    cmp_typ: productType === 'ETN' ? '25' : '5',
+  });
+
+  const response = await fetchImpl(`${WISE_ETF_NAV_DATA_URL}?${searchParams.toString()}`, {
+    headers: {
+      'User-Agent': 'Mozilla/5.0',
+      'X-Requested-With': 'XMLHttpRequest',
+      Referer: 'https://comp.wisereport.co.kr/ETF/lookup.aspx',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error(`WiseReport exchange product quote fetch failed: ${response.status}`);
+  }
+
+  const payload = await response.json();
+  const gridData = Array.isArray(payload?.grid_data) ? payload.grid_data : [];
+  const exactDate = yyyymmddToIsoDate(tradeDate);
+  const row = (exactDate ? gridData.find((item) => item?.TRD_DT === exactDate) : null) ?? gridData.at(-1);
+  const price = Number(row?.CLOSE_PRC);
+
+  if (!row || !Number.isFinite(price)) {
+    return null;
+  }
+
+  return {
+    market: 'KR',
+    code,
+    ticker: null,
+    price,
+    currency: 'KRW',
+    asOf: row.TRD_DT ?? exactDate,
+    source: productType === 'ETN' ? 'wisereport-etn' : 'wisereport-etf',
+    status: 'ok',
   };
 }
 
@@ -120,12 +227,19 @@ export async function getKrxCurrentQuotes(codes, options = {}) {
 
     const items = [];
     const missing = [];
+    const fallbackTargets = [];
 
     for (const code of normalizedCodes) {
       const row = rowsByCode.get(code);
       const price = Number(row?.['종가']);
 
       if (!row || !Number.isFinite(price)) {
+        const productType = resolveKrExchangeProductType(code, options);
+        if (productType === 'ETF' || productType === 'ETN') {
+          fallbackTargets.push({ code, productType });
+          continue;
+        }
+
         missing.push({ market: 'KR', code, ticker: null, reason: 'not-found' });
         continue;
       }
@@ -140,6 +254,38 @@ export async function getKrxCurrentQuotes(codes, options = {}) {
         source: 'krx',
         status: 'ok',
       });
+    }
+
+    if (fallbackTargets.length > 0) {
+      const fallbackResults = await Promise.all(
+        fallbackTargets.map(async ({ code, productType }) => {
+          try {
+            const item = await getKrExchangeProductQuote(code, productType, tradeDate, options);
+            return item
+              ? { type: 'item', item }
+              : { type: 'missing', missing: { market: 'KR', code, ticker: null, reason: 'not-found' } };
+          } catch (error) {
+            return {
+              type: 'missing',
+              missing: {
+                market: 'KR',
+                code,
+                ticker: null,
+                reason: 'not-found',
+                message: getErrorMessage(error, 'exchange product quote unavailable'),
+              },
+            };
+          }
+        }),
+      );
+
+      for (const result of fallbackResults) {
+        if (result.type === 'item') {
+          items.push(result.item);
+        } else {
+          missing.push(result.missing);
+        }
+      }
     }
 
     return {
