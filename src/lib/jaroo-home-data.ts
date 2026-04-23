@@ -607,8 +607,10 @@ function formatPercentValue(value: number | null) {
     return '-'
   }
 
-  const roundedValue = Number(value.toFixed(1))
-  return `${roundedValue >= 0 ? '+' : ''}${roundedValue.toFixed(1)}%`
+  const formattedValue = value.toFixed(1)
+  const roundedValue = Number(formattedValue)
+  const sign = roundedValue > 0 ? '+' : roundedValue < 0 ? '-' : ''
+  return `${sign}${Math.abs(roundedValue).toFixed(1)}%`
 }
 
 function computeHoldingBaseAmount(quantity: string, averagePrice: string) {
@@ -972,8 +974,9 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
     const identifierCode = row.resolvedCode?.trim() || row.code || HOME_HOLDING_CODE_BY_NAME.get(normalizeStockName(displayName)) || undefined
     const identifierLabel = buildHoldingIdentifierLabel(identifierTicker, identifierCode)
     const resolvedCode = identifierCode || identifierTicker
-    const evaluationAmount = typeof row.currentPrice === 'number'
-      ? formatCurrencyValue(String((parseOcrNumber(row.quantity) ?? 0) * row.currentPrice), row.currentPriceCurrency ?? placeholderCurrency)
+    const quantityValue = parseOcrNumber(row.quantity)
+    const evaluationAmount = typeof row.currentPrice === 'number' && quantityValue !== null
+      ? formatCurrencyValue(String(quantityValue * row.currentPrice), row.currentPriceCurrency ?? placeholderCurrency)
       : undefined
 
     return {
