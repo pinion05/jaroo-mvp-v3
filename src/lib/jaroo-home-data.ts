@@ -78,6 +78,9 @@ export type AppliedHomePortfolioRow = Pick<
   | 'ticker'
 > & {
   averagePriceCurrency?: AveragePriceCurrency
+  currentPrice?: number
+  currentPriceCurrency?: AveragePriceCurrency
+  currentProfitRate?: number
 }
 
 export const homeHoldings: HomeHolding[] = [
@@ -518,12 +521,18 @@ function sanitizeAppliedHomePortfolioRows(input: unknown): AppliedHomePortfolioR
         item.resolvedKind === 'stock' || item.resolvedKind === 'etf' ? item.resolvedKind : undefined
       const resolvedMarket = readTrimmedString(item.resolvedMarket)
       const averagePriceCurrency = resolveAppliedAveragePriceCurrency(item, resolvedMarketTone, resolvedMarket)
+      const currentPrice = typeof item.currentPrice === 'number' && Number.isFinite(item.currentPrice) ? item.currentPrice : undefined
+      const currentProfitRate = typeof item.currentProfitRate === 'number' && Number.isFinite(item.currentProfitRate) ? item.currentProfitRate : undefined
+      const currentPriceCurrency = normalizeAveragePriceCurrency(item.currentPriceCurrency)
 
       return {
         name: readTrimmedString(item.name) ?? '',
         quantity: readTrimmedString(item.quantity) ?? '',
         averagePrice: readTrimmedString(item.averagePrice) ?? '',
         averagePriceCurrency,
+        currentPrice,
+        currentPriceCurrency,
+        currentProfitRate,
         code: normalizeAppliedInstrumentCode(item.code),
         ticker: normalizeAppliedInstrumentCode(item.ticker),
         resolvedName: readTrimmedString(item.resolvedName),
@@ -591,6 +600,17 @@ function formatSignedCurrencyValue(value: number | null, currency: 'KRW' | 'USD'
   }
 
   return `${value > 0 ? '+' : value < 0 ? '-' : ''}${formatNumber(Math.abs(value))}원`
+}
+
+function formatPercentValue(value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return '-'
+  }
+
+  const formattedValue = value.toFixed(1)
+  const roundedValue = Number(formattedValue)
+  const sign = roundedValue > 0 ? '+' : roundedValue < 0 ? '-' : ''
+  return `${sign}${Math.abs(roundedValue).toFixed(1)}%`
 }
 
 function computeHoldingBaseAmount(quantity: string, averagePrice: string) {
@@ -884,6 +904,9 @@ function buildAppliedRowFromPortfolioItem(item: PortfolioNormalizedItem): Applie
     quantity: `${item.quantity}주`,
     averagePrice: formatAveragePriceFromPortfolioItem(item),
     averagePriceCurrency: item.averagePriceCurrency,
+    currentPrice: item.currentPrice,
+    currentPriceCurrency: item.currentPriceCurrency,
+    currentProfitRate: item.currentProfitRate,
     code: item.code,
     ticker: item.ticker,
     resolvedName: item.name,
@@ -919,6 +942,10 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
       ?? inferCurrencyFromMoneyText(row.averagePrice)
       ?? (marketTone === 'nasdaq' ? undefined : 'KRW')
     const averagePriceRaw = row.averagePrice
+    const currentPriceCurrency = row.currentPriceCurrency ?? (marketTone === 'nasdaq' ? 'USD' : 'KRW')
+    const currentPriceText = typeof row.currentPrice === 'number'
+      ? formatCurrencyValue(String(row.currentPrice), currentPriceCurrency)
+      : undefined
 
     return {
       row,
@@ -928,6 +955,7 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
       marketTone,
       averagePriceCurrency: displayCurrency,
       averagePrice: formatCurrencyValue(averagePriceRaw, displayCurrency),
+      currentPriceText,
       baseAmountValue: computeHoldingBaseAmount(row.quantity, averagePriceRaw),
     }
   })
@@ -935,17 +963,27 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
   const weights = preparedRows.map((item) => item.baseAmountValue ?? 1)
   const totalWeight = weights.reduce((sum, value) => sum + value, 0) || sanitizedRows.length
 
-  return preparedRows.map(({ row, kind, displayName, market, marketTone, averagePriceCurrency, averagePrice }, index) => {
-    const tone = deriveHoldingTone(null)
+  return preparedRows.map(({ row, kind, displayName, market, marketTone, averagePriceCurrency, averagePrice, currentPriceText, baseAmountValue }, index) => {
+    const tone = deriveHoldingTone(row.currentProfitRate ?? null)
     const shares = formatQuantityValue(row.quantity)
-    const change = '-'
+    const change = formatPercentValue(row.currentProfitRate ?? null)
     const placeholderCurrency = averagePriceCurrency ?? (marketTone === 'nasdaq' ? 'USD' : 'KRW')
-    const pnl = formatSignedCurrencyValue(null, placeholderCurrency)
     const donutPercent = weights[index] / totalWeight
     const identifierTicker = row.resolvedTicker?.trim() || row.ticker || undefined
     const identifierCode = row.resolvedCode?.trim() || row.code || HOME_HOLDING_CODE_BY_NAME.get(normalizeStockName(displayName)) || undefined
     const identifierLabel = buildHoldingIdentifierLabel(identifierTicker, identifierCode)
     const resolvedCode = identifierCode || identifierTicker
+    const quantityValue = parseOcrNumber(row.quantity)
+    const evaluationAmount = typeof row.currentPrice === 'number' && quantityValue !== null
+      ? formatCurrencyValue(String(quantityValue * row.currentPrice), row.currentPriceCurrency ?? placeholderCurrency)
+      : undefined
+    const evaluationAmountValue = typeof row.currentPrice === 'number' && quantityValue !== null
+      ? quantityValue * row.currentPrice
+      : null
+    const pnl = formatSignedCurrencyValue(
+      evaluationAmountValue !== null && baseAmountValue !== null ? evaluationAmountValue - baseAmountValue : null,
+      row.currentPriceCurrency ?? placeholderCurrency,
+    )
 
     return {
       id: index,
@@ -957,6 +995,7 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
       shares,
       averagePrice,
       averagePriceCurrency,
+      evaluationAmount,
       market,
       marketTone,
       identifierTicker,
@@ -987,11 +1026,12 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
       opinionBackground: kind === 'etf' ? '#f0f7ff' : tone.cardTone === 'profit' ? '#F0FAF4' : tone.cardTone === 'danger' ? '#FFF0F0' : '#f8f8f6',
       opinionBorder: kind === 'etf' ? '#B5D4F4' : tone.cardTone === 'danger' ? '#F7C1C1' : 'transparent',
       opinionTextColor: kind === 'etf' ? '#0C447C' : tone.cardTone === 'profit' ? '#27500A' : tone.cardTone === 'danger' ? '#791F1F' : '#555',
-      metaLine: buildHoldingMetaLine(identifierTicker, identifierCode, averagePrice),
+      metaLine: [buildHoldingMetaLine(identifierTicker, identifierCode, averagePrice, evaluationAmount), currentPriceText ? `현재가 ${currentPriceText}` : null].filter(Boolean).join(' · '),
       metrics: [
         { label: '보유 수량', value: shares, tone: 'neutral' },
-        { label: '수익률', value: change, tone: 'neutral' },
-        { label: '평가 금액', value: '-', tone: 'neutral' },
+        { label: '수익률', value: change, tone: tone.metricTone },
+        { label: '평가 금액', value: evaluationAmount ?? '-', tone: 'neutral' },
+        { label: '현재가', value: currentPriceText ?? '-', tone: 'neutral' },
       ],
       actionLabel: kind === 'etf' ? 'ETF 분석' : '딥스캔',
       actionSubLabel: kind === 'etf' ? '섹터 구성 + 회복 시나리오' : 'AI 9인 위원회 분석',

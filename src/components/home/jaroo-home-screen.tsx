@@ -59,9 +59,10 @@ type PortfolioSummary = {
 type PortfolioStoreItem = ReturnType<typeof usePortfolioStore.getState>['items'][number]
 
 function stripPortfolioQuoteFields(item: PortfolioStoreItem) {
-  const { currentPrice, currentProfitRate, ...baseItem } = item
+  const { currentPrice, currentProfitRate, currentPriceCurrency, ...baseItem } = item
   void currentPrice
   void currentProfitRate
+  void currentPriceCurrency
   return baseItem
 }
 
@@ -367,7 +368,7 @@ export function JarooHomeScreen() {
   )
   const hasPortfolioItems = portfolioBaseItems.length > 0
   const isAppliedPortfolio = hasPortfolioItems
-  const rawHomeHoldings = useMemo(() => buildHomeHoldingsFromPortfolioItems(portfolioBaseItems), [portfolioBaseItems])
+  const rawHomeHoldings = useMemo(() => buildHomeHoldingsFromPortfolioItems(portfolioItems), [portfolioItems])
   const portfolioBaseItemsRef = useRef(portfolioBaseItems)
   const rawHomeHoldingsRef = useRef(rawHomeHoldings)
   const quoteQuery = useMemo(() => buildHomeCurrentQuoteQuery(rawHomeHoldings), [rawHomeHoldings])
@@ -500,6 +501,7 @@ export function JarooHomeScreen() {
             { code: item.code, ticker: item.ticker, name: item.name, market: item.market },
             {
               currentPrice: quoteItem.price,
+              currentPriceCurrency: quoteCurrency,
               currentProfitRate: parseOcrNumber(enrichedHolding?.change ?? '') ?? undefined,
             },
           )
