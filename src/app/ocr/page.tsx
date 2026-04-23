@@ -193,6 +193,43 @@ function applyReviewCandidate(row: OcrReviewRow, candidate?: ResolveCandidate) {
   }
 }
 
+function mergeResolvedRowsWithExistingReviewRows(
+  resolvedRows: OcrSourceRow[],
+  existingRows: OcrReviewRow[],
+  existingCandidatesByRowId: Record<string, ResolveCandidate[]>,
+) {
+  const existingRowsById = new Map(existingRows.map((row) => [row.id, row]))
+  const nextRows = resolvedRows.map((row) => existingRowsById.get(row.id) ?? toReviewRow(row))
+  const nextCandidatesByRowId = Object.fromEntries(
+    Object.entries(existingCandidatesByRowId).filter(([rowId]) => nextRows.some((row) => row.id === rowId)),
+  )
+
+  return {
+    rows: nextRows,
+    candidatesByRowId: nextCandidatesByRowId,
+  }
+}
+
+function filterConflictSelections(
+  conflicts: Array<{ key: string; candidates: Array<{ id: string }> }>,
+  selections: Record<string, string>,
+) {
+  return Object.fromEntries(
+    conflicts
+      .map((conflict) => {
+        const selectedCandidateId = selections[conflict.key]
+        if (!selectedCandidateId) {
+          return null
+        }
+
+        return conflict.candidates.some((candidate) => candidate.id === selectedCandidateId)
+          ? [conflict.key, selectedCandidateId]
+          : null
+      })
+      .filter((entry): entry is [string, string] => entry !== null),
+  )
+}
+
 function formatCandidateScore(score?: number) {
   if (typeof score !== 'number' || !Number.isFinite(score)) {
     return ''
@@ -593,41 +630,41 @@ export default function OcrPage() {
     void runOcrBatch(session)
   }, [runOcrBatch, session])
 
+  const conflictsWithRemainingCandidates = useMemo(
+    () =>
+      conflicts.map((conflict) => ({
+        ...conflict,
+        candidates: conflict.candidates.filter((candidate) => !removedRowIds[candidate.id]),
+      })),
+    [conflicts, removedRowIds],
+  )
+
   const resolvedRows = useMemo(() => {
     const filteredBaseRows = baseMergedRows.filter((row) => !removedRowIds[row.id])
-    const autoResolvedRows = conflicts.flatMap((conflict) => {
-      const remainingCandidates = conflict.candidates.filter((candidate) => !removedRowIds[candidate.id])
-      if (remainingCandidates.length === 1) {
-        return remainingCandidates
+    const autoResolvedRows = conflictsWithRemainingCandidates.flatMap((conflict) => {
+      if (conflict.candidates.length === 1) {
+        return conflict.candidates
       }
 
       return []
     })
 
-    const filteredConflicts = conflicts
-      .map((conflict) => ({
-        ...conflict,
-        candidates: conflict.candidates.filter((candidate) => !removedRowIds[candidate.id]),
-      }))
-      .filter((conflict) => conflict.candidates.length > 1)
-
+    const filteredConflicts = conflictsWithRemainingCandidates.filter((conflict) => conflict.candidates.length > 1)
     const chosenRows = resolveMergedOcrRows([], filteredConflicts, conflictSelections)
 
     return [...filteredBaseRows, ...autoResolvedRows, ...chosenRows].sort(
       (left, right) => left.uploadIndex - right.uploadIndex || left.rowIndex - right.rowIndex,
     )
-  }, [baseMergedRows, conflicts, conflictSelections, removedRowIds])
+  }, [baseMergedRows, conflictSelections, conflictsWithRemainingCandidates, removedRowIds])
 
   const visibleConflicts = useMemo(
-    () =>
-      conflicts
-        .map((conflict) => ({
-          ...conflict,
-          candidates: conflict.candidates.filter((candidate) => !removedRowIds[candidate.id]),
-        }))
-        .filter((conflict) => conflict.candidates.length > 1),
-    [conflicts, removedRowIds],
+    () => conflictsWithRemainingCandidates.filter((conflict) => conflict.candidates.length > 1),
+    [conflictsWithRemainingCandidates],
   )
+
+  useEffect(() => {
+    setConflictSelections((currentSelections) => filterConflictSelections(visibleConflicts, currentSelections))
+  }, [visibleConflicts])
 
   useEffect(() => {
     if (requestState !== 'success' || resolvedRows.length === 0) {
@@ -639,31 +676,52 @@ export default function OcrPage() {
     }
 
     let isCancelled = false
+    const mergedState = mergeResolvedRowsWithExistingReviewRows(resolvedRows, reviewRows, instrumentCandidatesByRowId)
+    const unresolvedRows = resolvedRows.filter((row) => !mergedState.candidatesByRowId[row.id])
 
-    setReviewRows(resolvedRows.map(toReviewRow))
+    setReviewRows(mergedState.rows)
+    replaceCandidates(mergedState.candidatesByRowId)
+    setExpandedRowId((current) => (current && mergedState.candidatesByRowId[current]?.length > 1 ? current : null))
+
+    if (unresolvedRows.length === 0) {
+      setResolveStatus('success')
+      return
+    }
+
     setResolveStatus('loading')
 
-    void resolveInstrumentRows(resolvedRows)
+    void resolveInstrumentRows(unresolvedRows)
       .then((result) => {
         if (isCancelled) {
           return
         }
 
-        const nextRows = result.rows.map((row) => {
-          const candidates = result.candidatesByRowId[row.id] ?? []
+        const resolvedRowsById = new Map(result.rows.map((row) => [row.id, row]))
+        const nextRows = mergedState.rows.map((row) => {
+          const resolvedRow = resolvedRowsById.get(row.id)
+          const candidates = result.candidatesByRowId[row.id] ?? mergedState.candidatesByRowId[row.id] ?? []
           const firstCandidate = candidates[0]
-          const manuallyRequired = !hasResolvedIdentifier(row) && candidates.length === 0
+          const manuallyRequired = !hasResolvedIdentifier(resolvedRow ?? row) && candidates.length === 0
 
           return {
-            ...toReviewRow(row),
-            selectedCandidateId: !hasResolvedIdentifier(row) && firstCandidate ? firstCandidate.id : null,
+            ...(resolvedRow ? toReviewRow(resolvedRow) : row),
+            selectedCandidateId: !hasResolvedIdentifier(resolvedRow ?? row) && firstCandidate ? firstCandidate.id : row.selectedCandidateId ?? null,
             resolutionState: manuallyRequired ? 'manual-required' : 'resolved',
           } satisfies OcrReviewRow
         })
 
         setReviewRows(nextRows)
-        replaceCandidates(result.candidatesByRowId)
-        setExpandedRowId((current) => (current && result.candidatesByRowId[current]?.length > 1 ? current : null))
+        replaceCandidates({
+          ...mergedState.candidatesByRowId,
+          ...result.candidatesByRowId,
+        })
+        setExpandedRowId((current) => {
+          const nextCandidatesByRowId = {
+            ...mergedState.candidatesByRowId,
+            ...result.candidatesByRowId,
+          }
+          return current && nextCandidatesByRowId[current]?.length > 1 ? current : null
+        })
         setResolveStatus('success')
       })
       .catch((error) => {
@@ -671,16 +729,16 @@ export default function OcrPage() {
           return
         }
 
-        setReviewRows(resolvedRows.map(toReviewRow))
-        replaceCandidates({})
-        setExpandedRowId(null)
+        setReviewRows(mergedState.rows)
+        replaceCandidates(mergedState.candidatesByRowId)
+        setExpandedRowId((current) => (current && mergedState.candidatesByRowId[current]?.length > 1 ? current : null))
         setResolveStatus('error', error instanceof Error ? error.message : '종목 식별자 확인에 실패했어요.')
       })
 
     return () => {
       isCancelled = true
     }
-  }, [replaceCandidates, requestState, resolvedRows, setResolveStatus, setReviewRows])
+  }, [instrumentCandidatesByRowId, replaceCandidates, requestState, resolvedRows, reviewRows, setResolveStatus, setReviewRows])
 
   const previewRows = useMemo(() => {
     const baseRows = requestState === 'success' ? reviewRows : reviewRows.length > 0 ? reviewRows : resolvedRows.map(toReviewRow)
