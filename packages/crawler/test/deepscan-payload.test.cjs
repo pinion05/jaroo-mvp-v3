@@ -307,6 +307,51 @@ test('buildJarooDeepScanPayload keeps position-fit evidence when the handoff use
   assert.match(payload.sellNow.realizedText, /\+170400 KRW/);
 });
 
+test('buildJarooDeepScanPayload uses package-derived KR committee wording when available', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+
+  const payload = await buildJarooDeepScanPayload({
+    instrument: {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KR',
+    },
+    holding: {
+      shares: '12',
+      averagePrice: '71000',
+      evaluationAmount: '1022400',
+    },
+    selectedAt: '2026-04-14T00:00:00.000Z',
+    sources: {
+      ...createStrongKrSources(),
+      packageResult: {
+        stockCode: '005930',
+        listingMarket: 'KOSPI',
+        timestamp: '2026-04-15T12:00:00.000Z',
+        reportContent: '패키지 요약: 메모리 수요와 서버 투자 확대가 실적 체력을 지지합니다.',
+        marketScoreSnapshot: {
+          totalScore: 81,
+          summary: '밸류에이션은 과열보다 재평가 구간에 가깝습니다.',
+        },
+        boardAnalysis: {
+          boardOpinions: [
+            { analyst: 'A', summary: '재무 구조와 현금창출력이 안정적이라 downside가 제한적입니다.' },
+            { analyst: 'B', summary: 'HBM 증설과 AI 수요가 성장 가시성을 높여줍니다.' },
+            { analyst: 'C', summary: '기관 수급은 변동성이 있지만 추세 훼손 신호는 아직 약합니다.' },
+          ],
+          boardMarketEvaluation: '평단 대비 현재가는 부담이 크지 않고 시나리오 대응 여지가 남아 있습니다.',
+        },
+      },
+    },
+  });
+
+  const reasons = payload.committee.axes.flatMap((axis) => axis.members.map((member) => member.reason));
+  assert.ok(reasons.some((reason) => reason.includes('재무 구조와 현금창출력')))
+  assert.ok(reasons.some((reason) => reason.includes('HBM 증설과 AI 수요')))
+  assert.ok(reasons.some((reason) => reason.includes('기관 수급은 변동성이 있지만')))
+  assert.doesNotMatch(reasons[0], /최근 리포트 2건 기준입니다/)
+});
+
 test('buildKrPackageInvocationInput converts deepscan holding handoff strings into package input fields', async () => {
   const { buildKrPackageInvocationInput } = await import('../src/services/deepscan-payload.js');
 

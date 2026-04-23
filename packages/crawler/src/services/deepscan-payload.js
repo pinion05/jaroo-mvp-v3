@@ -840,10 +840,71 @@ function createCommitteeMember(shortLabel, title, score, reason) {
   };
 }
 
-function createCommitteeAxes(evidence, scored) {
+function collectStructuredStrings(value, bucket = []) {
+  if (typeof value === 'string') {
+    const normalized = normalizeText(value);
+    if (normalized) {
+      bucket.push(normalized);
+    }
+    return bucket;
+  }
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      collectStructuredStrings(item, bucket);
+    }
+    return bucket;
+  }
+
+  if (value && typeof value === 'object') {
+    for (const nestedValue of Object.values(value)) {
+      collectStructuredStrings(nestedValue, bucket);
+    }
+  }
+
+  return bucket;
+}
+
+function splitNarrativeText(value) {
+  return collectStructuredStrings(value)
+    .flatMap((entry) => entry.split(/[\n\r]+|(?<=[.!?。])\s+/))
+    .map((entry) => normalizeText(entry))
+    .filter((entry) => entry && entry.length >= 12);
+}
+
+function createKrPackageReasonOverrides(packageResult) {
+  if (!packageResult || typeof packageResult !== 'object') {
+    return [];
+  }
+
+  const candidateTexts = [
+    ...splitNarrativeText(packageResult.boardAnalysis),
+    ...splitNarrativeText(packageResult.marketScoreSnapshot),
+    ...splitNarrativeText(packageResult.reportContent),
+  ];
+
+  const uniqueTexts = [];
+  const seen = new Set();
+
+  for (const text of candidateTexts) {
+    if (!text || seen.has(text)) {
+      continue;
+    }
+
+    seen.add(text);
+    uniqueTexts.push(text);
+  }
+
+  return uniqueTexts;
+}
+
+function createCommitteeAxes(evidence, scored, packageResult) {
   const businessQualityReason = evidence.sourceCoverage.hasPackageResult
     ? `회사개요·재무·리포트 근거를 합산했습니다. 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건, package-result 확보 기준입니다.`
     : `회사개요·재무·리포트 근거를 합산했습니다. 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건 기준입니다.`;
+  const packageReasonOverrides = createKrPackageReasonOverrides(packageResult);
+  let packageReasonIndex = 0;
+  const nextReason = (fallbackReason) => packageReasonOverrides[packageReasonIndex++] ?? fallbackReason;
 
   return [
     {
@@ -858,19 +919,19 @@ function createCommitteeAxes(evidence, scored) {
           '수익성',
           '수익성/기본체력',
           scored.committee.businessQuality.profitability,
-          businessQualityReason,
+          nextReason(businessQualityReason),
         ),
         createCommitteeMember(
           '밸류',
           '밸류에이션',
           scored.committee.businessQuality.valuation,
-          `컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 현재가 ${evidence.currentQuote ? '확보' : '없음'}를 반영했습니다.`,
+          nextReason(`컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 현재가 ${evidence.currentQuote ? '확보' : '없음'}를 반영했습니다.`),
         ),
         createCommitteeMember(
           '지배',
           '지분/안정성',
           scored.committee.businessQuality.ownershipStability,
-          `보유 맥락 ${evidence.holding.hasHoldingContext ? '확인' : '없음'}, 스타일/지분 페이지 ${evidence.reportSignals.styleAnalysisAvailable || evidence.pageCoverage.availablePageIds.includes('shareholding') ? '일부 확보' : '부족'} 상태입니다.`,
+          nextReason(`보유 맥락 ${evidence.holding.hasHoldingContext ? '확인' : '없음'}, 스타일/지분 페이지 ${evidence.reportSignals.styleAnalysisAvailable || evidence.pageCoverage.availablePageIds.includes('shareholding') ? '일부 확보' : '부족'} 상태입니다.`),
         ),
       ],
     },
@@ -886,21 +947,21 @@ function createCommitteeAxes(evidence, scored) {
           '트렌드',
           '트렌드',
           scored.committee.marketTiming.trend,
-          `상대수익률 ${evidence.reportSignals.relativeReturnAvailable ? '확보' : '없음'}, 스타일 분석 ${evidence.reportSignals.styleAnalysisAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportsAvailable ? '확보' : '없음'} 기준입니다.`,
+          nextReason(`상대수익률 ${evidence.reportSignals.relativeReturnAvailable ? '확보' : '없음'}, 스타일 분석 ${evidence.reportSignals.styleAnalysisAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportsAvailable ? '확보' : '없음'} 기준입니다.`),
         ),
         createCommitteeMember(
           '컨센',
           '컨센서스 모멘텀',
           scored.committee.marketTiming.consensusMomentum,
-          `컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건을 반영했습니다.`,
+          nextReason(`컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건을 반영했습니다.`),
         ),
         createCommitteeMember(
           '가격',
           '가격 위치',
           scored.committee.marketTiming.priceLocation,
-          evidence.currentQuote
+          nextReason(evidence.currentQuote
             ? `현재가 ${formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency)}와 평단 ${formatNumber(evidence.holding.averagePrice)} 비교 기준입니다.`
-            : '현재가가 없어 가격 위치 점수는 보수적으로 계산했습니다.',
+            : '현재가가 없어 가격 위치 점수는 보수적으로 계산했습니다.'),
         ),
       ],
     },
@@ -916,23 +977,23 @@ function createCommitteeAxes(evidence, scored) {
           '평단',
           '평단 격차',
           scored.committee.positionFit.avgPriceGap,
-          evidence.currentQuote && evidence.holding.averagePrice !== null
+          nextReason(evidence.currentQuote && evidence.holding.averagePrice !== null
             ? `현재가 ${formatNumber(evidence.currentQuote.price)} 대비 평단 ${formatNumber(evidence.holding.averagePrice)} 간격을 반영했습니다.`
-            : '현재가 또는 평단이 부족해 평단 격차 점수를 보수적으로 계산했습니다.',
+            : '현재가 또는 평단이 부족해 평단 격차 점수를 보수적으로 계산했습니다.'),
         ),
         createCommitteeMember(
           '여지',
           '상방 버퍼',
           scored.committee.positionFit.upsideBuffer,
-          `컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportsAvailable ? '확보' : '없음'} 반영입니다.`,
+          nextReason(`컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportsAvailable ? '확보' : '없음'} 반영입니다.`),
         ),
         createCommitteeMember(
           '입력',
           '입력 완성도',
           scored.committee.positionFit.holdingCompleteness,
-          evidence.holding.hasFullSellNowInputs
+          nextReason(evidence.holding.hasFullSellNowInputs
             ? '보유 수량, 평단, 현재가가 모두 확인되어 sell-now 계산이 가능합니다.'
-            : '보유 수량·평단·현재가 중 일부가 없어 sell-now 계산이 제한됩니다.',
+            : '보유 수량·평단·현재가 중 일부가 없어 sell-now 계산이 제한됩니다.'),
         ),
       ],
     },
@@ -1241,7 +1302,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
       hero,
       committee: {
         ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'committee', evidenceSourceRefs), fallback: blockFallback }),
-        axes: createCommitteeAxes(evidence, scored),
+        axes: createCommitteeAxes(evidence, scored, sources.packageResult),
       },
       insights: {
         ...createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'insights', evidenceSourceRefs), fallback: blockFallback }),
