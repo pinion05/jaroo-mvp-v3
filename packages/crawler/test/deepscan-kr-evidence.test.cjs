@@ -120,6 +120,13 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
     source: 'krx',
     status: 'ok',
   });
+  assert.deepEqual(packet.marketSnapshot, {
+    currentPrice: 85200,
+    currency: 'KRW',
+    averagePriceGapPct: 20,
+    evaluationPnL: 170400,
+    evaluationPnLPct: 20,
+  });
   assert.equal(packet.pageCoverage.totalKnownPages, publicApi.WISEREPORT_KR_PAGES.length);
   assert.deepEqual(packet.pageCoverage.availablePageIds, [
     'company-overview',
@@ -156,6 +163,29 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
     relativeReturnAvailable: true,
     styleAnalysisAvailable: true,
     recentReportCount: 2,
+  });
+  assert.deepEqual(packet.consensusSnapshot, {
+    targetPrice: 100000,
+    targetGapPct: ((100000 - 85200) / 85200) * 100,
+    recommendation: 'BUY',
+    recommendationCounts: null,
+    revisionDirection: 'unknown',
+    revisionPct: null,
+  });
+  assert.deepEqual(packet.valuationSnapshot, {
+    per: null,
+    pbr: null,
+    roe: null,
+    evEbitda: null,
+  });
+  assert.deepEqual(packet.styleAnalysisSnapshot, {
+    factorScores: [{ name: '성장', value: 95 }],
+  });
+  assert.deepEqual(packet.packageContext, {
+    available: true,
+    summaryFacts: ['ok'],
+    marketView: null,
+    boardHighlights: [],
   });
   assert.deepEqual(packet.missingSources, []);
   assert.deepEqual(packet.topFacts, [
@@ -209,6 +239,13 @@ test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a dire
     source: 'fixture',
     status: 'ok',
   });
+  assert.deepEqual(packet.marketSnapshot, {
+    currentPrice: 90000,
+    currency: 'KRW',
+    averagePriceGapPct: null,
+    evaluationPnL: null,
+    evaluationPnLPct: null,
+  });
   assert.equal(packet.pageCoverage.availableCount, 0);
   assert.equal(packet.pageCoverage.totalKnownPages, 10);
   assert.equal(packet.pageCoverage.availablePageIds.length, 0);
@@ -227,6 +264,8 @@ test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a dire
     styleAnalysisAvailable: false,
     recentReportCount: null,
   });
+  assert.equal(packet.packageContext.available, false);
+  assert.deepEqual(packet.packageContext.summaryFacts, []);
   assert.deepEqual(packet.missingSources, ['slim']);
   assert.deepEqual(packet.topFacts, [
     '현재가 90000 KRW 확인',

@@ -113,14 +113,20 @@ function missingFact(message, reasonCode = ['missing_fact']) {
   };
 }
 
+function optionalFact(value, reasonCode, missingMessage) {
+  return value === null || value === undefined
+    ? missingFact(missingMessage, reasonCode)
+    : presentValue(value, reasonCode);
+}
+
 function buildSharedDump(input, evidence, sources) {
-  const packageResult = sources.packageResult && typeof sources.packageResult === 'object' ? sources.packageResult : null;
   return {
     instrument: {
       code: presentValue(input.instrument.code ?? null, ['instrument_code']),
       name: presentValue(input.instrument.name ?? null, ['instrument_name']),
       market: presentValue(input.instrument.market ?? evidence.instrument?.market ?? null, ['instrument_market']),
     },
+    timestamps: presentValue(evidence.timestamps ?? {}, ['timestamps']),
     sourceCoverage: presentValue(evidence.sourceCoverage ?? {}, ['source_coverage']),
     pageCoverage: presentValue(evidence.pageCoverage ?? {}, ['page_coverage']),
     reportSignals: presentValue(evidence.reportSignals ?? {}, ['report_signals']),
@@ -128,17 +134,16 @@ function buildSharedDump(input, evidence, sources) {
     currentQuote: evidence.currentQuote
       ? presentValue(evidence.currentQuote, ['current_quote'])
       : missingFact('현재가 근거가 없습니다.', ['current_quote_missing']),
+    marketSnapshot: presentValue(evidence.marketSnapshot ?? {}, ['market_snapshot']),
+    consensusSnapshot: presentValue(evidence.consensusSnapshot ?? {}, ['consensus_snapshot']),
+    valuationSnapshot: presentValue(evidence.valuationSnapshot ?? {}, ['valuation_snapshot']),
+    relativeReturnSnapshot: presentValue(evidence.relativeReturnSnapshot ?? {}, ['relative_return_snapshot']),
+    styleAnalysisSnapshot: presentValue(evidence.styleAnalysisSnapshot ?? {}, ['style_analysis_snapshot']),
+    ownershipSnapshot: presentValue(evidence.ownershipSnapshot ?? {}, ['ownership_snapshot']),
+    financialSnapshot: presentValue(evidence.financialSnapshot ?? {}, ['financial_snapshot']),
     topFacts: presentValue(Array.isArray(evidence.topFacts) ? evidence.topFacts : [], ['top_facts']),
     topRisks: presentValue(Array.isArray(evidence.topRisks) ? evidence.topRisks : [], ['top_risks']),
-    packageContext: packageResult
-      ? presentValue({
-          listingMarket: normalizeText(packageResult.listingMarket) ?? null,
-          timestamp: normalizeText(packageResult.timestamp) ?? null,
-          reportContent: normalizeText(packageResult.reportContent) ?? null,
-          marketScoreSnapshot: packageResult.marketScoreSnapshot ?? null,
-          boardOpinions: packageResult.boardAnalysis?.boardOpinions ?? null,
-        }, ['package_context'], ['Supplemental only; not numeric truth.'])
-      : missingFact('패키지 보조 컨텍스트가 없습니다.', ['package_context_missing']),
+    packageContext: presentValue(evidence.packageContext ?? { available: false, summaryFacts: [], marketView: null, boardHighlights: [] }, ['package_context'], ['Supplemental only; not numeric truth.']),
   };
 }
 
@@ -146,8 +151,16 @@ function buildMemberDump(memberKey, input, evidence, sources) {
   const shared = buildSharedDump(input, evidence, sources);
   const common = {
     instrument: shared.instrument,
+    timestamps: shared.timestamps,
     holding: shared.holding,
     currentQuote: shared.currentQuote,
+    marketSnapshot: shared.marketSnapshot,
+    consensusSnapshot: shared.consensusSnapshot,
+    valuationSnapshot: shared.valuationSnapshot,
+    relativeReturnSnapshot: shared.relativeReturnSnapshot,
+    styleAnalysisSnapshot: shared.styleAnalysisSnapshot,
+    ownershipSnapshot: shared.ownershipSnapshot,
+    financialSnapshot: shared.financialSnapshot,
     pageCoverage: shared.pageCoverage,
     reportSignals: shared.reportSignals,
     sourceCoverage: shared.sourceCoverage,
@@ -161,72 +174,88 @@ function buildMemberDump(memberKey, input, evidence, sources) {
       return {
         member: memberKey,
         facts: {
-          ...common,
-          financialCoverage: presentValue({
-            hasCompanyOverview: evidence.pageCoverage?.availablePageIds?.includes('company-overview') === true,
-            hasFinancialAnalysis: evidence.pageCoverage?.availablePageIds?.includes('financial-analysis') === true,
-            hasFnGuideFinance: evidence.pageCoverage?.availablePageIds?.includes('fnguide-finance') === true,
+          instrument: common.instrument,
+          financialSnapshot: presentValue({
+            revenueLatest: evidence.financialSnapshot?.revenueLatest ?? null,
+            revenueYoY: evidence.financialSnapshot?.revenueYoY ?? null,
+            operatingIncomeLatest: evidence.financialSnapshot?.operatingIncomeLatest ?? null,
+            operatingIncomeYoY: evidence.financialSnapshot?.operatingIncomeYoY ?? null,
+            netIncomeLatest: evidence.financialSnapshot?.netIncomeLatest ?? null,
+            netIncomeYoY: evidence.financialSnapshot?.netIncomeYoY ?? null,
+            operatingMarginLatest: evidence.financialSnapshot?.operatingMarginLatest ?? null,
+            netMarginLatest: evidence.financialSnapshot?.netMarginLatest ?? null,
+            roe: evidence.valuationSnapshot?.roe ?? null,
             recentReportCount: evidence.reportSignals?.recentReportCount ?? null,
           }, ['profitability_inputs']),
+          packageSummaryFacts: presentValue(evidence.packageContext?.summaryFacts ?? [], ['package_summary_facts']),
         },
       };
     case 'valuation':
       return {
         member: memberKey,
         facts: {
-          ...common,
-          valuationInputs: presentValue({
-            consensusAvailable: evidence.reportSignals?.consensusAvailable === true,
-            opinionAvailable: evidence.reportSignals?.opinionAvailable === true,
-            investmentIndicatorsAvailable: evidence.pageCoverage?.availablePageIds?.includes('investment-indicators') === true,
-            currentPrice: evidence.currentQuote?.price ?? null,
+          instrument: common.instrument,
+          marketSnapshot: common.marketSnapshot,
+          consensusSnapshot: presentValue({
+            targetPrice: evidence.consensusSnapshot?.targetPrice ?? null,
+            targetGapPct: evidence.consensusSnapshot?.targetGapPct ?? null,
+            recommendation: evidence.consensusSnapshot?.recommendation ?? null,
+            revisionDirection: evidence.consensusSnapshot?.revisionDirection ?? null,
+            revisionPct: evidence.consensusSnapshot?.revisionPct ?? null,
+          }, ['consensus_snapshot']),
+          valuationSnapshot: presentValue({
+            per: evidence.valuationSnapshot?.per ?? null,
+            pbr: evidence.valuationSnapshot?.pbr ?? null,
+            roe: evidence.valuationSnapshot?.roe ?? null,
+            evEbitda: evidence.valuationSnapshot?.evEbitda ?? null,
           }, ['valuation_inputs']),
+          packageSummaryFacts: presentValue(evidence.packageContext?.summaryFacts ?? [], ['package_summary_facts']),
         },
       };
     case 'ownershipStability':
       return {
         member: memberKey,
         facts: {
-          ...common,
-          ownershipInputs: presentValue({
-            shareholdingAvailable: evidence.pageCoverage?.availablePageIds?.includes('shareholding') === true,
-            styleAnalysisAvailable: evidence.reportSignals?.styleAnalysisAvailable === true,
-            holdingContext: evidence.holding?.hasHoldingContext === true,
-          }, ['ownership_inputs']),
+          instrument: common.instrument,
+          ownershipSnapshot: presentValue(evidence.ownershipSnapshot ?? {}, ['ownership_inputs']),
+          styleAnalysisSnapshot: presentValue(evidence.styleAnalysisSnapshot ?? {}, ['style_analysis_snapshot']),
+          holding: common.holding,
+          packageSummaryFacts: presentValue(evidence.packageContext?.summaryFacts ?? [], ['package_summary_facts']),
         },
       };
     case 'trend':
       return {
         member: memberKey,
         facts: {
-          ...common,
-          momentumInputs: presentValue({
-            relativeReturnAvailable: evidence.reportSignals?.relativeReturnAvailable === true,
-            styleAnalysisAvailable: evidence.reportSignals?.styleAnalysisAvailable === true,
-            recentReportsAvailable: evidence.reportSignals?.recentReportsAvailable === true,
-          }, ['trend_inputs']),
+          instrument: common.instrument,
+          marketSnapshot: common.marketSnapshot,
+          relativeReturnSnapshot: presentValue(evidence.relativeReturnSnapshot ?? {}, ['relative_return_snapshot']),
+          styleAnalysisSnapshot: presentValue(evidence.styleAnalysisSnapshot ?? {}, ['style_analysis_snapshot']),
+          recent30dReportCount: optionalFact(evidence.reportSignals?.recent30dReportCount ?? null, ['recent_report_count'], '최근 30일 리포트 수가 없습니다.'),
+          packageMarketView: optionalFact(evidence.packageContext?.marketView ?? null, ['package_market_view'], '패키지 시장 뷰가 없습니다.'),
         },
       };
     case 'consensusMomentum':
       return {
         member: memberKey,
         facts: {
-          ...common,
-          consensusInputs: presentValue({
-            consensusAvailable: evidence.reportSignals?.consensusAvailable === true,
-            opinionAvailable: evidence.reportSignals?.opinionAvailable === true,
-            recentReportCount: evidence.reportSignals?.recentReportCount ?? null,
-          }, ['consensus_inputs']),
+          instrument: common.instrument,
+          consensusSnapshot: common.consensusSnapshot,
+          recentReportCount: optionalFact(evidence.reportSignals?.recentReportCount ?? null, ['recent_report_count'], '최근 리포트 수가 없습니다.'),
+          recent30dReportCount: optionalFact(evidence.reportSignals?.recent30dReportCount ?? null, ['recent_30d_report_count'], '최근 30일 리포트 수가 없습니다.'),
+          packageMarketView: optionalFact(evidence.packageContext?.marketView ?? null, ['package_market_view'], '패키지 시장 뷰가 없습니다.'),
         },
       };
     case 'priceLocation':
       return {
         member: memberKey,
         facts: {
-          ...common,
-          priceInputs: presentValue({
-            currentPrice: evidence.currentQuote?.price ?? null,
-            averagePrice: evidence.holding?.averagePrice ?? null,
+          instrument: common.instrument,
+          marketSnapshot: common.marketSnapshot,
+          consensusSnapshot: common.consensusSnapshot,
+          relativeReturnSnapshot: presentValue({
+            return1m: evidence.relativeReturnSnapshot?.return1m ?? null,
+            return3m: evidence.relativeReturnSnapshot?.return3m ?? null,
           }, ['price_location_inputs']),
         },
       };
@@ -234,38 +263,34 @@ function buildMemberDump(memberKey, input, evidence, sources) {
       return {
         member: memberKey,
         facts: {
-          ...common,
-          avgPriceGapInputs: presentValue({
-            currentPrice: evidence.currentQuote?.price ?? null,
-            averagePrice: evidence.holding?.averagePrice ?? null,
-            shares: evidence.holding?.shares ?? null,
-          }, ['avg_price_gap_inputs']),
+          instrument: common.instrument,
+          holding: common.holding,
+          marketSnapshot: common.marketSnapshot,
         },
       };
     case 'upsideBuffer':
       return {
         member: memberKey,
         facts: {
-          ...common,
-          upsideInputs: presentValue({
-            consensusAvailable: evidence.reportSignals?.consensusAvailable === true,
-            opinionAvailable: evidence.reportSignals?.opinionAvailable === true,
-            recentReportsAvailable: evidence.reportSignals?.recentReportsAvailable === true,
-            styleAnalysisAvailable: evidence.reportSignals?.styleAnalysisAvailable === true,
-          }, ['upside_inputs']),
+          instrument: common.instrument,
+          marketSnapshot: common.marketSnapshot,
+          consensusSnapshot: common.consensusSnapshot,
+          recent30dReportCount: optionalFact(evidence.reportSignals?.recent30dReportCount ?? null, ['recent_30d_report_count'], '최근 30일 리포트 수가 없습니다.'),
+          packageMarketView: optionalFact(evidence.packageContext?.marketView ?? null, ['package_market_view'], '패키지 시장 뷰가 없습니다.'),
         },
       };
     case 'holdingCompleteness':
       return {
         member: memberKey,
         facts: {
-          ...common,
-          holdingInputs: presentValue({
-            hasHoldingContext: evidence.holding?.hasHoldingContext === true,
-            hasFullSellNowInputs: evidence.holding?.hasFullSellNowInputs === true,
-            shares: evidence.holding?.shares ?? null,
-            averagePrice: evidence.holding?.averagePrice ?? null,
-            evaluationAmount: evidence.holding?.evaluationAmount ?? null,
+          instrument: common.instrument,
+          holding: common.holding,
+          marketSnapshot: common.marketSnapshot,
+          timestamps: common.timestamps,
+          pageCoverage: presentValue({
+            coverageRatio: evidence.pageCoverage?.totalKnownPages
+              ? evidence.pageCoverage.availableCount / evidence.pageCoverage.totalKnownPages
+              : 0,
           }, ['holding_completeness_inputs']),
         },
       };
@@ -282,6 +307,9 @@ function systemPrompt(memberKey) {
     'Use only the provided sharedContext/memberContext JSON generated from KR evidence and dump inputs.',
     'Treat package-derived context as supplemental only, never as silent numeric truth.',
     'Missing or unavailable facts must lower confidence and can lower the score.',
+    'Lead with the strongest numeric or concrete evidence that is actually present.',
+    'Mention missing context at most once, briefly, in the final clause only if it materially limits the verdict.',
+    'Avoid repeating phrases like 부재, 누락, 판단 불가, or 컨텍스트 부족 across multiple sentences.',
     'Return only valid JSON matching the schema. Write the reason in concise Korean.',
     'Score semantics: 0 extremely negative, 50 mixed/unclear, 100 extremely positive.',
   ].join(' ');
