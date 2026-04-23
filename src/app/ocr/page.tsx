@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, Check, ChevronDown, LoaderCircle, RefreshCcw, ScanSearch } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Check, ChevronDown, LoaderCircle, RefreshCcw, ScanSearch, Trash2 } from 'lucide-react'
 import { OcrConflictMergeCard } from '@/components/ocr-conflict-merge-card'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -20,6 +20,7 @@ import {
   type OcrSourceRow,
   type ScreenshotUploadSession,
 } from '@/lib/screenshot-ocr'
+import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
 import { useOcrUploadStore } from '@/lib/stores/use-ocr-upload-store'
 import type { OcrReviewRow, ResolveCandidate } from '@/lib/workflow-types'
@@ -192,6 +193,53 @@ function applyReviewCandidate(row: OcrReviewRow, candidate?: ResolveCandidate) {
   }
 }
 
+function mergeResolvedRowsWithExistingReviewRows(
+  resolvedRows: OcrSourceRow[],
+  existingRows: OcrReviewRow[],
+  existingCandidatesByRowId: Record<string, ResolveCandidate[]>,
+) {
+  const existingRowsById = new Map(existingRows.map((row) => [row.id, row]))
+  const nextRows = resolvedRows.map((row) => existingRowsById.get(row.id) ?? toReviewRow(row))
+  const nextCandidatesByRowId = Object.fromEntries(
+    Object.entries(existingCandidatesByRowId).filter(([rowId]) => nextRows.some((row) => row.id === rowId)),
+  )
+
+  return {
+    rows: nextRows,
+    candidatesByRowId: nextCandidatesByRowId,
+  }
+}
+
+function filterConflictSelections(
+  conflicts: Array<{ key: string; candidates: Array<{ id: string }> }>,
+  selections: Record<string, string>,
+) {
+  return Object.fromEntries(
+    conflicts
+      .map((conflict) => {
+        const selectedCandidateId = selections[conflict.key]
+        if (!selectedCandidateId) {
+          return null
+        }
+
+        return conflict.candidates.some((candidate) => candidate.id === selectedCandidateId)
+          ? [conflict.key, selectedCandidateId]
+          : null
+      })
+      .filter((entry): entry is [string, string] => entry !== null),
+  )
+}
+
+function areSameSelectionMap(left: Record<string, string>, right: Record<string, string>) {
+  const leftKeys = Object.keys(left)
+  const rightKeys = Object.keys(right)
+
+  return (
+    leftKeys.length === rightKeys.length
+    && leftKeys.every((key) => right[key] === left[key])
+  )
+}
+
 function formatCandidateScore(score?: number) {
   if (typeof score !== 'number' || !Number.isFinite(score)) {
     return ''
@@ -211,6 +259,7 @@ type OcrResolvedRowCardProps = {
   onSelectCandidate: (candidateId: string) => void
   onClearCandidateSelection: () => void
   onManualFieldChange: (field: ManualEditableField, value: string) => void
+  onRemoveRow: () => void
 }
 
 function OcrResolvedRowCard({
@@ -224,6 +273,7 @@ function OcrResolvedRowCard({
   onSelectCandidate,
   onClearCandidateSelection,
   onManualFieldChange,
+  onRemoveRow,
 }: OcrResolvedRowCardProps) {
   const identifierName = row.resolvedName?.trim()
   const identifierMeta = [row.resolvedMarket?.trim(), row.resolvedTicker?.trim(), row.resolvedCode?.trim()].filter(Boolean).join(' · ')
@@ -239,53 +289,64 @@ function OcrResolvedRowCard({
 
   return (
     <div className={cn(!isLast && 'border-b border-[color:var(--jaroo-border)]')}>
-      <button
-        type='button'
-        onClick={hasCandidatePicker ? onToggleExpand : undefined}
-        className={cn(
-          'w-full px-4 py-3 text-left',
-          hasCandidatePicker ? 'transition hover:bg-[color:var(--jaroo-secondary)]' : 'cursor-default'
-        )}
-      >
-        <div className='flex items-start justify-between gap-3'>
-          <div className='min-w-0'>
-            <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.name || '-'}</p>
-            <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.sourceFileName}</p>
-          </div>
-          <p className='shrink-0 text-[11px] font-medium text-[color:var(--jaroo-primary)]'>{row.profitRate || '-'}</p>
-        </div>
-
-        <div className='mt-3 rounded-[14px] border border-[#DCE8F5] bg-[#F7FBFF] px-3 py-2'>
+      <div className='flex items-start gap-2 px-4 py-3'>
+        <button
+          type='button'
+          onClick={hasCandidatePicker ? onToggleExpand : undefined}
+          className={cn(
+            'flex-1 text-left',
+            hasCandidatePicker ? 'transition hover:bg-[color:var(--jaroo-secondary)]' : 'cursor-default'
+          )}
+        >
           <div className='flex items-start justify-between gap-3'>
             <div className='min-w-0'>
-              <p className='text-[10px] text-[color:var(--jaroo-muted)]'>식별된 종목</p>
-              {identifierName || identifierMeta ? (
-                <>
-                  <p className='mt-1 truncate text-[12px] font-semibold text-[color:var(--jaroo-ink)]'>{identifierName || row.name || '-'}</p>
-                  <p className='mt-1 truncate text-[10px] text-[color:var(--jaroo-primary)]'>{identifierMeta || '이름만 확인됨'}</p>
-                </>
-              ) : (
-                <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>{identifierStatusText}</p>
-              )}
+              <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.name || '-'}</p>
+              <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.sourceFileName}</p>
             </div>
-            {hasCandidatePicker ? (
-              <div className='flex shrink-0 items-center gap-2 pl-2'>
-                <span className='rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[color:var(--jaroo-primary)]'>
-                  {selectedCandidate ? '후보 적용됨' : `후보 ${candidates.length}개`}
-                </span>
-                <ChevronDown className={cn('size-4 text-[color:var(--jaroo-primary)] transition', isExpanded && 'rotate-180')} />
-              </div>
-            ) : null}
+            <p className='shrink-0 text-[11px] font-medium text-[color:var(--jaroo-primary)]'>{row.profitRate || '-'}</p>
           </div>
-        </div>
 
-        <div className='mt-3 grid grid-cols-2 gap-2'>
-          <OcrMetricChip label='보유 수량' value={row.quantity} />
-          <OcrMetricChip label='평가 금액' value={row.evaluationAmount} />
-          <OcrMetricChip label='평균 단가' value={row.averagePrice} />
-          <OcrMetricChip label='수익률' value={row.profitRate} valueClassName='text-[color:var(--jaroo-primary)]' />
-        </div>
-      </button>
+          <div className='mt-3 rounded-[14px] border border-[#DCE8F5] bg-[#F7FBFF] px-3 py-2'>
+            <div className='flex items-start justify-between gap-3'>
+              <div className='min-w-0'>
+                <p className='text-[10px] text-[color:var(--jaroo-muted)]'>식별된 종목</p>
+                {identifierName || identifierMeta ? (
+                  <>
+                    <p className='mt-1 truncate text-[12px] font-semibold text-[color:var(--jaroo-ink)]'>{identifierName || row.name || '-'}</p>
+                    <p className='mt-1 truncate text-[10px] text-[color:var(--jaroo-primary)]'>{identifierMeta || '이름만 확인됨'}</p>
+                  </>
+                ) : (
+                  <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>{identifierStatusText}</p>
+                )}
+              </div>
+              {hasCandidatePicker ? (
+                <div className='flex shrink-0 items-center gap-2 pl-2'>
+                  <span className='rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[color:var(--jaroo-primary)]'>
+                    {selectedCandidate ? '후보 적용됨' : `후보 ${candidates.length}개`}
+                  </span>
+                  <ChevronDown className={cn('size-4 text-[color:var(--jaroo-primary)] transition', isExpanded && 'rotate-180')} />
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          <div className='mt-3 grid grid-cols-2 gap-2'>
+            <OcrMetricChip label='보유 수량' value={row.quantity} />
+            <OcrMetricChip label='평가 금액' value={row.evaluationAmount} />
+            <OcrMetricChip label='평균 단가' value={row.averagePrice} />
+            <OcrMetricChip label='수익률' value={row.profitRate} valueClassName='text-[color:var(--jaroo-primary)]' />
+          </div>
+        </button>
+
+        <button
+          type='button'
+          onClick={onRemoveRow}
+          className='mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full border border-[color:var(--jaroo-border)] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[color:var(--jaroo-muted)] transition hover:border-[#F5B8B8] hover:bg-[#FFF3F3] hover:text-[#C13030]'
+        >
+          <Trash2 className='size-3.5' />
+          제거
+        </button>
+      </div>
 
       {hasCandidatePicker && isExpanded ? (
         <div className='border-t border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)] px-4 py-3'>
@@ -421,16 +482,19 @@ export default function OcrPage() {
   const instrumentResolveError = useOcrReviewStore((state) => state.resolveErrorMessage ?? '')
   const setReviewRows = useOcrReviewStore((state) => state.setRows)
   const patchReviewRow = useOcrReviewStore((state) => state.patchRow)
+  const removeReviewRow = useOcrReviewStore((state) => state.removeRow)
   const replaceCandidates = useOcrReviewStore((state) => state.replaceCandidates)
   const selectCandidate = useOcrReviewStore((state) => state.selectCandidate)
   const setRequestStatus = useOcrReviewStore((state) => state.setRequestStatus)
   const setResolveStatus = useOcrReviewStore((state) => state.setResolveStatus)
   const resetReviewState = useOcrReviewStore((state) => state.resetForRestart)
+  const resetMergeState = useMergeStore((state) => state.resetForBackNav)
   const [uploadStatuses, setUploadStatuses] = useState<Record<string, UploadStatus>>({})
   const [baseMergedRows, setBaseMergedRows] = useState<OcrSourceRow[]>([])
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
   const [conflicts, setConflicts] = useState<ReturnType<typeof buildMergedOcrResult>['conflicts']>([])
   const [conflictSelections, setConflictSelections] = useState<Record<string, string>>({})
+  const [removedRowIds, setRemovedRowIds] = useState<Record<string, true>>({})
 
   useEffect(() => {
     if (!session) {
@@ -462,6 +526,7 @@ export default function OcrPage() {
     setExpandedRowId(null)
     setConflicts([])
     setConflictSelections({})
+    setRemovedRowIds({})
 
     const nextRowsByUpload: Record<string, OcrRow[]> = {}
     let hasErrors = false
@@ -575,7 +640,44 @@ export default function OcrPage() {
     void runOcrBatch(session)
   }, [runOcrBatch, session])
 
-  const resolvedRows = useMemo(() => resolveMergedOcrRows(baseMergedRows, conflicts, conflictSelections), [baseMergedRows, conflicts, conflictSelections])
+  const conflictsWithRemainingCandidates = useMemo(
+    () =>
+      conflicts.map((conflict) => ({
+        ...conflict,
+        candidates: conflict.candidates.filter((candidate) => !removedRowIds[candidate.id]),
+      })),
+    [conflicts, removedRowIds],
+  )
+
+  const resolvedRows = useMemo(() => {
+    const filteredBaseRows = baseMergedRows.filter((row) => !removedRowIds[row.id])
+    const autoResolvedRows = conflictsWithRemainingCandidates.flatMap((conflict) => {
+      if (conflict.candidates.length === 1) {
+        return conflict.candidates
+      }
+
+      return []
+    })
+
+    const filteredConflicts = conflictsWithRemainingCandidates.filter((conflict) => conflict.candidates.length > 1)
+    const chosenRows = resolveMergedOcrRows([], filteredConflicts, conflictSelections)
+
+    return [...filteredBaseRows, ...autoResolvedRows, ...chosenRows].sort(
+      (left, right) => left.uploadIndex - right.uploadIndex || left.rowIndex - right.rowIndex,
+    )
+  }, [baseMergedRows, conflictSelections, conflictsWithRemainingCandidates, removedRowIds])
+
+  const visibleConflicts = useMemo(
+    () => conflictsWithRemainingCandidates.filter((conflict) => conflict.candidates.length > 1),
+    [conflictsWithRemainingCandidates],
+  )
+
+  useEffect(() => {
+    setConflictSelections((currentSelections) => {
+      const nextSelections = filterConflictSelections(visibleConflicts, currentSelections)
+      return areSameSelectionMap(currentSelections, nextSelections) ? currentSelections : nextSelections
+    })
+  }, [visibleConflicts])
 
   useEffect(() => {
     if (requestState !== 'success' || resolvedRows.length === 0) {
@@ -587,31 +689,52 @@ export default function OcrPage() {
     }
 
     let isCancelled = false
+    const mergedState = mergeResolvedRowsWithExistingReviewRows(resolvedRows, reviewRows, instrumentCandidatesByRowId)
+    const unresolvedRows = resolvedRows.filter((row) => !mergedState.candidatesByRowId[row.id])
 
-    setReviewRows(resolvedRows.map(toReviewRow))
+    setReviewRows(mergedState.rows)
+    replaceCandidates(mergedState.candidatesByRowId)
+    setExpandedRowId((current) => (current && mergedState.candidatesByRowId[current]?.length > 1 ? current : null))
+
+    if (unresolvedRows.length === 0) {
+      setResolveStatus('success')
+      return
+    }
+
     setResolveStatus('loading')
 
-    void resolveInstrumentRows(resolvedRows)
+    void resolveInstrumentRows(unresolvedRows)
       .then((result) => {
         if (isCancelled) {
           return
         }
 
-        const nextRows = result.rows.map((row) => {
-          const candidates = result.candidatesByRowId[row.id] ?? []
+        const resolvedRowsById = new Map(result.rows.map((row) => [row.id, row]))
+        const nextRows = mergedState.rows.map((row) => {
+          const resolvedRow = resolvedRowsById.get(row.id)
+          const candidates = result.candidatesByRowId[row.id] ?? mergedState.candidatesByRowId[row.id] ?? []
           const firstCandidate = candidates[0]
-          const manuallyRequired = !hasResolvedIdentifier(row) && candidates.length === 0
+          const manuallyRequired = !hasResolvedIdentifier(resolvedRow ?? row) && candidates.length === 0
 
           return {
-            ...toReviewRow(row),
-            selectedCandidateId: !hasResolvedIdentifier(row) && firstCandidate ? firstCandidate.id : null,
+            ...(resolvedRow ? toReviewRow(resolvedRow) : row),
+            selectedCandidateId: !hasResolvedIdentifier(resolvedRow ?? row) && firstCandidate ? firstCandidate.id : row.selectedCandidateId ?? null,
             resolutionState: manuallyRequired ? 'manual-required' : 'resolved',
           } satisfies OcrReviewRow
         })
 
         setReviewRows(nextRows)
-        replaceCandidates(result.candidatesByRowId)
-        setExpandedRowId((current) => (current && result.candidatesByRowId[current]?.length > 1 ? current : null))
+        replaceCandidates({
+          ...mergedState.candidatesByRowId,
+          ...result.candidatesByRowId,
+        })
+        setExpandedRowId((current) => {
+          const nextCandidatesByRowId = {
+            ...mergedState.candidatesByRowId,
+            ...result.candidatesByRowId,
+          }
+          return current && nextCandidatesByRowId[current]?.length > 1 ? current : null
+        })
         setResolveStatus('success')
       })
       .catch((error) => {
@@ -619,19 +742,19 @@ export default function OcrPage() {
           return
         }
 
-        setReviewRows(resolvedRows.map(toReviewRow))
-        replaceCandidates({})
-        setExpandedRowId(null)
+        setReviewRows(mergedState.rows)
+        replaceCandidates(mergedState.candidatesByRowId)
+        setExpandedRowId((current) => (current && mergedState.candidatesByRowId[current]?.length > 1 ? current : null))
         setResolveStatus('error', error instanceof Error ? error.message : '종목 식별자 확인에 실패했어요.')
       })
 
     return () => {
       isCancelled = true
     }
-  }, [replaceCandidates, requestState, resolvedRows, setResolveStatus, setReviewRows])
+  }, [instrumentCandidatesByRowId, replaceCandidates, requestState, resolvedRows, reviewRows, setResolveStatus, setReviewRows])
 
   const previewRows = useMemo(() => {
-    const baseRows = reviewRows.length > 0 ? reviewRows : resolvedRows.map(toReviewRow)
+    const baseRows = requestState === 'success' ? reviewRows : reviewRows.length > 0 ? reviewRows : resolvedRows.map(toReviewRow)
 
     return baseRows.map((row) =>
       applyReviewCandidate(
@@ -639,7 +762,7 @@ export default function OcrPage() {
         instrumentCandidatesByRowId[row.id]?.find((candidate) => candidate.id === row.selectedCandidateId),
       ),
     )
-  }, [instrumentCandidatesByRowId, resolvedRows, reviewRows])
+  }, [instrumentCandidatesByRowId, requestState, resolvedRows, reviewRows])
 
   const completedUploadCount = useMemo(
     () => session?.uploads.filter((upload) => uploadStatuses[upload.id]?.state === 'success').length ?? 0,
@@ -647,8 +770,8 @@ export default function OcrPage() {
   )
 
   const unresolvedConflictCount = useMemo(
-    () => conflicts.filter((conflict) => !conflictSelections[conflict.key]).length,
-    [conflictSelections, conflicts],
+    () => visibleConflicts.filter((conflict) => !conflictSelections[conflict.key]).length,
+    [conflictSelections, visibleConflicts],
   )
   const invalidManualRowIds = useMemo(
     () => previewRows.filter((row) => row.resolutionState === 'manual-required' && !isManualRowComplete(row)).map((row) => row.id),
@@ -661,19 +784,19 @@ export default function OcrPage() {
     }
 
     if (requestState === 'success') {
-      if (conflicts.length > 0 && unresolvedConflictCount > 0) {
-        return `${resolvedRows.length}행 정리됨 · 충돌 ${unresolvedConflictCount}건 선택 필요`
+      if (visibleConflicts.length > 0 && unresolvedConflictCount > 0) {
+        return `${previewRows.length}행 정리됨 · 충돌 ${unresolvedConflictCount}건 선택 필요`
       }
 
       if (instrumentResolveState === 'loading') {
-        return `${resolvedRows.length}개 종목 정리 완료 · 식별자 확인 중`
+        return `${previewRows.length}개 종목 정리 완료 · 식별자 확인 중`
       }
 
       if (instrumentResolveState === 'error') {
-        return `${resolvedRows.length}개 종목 정리 완료 · 식별자 확인 재시도 필요`
+        return `${previewRows.length}개 종목 정리 완료 · 식별자 확인 재시도 필요`
       }
 
-      return `${resolvedRows.length}개 종목 정리 완료`
+      return `${previewRows.length}개 종목 정리 완료`
     }
 
     if (requestState === 'error') {
@@ -681,7 +804,7 @@ export default function OcrPage() {
     }
 
     return '업로드된 스크린샷을 준비 중이에요'
-  }, [completedUploadCount, conflicts.length, instrumentResolveState, requestState, resolvedRows.length, session?.uploads.length, unresolvedConflictCount])
+  }, [completedUploadCount, instrumentResolveState, previewRows.length, requestState, session?.uploads.length, unresolvedConflictCount, visibleConflicts.length])
 
   const canContinue =
     requestState === 'success'
@@ -727,6 +850,7 @@ export default function OcrPage() {
       return
     }
 
+    resetMergeState()
     router.push('/merge')
   }
 
@@ -836,14 +960,14 @@ export default function OcrPage() {
         </Card>
       ) : null}
 
-      {conflicts.length > 0 ? (
+      {visibleConflicts.length > 0 ? (
         <section className='space-y-3'>
           <div className='rounded-[20px] border border-[#FAC775] bg-[color:var(--jaroo-warning-soft)] px-4 py-3'>
             <p className='text-[12px] font-semibold text-[#854F0B]'>충돌 머지 확인</p>
-            <p className='mt-1 text-[11px] leading-5 text-[#8A6520]'>중복 종목 {conflicts.length}건 중 {unresolvedConflictCount}건이 아직 선택되지 않았어요.</p>
+            <p className='mt-1 text-[11px] leading-5 text-[#8A6520]'>중복 종목 {visibleConflicts.length}건 중 {unresolvedConflictCount}건이 아직 선택되지 않았어요.</p>
           </div>
 
-          {conflicts.map((conflict) => (
+          {visibleConflicts.map((conflict) => (
             <OcrConflictMergeCard
               key={conflict.key}
               conflict={conflict}
@@ -894,6 +1018,13 @@ export default function OcrPage() {
                     selectCandidate(item.id, null)
                   }
                   onManualFieldChange={(field, value) => handleManualFieldChange(item.id, field, value)}
+                  onRemoveRow={() => {
+                    setRemovedRowIds((current) => ({ ...current, [item.id]: true }))
+                    removeReviewRow(item.id)
+                    if (expandedRowId === item.id) {
+                      setExpandedRowId(null)
+                    }
+                  }}
                 />
               )
             })}

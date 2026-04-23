@@ -214,6 +214,43 @@ test('OCR review store supports candidate replacement and manual row patching', 
   assert.equal(state.resolveStatus, 'success')
 })
 
+test('OCR review store can remove one row and its candidate cache without resetting others', () => {
+  const firstRow = createReviewRow({ id: 'row-1' })
+  const secondRow = createReviewRow({ id: 'row-2', name: '엔비디아', resolvedName: 'NVIDIA CORP' })
+
+  useOcrReviewStore.getState().setRows([firstRow, secondRow])
+  useOcrReviewStore.getState().replaceCandidates({
+    [firstRow.id]: [{ id: 'candidate-1', resolvedName: 'Microsoft Corporation', resolvedTicker: 'MSFT', source: 'local' }],
+    [secondRow.id]: [{ id: 'candidate-2', resolvedName: 'NVIDIA CORP', resolvedTicker: 'NVDA', source: 'local' }],
+  })
+
+  useOcrReviewStore.getState().removeRow(firstRow.id)
+
+  const state = useOcrReviewStore.getState()
+  assert.deepEqual(state.rows.map((row) => row.id), ['row-2'])
+  assert.equal(state.candidatesByRowId[firstRow.id], undefined)
+  assert.equal(state.candidatesByRowId[secondRow.id]?.[0]?.id, 'candidate-2')
+})
+
+test('OCR review store reuses state references for identical rows and candidate maps', () => {
+  const row = createReviewRow({ id: 'row-stable' })
+  const candidates = [{ id: 'candidate-1', resolvedName: 'Microsoft Corporation', resolvedTicker: 'MSFT', source: 'local' }] as const
+
+  useOcrReviewStore.getState().setRows([row])
+  useOcrReviewStore.getState().replaceCandidates({ [row.id]: [...candidates] })
+
+  const stateBefore = useOcrReviewStore.getState()
+  const rowsBefore = stateBefore.rows
+  const candidatesBefore = stateBefore.candidatesByRowId
+
+  useOcrReviewStore.getState().setRows(rowsBefore)
+  useOcrReviewStore.getState().replaceCandidates(candidatesBefore)
+
+  const stateAfter = useOcrReviewStore.getState()
+  assert.equal(stateAfter.rows, rowsBefore)
+  assert.equal(stateAfter.candidatesByRowId, candidatesBefore)
+})
+
 test('merge selector excludes error rows from applicable payload', () => {
   useMergeStore.getState().setRows([
     createMergeRow(),
@@ -228,6 +265,18 @@ test('merge selector excludes error rows from applicable payload', () => {
 
   assert.equal(applicable.length, 1)
   assert.equal(applicable[0]?.displayName, 'Microsoft Corporation')
+})
+
+test('merge store reset clears stale rows before rebuilding from updated OCR review state', () => {
+  useMergeStore.getState().setRows([createMergeRow()])
+  useMergeStore.getState().setApplyStatus('error', 'stale merge rows')
+
+  useMergeStore.getState().resetForBackNav()
+
+  const state = useMergeStore.getState()
+  assert.deepEqual(state.rows, [])
+  assert.equal(state.applyStatus, 'idle')
+  assert.equal(state.errorMessage, null)
 })
 
 test('portfolio store can normalize confirmed holdings and clear failed quote fields for one item', () => {
