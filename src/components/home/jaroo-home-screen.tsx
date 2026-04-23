@@ -345,6 +345,7 @@ export function JarooHomeScreen() {
   const portfolioItems = usePortfolioStore((state) => state.items)
   const quoteStatus = usePortfolioStore((state) => state.quoteStatus)
   const quoteErrorMessage = usePortfolioStore((state) => state.quoteErrorMessage)
+  const quoteQueryKey = usePortfolioStore((state) => state.quoteQueryKey)
   const setQuoteStatus = usePortfolioStore((state) => state.setQuoteStatus)
   const patchQuote = usePortfolioStore((state) => state.patchQuote)
   const clearItemQuote = usePortfolioStore((state) => state.clearItemQuote)
@@ -404,6 +405,11 @@ export function JarooHomeScreen() {
     if (!quoteSurfaceEnabled) {
       return
     }
+
+    if (refreshVersion === 0 && quoteQueryKey === quoteQuery && (quoteStatus === 'loading' || quoteStatus === 'success')) {
+      return
+    }
+
     const abortController = new AbortController()
 
     const clearAllKnownQuotes = () => {
@@ -413,7 +419,7 @@ export function JarooHomeScreen() {
     }
 
     const hydrateQuotes = async () => {
-      setQuoteStatus('loading')
+      setQuoteStatus('loading', null, quoteQuery)
       setQuoteSummaryMessage(null)
       setQuoteFailureKinds({})
 
@@ -447,7 +453,7 @@ export function JarooHomeScreen() {
           clearAllKnownQuotes()
           setLiveQuoteSnapshot({ query: quoteQuery, items: [] })
           setUsdKrwRate(nextFxRate)
-          setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.')
+          setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', quoteQuery)
           return
         }
 
@@ -514,7 +520,7 @@ export function JarooHomeScreen() {
         const failureCount = Object.keys(nextFailureKinds).length
         if (failureCount === rawHomeHoldingsRef.current.length) {
           setQuoteSummaryMessage(null)
-          setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.')
+          setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', quoteQuery)
           return
         }
 
@@ -523,7 +529,7 @@ export function JarooHomeScreen() {
             ? '일부 종목의 시세를 불러오지 못해 오류 카드로 표시했어요.'
             : null,
         )
-        setQuoteStatus('success')
+        setQuoteStatus('success', null, quoteQuery)
       } catch (error) {
         if (abortController.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
           return
@@ -534,7 +540,7 @@ export function JarooHomeScreen() {
         setUsdKrwRate(nextFxRate)
         setQuoteFailureKinds({})
         setQuoteSummaryMessage(null)
-        setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.')
+        setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', quoteQuery)
       }
     }
 
@@ -543,7 +549,7 @@ export function JarooHomeScreen() {
     return () => {
       abortController.abort()
     }
-  }, [clearItemQuote, hasUsHomeHoldings, patchQuote, quoteRunKey, quoteSurfaceEnabled, quoteQuery, setQuoteStatus])
+  }, [clearItemQuote, hasUsHomeHoldings, patchQuote, quoteQuery, quoteQueryKey, quoteRunKey, quoteStatus, quoteSurfaceEnabled, refreshVersion, setQuoteStatus])
 
   const homeHoldings = useMemo(() => {
     const quoteApplied = applyCurrentQuotesToHomeHoldings(

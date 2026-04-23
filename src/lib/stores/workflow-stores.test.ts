@@ -312,6 +312,16 @@ test('portfolio store can normalize confirmed holdings and clear failed quote fi
   assert.equal(items[1]?.currentProfitRate, undefined)
 })
 
+test('portfolio store keeps quote status scoped to the current quote query key', () => {
+  usePortfolioStore.getState().setQuoteStatus('loading', null, 'codes=005930')
+  assert.equal(usePortfolioStore.getState().quoteStatus, 'loading')
+  assert.equal(usePortfolioStore.getState().quoteQueryKey, 'codes=005930')
+
+  usePortfolioStore.getState().setQuoteStatus('success', null, 'codes=000660')
+  assert.equal(usePortfolioStore.getState().quoteStatus, 'success')
+  assert.equal(usePortfolioStore.getState().quoteQueryKey, 'codes=000660')
+})
+
 test('deep scan store reuses the last successful result only for the same target key', () => {
   const target: DeepScanTargetInput = {
     code: '005930',

@@ -6,7 +6,9 @@ import { useRouter } from 'next/navigation'
 import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { JarooShell } from '@/components/jaroo-shell'
-import { type AppliedHomePortfolioRow } from '@/lib/jaroo-home-data'
+import { buildHomeCurrentQuoteQuery } from '@/lib/home-current-quotes'
+import { hydratePortfolioItemsWithCurrentQuotes } from '@/lib/home-quote-bootstrap'
+import { buildHomeHoldingsFromPortfolioItems, type AppliedHomePortfolioRow } from '@/lib/jaroo-home-data'
 import { computeAveragePrice } from '@/lib/screenshot-ocr'
 import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
@@ -161,6 +163,7 @@ export default function JarooMergeScreen() {
   const markApplied = useMergeStore((state) => state.markApplied)
   const resetMergeState = useMergeStore((state) => state.resetForBackNav)
   const replacePortfolioItems = usePortfolioStore((state) => state.replaceItems)
+  const setQuoteStatus = usePortfolioStore((state) => state.setQuoteStatus)
 
   useEffect(() => {
     if (mergeRows.length > 0) {
@@ -213,7 +216,17 @@ export default function JarooMergeScreen() {
     setApplyStatus('loading')
 
     try {
+      const nextQuoteQuery = buildHomeCurrentQuoteQuery(buildHomeHoldingsFromPortfolioItems(normalizedItems))
       replacePortfolioItems(normalizedItems)
+      setQuoteStatus('loading', null, nextQuoteQuery)
+      void hydratePortfolioItemsWithCurrentQuotes(normalizedItems)
+        .then((result) => {
+          replacePortfolioItems(result.items)
+          setQuoteStatus(result.quoteStatus, result.quoteErrorMessage, result.quoteQuery)
+        })
+        .catch(() => {
+          setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', null)
+        })
       markApplied()
       router.push('/home')
     } catch (error) {

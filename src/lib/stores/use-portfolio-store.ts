@@ -7,6 +7,7 @@ type PortfolioStoreState = {
   items: PortfolioNormalizedItem[]
   quoteStatus: WorkflowAsyncStatus
   quoteErrorMessage: string | null
+  quoteQueryKey: string | null
 }
 
 type PortfolioStoreActions = {
@@ -14,7 +15,7 @@ type PortfolioStoreActions = {
   upsertItem: (item: PortfolioNormalizedItem) => void
   patchQuote: (identity: Pick<PortfolioNormalizedItem, 'code' | 'ticker' | 'name' | 'market'>, patch: Partial<PortfolioNormalizedItem>) => void
   clearItemQuote: (identity: Pick<PortfolioNormalizedItem, 'code' | 'ticker' | 'name' | 'market'>) => void
-  setQuoteStatus: (status: WorkflowAsyncStatus, errorMessage?: string | null) => void
+  setQuoteStatus: (status: WorkflowAsyncStatus, errorMessage?: string | null, quoteQueryKey?: string | null) => void
   clear: () => void
 }
 
@@ -22,6 +23,7 @@ const initialState: PortfolioStoreState = {
   items: [],
   quoteStatus: 'idle',
   quoteErrorMessage: null,
+  quoteQueryKey: null,
 }
 
 export const usePortfolioStore = create<PortfolioStoreState & PortfolioStoreActions>()((set) => ({
@@ -58,6 +60,6 @@ export const usePortfolioStore = create<PortfolioStoreState & PortfolioStoreActi
         ),
       }
     }),
-  setQuoteStatus: (quoteStatus, quoteErrorMessage = null) => set({ quoteStatus, quoteErrorMessage }),
+  setQuoteStatus: (quoteStatus, quoteErrorMessage = null, quoteQueryKey = null) => set({ quoteStatus, quoteErrorMessage, quoteQueryKey }),
   clear: () => set(initialState),
 }))
