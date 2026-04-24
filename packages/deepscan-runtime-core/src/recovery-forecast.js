@@ -657,8 +657,8 @@ function modelResultFromDetail(detail) {
 }
 
 export function buildRecoveryForecastFromPriceSeries(input, options = {}) {
-  const currentPrice = parsePositiveFiniteNumber(input?.currentPrice)
   const targetPrice = parsePositiveFiniteNumber(input?.targetPrice ?? input?.buyPrice ?? input?.averagePrice)
+  const currentPrice = inferCurrentPrice(input, targetPrice)
   const primarySeries = normalizePrimarySeriesInput(input)
   const modelDetails = {
     similarPattern: calculateSimilarPatternRecovery(input, options.similarPattern),
@@ -797,6 +797,25 @@ function inferTargetDrawdownPct(input, targetPrice) {
   }
 
   return Math.abs(((currentPrice - targetPrice) / targetPrice) * 100)
+}
+
+function inferCurrentPrice(input, targetPrice) {
+  const currentPrice = parsePositiveFiniteNumber(input?.currentPrice)
+  if (currentPrice !== null) {
+    return currentPrice
+  }
+
+  const explicitDrawdownPct = parseFiniteNumber(input?.targetDrawdownPct)
+  if (
+    targetPrice === null
+    || explicitDrawdownPct === null
+    || explicitDrawdownPct < 0
+    || explicitDrawdownPct >= 100
+  ) {
+    return null
+  }
+
+  return targetPrice * (1 - (explicitDrawdownPct / 100))
 }
 
 function findFirstRecoveryDay(points, startIndex, targetPrice) {
