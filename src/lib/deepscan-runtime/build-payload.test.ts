@@ -2,10 +2,12 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  buildDeepScanRecoveryForecastBlock,
   buildKrDeepScanCrawlerCanonicalUrl,
   buildKrDeepScanPayloadViaCrawler,
   CrawlerDeepScanRequestError,
   describeMomentumProvenance,
+  extractGeneratedOhlcSeries,
   extractKrCodeFromTicker,
   prepareDeepScanRawInputForBuilder,
   resolveDeepScanPayloadBuilderRoute,
@@ -95,6 +97,67 @@ test('summarizeGeneratedDumpSignals preserves missing availability when direct f
   assert.equal(summary.momentum?.pointCount, 0)
   assert.equal(summary.ownershipFlow?.availability, 'missing')
   assert.equal(summary.ownershipFlow?.eventCount, 0)
+})
+
+test('extractGeneratedOhlcSeries normalizes runtime OHLC facts for recovery forecasting', () => {
+  const series = extractGeneratedOhlcSeries({
+    members: {
+      momentum: {
+        facts: {
+          ohlcSeries: {
+            value: [
+              { date: '2026-04-20', close: 273.05 },
+              { tradeDate: '2026-04-17', closePrice: 270.23 },
+              { date: 'bad-row', close: null },
+            ],
+            quality: { availability: 'present' },
+          },
+        },
+      },
+    },
+  })
+
+  assert.deepEqual(series, [
+    { date: '2026-04-20', close: 273.05 },
+    { date: '2026-04-17', close: 270.23 },
+  ])
+})
+
+test('buildDeepScanRecoveryForecastBlock returns a deepscan-ready 원금회수 block from holding and OHLC context', () => {
+  const block = buildDeepScanRecoveryForecastBlock({
+    rawInput: {
+      instrument: { name: 'Tesla', ticker: 'TSLA', market: 'US', kind: 'stock' },
+      holding: { shares: '3', averagePrice: '121' },
+      sourceContext: { from: 'holding' },
+    },
+    currentPrice: 100,
+    currency: 'USD',
+    primarySeries: [
+      { date: '2026-01-01', close: 121 },
+      { date: '2026-01-02', close: 100 },
+      { date: '2026-01-03', close: 121 },
+      { date: '2026-01-04', close: 130 },
+      { date: '2026-01-05', close: 121 },
+      { date: '2026-01-06', close: 100 },
+      { date: '2026-01-07', close: 121 },
+      { date: '2026-01-08', close: 130 },
+      { date: '2026-01-09', close: 100 },
+      { date: '2026-01-10', close: 121 },
+    ],
+    sourceRefs: [],
+    sourceId: 'test-ohlc:TSLA',
+    sourceLabel: 'test OHLC',
+  })
+
+  assert.ok(block)
+  assert.equal(block.blockState, 'ok')
+  assert.match(block.summaryText, /평단 \$121\.00 회복/)
+  assert.match(block.expectedRecoveryDaysText, /거래일|이미 도달/)
+  assert.notEqual(block.recoveryProbabilityText, 'N/A')
+  assert.equal(block.currentPriceText, '$100.00')
+  assert.equal(block.targetPriceText, '$121.00')
+  assert.equal(block.modelRows.length, 3)
+  assert.match(block.disclaimer, /투자 권유/)
 })
 
 test('describeMomentumProvenance는 provider별 OHLC 문구를 맞춘다', () => {
