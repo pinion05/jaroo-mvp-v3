@@ -110,6 +110,13 @@ export type JarooDeepScanStrategyScenario = {
   condition: string
 }
 
+export type JarooDeepScanRecoveryForecastModelRow = {
+  label: string
+  recoveryDaysText: string
+  probabilityText: string
+  sampleText?: string
+}
+
 export type JarooDeepScanSellNowRow = {
   label: string
   value: string
@@ -151,6 +158,19 @@ export type JarooDeepScanStrategyBlock = DeepScanBlockMeta & {
   scenarioDetails: string[]
   otherScenarios: JarooDeepScanStrategyScenario[]
   otherScenarioTags: string[]
+}
+
+export type JarooDeepScanRecoveryForecastBlock = DeepScanBlockMeta & {
+  statusText: string
+  summaryText: string
+  expectedRecoveryDaysText: string
+  recoveryProbabilityText: string
+  confidenceText: string
+  currentPriceText: string
+  targetPriceText: string
+  drawdownText: string
+  modelRows: JarooDeepScanRecoveryForecastModelRow[]
+  disclaimer: string
 }
 
 export type JarooDeepScanSellNowBlock = DeepScanBlockMeta & {
@@ -205,6 +225,7 @@ export type JarooDeepScanPayload = {
   committee: JarooDeepScanCommitteeBlock
   insights: JarooDeepScanInsightsBlock
   strategy: JarooDeepScanStrategyBlock
+  recoveryForecast?: JarooDeepScanRecoveryForecastBlock
   sellNow: JarooDeepScanSellNowBlock
   portfolioSimulation: JarooDeepScanPortfolioSimulationBlock
   metadata: JarooDeepScanMetadata
