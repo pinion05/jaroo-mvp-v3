@@ -367,3 +367,44 @@ test('buildRecoveryForecastFromPriceSeries runs similar pattern, GBM, JD, and co
   assert.equal(forecast.modelDetails.jumpDiffusion.medianRecoveryDays, 2)
   assert.equal(forecast.parameters.status, 'available')
 })
+
+test('buildRecoveryForecastFromPriceSeries infers current price from target drawdown pct', () => {
+  const forecast = buildRecoveryForecastFromPriceSeries(
+    {
+      primarySeries: buildPriceSeriesFromReturns([0.1, 0.1, 0.1]),
+      peerSeries: [
+        {
+          label: 'peer-a',
+          series: [
+            { date: '2026-02-01', close: 121 },
+            { date: '2026-02-02', close: 100 },
+            { date: '2026-02-03', close: 121 },
+            { date: '2026-02-04', close: 121 },
+            { date: '2026-02-05', close: 100 },
+            { date: '2026-02-06', close: 121 },
+          ],
+        },
+      ],
+      targetPrice: 121,
+      targetDrawdownPct: ((121 - 100) / 121) * 100,
+    },
+    {
+      similarPattern: {
+        lookbackDays: 2,
+        tolerancePct: 5,
+        spacingDays: 1,
+        minSampleSize: 2,
+      },
+      simulation: {
+        horizonDays: 5,
+        pathCount: 7,
+        seed: 'integrated',
+      },
+    },
+  )
+
+  assert.equal(forecast.status, 'available')
+  assert.equal(forecast.consensus.expectedRecoveryDays, 2)
+  assert.equal(forecast.modelDetails.gbm.medianRecoveryDays, 2)
+  assert.equal(forecast.modelDetails.jumpDiffusion.medianRecoveryDays, 2)
+})

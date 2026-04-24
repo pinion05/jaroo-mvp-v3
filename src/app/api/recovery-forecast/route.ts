@@ -38,6 +38,11 @@ type RecoveryForecastRequest = {
   options?: unknown
 }
 
+type RecoveryForecastForecaster = (
+  input: ReturnType<typeof buildForecastInput>,
+  options?: Record<string, unknown>,
+) => unknown
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === 'object' && !Array.isArray(value)
 }
@@ -53,6 +58,18 @@ function parsePositiveNumber(value: unknown) {
 
   const parsed = Number(value.replace(/[,\s₩$원]/g, '').trim())
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+function parseDrawdownPct(value: unknown) {
+  const parsed = typeof value === 'number'
+    ? value
+    : typeof value === 'string'
+      ? Number(value.replace(/[,\s%]/g, '').trim())
+      : null
+
+  return parsed !== null && Number.isFinite(parsed) && parsed >= 0 && parsed < 100
+    ? parsed
+    : null
 }
 
 function getPrimarySeries(payload: RecoveryForecastRequest | null) {
@@ -111,7 +128,7 @@ export function getRecoveryForecastValidationError(payload: RecoveryForecastRequ
   }
 
   const hasCurrentPrice = parsePositiveNumber(payload.currentPrice) !== null
-  const hasTargetDrawdownPct = typeof payload.targetDrawdownPct === 'number' && Number.isFinite(payload.targetDrawdownPct) && payload.targetDrawdownPct >= 0
+  const hasTargetDrawdownPct = parseDrawdownPct(payload.targetDrawdownPct) !== null
   if (!hasCurrentPrice && !hasTargetDrawdownPct) {
     return 'currentPrice must be a positive number unless targetDrawdownPct is provided.'
   }
@@ -129,7 +146,7 @@ function buildForecastInput(payload: RecoveryForecastRequest) {
 
 export async function createRecoveryForecastResponse(
   payload: RecoveryForecastRequest | null,
-  forecaster: typeof buildRecoveryForecastFromPriceSeries = buildRecoveryForecastFromPriceSeries,
+  forecaster: RecoveryForecastForecaster = buildRecoveryForecastFromPriceSeries,
 ) {
   const validationError = getRecoveryForecastValidationError(payload)
   if (validationError) {
@@ -138,7 +155,10 @@ export async function createRecoveryForecastResponse(
 
   try {
     const requestPayload = payload as RecoveryForecastRequest
-    const forecast = forecaster(buildForecastInput(requestPayload), isPlainObject(requestPayload.options) ? requestPayload.options : {})
+    const forecast = forecaster(
+      buildForecastInput(requestPayload),
+      isPlainObject(requestPayload.options) ? requestPayload.options : {},
+    )
     return NextResponse.json({ forecast })
   } catch (error) {
     return NextResponse.json(

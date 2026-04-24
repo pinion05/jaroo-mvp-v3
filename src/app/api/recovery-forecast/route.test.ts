@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   MAX_RECOVERY_FORECAST_PEER_SERIES,
   MAX_RECOVERY_FORECAST_PRICE_POINTS,
+  MAX_RECOVERY_FORECAST_TOTAL_PRICE_POINTS,
   POST,
   createRecoveryForecastResponse,
   getRecoveryForecastValidationError,
@@ -89,6 +90,20 @@ test('recovery forecast API validation caps peer series count', () => {
   )
 })
 
+test('recovery forecast API validation caps total point count across primary and peer series', () => {
+  assert.equal(
+    getRecoveryForecastValidationError({
+      primarySeries: Array.from({ length: MAX_RECOVERY_FORECAST_PRICE_POINTS }, () => 100),
+      peerSeries: Array.from({ length: MAX_RECOVERY_FORECAST_PEER_SERIES }, () => (
+        Array.from({ length: 1801 }, () => 100)
+      )),
+      currentPrice: 100,
+      targetPrice: 120,
+    }),
+    `The recovery forecast request supports up to ${MAX_RECOVERY_FORECAST_TOTAL_PRICE_POINTS} total price points.`,
+  )
+})
+
 test('recovery forecast API validation requires target and current context', () => {
   assert.equal(
     getRecoveryForecastValidationError({ primarySeries: [100], currentPrice: 100 }),
@@ -129,6 +144,27 @@ test('POST /api/recovery-forecast runs the recovery model end-to-end from JSON b
   assert.equal(body.forecast.consensus.expectedRecoveryDays, 2)
   assert.equal(body.forecast.consensus.recoveryProbabilityPct, 100)
   assert.equal(body.forecast.modelDetails.similarPattern.sampleCount, 2)
+  assert.equal(body.forecast.modelDetails.gbm.medianRecoveryDays, 2)
+  assert.equal(body.forecast.modelDetails.jumpDiffusion.medianRecoveryDays, 2)
+})
+
+test('POST /api/recovery-forecast can infer current price from target drawdown pct', async () => {
+  const payload = {
+    ...buildIntegratedPayload(),
+    currentPrice: undefined,
+    targetDrawdownPct: ((121 - 100) / 121) * 100,
+  }
+
+  const response = await POST(new Request('http://localhost/api/recovery-forecast', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }))
+  const body = await response.json()
+
+  assert.equal(response.status, 200)
+  assert.equal(body.forecast.status, 'available')
+  assert.equal(body.forecast.consensus.expectedRecoveryDays, 2)
   assert.equal(body.forecast.modelDetails.gbm.medianRecoveryDays, 2)
   assert.equal(body.forecast.modelDetails.jumpDiffusion.medianRecoveryDays, 2)
 })
