@@ -1,6 +1,10 @@
 'use client'
 
-import type { JarooDeepScanCommitteeAxis, JarooDeepScanInsightItem } from '../../../packages/contracts/src/deepscan'
+import type {
+  JarooDeepScanCommitteeAxis,
+  JarooDeepScanInsightItem,
+  JarooDeepScanRecoveryForecastBlock,
+} from '../../../packages/contracts/src/deepscan'
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -23,7 +27,7 @@ import { getDeepScanTargetKey } from '@/lib/workflow-types'
 import { cn } from '@/lib/utils'
 
 type TabValue = 'analysis' | 'strategy'
-type SectionKey = 'why' | 'news' | 'scenarioDetail' | 'otherScenarios' | 'sellNow' | 'pfSim'
+type SectionKey = 'why' | 'news' | 'scenarioDetail' | 'recoveryForecast' | 'otherScenarios' | 'sellNow' | 'pfSim'
 type HomeMarketTone = DeepScanCanonicalTargetSession['holding']['marketTone']
 
 const axisToneStyles = {
@@ -184,6 +188,42 @@ function resolveWeekToneClasses(tone: string) {
   }
 }
 
+function resolveRecoveryForecastTone(block: JarooDeepScanRecoveryForecastBlock) {
+  if (block.blockState !== 'ok') {
+    return {
+      text: 'text-[color:var(--jaroo-warning)]',
+      pill: 'bg-[color:var(--jaroo-warning-soft)] text-[color:var(--jaroo-warning)]',
+      border: 'border-[color:var(--jaroo-warning)]/20',
+      bg: 'bg-[color:var(--jaroo-warning-soft)]',
+    }
+  }
+
+  if (block.confidenceText === '높음') {
+    return {
+      text: 'text-[color:var(--jaroo-success)]',
+      pill: 'bg-[color:var(--jaroo-success-soft)] text-[color:var(--jaroo-success)]',
+      border: 'border-[color:var(--jaroo-success)]/20',
+      bg: 'bg-[color:var(--jaroo-success-ghost)]',
+    }
+  }
+
+  if (block.confidenceText === '보통') {
+    return {
+      text: 'text-[color:var(--jaroo-primary)]',
+      pill: 'bg-[color:var(--jaroo-accent)] text-[color:var(--jaroo-primary)]',
+      border: 'border-[color:var(--jaroo-primary)]/20',
+      bg: 'bg-[color:var(--jaroo-accent)]/60',
+    }
+  }
+
+  return {
+    text: 'text-[color:var(--jaroo-warning)]',
+    pill: 'bg-[color:var(--jaroo-warning-soft)] text-[color:var(--jaroo-warning)]',
+    border: 'border-[color:var(--jaroo-warning)]/20',
+    bg: 'bg-[color:var(--jaroo-warning-soft)]',
+  }
+}
+
 function SectionStatusCard({ notice }: { notice: { badge: string; title: string; body: string } }) {
   return (
     <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
@@ -239,6 +279,7 @@ export default function DeepScanPage() {
     why: false,
     news: false,
     scenarioDetail: false,
+    recoveryForecast: false,
     otherScenarios: false,
     sellNow: false,
     pfSim: false,
@@ -841,6 +882,109 @@ export default function DeepScanPage() {
               </Card>
             </>
           )}
+
+          {payload?.recoveryForecast ? (() => {
+            const recoveryForecast = payload.recoveryForecast
+            const recoveryTone = resolveRecoveryForecastTone(recoveryForecast)
+
+            return (
+              <SectionToggle
+                label='원금회수 예측'
+                isOpen={openSections.recoveryForecast}
+                onToggle={() => toggleSection('recoveryForecast')}
+                tags={
+                  recoveryForecast.blockState !== 'ok' ? (
+                    <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-medium', recoveryTone.pill)}>
+                      {getDeepScanBlockNotice(recoveryForecast, {
+                        badge: 'Blocked',
+                        title: '원금회수 예측을 표시할 수 없어요',
+                        body: '가격 시계열 또는 평단 데이터가 부족합니다.',
+                      }).badge}
+                    </span>
+                  ) : (
+                    <>
+                      <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-medium', recoveryTone.pill)}>
+                        {recoveryForecast.expectedRecoveryDaysText}
+                      </span>
+                      <span className='rounded-full bg-[color:var(--jaroo-secondary)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-muted)]'>
+                        회복확률 {recoveryForecast.recoveryProbabilityText}
+                      </span>
+                      <span className='rounded-full bg-[color:var(--jaroo-secondary)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-muted)]'>
+                        신뢰도 {recoveryForecast.confidenceText}
+                      </span>
+                    </>
+                  )
+                }
+              >
+                {recoveryForecast.blockState !== 'ok' ? (
+                  <SectionStatusCard notice={getDeepScanBlockNotice(recoveryForecast, {
+                    badge: 'Blocked',
+                    title: '원금회수 예측을 표시할 수 없어요',
+                    body: '가격 시계열 또는 평단 데이터가 부족합니다.',
+                  })} />
+                ) : (
+                  <Card className={cn('rounded-[28px] border p-5 shadow-none', recoveryTone.border, recoveryTone.bg)}>
+                    <div className='flex items-start justify-between gap-4'>
+                      <div className='min-w-0'>
+                        <p className='text-[11px] font-medium tracking-[0.08em] text-[color:var(--jaroo-muted)]'>
+                          RECOVERY FORECAST
+                        </p>
+                        <h2 className={cn('mt-2 text-2xl font-semibold leading-tight', recoveryTone.text)}>
+                          {recoveryForecast.statusText}
+                        </h2>
+                        <p className='mt-2 text-sm leading-6 text-[color:var(--jaroo-ink)]/80'>
+                          {recoveryForecast.summaryText}
+                        </p>
+                      </div>
+                      <div className='shrink-0 text-right'>
+                        <p className={cn('text-3xl font-semibold leading-none', recoveryTone.text)}>
+                          {recoveryForecast.expectedRecoveryDaysText}
+                        </p>
+                        <p className='mt-2 text-[11px] text-[color:var(--jaroo-muted)]'>예상 기간</p>
+                      </div>
+                    </div>
+
+                    <div className='mt-4 grid grid-cols-3 gap-2'>
+                      {[
+                        ['현재가', recoveryForecast.currentPriceText],
+                        ['평단/목표', recoveryForecast.targetPriceText],
+                        ['하락률', recoveryForecast.drawdownText],
+                      ].map(([label, value]) => (
+                        <div key={label} className='rounded-[18px] bg-white/70 px-3 py-3'>
+                          <p className='text-[10px] text-[color:var(--jaroo-muted)]'>{label}</p>
+                          <p className='mt-1 text-sm font-semibold text-[color:var(--jaroo-ink)]'>{value}</p>
+                        </div>
+                      ))}
+                    </div>
+
+                    <div className='mt-4 rounded-[22px] bg-white/75 px-4 py-2'>
+                      {recoveryForecast.modelRows.map((row) => (
+                        <div
+                          key={row.label}
+                          className='flex items-center justify-between gap-3 border-b border-[color:var(--jaroo-border)]/70 py-3 last:border-b-0'
+                        >
+                          <div className='min-w-0'>
+                            <p className='text-sm font-semibold text-[color:var(--jaroo-ink)]'>{row.label}</p>
+                            {row.sampleText ? (
+                              <p className='mt-0.5 text-[11px] text-[color:var(--jaroo-muted)]'>샘플 {row.sampleText}</p>
+                            ) : null}
+                          </div>
+                          <div className='shrink-0 text-right'>
+                            <p className='text-sm font-semibold text-[color:var(--jaroo-ink)]'>{row.recoveryDaysText}</p>
+                            <p className='mt-0.5 text-[11px] text-[color:var(--jaroo-muted)]'>{row.probabilityText}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+
+                    <p className='mt-3 text-[11px] leading-5 text-[color:var(--jaroo-muted)]'>
+                      {recoveryForecast.disclaimer}
+                    </p>
+                  </Card>
+                )}
+              </SectionToggle>
+            )
+          })() : null}
 
           <SectionToggle
             label='다른 시나리오 비교'
