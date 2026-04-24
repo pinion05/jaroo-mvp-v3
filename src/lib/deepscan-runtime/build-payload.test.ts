@@ -1,12 +1,113 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
+import type { JarooDeepScanPayload } from '../../../packages/contracts/src/deepscan'
 import {
+  appendKrRecoveryForecastToPayload,
   buildDeepScanRecoveryForecastBlock,
+  buildKrYahooChartSymbolCandidates,
   describeMomentumProvenance,
+  extractYahooChartRecoverySeries,
   extractGeneratedOhlcSeries,
   summarizeGeneratedDumpSignals,
 } from './build-payload'
+
+function createYahooChartPayload(closes: number[]) {
+  const start = Date.UTC(2025, 0, 1) / 1000
+
+  return {
+    chart: {
+      result: [
+        {
+          timestamp: closes.map((_, index) => start + (index * 86400)),
+          indicators: {
+            quote: [
+              {
+                close: closes,
+              },
+            ],
+          },
+        },
+      ],
+    },
+  }
+}
+
+function createCanonicalPayload(): JarooDeepScanPayload {
+  return {
+    input: {
+      instrument: {
+        name: 'SOOP',
+        code: '067160',
+        ticker: '067160.KQ',
+        market: 'KOSDAQ',
+        kind: 'stock',
+      },
+      holding: {
+        shares: '3주',
+        averagePrice: '64,784원',
+        evaluationAmount: '181,137원',
+      },
+      sourceContext: { from: 'holding' },
+    },
+    hero: {
+      blockState: 'ok',
+      sourceRefs: [],
+      fallback: null,
+      error: null,
+      headline: 'SOOP KR DeepScan 60점',
+      body: 'body',
+      statusText: '관찰',
+      score: 60,
+      scoreLabel: 'moderate · 60 / 100',
+      scoreDelta: '+0',
+    },
+    committee: { blockState: 'ok', sourceRefs: [], fallback: null, error: null, axes: [] },
+    insights: { blockState: 'ok', sourceRefs: [], fallback: null, error: null, sectionLabel: 'KR evidence snapshot', items: [], summaryTags: [] },
+    strategy: {
+      blockState: 'ok',
+      sourceRefs: [],
+      fallback: null,
+      error: null,
+      weekSignal: '관찰',
+      weekSignalTone: 'warning',
+      weekBadgeText: '관찰',
+      scenarioLabel: '기본',
+      scenarioProbability: '60%',
+      scenarioPeriod: '1-2주',
+      scenarioCondition: 'cond',
+      currentPriceText: '60,379원',
+      targetPriceText: '목표가 근거 없음',
+      scenarioDetails: [],
+      otherScenarios: [],
+      otherScenarioTags: [],
+    },
+    sellNow: { blockState: 'ok', sourceRefs: [], fallback: null, error: null, realizedText: 'text', rows: [] },
+    portfolioSimulation: { blockState: 'ok', sourceRefs: [], fallback: null, error: null, beforeScore: 60, afterScore: 65, deltaLabel: 'hold:+5', caption: 'caption' },
+    metadata: {
+      generatedAt: '2026-04-24T00:00:00.000Z',
+      version: 'test',
+      degraded: false,
+      debugId: 'deepscan:KR:067160',
+      inputValidity: { valid: true, raw: {} },
+      sourceRefs: [
+        {
+          type: 'market',
+          id: 'current-quote:067160',
+          label: 'current quote',
+        },
+      ],
+      blockStatus: {
+        hero: 'ok',
+        committee: 'ok',
+        insights: 'ok',
+        strategy: 'ok',
+        sellNow: 'ok',
+        portfolioSimulation: 'ok',
+      },
+    },
+  }
+}
 
 test('summarizeGeneratedDumpSignals surfaces Polygon OHLC and direct ownership flow summaries', () => {
   const summary = summarizeGeneratedDumpSignals({
@@ -151,6 +252,66 @@ test('buildDeepScanRecoveryForecastBlock returns a deepscan-ready 원금회수 b
   assert.equal(block.targetPriceText, '$121.00')
   assert.equal(block.modelRows.length, 3)
   assert.match(block.disclaimer, /투자 권유/)
+})
+
+test('buildKrYahooChartSymbolCandidates resolves KOSDAQ tickers before KOSPI fallback', () => {
+  assert.deepEqual(
+    buildKrYahooChartSymbolCandidates({
+      instrument: { name: 'SOOP', code: '067160', ticker: '067160.KQ', market: 'KOSDAQ', kind: 'stock' },
+      holding: { shares: '3주', averagePrice: '64,784원', evaluationAmount: '181,137원' },
+      sourceContext: { from: 'home-handoff' },
+    }),
+    ['067160.KQ', '067160.KS'],
+  )
+
+  assert.deepEqual(
+    buildKrYahooChartSymbolCandidates({
+      instrument: { name: '파미셀', code: '005690', market: 'KOSPI', kind: 'stock' },
+      holding: { shares: '7주', averagePrice: '18,839원', evaluationAmount: '124,491원' },
+      sourceContext: { from: 'home-handoff' },
+    }),
+    ['005690.KS', '005690.KQ'],
+  )
+})
+
+test('extractYahooChartRecoverySeries converts Yahoo chart closes into recovery series points', () => {
+  const series = extractYahooChartRecoverySeries(createYahooChartPayload([70000, 60379, 64784]))
+
+  assert.deepEqual(series, [
+    { date: '2025-01-01', close: 70000 },
+    { date: '2025-01-02', close: 60379 },
+    { date: '2025-01-03', close: 64784 },
+  ])
+})
+
+test('appendKrRecoveryForecastToPayload adds KR OCR/home recovery forecast for DeepScan UI', async () => {
+  const basePayload = createCanonicalPayload()
+  const chartPayload = createYahooChartPayload(Array.from({ length: 80 }, (_, index) => [70000, 60379, 64784, 70000][index % 4]))
+  const requestedUrls: string[] = []
+  const fetcher = async (input: RequestInfo | URL) => {
+    requestedUrls.push(String(input))
+    return new Response(JSON.stringify(chartPayload), {
+      status: 200,
+      headers: { 'content-type': 'application/json; charset=utf-8' },
+    })
+  }
+
+  const payload = await appendKrRecoveryForecastToPayload(
+    basePayload,
+    {
+      instrument: { name: 'SOOP', code: '067160', ticker: '067160.KQ', market: 'KOSDAQ', kind: 'stock' },
+      holding: { shares: '3주', averagePrice: '64,784원', evaluationAmount: '181,137원' },
+      sourceContext: { from: 'home-handoff' },
+    },
+    fetcher as typeof fetch,
+  )
+
+  assert.match(requestedUrls[0] ?? '', /067160\.KQ/)
+  assert.equal(payload.recoveryForecast?.blockState, 'ok')
+  assert.equal(payload.recoveryForecast?.currentPriceText, '60,379원')
+  assert.equal(payload.recoveryForecast?.targetPriceText, '64,784원')
+  assert.equal(payload.recoveryForecast?.drawdownText, '6.8%')
+  assert.match(payload.recoveryForecast?.summaryText ?? '', /평단 64,784원 회복/)
 })
 
 test('describeMomentumProvenance는 provider별 OHLC 문구를 맞춘다', () => {

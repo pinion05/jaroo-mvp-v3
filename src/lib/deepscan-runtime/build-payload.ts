@@ -114,6 +114,11 @@ type RecoveryForecastContext = {
   sourceId: string
 }
 
+type KrYahooChartSeriesResult = {
+  symbol: string
+  series: Array<{ date: string; close: number }>
+}
+
 type GeneratedDumpSignalSummary = {
   momentum: {
     availability: string
@@ -174,6 +179,128 @@ function parseNumberish(value: unknown) {
 
   const parsed = Number(cleaned)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function normalizeKrCode(value: unknown) {
+  const normalized = normalizeText(value)?.replace(/\D/g, '')
+  return normalized && /^\d{6}$/.test(normalized) ? normalized : undefined
+}
+
+function normalizeKrYahooTicker(value: unknown) {
+  const normalized = normalizeText(value)?.toUpperCase()
+  if (!normalized) {
+    return undefined
+  }
+
+  return /^\d{6}\.(KS|KQ)$/.test(normalized) ? normalized : undefined
+}
+
+export function buildKrYahooChartSymbolCandidates(rawInput: DeepScanRawInput) {
+  const explicitYahooTicker = normalizeKrYahooTicker(rawInput.instrument.ticker)
+  const code = normalizeKrCode(rawInput.instrument.code) ?? normalizeKrCode(rawInput.instrument.ticker)
+
+  if (!code && !explicitYahooTicker) {
+    return []
+  }
+
+  const market = normalizeText(rawInput.instrument.market)?.toUpperCase()
+  const suffixes = market === 'KOSDAQ' || market === 'KQ'
+    ? ['KQ', 'KS']
+    : market === 'KOSPI' || market === 'KS' || market === 'KR'
+      ? ['KS', 'KQ']
+      : ['KS', 'KQ']
+  const candidates = [
+    explicitYahooTicker,
+    ...(code ? suffixes.map((suffix) => `${code}.${suffix}`) : []),
+  ].filter((candidate): candidate is string => Boolean(candidate))
+
+  return [...new Set(candidates)]
+}
+
+export function extractYahooChartRecoverySeries(payload: unknown) {
+  const result = asRecord(asArray(asRecord(asRecord(payload)?.chart)?.result)[0])
+  const timestamps = asArray(result?.timestamp)
+  const quote = asRecord(asArray(asRecord(result?.indicators)?.quote)[0])
+  const closes = asArray(quote?.close)
+
+  return timestamps
+    .map((timestamp, index) => {
+      const epochSeconds = typeof timestamp === 'number' && Number.isFinite(timestamp) ? timestamp : null
+      const close = asFiniteNumber(closes[index])
+
+      if (epochSeconds === null || close === null) {
+        return null
+      }
+
+      return {
+        date: new Date(epochSeconds * 1000).toISOString().slice(0, 10),
+        close,
+      }
+    })
+    .filter((point): point is { date: string; close: number } => point !== null)
+}
+
+export async function fetchKrYahooChartRecoverySeries(rawInput: DeepScanRawInput, fetcher: typeof fetch = fetch): Promise<KrYahooChartSeriesResult | null> {
+  for (const symbol of buildKrYahooChartSymbolCandidates(rawInput)) {
+    const response = await fetcher(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?range=5y&interval=1d`, {
+      cache: 'no-store',
+      headers: {
+        'User-Agent': 'Mozilla/5.0',
+      },
+    })
+
+    if (!response.ok) {
+      continue
+    }
+
+    const payload = await response.json().catch(() => null)
+    const series = extractYahooChartRecoverySeries(payload)
+
+    if (series.length >= 3) {
+      return { symbol, series }
+    }
+  }
+
+  return null
+}
+
+function deriveKrRecoveryCurrentPrice(rawInput: DeepScanRawInput, series: Array<{ close: number }>) {
+  const shares = parseNumberish(rawInput.holding?.shares)
+  const evaluationAmount = parseNumberish(rawInput.holding?.evaluationAmount)
+
+  if (shares !== null && shares > 0 && evaluationAmount !== null && evaluationAmount > 0) {
+    return evaluationAmount / shares
+  }
+
+  return series.at(-1)?.close
+}
+
+export async function buildKrDeepScanRecoveryForecastBlock(rawInput: DeepScanRawInput, sourceRefs: DeepScanSourceRef[] = [], fetcher: typeof fetch = fetch) {
+  const seriesResult = await fetchKrYahooChartRecoverySeries(rawInput, fetcher).catch(() => null)
+
+  if (!seriesResult) {
+    return null
+  }
+
+  return buildDeepScanRecoveryForecastBlock({
+    rawInput,
+    primarySeries: seriesResult.series,
+    currentPrice: deriveKrRecoveryCurrentPrice(rawInput, seriesResult.series),
+    currency: 'KRW',
+    sourceRefs,
+    sourceId: `kr-yahoo-chart:${seriesResult.symbol}`,
+    sourceLabel: `Yahoo Finance KR chart ${seriesResult.symbol}`,
+  })
+}
+
+export async function appendKrRecoveryForecastToPayload(payload: JarooDeepScanPayload, rawInput: DeepScanRawInput, fetcher: typeof fetch = fetch): Promise<JarooDeepScanPayload> {
+  if (payload.recoveryForecast) {
+    return payload
+  }
+
+  const recoveryForecast = await buildKrDeepScanRecoveryForecastBlock(rawInput, payload.metadata.sourceRefs, fetcher)
+
+  return recoveryForecast ? { ...payload, recoveryForecast } : payload
 }
 
 function readRuntimeDumpFact<T>(memberDump: unknown, factKey: string): RuntimeDumpFact<T> | null {
@@ -1332,7 +1459,8 @@ export async function buildDeepScanPayloadFromSearchParams(searchParams: URLSear
     return createInvalidInputPayload(rawInput)
   }
 
-  return buildCrawlerDeepScanPayload(rawInput)
+  const payload = await buildCrawlerDeepScanPayload(rawInput) as JarooDeepScanPayload
+  return appendKrRecoveryForecastToPayload(payload, rawInput)
 }
 
 export { buildRawInputFromSearchParams }
