@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Treemap, type PieLabelRenderProps, type TreemapNode } from 'recharts'
+import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
 import { prefetchAndPersistDeepScanSlimSummary } from '@/lib/deepscan-slim'
 import {
@@ -43,6 +44,10 @@ type MomentumSignalItem = (typeof defaultMomentumSignals)[number]
 type ForecastCard = typeof defaultHomeForecast
 type DonutChartDatum = HomeHolding & { value: number }
 type HeatmapChartDatum = HomeHolding & { value: number; name: string }
+type DeepScanLoadingTarget = {
+  name: string
+  identifier?: string
+}
 
 type PortfolioSummary = {
   score: string
@@ -341,6 +346,7 @@ export function JarooHomeScreen() {
   const router = useRouter()
   const frameRef = useRef<HTMLDivElement>(null)
   const cardRefs = useRef<Record<number, HTMLDivElement | null>>({})
+  const deepScanNavigationIdRef = useRef(0)
 
   const portfolioItems = usePortfolioStore((state) => state.items)
   const quoteStatus = usePortfolioStore((state) => state.quoteStatus)
@@ -361,6 +367,7 @@ export function JarooHomeScreen() {
   const [quoteFailureKinds, setQuoteFailureKinds] = useState<Record<string, HomeHoldingQuoteErrorKind>>({})
   const [quoteSummaryMessage, setQuoteSummaryMessage] = useState<string | null>(null)
   const [refreshVersion, setRefreshVersion] = useState(0)
+  const [deepScanLoadingTarget, setDeepScanLoadingTarget] = useState<DeepScanLoadingTarget | null>(null)
 
   const portfolioBaseItems = useMemo(() => portfolioItems.map((item) => stripPortfolioQuoteFields(item)), [portfolioItems])
   const portfolioSignature = useMemo(
@@ -611,14 +618,29 @@ export function JarooHomeScreen() {
       return
     }
 
+    const navigationId = deepScanNavigationIdRef.current + 1
+    deepScanNavigationIdRef.current = navigationId
+    setDeepScanLoadingTarget({
+      name: holding.name,
+      identifier: getHoldingIdentifierText(holding),
+    })
     setDeepScanTarget(toDeepScanTargetInput(item))
     await Promise.race([
       prefetchAndPersistDeepScanSlimSummary(holding),
       new Promise((resolve) => window.setTimeout(resolve, 500)),
     ]).catch(() => undefined)
 
+    if (deepScanNavigationIdRef.current !== navigationId) {
+      return
+    }
+
     router.push(actionHref)
   }, [homeHoldings, portfolioItems, router, setDeepScanTarget])
+
+  const cancelDeepScanLoading = useCallback(() => {
+    deepScanNavigationIdRef.current += 1
+    setDeepScanLoadingTarget(null)
+  }, [])
 
   const handleHoldingActionClick = useCallback(async (item: HomeHolding, event: MouseEvent<HTMLAnchorElement>) => {
     event.preventDefault()
@@ -1277,6 +1299,18 @@ export function JarooHomeScreen() {
           </div>
         </div>
       </div>
+
+      {deepScanLoadingTarget ? (
+        <div className={styles.deepScanLoadingMount}>
+          <div className={styles.deepScanLoadingInner}>
+            <DeepScanLoadingScreen
+              name={deepScanLoadingTarget.name}
+              identifier={deepScanLoadingTarget.identifier}
+              onBack={cancelDeepScanLoading}
+            />
+          </div>
+        </div>
+      ) : null}
     </div>
   )
 }

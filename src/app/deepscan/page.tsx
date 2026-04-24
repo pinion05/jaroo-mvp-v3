@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import {
@@ -408,6 +409,23 @@ export default function DeepScanPage() {
     body: errorMessage ?? 'canonical payload 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
   }
 
+  if (fetchState === 'loading') {
+    const identifier = [requestSeed.holding.ticker, requestSeed.holding.code]
+      .filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index)
+      .join(' · ')
+
+    return (
+      <div className='flex min-h-screen justify-center bg-[#e8e8e8]'>
+        <DeepScanLoadingScreen
+          className='max-w-[340px] shadow-[0_4px_24px_rgba(0,0,0,.12)]'
+          name={requestSeed.holding.name}
+          identifier={identifier}
+          backHref='/home'
+        />
+      </div>
+    )
+  }
+
   const handleTabChange = (value: TabValue) => {
     setTab(value)
     scrollContentToTop()
@@ -474,7 +492,6 @@ export default function DeepScanPage() {
                 <button
                   type='button'
                   onClick={handleRetry}
-                  disabled={fetchState === 'loading'}
                   className={buttonVariants({
                     variant: 'outline',
                     className:

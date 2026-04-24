@@ -1,0 +1,256 @@
+.loadingCard {
+  background: #fff;
+  width: 100%;
+  min-height: 100vh;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.topBar {
+  padding: 14px 16px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border-bottom: 0.5px solid #eee;
+  flex-shrink: 0;
+}
+
+.backButton {
+  width: 28px;
+  height: 28px;
+  border-radius: 999px;
+  border: none;
+  background: #f0efe8;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  cursor: pointer;
+  color: #555;
+  flex-shrink: 0;
+  text-decoration: none;
+}
+
+.topTitle {
+  font-size: 14px;
+  font-weight: 500;
+  color: #111;
+  flex: 1;
+}
+
+.inner {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  text-align: center;
+}
+
+.iconWrap {
+  position: relative;
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 28px;
+}
+
+.iconRing,
+.iconRingFill {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 2.5px solid #f0efe8;
+}
+
+.iconRingFill {
+  border-color: transparent;
+  border-top-color: #185fa5;
+  animation: spin 1.2s linear infinite;
+}
+
+.iconInner {
+  position: absolute;
+  inset: 8px;
+  border-radius: 50%;
+  background: #e6f1fb;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26px;
+}
+
+.loadingTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: #111;
+  margin-bottom: 8px;
+  line-height: 1.35;
+}
+
+.loadingSub {
+  font-size: 14px;
+  color: #aaa;
+  margin-bottom: 32px;
+  line-height: 1.6;
+}
+
+.stepsWrap {
+  width: 100%;
+  margin-bottom: 32px;
+}
+
+.stepRow {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+}
+
+.stepIcon {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  flex-shrink: 0;
+  transition: all 0.3s;
+}
+
+.stepDone {
+  background: #eaf3de;
+  color: #3b6d11;
+}
+
+.stepActive {
+  background: #e6f1fb;
+  animation: pulse 1.2s infinite;
+}
+
+.stepWait {
+  background: #f0efe8;
+  color: #ccc;
+}
+
+.stepLabel {
+  font-size: 13px;
+  flex: 1;
+  text-align: left;
+  transition: color 0.3s;
+}
+
+.stepLabelDone {
+  color: #111;
+  font-weight: 500;
+}
+
+.stepLabelActive {
+  color: #185fa5;
+  font-weight: 500;
+}
+
+.stepLabelWait {
+  color: #ccc;
+}
+
+.stepCheck {
+  font-size: 13px;
+  color: #3b6d11;
+}
+
+.stepCount {
+  font-size: 11px;
+  color: #185fa5;
+}
+
+.committeeWrap {
+  width: 100%;
+  background: #f8f8f8;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.committeeTitle {
+  font-size: 11px;
+  color: #aaa;
+  margin-bottom: 10px;
+  letter-spacing: 0.04em;
+}
+
+.membersGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.member {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  flex: 1;
+  min-width: 56px;
+}
+
+.memberIcon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 500;
+  border: 2px solid transparent;
+  transition: all 0.4s;
+}
+
+.memberWait {
+  background: #f0efe8;
+  color: #ccc;
+  border-color: #eee;
+}
+
+.memberActive {
+  background: #e6f1fb;
+  color: #185fa5;
+  border-color: #185fa5;
+  animation: pulse 1s infinite;
+}
+
+.memberDone {
+  background: #eaf3de;
+  color: #3b6d11;
+  border-color: #c0dd97;
+}
+
+.memberName {
+  font-size: 9px;
+  color: #aaa;
+  text-align: center;
+  line-height: 1.3;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 0.7;
+    transform: scale(0.95);
+  }
+}
