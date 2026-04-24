@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { extractOpenRouterErrorMessage, extractOpenRouterErrorStatus } from './route'
+import { OCR_SYSTEM_PROMPT, extractOpenRouterErrorMessage, extractOpenRouterErrorStatus } from './route'
 
 test('OpenRouter가 HTTP 200으로 error payload를 내려도 메시지를 추출한다', () => {
   const message = extractOpenRouterErrorMessage({
@@ -36,4 +36,9 @@ test('정상 payload 에서는 error message가 없다', () => {
   })
 
   assert.equal(message, '')
+})
+
+test('OCR prompt explains brokerage rows that show P/L amount plus parenthesized return', () => {
+  assert.match(OCR_SYSTEM_PROMPT, /\+262,740 \(12\.7%\)[\s\S]*\+12\.7%/)
+  assert.match(OCR_SYSTEM_PROMPT, /-13,263 \(6\.8%\)[\s\S]*-6\.8%/)
 })

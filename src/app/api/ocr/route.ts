@@ -43,7 +43,7 @@ const OCR_SCHEMA = {
   },
 } as const
 
-const SYSTEM_PROMPT = `You are an OCR extraction engine for Korean and English brokerage screenshots.
+export const OCR_SYSTEM_PROMPT = `You are an OCR extraction engine for Korean and English brokerage screenshots.
 Return ONLY valid JSON matching the provided schema.
 Never output markdown, prose, explanations, code fences, or extra keys.
 Top-level object must be exactly {"rows": [...]}.
@@ -69,6 +69,9 @@ OCR guidance:
 - Do not infer hidden values. Use only what is visible.
 - Quantity must map to the user's holding count, not price or valuation.
 - profitRate must map to the return/percentage column, not profit amount.
+- Korean brokerage rows often show profit/loss amount followed by the percentage in parentheses.
+  In that case, extract the parenthesized percentage and carry the sign from the visible profit/loss amount or color.
+  Examples: "+262,740 (12.7%)" means "+12.7%"; "-13,263 (6.8%)" means "-6.8%".
 - evaluationAmount must map to the row-level valuation/market value amount, not profit/loss amount, principal, or a totals summary.
 - If the same row appears twice due to sticky headers or repeated sections, keep one row only.`
 
@@ -137,7 +140,7 @@ export async function POST(request: Request) {
       messages: [
         {
           role: 'system',
-          content: SYSTEM_PROMPT,
+          content: OCR_SYSTEM_PROMPT,
         },
         {
           role: 'user',

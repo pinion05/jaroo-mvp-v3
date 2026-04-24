@@ -93,6 +93,45 @@ export function parseOcrNumber(value: string) {
   return isWrappedNegative ? -Math.abs(parsedValue) : parsedValue
 }
 
+const OCR_PERCENT_TEXT_PATTERN = /([+-]?)\s*((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\.\d+)\s*%/g
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+}
+
+export function normalizeOcrProfitRate(value: string) {
+  const normalizedValue = value.trim().replace(/[−–—]/g, '-')
+
+  if (!normalizedValue) {
+    return ''
+  }
+
+  const percentMatches = [...normalizedValue.matchAll(OCR_PERCENT_TEXT_PATTERN)]
+
+  if (percentMatches.length === 0) {
+    return normalizedValue
+  }
+
+  const selectedMatch = percentMatches[percentMatches.length - 1]
+  const selectedIndex = selectedMatch.index ?? 0
+  const explicitSign = selectedMatch[1] ?? ''
+  const rateNumber = (selectedMatch[2] ?? '').replaceAll(',', '')
+  const textBeforeRate = normalizedValue.slice(0, selectedIndex)
+  const isWrappedAccountingNegative = new RegExp(`^\\(\\s*${escapeRegExp(selectedMatch[0])}\\s*\\)$`).test(normalizedValue)
+  const hasSignedAmountBeforeRate = /[+-]\s*\d/.test(textBeforeRate)
+  let inferredSign = explicitSign
+
+  if (!inferredSign && hasSignedAmountBeforeRate) {
+    inferredSign = /-\s*\d/.test(textBeforeRate) ? '-' : '+'
+  }
+
+  if (!inferredSign && isWrappedAccountingNegative) {
+    inferredSign = '-'
+  }
+
+  return `${inferredSign}${rateNumber}%`
+}
+
 export function formatComputedNumber(value: number) {
   const roundedValue = Number(value.toFixed(4))
 
@@ -151,7 +190,7 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
     .map((item) => {
       const name = typeof item.name === 'string' ? item.name.trim() : ''
       const quantity = typeof item.quantity === 'string' ? item.quantity.trim() : ''
-      const profitRate = typeof item.profitRate === 'string' ? item.profitRate.trim() : ''
+      const profitRate = typeof item.profitRate === 'string' ? normalizeOcrProfitRate(item.profitRate) : ''
       const evaluationAmount = typeof item.evaluationAmount === 'string' ? item.evaluationAmount.trim() : ''
       const averagePrice = typeof item.averagePrice === 'string' ? item.averagePrice.trim() : ''
       const code = normalizeInstrumentCode(item.code)
