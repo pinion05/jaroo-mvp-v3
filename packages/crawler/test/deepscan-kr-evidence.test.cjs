@@ -492,6 +492,79 @@ test('buildDeepScanKrEvidencePacket promotes KR WiseReport raw facts into struct
   assert.equal(packet.sourceLimitations.some((limitation) => limitation.fact === 'institutionalOwnershipPct'), true);
 });
 
+test('buildDeepScanKrEvidencePacket uses v1.2 FnGuide ownership pages when present', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  const packet = buildDeepScanKrEvidencePacket(
+    {
+      instrument: {
+        code: '100840',
+        name: 'SNT에너지',
+      },
+    },
+    {
+      slim: {
+        schemaVersion: 'wisereport-kr-slim-v1.2',
+        code: '100840',
+        pages: {
+          shareholding: {
+            ownershipSummary: {
+              rows: [
+                { 항목: '최대주주 보유지분', 보유지분: '52.32%' },
+              ],
+            },
+          },
+          'fnguide-snapshot': {
+            marketSnapshot: {
+              rows: [
+                { key: '외국인 지분율', value: '2.70' },
+              ],
+            },
+            assetManagerHoldings: {
+              rows: [
+                { 운용사명: '삼성자산운용', 상장주식수내비중: '1.20' },
+                { 운용사명: '신영자산운용', 상장주식수내비중: '1.07' },
+              ],
+            },
+          },
+          'fnguide-shareanalysis': {
+            shareholderDetailsJson: {
+              comp: [
+                {
+                  MAJ_SHER_NM: '국민연금공단',
+                  SHER_NM: '국민연금공단',
+                  COMM_STK_QTY: '1,071,914',
+                  SHER_RT: '5.18',
+                },
+              ],
+            },
+          },
+          'fnguide-foreign-ownership-chart': {
+            chartJson: {
+              CHART: [
+                { TRD_DT: '2026/04/23', FRG_RT: '2.81' },
+                { TRD_DT: '2026/04/24', FRG_RT: '2.73' },
+              ],
+            },
+          },
+        },
+      },
+    },
+  );
+
+  assert.equal(packet.pageCoverage.totalKnownPages, 13);
+  assert.equal(packet.pageCoverage.availableCount, 4);
+  assert.equal(packet.ownershipSnapshot.foreignOwnershipPct, 2.73);
+  assert.equal(packet.ownershipSnapshot.foreignOwnershipAsOf, '2026-04-24');
+  assert.equal(packet.ownershipSnapshot.foreignOwnershipHistory.length, 2);
+  assert.equal(packet.ownershipSnapshot.assetManagerOwnershipPctSum, 2.27);
+  assert.equal(packet.sourceLimitations.some((limitation) => limitation.fact === 'foreignOwnershipPct'), false);
+  assert.equal(packet.sourceLimitations.some((limitation) => limitation.fact === 'institutionalOwnershipPct'), true);
+  assert.deepEqual(packet.topFacts, [
+    'KR 리포트 페이지 4/13 확보',
+  ]);
+});
+
 test('buildDeepScanKrEvidencePacket ignores unknown slim page keys, counts recent reports from row-like payloads, and reports missing quote/holding sources deterministically', async () => {
   const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
 

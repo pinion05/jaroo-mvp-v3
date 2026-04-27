@@ -6,7 +6,10 @@ import { invokeDeepScanKrPackage } from './deepscan-kr-package-adapter.js';
 import { buildKrCommitteeAxesFromLlmResults, scoreDeepScanKrCommitteeFromDump } from './deepscan-kr-committee-runtime.js';
 
 const require = createRequire(import.meta.url);
-const { WISEREPORT_KR_PAGES, getCrawl } = require('../crawlers/wisereport-kr.cjs');
+const {
+  WISEREPORT_KR_V12_PAGES,
+  getCrawlV12,
+} = require('../crawlers/wisereport-kr.cjs');
 
 const DEEP_SCAN_VERSION = 'deepscan-payload-kr-v2';
 const MAJOR_BLOCK_KEYS = Object.freeze([
@@ -541,10 +544,10 @@ function slimWiseReportKrValue(value) {
   );
 }
 
-function pickWiseReportKrCompany(rawAggregate, code) {
+function pickWiseReportKrCompany(rawAggregate, code, pageDefinitions = WISEREPORT_KR_V12_PAGES) {
   const normalizedAggregate = normalizeWiseReportKrAggregate(rawAggregate);
 
-  for (const page of WISEREPORT_KR_PAGES) {
+  for (const page of pageDefinitions) {
     const company = extractWiseReportKrNormalizedPage(normalizedAggregate.pages?.[page.id])?.company;
     if (company && typeof company === 'object') {
       return {
@@ -560,9 +563,9 @@ function pickWiseReportKrCompany(rawAggregate, code) {
   };
 }
 
-function buildWiseReportKrSlimPayload(rawAggregate, code) {
+function buildWiseReportKrSlimPayload(rawAggregate, code, pageDefinitions = WISEREPORT_KR_V12_PAGES) {
   const normalizedAggregate = normalizeWiseReportKrAggregate(rawAggregate);
-  const slimPages = Object.fromEntries(WISEREPORT_KR_PAGES.map((page) => {
+  const slimPages = Object.fromEntries(pageDefinitions.map((page) => {
     const pagePayload = normalizedAggregate.pages?.[page.id];
     const normalizedPage = extractWiseReportKrNormalizedPage(pagePayload);
 
@@ -583,7 +586,7 @@ function buildWiseReportKrSlimPayload(rawAggregate, code) {
 
   return {
     code: String(code || ''),
-    company: pickWiseReportKrCompany(rawAggregate, code),
+    company: pickWiseReportKrCompany(rawAggregate, code, pageDefinitions),
     pages: slimPages,
   };
 }
@@ -727,7 +730,11 @@ async function resolveKrSourceBundle(rawInput, input) {
 
   const tradeDate = normalizeTradeDate(input.selectedAt ?? input.sourceContext.appliedAt);
   const [slimResult, quotesResult, packageResult] = await Promise.all([
-    captureSource('slim', async () => buildWiseReportKrSlimPayload(await getCrawl(input.instrument.code), input.instrument.code)),
+    captureSource('slim', async () => buildWiseReportKrSlimPayload(
+      await getCrawlV12(input.instrument.code),
+      input.instrument.code,
+      WISEREPORT_KR_V12_PAGES,
+    )),
     captureSource('current-quote', async () => getCurrentQuotes({
       codes: input.instrument.code ? [input.instrument.code] : [],
       tickers: input.instrument.ticker ? [input.instrument.ticker] : [],

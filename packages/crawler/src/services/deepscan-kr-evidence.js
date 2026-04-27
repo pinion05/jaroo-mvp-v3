@@ -1,9 +1,14 @@
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const { WISEREPORT_KR_PAGES } = require('../crawlers/wisereport-kr/page-specs.cjs');
+const {
+  WISEREPORT_KR_PAGES,
+  WISEREPORT_KR_V12_PAGES,
+} = require('../crawlers/wisereport-kr/page-specs.cjs');
 
 const KNOWN_PAGE_IDS = Object.freeze(WISEREPORT_KR_PAGES.map((page) => page.id));
+const KNOWN_V12_PAGE_IDS = Object.freeze(WISEREPORT_KR_V12_PAGES.map((page) => page.id));
+const V12_EXTRA_PAGE_IDS = Object.freeze(KNOWN_V12_PAGE_IDS.filter((pageId) => !KNOWN_PAGE_IDS.includes(pageId)));
 const OCRISH_NUMBER_TEXT_PATTERN = /(shares?|share|stocks?|stock|주|원|krw|usd|eur|jpy|cny|aud|cad|hkd)/gi;
 const LABEL_PREFIX_PATTERN = /^(?:펼치기|접기)\s*/;
 
@@ -150,6 +155,22 @@ function hasEvidence(value) {
   }
 
   return Boolean(value);
+}
+
+function resolveKnownPageIds(slimSource, slimPages) {
+  const schemaVersion = normalizeText(slimSource?.schemaVersion);
+  const declaredTotalPages = slimSource?.sourceCoverage?.pageCoverage?.totalKnownPages;
+  const hasV12Extras = V12_EXTRA_PAGE_IDS.some((pageId) => hasEvidence(slimPages?.[pageId]));
+
+  if (
+    /v1\.2/i.test(schemaVersion ?? '')
+    || hasV12Extras
+    || (typeof declaredTotalPages === 'number' && declaredTotalPages > KNOWN_PAGE_IDS.length)
+  ) {
+    return KNOWN_V12_PAGE_IDS;
+  }
+
+  return KNOWN_PAGE_IDS;
 }
 
 function formatNumber(value) {
@@ -1149,10 +1170,11 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
     .map((row) => normalizeDate(row.date ?? row.일자 ?? row.작성일 ?? row.publishedAt))
     .find(Boolean) ?? null;
 
-  const availablePageIds = KNOWN_PAGE_IDS.filter((pageId) => hasEvidence(slimPages[pageId]));
-  const missingPageIds = KNOWN_PAGE_IDS.filter((pageId) => !hasEvidence(slimPages[pageId]));
+  const knownPageIds = resolveKnownPageIds(safeSources.slim, slimPages);
+  const availablePageIds = knownPageIds.filter((pageId) => hasEvidence(slimPages[pageId]));
+  const missingPageIds = knownPageIds.filter((pageId) => !hasEvidence(slimPages[pageId]));
   const pageCoverage = {
-    totalKnownPages: KNOWN_PAGE_IDS.length,
+    totalKnownPages: knownPageIds.length,
     availablePageIds,
     missingPageIds,
     availableCount: availablePageIds.length,
