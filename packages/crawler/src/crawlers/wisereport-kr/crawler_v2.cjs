@@ -87,6 +87,30 @@ function candidateFromTable(field, match, parser, parserOptions = null) {
   return candidate(field, match.source, parsed, match.sourceDetail);
 }
 
+function pairsFromTableCells(table) {
+  if (!table) {
+    return null;
+  }
+  const rows = Array.isArray(table.rows) ? table.rows : [];
+  return {
+    tableId: table.id,
+    className: table.className,
+    rows: rows
+      .flatMap((row) => {
+        const pairs = [];
+        for (let index = 0; index < row.length; index += 2) {
+          const key = row[index];
+          const value = row[index + 1];
+          if (key || value) {
+            pairs.push({ key, value });
+          }
+        }
+        return pairs;
+      })
+      .filter((row) => row.key || row.value),
+  };
+}
+
 function firstParsedJsonResponse(responses, pattern) {
   return selectCapturedResponses(responses, pattern).find((response) => response.parsedBody && typeof response.parsedBody === 'object');
 }
@@ -215,6 +239,54 @@ function runCrawlerV2Stage({ spec, code, v1 }) {
       const jsonResponse = firstParsedJsonResponse(capturedResponses, /json\/chart\/05_05/i);
       candidates = {
         factorScores: [candidate('factorScores', 'network', jsonResponse?.parsedBody, { url: jsonResponse?.url || null })],
+        popupTable: [candidateFromTable('popupTable', byIndex(0), recordsFromTable)],
+      };
+      break;
+    }
+    case 'fnguide-snapshot':
+      candidates = {
+        marketSnapshot: [candidateFromTable(
+          'marketSnapshot',
+          byClass('us_table_ty1', (table) => table.caption === '시세현황' || /외국인\s*지분율/.test((table.rows || []).flat().join(' '))),
+          pairsFromTableCells,
+        )],
+        assetManagerHoldings: [candidateFromTable(
+          'assetManagerHoldings',
+          byClass('us_table_ty1', (table) => table.caption === '운용사별 보유 현황' || /운용사명/.test((table.rows || [])[0]?.join(' ') || '')),
+          recordsFromTable,
+        )],
+        snapshotMajorShareholders: [candidateFromTable(
+          'snapshotMajorShareholders',
+          byClass('us_table_ty1', (table) => /항목/.test((table.rows || [])[0]?.join(' ') || '') && /보통주/.test((table.rows || [])[0]?.join(' ') || '') && /지분율/.test((table.rows || [])[0]?.join(' ') || '')),
+          recordsFromTable,
+        )],
+        shareholderCategories: [candidateFromTable(
+          'shareholderCategories',
+          byClass('us_table_ty1', (table) => /주주구분/.test((table.rows || [])[0]?.join(' ') || '') && /대표주주수|대표 주주수/.test((table.rows || [])[0]?.join(' ') || '')),
+          recordsFromTable,
+        )],
+      };
+      break;
+    case 'fnguide-shareanalysis': {
+      const detailJson = firstParsedJsonResponse(capturedResponses, /json\/data\/01_09_01/i);
+      const changesJson = firstParsedJsonResponse(capturedResponses, /json\/data\/01_09_02/i);
+      candidates = {
+        shareholderCategories: [candidateFromTable('shareholderCategories', byId('dataTable'), recordsFromTable)],
+        shareholderDetails: [candidateFromTable('shareholderDetails', byId('sharedetailtable'), recordsFromTable)],
+        shareholderChanges: [candidateFromTable(
+          'shareholderChanges',
+          byClass('us_table_ty1', (table) => table.caption === '주주변동내역' || /변동주주/.test((table.rows || [])[0]?.join(' ') || '')),
+          recordsFromTable,
+        )],
+        shareholderDetailsJson: [candidate('shareholderDetailsJson', 'network', detailJson?.parsedBody, { url: detailJson?.url || null })],
+        shareholderChangesJson: [candidate('shareholderChangesJson', 'network', changesJson?.parsedBody, { url: changesJson?.url || null })],
+      };
+      break;
+    }
+    case 'fnguide-foreign-ownership-chart': {
+      const jsonResponse = firstParsedJsonResponse(capturedResponses, /json\/chart\/01_01/i);
+      candidates = {
+        chartJson: [candidate('chartJson', 'network', jsonResponse?.parsedBody, { url: jsonResponse?.url || null })],
         popupTable: [candidateFromTable('popupTable', byIndex(0), recordsFromTable)],
       };
       break;

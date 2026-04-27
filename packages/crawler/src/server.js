@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import {
   WISEREPORT_GLOBAL_ROUTES,
   WISEREPORT_KR_PAGES,
+  WISEREPORT_KR_V12_PAGES,
   buildDeepScanKrEvidencePacket,
   buildJarooDeepScanPayload,
   crawlWiseReportGlobal,
@@ -19,6 +20,7 @@ import {
   getCompanyFactsTaxonomies,
   getCompanyFactsTaxonomyConcepts,
   getCrawl,
+  getCrawlV12,
   getKrx,
   getIndexData,
   getInvestorVolume,
@@ -611,10 +613,10 @@ function slimWiseReportKrValue(value, parentKey = null) {
   return Object.fromEntries(entries);
 }
 
-function pickWiseReportKrCompany(rawAggregate, code) {
+function pickWiseReportKrCompany(rawAggregate, code, pageDefinitions = WISEREPORT_KR_PAGES) {
   const normalizedAggregate = normalizeWiseReportKrAggregate(rawAggregate);
 
-  for (const page of WISEREPORT_KR_PAGES) {
+  for (const page of pageDefinitions) {
     const company = extractWiseReportKrNormalizedPage(normalizedAggregate.pages?.[page.id])?.company;
     if (company && typeof company === 'object') {
       return {
@@ -727,9 +729,9 @@ function slimWiseReportKrValueV11(value, parentKey = null) {
   return Object.fromEntries(entries);
 }
 
-function buildWiseReportKrSlimPayloadV11(rawAggregate, code) {
+function buildWiseReportKrSlimPayloadV11(rawAggregate, code, pageDefinitions = WISEREPORT_KR_PAGES) {
   const normalizedAggregate = normalizeWiseReportKrAggregate(rawAggregate);
-  const slimPages = Object.fromEntries(WISEREPORT_KR_PAGES.map((page) => {
+  const slimPages = Object.fromEntries(pageDefinitions.map((page) => {
     const pagePayload = normalizedAggregate.pages?.[page.id];
     const normalizedPage = extractWiseReportKrNormalizedPage(pagePayload);
 
@@ -754,7 +756,7 @@ function buildWiseReportKrSlimPayloadV11(rawAggregate, code) {
 
   return {
     code: String(code || ''),
-    company: pickWiseReportKrCompany(rawAggregate, code),
+    company: pickWiseReportKrCompany(rawAggregate, code, pageDefinitions),
     pages: slimPages,
   };
 }
@@ -865,27 +867,50 @@ function makeSlimV12FinancialFact(value, options, instrumentKind) {
 
 function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
   const noQuoteMessage = 'KR slim v1.2 builder는 WiseReport/FnGuide payload만으로 현재가를 보장하지 않습니다. DeepScan에서는 별도 quotes source를 결합해야 합니다.';
-  const noFlowMessage = 'WiseReport KR slim v1.1 shareholding source에는 외국인/기관/개인 수급 집계가 없습니다. v1.2 investorFlow에는 별도 source acquisition이 필요합니다.';
+  const noFlowMessage = 'WiseReport/FnGuide KR 내부 source는 외국인 지분율·대차잔고·공매도·지분공시는 제공하지만 개인/외국인/기관 순매수 3분류 집계는 제공하지 않습니다.';
   const notCorporate = instrumentKind === 'etf' || instrumentKind === 'etn';
   const financialSource = { pageId: 'financial-analysis', checkedSources: ['wisereport.financial-analysis', 'wisereport.consensus'] };
   const indicatorSource = { pageId: 'investment-indicators', checkedSources: ['wisereport.investment-indicators'] };
+  const ownershipCheckedSources = ['wisereport.shareholding', 'fnguide.snapshot', 'fnguide.shareanalysis', 'fnguide.foreign-ownership-chart'];
 
   const foreignOwnershipFact = evidence.ownershipSnapshot?.foreignOwnershipPct !== null && evidence.ownershipSnapshot?.foreignOwnershipPct !== undefined
-    ? makeSlimV12Fact(evidence.ownershipSnapshot.foreignOwnershipPct, { pageId: 'shareholding', fieldPath: 'shareholding.foreignOwnershipPct' })
+    ? makeSlimV12Fact(evidence.ownershipSnapshot.foreignOwnershipPct, {
+        provider: 'fnguide',
+        pageId: evidence.ownershipSnapshot.foreignOwnershipHistory?.length ? 'fnguide-foreign-ownership-chart' : 'fnguide-snapshot',
+        fieldPath: evidence.ownershipSnapshot.foreignOwnershipHistory?.length ? 'fnguide-foreign-ownership-chart.chartJson.CHART[].FRG_RT' : 'fnguide-snapshot.marketSnapshot.rows[외국인 지분율]',
+        checkedSources: ownershipCheckedSources,
+        asOf: evidence.ownershipSnapshot.foreignOwnershipAsOf,
+      })
     : makeSlimV12MissingFact({
-        pageId: 'shareholding',
-        checkedSources: ['wisereport.shareholding'],
-        reasonCode: 'not_available_in_wisereport_shareholding',
-        message: 'WiseReport 지분현황 slim source에는 외국인 보유율 집계 필드가 없습니다.',
+        provider: 'fnguide',
+        pageId: 'fnguide-snapshot',
+        checkedSources: ownershipCheckedSources,
+        reasonCode: 'not_available_in_wisereport_fnguide_sources',
+        message: 'WiseReport/FnGuide KR source에서 외국인 보유율 집계 필드를 찾지 못했습니다.',
       });
   const institutionalOwnershipFact = evidence.ownershipSnapshot?.institutionalOwnershipPct !== null && evidence.ownershipSnapshot?.institutionalOwnershipPct !== undefined
-    ? makeSlimV12Fact(evidence.ownershipSnapshot.institutionalOwnershipPct, { pageId: 'shareholding', fieldPath: 'shareholding.institutionalOwnershipPct' })
+    ? makeSlimV12Fact(evidence.ownershipSnapshot.institutionalOwnershipPct, {
+        provider: 'fnguide',
+        pageId: 'fnguide-shareanalysis',
+        fieldPath: 'fnguide-shareanalysis.institutionalOwnershipPct',
+        checkedSources: ownershipCheckedSources,
+      })
     : makeSlimV12MissingFact({
-        pageId: 'shareholding',
-        checkedSources: ['wisereport.shareholding'],
-        reasonCode: 'aggregate_not_available_in_wisereport_shareholding',
-        message: 'WiseReport 지분현황 slim source에는 기관 전체 보유율 집계가 없습니다. 5% 이상/국민연금 rows는 aggregate로 대체하지 않습니다.',
+        provider: 'fnguide',
+        pageId: 'fnguide-shareanalysis',
+        checkedSources: ownershipCheckedSources,
+        reasonCode: 'institutional_aggregate_not_available_in_wisereport_fnguide_sources',
+        message: 'WiseReport/FnGuide KR source에는 기관 전체 보유율 aggregate가 없습니다. 운용사별 보유/국민연금/5% 이상 rows를 aggregate로 대체하지 않습니다.',
       });
+  const assetManagerOwnershipPctSum = evidence.ownershipSnapshot?.assetManagerOwnershipPctSum ?? null;
+  const assetManagerHoldings = evidence.ownershipSnapshot?.assetManagerHoldings ?? [];
+  const assetManagerFactOptions = {
+    provider: 'fnguide',
+    pageId: 'fnguide-snapshot',
+    checkedSources: ownershipCheckedSources,
+    reasonCode: 'top_asset_managers_only',
+    message: 'FnGuide Snapshot의 운용사별 보유 현황은 상위 운용사/공모펀드 보고서 기반 partial context이며 기관 전체 보유율 aggregate가 아닙니다.',
+  };
 
   return {
     quote: {
@@ -940,11 +965,19 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
     investorFlow: {
       foreignOwnershipPct: foreignOwnershipFact,
       institutionalOwnershipPct: institutionalOwnershipFact,
-      retailNetBuy: makeSlimV12MissingFact({ checkedSources: ['wisereport.shareholding'], reasonCode: 'investor_flow_source_not_attached', message: noFlowMessage }),
-      foreignNetBuy: makeSlimV12MissingFact({ checkedSources: ['wisereport.shareholding'], reasonCode: 'investor_flow_source_not_attached', message: noFlowMessage }),
-      institutionalNetBuy: makeSlimV12MissingFact({ checkedSources: ['wisereport.shareholding'], reasonCode: 'investor_flow_source_not_attached', message: noFlowMessage }),
-      flowWindow: makeSlimV12MissingFact({ checkedSources: ['wisereport.shareholding'], reasonCode: 'investor_flow_source_not_attached', message: noFlowMessage }),
-      flowRows: makeSlimV12MissingFact({ checkedSources: ['wisereport.shareholding'], reasonCode: 'investor_flow_source_not_attached', message: noFlowMessage }),
+      foreignOwnershipHistory: makeSlimV12Fact(evidence.ownershipSnapshot?.foreignOwnershipHistory ?? [], { provider: 'fnguide', pageId: 'fnguide-foreign-ownership-chart', fieldPath: 'fnguide-foreign-ownership-chart.chartJson.CHART', checkedSources: ownershipCheckedSources }),
+      assetManagerOwnershipPctSum: assetManagerOwnershipPctSum !== null
+        ? makeSlimV12Fact(assetManagerOwnershipPctSum, { ...assetManagerFactOptions, availability: 'partial', fieldPath: 'fnguide-snapshot.assetManagerHoldings.rows[].상장주식수내비중' })
+        : makeSlimV12MissingFact({ ...assetManagerFactOptions, fieldPath: 'fnguide-snapshot.assetManagerHoldings.rows[].상장주식수내비중' }),
+      assetManagerHoldings: assetManagerHoldings.length > 0
+        ? makeSlimV12Fact(assetManagerHoldings, { ...assetManagerFactOptions, availability: 'partial', fieldPath: 'fnguide-snapshot.assetManagerHoldings.rows' })
+        : makeSlimV12MissingFact({ ...assetManagerFactOptions, fieldPath: 'fnguide-snapshot.assetManagerHoldings.rows' }),
+      shareholderCategories: makeSlimV12Fact(evidence.ownershipSnapshot?.shareholderCategories ?? [], { provider: 'fnguide', pageId: 'fnguide-shareanalysis', fieldPath: 'fnguide-shareanalysis.shareholderCategories.rows', checkedSources: ownershipCheckedSources }),
+      retailNetBuy: makeSlimV12MissingFact({ provider: 'fnguide', checkedSources: ownershipCheckedSources, reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide', message: noFlowMessage }),
+      foreignNetBuy: makeSlimV12MissingFact({ provider: 'fnguide', checkedSources: ownershipCheckedSources, reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide', message: noFlowMessage }),
+      institutionalNetBuy: makeSlimV12MissingFact({ provider: 'fnguide', checkedSources: ownershipCheckedSources, reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide', message: noFlowMessage }),
+      flowWindow: makeSlimV12MissingFact({ provider: 'fnguide', checkedSources: ownershipCheckedSources, reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide', message: noFlowMessage }),
+      flowRows: makeSlimV12MissingFact({ provider: 'fnguide', checkedSources: ownershipCheckedSources, reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide', message: noFlowMessage }),
     },
     reports: {
       totalCount: makeSlimV12Fact(evidence.reportSignals?.recentReportCount ?? null, { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows' }),
@@ -961,13 +994,13 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
       ...(Array.isArray(evidence.sourceLimitations) ? evidence.sourceLimitations.map((limitation) => ({
         factPath: limitation.fact,
         reasonCode: limitation.reasonCode,
-        checkedSources: ['wisereport.shareholding'],
+        checkedSources: /ownership/i.test(String(limitation.fact || '')) ? ownershipCheckedSources : ['wisereport.shareholding'],
         message: limitation.message,
       })) : []),
       {
         factPath: 'investorFlow.*NetBuy',
-        reasonCode: 'investor_flow_source_not_attached',
-        checkedSources: ['wisereport.shareholding'],
+        reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide',
+        checkedSources: ownershipCheckedSources,
         message: noFlowMessage,
       },
       ...(notCorporate ? [{
@@ -981,7 +1014,7 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
 }
 
 function buildWiseReportKrSlimPayloadV12(rawAggregate, code) {
-  const slimV11 = buildWiseReportKrSlimPayloadV11(rawAggregate, code);
+  const slimV11 = buildWiseReportKrSlimPayloadV11(rawAggregate, code, WISEREPORT_KR_V12_PAGES);
   const evidence = buildDeepScanKrEvidencePacket({
     instrument: {
       code: slimV11.company?.code ?? slimV11.code,
@@ -992,6 +1025,18 @@ function buildWiseReportKrSlimPayloadV12(rawAggregate, code) {
     slim: slimV11,
   });
   const instrumentKind = inferWiseReportKrInstrumentKind(slimV11);
+  const availableV12PageIds = WISEREPORT_KR_V12_PAGES
+    .map((page) => page.id)
+    .filter((pageId) => hasSlimV12Value(slimV11.pages?.[pageId]));
+  const missingV12PageIds = WISEREPORT_KR_V12_PAGES
+    .map((page) => page.id)
+    .filter((pageId) => !hasSlimV12Value(slimV11.pages?.[pageId]));
+  const v12PageCoverage = {
+    totalKnownPages: WISEREPORT_KR_V12_PAGES.length,
+    availablePageIds: availableV12PageIds,
+    missingPageIds: missingV12PageIds,
+    availableCount: availableV12PageIds.length,
+  };
 
   return {
     schemaVersion: 'wisereport-kr-slim-v1.2',
@@ -1004,8 +1049,11 @@ function buildWiseReportKrSlimPayloadV12(rawAggregate, code) {
       instrumentKind,
     },
     sourceCoverage: {
-      pageCoverage: evidence.pageCoverage,
-      sourceCoverage: evidence.sourceCoverage,
+      pageCoverage: v12PageCoverage,
+      sourceCoverage: {
+        ...evidence.sourceCoverage,
+        availableReportPages: availableV12PageIds,
+      },
       checkedSources: [
         'wisereport.company-overview',
         'wisereport.financial-analysis',
@@ -1013,6 +1061,9 @@ function buildWiseReportKrSlimPayloadV12(rawAggregate, code) {
         'wisereport.consensus',
         'wisereport.shareholding',
         'wisereport.recent-reports',
+        'fnguide.snapshot',
+        'fnguide.shareanalysis',
+        'fnguide.foreign-ownership-chart',
         'fnguide.finance',
         'fnguide.relative-return',
         'fnguide.opinion',
@@ -2222,13 +2273,13 @@ const endpointDefinitions = [
   {
     id: 'wisereport-kr-slim-v1.2',
     resource: 'wisereport.kr.aggregate.slim.v1.2',
-    description: '한국 상장사 WiseReport/FnGuide slim v1.1 원본에 DeepScan용 krFacts, fact availability, investorFlow missing semantics, instrumentKind를 추가한 v1.2 raw JSON을 반환합니다.',
+    description: '한국 상장사 WiseReport/FnGuide slim v1.1 원본에 v1.2 전용 FnGuide 스냅샷/지분분석/외국인지분율 차트와 DeepScan용 krFacts를 추가한 raw JSON을 반환합니다.',
     primaryPath: buildMajorPath('/wisereport-fnguide/kr/companies/:code/slim/v1.2'),
     dataSources: ['wisereport', 'fnguide'],
     params: ['code'],
     query: [],
     rawSuccess: true,
-    handler: async (req) => buildWiseReportKrSlimPayloadV12(await getCrawl(req.params.code), req.params.code),
+    handler: async (req) => buildWiseReportKrSlimPayloadV12(await getCrawlV12(req.params.code), req.params.code),
   },
   ...WISEREPORT_KR_PAGE_ROUTES.map((route) => ({
     id: route.id,

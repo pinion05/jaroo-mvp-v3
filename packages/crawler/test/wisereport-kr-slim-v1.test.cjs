@@ -150,6 +150,123 @@ function createAggregateFixture() {
           },
         },
       },
+      'fnguide-snapshot': {
+        id: 'fnguide-snapshot',
+        normalized: {
+          company: {
+            code: '005930',
+            name: '삼성전자',
+            title: '삼성전자(A005930) | Snapshot | 기업정보 | Company Guide',
+            headerText: '스냅샷',
+          },
+          sourceType: 'fnguide',
+          sourceKey: 'fnguide스냅샷',
+          bodyTextHead: 'debug text',
+          marketSnapshot: {
+            rows: [
+              { key: '수익률(1M/ 3M/ 6M/ 1Y)', value: '+16.48/ +44.36/ +12.72/ +54.42' },
+              { key: '외국인 지분율', value: '2.73' },
+              { key: '유동주식수/비율(보통주)', value: '8,941,029 / 43.23' },
+            ],
+          },
+          assetManagerHoldings: {
+            rows: [
+              {
+                운용사명: '삼성자산운용',
+                보유수량: '248.81',
+                시가평가액: '91.06',
+                상장주식수내비중: '1.20',
+                운용사내비중: '0.01',
+              },
+              {
+                운용사명: '신영자산운용',
+                보유수량: '221.11',
+                시가평가액: '80.93',
+                상장주식수내비중: '1.07',
+                운용사내비중: '0.11',
+              },
+            ],
+          },
+          snapshotMajorShareholders: {
+            rows: [
+              { 항목: 'SNT홀딩스(외 1인)', 보통주: '10,820,079', 지분율: '52.32', 최종변동일: '2026/04/06' },
+              { 항목: '국민연금공단', 보통주: '1,071,914', 지분율: '5.18', 최종변동일: '2026/03/30' },
+            ],
+          },
+          shareholderCategories: {
+            rows: [
+              { 주주구분: '최대주주등 (본인+특별관계자)', 대표주주수: '1', 보통주: '10,820,079', 지분율: '52.32', 최종변동일: '2026/04/06' },
+              { 주주구분: '5%이상주주 (본인+특별관계자)', 대표주주수: '1', 보통주: '1,071,914', 지분율: '5.18', 최종변동일: '2026/03/30' },
+            ],
+          },
+        },
+      },
+      'fnguide-shareanalysis': {
+        id: 'fnguide-shareanalysis',
+        normalized: {
+          company: {
+            code: '005930',
+            name: '삼성전자',
+            title: '삼성전자(A005930) | 지분분석 | 기업정보 | Company Guide',
+            headerText: '지분분석',
+          },
+          sourceType: 'fnguide',
+          sourceKey: 'fnguide지분분석',
+          bodyTextHead: 'debug text',
+          shareholderDetailsJson: {
+            comp: [
+              {
+                SHER_GB_1: '30',
+                MAJ_SHER_NM: '국민연금공단',
+                SHER_NM: '국민연금공단',
+                MAJ_REL_NM: '본인',
+                COMM_STK_QTY: '1,071,914',
+                SHER_RT: '5.18',
+                CHG_DT: '2026/03/30',
+                COMM_STK_QTY_SUM: '1,071,914',
+                SHER_RT_SUM: '5.18',
+                MAX_CHG_DT: '2026/03/30',
+              },
+            ],
+          },
+          shareholderChangesJson: {
+            comp: [
+              {
+                주주구분: '주요주주',
+                대표주주: '국민연금공단',
+                변동주주: '국민연금공단',
+                변동일: '2026.03.30',
+                변동사유: '기타(+)',
+                주식종류: '보통주',
+                변동전주: '0',
+                증감주: '1,071,914',
+                변동후주: '1,071,914',
+                지분율: '5.18',
+              },
+            ],
+          },
+        },
+      },
+      'fnguide-foreign-ownership-chart': {
+        id: 'fnguide-foreign-ownership-chart',
+        normalized: {
+          company: {
+            code: '005930',
+            name: '삼성전자',
+            title: '외국인 지분율, 시가총액 상세보기 : 삼성전자',
+            headerText: '외국인 지분율 차트',
+          },
+          sourceType: 'fnguide',
+          sourceKey: 'fnguide외국인지분율차트',
+          bodyTextHead: 'debug text',
+          chartJson: {
+            CHART: [
+              { TRD_DT: '2026/04/23', J_PRC: '54300', MKT_CAP: '11227', FRG_RT: '2.81' },
+              { TRD_DT: '2026/04/24', J_PRC: '57600', MKT_CAP: '11912', FRG_RT: '2.73' },
+            ],
+          },
+        },
+      },
     },
   };
 }
@@ -524,6 +641,9 @@ test('buildWiseReportKrSlimPayloadV12 adds DeepScan krFacts with explicit invest
   assert.equal(slim.schemaVersion, 'wisereport-kr-slim-v1.2');
   assert.equal(slim.market, 'KR');
   assert.equal(slim.company.instrumentKind, 'stock');
+  assert.equal(slim.sourceCoverage.pageCoverage.totalKnownPages, 13);
+  assert.equal(slim.sourceCoverage.pageCoverage.availableCount, 12);
+  assert.deepEqual(slim.sourceCoverage.pageCoverage.missingPageIds, ['fnguide-finance']);
   assert.equal(slim.krFacts.consensus.targetPrice.value, 100000);
   assert.equal(slim.krFacts.consensus.previousTargetPrice.value, 90000);
   assert.equal(slim.krFacts.consensus.targetRevisionPct.value, 11.11);
@@ -534,12 +654,18 @@ test('buildWiseReportKrSlimPayloadV12 adds DeepScan krFacts with explicit invest
   assert.equal(slim.krFacts.ownership.freeFloatPct.value, 43.23);
   assert.equal(slim.krFacts.ownership.knownInstitutionalMajorHolders.value[0].name, '국민연금공단');
 
-  assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.availability, 'missing');
-  assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.reasonCode, 'not_available_in_wisereport_shareholding');
-  assert.deepEqual(slim.krFacts.investorFlow.foreignOwnershipPct.source.checkedSources, ['wisereport.shareholding']);
+  assert.equal(slim.pages['fnguide-snapshot'].marketSnapshot.rows[1].key, '외국인 지분율');
+  assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.value, 2.73);
+  assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.availability, 'present');
+  assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.source.pageId, 'fnguide-foreign-ownership-chart');
+  assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.asOf, '2026-04-24');
+  assert.equal(slim.krFacts.investorFlow.foreignOwnershipHistory.value.length, 2);
+  assert.equal(slim.krFacts.investorFlow.assetManagerOwnershipPctSum.availability, 'partial');
+  assert.equal(slim.krFacts.investorFlow.assetManagerOwnershipPctSum.value, 2.27);
   assert.equal(slim.krFacts.investorFlow.institutionalOwnershipPct.availability, 'missing');
   assert.match(slim.krFacts.investorFlow.institutionalOwnershipPct.message, /aggregate로 대체하지 않습니다/);
   assert.equal(slim.krFacts.investorFlow.foreignNetBuy.availability, 'missing');
+  assert.equal(slim.krFacts.investorFlow.foreignNetBuy.reasonCode, 'investor_net_buy_not_provided_by_wisereport_fnguide');
   assert.equal(slim.krFacts.styleFactors.factors.value[0].name, '베타');
 });
 

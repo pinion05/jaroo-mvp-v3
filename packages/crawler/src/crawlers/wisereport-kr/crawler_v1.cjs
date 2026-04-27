@@ -5,6 +5,7 @@ const DEFAULT_NAVIGATION_TIMEOUT_MS = 30000;
 const DEFAULT_WAIT_AFTER_LOAD_MS = 1200;
 const MAX_CAPTURED_TABLES = 32;
 const BLOCKED_RESOURCE_TYPES = Object.freeze(['image', 'stylesheet', 'font', 'media']);
+const ONE_PIXEL_GIF = Buffer.from('R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==', 'base64');
 
 const NOISE_SELECTORS = Object.freeze([
   '#skipNavi',
@@ -60,6 +61,7 @@ const SELECTED_RESPONSE_PATTERNS = Object.freeze([
   /\/company\/getFinStatement/i,
   /\/company\/getFinChart/i,
   /\/json\/chart\//i,
+  /\/json\/data\//i,
   /BandChart/i,
 ]);
 
@@ -289,6 +291,13 @@ async function runCrawlerV1Stage(context, code, spec, options = {}) {
 
   await page.route('**/*', (route) => {
     const resourceType = route.request().resourceType();
+    if (resourceType === 'image') {
+      return route.fulfill({
+        status: 200,
+        contentType: 'image/gif',
+        body: ONE_PIXEL_GIF,
+      });
+    }
     if (BLOCKED_RESOURCE_TYPES.includes(resourceType)) {
       return route.abort();
     }

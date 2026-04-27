@@ -95,6 +95,41 @@ const KR_WISEREPORT_PAGE_SPECS = Object.freeze([
   },
 ]);
 
+const KR_WISEREPORT_V12_EXTRA_PAGE_SPECS = Object.freeze([
+  {
+    id: 'fnguide-snapshot',
+    legacyKey: 'fnguideSnapshot',
+    sourceKey: 'fnguide스냅샷',
+    sourceType: 'fnguide',
+    title: '스냅샷',
+    url: (code) => `https://comp.fnguide.com/SVO2/ASP/SVD_Main.asp?pGB=1&gicode=A${code}&cID=AA&MenuYn=Y&ReportGB=&NewMenuID=101&stkGb=701`,
+    waitForSelectors: ['table.us_table_ty1', '#svdMainChart12'],
+  },
+  {
+    id: 'fnguide-shareanalysis',
+    legacyKey: 'fnguideShareAnalysis',
+    sourceKey: 'fnguide지분분석',
+    sourceType: 'fnguide',
+    title: '지분분석',
+    url: (code) => `https://comp.fnguide.com/SVO2/ASP/SVD_shareanalysis.asp?pGB=1&gicode=A${code}&cID=AA&MenuYn=Y&ReportGB=&NewMenuID=109&stkGb=701`,
+    waitForSelectors: ['#dataTable', '#sharedetailtable'],
+  },
+  {
+    id: 'fnguide-foreign-ownership-chart',
+    legacyKey: 'fnguideForeignOwnershipChart',
+    sourceKey: 'fnguide외국인지분율차트',
+    sourceType: 'fnguide',
+    title: '외국인 지분율 차트',
+    url: (code) => `https://comp.fnguide.com/SVO2/common/chartListPopup2.asp?oid=topChart02&cid=01_01&gicode=A${code}&filter=D&term=Y&etc=3M&etc2=2&titleTxt=&dateTxt=&unitTxt=`,
+    waitForSelectors: ['#chartDataGrid table', '#chartDataGrid'],
+  },
+]);
+
+const KR_WISEREPORT_V12_PAGE_SPECS = Object.freeze([
+  ...KR_WISEREPORT_PAGE_SPECS,
+  ...KR_WISEREPORT_V12_EXTRA_PAGE_SPECS,
+]);
+
 const WISEREPORT_KR_PAGES = Object.freeze(KR_WISEREPORT_PAGE_SPECS.map((spec) => ({
   id: spec.id,
   legacyKey: spec.legacyKey,
@@ -103,7 +138,15 @@ const WISEREPORT_KR_PAGES = Object.freeze(KR_WISEREPORT_PAGE_SPECS.map((spec) =>
   sourceType: spec.sourceType,
 })));
 
-const PAGE_MAP = new Map(KR_WISEREPORT_PAGE_SPECS.flatMap((page) => compactArray([
+const WISEREPORT_KR_V12_PAGES = Object.freeze(KR_WISEREPORT_V12_PAGE_SPECS.map((spec) => ({
+  id: spec.id,
+  legacyKey: spec.legacyKey,
+  sourceKey: spec.sourceKey,
+  title: spec.title,
+  sourceType: spec.sourceType,
+})));
+
+const PAGE_MAP = new Map(KR_WISEREPORT_V12_PAGE_SPECS.flatMap((page) => compactArray([
   [page.id, page],
   [page.legacyKey, page],
   [page.sourceKey, page],
@@ -115,7 +158,10 @@ function getPageSpec(routeRef) {
 
 module.exports = {
   KR_WISEREPORT_PAGE_SPECS,
+  KR_WISEREPORT_V12_EXTRA_PAGE_SPECS,
+  KR_WISEREPORT_V12_PAGE_SPECS,
   WISEREPORT_KR_PAGES,
+  WISEREPORT_KR_V12_PAGES,
   PAGE_MAP,
   getPageSpec,
 };

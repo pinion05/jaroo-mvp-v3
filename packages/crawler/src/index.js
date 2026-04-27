@@ -18,7 +18,16 @@ import {
 
 const require = createRequire(import.meta.url);
 
-const { WISEREPORT_KR_PAGES, crawlWiseReportKr, crawlWiseReportKrPage, getCrawl, crawlMarketData } = require('./crawlers/wisereport-kr.cjs');
+const {
+  WISEREPORT_KR_PAGES,
+  WISEREPORT_KR_V12_PAGES,
+  crawlWiseReportKr,
+  crawlWiseReportKrV12,
+  crawlWiseReportKrPage,
+  getCrawl,
+  getCrawlV12,
+  crawlMarketData,
+} = require('./crawlers/wisereport-kr.cjs');
 const { fetchUsdKrwRate, formatRateData } = require('./crawlers/usd-krw-rate.cjs');
 const {
   SOURCES,
@@ -130,9 +139,12 @@ export {
   SOURCES,
   WISEREPORT_GLOBAL_ROUTES,
   WISEREPORT_KR_PAGES,
+  WISEREPORT_KR_V12_PAGES,
   crawlWiseReportKr,
+  crawlWiseReportKrV12,
   crawlWiseReportKrPage,
   getCrawl,
+  getCrawlV12,
   crawlMarketData,
   fetchUsdKrwRate,
   formatRateData,

@@ -186,23 +186,33 @@ type KrFactsV12 = {
 }
 ```
 
-## Required new source acquisition
+## Required source acquisition
 
-### 1. Investor flow source
+### 1. Investor/ownership source
 
-v1.2 needs a source beyond current WiseReport shareholding page for:
+v1.2 needs a source beyond the current WiseReport `shareholding` page for:
 
 - foreign ownership percentage
 - institutional ownership percentage, if available
 - foreign/institutional/retail net buy over a defined window
 
-Candidate source groups to investigate:
+After re-checking WiseReport/FnGuide KR, the first pass should **not** add a new provider such as KRX/Naver. The missing facts are partly available inside the existing FnGuide KR surface but were not part of slim v1.1:
 
-- KRX investor trading by stock
-- Naver Finance investor trend/foreign ownership tables
-- FnGuide pages if there is a stable investor-flow endpoint not currently captured
+| Internal source | Route / JSON | v1.2 use | Caveat |
+|---|---|---|---|
+| FnGuide Snapshot | `SVD_Main.asp?gicode=A{code}&NewMenuID=101` | `시세현황` table contains `외국인 지분율`; Snapshot also contains `운용사별 보유 현황`, `주주현황`, and `주주구분` tables. | 운용사별 보유는 top/public-fund context, not aggregate institutional ownership. |
+| FnGuide foreign ownership chart | `chartListPopup2.asp?oid=topChart02&cid=01_01...` -> `/SVO2/json/chart/01_01/chart_A{code}_3M.json` | 3M `FRG_RT` history and latest `foreignOwnershipPct` with `asOf`. | Same source family; not investor net-buy. |
+| FnGuide share analysis | `SVD_shareanalysis.asp?gicode=A{code}&NewMenuID=109` -> `/SVO2/json/data/01_09_01/A{code}.json`, `/SVO2/json/data/01_09_02/A{code}.json` | Detailed shareholder rows and shareholder change rows, including known institutional/major holder details. | Still not a true 기관 전체 보유율 aggregate. |
+| FnGuide short/loan charts | `/SVO2/json/chart/11_01/chart_A{code}_BALANCE1Y.json`, `/SELL1Y.json` | Candidate future context for 대차잔고/차입공매도. | This is market pressure context, not 개인/외국인/기관 순매수. |
 
-Do not choose a provider until availability, stability, and terms/technical feasibility are checked.
+Decision for this branch:
+
+- v1.2 attaches the three internal FnGuide pages above only to the v1.2 crawl path.
+- v1.1 remains on the original 10-page contract for compatibility.
+- `foreignOwnershipPct` should be `present` when Snapshot/chart JSON provides `FRG_RT`.
+- `assetManagerHoldings` and `assetManagerOwnershipPctSum` should be `partial`, explicitly labeled as top 운용사 context.
+- `institutionalOwnershipPct` remains `missing` unless a true aggregate source appears; do **not** substitute 국민연금, 운용사 top-10 sum, or 5% holder rows.
+- `foreignNetBuy`, `institutionalNetBuy`, and `retailNetBuy` remain `missing` for WiseReport/FnGuide because those internal pages do not provide the KRX-style investor-type net-buy split.
 
 ### 2. Instrument kind source
 
@@ -367,3 +377,35 @@ Verification at checkpoint:
 - `npm run test:web:ts -- src/app/api/deepscan/slim/route.test.ts` (script runs the TS test suite plus the explicit file)
 - `npm run lint:web` (passes with pre-existing warnings only)
 - `git diff --check`
+
+## Implementation checkpoint — internal FnGuide ownership sources
+
+The initial candidate investigation briefly looked at external KRX/Naver-style sources, but that was the wrong first move for this task. The corrected approach is to keep the source family inside WiseReport/FnGuide KR and check whether v1.1 simply omitted available internal pages.
+
+Implemented on branch `issue34-kr-slim-v1.2-source-contract`:
+
+- Added v1.2-only page specs:
+  - `fnguide-snapshot`
+  - `fnguide-shareanalysis`
+  - `fnguide-foreign-ownership-chart`
+- Added `getCrawlV12` / `crawlWiseReportKrV12` so v1.2 collects 13 pages while v1.1 remains the original 10-page contract.
+- Parsed:
+  - Snapshot `외국인 지분율`
+  - foreign ownership chart JSON `FRG_RT` history
+  - Snapshot `운용사별 보유 현황`
+  - Snapshot/shareanalysis shareholder category/detail/change rows
+- Updated `krFacts.investorFlow`:
+  - `foreignOwnershipPct`: present from FnGuide chart/Snapshot when available
+  - `foreignOwnershipHistory`: present from FnGuide 3M chart JSON
+  - `assetManagerHoldings`: partial
+  - `assetManagerOwnershipPctSum`: partial
+  - `institutionalOwnershipPct`: still missing with explicit aggregate-not-provided reason
+  - `*NetBuy`: still missing because WiseReport/FnGuide KR does not provide 개인/외국인/기관 순매수 split
+- Changed image request handling from abort to one-pixel fulfillment to avoid FnGuide `onerror` image retry storms.
+
+Live verification for `100840`:
+
+- v1.2 crawl completed 13/13 pages with zero warnings.
+- `fnguide-snapshot` produced `외국인 지분율 = 2.73`.
+- `fnguide-foreign-ownership-chart` produced 60 `FRG_RT` points, latest `2026-04-24 = 2.73`.
+- `krFacts.investorFlow.foreignOwnershipPct` became `present`; `institutionalOwnershipPct` remained explicitly missing as a true aggregate.

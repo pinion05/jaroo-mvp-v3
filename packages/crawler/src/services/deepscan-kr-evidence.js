@@ -241,6 +241,7 @@ function getRowLabel(row) {
   return normalizeLabel(
     row.항목
       ?? row.구분
+      ?? row.key
       ?? row.요인
       ?? row.label
       ?? row.항목명
@@ -254,7 +255,7 @@ function isLabelMatch(row, labelPatterns) {
 }
 
 function isLabelKey(key) {
-  return ['항목', '구분', '요인', '의견', '일자', 'TRD_DT', 'NM', 'label', '항목명', '상세기준', '분류'].includes(key);
+  return ['항목', '구분', 'key', '요인', '의견', '일자', 'TRD_DT', 'NM', 'label', '항목명', '상세기준', '분류'].includes(key);
 }
 
 function parsePeriodColumnKey(key) {
@@ -628,18 +629,115 @@ function extractStyleAnalysisSnapshot(stylePage) {
   };
 }
 
-function extractOwnershipSnapshot(shareholdingPage) {
+function extractForeignOwnershipHistory(foreignOwnershipChartPage) {
+  const chartRows = Array.isArray(foreignOwnershipChartPage?.chartJson?.CHART)
+    ? foreignOwnershipChartPage.chartJson.CHART
+    : [];
+
+  return chartRows
+    .map((row) => ({
+      date: normalizeDate(row?.TRD_DT),
+      foreignOwnershipPct: normalizePercent(row?.FRG_RT),
+      closePrice: normalizeNumber(row?.J_PRC),
+      marketCap: normalizeNumber(row?.MKT_CAP),
+    }))
+    .filter((row) => row.date && row.foreignOwnershipPct !== null)
+    .sort((left, right) => left.date.localeCompare(right.date));
+}
+
+function extractAssetManagerHoldings(snapshotPage) {
+  const rows = Array.isArray(snapshotPage?.assetManagerHoldings?.rows)
+    ? snapshotPage.assetManagerHoldings.rows
+    : [];
+
+  return rows
+    .map((row) => ({
+      name: normalizeText(row.운용사명 ?? row.name),
+      shares: normalizeNumber(row.보유수량 ?? row.shares),
+      marketValue: normalizeNumber(row.시가평가액 ?? row.marketValue),
+      listedSharePct: normalizePercent(row.상장주식수내비중 ?? row.listedSharePct),
+      managerPortfolioPct: normalizePercent(row.운용사내비중 ?? row.managerPortfolioPct),
+    }))
+    .filter((row) => row.name || row.shares !== null || row.listedSharePct !== null)
+    .slice(0, 10);
+}
+
+function extractFnguideShareholderDetails(shareAnalysisPage, snapshotPage) {
+  const jsonRows = Array.isArray(shareAnalysisPage?.shareholderDetailsJson?.comp)
+    ? shareAnalysisPage.shareholderDetailsJson.comp
+    : [];
+  const tableRows = Array.isArray(shareAnalysisPage?.shareholderDetails?.rows)
+    ? shareAnalysisPage.shareholderDetails.rows
+    : [];
+  const snapshotRows = Array.isArray(snapshotPage?.snapshotMajorShareholders?.rows)
+    ? snapshotPage.snapshotMajorShareholders.rows
+    : [];
+
+  return [...jsonRows, ...tableRows, ...snapshotRows]
+    .map((row) => ({
+      groupCode: normalizeText(row.SHER_GB_1),
+      groupName: normalizeText(row.SHER_TYPE_NM ?? row.주주구분 ?? row.항목),
+      representative: normalizeText(row.MAJ_SHER_NM ?? row.대표주주 ?? row.항목),
+      name: normalizeText(row.SHER_NM ?? row.주주명 ?? row.변동주주 ?? row.항목),
+      relationship: normalizeText(row.MAJ_REL_NM ?? row.관계),
+      shares: normalizeShareCount(row.COMM_STK_QTY ?? row.보통주),
+      pct: normalizePercent(row.SHER_RT ?? row.지분율),
+      groupShares: normalizeShareCount(row.COMM_STK_QTY_SUM),
+      groupPct: normalizePercent(row.SHER_RT_SUM),
+      lastChangeDate: normalizeDate(row.CHG_DT ?? row.MAX_CHG_DT ?? row.최종변동일),
+    }))
+    .filter((row) => row.name || row.representative || row.pct !== null || row.shares !== null);
+}
+
+function extractFnguideShareholderCategories(shareAnalysisPage, snapshotPage) {
+  const rows = [
+    ...(Array.isArray(shareAnalysisPage?.shareholderCategories?.rows) ? shareAnalysisPage.shareholderCategories.rows : []),
+    ...(Array.isArray(snapshotPage?.shareholderCategories?.rows) ? snapshotPage.shareholderCategories.rows : []),
+  ];
+
+  return rows
+    .map((row) => ({
+      category: normalizeText(row.주주구분 ?? row.NM),
+      representativeCount: normalizeNumber(row['대표 주주수'] ?? row.대표주주수),
+      shares: normalizeShareCount(row.보통주),
+      pct: normalizePercent(row.지분율 ?? row.STK_RT),
+      lastChangeDate: normalizeDate(row.최종변동일),
+    }))
+    .filter((row) => row.category || row.pct !== null || row.shares !== null)
+    .reduce((acc, row) => {
+      if (!acc.some((item) => item.category === row.category)) {
+        acc.push(row);
+      }
+      return acc;
+    }, []);
+}
+
+function extractOwnershipSnapshot(shareholdingPage, snapshotPage = null, shareAnalysisPage = null, foreignOwnershipChartPage = null) {
   const rows = collectRows(shareholdingPage);
+  const snapshotRows = collectRows(snapshotPage);
   const summaryRows = Array.isArray(shareholdingPage?.ownershipSummary?.rows) ? shareholdingPage.ownershipSummary.rows : [];
   const summaryValueRows = summaryRows.length > 0 ? summaryRows : rows;
   const majorHolderValue = findFirstKeyValue(summaryValueRows, [/최대주주.*보유지분/i]);
   const freeFloatShareValue = findFirstKeyValue(summaryValueRows, [/유동주식.*주식수/i]);
   const freeFloatPctValue = findFirstKeyValue(summaryValueRows, [/유동주식.*비율/i]);
   const fivePctHolderValue = findFirstKeyValue(summaryValueRows, [/5%이상주주.*보유지분/i]);
-  const foreignOwnershipPct = normalizePercent(findFirstKeyValue(rows, [/외국인.*(지분|보유|비율)/i]));
-  const institutionalOwnershipPct = normalizePercent(findFirstKeyValue(rows, [/(기관|연기금|투신|보험).*?(지분|보유|비율)/i]));
+  const foreignOwnershipHistory = extractForeignOwnershipHistory(foreignOwnershipChartPage);
+  const latestForeignOwnershipPoint = foreignOwnershipHistory.at(-1) ?? null;
+  const snapshotForeignOwnershipPct = normalizePercent(findNamedValue(snapshotRows, [/외국인.*지분율/i, /외국인지분율/i]));
+  const foreignOwnershipPct = pickFirst(
+    latestForeignOwnershipPoint?.foreignOwnershipPct ?? null,
+    snapshotForeignOwnershipPct,
+    normalizePercent(findFirstKeyValue(rows, [/외국인.*(지분|보유|비율)/i])),
+  );
+  const institutionalOwnershipPct = normalizePercent(findFirstKeyValue([...rows, ...snapshotRows], [/(기관|연기금|투신|보험).*?(지분|보유|비율)/i]));
   const majorShareholderRows = Array.isArray(shareholdingPage?.majorShareholders?.rows) ? shareholdingPage.majorShareholders.rows : [];
   const shareholderChangeRows = Array.isArray(shareholdingPage?.shareholderChanges?.rows) ? shareholdingPage.shareholderChanges.rows : [];
+  const fnguideShareholderDetails = extractFnguideShareholderDetails(shareAnalysisPage, snapshotPage);
+  const fnguideShareholderCategories = extractFnguideShareholderCategories(shareAnalysisPage, snapshotPage);
+  const assetManagerHoldings = extractAssetManagerHoldings(snapshotPage);
+  const assetManagerOwnershipPctSum = assetManagerHoldings.length > 0
+    ? Math.round(assetManagerHoldings.reduce((sum, row) => sum + (row.listedSharePct ?? 0), 0) * 100) / 100
+    : null;
   const majorShareholders = majorShareholderRows
     .map((row) => ({
       name: normalizeText(row.대표주주) ?? normalizeText(row.보고자) ?? normalizeText(row.주주명),
@@ -652,15 +750,34 @@ function extractOwnershipSnapshot(shareholdingPage) {
       changeReason: normalizeText(row.변동사유),
     }))
     .filter((entry) => entry.name || entry.reporter || entry.pct !== null || entry.shares !== null)
-    .slice(0, 5);
+    .concat(fnguideShareholderDetails
+      .map((row) => ({
+        name: row.representative ?? row.name,
+        reporter: row.name ?? row.representative,
+        shares: row.groupShares ?? row.shares,
+        pct: row.groupPct ?? row.pct,
+        lastTradeDate: row.lastChangeDate,
+        changeShares: null,
+        changePct: null,
+        changeReason: null,
+      }))
+      .filter((entry) => entry.name || entry.reporter || entry.pct !== null || entry.shares !== null))
+    .reduce((acc, entry) => {
+      const key = `${entry.name ?? ''}|${entry.reporter ?? ''}|${entry.pct ?? ''}`;
+      if (!acc.some((item) => `${item.name ?? ''}|${item.reporter ?? ''}|${item.pct ?? ''}` === key)) {
+        acc.push(entry);
+      }
+      return acc;
+    }, [])
+    .slice(0, 10);
 
   const institutionalNamePattern = /(국민연금|연기금|공무원연금|사학연금|자산운용|투자신탁|투신|보험|은행|캐피탈|증권|기관)/;
-  const knownInstitutionalMajorHolders = [...majorShareholderRows, ...shareholderChangeRows]
+  const knownInstitutionalMajorHolders = [...majorShareholderRows, ...shareholderChangeRows, ...fnguideShareholderDetails]
     .map((row) => ({
-      name: normalizeText(row.주주명) ?? normalizeText(row.보고자) ?? normalizeText(row.대표주주),
-      pct: normalizePercent(row['변동후 보유지분율(%)'] ?? row['보유지분 (%)']),
-      shares: normalizeShareCount(row['변동후 보유주식수'] ?? row.보유주식수),
-      lastTradeDate: normalizeDate(row.거래일 ?? row.최종거래일),
+      name: normalizeText(row.주주명) ?? normalizeText(row.보고자) ?? normalizeText(row.대표주주) ?? row.representative ?? row.name,
+      pct: normalizePercent(row['변동후 보유지분율(%)'] ?? row['보유지분 (%)']) ?? row.groupPct ?? row.pct,
+      shares: normalizeShareCount(row['변동후 보유주식수'] ?? row.보유주식수) ?? row.groupShares ?? row.shares,
+      lastTradeDate: normalizeDate(row.거래일 ?? row.최종거래일) ?? row.lastChangeDate,
       changePct: normalizePercent(row['지분 변동율(%)'] ?? row['변동지분 (%)']),
       changeReason: normalizeText(row.변동사유),
     }))
@@ -677,15 +794,15 @@ function extractOwnershipSnapshot(shareholdingPage) {
   if (foreignOwnershipPct === null) {
     sourceLimitations.push({
       fact: 'foreignOwnershipPct',
-      reasonCode: 'not_provided_by_wisereport_shareholding_dump',
-      message: 'WiseReport 지분 페이지 원본 덤프에 외국인 보유율 집계 필드가 없습니다.',
+      reasonCode: 'not_provided_by_wisereport_fnguide_dump',
+      message: 'WiseReport/FnGuide KR 원본 덤프에 외국인 보유율 집계 필드가 없습니다.',
     });
   }
   if (institutionalOwnershipPct === null) {
     sourceLimitations.push({
       fact: 'institutionalOwnershipPct',
-      reasonCode: 'aggregate_not_provided_by_wisereport_shareholding_dump',
-      message: 'WiseReport 지분 페이지 원본 덤프에는 기관 전체 보유율 집계가 없고 5% 이상 보유자/변동 내역만 있습니다.',
+      reasonCode: 'aggregate_not_provided_by_wisereport_fnguide_dump',
+      message: 'WiseReport/FnGuide KR 원본 덤프에는 기관 전체 보유율 aggregate가 없고 운용사별 보유/5% 이상 보유자/변동 내역만 있습니다.',
     });
   }
 
@@ -699,9 +816,14 @@ function extractOwnershipSnapshot(shareholdingPage) {
     freeFloatPct: normalizePercent(freeFloatPctValue),
     freeFloatShares: normalizeShareCount(freeFloatShareValue),
     foreignOwnershipPct,
+    foreignOwnershipAsOf: latestForeignOwnershipPoint?.date ?? null,
+    foreignOwnershipHistory,
     institutionalOwnershipPct,
     majorShareholders,
     knownInstitutionalMajorHolders,
+    assetManagerHoldings,
+    assetManagerOwnershipPctSum,
+    shareholderCategories: fnguideShareholderCategories,
     sourceLimitations,
     latestOwnershipChangeSummary: firstSummaryRow
       ? Object.entries(firstSummaryRow)
@@ -1093,7 +1215,12 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
   const valuationSnapshot = extractValuationSnapshot(slimPages['investment-indicators'], slimPages['fnguide-finance']);
   const relativeReturnSnapshot = extractRelativeReturnSnapshot(slimPages['relative-return']);
   const styleAnalysisSnapshot = extractStyleAnalysisSnapshot(slimPages['style-analysis']);
-  const ownershipSnapshot = extractOwnershipSnapshot(slimPages.shareholding);
+  const ownershipSnapshot = extractOwnershipSnapshot(
+    slimPages.shareholding,
+    slimPages['fnguide-snapshot'],
+    slimPages['fnguide-shareanalysis'],
+    slimPages['fnguide-foreign-ownership-chart'],
+  );
   const financialSnapshot = extractFinancialSnapshot(
     slimPages['financial-analysis'],
     slimPages['fnguide-finance'],
