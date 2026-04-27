@@ -124,7 +124,6 @@ function MergeResultRowCard({ row, isLast }: { row: MergeRow; isLast: boolean })
       <div className='flex items-start justify-between gap-3'>
         <div className='min-w-0'>
           <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.displayName || '-'}</p>
-          {row.sourceFileName ? <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.sourceFileName}</p> : null}
           {resolvedMeta ? <p className='mt-1 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{resolvedMeta}</p> : null}
         </div>
         <p className='shrink-0 text-[11px] font-medium text-[color:var(--jaroo-primary)]'>{row.profitRateText || '-'}</p>
