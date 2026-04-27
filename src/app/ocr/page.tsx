@@ -3,7 +3,7 @@
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, ArrowRight, Check, ChevronDown, LoaderCircle, RefreshCcw, ScanSearch, Trash2 } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Check, ChevronDown, LoaderCircle, RefreshCcw, ScanSearch } from 'lucide-react'
 import { OcrConflictMergeCard } from '@/components/ocr-conflict-merge-card'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -73,10 +73,24 @@ const uploadStateLabel: Record<UploadRequestState, string> = {
 
 function OcrMetricChip({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
   return (
-    <div className='rounded-[14px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
+    <div className='min-w-0 rounded-[14px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
       <p className='text-[10px] text-[color:var(--jaroo-muted)]'>{label}</p>
       <p className={cn('mt-1 truncate text-[12px] font-semibold text-[color:var(--jaroo-ink)]', valueClassName)}>{value || '-'}</p>
     </div>
+  )
+}
+
+function OcrRemoveChip({ label, onRemove }: { label: string; onRemove: () => void }) {
+  return (
+    <button
+      type='button'
+      onClick={onRemove}
+      aria-label={label}
+      className='group col-span-2 min-w-0 rounded-[14px] bg-[#FFF7F7] px-3 py-2 text-left transition hover:bg-[#FFF0F0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5B8B8]/60'
+    >
+      <p className='text-[10px] text-[#B78585]'>항목 관리</p>
+      <p className='mt-1 truncate text-[12px] font-semibold text-[#A96A6A] transition group-hover:text-[#C13030]'>이 항목 제거</p>
+    </button>
   )
 }
 
@@ -288,26 +302,24 @@ function OcrResolvedRowCard({
   const needsManualConfirmation = row.resolutionState === 'manual-required'
 
   return (
-    <div className={cn(!isLast && 'border-b border-[color:var(--jaroo-border)]')}>
-      <div className='flex items-start gap-2 px-4 py-3'>
+    <div className={cn('min-w-0', !isLast && 'border-b border-[color:var(--jaroo-border)]')}>
+      <div className='min-w-0 px-4 py-3'>
         <button
           type='button'
           onClick={hasCandidatePicker ? onToggleExpand : undefined}
           className={cn(
-            'flex-1 text-left',
+            'min-w-0 w-full text-left',
             hasCandidatePicker ? 'transition hover:bg-[color:var(--jaroo-secondary)]' : 'cursor-default'
           )}
         >
-          <div className='flex items-start justify-between gap-3'>
+          <div className='min-w-0'>
             <div className='min-w-0'>
               <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.name || '-'}</p>
-              <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{row.sourceFileName}</p>
             </div>
-            <p className='shrink-0 text-[11px] font-medium text-[color:var(--jaroo-primary)]'>{row.profitRate || '-'}</p>
           </div>
 
-          <div className='mt-3 rounded-[14px] border border-[#DCE8F5] bg-[#F7FBFF] px-3 py-2'>
-            <div className='flex items-start justify-between gap-3'>
+          <div className='mt-3 min-w-0 rounded-[14px] border border-[#DCE8F5] bg-[#F7FBFF] px-3 py-2'>
+            <div className='flex min-w-0 items-start justify-between gap-3'>
               <div className='min-w-0'>
                 <p className='text-[10px] text-[color:var(--jaroo-muted)]'>식별된 종목</p>
                 {identifierName || identifierMeta ? (
@@ -329,23 +341,15 @@ function OcrResolvedRowCard({
               ) : null}
             </div>
           </div>
-
-          <div className='mt-3 grid grid-cols-2 gap-2'>
-            <OcrMetricChip label='보유 수량' value={row.quantity} />
-            <OcrMetricChip label='평가 금액' value={row.evaluationAmount} />
-            <OcrMetricChip label='평균 단가' value={row.averagePrice} />
-            <OcrMetricChip label='수익률' value={row.profitRate} valueClassName='text-[color:var(--jaroo-primary)]' />
-          </div>
         </button>
 
-        <button
-          type='button'
-          onClick={onRemoveRow}
-          className='mt-0.5 inline-flex shrink-0 items-center gap-1 rounded-full border border-[color:var(--jaroo-border)] bg-white px-2.5 py-1.5 text-[10px] font-semibold text-[color:var(--jaroo-muted)] transition hover:border-[#F5B8B8] hover:bg-[#FFF3F3] hover:text-[#C13030]'
-        >
-          <Trash2 className='size-3.5' />
-          제거
-        </button>
+        <div className='mt-3 grid min-w-0 grid-cols-2 gap-2'>
+          <OcrMetricChip label='보유 수량' value={row.quantity} />
+          <OcrMetricChip label='평가 금액' value={row.evaluationAmount} />
+          <OcrMetricChip label='평균 단가' value={row.averagePrice} />
+          <OcrMetricChip label='수익률' value={row.profitRate} valueClassName='text-[color:var(--jaroo-primary)]' />
+          <OcrRemoveChip label={`${row.name || '항목'} 제거`} onRemove={onRemoveRow} />
+        </div>
       </div>
 
       {hasCandidatePicker && isExpanded ? (
