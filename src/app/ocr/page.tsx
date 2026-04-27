@@ -71,6 +71,20 @@ const uploadStateLabel: Record<UploadRequestState, string> = {
   error: '실패',
 }
 
+const MIN_IDENTIFIER_SEARCH_RING_MS = 900
+
+function waitForMinimumIdentifierSearchRing(startedAt: number) {
+  const remainingMs = MIN_IDENTIFIER_SEARCH_RING_MS - (Date.now() - startedAt)
+
+  if (remainingMs <= 0) {
+    return Promise.resolve()
+  }
+
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, remainingMs)
+  })
+}
+
 function OcrMetricChip({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
   return (
     <div className='min-w-0 rounded-[14px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
@@ -297,6 +311,7 @@ function OcrResolvedRowCard({
       : identifierStatus === 'error'
         ? '식별자 확인 실패'
         : '식별자 미확인'
+  const isIdentifierSearching = identifierStatus === 'loading' && !identifierName && !identifierMeta
   const hasCandidatePicker = candidates.length > 1
   const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId)
   const needsManualConfirmation = row.resolutionState === 'manual-required'
@@ -331,7 +346,16 @@ function OcrResolvedRowCard({
                   <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>{identifierStatusText}</p>
                 )}
               </div>
-              {hasCandidatePicker ? (
+              {isIdentifierSearching ? (
+                <div
+                  role='status'
+                  aria-label='식별자 검색 중'
+                  className='flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[color:var(--jaroo-primary)] shadow-[0_4px_12px_rgba(75,157,245,0.12)]'
+                >
+                  <LoaderCircle className='size-3 animate-spin' strokeWidth={2.5} />
+                  <span>검색 중</span>
+                </div>
+              ) : hasCandidatePicker ? (
                 <div className='flex shrink-0 items-center gap-2 pl-2'>
                   <span className='rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[color:var(--jaroo-primary)]'>
                     {selectedCandidate ? '후보 적용됨' : `후보 ${candidates.length}개`}
@@ -523,9 +547,9 @@ export default function OcrPage() {
   }, [session, setRequestStatus, setResolveStatus])
 
   const runOcrBatch = useCallback(async (currentSession: ScreenshotUploadSession) => {
+    resetReviewState()
     setRequestStatus('loading')
     setResolveStatus('idle')
-    resetReviewState()
     setBaseMergedRows([])
     setExpandedRowId(null)
     setConflicts([])
@@ -706,9 +730,12 @@ export default function OcrPage() {
     }
 
     setResolveStatus('loading')
+    const resolveStartedAt = Date.now()
 
     void resolveInstrumentRows(unresolvedRows)
-      .then((result) => {
+      .then(async (result) => {
+        await waitForMinimumIdentifierSearchRing(resolveStartedAt)
+
         if (isCancelled) {
           return
         }
@@ -741,7 +768,9 @@ export default function OcrPage() {
         })
         setResolveStatus('success')
       })
-      .catch((error) => {
+      .catch(async (error) => {
+        await waitForMinimumIdentifierSearchRing(resolveStartedAt)
+
         if (isCancelled) {
           return
         }
@@ -772,6 +801,19 @@ export default function OcrPage() {
     () => session?.uploads.filter((upload) => uploadStatuses[upload.id]?.state === 'success').length ?? 0,
     [session?.uploads, uploadStatuses],
   )
+  const processedUploadCount = useMemo(
+    () => session?.uploads.filter((upload) => {
+      const uploadState = uploadStatuses[upload.id]?.state
+      return uploadState === 'success' || uploadState === 'error'
+    }).length ?? 0,
+    [session?.uploads, uploadStatuses],
+  )
+  const uploadProgressPercent = session?.uploads.length
+    ? Math.round((processedUploadCount / session.uploads.length) * 100)
+    : 0
+  const visibleUploadProgressPercent = requestState === 'loading'
+    ? Math.max(12, uploadProgressPercent)
+    : uploadProgressPercent
 
   const unresolvedConflictCount = useMemo(
     () => visibleConflicts.filter((conflict) => !conflictSelections[conflict.key]).length,
@@ -858,6 +900,10 @@ export default function OcrPage() {
     router.push('/merge')
   }
 
+  const isIdentifierResolving = requestState === 'success' && instrumentResolveState === 'loading'
+  const progressState = isIdentifierResolving ? 'loading' : requestState
+  const progressStatusLabel = isIdentifierResolving ? '식별 중' : statusLabel[requestState]
+
   return (
     <JarooShell title='종목 확인' backHref='/screenshot' showBottomNav={false} mainClassName='space-y-3'>
       <p className='text-[11px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>인식된 종목을 확인한 뒤 다음 단계로 진행하세요</p>
@@ -885,15 +931,15 @@ export default function OcrPage() {
               <div
                 className={cn(
                   'flex size-[18px] items-center justify-center rounded-full',
-                  requestState === 'success' && 'bg-[color:var(--jaroo-success-soft)] text-[color:var(--jaroo-success)]',
-                  requestState === 'loading' && 'bg-[color:var(--jaroo-accent)] text-[color:var(--jaroo-primary)]',
-                  requestState === 'error' && 'bg-[color:var(--jaroo-warning-soft)] text-[#854F0B]',
-                  requestState === 'idle' && 'bg-[color:var(--jaroo-secondary)] text-[color:var(--jaroo-muted)]',
+                  progressState === 'success' && 'bg-[color:var(--jaroo-success-soft)] text-[color:var(--jaroo-success)]',
+                  progressState === 'loading' && 'bg-[color:var(--jaroo-accent)] text-[color:var(--jaroo-primary)]',
+                  progressState === 'error' && 'bg-[color:var(--jaroo-warning-soft)] text-[#854F0B]',
+                  progressState === 'idle' && 'bg-[color:var(--jaroo-secondary)] text-[color:var(--jaroo-muted)]',
                 )}
               >
-                {requestState === 'loading' ? (
+                {progressState === 'loading' ? (
                   <LoaderCircle className='size-3 animate-spin' strokeWidth={2.5} />
-                ) : requestState === 'error' ? (
+                ) : progressState === 'error' ? (
                   <AlertTriangle className='size-3' strokeWidth={2.5} />
                 ) : (
                   <Check className='size-3' strokeWidth={2.5} />
@@ -904,15 +950,39 @@ export default function OcrPage() {
             <p
               className={cn(
                 'shrink-0 text-[11px] font-medium',
-                requestState === 'success' && 'text-[color:var(--jaroo-success)]',
-                requestState === 'loading' && 'text-[color:var(--jaroo-primary)]',
-                requestState === 'error' && 'text-[#854F0B]',
-                requestState === 'idle' && 'text-[color:var(--jaroo-muted)]',
+                progressState === 'success' && 'text-[color:var(--jaroo-success)]',
+                progressState === 'loading' && 'text-[color:var(--jaroo-primary)]',
+                progressState === 'error' && 'text-[#854F0B]',
+                progressState === 'idle' && 'text-[color:var(--jaroo-muted)]',
               )}
             >
-              {statusLabel[requestState]}
+              {progressStatusLabel}
             </p>
           </div>
+
+          {requestState === 'loading' ? (
+            <div className='border-t border-[color:var(--jaroo-border)] bg-white px-4 py-3'>
+              <div className='mb-2 flex items-center justify-between gap-3'>
+                <p className='text-[11px] font-medium text-[color:var(--jaroo-primary)]'>OCR 진행률</p>
+                <p className='text-[10px] font-semibold text-[color:var(--jaroo-muted)]'>
+                  {processedUploadCount}/{session.uploads.length}장
+                </p>
+              </div>
+              <div
+                role='progressbar'
+                aria-label='OCR 분석 진행률'
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={uploadProgressPercent}
+                className='h-2 overflow-hidden rounded-full bg-[color:var(--jaroo-accent)]'
+              >
+                <div
+                  className='h-full rounded-full bg-[color:var(--jaroo-primary)] transition-[width] duration-300 ease-out'
+                  style={{ width: `${visibleUploadProgressPercent}%` }}
+                />
+              </div>
+            </div>
+          ) : null}
         </Card>
       ) : null}
 
@@ -992,12 +1062,38 @@ export default function OcrPage() {
           <p className='text-[11px] font-medium text-[color:var(--jaroo-muted)]'>종목명과 식별자(name/ticker/code/market), 보유 수량, 수익률, 평가 금액, 평균 단가를 함께 확인하세요. 후보가 여러 개인 카드만 추천 후보를 펼칠 수 있어요.</p>
         </div>
 
+        {isIdentifierResolving ? (
+          <div
+            role='status'
+            aria-label='식별자 검색 중'
+            className='flex items-center gap-2 border-b border-[#DCE8F5] bg-[#F7FBFF] px-4 py-3 text-[12px] font-medium text-[color:var(--jaroo-primary)]'
+          >
+            <LoaderCircle className='size-4 shrink-0 animate-spin' strokeWidth={2.5} />
+            <span className='min-w-0 truncate'>종목 식별자를 검색하고 있어요</span>
+          </div>
+        ) : null}
+
         {requestState === 'loading' ? (
           <div className='flex flex-col items-center justify-center gap-3 px-4 py-10 text-center'>
             <LoaderCircle className='size-5 animate-spin text-[color:var(--jaroo-primary)]' />
             <div>
               <p className='text-[13px] font-medium text-[color:var(--jaroo-ink)]'>OCR 분석 중</p>
               <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>여러 스크린샷에서 종목명, 보유 수량, 수익률, 평가 금액을 순서대로 추출하고 있어요.</p>
+            </div>
+            <div className='w-full max-w-[220px]'>
+              <div
+                role='progressbar'
+                aria-label='OCR 분석 진행률'
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={uploadProgressPercent}
+                className='h-2 overflow-hidden rounded-full bg-[color:var(--jaroo-accent)]'
+              >
+                <div
+                  className='h-full rounded-full bg-[color:var(--jaroo-primary)] transition-[width] duration-300 ease-out'
+                  style={{ width: `${visibleUploadProgressPercent}%` }}
+                />
+              </div>
             </div>
           </div>
         ) : null}
