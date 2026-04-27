@@ -3,9 +3,16 @@ import assert from 'node:assert/strict'
 
 import { resolveDeepScanSlimUpstreamPath } from './route'
 
-test('deepscan slim proxy는 KR market이면 kr slim path를 반환한다', () => {
+test('deepscan slim proxy는 KR market이면 기본으로 kr slim v1.2 path를 반환한다', () => {
   assert.equal(
     resolveDeepScanSlimUpstreamPath(new URLSearchParams('market=KR&code=005930')),
+    '/api/major/wisereport-fnguide/kr/companies/005930/slim/v1.2',
+  )
+})
+
+test('deepscan slim proxy는 KR version=v1.1이면 kr slim v1.1 path를 반환한다', () => {
+  assert.equal(
+    resolveDeepScanSlimUpstreamPath(new URLSearchParams('market=KR&code=005930&version=v1.1')),
     '/api/major/wisereport-fnguide/kr/companies/005930/slim/v1.1',
   )
 })

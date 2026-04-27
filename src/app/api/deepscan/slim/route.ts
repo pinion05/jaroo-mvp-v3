@@ -9,7 +9,7 @@ export function resolveDeepScanSlimUpstreamPath(searchParams: URLSearchParams) {
   const version = searchParams.get('version')?.trim().toLowerCase()
 
   if (market === 'KR' && code) {
-    const krVersion = version === 'v1.2' || version === '1.2' ? 'v1.2' : 'v1.1'
+    const krVersion = version === 'v1.1' || version === '1.1' ? 'v1.1' : 'v1.2'
     return `/api/major/wisereport-fnguide/kr/companies/${encodeURIComponent(code)}/slim/${krVersion}`
   }
 
