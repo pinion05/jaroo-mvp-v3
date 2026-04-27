@@ -163,11 +163,14 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
     relativeReturnAvailable: true,
     styleAnalysisAvailable: true,
     recentReportCount: 2,
+    recent30dReportCount: null,
   });
   assert.deepEqual(packet.consensusSnapshot, {
     targetPrice: 100000,
+    previousTargetPrice: null,
     targetGapPct: ((100000 - 85200) / 85200) * 100,
     recommendation: 'BUY',
+    recommendationScore: null,
     recommendationCounts: null,
     revisionDirection: 'unknown',
     revisionPct: null,
@@ -263,6 +266,7 @@ test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a dire
     relativeReturnAvailable: false,
     styleAnalysisAvailable: false,
     recentReportCount: null,
+    recent30dReportCount: null,
   });
   assert.equal(packet.packageContext.available, false);
   assert.deepEqual(packet.packageContext.summaryFacts, []);
@@ -275,6 +279,217 @@ test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a dire
     'sell-now 입력 불완전',
     'KR 리포트 페이지 근거 없음',
   ]);
+});
+
+test('buildDeepScanKrEvidencePacket promotes KR WiseReport raw facts into structured snapshots instead of losing them behind global-shaped fields', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  const packet = buildDeepScanKrEvidencePacket(
+    {
+      instrument: {
+        code: '100840',
+        name: 'SNT에너지',
+        market: 'KR',
+      },
+      holding: {
+        shares: '32',
+        averagePrice: '49,256.7334',
+      },
+      selectedAt: '2026-04-27T00:00:00.000Z',
+    },
+    {
+      quotes: {
+        items: [{
+          market: 'KR',
+          code: '100840',
+          price: 57100,
+          currency: 'KRW',
+          asOf: '2026-04-27',
+          source: 'krx',
+          status: 'ok',
+        }],
+      },
+      slim: {
+        code: '100840',
+        company: {
+          code: '100840',
+          name: 'SNT에너지',
+        },
+        pages: {
+          opinion: {
+            analystOpinions: {
+              rows: [{
+                추정기관: 'Consensus',
+                적정주가: '66,000',
+                '적정주가(직전 적정주가)': '60,000',
+                '적정주가(증감율)': '10.00',
+                투자의견: '4.00',
+              }],
+            },
+          },
+          'financial-analysis': {
+            financialStatements: {
+              rows: [
+                {
+                  항목: '펼치기 매출액(수익)',
+                  '2024/12 (IFRS연결)': '2,942.6',
+                  '2025/12 (IFRS연결) 연간컨센서스보기': '6,061.2',
+                  '2026/12(E) (IFRS연결) 연간컨센서스닫기': '6,318.0',
+                },
+                {
+                  항목: '펼치기 영업이익',
+                  '2024/12 (IFRS연결)': '222.4',
+                  '2025/12 (IFRS연결) 연간컨센서스보기': '1,113.1',
+                  '2026/12(E) (IFRS연결) 연간컨센서스닫기': '1,247.8',
+                },
+                {
+                  항목: '펼치기 당기순이익',
+                  '2024/12 (IFRS연결)': '346.4',
+                  '2025/12 (IFRS연결) 연간컨센서스보기': '843.7',
+                  '2026/12(E) (IFRS연결) 연간컨센서스닫기': '1,006.5',
+                },
+              ],
+            },
+          },
+          'investment-indicators': {
+            metrics: {
+              0: {
+                rows: [
+                  {
+                    항목: '펼치기영업이익률',
+                    '2025/12 (IFRS연결) 연간컨센서스보기': '18.37',
+                    '2026/12(E) (IFRS연결) 연간컨센서스닫기': '19.75',
+                  },
+                  {
+                    항목: '펼치기순이익률',
+                    '2025/12 (IFRS연결) 연간컨센서스보기': '13.92',
+                    '2026/12(E) (IFRS연결) 연간컨센서스닫기': '15.93',
+                  },
+                  {
+                    항목: '펼치기ROE',
+                    '2025/12 (IFRS연결) 연간컨센서스보기': '25.15',
+                    '2026/12(E) (IFRS연결) 연간컨센서스닫기': '24.85',
+                  },
+                  {
+                    항목: '펼치기PER',
+                    '2025/12 (IFRS연결) 연간컨센서스보기': '8.97',
+                    '2026/12(E) (IFRS연결) 연간컨센서스닫기': '11.84',
+                  },
+                  {
+                    항목: '펼치기PBR',
+                    '2025/12 (IFRS연결) 연간컨센서스보기': '1.98',
+                    '2026/12(E) (IFRS연결) 연간컨센서스닫기': '2.56',
+                  },
+                  {
+                    항목: '펼치기EV/EBITDA',
+                    '2025/12 (IFRS연결) 연간컨센서스보기': '5.51',
+                    '2026/12(E) (IFRS연결) 연간컨센서스닫기': '8.10',
+                  },
+                ],
+              },
+            },
+          },
+          shareholding: {
+            ownershipSummary: {
+              rows: [{
+                '최대주주(보유지분)': '10,820,079주 (52.32%)',
+                '5%이상주주(보유지분)': '1,071,914주 (5.18%)',
+                '유동주식(유동주식수)': '8,941,029주',
+                '유동주식(유동주식비율)': '43.23%',
+              }],
+            },
+            majorShareholders: {
+              rows: [{
+                대표주주: 'SNT홀딩스',
+                보고자: 'SNT홀딩스',
+                보유주식수: '9,920,079',
+                '보유지분 (%)': '47.97',
+                최종거래일: '26/04/06',
+                변동주식수: '-96,829',
+                '변동지분 (%)': '-0.47',
+                변동사유: '교환(-)',
+              }],
+            },
+            shareholderChanges: {
+              rows: [{
+                거래일: '26/03/30',
+                주주명: '국민연금공단',
+                '지분 변동율(%)': '5.18',
+                '변동후 보유지분율(%)': '5.18',
+                '변동후 보유주식수': '1,071,914',
+                변동사유: '기타(+)',
+              }],
+            },
+          },
+          'style-analysis': {
+            factorScores: {
+              CHART_H: [
+                { ID: 'VAL1', NAME: 'SNT에너지' },
+                { ID: 'VAL2', NAME: '에너지(업종)' },
+              ],
+              CHART_D: [
+                { NM: '베타', VAL1: '-0.23', VAL2: '-0.89' },
+                { NM: '배당성', VAL1: '0.82', VAL2: '-0.37' },
+                { NM: '기업규모', VAL1: '-2.31', VAL2: '-2.20' },
+              ],
+            },
+          },
+          'recent-reports': {
+            recentReports: {
+              rows: [
+                { 일자: '26/04/14', 제목: '상반기 흐린 뒤 하반기 맑음' },
+                { 일자: '26/04/06', 제목: '미국 수주 확대로 밸류에이션 리레이팅 될 듯' },
+                { 일자: '26/04/03', 제목: '흐린 뒤 맑음' },
+                { 일자: '26/04/02', 제목: '견조한 업황 대비 매력적인 밸류에이션' },
+                { 일자: '26/03/20', 제목: 'LNG 생산자, LNG 발전사 모두가 수요처' },
+              ],
+            },
+          },
+        },
+      },
+    },
+  );
+
+  assert.equal(packet.consensusSnapshot.targetPrice, 66000);
+  assert.equal(packet.consensusSnapshot.previousTargetPrice, 60000);
+  assert.equal(packet.consensusSnapshot.revisionPct, 10);
+  assert.equal(packet.consensusSnapshot.revisionDirection, 'up');
+  assert.equal(Math.round(packet.consensusSnapshot.targetGapPct * 100) / 100, 15.59);
+  assert.equal(packet.financialSnapshot.revenueLatest, 6318);
+  assert.equal(packet.financialSnapshot.revenuePrev, 6061.2);
+  assert.equal(Math.round(packet.financialSnapshot.revenueYoY * 100) / 100, 4.24);
+  assert.equal(packet.financialSnapshot.operatingMarginLatest, 19.75);
+  assert.equal(packet.financialSnapshot.netMarginLatest, 15.93);
+  assert.deepEqual(packet.valuationSnapshot, {
+    per: 11.84,
+    pbr: 2.56,
+    roe: 24.85,
+    evEbitda: 8.1,
+  });
+  assert.equal(packet.ownershipSnapshot.majorHolderPct, 52.32);
+  assert.equal(packet.ownershipSnapshot.majorHolderShares, 10820079);
+  assert.equal(packet.ownershipSnapshot.freeFloatPct, 43.23);
+  assert.equal(packet.ownershipSnapshot.freeFloatShares, 8941029);
+  assert.equal(packet.ownershipSnapshot.foreignOwnershipPct, null);
+  assert.equal(packet.ownershipSnapshot.institutionalOwnershipPct, null);
+  assert.deepEqual(packet.ownershipSnapshot.knownInstitutionalMajorHolders[0], {
+    name: '국민연금공단',
+    pct: 5.18,
+    shares: 1071914,
+    lastTradeDate: '2026-03-30',
+    changePct: 5.18,
+    changeReason: '기타(+)',
+  });
+  assert.deepEqual(packet.styleAnalysisSnapshot.factorScores[0], {
+    name: '베타',
+    value: -0.23,
+    peerValue: -0.89,
+  });
+  assert.equal(packet.styleAnalysisSnapshot.factorScores.length, 3);
+  assert.equal(packet.reportSignals.recentReportCount, 5);
+  assert.equal(packet.reportSignals.recent30dReportCount, 4);
+  assert.equal(packet.sourceLimitations.some((limitation) => limitation.fact === 'foreignOwnershipPct'), true);
+  assert.equal(packet.sourceLimitations.some((limitation) => limitation.fact === 'institutionalOwnershipPct'), true);
 });
 
 test('buildDeepScanKrEvidencePacket ignores unknown slim page keys, counts recent reports from row-like payloads, and reports missing quote/holding sources deterministically', async () => {
@@ -335,6 +550,7 @@ test('buildDeepScanKrEvidencePacket ignores unknown slim page keys, counts recen
     relativeReturnAvailable: false,
     styleAnalysisAvailable: false,
     recentReportCount: 1,
+    recent30dReportCount: null,
   });
   assert.deepEqual(packet.missingSources, ['current-quote', 'holding']);
   assert.deepEqual(packet.topFacts, [

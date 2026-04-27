@@ -74,6 +74,51 @@ function normalizeText(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
+}
+
+function hasFactEvidence(value) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value);
+  }
+
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((entry) => hasFactEvidence(entry));
+  }
+
+  if (typeof value === 'object') {
+    return Object.values(value).some((entry) => hasFactEvidence(entry));
+  }
+
+  return Boolean(value);
+}
+
+function hasMissingLeaf(value) {
+  if (value === null || value === undefined) {
+    return true;
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((entry) => hasMissingLeaf(entry));
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.values(value).some((entry) => hasMissingLeaf(entry));
+  }
+
+  return false;
+}
+
 function ensureLogDir(root) {
   mkdirSync(root, { recursive: true });
 }
@@ -102,6 +147,20 @@ function presentValue(value, reasonCode = [], notes) {
   };
 }
 
+function snapshotValue(value, reasonCode = [], notes) {
+  const hasEvidence = hasFactEvidence(value);
+  const availability = hasEvidence ? (hasMissingLeaf(value) ? 'partial' : 'present') : 'missing';
+  return {
+    value: hasEvidence ? value : null,
+    quality: createQuality(availability, reasonCode, {
+      derivationKind: 'normalized',
+      inputOrigin: 'wisereport-kr-slim',
+      ...(availability === 'missing' ? { severity: 'medium', actionability: 'caution' } : {}),
+    }),
+    ...(notes ? { notes } : {}),
+  };
+}
+
 function missingFact(message, reasonCode = ['missing_fact']) {
   return {
     value: null,
@@ -119,8 +178,153 @@ function optionalFact(value, reasonCode, missingMessage) {
     : presentValue(value, reasonCode);
 }
 
+function buildKrFactBank(evidence) {
+  const sourceLimitations = Array.isArray(evidence.sourceLimitations) ? evidence.sourceLimitations : [];
+  return {
+    schemaVersion: 'jaroo.deepscan.kr-fact-bank.v2',
+    locale: 'KR',
+    sourceFlavor: 'wisereport-fnguide-krx',
+    instrument: snapshotValue(evidence.instrument ?? {}, ['instrument']),
+    quote: evidence.currentQuote
+      ? snapshotValue(evidence.currentQuote, ['current_quote'])
+      : missingFact('KR 현재가 원본이 없습니다.', ['current_quote_missing']),
+    holding: snapshotValue(evidence.holding ?? {}, ['holding_context']),
+    analystConsensus: snapshotValue({
+      targetPrice: evidence.consensusSnapshot?.targetPrice ?? null,
+      previousTargetPrice: evidence.consensusSnapshot?.previousTargetPrice ?? null,
+      targetGapPct: evidence.consensusSnapshot?.targetGapPct ?? null,
+      recommendation: evidence.consensusSnapshot?.recommendation ?? null,
+      recommendationScore: evidence.consensusSnapshot?.recommendationScore ?? null,
+      revisionDirection: evidence.consensusSnapshot?.revisionDirection ?? null,
+      revisionPct: evidence.consensusSnapshot?.revisionPct ?? null,
+    }, ['opinion_analyst_consensus']),
+    profitability: snapshotValue({
+      revenueLatest: evidence.financialSnapshot?.revenueLatest ?? null,
+      revenuePrev: evidence.financialSnapshot?.revenuePrev ?? null,
+      revenueYoY: evidence.financialSnapshot?.revenueYoY ?? null,
+      operatingIncomeLatest: evidence.financialSnapshot?.operatingIncomeLatest ?? null,
+      operatingIncomePrev: evidence.financialSnapshot?.operatingIncomePrev ?? null,
+      operatingIncomeYoY: evidence.financialSnapshot?.operatingIncomeYoY ?? null,
+      netIncomeLatest: evidence.financialSnapshot?.netIncomeLatest ?? null,
+      netIncomePrev: evidence.financialSnapshot?.netIncomePrev ?? null,
+      netIncomeYoY: evidence.financialSnapshot?.netIncomeYoY ?? null,
+      operatingMarginLatest: evidence.financialSnapshot?.operatingMarginLatest ?? null,
+      netMarginLatest: evidence.financialSnapshot?.netMarginLatest ?? null,
+      roe: evidence.valuationSnapshot?.roe ?? null,
+    }, ['kr_profitability']),
+    valuation: snapshotValue({
+      per: evidence.valuationSnapshot?.per ?? null,
+      pbr: evidence.valuationSnapshot?.pbr ?? null,
+      roe: evidence.valuationSnapshot?.roe ?? null,
+      evEbitda: evidence.valuationSnapshot?.evEbitda ?? null,
+      targetPrice: evidence.consensusSnapshot?.targetPrice ?? null,
+      targetGapPct: evidence.consensusSnapshot?.targetGapPct ?? null,
+    }, ['kr_valuation']),
+    ownership: snapshotValue(evidence.ownershipSnapshot ?? {}, ['kr_ownership']),
+    styleFactors: snapshotValue(evidence.styleAnalysisSnapshot ?? {}, ['kr_style_factors']),
+    reports: snapshotValue({
+      recentReportCount: evidence.reportSignals?.recentReportCount ?? null,
+      recent30dReportCount: evidence.reportSignals?.recent30dReportCount ?? null,
+      consensusAvailable: evidence.reportSignals?.consensusAvailable ?? false,
+      opinionAvailable: evidence.reportSignals?.opinionAvailable ?? false,
+    }, ['kr_reports']),
+    limitations: presentValue(sourceLimitations, ['source_limitations'], ['Source-specific missing facts must be stated as unavailable from WiseReport, not as analysis failure.']),
+  };
+}
+
+function buildMemberKrFacts(memberKey, evidence) {
+  const base = {
+    schemaVersion: 'jaroo.deepscan.kr-member-slice.v2',
+    locale: 'KR',
+    sourceFlavor: 'wisereport-fnguide-krx',
+    sourceLimitations: Array.isArray(evidence.sourceLimitations) ? evidence.sourceLimitations : [],
+  };
+
+  switch (memberKey) {
+    case 'profitability':
+      return {
+        ...base,
+        profitability: evidence.financialSnapshot ?? {},
+        valuationCrossChecks: {
+          roe: evidence.valuationSnapshot?.roe ?? null,
+          operatingMarginLatest: evidence.financialSnapshot?.operatingMarginLatest ?? null,
+          netMarginLatest: evidence.financialSnapshot?.netMarginLatest ?? null,
+        },
+        reports: {
+          recentReportCount: evidence.reportSignals?.recentReportCount ?? null,
+          recent30dReportCount: evidence.reportSignals?.recent30dReportCount ?? null,
+        },
+      };
+    case 'valuation':
+      return {
+        ...base,
+        market: evidence.marketSnapshot ?? {},
+        consensus: evidence.consensusSnapshot ?? {},
+        valuation: evidence.valuationSnapshot ?? {},
+      };
+    case 'ownershipStability':
+      return {
+        ...base,
+        ownership: evidence.ownershipSnapshot ?? {},
+        styleFactors: evidence.styleAnalysisSnapshot ?? {},
+        pageCoverage: evidence.pageCoverage ?? {},
+      };
+    case 'trend':
+      return {
+        ...base,
+        market: evidence.marketSnapshot ?? {},
+        relativeReturn: evidence.relativeReturnSnapshot ?? {},
+        styleFactors: evidence.styleAnalysisSnapshot ?? {},
+        reports: evidence.reportSignals ?? {},
+      };
+    case 'consensusMomentum':
+      return {
+        ...base,
+        consensus: evidence.consensusSnapshot ?? {},
+        reports: evidence.reportSignals ?? {},
+      };
+    case 'priceLocation':
+      return {
+        ...base,
+        market: evidence.marketSnapshot ?? {},
+        consensus: {
+          targetPrice: evidence.consensusSnapshot?.targetPrice ?? null,
+          targetGapPct: evidence.consensusSnapshot?.targetGapPct ?? null,
+        },
+        relativeReturn: evidence.relativeReturnSnapshot ?? {},
+      };
+    case 'avgPriceGap':
+      return {
+        ...base,
+        holding: evidence.holding ?? {},
+        market: evidence.marketSnapshot ?? {},
+      };
+    case 'upsideBuffer':
+      return {
+        ...base,
+        market: evidence.marketSnapshot ?? {},
+        consensus: evidence.consensusSnapshot ?? {},
+        valuation: evidence.valuationSnapshot ?? {},
+        reports: evidence.reportSignals ?? {},
+      };
+    case 'holdingCompleteness':
+      return {
+        ...base,
+        holding: evidence.holding ?? {},
+        quote: evidence.currentQuote ?? null,
+        timestamps: evidence.timestamps ?? {},
+        pageCoverage: evidence.pageCoverage ?? {},
+      };
+    default:
+      return base;
+  }
+}
+
 function buildSharedDump(input, evidence, sources) {
   return {
+    schemaVersion: 'jaroo.deepscan.runtime.shared.v2',
+    locale: 'KR',
+    sourceFlavor: 'wisereport-fnguide-krx',
     instrument: {
       code: presentValue(input.instrument.code ?? null, ['instrument_code']),
       name: presentValue(input.instrument.name ?? null, ['instrument_name']),
@@ -141,6 +345,7 @@ function buildSharedDump(input, evidence, sources) {
     styleAnalysisSnapshot: presentValue(evidence.styleAnalysisSnapshot ?? {}, ['style_analysis_snapshot']),
     ownershipSnapshot: presentValue(evidence.ownershipSnapshot ?? {}, ['ownership_snapshot']),
     financialSnapshot: presentValue(evidence.financialSnapshot ?? {}, ['financial_snapshot']),
+    sourceLimitations: presentValue(Array.isArray(evidence.sourceLimitations) ? evidence.sourceLimitations : [], ['source_limitations']),
     topFacts: presentValue(Array.isArray(evidence.topFacts) ? evidence.topFacts : [], ['top_facts']),
     topRisks: presentValue(Array.isArray(evidence.topRisks) ? evidence.topRisks : [], ['top_risks']),
     packageContext: presentValue(evidence.packageContext ?? { available: false, summaryFacts: [], marketView: null, boardHighlights: [] }, ['package_context'], ['Supplemental only; not numeric truth.']),
@@ -168,12 +373,14 @@ function buildMemberDump(memberKey, input, evidence, sources) {
     topRisks: shared.topRisks,
     packageContext: shared.packageContext,
   };
+  const krFacts = snapshotValue(buildMemberKrFacts(memberKey, evidence), ['kr_member_fact_slice']);
 
   switch (memberKey) {
     case 'profitability':
       return {
         member: memberKey,
         facts: {
+          krFacts,
           instrument: common.instrument,
           financialSnapshot: presentValue({
             revenueLatest: evidence.financialSnapshot?.revenueLatest ?? null,
@@ -194,6 +401,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
       return {
         member: memberKey,
         facts: {
+          krFacts,
           instrument: common.instrument,
           marketSnapshot: common.marketSnapshot,
           consensusSnapshot: presentValue({
@@ -216,6 +424,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
       return {
         member: memberKey,
         facts: {
+          krFacts,
           instrument: common.instrument,
           ownershipSnapshot: presentValue(evidence.ownershipSnapshot ?? {}, ['ownership_inputs']),
           styleAnalysisSnapshot: presentValue(evidence.styleAnalysisSnapshot ?? {}, ['style_analysis_snapshot']),
@@ -227,6 +436,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
       return {
         member: memberKey,
         facts: {
+          krFacts,
           instrument: common.instrument,
           marketSnapshot: common.marketSnapshot,
           relativeReturnSnapshot: presentValue(evidence.relativeReturnSnapshot ?? {}, ['relative_return_snapshot']),
@@ -239,6 +449,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
       return {
         member: memberKey,
         facts: {
+          krFacts,
           instrument: common.instrument,
           consensusSnapshot: common.consensusSnapshot,
           recentReportCount: optionalFact(evidence.reportSignals?.recentReportCount ?? null, ['recent_report_count'], '최근 리포트 수가 없습니다.'),
@@ -250,6 +461,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
       return {
         member: memberKey,
         facts: {
+          krFacts,
           instrument: common.instrument,
           marketSnapshot: common.marketSnapshot,
           consensusSnapshot: common.consensusSnapshot,
@@ -263,6 +475,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
       return {
         member: memberKey,
         facts: {
+          krFacts,
           instrument: common.instrument,
           holding: common.holding,
           marketSnapshot: common.marketSnapshot,
@@ -272,6 +485,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
       return {
         member: memberKey,
         facts: {
+          krFacts,
           instrument: common.instrument,
           marketSnapshot: common.marketSnapshot,
           consensusSnapshot: common.consensusSnapshot,
@@ -283,6 +497,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
       return {
         member: memberKey,
         facts: {
+          krFacts,
           instrument: common.instrument,
           holding: common.holding,
           marketSnapshot: common.marketSnapshot,
@@ -295,7 +510,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
         },
       };
     default:
-      return { member: memberKey, facts: common };
+      return { member: memberKey, facts: { krFacts, ...common } };
   }
 }
 
@@ -304,9 +519,11 @@ function systemPrompt(memberKey) {
   return [
     `You are Jaroo KR DeepScan committee member: ${spec.role}.`,
     spec.focus,
-    'Use only the provided sharedContext/memberContext JSON generated from KR evidence and dump inputs.',
+    'Use only the provided sharedContext/memberContext JSON generated from KR WiseReport/FnGuide/KRX evidence and dump inputs.',
+    'Prefer memberContext.facts.krFacts when present; it is the source-specific normalized KR slice and should override generic global-shaped assumptions.',
     'Treat package-derived context as supplemental only, never as silent numeric truth.',
-    'Missing or unavailable facts must lower confidence and can lower the score.',
+    'If a fact is listed in sourceLimitations, describe it as unavailable from the WiseReport source dump rather than claiming analysis context was generally insufficient.',
+    'Missing or unavailable facts must lower confidence and can lower the score, but do not say a fact is missing when a numeric value is present in krFacts or snapshots.',
     'Lead with the strongest numeric or concrete evidence that is actually present.',
     'Mention missing context at most once, briefly, in the final clause only if it materially limits the verdict.',
     'Avoid repeating phrases like 부재, 누락, 판단 불가, or 컨텍스트 부족 across multiple sentences.',
@@ -347,28 +564,48 @@ function rollupAxis(axisKey, memberKeys, results) {
 export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources) {
   const requestId = `kr-committee-${input.instrument.code ?? input.instrument.name ?? randomUUID()}-${Date.now()}`;
   const shared = buildSharedDump(input, evidence, sources);
-  const members = Object.fromEntries(Object.keys(KR_MEMBER_SPECS).map((memberKey) => [memberKey, buildMemberDump(memberKey, input, evidence, sources)]));
+  const factBank = buildKrFactBank(evidence);
+  const memberKeys = Object.keys(KR_MEMBER_SPECS);
+  const members = Object.fromEntries(memberKeys.map((memberKey) => [memberKey, buildMemberDump(memberKey, input, evidence, sources)]));
   const logDir = join(process.cwd(), '.omx', 'context', 'committee-debug-logs', requestId);
-  writeJson(logDir, 'runtime-shape.json', { shared, members });
+  writeJson(logDir, 'source-input.json', { rawInput, input, evidence, sources });
+  writeJson(logDir, 'prompt-map.json', Object.fromEntries(memberKeys.map((memberKey) => [memberKey, systemPrompt(memberKey)])));
+  writeJson(logDir, 'runtime-shape.json', {
+    schemaVersion: 'jaroo.deepscan.runtime.v2',
+    locale: 'KR',
+    sourceFlavor: 'wisereport-fnguide-krx',
+    factBank,
+    shared,
+    members,
+  });
 
   const enabled = normalizeText(process.env.DEEPSCAN_KR_LLM_ENABLE)?.toLowerCase();
   if (!process.env.OPENROUTER_API_KEY && !['1', 'true', 'yes', 'on'].includes(enabled ?? '')) {
     return {
       requestId,
-      runtimeShape: { shared, members },
+      runtimeShape: {
+        schemaVersion: 'jaroo.deepscan.runtime.v2',
+        locale: 'KR',
+        sourceFlavor: 'wisereport-fnguide-krx',
+        factBank,
+        shared,
+        members,
+      },
       results: {},
       errors: [{ member: 'all', error: 'OPENROUTER_API_KEY is not configured.' }],
     };
   }
 
   const { results, errors } = await scoreCommitteeMembers({
-    memberKeys: Object.keys(KR_MEMBER_SPECS),
+    memberKeys,
     shared,
     members,
     options: {
       schemaName: 'jaroo_kr_committee_member',
       title: 'jaroo-mvp-v3 KR DeepScan Committee',
       model: process.env.DEEPSCAN_KR_LLM_MODEL ?? process.env.DEEPSCAN_LLM_MODEL ?? process.env.OCR_MODEL ?? 'qwen/qwen3.5-flash-02-23',
+      timeoutMs: parsePositiveInteger(process.env.DEEPSCAN_KR_LLM_TIMEOUT_MS ?? process.env.DEEPSCAN_LLM_TIMEOUT_MS, 75000),
+      concurrency: parsePositiveInteger(process.env.DEEPSCAN_KR_LLM_CONCURRENCY ?? process.env.DEEPSCAN_LLM_CONCURRENCY, 4),
       summaryKey: input.instrument.code ?? input.instrument.name ?? 'kr',
       logDir,
       systemPrompt,
@@ -379,7 +616,14 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
 
   return {
     requestId,
-    runtimeShape: { shared, members },
+    runtimeShape: {
+      schemaVersion: 'jaroo.deepscan.runtime.v2',
+      locale: 'KR',
+      sourceFlavor: 'wisereport-fnguide-krx',
+      factBank,
+      shared,
+      members,
+    },
     results,
     errors,
   };
