@@ -911,7 +911,7 @@ export function JarooHomeScreen() {
                       startAngle={90}
                       endAngle={-270}
                       paddingAngle={homeHoldings.length > 1 ? 3 : 0}
-                      cornerRadius={10}
+                      cornerRadius={3}
                       stroke='none'
                       labelLine={false}
                       label={renderDonutLabel}
