@@ -335,3 +335,35 @@ v1.2 should satisfy committee inputs directly:
 2. Should institutional ownership aggregate be required, or is investor net-buy flow enough for timing committee?
 3. Should ETF/ETN DeepScan use a separate committee composition instead of stock committee with `not_applicable` facts?
 4. Should v1.2 be exposed as a new route immediately or first as an internal builder consumed by DeepScan?
+
+## Implementation checkpoint — initial v1.2 branch
+
+Started on branch `issue34-kr-slim-v1.2-source-contract` after merging v1.1 hardening to master.
+
+Initial implementation scope:
+
+- Added `buildWiseReportKrSlimPayloadV12(rawAggregate, code)` as an additive builder on top of v1.1 pages.
+- Added active crawler route:
+  - `/api/major/wisereport-fnguide/kr/companies/:code/slim/v1.2`
+  - endpoint id `wisereport-kr-slim-v1.2`
+- Added App Router proxy support:
+  - `/api/deepscan/slim?market=KR&code=005930&version=v1.2`
+- Added `krFacts` with fact envelopes for:
+  - quote
+  - consensus
+  - profitability
+  - valuation
+  - ownership
+  - investorFlow
+  - reports
+  - styleFactors
+- Added explicit `investorFlow` missing semantics for fields not available in WiseReport v1.1 shareholding.
+- Added ETF/ETN `instrumentKind` inference and `not_applicable` corporate financial facts.
+
+Verification at checkpoint:
+
+- `npm --prefix packages/crawler run check`
+- `npm --prefix packages/crawler run test`
+- `npm run test:web:ts -- src/app/api/deepscan/slim/route.test.ts` (script runs the TS test suite plus the explicit file)
+- `npm run lint:web` (passes with pre-existing warnings only)
+- `git diff --check`

@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url';
 import {
   WISEREPORT_GLOBAL_ROUTES,
   WISEREPORT_KR_PAGES,
+  buildDeepScanKrEvidencePacket,
   buildJarooDeepScanPayload,
   crawlWiseReportGlobal,
   crawlWiseReportGlobalDomainData,
@@ -755,6 +756,271 @@ function buildWiseReportKrSlimPayloadV11(rawAggregate, code) {
     code: String(code || ''),
     company: pickWiseReportKrCompany(rawAggregate, code),
     pages: slimPages,
+  };
+}
+
+function hasSlimV12Value(value) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  if (typeof value === 'number') {
+    return Number.isFinite(value);
+  }
+  if (typeof value === 'string') {
+    return value.trim().length > 0;
+  }
+  if (Array.isArray(value)) {
+    return value.length > 0;
+  }
+  if (typeof value === 'object') {
+    return Object.values(value).some((nested) => hasSlimV12Value(nested));
+  }
+  return Boolean(value);
+}
+
+function makeSlimV12Source({ provider = 'wisereport', pageId = null, fieldPath = null, checkedSources = null } = {}) {
+  return {
+    provider,
+    ...(pageId ? { pageId } : {}),
+    ...(fieldPath ? { fieldPath } : {}),
+    ...(Array.isArray(checkedSources) ? { checkedSources } : {}),
+  };
+}
+
+function makeSlimV12Fact(value, {
+  availability,
+  provider = 'wisereport',
+  pageId = null,
+  fieldPath = null,
+  checkedSources = null,
+  reasonCode = null,
+  message = null,
+  asOf = null,
+} = {}) {
+  const resolvedAvailability = availability ?? (hasSlimV12Value(value) ? 'present' : 'missing');
+  return {
+    value: value ?? null,
+    availability: resolvedAvailability,
+    source: makeSlimV12Source({ provider, pageId, fieldPath, checkedSources }),
+    ...(reasonCode ? { reasonCode } : {}),
+    ...(message ? { message } : {}),
+    ...(asOf ? { asOf } : {}),
+  };
+}
+
+function makeSlimV12MissingFact({ provider = 'wisereport', pageId = null, fieldPath = null, checkedSources = [], reasonCode, message }) {
+  return makeSlimV12Fact(null, {
+    availability: 'missing',
+    provider,
+    pageId,
+    fieldPath,
+    checkedSources,
+    reasonCode,
+    message,
+  });
+}
+
+function makeSlimV12NotApplicableFact({ provider = 'internal', checkedSources = [], reasonCode, message }) {
+  return makeSlimV12Fact(null, {
+    availability: 'not_applicable',
+    provider,
+    checkedSources,
+    reasonCode,
+    message,
+  });
+}
+
+function inferWiseReportKrInstrumentKind(slimPayload) {
+  const haystack = [
+    slimPayload?.company?.name,
+    slimPayload?.company?.market,
+    slimPayload?.pages?.['company-overview']?.summary?.market,
+    slimPayload?.pages?.['company-overview']?.profile,
+  ]
+    .map((value) => (typeof value === 'string' ? value : JSON.stringify(value ?? '')))
+    .join(' ');
+
+  if (/(^|[^A-Z])ETN([^A-Z]|$)|상장지수증권|파생결합증권/i.test(haystack)) {
+    return 'etn';
+  }
+  if (/(^|[^A-Z])ETF([^A-Z]|$)|상장지수펀드|KODEX|TIGER|ACE|SOL|RISE|KBSTAR|HANARO|PLUS|히어로즈/i.test(haystack)) {
+    return 'etf';
+  }
+  if (slimPayload?.company?.name || slimPayload?.code) {
+    return 'stock';
+  }
+  return 'unknown';
+}
+
+function makeSlimV12FinancialFact(value, options, instrumentKind) {
+  if (instrumentKind === 'etf' || instrumentKind === 'etn') {
+    return makeSlimV12NotApplicableFact({
+      reasonCode: 'corporate_financials_not_applicable',
+      message: 'ETF/ETN에는 일반 상장사 재무제표 기반 수익성 지표를 적용하지 않습니다.',
+      checkedSources: ['instrumentKind'],
+    });
+  }
+  return makeSlimV12Fact(value, options);
+}
+
+function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
+  const noQuoteMessage = 'KR slim v1.2 builder는 WiseReport/FnGuide payload만으로 현재가를 보장하지 않습니다. DeepScan에서는 별도 quotes source를 결합해야 합니다.';
+  const noFlowMessage = 'WiseReport KR slim v1.1 shareholding source에는 외국인/기관/개인 수급 집계가 없습니다. v1.2 investorFlow에는 별도 source acquisition이 필요합니다.';
+  const notCorporate = instrumentKind === 'etf' || instrumentKind === 'etn';
+  const financialSource = { pageId: 'financial-analysis', checkedSources: ['wisereport.financial-analysis', 'wisereport.consensus'] };
+  const indicatorSource = { pageId: 'investment-indicators', checkedSources: ['wisereport.investment-indicators'] };
+
+  const foreignOwnershipFact = evidence.ownershipSnapshot?.foreignOwnershipPct !== null && evidence.ownershipSnapshot?.foreignOwnershipPct !== undefined
+    ? makeSlimV12Fact(evidence.ownershipSnapshot.foreignOwnershipPct, { pageId: 'shareholding', fieldPath: 'shareholding.foreignOwnershipPct' })
+    : makeSlimV12MissingFact({
+        pageId: 'shareholding',
+        checkedSources: ['wisereport.shareholding'],
+        reasonCode: 'not_available_in_wisereport_shareholding',
+        message: 'WiseReport 지분현황 slim source에는 외국인 보유율 집계 필드가 없습니다.',
+      });
+  const institutionalOwnershipFact = evidence.ownershipSnapshot?.institutionalOwnershipPct !== null && evidence.ownershipSnapshot?.institutionalOwnershipPct !== undefined
+    ? makeSlimV12Fact(evidence.ownershipSnapshot.institutionalOwnershipPct, { pageId: 'shareholding', fieldPath: 'shareholding.institutionalOwnershipPct' })
+    : makeSlimV12MissingFact({
+        pageId: 'shareholding',
+        checkedSources: ['wisereport.shareholding'],
+        reasonCode: 'aggregate_not_available_in_wisereport_shareholding',
+        message: 'WiseReport 지분현황 slim source에는 기관 전체 보유율 집계가 없습니다. 5% 이상/국민연금 rows는 aggregate로 대체하지 않습니다.',
+      });
+
+  return {
+    quote: {
+      currentPrice: evidence.currentQuote
+        ? makeSlimV12Fact(evidence.currentQuote.price, { provider: 'krx', fieldPath: 'quotes.currentPrice', asOf: evidence.currentQuote.asOf })
+        : makeSlimV12MissingFact({ provider: 'krx', checkedSources: ['quotes'], reasonCode: 'quote_source_not_attached', message: noQuoteMessage }),
+      currency: makeSlimV12Fact(evidence.currentQuote?.currency ?? 'KRW', { provider: evidence.currentQuote ? 'krx' : 'internal', fieldPath: 'quote.currency' }),
+      asOf: evidence.currentQuote?.asOf
+        ? makeSlimV12Fact(evidence.currentQuote.asOf, { provider: 'krx', fieldPath: 'quotes.asOf' })
+        : makeSlimV12MissingFact({ provider: 'krx', checkedSources: ['quotes'], reasonCode: 'quote_asof_not_attached', message: noQuoteMessage }),
+    },
+    consensus: {
+      targetPrice: makeSlimV12Fact(evidence.consensusSnapshot?.targetPrice ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가', checkedSources: ['fnguide.opinion', 'wisereport.consensus'] }),
+      previousTargetPrice: makeSlimV12Fact(evidence.consensusSnapshot?.previousTargetPrice ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가(직전 적정주가)' }),
+      targetRevisionPct: makeSlimV12Fact(evidence.consensusSnapshot?.revisionPct ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가(증감율)' }),
+      targetGapPct: evidence.consensusSnapshot?.targetGapPct !== null && evidence.consensusSnapshot?.targetGapPct !== undefined
+        ? makeSlimV12Fact(evidence.consensusSnapshot.targetGapPct, { provider: 'internal', fieldPath: 'computed.targetGapPct', checkedSources: ['targetPrice', 'quotes.currentPrice'] })
+        : makeSlimV12MissingFact({ provider: 'internal', checkedSources: ['targetPrice', 'quotes.currentPrice'], reasonCode: 'target_gap_requires_quote', message: '목표가 괴리율 계산에는 현재가 source가 필요합니다.' }),
+      recommendation: makeSlimV12Fact(evidence.consensusSnapshot?.recommendationScore ?? evidence.consensusSnapshot?.recommendation ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].투자의견' }),
+      analystOpinionRows: makeSlimV12Fact(slimPayload.pages?.opinion?.analystOpinions?.rows ?? [], { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions.rows' }),
+    },
+    profitability: {
+      revenueLatest: makeSlimV12FinancialFact(evidence.financialSnapshot?.revenueLatest ?? null, financialSource, instrumentKind),
+      revenuePrev: makeSlimV12FinancialFact(evidence.financialSnapshot?.revenuePrev ?? null, financialSource, instrumentKind),
+      revenueYoY: makeSlimV12FinancialFact(evidence.financialSnapshot?.revenueYoY ?? null, { ...financialSource, provider: 'internal', fieldPath: 'computed.revenueYoY' }, instrumentKind),
+      operatingIncomeLatest: makeSlimV12FinancialFact(evidence.financialSnapshot?.operatingIncomeLatest ?? null, financialSource, instrumentKind),
+      operatingIncomePrev: makeSlimV12FinancialFact(evidence.financialSnapshot?.operatingIncomePrev ?? null, financialSource, instrumentKind),
+      operatingIncomeYoY: makeSlimV12FinancialFact(evidence.financialSnapshot?.operatingIncomeYoY ?? null, { ...financialSource, provider: 'internal', fieldPath: 'computed.operatingIncomeYoY' }, instrumentKind),
+      netIncomeLatest: makeSlimV12FinancialFact(evidence.financialSnapshot?.netIncomeLatest ?? null, financialSource, instrumentKind),
+      netIncomePrev: makeSlimV12FinancialFact(evidence.financialSnapshot?.netIncomePrev ?? null, financialSource, instrumentKind),
+      netIncomeYoY: makeSlimV12FinancialFact(evidence.financialSnapshot?.netIncomeYoY ?? null, { ...financialSource, provider: 'internal', fieldPath: 'computed.netIncomeYoY' }, instrumentKind),
+      operatingMarginLatest: makeSlimV12FinancialFact(evidence.financialSnapshot?.operatingMarginLatest ?? null, { ...indicatorSource, fieldPath: 'investment-indicators.metrics[].영업이익률' }, instrumentKind),
+      netMarginLatest: makeSlimV12FinancialFact(evidence.financialSnapshot?.netMarginLatest ?? null, { ...indicatorSource, fieldPath: 'investment-indicators.metrics[].순이익률' }, instrumentKind),
+      roe: makeSlimV12FinancialFact(evidence.valuationSnapshot?.roe ?? null, { ...indicatorSource, fieldPath: 'investment-indicators.metrics[].ROE' }, instrumentKind),
+    },
+    valuation: {
+      per: makeSlimV12FinancialFact(evidence.valuationSnapshot?.per ?? null, { ...indicatorSource, fieldPath: 'investment-indicators.metrics[].PER' }, instrumentKind),
+      pbr: makeSlimV12FinancialFact(evidence.valuationSnapshot?.pbr ?? null, { ...indicatorSource, fieldPath: 'investment-indicators.metrics[].PBR' }, instrumentKind),
+      roe: makeSlimV12FinancialFact(evidence.valuationSnapshot?.roe ?? null, { ...indicatorSource, fieldPath: 'investment-indicators.metrics[].ROE' }, instrumentKind),
+      evEbitda: makeSlimV12FinancialFact(evidence.valuationSnapshot?.evEbitda ?? null, { ...indicatorSource, fieldPath: 'investment-indicators.metrics[].EV/EBITDA' }, instrumentKind),
+      forwardPer: makeSlimV12FinancialFact(evidence.valuationSnapshot?.per ?? null, { ...indicatorSource, fieldPath: 'investment-indicators.metrics[].PER' }, instrumentKind),
+      forwardPbr: makeSlimV12FinancialFact(evidence.valuationSnapshot?.pbr ?? null, { ...indicatorSource, fieldPath: 'investment-indicators.metrics[].PBR' }, instrumentKind),
+    },
+    ownership: {
+      majorHolderPct: makeSlimV12Fact(evidence.ownershipSnapshot?.majorHolderPct ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.최대주주(보유지분)' }),
+      majorHolderShares: makeSlimV12Fact(evidence.ownershipSnapshot?.majorHolderShares ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.최대주주(보유지분)' }),
+      freeFloatPct: makeSlimV12Fact(evidence.ownershipSnapshot?.freeFloatPct ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.유동주식(유동주식비율)' }),
+      freeFloatShares: makeSlimV12Fact(evidence.ownershipSnapshot?.freeFloatShares ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.유동주식(유동주식수)' }),
+      majorShareholders: makeSlimV12Fact(evidence.ownershipSnapshot?.majorShareholders ?? [], { pageId: 'shareholding', fieldPath: 'shareholding.majorShareholders.rows' }),
+      knownInstitutionalMajorHolders: makeSlimV12Fact(evidence.ownershipSnapshot?.knownInstitutionalMajorHolders ?? [], { pageId: 'shareholding', fieldPath: 'shareholding.shareholderChanges.rows' }),
+    },
+    investorFlow: {
+      foreignOwnershipPct: foreignOwnershipFact,
+      institutionalOwnershipPct: institutionalOwnershipFact,
+      retailNetBuy: makeSlimV12MissingFact({ checkedSources: ['wisereport.shareholding'], reasonCode: 'investor_flow_source_not_attached', message: noFlowMessage }),
+      foreignNetBuy: makeSlimV12MissingFact({ checkedSources: ['wisereport.shareholding'], reasonCode: 'investor_flow_source_not_attached', message: noFlowMessage }),
+      institutionalNetBuy: makeSlimV12MissingFact({ checkedSources: ['wisereport.shareholding'], reasonCode: 'investor_flow_source_not_attached', message: noFlowMessage }),
+      flowWindow: makeSlimV12MissingFact({ checkedSources: ['wisereport.shareholding'], reasonCode: 'investor_flow_source_not_attached', message: noFlowMessage }),
+      flowRows: makeSlimV12MissingFact({ checkedSources: ['wisereport.shareholding'], reasonCode: 'investor_flow_source_not_attached', message: noFlowMessage }),
+    },
+    reports: {
+      totalCount: makeSlimV12Fact(evidence.reportSignals?.recentReportCount ?? null, { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows' }),
+      recent30dCount: makeSlimV12Fact(evidence.reportSignals?.recent30dReportCount ?? null, { provider: 'internal', pageId: 'recent-reports', fieldPath: 'computed.recent30dReportCount', checkedSources: ['recent-reports.recentReports.rows', 'quotes.asOf'] }),
+      latestReportDate: makeSlimV12Fact(evidence.timestamps?.reportAsOf ?? null, { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows[0].일자' }),
+      recentItems: makeSlimV12Fact(slimPayload.pages?.['recent-reports']?.recentReports?.rows ?? [], { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows' }),
+    },
+    styleFactors: {
+      companyName: makeSlimV12Fact(evidence.styleAnalysisSnapshot?.companyName ?? null, { provider: 'fnguide', pageId: 'style-analysis', fieldPath: 'style-analysis.factorScores.CHART_H[0].NAME' }),
+      peerName: makeSlimV12Fact(evidence.styleAnalysisSnapshot?.peerName ?? null, { provider: 'fnguide', pageId: 'style-analysis', fieldPath: 'style-analysis.factorScores.CHART_H[1].NAME' }),
+      factors: makeSlimV12Fact(evidence.styleAnalysisSnapshot?.factorScores ?? [], { provider: 'fnguide', pageId: 'style-analysis', fieldPath: 'style-analysis.factorScores.CHART_D' }),
+    },
+    sourceLimitations: [
+      ...(Array.isArray(evidence.sourceLimitations) ? evidence.sourceLimitations.map((limitation) => ({
+        factPath: limitation.fact,
+        reasonCode: limitation.reasonCode,
+        checkedSources: ['wisereport.shareholding'],
+        message: limitation.message,
+      })) : []),
+      {
+        factPath: 'investorFlow.*NetBuy',
+        reasonCode: 'investor_flow_source_not_attached',
+        checkedSources: ['wisereport.shareholding'],
+        message: noFlowMessage,
+      },
+      ...(notCorporate ? [{
+        factPath: 'profitability.*',
+        reasonCode: 'corporate_financials_not_applicable',
+        checkedSources: ['instrumentKind'],
+        message: 'ETF/ETN instrument kind uses product-specific analysis rather than corporate financial statements.',
+      }] : []),
+    ],
+  };
+}
+
+function buildWiseReportKrSlimPayloadV12(rawAggregate, code) {
+  const slimV11 = buildWiseReportKrSlimPayloadV11(rawAggregate, code);
+  const evidence = buildDeepScanKrEvidencePacket({
+    instrument: {
+      code: slimV11.company?.code ?? slimV11.code,
+      name: slimV11.company?.name,
+      market: slimV11.company?.market,
+    },
+  }, {
+    slim: slimV11,
+  });
+  const instrumentKind = inferWiseReportKrInstrumentKind(slimV11);
+
+  return {
+    schemaVersion: 'wisereport-kr-slim-v1.2',
+    market: 'KR',
+    code: slimV11.code,
+    company: {
+      code: slimV11.company?.code ?? slimV11.code,
+      name: slimV11.company?.name ?? null,
+      market: evidence.instrument?.market ?? slimV11.company?.market ?? null,
+      instrumentKind,
+    },
+    sourceCoverage: {
+      pageCoverage: evidence.pageCoverage,
+      sourceCoverage: evidence.sourceCoverage,
+      checkedSources: [
+        'wisereport.company-overview',
+        'wisereport.financial-analysis',
+        'wisereport.investment-indicators',
+        'wisereport.consensus',
+        'wisereport.shareholding',
+        'wisereport.recent-reports',
+        'fnguide.finance',
+        'fnguide.relative-return',
+        'fnguide.opinion',
+        'fnguide.style-analysis',
+      ],
+    },
+    pages: slimV11.pages,
+    krFacts: buildWiseReportKrSlimFactsV12(slimV11, evidence, instrumentKind),
   };
 }
 
@@ -1953,6 +2219,17 @@ const endpointDefinitions = [
     rawSuccess: true,
     handler: async (req) => buildWiseReportKrSlimPayloadV11(await getCrawl(req.params.code), req.params.code),
   },
+  {
+    id: 'wisereport-kr-slim-v1.2',
+    resource: 'wisereport.kr.aggregate.slim.v1.2',
+    description: '한국 상장사 WiseReport/FnGuide slim v1.1 원본에 DeepScan용 krFacts, fact availability, investorFlow missing semantics, instrumentKind를 추가한 v1.2 raw JSON을 반환합니다.',
+    primaryPath: buildMajorPath('/wisereport-fnguide/kr/companies/:code/slim/v1.2'),
+    dataSources: ['wisereport', 'fnguide'],
+    params: ['code'],
+    query: [],
+    rawSuccess: true,
+    handler: async (req) => buildWiseReportKrSlimPayloadV12(await getCrawl(req.params.code), req.params.code),
+  },
   ...WISEREPORT_KR_PAGE_ROUTES.map((route) => ({
     id: route.id,
     resource: route.resource,
@@ -2656,6 +2933,7 @@ export {
   buildWiseReportGlobalSlimPayloadV11,
   buildWiseReportKrSlimPayload,
   buildWiseReportKrSlimPayloadV11,
+  buildWiseReportKrSlimPayloadV12,
   activeEndpointDefinitions as endpointDefinitions,
   slimWiseReportKrValue,
   slimWiseReportKrValueV11,

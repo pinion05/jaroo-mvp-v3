@@ -6,9 +6,11 @@ export function resolveDeepScanSlimUpstreamPath(searchParams: URLSearchParams) {
   const market = searchParams.get('market')?.trim().toUpperCase()
   const code = searchParams.get('code')?.trim()
   const ticker = searchParams.get('ticker')?.trim().toUpperCase()
+  const version = searchParams.get('version')?.trim().toLowerCase()
 
   if (market === 'KR' && code) {
-    return `/api/major/wisereport-fnguide/kr/companies/${encodeURIComponent(code)}/slim/v1.1`
+    const krVersion = version === 'v1.2' || version === '1.2' ? 'v1.2' : 'v1.1'
+    return `/api/major/wisereport-fnguide/kr/companies/${encodeURIComponent(code)}/slim/${krVersion}`
   }
 
   if (market === 'US' && ticker) {

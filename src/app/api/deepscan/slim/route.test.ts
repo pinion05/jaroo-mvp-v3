@@ -10,6 +10,13 @@ test('deepscan slim proxy는 KR market이면 kr slim path를 반환한다', () =
   )
 })
 
+test('deepscan slim proxy는 KR version=v1.2이면 kr slim v1.2 path를 반환한다', () => {
+  assert.equal(
+    resolveDeepScanSlimUpstreamPath(new URLSearchParams('market=KR&code=005930&version=v1.2')),
+    '/api/major/wisereport-fnguide/kr/companies/005930/slim/v1.2',
+  )
+})
+
 test('deepscan slim proxy는 US market이면 global slim path를 반환한다', () => {
   assert.equal(
     resolveDeepScanSlimUpstreamPath(new URLSearchParams('market=US&ticker=AAPL')),

@@ -183,6 +183,16 @@ function createAggregateFixtureV11() {
                 column_10: '',
                 '2026/03(E)(최근분기) 분기컨센서스닫기': '10',
               },
+              {
+                항목: '펼치기 영업이익',
+                '2025/12 (IFRS연결) 연간컨센서스보기': '20',
+                '2026/12(E) (IFRS연결) 연간컨센서스닫기': '25',
+              },
+              {
+                항목: '펼치기 당기순이익',
+                '2025/12 (IFRS연결) 연간컨센서스보기': '15',
+                '2026/12(E) (IFRS연결) 연간컨센서스닫기': '18',
+              },
             ],
             rowCount: 1,
           },
@@ -213,6 +223,26 @@ function createAggregateFixtureV11() {
                   '2025/12 (IFRS연결) 연간컨센서스보기': '1.2',
                   column_10: '',
                 },
+                {
+                  항목: '펼치기영업이익률',
+                  '2025/12 (IFRS연결) 연간컨센서스보기': '20.0',
+                  '2026/12(E) (IFRS연결) 연간컨센서스닫기': '25.0',
+                },
+                {
+                  항목: '펼치기순이익률',
+                  '2025/12 (IFRS연결) 연간컨센서스보기': '15.0',
+                  '2026/12(E) (IFRS연결) 연간컨센서스닫기': '18.0',
+                },
+                {
+                  항목: '펼치기ROE',
+                  '2025/12 (IFRS연결) 연간컨센서스보기': '11.0',
+                  '2026/12(E) (IFRS연결) 연간컨센서스닫기': '12.0',
+                },
+                {
+                  항목: '펼치기PER',
+                  '2025/12 (IFRS연결) 연간컨센서스보기': '9.0',
+                  '2026/12(E) (IFRS연결) 연간컨센서스닫기': '10.0',
+                },
               ],
               rowCount: 1,
             },
@@ -237,8 +267,32 @@ function createAggregateFixtureV11() {
           },
           ownershipSummary: {
             headers: ['구분', '지분율'],
-            rows: [{ 구분: '최대주주', 지분율: '20.0' }],
+            rows: [{
+              '최대주주(보유지분)': '10,820,079주 (52.32%)',
+              '5%이상주주(보유지분)': '1,071,914주 (5.18%)',
+              '유동주식(유동주식수)': '8,941,029주',
+              '유동주식(유동주식비율)': '43.23%',
+            }],
             rowCount: 1,
+          },
+          majorShareholders: {
+            headers: ['대표주주', '보고자', '보유주식수', '보유지분 (%)'],
+            rows: [{
+              대표주주: '삼성생명',
+              보고자: '삼성생명',
+              보유주식수: '500,000',
+              '보유지분 (%)': '8.50',
+            }],
+          },
+          shareholderChanges: {
+            headers: ['거래일', '주주명', '변동후 보유지분율(%)'],
+            rows: [{
+              거래일: '26/03/30',
+              주주명: '국민연금공단',
+              '변동후 보유지분율(%)': '5.18',
+              '변동후 보유주식수': '1,071,914',
+              '지분 변동율(%)': '5.18',
+            }],
           },
         },
       },
@@ -269,8 +323,81 @@ function createAggregateFixtureV11() {
           ajaxEvidence: [{ source: 'network' }],
         },
       },
+      opinion: {
+        id: 'opinion',
+        normalized: {
+          company: {
+            code: '005930',
+            name: '삼성전자',
+            title: '삼성전자',
+            headerText: '투자의견',
+          },
+          sourceType: 'fnguide',
+          sourceKey: 'fnguide투자의견',
+          bodyTextHead: 'debug text',
+          analystOpinions: {
+            headers: ['추정기관', '적정주가'],
+            rows: [{
+              추정기관: 'Consensus',
+              적정주가: '100,000',
+              '적정주가(직전 적정주가)': '90,000',
+              '적정주가(증감율)': '11.11',
+              투자의견: '4.00',
+            }],
+          },
+        },
+      },
+      'recent-reports': {
+        id: 'recent-reports',
+        normalized: {
+          company: {
+            code: '005930',
+            name: '삼성전자',
+            title: '삼성전자',
+            headerText: '최근리포트',
+          },
+          sourceType: 'wisereport',
+          sourceKey: 'wisereport최근리포트',
+          bodyTextHead: 'debug text',
+          recentReports: {
+            rows: [{ 일자: '26/04/14', 제목: 'fixture report' }],
+          },
+        },
+      },
+      'style-analysis': {
+        id: 'style-analysis',
+        normalized: {
+          company: {
+            code: '005930',
+            name: '삼성전자',
+            title: '삼성전자',
+            headerText: '스타일분석',
+          },
+          sourceType: 'fnguide',
+          sourceKey: 'fnguide스타일분석',
+          bodyTextHead: 'debug text',
+          factorScores: {
+            CHART_H: [
+              { ID: 'VAL1', NAME: '삼성전자' },
+              { ID: 'VAL2', NAME: '반도체(업종)' },
+            ],
+            CHART_D: [{ NM: '베타', VAL1: '0.50', VAL2: '0.40' }],
+          },
+        },
+      },
     },
   };
+}
+
+function createEtfAggregateFixtureV11() {
+  const fixture = JSON.parse(JSON.stringify(createAggregateFixtureV11()));
+  for (const page of Object.values(fixture.pages)) {
+    if (page?.normalized?.company) {
+      page.normalized.company.name = 'KODEX 200 ETF';
+      page.normalized.company.title = 'KODEX 200 ETF';
+    }
+  }
+  return fixture;
 }
 
 async function withServer(app, run) {
@@ -368,7 +495,7 @@ test('buildWiseReportKrSlimPayloadV11 removes parser artifacts but preserves gen
   assert.deepEqual(Object.keys(slim.pages['financial-analysis']), ['financialStatements']);
   assert.deepEqual(Object.keys(slim.pages['investment-indicators']), ['metrics']);
   assert.deepEqual(Object.keys(slim.pages.consensus), ['consensusSummary']);
-  assert.deepEqual(Object.keys(slim.pages.shareholding), ['ownershipSummary']);
+  assert.deepEqual(Object.keys(slim.pages.shareholding), ['ownershipSummary', 'majorShareholders', 'shareholderChanges']);
 
   const financialRow = slim.pages['financial-analysis'].financialStatements.rows[0];
   assert.equal(financialRow.항목, '매출액(수익)');
@@ -390,6 +517,44 @@ test('buildWiseReportKrSlimPayloadV11 removes parser artifacts but preserves gen
   assert.deepEqual(collectForbiddenKeyHits(slim), []);
 });
 
+test('buildWiseReportKrSlimPayloadV12 adds DeepScan krFacts with explicit investor-flow missing semantics', async () => {
+  const { buildWiseReportKrSlimPayloadV12 } = await import('../src/server.js');
+  const slim = buildWiseReportKrSlimPayloadV12(createAggregateFixtureV11(), '005930');
+
+  assert.equal(slim.schemaVersion, 'wisereport-kr-slim-v1.2');
+  assert.equal(slim.market, 'KR');
+  assert.equal(slim.company.instrumentKind, 'stock');
+  assert.equal(slim.krFacts.consensus.targetPrice.value, 100000);
+  assert.equal(slim.krFacts.consensus.previousTargetPrice.value, 90000);
+  assert.equal(slim.krFacts.consensus.targetRevisionPct.value, 11.11);
+  assert.equal(slim.krFacts.profitability.operatingMarginLatest.value, 25);
+  assert.equal(slim.krFacts.profitability.netMarginLatest.value, 18);
+  assert.equal(slim.krFacts.valuation.per.value, 10);
+  assert.equal(slim.krFacts.ownership.majorHolderPct.value, 52.32);
+  assert.equal(slim.krFacts.ownership.freeFloatPct.value, 43.23);
+  assert.equal(slim.krFacts.ownership.knownInstitutionalMajorHolders.value[0].name, '국민연금공단');
+
+  assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.availability, 'missing');
+  assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.reasonCode, 'not_available_in_wisereport_shareholding');
+  assert.deepEqual(slim.krFacts.investorFlow.foreignOwnershipPct.source.checkedSources, ['wisereport.shareholding']);
+  assert.equal(slim.krFacts.investorFlow.institutionalOwnershipPct.availability, 'missing');
+  assert.match(slim.krFacts.investorFlow.institutionalOwnershipPct.message, /aggregate로 대체하지 않습니다/);
+  assert.equal(slim.krFacts.investorFlow.foreignNetBuy.availability, 'missing');
+  assert.equal(slim.krFacts.styleFactors.factors.value[0].name, '베타');
+});
+
+test('buildWiseReportKrSlimPayloadV12 marks ETF corporate financial facts as not_applicable', async () => {
+  const { buildWiseReportKrSlimPayloadV12 } = await import('../src/server.js');
+  const slim = buildWiseReportKrSlimPayloadV12(createEtfAggregateFixtureV11(), '069500');
+
+  assert.equal(slim.company.name, 'KODEX 200 ETF');
+  assert.equal(slim.company.instrumentKind, 'etf');
+  assert.equal(slim.krFacts.profitability.revenueLatest.availability, 'not_applicable');
+  assert.equal(slim.krFacts.profitability.revenueLatest.reasonCode, 'corporate_financials_not_applicable');
+  assert.equal(slim.krFacts.valuation.per.availability, 'not_applicable');
+  assert.ok(slim.krFacts.sourceLimitations.some((limitation) => limitation.factPath === 'profitability.*'));
+});
+
 test('GET explicit-source KR slim v1.1 path returns raw json without envelope', async () => {
   const { app, endpointDefinitions, buildWiseReportKrSlimPayloadV11 } = await import('../src/server.js');
   const fixture = buildWiseReportKrSlimPayloadV11(createAggregateFixtureV11(), '005930');
@@ -408,6 +573,33 @@ test('GET explicit-source KR slim v1.1 path returns raw json without envelope', 
     });
 
     assert.deepEqual(responseBody, fixture);
+    assert.equal(Object.hasOwn(responseBody, 'ok'), false);
+    assert.equal(Object.hasOwn(responseBody, 'data'), false);
+    assert.equal(Object.hasOwn(responseBody, 'meta'), false);
+  } finally {
+    definition.handler = originalHandler;
+  }
+});
+
+test('GET explicit-source KR slim v1.2 path returns raw json without envelope', async () => {
+  const { app, endpointDefinitions, buildWiseReportKrSlimPayloadV12 } = await import('../src/server.js');
+  const fixture = buildWiseReportKrSlimPayloadV12(createAggregateFixtureV11(), '005930');
+  const definition = endpointDefinitions.find((entry) => entry.id === 'wisereport-kr-slim-v1.2');
+
+  assert.ok(definition, 'slim v1.2 endpoint definition should exist');
+
+  const originalHandler = definition.handler;
+  definition.handler = async () => fixture;
+
+  try {
+    const responseBody = await withServer(app, async (baseUrl) => {
+      const response = await fetch(`${baseUrl}/api/major/wisereport-fnguide/kr/companies/005930/slim/v1.2`);
+      assert.equal(response.status, 200);
+      return response.json();
+    });
+
+    assert.deepEqual(responseBody, fixture);
+    assert.equal(responseBody.schemaVersion, 'wisereport-kr-slim-v1.2');
     assert.equal(Object.hasOwn(responseBody, 'ok'), false);
     assert.equal(Object.hasOwn(responseBody, 'data'), false);
     assert.equal(Object.hasOwn(responseBody, 'meta'), false);

@@ -33,7 +33,7 @@ const EXPECTED_ARCHIVED_IDS = [
   'wisereport-global-slim-v1',
 ];
 
-test('only WiseReport slim v1.1 endpoints remain active', async () => {
+test('only current WiseReport slim endpoints remain active', async () => {
   const { endpointDefinitions, archivedEndpointDefinitions } = await import('../src/server.js');
 
   const activeWiseReportIds = endpointDefinitions
@@ -46,6 +46,7 @@ test('only WiseReport slim v1.1 endpoints remain active', async () => {
   assert.deepEqual(activeWiseReportIds.sort(), [
     'wisereport-global-slim-v1.1',
     'wisereport-kr-slim-v1.1',
+    'wisereport-kr-slim-v1.2',
   ]);
   assert.deepEqual(archivedWiseReportIds.sort(), [...EXPECTED_ARCHIVED_IDS].sort());
 });
