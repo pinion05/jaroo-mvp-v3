@@ -367,6 +367,53 @@ test('deep scan store reuses the last successful result only for the same target
   assert.equal(useDeepScanStore.getState().activeTargetKey, getDeepScanTargetKey(target))
 })
 
+test('deep scan target key changes when holding metrics change for the same symbol', () => {
+  const target: DeepScanTargetInput = {
+    code: '005930',
+    ticker: '005930.KS',
+    name: '삼성전자',
+    market: 'KR',
+    marketTone: 'kospi',
+    kind: 'stock',
+    quantity: 10,
+    averagePrice: 70000,
+    evaluationAmount: 700000,
+  }
+
+  assert.equal(getDeepScanTargetKey(target), getDeepScanTargetKey({
+    ...target,
+    code: ' 005930 ',
+    ticker: ' 005930.KS ',
+    market: ' KR ',
+  }))
+  assert.notEqual(getDeepScanTargetKey(target), getDeepScanTargetKey({ ...target, quantity: 11 }))
+  assert.notEqual(getDeepScanTargetKey(target), getDeepScanTargetKey({ ...target, averagePrice: 71000 }))
+  assert.notEqual(getDeepScanTargetKey(target), getDeepScanTargetKey({ ...target, evaluationAmount: 710000 }))
+})
+
+test('deep scan store does not reuse a successful result after holding metrics change', () => {
+  const target: DeepScanTargetInput = {
+    code: '005930',
+    ticker: '005930.KS',
+    name: '삼성전자',
+    market: 'KR',
+    marketTone: 'kospi',
+    kind: 'stock',
+    quantity: 10,
+    averagePrice: 70000,
+    evaluationAmount: 700000,
+  }
+
+  useDeepScanStore.getState().setTarget(target)
+  useDeepScanStore.getState().startRequest()
+  useDeepScanStore.getState().finishSuccess(createDeepScanPayload(), '2026-04-17T01:00:00.000Z')
+
+  assert.equal(shouldReuseDeepScanLastSuccess(target), true)
+  assert.equal(shouldReuseDeepScanLastSuccess({ ...target, quantity: 11 }), false)
+  assert.equal(shouldReuseDeepScanLastSuccess({ ...target, averagePrice: 71000 }), false)
+  assert.equal(shouldReuseDeepScanLastSuccess({ ...target, evaluationAmount: 710000 }), false)
+})
+
 test('deep scan store resets active request state when the target key changes', () => {
   const firstTarget: DeepScanTargetInput = {
     code: '005930',
