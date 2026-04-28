@@ -637,6 +637,10 @@ test('buildWiseReportKrSlimPayloadV11 removes parser artifacts but preserves gen
 test('buildWiseReportKrSlimPayloadV12 adds DeepScan krFacts with explicit investor-flow missing semantics', async () => {
   const { buildWiseReportKrSlimPayloadV12 } = await import('../src/server.js');
   const slim = buildWiseReportKrSlimPayloadV12(createAggregateFixtureV11(), '005930');
+  const {
+    WISEREPORT_KR_V12_CHECKED_SOURCE_IDS,
+    getWiseReportKrV12CheckedSourceIds,
+  } = require('../src/crawlers/wisereport-kr.cjs');
 
   assert.equal(slim.schemaVersion, 'wisereport-kr-slim-v1.2');
   assert.equal(slim.market, 'KR');
@@ -644,6 +648,7 @@ test('buildWiseReportKrSlimPayloadV12 adds DeepScan krFacts with explicit invest
   assert.equal(slim.sourceCoverage.pageCoverage.totalKnownPages, 13);
   assert.equal(slim.sourceCoverage.pageCoverage.availableCount, 12);
   assert.deepEqual(slim.sourceCoverage.pageCoverage.missingPageIds, ['fnguide-finance']);
+  assert.deepEqual(slim.sourceCoverage.checkedSources, WISEREPORT_KR_V12_CHECKED_SOURCE_IDS);
   assert.equal(slim.krFacts.consensus.targetPrice.value, 100000);
   assert.equal(slim.krFacts.consensus.previousTargetPrice.value, 90000);
   assert.equal(slim.krFacts.consensus.targetRevisionPct.value, 11.11);
@@ -658,6 +663,15 @@ test('buildWiseReportKrSlimPayloadV12 adds DeepScan krFacts with explicit invest
   assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.value, 2.73);
   assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.availability, 'present');
   assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.source.pageId, 'fnguide-foreign-ownership-chart');
+  assert.deepEqual(
+    slim.krFacts.investorFlow.foreignOwnershipPct.source.checkedSources,
+    getWiseReportKrV12CheckedSourceIds([
+      'shareholding',
+      'fnguide-snapshot',
+      'fnguide-shareanalysis',
+      'fnguide-foreign-ownership-chart',
+    ]),
+  );
   assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.asOf, '2026-04-24');
   assert.equal(slim.krFacts.investorFlow.foreignOwnershipHistory.value.length, 2);
   assert.equal(slim.krFacts.investorFlow.assetManagerOwnershipPctSum.availability, 'partial');
@@ -667,6 +681,38 @@ test('buildWiseReportKrSlimPayloadV12 adds DeepScan krFacts with explicit invest
   assert.equal(slim.krFacts.investorFlow.foreignNetBuy.availability, 'missing');
   assert.equal(slim.krFacts.investorFlow.foreignNetBuy.reasonCode, 'investor_net_buy_not_provided_by_wisereport_fnguide');
   assert.equal(slim.krFacts.styleFactors.factors.value[0].name, '베타');
+});
+
+test('KR v1.2 checked source ids are derived from page specs', () => {
+  const {
+    KR_WISEREPORT_V12_PAGE_SPECS,
+    WISEREPORT_KR_V12_CHECKED_SOURCE_IDS,
+    WISEREPORT_KR_V12_PAGES,
+    getWiseReportKrV12CheckedSourceIds,
+  } = require('../src/crawlers/wisereport-kr.cjs');
+
+  assert.deepEqual(
+    WISEREPORT_KR_V12_CHECKED_SOURCE_IDS,
+    KR_WISEREPORT_V12_PAGE_SPECS.map((spec) => spec.checkedSourceId),
+  );
+  assert.equal(WISEREPORT_KR_V12_CHECKED_SOURCE_IDS.length, WISEREPORT_KR_V12_PAGES.length);
+  assert.equal(new Set(WISEREPORT_KR_V12_CHECKED_SOURCE_IDS).size, WISEREPORT_KR_V12_CHECKED_SOURCE_IDS.length);
+  assert.deepEqual(
+    getWiseReportKrV12CheckedSourceIds([
+      'fnguide-snapshot',
+      'fnguide-shareanalysis',
+      'fnguide-foreign-ownership-chart',
+    ]),
+    [
+      'fnguide.snapshot',
+      'fnguide.shareanalysis',
+      'fnguide.foreign-ownership-chart',
+    ],
+  );
+  assert.throws(
+    () => getWiseReportKrV12CheckedSourceIds(['not-a-kr-page']),
+    /Unknown KR page ids for checked source derivation: not-a-kr-page/,
+  );
 });
 
 test('buildWiseReportKrSlimPayloadV12 does not count arrays of empty rows as available page evidence', async () => {

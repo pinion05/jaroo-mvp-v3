@@ -4,6 +4,7 @@ import {
   WISEREPORT_GLOBAL_ROUTES,
   WISEREPORT_KR_PAGES,
   WISEREPORT_KR_V12_PAGES,
+  WISEREPORT_KR_V12_CHECKED_SOURCE_IDS,
   buildDeepScanKrEvidencePacket,
   buildJarooDeepScanPayload,
   crawlWiseReportGlobal,
@@ -37,6 +38,7 @@ import {
   DEFAULT_US_OHLC_LIMIT,
   getUSOwnershipFlow,
   getUSStockReportData,
+  getWiseReportKrV12CheckedSourceIds,
   runTriggerBatch,
 } from './index.js';
 
@@ -124,6 +126,19 @@ const DEEPSCAN_MAJOR_BLOCK_KEYS = Object.freeze([
   'sellNow',
   'portfolioSimulation',
 ]);
+
+const KR_V12_FINANCIAL_CHECKED_SOURCES = Object.freeze(getWiseReportKrV12CheckedSourceIds(['financial-analysis', 'consensus']));
+const KR_V12_INVESTMENT_INDICATOR_CHECKED_SOURCES = Object.freeze(getWiseReportKrV12CheckedSourceIds(['investment-indicators']));
+const KR_V12_CONSENSUS_CHECKED_SOURCES = Object.freeze(getWiseReportKrV12CheckedSourceIds(['opinion', 'consensus']));
+const KR_V12_OWNERSHIP_CHECKED_SOURCES = Object.freeze(getWiseReportKrV12CheckedSourceIds([
+  'shareholding',
+  'fnguide-snapshot',
+  'fnguide-shareanalysis',
+  'fnguide-foreign-ownership-chart',
+]));
+const KR_V12_SHAREHOLDING_CHECKED_SOURCES = Object.freeze(getWiseReportKrV12CheckedSourceIds(['shareholding']));
+const KR_V12_RECENT_REPORT_CHECKED_SOURCES = Object.freeze(getWiseReportKrV12CheckedSourceIds(['recent-reports']));
+const KR_V12_STYLE_CHECKED_SOURCES = Object.freeze(getWiseReportKrV12CheckedSourceIds(['style-analysis']));
 
 function buildJarooDeepScanInputFromQuery(req) {
   const market = parseSingleQueryValue(req.query.market);
@@ -869,9 +884,9 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
   const noQuoteMessage = 'KR slim v1.2 builder는 WiseReport/FnGuide payload만으로 현재가를 보장하지 않습니다. DeepScan에서는 별도 quotes source를 결합해야 합니다.';
   const noFlowMessage = 'WiseReport/FnGuide KR 내부 source는 외국인 지분율·대차잔고·공매도·지분공시는 제공하지만 개인/외국인/기관 순매수 3분류 집계는 제공하지 않습니다.';
   const notCorporate = instrumentKind === 'etf' || instrumentKind === 'etn';
-  const financialSource = { pageId: 'financial-analysis', checkedSources: ['wisereport.financial-analysis', 'wisereport.consensus'] };
-  const indicatorSource = { pageId: 'investment-indicators', checkedSources: ['wisereport.investment-indicators'] };
-  const ownershipCheckedSources = ['wisereport.shareholding', 'fnguide.snapshot', 'fnguide.shareanalysis', 'fnguide.foreign-ownership-chart'];
+  const financialSource = { pageId: 'financial-analysis', checkedSources: KR_V12_FINANCIAL_CHECKED_SOURCES };
+  const indicatorSource = { pageId: 'investment-indicators', checkedSources: KR_V12_INVESTMENT_INDICATOR_CHECKED_SOURCES };
+  const ownershipCheckedSources = KR_V12_OWNERSHIP_CHECKED_SOURCES;
 
   const foreignOwnershipFact = evidence.ownershipSnapshot?.foreignOwnershipPct !== null && evidence.ownershipSnapshot?.foreignOwnershipPct !== undefined
     ? makeSlimV12Fact(evidence.ownershipSnapshot.foreignOwnershipPct, {
@@ -923,14 +938,14 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
         : makeSlimV12MissingFact({ provider: 'krx', checkedSources: ['quotes'], reasonCode: 'quote_asof_not_attached', message: noQuoteMessage }),
     },
     consensus: {
-      targetPrice: makeSlimV12Fact(evidence.consensusSnapshot?.targetPrice ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가', checkedSources: ['fnguide.opinion', 'wisereport.consensus'] }),
-      previousTargetPrice: makeSlimV12Fact(evidence.consensusSnapshot?.previousTargetPrice ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가(직전 적정주가)' }),
-      targetRevisionPct: makeSlimV12Fact(evidence.consensusSnapshot?.revisionPct ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가(증감율)' }),
+      targetPrice: makeSlimV12Fact(evidence.consensusSnapshot?.targetPrice ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가', checkedSources: KR_V12_CONSENSUS_CHECKED_SOURCES }),
+      previousTargetPrice: makeSlimV12Fact(evidence.consensusSnapshot?.previousTargetPrice ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가(직전 적정주가)', checkedSources: KR_V12_CONSENSUS_CHECKED_SOURCES }),
+      targetRevisionPct: makeSlimV12Fact(evidence.consensusSnapshot?.revisionPct ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가(증감율)', checkedSources: KR_V12_CONSENSUS_CHECKED_SOURCES }),
       targetGapPct: evidence.consensusSnapshot?.targetGapPct !== null && evidence.consensusSnapshot?.targetGapPct !== undefined
         ? makeSlimV12Fact(evidence.consensusSnapshot.targetGapPct, { provider: 'internal', fieldPath: 'computed.targetGapPct', checkedSources: ['targetPrice', 'quotes.currentPrice'] })
         : makeSlimV12MissingFact({ provider: 'internal', checkedSources: ['targetPrice', 'quotes.currentPrice'], reasonCode: 'target_gap_requires_quote', message: '목표가 괴리율 계산에는 현재가 source가 필요합니다.' }),
-      recommendation: makeSlimV12Fact(evidence.consensusSnapshot?.recommendationScore ?? evidence.consensusSnapshot?.recommendation ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].투자의견' }),
-      analystOpinionRows: makeSlimV12Fact(slimPayload.pages?.opinion?.analystOpinions?.rows ?? [], { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions.rows' }),
+      recommendation: makeSlimV12Fact(evidence.consensusSnapshot?.recommendationScore ?? evidence.consensusSnapshot?.recommendation ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].투자의견', checkedSources: KR_V12_CONSENSUS_CHECKED_SOURCES }),
+      analystOpinionRows: makeSlimV12Fact(slimPayload.pages?.opinion?.analystOpinions?.rows ?? [], { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions.rows', checkedSources: KR_V12_CONSENSUS_CHECKED_SOURCES }),
     },
     profitability: {
       revenueLatest: makeSlimV12FinancialFact(evidence.financialSnapshot?.revenueLatest ?? null, financialSource, instrumentKind),
@@ -955,12 +970,12 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
       forwardPbr: makeSlimV12FinancialFact(evidence.valuationSnapshot?.pbr ?? null, { ...indicatorSource, fieldPath: 'investment-indicators.metrics[].PBR' }, instrumentKind),
     },
     ownership: {
-      majorHolderPct: makeSlimV12Fact(evidence.ownershipSnapshot?.majorHolderPct ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.최대주주(보유지분)' }),
-      majorHolderShares: makeSlimV12Fact(evidence.ownershipSnapshot?.majorHolderShares ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.최대주주(보유지분)' }),
-      freeFloatPct: makeSlimV12Fact(evidence.ownershipSnapshot?.freeFloatPct ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.유동주식(유동주식비율)' }),
-      freeFloatShares: makeSlimV12Fact(evidence.ownershipSnapshot?.freeFloatShares ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.유동주식(유동주식수)' }),
-      majorShareholders: makeSlimV12Fact(evidence.ownershipSnapshot?.majorShareholders ?? [], { pageId: 'shareholding', fieldPath: 'shareholding.majorShareholders.rows' }),
-      knownInstitutionalMajorHolders: makeSlimV12Fact(evidence.ownershipSnapshot?.knownInstitutionalMajorHolders ?? [], { pageId: 'shareholding', fieldPath: 'shareholding.shareholderChanges.rows' }),
+      majorHolderPct: makeSlimV12Fact(evidence.ownershipSnapshot?.majorHolderPct ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.최대주주(보유지분)', checkedSources: ownershipCheckedSources }),
+      majorHolderShares: makeSlimV12Fact(evidence.ownershipSnapshot?.majorHolderShares ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.최대주주(보유지분)', checkedSources: ownershipCheckedSources }),
+      freeFloatPct: makeSlimV12Fact(evidence.ownershipSnapshot?.freeFloatPct ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.유동주식(유동주식비율)', checkedSources: ownershipCheckedSources }),
+      freeFloatShares: makeSlimV12Fact(evidence.ownershipSnapshot?.freeFloatShares ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.유동주식(유동주식수)', checkedSources: ownershipCheckedSources }),
+      majorShareholders: makeSlimV12Fact(evidence.ownershipSnapshot?.majorShareholders ?? [], { pageId: 'shareholding', fieldPath: 'shareholding.majorShareholders.rows', checkedSources: ownershipCheckedSources }),
+      knownInstitutionalMajorHolders: makeSlimV12Fact(evidence.ownershipSnapshot?.knownInstitutionalMajorHolders ?? [], { pageId: 'shareholding', fieldPath: 'shareholding.shareholderChanges.rows', checkedSources: ownershipCheckedSources }),
     },
     investorFlow: {
       foreignOwnershipPct: foreignOwnershipFact,
@@ -980,21 +995,21 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
       flowRows: makeSlimV12MissingFact({ provider: 'fnguide', checkedSources: ownershipCheckedSources, reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide', message: noFlowMessage }),
     },
     reports: {
-      totalCount: makeSlimV12Fact(evidence.reportSignals?.recentReportCount ?? null, { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows' }),
-      recent30dCount: makeSlimV12Fact(evidence.reportSignals?.recent30dReportCount ?? null, { provider: 'internal', pageId: 'recent-reports', fieldPath: 'computed.recent30dReportCount', checkedSources: ['recent-reports.recentReports.rows', 'quotes.asOf'] }),
-      latestReportDate: makeSlimV12Fact(evidence.timestamps?.reportAsOf ?? null, { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows[0].일자' }),
-      recentItems: makeSlimV12Fact(slimPayload.pages?.['recent-reports']?.recentReports?.rows ?? [], { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows' }),
+      totalCount: makeSlimV12Fact(evidence.reportSignals?.recentReportCount ?? null, { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows', checkedSources: KR_V12_RECENT_REPORT_CHECKED_SOURCES }),
+      recent30dCount: makeSlimV12Fact(evidence.reportSignals?.recent30dReportCount ?? null, { provider: 'internal', pageId: 'recent-reports', fieldPath: 'computed.recent30dReportCount', checkedSources: KR_V12_RECENT_REPORT_CHECKED_SOURCES }),
+      latestReportDate: makeSlimV12Fact(evidence.timestamps?.reportAsOf ?? null, { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows[0].일자', checkedSources: KR_V12_RECENT_REPORT_CHECKED_SOURCES }),
+      recentItems: makeSlimV12Fact(slimPayload.pages?.['recent-reports']?.recentReports?.rows ?? [], { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows', checkedSources: KR_V12_RECENT_REPORT_CHECKED_SOURCES }),
     },
     styleFactors: {
-      companyName: makeSlimV12Fact(evidence.styleAnalysisSnapshot?.companyName ?? null, { provider: 'fnguide', pageId: 'style-analysis', fieldPath: 'style-analysis.factorScores.CHART_H[0].NAME' }),
-      peerName: makeSlimV12Fact(evidence.styleAnalysisSnapshot?.peerName ?? null, { provider: 'fnguide', pageId: 'style-analysis', fieldPath: 'style-analysis.factorScores.CHART_H[1].NAME' }),
-      factors: makeSlimV12Fact(evidence.styleAnalysisSnapshot?.factorScores ?? [], { provider: 'fnguide', pageId: 'style-analysis', fieldPath: 'style-analysis.factorScores.CHART_D' }),
+      companyName: makeSlimV12Fact(evidence.styleAnalysisSnapshot?.companyName ?? null, { provider: 'fnguide', pageId: 'style-analysis', fieldPath: 'style-analysis.factorScores.CHART_H[0].NAME', checkedSources: KR_V12_STYLE_CHECKED_SOURCES }),
+      peerName: makeSlimV12Fact(evidence.styleAnalysisSnapshot?.peerName ?? null, { provider: 'fnguide', pageId: 'style-analysis', fieldPath: 'style-analysis.factorScores.CHART_H[1].NAME', checkedSources: KR_V12_STYLE_CHECKED_SOURCES }),
+      factors: makeSlimV12Fact(evidence.styleAnalysisSnapshot?.factorScores ?? [], { provider: 'fnguide', pageId: 'style-analysis', fieldPath: 'style-analysis.factorScores.CHART_D', checkedSources: KR_V12_STYLE_CHECKED_SOURCES }),
     },
     sourceLimitations: [
       ...(Array.isArray(evidence.sourceLimitations) ? evidence.sourceLimitations.map((limitation) => ({
         factPath: limitation.fact,
         reasonCode: limitation.reasonCode,
-        checkedSources: /ownership/i.test(String(limitation.fact || '')) ? ownershipCheckedSources : ['wisereport.shareholding'],
+        checkedSources: /ownership/i.test(String(limitation.fact || '')) ? ownershipCheckedSources : KR_V12_SHAREHOLDING_CHECKED_SOURCES,
         message: limitation.message,
       })) : []),
       {
@@ -1054,21 +1069,7 @@ function buildWiseReportKrSlimPayloadV12(rawAggregate, code) {
         ...evidence.sourceCoverage,
         availableReportPages: availableV12PageIds,
       },
-      checkedSources: [
-        'wisereport.company-overview',
-        'wisereport.financial-analysis',
-        'wisereport.investment-indicators',
-        'wisereport.consensus',
-        'wisereport.shareholding',
-        'wisereport.recent-reports',
-        'fnguide.snapshot',
-        'fnguide.shareanalysis',
-        'fnguide.foreign-ownership-chart',
-        'fnguide.finance',
-        'fnguide.relative-return',
-        'fnguide.opinion',
-        'fnguide.style-analysis',
-      ],
+      checkedSources: WISEREPORT_KR_V12_CHECKED_SOURCE_IDS,
     },
     pages: slimV11.pages,
     krFacts: buildWiseReportKrSlimFactsV12(slimV11, evidence, instrumentKind),

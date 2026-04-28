@@ -8,6 +8,11 @@ const {
   KR_WISEREPORT_V12_PAGE_SPECS,
   WISEREPORT_KR_PAGES,
   WISEREPORT_KR_V12_PAGES,
+  WISEREPORT_KR_CHECKED_SOURCE_IDS,
+  WISEREPORT_KR_V12_CHECKED_SOURCE_IDS,
+  getCheckedSourceIds,
+  getWiseReportKrCheckedSourceIds,
+  getWiseReportKrV12CheckedSourceIds,
   getPageSpec,
 } = require('./wisereport-kr/page-specs.cjs');
 const { runCrawlerV1Stage } = require('./wisereport-kr/crawler_v1.cjs');
@@ -165,6 +170,11 @@ module.exports = {
   KR_WISEREPORT_V12_PAGE_SPECS,
   WISEREPORT_KR_PAGES,
   WISEREPORT_KR_V12_PAGES,
+  WISEREPORT_KR_CHECKED_SOURCE_IDS,
+  WISEREPORT_KR_V12_CHECKED_SOURCE_IDS,
+  getCheckedSourceIds,
+  getWiseReportKrCheckedSourceIds,
+  getWiseReportKrV12CheckedSourceIds,
   getAggregate,
   getCrawl,
   getCrawlV12,
