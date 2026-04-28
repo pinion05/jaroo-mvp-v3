@@ -122,10 +122,8 @@ export function MergeResultRowCard({ row, isLast }: { row: MergeRow; isLast: boo
   return (
     <div className={cn('px-4 py-3', !isLast && 'border-b border-[color:var(--jaroo-border)]')}>
       <div>
-        <div className='min-w-0'>
-          <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.displayName || '-'}</p>
-          {resolvedMeta ? <p className='mt-1 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{resolvedMeta}</p> : null}
-        </div>
+        <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.displayName || '-'}</p>
+        {resolvedMeta ? <p className='mt-1 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{resolvedMeta}</p> : null}
       </div>
 
       <div className='mt-3 grid grid-cols-2 gap-2'>
