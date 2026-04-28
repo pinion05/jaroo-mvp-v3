@@ -19,10 +19,17 @@ import {
   type OcrSourceRow,
   type ScreenshotUploadSession,
 } from '@/lib/screenshot-ocr'
-import { hasResolvedIdentifier, resolveIdentifierRowsWithRetry, type OcrIdentifierResolutionResult } from '@/lib/ocr-identifier-resolution'
+import { resolveIdentifierRowsWithRetry, type OcrIdentifierResolutionResult } from '@/lib/ocr-identifier-resolution'
 import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
 import { useOcrUploadStore } from '@/lib/stores/use-ocr-upload-store'
+import {
+  applyInstrumentResolutionFailure,
+  applyInstrumentResolutionResult,
+  applyReviewCandidate,
+  mergeResolvedRowsWithExistingReviewRows,
+  toReviewRow,
+} from '@/lib/ocr-review-resolution'
 import type { OcrReviewRow, ResolveCandidate } from '@/lib/workflow-types'
 import { cn } from '@/lib/utils'
 
@@ -182,58 +189,6 @@ function isManualRowComplete(row: OcrReviewRow) {
     && row.profitRate.trim()
     && row.evaluationAmount.trim(),
   )
-}
-
-function toReviewRow(row: OcrSourceRow): OcrReviewRow {
-  return {
-    ...row,
-    raw: {
-      name: row.name,
-      quantity: row.quantity,
-      profitRate: row.profitRate,
-      evaluationAmount: row.evaluationAmount,
-      averagePrice: row.averagePrice,
-      code: row.code,
-      ticker: row.ticker,
-    },
-    sourceFileName: row.fileName,
-    sourceUploadId: row.uploadId,
-    resolutionState: hasResolvedIdentifier(row) ? 'resolved' : 'unresolved',
-    selectedCandidateId: null,
-  }
-}
-
-function applyReviewCandidate(row: OcrReviewRow, candidate?: ResolveCandidate) {
-  if (!candidate) {
-    return row
-  }
-
-  return {
-    ...row,
-    resolvedName: candidate.resolvedName,
-    resolvedCode: candidate.resolvedCode ?? row.resolvedCode,
-    resolvedTicker: candidate.resolvedTicker ?? row.resolvedTicker,
-    resolvedMarket: candidate.resolvedMarket ?? row.resolvedMarket,
-    resolvedMarketTone: candidate.resolvedMarketTone ?? row.resolvedMarketTone,
-    resolvedKind: candidate.resolvedKind ?? row.resolvedKind,
-  }
-}
-
-function mergeResolvedRowsWithExistingReviewRows(
-  resolvedRows: OcrSourceRow[],
-  existingRows: OcrReviewRow[],
-  existingCandidatesByRowId: Record<string, ResolveCandidate[]>,
-) {
-  const existingRowsById = new Map(existingRows.map((row) => [row.id, row]))
-  const nextRows = resolvedRows.map((row) => existingRowsById.get(row.id) ?? toReviewRow(row))
-  const nextCandidatesByRowId = Object.fromEntries(
-    Object.entries(existingCandidatesByRowId).filter(([rowId]) => nextRows.some((row) => row.id === rowId)),
-  )
-
-  return {
-    rows: nextRows,
-    candidatesByRowId: nextCandidatesByRowId,
-  }
 }
 
 function filterConflictSelections(
@@ -763,19 +718,7 @@ export default function OcrPage() {
           return
         }
 
-        const resolvedRowsById = new Map(result.rows.map((row) => [row.id, row]))
-        const nextRows = mergedState.rows.map((row) => {
-          const resolvedRow = resolvedRowsById.get(row.id)
-          const candidates = result.candidatesByRowId[row.id] ?? mergedState.candidatesByRowId[row.id] ?? []
-          const firstCandidate = candidates[0]
-          const manuallyRequired = !hasResolvedIdentifier(resolvedRow ?? row) && candidates.length === 0
-
-          return {
-            ...(resolvedRow ? toReviewRow(resolvedRow) : row),
-            selectedCandidateId: !hasResolvedIdentifier(resolvedRow ?? row) && firstCandidate ? firstCandidate.id : row.selectedCandidateId ?? null,
-            resolutionState: manuallyRequired ? 'manual-required' : 'resolved',
-          } satisfies OcrReviewRow
-        })
+        const nextRows = applyInstrumentResolutionResult(mergedState.rows, result, mergedState.candidatesByRowId)
 
         setReviewRows(nextRows)
         replaceCandidates({
@@ -798,7 +741,7 @@ export default function OcrPage() {
           return
         }
 
-        setReviewRows(mergedState.rows)
+        setReviewRows(applyInstrumentResolutionFailure(mergedState.rows))
         replaceCandidates(mergedState.candidatesByRowId)
         setExpandedRowId((current) => (current && mergedState.candidatesByRowId[current]?.length > 1 ? current : null))
         setResolveStatus('error', error instanceof Error ? error.message : '종목 식별자 확인에 실패했어요.')
@@ -877,7 +820,7 @@ export default function OcrPage() {
 
   const canContinue =
     requestState === 'success'
-    && instrumentResolveState === 'success'
+    && (instrumentResolveState === 'success' || instrumentResolveState === 'error')
     && unresolvedConflictCount === 0
     && previewRows.length > 0
     && invalidManualRowIds.length === 0
@@ -919,6 +862,7 @@ export default function OcrPage() {
       return
     }
 
+    setReviewRows(previewRows)
     resetMergeState()
     router.push('/merge')
   }
