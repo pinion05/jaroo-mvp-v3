@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
+import type { HomeHolding } from './jaroo-home-data'
 import {
   buildDeepScanSlimSummaryKey,
   clearCachedDeepScanSlimSummary,
@@ -10,6 +11,11 @@ import {
   readCachedDeepScanSlimSummary,
   resolveDeepScanSlimRequest,
 } from './deepscan-slim'
+
+type DeepScanSlimTarget = Pick<HomeHolding, 'identifierTicker' | 'identifierCode' | 'code'>
+
+const krSlimTarget = { code: '005930', identifierCode: '005930' } satisfies DeepScanSlimTarget
+const usSlimTarget = { identifierTicker: 'aapl' } satisfies DeepScanSlimTarget
 
 test('KR slim payload를 deepscan summary로 정규화한다', () => {
   const summary = normalizeDeepScanSlimPayload({
@@ -72,8 +78,8 @@ test('US slim payload를 deepscan summary로 정규화한다', () => {
 })
 
 test('holding에서 deepscan slim 요청과 key를 만든다', () => {
-  const krRequest = resolveDeepScanSlimRequest({ code: '005930', identifierCode: '005930', identifierTicker: undefined } as never)
-  const usRequest = resolveDeepScanSlimRequest({ code: undefined, identifierCode: undefined, identifierTicker: 'aapl' } as never)
+  const krRequest = resolveDeepScanSlimRequest(krSlimTarget)
+  const usRequest = resolveDeepScanSlimRequest(usSlimTarget)
 
   assert.deepEqual(krRequest, { market: 'KR', identifier: '005930' })
   assert.deepEqual(usRequest, { market: 'US', identifier: 'AAPL' })
@@ -102,7 +108,7 @@ test('deepscan slim summary를 fetch 후 메모리 캐시에 저장한다', asyn
   assert.equal(requestedUrls[0], '/api/deepscan/slim?market=KR&code=005930&version=v1.1')
 
   const cached = await prefetchAndPersistDeepScanSlimSummary(
-    { code: '005930', identifierCode: '005930', identifierTicker: undefined } as never,
+    krSlimTarget,
     async (url) => {
       requestedUrls.push(String(url))
       return new Response(JSON.stringify({
@@ -127,7 +133,7 @@ test('home summary prefetch는 KR slim v1.1 endpoint를 한 번만 요청해 v1.
   const requestedUrls: string[] = []
 
   const cached = await prefetchAndPersistDeepScanSlimSummary(
-    { code: '005930', identifierCode: '005930', identifierTicker: undefined } as never,
+    krSlimTarget,
     async (url) => {
       requestedUrls.push(String(url))
       return new Response(JSON.stringify({
