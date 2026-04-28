@@ -255,6 +255,32 @@ test('fetchDeepScanCanonicalPayload는 local proxy failure JSON을 canonical pay
   assert.equal(fetched, null)
 })
 
+test('isDeepScanPayloadReady는 malformed nested recovery forecast payload를 거부한다', () => {
+  const malformedModelPayload = createCanonicalPayload() as unknown as {
+    recoveryForecast: JarooDeepScanPayload['recoveryForecast']
+  }
+  malformedModelPayload.recoveryForecast.models = [
+    {
+      ...malformedModelPayload.recoveryForecast.models[0],
+      id: 'unknown-model',
+      probabilityWithinOneYear: '60%',
+    },
+  ] as unknown as JarooDeepScanPayload['recoveryForecast']['models']
+
+  assert.equal(isDeepScanPayloadReady(malformedModelPayload), false)
+
+  const malformedDataQualityPayload = createCanonicalPayload() as unknown as {
+    recoveryForecast: JarooDeepScanPayload['recoveryForecast']
+  }
+  malformedDataQualityPayload.recoveryForecast.dataQuality = {
+    ...malformedDataQualityPayload.recoveryForecast.dataQuality,
+    sampleCount: '120',
+    notes: ['ok', 123],
+  } as unknown as JarooDeepScanPayload['recoveryForecast']['dataQuality']
+
+  assert.equal(isDeepScanPayloadReady(malformedDataQualityPayload), false)
+})
+
 test('isDeepScanPayloadReady는 meta 모양만 맞춘 불완전 payload를 거부한다', () => {
   const malformedPayload = {
     input: {

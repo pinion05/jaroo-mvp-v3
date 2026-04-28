@@ -120,7 +120,15 @@ function hasRequiredStringFields(value: unknown, keys: readonly string[]) {
 
 function hasRequiredNumberFields(value: unknown, keys: readonly string[]) {
   const record = asRecord(value)
-  return !!record && keys.every((key) => typeof record[key] === 'number')
+  return !!record && keys.every((key) => isFiniteNumber(record[key]))
+}
+
+function isFiniteNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function isNullableFiniteNumber(value: unknown) {
+  return value === null || isFiniteNumber(value)
 }
 
 function isCanonicalInput(input: unknown) {
@@ -211,20 +219,55 @@ function isCanonicalPortfolioSimulationBlock(block: unknown) {
     && hasRequiredNumberFields(block, ['beforeScore', 'afterScore'])
 }
 
+const RECOVERY_FORECAST_STATUSES = new Set(['ok', 'low_confidence', 'unavailable'])
+const RECOVERY_FORECAST_CONFIDENCES = new Set(['high', 'medium', 'low'])
+const RECOVERY_FORECAST_MODEL_IDS = new Set(['similarPattern', 'gbm', 'jumpDiffusion'])
+
+function isRecoveryForecastStatus(value: unknown) {
+  return typeof value === 'string' && RECOVERY_FORECAST_STATUSES.has(value)
+}
+
+function isCanonicalRecoveryForecastModelRow(model: unknown) {
+  const record = asRecord(model)
+  return !!record
+    && typeof record.id === 'string'
+    && RECOVERY_FORECAST_MODEL_IDS.has(record.id)
+    && typeof record.label === 'string'
+    && isFiniteNumber(record.weight)
+    && isRecoveryForecastStatus(record.status)
+    && isNullableFiniteNumber(record.medianDays)
+    && isNullableFiniteNumber(record.p25Days)
+    && isNullableFiniteNumber(record.p75Days)
+    && isNullableFiniteNumber(record.probabilityWithinOneYear)
+    && isFiniteNumber(record.sampleCount)
+}
+
+function isCanonicalRecoveryForecastDataQuality(dataQuality: unknown) {
+  const record = asRecord(dataQuality)
+  return !!record
+    && isFiniteNumber(record.sampleCount)
+    && isFiniteNumber(record.historyDays)
+    && isFiniteNumber(record.similarPatternSamples)
+    && isStringArray(record.missingInputs)
+    && isStringArray(record.notes)
+}
+
 function isCanonicalRecoveryForecastBlock(block: unknown) {
   const record = asRecord(block)
   return isBlockMeta(block)
     && !!record
-    && ['ok', 'low_confidence', 'unavailable'].includes(String(record.status))
+    && isRecoveryForecastStatus(record.status)
     && typeof record.expectedRecoveryPeriodLabel === 'string'
-    && (typeof record.expectedRecoveryDays === 'number' || record.expectedRecoveryDays === null)
-    && (typeof record.probabilityWithinOneYear === 'number' || record.probabilityWithinOneYear === null)
-    && ['high', 'medium', 'low'].includes(String(record.confidence))
+    && isNullableFiniteNumber(record.expectedRecoveryDays)
+    && isNullableFiniteNumber(record.probabilityWithinOneYear)
+    && typeof record.confidence === 'string'
+    && RECOVERY_FORECAST_CONFIDENCES.has(record.confidence)
     && typeof record.confidenceLabel === 'string'
-    && (typeof record.divergenceRatio === 'number' || record.divergenceRatio === null)
+    && isNullableFiniteNumber(record.divergenceRatio)
     && typeof record.disclaimer === 'string'
     && Array.isArray(record.models)
-    && !!asRecord(record.dataQuality)
+    && record.models.every(isCanonicalRecoveryForecastModelRow)
+    && isCanonicalRecoveryForecastDataQuality(record.dataQuality)
 }
 
 function isCanonicalPayload(payload: unknown): payload is JarooDeepScanPayload {

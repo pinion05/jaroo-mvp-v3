@@ -151,7 +151,7 @@ function summarizeHits(hits, paths) {
   };
 }
 
-function simulatePaths({ currentPrice, averagePrice, mu, sigma, paths = DEFAULT_PATHS, horizonDays = TRADING_DAYS, seed = 20260428, jumpParams = null }) {
+export function simulatePaths({ currentPrice, averagePrice, mu, sigma, paths = DEFAULT_PATHS, horizonDays = TRADING_DAYS, seed = 20260428, jumpParams = null }) {
   if (!(currentPrice > 0) || !(averagePrice > 0) || mu === null || sigma === null || sigma < 0) return summarizeHits([], 0);
   const random = createSeededRandom(seed);
   const hits = [];
@@ -159,7 +159,7 @@ function simulatePaths({ currentPrice, averagePrice, mu, sigma, paths = DEFAULT_
     let price = currentPrice;
     let hit = null;
     for (let day = 1; day <= horizonDays; day += 1) {
-      let dailyReturn = (mu - (sigma ** 2) / 2) + sigma * normalSample(random);
+      let dailyReturn = mu + sigma * normalSample(random);
       if (jumpParams && random() < jumpParams.lambda) {
         dailyReturn += jumpParams.muJ + jumpParams.sigmaJ * normalSample(random);
       }

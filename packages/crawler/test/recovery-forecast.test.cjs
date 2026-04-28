@@ -73,6 +73,23 @@ test('sampleSimilarPatterns finds independent drawdown recovery samples', async 
   assert.equal(samples.some((sample) => sample.recovered), true);
 });
 
+test('simulatePaths treats mu as an observed mean log return without another volatility drift adjustment', async () => {
+  const { simulatePaths } = await import('../src/services/recovery-forecast.js');
+
+  const oneDayForecast = simulatePaths({
+    currentPrice: 100,
+    averagePrice: Math.exp(0.32) * 100,
+    mu: 0.05,
+    sigma: 0.2,
+    paths: 1,
+    horizonDays: 1,
+    seed: 42,
+  });
+
+  assert.equal(oneDayForecast.probabilityWithinOneYear, 1);
+  assert.equal(oneDayForecast.medianDays, 1);
+});
+
 test('buildRecoveryForecast returns deterministic model comparison and consensus', async () => {
   const { buildRecoveryForecast, RECOVERY_FORECAST_DISCLAIMER } = await import('../src/services/recovery-forecast.js');
 
