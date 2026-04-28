@@ -8,7 +8,7 @@ import { Card } from '@/components/ui/card'
 import { JarooShell } from '@/components/jaroo-shell'
 import { buildHomeCurrentQuoteQuery } from '@/lib/home-current-quotes'
 import { hydratePortfolioItemsWithCurrentQuotes } from '@/lib/home-quote-bootstrap'
-import { buildHomeHoldingsFromPortfolioItems, type AppliedHomePortfolioRow } from '@/lib/jaroo-home-data'
+import { buildHomeHoldingsFromPortfolioItems, persistAppliedHomePortfolio, type AppliedHomePortfolioRow } from '@/lib/jaroo-home-data'
 import { computeAveragePrice } from '@/lib/screenshot-ocr'
 import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
@@ -212,6 +212,17 @@ export default function JarooMergeScreen() {
     setApplyStatus('loading')
 
     try {
+      const appliedAt = new Date().toISOString()
+      const persisted = persistAppliedHomePortfolio({
+        broker: 'OCR 적용 포트폴리오',
+        rows: buildAppliedHomePortfolioRowsFromConfirmedHoldings(applicableHoldings),
+        appliedAt,
+      })
+
+      if (!persisted) {
+        throw new Error('홈 포트폴리오 저장에 실패했어요.')
+      }
+
       const nextQuoteQuery = buildHomeCurrentQuoteQuery(buildHomeHoldingsFromPortfolioItems(normalizedItems))
       replacePortfolioItems(normalizedItems)
       setQuoteStatus('loading', null, nextQuoteQuery)
@@ -223,7 +234,7 @@ export default function JarooMergeScreen() {
         .catch(() => {
           setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', null)
         })
-      markApplied()
+      markApplied(appliedAt)
       router.push('/home')
     } catch (error) {
       setApplyStatus('error', error instanceof Error ? error.message : '포트폴리오 저장에 실패했어요.')

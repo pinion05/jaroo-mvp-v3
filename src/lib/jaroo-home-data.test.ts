@@ -6,6 +6,7 @@ import {
   buildHomeHoldingsFromOcrRows,
   buildHomeHoldingsFromPortfolioItems,
   buildHomeMarketScore,
+  buildPortfolioItemsFromAppliedHomePortfolioRows,
   homeHoldings,
   persistAppliedHomePortfolio,
   persistDeepScanTarget,
@@ -263,6 +264,44 @@ test('home holdings builder preserves portfolio-store live quote fields on remou
     { label: '수익률', value: '+6.5%', tone: 'positive' },
     { label: '평가 금액', value: '852,000원', tone: 'neutral' },
     { label: '현재가', value: '85,200원', tone: 'neutral' },
+  ])
+})
+
+test('applied home portfolio rows can rehydrate the in-memory portfolio store shape', () => {
+  const restoredItems = buildPortfolioItemsFromAppliedHomePortfolioRows([
+    {
+      name: '마이크로소프트',
+      quantity: '3주',
+      averagePrice: '$972.11',
+      averagePriceCurrency: 'USD',
+      resolvedName: 'Microsoft Corporation',
+      resolvedTicker: 'MSFT',
+      resolvedCode: 'US5949181045',
+      resolvedMarket: 'NASDAQ',
+      resolvedMarketTone: 'nasdaq',
+      resolvedKind: 'stock',
+      currentPrice: 1150,
+      currentPriceCurrency: 'USD',
+      currentProfitRate: 18.3,
+    },
+  ])
+
+  assert.deepEqual(restoredItems, [
+    {
+      code: 'US5949181045',
+      ticker: 'MSFT',
+      market: 'NASDAQ',
+      marketTone: 'nasdaq',
+      kind: 'stock',
+      name: 'Microsoft Corporation',
+      quantity: 3,
+      averagePrice: 972.11,
+      averagePriceCurrency: 'USD',
+      currentPrice: 1150,
+      currentPriceCurrency: 'USD',
+      currentProfitRate: 18.3,
+      identifierLabel: 'MSFT · US5949181045',
+    },
   ])
 })
 

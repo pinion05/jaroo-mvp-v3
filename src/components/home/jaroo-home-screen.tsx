@@ -30,10 +30,12 @@ import { cn } from '@/lib/utils'
 import {
   buildHomeHoldingsFromPortfolioItems,
   buildHomeMarketScore,
+  buildPortfolioItemsFromAppliedHomePortfolioRows,
   homeForecast as defaultHomeForecast,
   momentumSignals as defaultMomentumSignals,
   momentumStages as defaultMomentumStages,
   portfolioScoreBreakdown as defaultPortfolioScoreBreakdown,
+  readAppliedHomePortfolio,
   type HomeBadgeTone,
   type HomeHolding,
   type HomeMetricTone,
@@ -383,6 +385,7 @@ export function JarooHomeScreen() {
   const quoteStatus = usePortfolioStore((state) => state.quoteStatus)
   const quoteErrorMessage = usePortfolioStore((state) => state.quoteErrorMessage)
   const quoteQueryKey = usePortfolioStore((state) => state.quoteQueryKey)
+  const replacePortfolioItems = usePortfolioStore((state) => state.replaceItems)
   const setQuoteStatus = usePortfolioStore((state) => state.setQuoteStatus)
   const patchQuote = usePortfolioStore((state) => state.patchQuote)
   const clearItemQuote = usePortfolioStore((state) => state.clearItemQuote)
@@ -399,6 +402,7 @@ export function JarooHomeScreen() {
   const [quoteSummaryMessage, setQuoteSummaryMessage] = useState<string | null>(null)
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [deepScanLoadingTarget, setDeepScanLoadingTarget] = useState<DeepScanLoadingTarget | null>(null)
+  const hasCheckedPersistedPortfolioRef = useRef(false)
 
   const portfolioBaseItems = useMemo(() => portfolioItems.map((item) => stripPortfolioQuoteFields(item)), [portfolioItems])
   const portfolioSignature = useMemo(
@@ -427,6 +431,20 @@ export function JarooHomeScreen() {
       return
     }
 
+    if (!hasCheckedPersistedPortfolioRef.current) {
+      hasCheckedPersistedPortfolioRef.current = true
+
+      const persistedPortfolio = readAppliedHomePortfolio()
+      const persistedItems = persistedPortfolio
+        ? buildPortfolioItemsFromAppliedHomePortfolioRows(persistedPortfolio.rows)
+        : []
+
+      if (persistedItems.length > 0) {
+        replacePortfolioItems(persistedItems)
+        return
+      }
+    }
+
     const timeoutId = window.setTimeout(() => {
       router.replace('/ocr')
     }, 350)
@@ -434,7 +452,7 @@ export function JarooHomeScreen() {
     return () => {
       window.clearTimeout(timeoutId)
     }
-  }, [hasPortfolioItems, router])
+  }, [hasPortfolioItems, replacePortfolioItems, router])
 
   useEffect(() => {
     portfolioBaseItemsRef.current = portfolioBaseItems

@@ -214,6 +214,21 @@ test('OCR review store supports candidate replacement and manual row patching', 
   assert.equal(state.resolveStatus, 'success')
 })
 
+test('OCR review store marks row manual-required when candidate selection is cleared', () => {
+  const row = createReviewRow({
+    id: 'candidate-clear-row',
+    resolutionState: 'resolved',
+    selectedCandidateId: 'candidate-1',
+  })
+
+  useOcrReviewStore.getState().setRows([row])
+  useOcrReviewStore.getState().selectCandidate(row.id, null)
+
+  const [clearedRow] = useOcrReviewStore.getState().rows
+  assert.equal(clearedRow?.selectedCandidateId, null)
+  assert.equal(clearedRow?.resolutionState, 'manual-required')
+})
+
 test('OCR review store can remove one row and its candidate cache without resetting others', () => {
   const firstRow = createReviewRow({ id: 'row-1' })
   const secondRow = createReviewRow({ id: 'row-2', name: '엔비디아', resolvedName: 'NVIDIA CORP' })

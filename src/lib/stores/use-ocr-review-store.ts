@@ -87,7 +87,7 @@ export const useOcrReviewStore = create<OcrReviewStoreState & OcrReviewStoreActi
           ? {
               ...row,
               selectedCandidateId: candidateId,
-              resolutionState: candidateId ? 'resolved' : row.resolutionState === 'error' ? 'error' : row.resolutionState,
+              resolutionState: candidateId ? 'resolved' : row.resolutionState === 'error' ? 'error' : 'manual-required',
             }
           : row,
       ),

@@ -1,5 +1,5 @@
 import { buildDeepScanTargetSession, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding, type DeepScanTargetSession } from '@/lib/deepscan-target'
-import type { PortfolioNormalizedItem, WorkflowAsyncStatus } from '@/lib/workflow-types'
+import { buildIdentifierLabel, type PortfolioNormalizedItem, type WorkflowAsyncStatus } from '@/lib/workflow-types'
 import { normalizeStockName, parseOcrNumber, type OcrRow } from '@/lib/screenshot-ocr'
 
 export type HomeBadgeTone = 'amber' | 'red' | 'green'
@@ -1034,6 +1034,45 @@ export function buildHomeHoldingsFromPortfolioItems(items: PortfolioNormalizedIt
   }
 
   return buildHomeHoldingsFromOcrRows(items.map((item) => buildAppliedRowFromPortfolioItem(item)))
+}
+
+export function buildPortfolioItemsFromAppliedHomePortfolioRows(rows: AppliedHomePortfolioRow[]): PortfolioNormalizedItem[] {
+  return sanitizeAppliedHomePortfolioRows(rows)
+    .map((row): PortfolioNormalizedItem | null => {
+      const name = row.resolvedName?.trim() || row.name.trim()
+      const quantity = parseOcrNumber(row.quantity)
+      const averagePrice = parseOcrNumber(row.averagePrice)
+
+      if (!name || quantity === null || averagePrice === null) {
+        return null
+      }
+
+      const kind = row.resolvedKind ?? inferHoldingKind(name)
+      const resolvedMarket = row.resolvedMarket?.trim()
+      const market = resolvedMarket || (kind === 'etf' ? 'ETF' : 'OCR')
+      const marketTone = resolveHomeMarketTone(row.resolvedMarketTone, market, kind)
+      const code = row.resolvedCode?.trim() || row.code?.trim() || undefined
+      const ticker = row.resolvedTicker?.trim() || row.ticker?.trim() || undefined
+
+      return {
+        code,
+        ticker,
+        market: resolvedMarket,
+        marketTone,
+        kind,
+        name,
+        quantity,
+        averagePrice,
+        averagePriceCurrency: row.averagePriceCurrency
+          ?? inferCurrencyFromMoneyText(row.averagePrice)
+          ?? (marketTone === 'nasdaq' ? undefined : 'KRW'),
+        currentPrice: row.currentPrice,
+        currentPriceCurrency: row.currentPriceCurrency,
+        currentProfitRate: row.currentProfitRate,
+        identifierLabel: buildIdentifierLabel(ticker, code),
+      }
+    })
+    .filter((item): item is PortfolioNormalizedItem => item !== null)
 }
 
 export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): HomeHolding[] {
