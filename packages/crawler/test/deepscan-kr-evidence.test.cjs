@@ -480,6 +480,9 @@ test('buildDeepScanKrEvidencePacket promotes KR WiseReport raw facts into struct
     changePct: 5.18,
     changeReason: '기타(+)',
   });
+  assert.deepEqual(packet.ownershipSnapshot.knownInstitutionalMajorHolderSourcePaths, [
+    'shareholding.shareholderChanges.rows',
+  ]);
   assert.deepEqual(packet.styleAnalysisSnapshot.factorScores[0], {
     name: '베타',
     value: -0.23,
@@ -528,6 +531,20 @@ test('buildDeepScanKrEvidencePacket uses v1.2 FnGuide ownership pages when prese
             },
           },
           'fnguide-shareanalysis': {
+            shareholderChangesJson: {
+              comp: [
+                {
+                  주주구분: '주요주주',
+                  대표주주: '국민연금공단',
+                  변동주주: '국민연금공단',
+                  변동일: '2026.03.30',
+                  변동사유: '기타(+)',
+                  증감주: '1,071,914',
+                  변동후주: '1,071,914',
+                  지분율: '5.18',
+                },
+              ],
+            },
             shareholderDetailsJson: {
               comp: [
                 {
@@ -558,6 +575,31 @@ test('buildDeepScanKrEvidencePacket uses v1.2 FnGuide ownership pages when prese
   assert.equal(packet.ownershipSnapshot.foreignOwnershipAsOf, '2026-04-24');
   assert.equal(packet.ownershipSnapshot.foreignOwnershipHistory.length, 2);
   assert.equal(packet.ownershipSnapshot.assetManagerOwnershipPctSum, 2.27);
+  assert.deepEqual(packet.ownershipSnapshot.knownInstitutionalMajorHolders[0], {
+    name: '국민연금공단',
+    pct: 5.18,
+    shares: 1071914,
+    lastTradeDate: '2026-03-30',
+    changePct: null,
+    changeReason: '기타(+)',
+  });
+  assert.deepEqual(packet.ownershipSnapshot.knownInstitutionalMajorHolderSourcePaths, [
+    'fnguide-shareanalysis.shareholderChangesJson.comp',
+  ]);
+  assert.deepEqual(packet.ownershipSnapshot.ownershipChanges[0], {
+    holderType: '주요주주',
+    representative: '국민연금공단',
+    name: '국민연금공단',
+    tradeDate: '2026-03-30',
+    changeReason: '기타(+)',
+    shareClass: null,
+    previousShares: null,
+    changeShares: 1071914,
+    shares: 1071914,
+    pct: 5.18,
+    changePct: null,
+    sourcePath: 'fnguide-shareanalysis.shareholderChangesJson.comp',
+  });
   assert.equal(packet.sourceLimitations.some((limitation) => limitation.fact === 'foreignOwnershipPct'), false);
   assert.equal(packet.sourceLimitations.some((limitation) => limitation.fact === 'institutionalOwnershipPct'), true);
   assert.deepEqual(packet.topFacts, [

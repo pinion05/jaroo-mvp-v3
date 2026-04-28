@@ -193,6 +193,11 @@ function normalizeDate(value) {
     return `${slashMatch[1]}-${slashMatch[2]}-${slashMatch[3]}`;
   }
 
+  const dotMatch = normalized.match(/^(\d{4})\.(\d{2})\.(\d{2})$/);
+  if (dotMatch) {
+    return `${dotMatch[1]}-${dotMatch[2]}-${dotMatch[3]}`;
+  }
+
   const shortSlashMatch = normalized.match(/^(\d{2})\/(\d{2})\/(\d{2})$/);
   if (shortSlashMatch) {
     const year = Number(shortSlashMatch[1]);
@@ -710,6 +715,38 @@ function extractFnguideShareholderDetails(shareAnalysisPage, snapshotPage) {
     .filter((row) => row.name || row.representative || row.pct !== null || row.shares !== null);
 }
 
+function extractFnguideShareholderChanges(shareAnalysisPage) {
+  const jsonRows = Array.isArray(shareAnalysisPage?.shareholderChangesJson?.comp)
+    ? shareAnalysisPage.shareholderChangesJson.comp.map((row) => ({
+        row,
+        sourcePath: 'fnguide-shareanalysis.shareholderChangesJson.comp',
+      }))
+    : [];
+  const tableRows = Array.isArray(shareAnalysisPage?.shareholderChanges?.rows)
+    ? shareAnalysisPage.shareholderChanges.rows.map((row) => ({
+        row,
+        sourcePath: 'fnguide-shareanalysis.shareholderChanges.rows',
+      }))
+    : [];
+
+  return [...jsonRows, ...tableRows]
+    .map(({ row, sourcePath }) => ({
+      holderType: normalizeText(row.주주구분 ?? row.holderType),
+      representative: normalizeText(row.대표주주 ?? row.representative),
+      name: normalizeText(row.변동주주 ?? row.주주명 ?? row.name),
+      tradeDate: normalizeDate(row.변동일 ?? row.거래일 ?? row.tradeDate),
+      changeReason: normalizeText(row.변동사유 ?? row.changeReason),
+      shareClass: normalizeText(row.주식종류 ?? row.shareClass),
+      previousShares: normalizeShareCount(row.변동전주 ?? row.previousShares),
+      changeShares: normalizeShareCount(row.증감주 ?? row.변동주식수 ?? row.changeShares),
+      shares: normalizeShareCount(row.변동후주 ?? row['변동후 보유주식수'] ?? row.shares),
+      pct: normalizePercent(row.지분율 ?? row['변동후 보유지분율(%)'] ?? row.pct),
+      changePct: normalizePercent(row['지분 변동율(%)'] ?? row['변동지분 (%)'] ?? row.changePct),
+      sourcePath,
+    }))
+    .filter((row) => row.name || row.representative || row.pct !== null || row.shares !== null || row.changeShares !== null);
+}
+
 function extractFnguideShareholderCategories(shareAnalysisPage, snapshotPage) {
   const rows = [
     ...(Array.isArray(shareAnalysisPage?.shareholderCategories?.rows) ? shareAnalysisPage.shareholderCategories.rows : []),
@@ -754,6 +791,7 @@ function extractOwnershipSnapshot(shareholdingPage, snapshotPage = null, shareAn
   const majorShareholderRows = Array.isArray(shareholdingPage?.majorShareholders?.rows) ? shareholdingPage.majorShareholders.rows : [];
   const shareholderChangeRows = Array.isArray(shareholdingPage?.shareholderChanges?.rows) ? shareholdingPage.shareholderChanges.rows : [];
   const fnguideShareholderDetails = extractFnguideShareholderDetails(shareAnalysisPage, snapshotPage);
+  const fnguideShareholderChanges = extractFnguideShareholderChanges(shareAnalysisPage);
   const fnguideShareholderCategories = extractFnguideShareholderCategories(shareAnalysisPage, snapshotPage);
   const assetManagerHoldings = extractAssetManagerHoldings(snapshotPage);
   const assetManagerOwnershipPctSum = assetManagerHoldings.length > 0
@@ -793,23 +831,93 @@ function extractOwnershipSnapshot(shareholdingPage, snapshotPage = null, shareAn
     .slice(0, 10);
 
   const institutionalNamePattern = /(국민연금|연기금|공무원연금|사학연금|자산운용|투자신탁|투신|보험|은행|캐피탈|증권|기관)/;
-  const knownInstitutionalMajorHolders = [...majorShareholderRows, ...shareholderChangeRows, ...fnguideShareholderDetails]
-    .map((row) => ({
-      name: normalizeText(row.주주명) ?? normalizeText(row.보고자) ?? normalizeText(row.대표주주) ?? row.representative ?? row.name,
-      pct: normalizePercent(row['변동후 보유지분율(%)'] ?? row['보유지분 (%)']) ?? row.groupPct ?? row.pct,
-      shares: normalizeShareCount(row['변동후 보유주식수'] ?? row.보유주식수) ?? row.groupShares ?? row.shares,
-      lastTradeDate: normalizeDate(row.거래일 ?? row.최종거래일) ?? row.lastChangeDate,
+  const knownInstitutionalMajorHolderCandidates = [
+    ...fnguideShareholderChanges.map((row) => ({
+      name: row.name ?? row.representative,
+      pct: row.pct,
+      shares: row.shares,
+      lastTradeDate: row.tradeDate,
+      changePct: row.changePct,
+      changeReason: row.changeReason,
+      sourcePath: row.sourcePath,
+    })),
+    ...majorShareholderRows.map((row) => ({
+      name: normalizeText(row.주주명) ?? normalizeText(row.보고자) ?? normalizeText(row.대표주주),
+      pct: normalizePercent(row['변동후 보유지분율(%)'] ?? row['보유지분 (%)']),
+      shares: normalizeShareCount(row['변동후 보유주식수'] ?? row.보유주식수),
+      lastTradeDate: normalizeDate(row.거래일 ?? row.최종거래일),
       changePct: normalizePercent(row['지분 변동율(%)'] ?? row['변동지분 (%)']),
       changeReason: normalizeText(row.변동사유),
+      sourcePath: 'shareholding.majorShareholders.rows',
+    })),
+    ...shareholderChangeRows.map((row) => ({
+      name: normalizeText(row.주주명) ?? normalizeText(row.보고자) ?? normalizeText(row.대표주주),
+      pct: normalizePercent(row['변동후 보유지분율(%)'] ?? row['보유지분 (%)']),
+      shares: normalizeShareCount(row['변동후 보유주식수'] ?? row.보유주식수),
+      lastTradeDate: normalizeDate(row.거래일 ?? row.최종거래일),
+      changePct: normalizePercent(row['지분 변동율(%)'] ?? row['변동지분 (%)']),
+      changeReason: normalizeText(row.변동사유),
+      sourcePath: 'shareholding.shareholderChanges.rows',
+    })),
+    ...fnguideShareholderDetails.map((row) => ({
+      name: row.representative ?? row.name,
+      pct: row.groupPct ?? row.pct,
+      shares: row.groupShares ?? row.shares,
+      lastTradeDate: row.lastChangeDate,
+      changePct: null,
+      changeReason: null,
+      sourcePath: 'fnguide-shareanalysis.shareholderDetailsJson.comp',
+    })),
+  ];
+  const knownInstitutionalMajorHoldersWithSources = knownInstitutionalMajorHolderCandidates
+    .map((row) => ({
+      name: row.name,
+      pct: row.pct,
+      shares: row.shares,
+      lastTradeDate: row.lastTradeDate,
+      changePct: row.changePct,
+      changeReason: row.changeReason,
+      sourcePath: row.sourcePath,
     }))
     .filter((entry) => entry.name && institutionalNamePattern.test(entry.name))
     .reduce((acc, entry) => {
-      if (!acc.some((item) => item.name === entry.name)) {
+      const existing = acc.find((item) => item.name === entry.name);
+      if (existing) {
+        for (const key of ['pct', 'shares', 'lastTradeDate', 'changePct', 'changeReason']) {
+          if (existing[key] === null || existing[key] === undefined) {
+            existing[key] = entry[key];
+          }
+        }
+      } else {
         acc.push(entry);
       }
       return acc;
     }, [])
     .slice(0, 5);
+  const knownInstitutionalMajorHolders = knownInstitutionalMajorHoldersWithSources
+    .map(({ sourcePath: _sourcePath, ...entry }) => entry);
+  const knownInstitutionalMajorHolderSourcePaths = [
+    ...new Set(knownInstitutionalMajorHoldersWithSources.map((entry) => entry.sourcePath).filter(Boolean)),
+  ];
+  const ownershipChanges = [
+    ...fnguideShareholderChanges.map((row) => ({ ...row })),
+    ...shareholderChangeRows.map((row) => ({
+      holderType: normalizeText(row.주주구분 ?? row.holderType),
+      representative: normalizeText(row.대표주주 ?? row.보고자 ?? row.representative),
+      name: normalizeText(row.변동주주 ?? row.주주명 ?? row.name),
+      tradeDate: normalizeDate(row.변동일 ?? row.거래일 ?? row.tradeDate),
+      changeReason: normalizeText(row.변동사유 ?? row.changeReason),
+      shareClass: normalizeText(row.주식종류 ?? row.shareClass),
+      previousShares: normalizeShareCount(row.변동전주 ?? row.previousShares),
+      changeShares: normalizeShareCount(row.증감주 ?? row.변동주식수 ?? row.changeShares),
+      shares: normalizeShareCount(row.변동후주 ?? row['변동후 보유주식수'] ?? row.shares),
+      pct: normalizePercent(row.지분율 ?? row['변동후 보유지분율(%)'] ?? row.pct),
+      changePct: normalizePercent(row['지분 변동율(%)'] ?? row['변동지분 (%)'] ?? row.changePct),
+      sourcePath: 'shareholding.shareholderChanges.rows',
+    })),
+  ]
+    .filter((row) => row.name || row.representative || row.pct !== null || row.shares !== null || row.changeShares !== null)
+    .slice(0, 10);
 
   const sourceLimitations = [];
   if (foreignOwnershipPct === null) {
@@ -827,7 +935,8 @@ function extractOwnershipSnapshot(shareholdingPage, snapshotPage = null, shareAn
     });
   }
 
-  const latestChangeRow = shareholderChangeRows.find((row) => hasEvidence(row));
+  const latestFnguideChangeRow = fnguideShareholderChanges.find((row) => hasEvidence(row));
+  const latestChangeRow = latestFnguideChangeRow ?? shareholderChangeRows.find((row) => hasEvidence(row));
   const firstSummaryRow = latestChangeRow ?? summaryRows.find((row) => hasEvidence(row)) ?? rows.find((row) => hasEvidence(row));
   return {
     majorHolderPct: normalizePercent(majorHolderValue),
@@ -842,13 +951,15 @@ function extractOwnershipSnapshot(shareholdingPage, snapshotPage = null, shareAn
     institutionalOwnershipPct,
     majorShareholders,
     knownInstitutionalMajorHolders,
+    knownInstitutionalMajorHolderSourcePaths,
+    ownershipChanges,
     assetManagerHoldings,
     assetManagerOwnershipPctSum,
     shareholderCategories: fnguideShareholderCategories,
     sourceLimitations,
     latestOwnershipChangeSummary: firstSummaryRow
       ? Object.entries(firstSummaryRow)
-        .filter(([key]) => key !== '구분' && key !== '항목')
+        .filter(([key]) => key !== '구분' && key !== '항목' && key !== 'sourcePath')
         .map(([key, value]) => `${key} ${normalizeText(value) ?? normalizeNumber(value) ?? ''}`.trim())
         .filter(Boolean)
         .join(' · ') || null

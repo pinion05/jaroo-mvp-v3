@@ -653,6 +653,17 @@ test('buildWiseReportKrSlimPayloadV12 adds DeepScan krFacts with explicit invest
   assert.equal(slim.krFacts.ownership.majorHolderPct.value, 52.32);
   assert.equal(slim.krFacts.ownership.freeFloatPct.value, 43.23);
   assert.equal(slim.krFacts.ownership.knownInstitutionalMajorHolders.value[0].name, '국민연금공단');
+  assert.equal(slim.krFacts.ownership.knownInstitutionalMajorHolders.source.provider, 'fnguide');
+  assert.equal(slim.krFacts.ownership.knownInstitutionalMajorHolders.source.pageId, 'fnguide-shareanalysis');
+  assert.equal(
+    slim.krFacts.ownership.knownInstitutionalMajorHolders.source.fieldPath,
+    'fnguide-shareanalysis.shareholderChangesJson.comp',
+  );
+  assert.equal(slim.krFacts.ownership.ownershipChanges.value[0].name, '국민연금공단');
+  assert.equal(slim.krFacts.ownership.ownershipChanges.value[0].sourcePath, 'fnguide-shareanalysis.shareholderChangesJson.comp');
+  assert.equal(slim.krFacts.ownership.ownershipChanges.source.provider, 'fnguide');
+  assert.equal(slim.krFacts.ownership.ownershipChanges.source.pageId, 'fnguide-shareanalysis');
+  assert.equal(slim.krFacts.ownership.ownershipChanges.source.fieldPath, 'fnguide-shareanalysis.shareholderChangesJson.comp');
 
   assert.equal(slim.pages['fnguide-snapshot'].marketSnapshot.rows[1].key, '외국인 지분율');
   assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.value, 2.73);

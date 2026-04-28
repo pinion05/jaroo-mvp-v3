@@ -904,6 +904,31 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
       });
   const assetManagerOwnershipPctSum = evidence.ownershipSnapshot?.assetManagerOwnershipPctSum ?? null;
   const assetManagerHoldings = evidence.ownershipSnapshot?.assetManagerHoldings ?? [];
+  const knownInstitutionalSourcePaths = Array.isArray(evidence.ownershipSnapshot?.knownInstitutionalMajorHolderSourcePaths)
+    ? evidence.ownershipSnapshot.knownInstitutionalMajorHolderSourcePaths
+    : [];
+  const knownInstitutionalSourcePath = knownInstitutionalSourcePaths.find((sourcePath) => sourcePath.startsWith('fnguide-shareanalysis.'))
+    ?? knownInstitutionalSourcePaths[0]
+    ?? 'shareholding.shareholderChanges.rows';
+  const knownInstitutionalPageId = knownInstitutionalSourcePath.startsWith('fnguide-shareanalysis.')
+    ? 'fnguide-shareanalysis'
+    : 'shareholding';
+  const knownInstitutionalProvider = knownInstitutionalSourcePath.startsWith('fnguide-shareanalysis.')
+    ? 'fnguide'
+    : 'wisereport';
+  const ownershipChanges = Array.isArray(evidence.ownershipSnapshot?.ownershipChanges)
+    ? evidence.ownershipSnapshot.ownershipChanges
+    : [];
+  const ownershipChangeSourcePaths = [...new Set(ownershipChanges.map((row) => row.sourcePath).filter(Boolean))];
+  const primaryOwnershipChangeSourcePath = ownershipChangeSourcePaths.find((sourcePath) => sourcePath.startsWith('fnguide-shareanalysis.'))
+    ?? ownershipChangeSourcePaths[0]
+    ?? 'shareholding.shareholderChanges.rows';
+  const primaryOwnershipChangePageId = primaryOwnershipChangeSourcePath.startsWith('fnguide-shareanalysis.')
+    ? 'fnguide-shareanalysis'
+    : 'shareholding';
+  const primaryOwnershipChangeProvider = primaryOwnershipChangeSourcePath.startsWith('fnguide-shareanalysis.')
+    ? 'fnguide'
+    : 'wisereport';
   const assetManagerFactOptions = {
     provider: 'fnguide',
     pageId: 'fnguide-snapshot',
@@ -960,7 +985,18 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
       freeFloatPct: makeSlimV12Fact(evidence.ownershipSnapshot?.freeFloatPct ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.유동주식(유동주식비율)' }),
       freeFloatShares: makeSlimV12Fact(evidence.ownershipSnapshot?.freeFloatShares ?? null, { pageId: 'shareholding', fieldPath: 'shareholding.ownershipSummary.유동주식(유동주식수)' }),
       majorShareholders: makeSlimV12Fact(evidence.ownershipSnapshot?.majorShareholders ?? [], { pageId: 'shareholding', fieldPath: 'shareholding.majorShareholders.rows' }),
-      knownInstitutionalMajorHolders: makeSlimV12Fact(evidence.ownershipSnapshot?.knownInstitutionalMajorHolders ?? [], { pageId: 'shareholding', fieldPath: 'shareholding.shareholderChanges.rows' }),
+      knownInstitutionalMajorHolders: makeSlimV12Fact(evidence.ownershipSnapshot?.knownInstitutionalMajorHolders ?? [], {
+        provider: knownInstitutionalProvider,
+        pageId: knownInstitutionalPageId,
+        fieldPath: knownInstitutionalSourcePath,
+        checkedSources: ownershipCheckedSources,
+      }),
+      ownershipChanges: makeSlimV12Fact(ownershipChanges, {
+        provider: primaryOwnershipChangeProvider,
+        pageId: primaryOwnershipChangePageId,
+        fieldPath: primaryOwnershipChangeSourcePath,
+        checkedSources: ownershipCheckedSources,
+      }),
     },
     investorFlow: {
       foreignOwnershipPct: foreignOwnershipFact,
