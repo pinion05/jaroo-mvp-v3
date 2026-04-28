@@ -10,6 +10,7 @@ const TOP_LEVEL_KEYS = [
   'insights',
   'metadata',
   'portfolioSimulation',
+  'recoveryForecast',
   'sellNow',
   'strategy',
 ];
@@ -21,6 +22,7 @@ const MAJOR_BLOCK_KEYS = [
   'strategy',
   'sellNow',
   'portfolioSimulation',
+  'recoveryForecast',
 ];
 
 function assertBlockMeta(block, expectedState) {
@@ -135,6 +137,24 @@ function collectStrings(value, bucket = []) {
   return bucket;
 }
 
+
+function createRecoveryChartRows() {
+  const start = new Date('2025-01-01T00:00:00.000Z');
+  return Array.from({ length: 180 }, (_, index) => {
+    let price;
+    if (index < 40) price = 120 - index;
+    else if (index < 80) price = 80 + ((index - 40) * 0.4);
+    else if (index < 120) price = 110 - ((index - 80) * 0.8);
+    else price = 78 + ((index - 120) * 0.35);
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return {
+      TRD_DT: date.toISOString().slice(0, 10).replaceAll('-', '/'),
+      J_PRC: String(Math.round(price * 100) / 100),
+    };
+  });
+}
+
 test('buildJarooDeepScanPayload returns input-invalid payload when code/ticker missing', async () => {
   const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
   const rawInput = {
@@ -239,6 +259,67 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
     assertBlockMeta(payload[key], 'ok');
     assert.equal(payload.metadata.blockStatus[key], 'ok');
   }
+});
+
+test('buildJarooDeepScanPayload adds a recovery forecast for loss-making KR holdings with history', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+
+  const sources = createStrongKrSources();
+  sources.slim.pages['relative-return'].chartJson.CHART = createRecoveryChartRows();
+  sources.quotes.items[0].price = 80;
+
+  const payload = await buildJarooDeepScanPayload({
+    instrument: {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KR',
+    },
+    holding: {
+      shares: '12',
+      averagePrice: '100',
+      evaluationAmount: '960',
+    },
+    selectedAt: '2026-04-14T00:00:00.000Z',
+    sources,
+  });
+
+  assertCanonicalPayloadShape(payload);
+  assert.equal(payload.recoveryForecast.blockState, 'ok');
+  assert.equal(['ok', 'low_confidence'].includes(payload.recoveryForecast.status), true);
+  assert.equal(typeof payload.recoveryForecast.expectedRecoveryDays, 'number');
+  assert.equal(payload.recoveryForecast.models.length, 3);
+  assert.equal(payload.recoveryForecast.models.map((model) => model.id).join(','), 'similarPattern,gbm,jumpDiffusion');
+  assert.match(payload.recoveryForecast.disclaimer, /투자 권유나 수익 보장이 아닙니다/);
+  assert.equal(payload.metadata.blockStatus.recoveryForecast, 'ok');
+});
+
+test('buildJarooDeepScanPayload can use relative-return latest price when live quote is missing', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+
+  const sources = createStrongKrSources();
+  sources.slim.pages['relative-return'].chartJson.CHART = createRecoveryChartRows();
+  sources.quotes.items = [];
+  sources.quotes.missing = [{ code: '005930', reason: 'quote-unavailable' }];
+
+  const payload = await buildJarooDeepScanPayload({
+    instrument: {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KR',
+    },
+    holding: {
+      shares: '12',
+      averagePrice: '100',
+      evaluationAmount: '960',
+    },
+    selectedAt: '2026-04-14T00:00:00.000Z',
+    sources,
+  });
+
+  assertCanonicalPayloadShape(payload);
+  assert.equal(payload.recoveryForecast.blockState, 'ok');
+  assert.notEqual(payload.recoveryForecast.status, 'unavailable');
+  assert.equal(payload.recoveryForecast.dataQuality.historyDays, 180);
 });
 
 test('buildJarooDeepScanPayload degrades with real missing-source messaging for KR input instead of placeholder copy', async () => {

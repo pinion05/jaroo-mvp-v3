@@ -120,6 +120,8 @@ type GeneratedDumpSignalSummary = {
   } | null
 }
 
+const RECOVERY_FORECAST_DISCLAIMER = '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.'
+
 function asRecord(value: unknown): UnknownRecord | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as UnknownRecord) : null
 }
@@ -315,6 +317,33 @@ function createBlockMeta(blockState: DeepScanBlockState, sourceRefs: DeepScanSou
   }
 }
 
+function createUnavailableRecoveryForecastBlock(
+  blockState: DeepScanBlockState,
+  sourceRefs: DeepScanSourceRef[],
+  reason: string,
+  options: { fallback?: DeepScanBlockFallback | null; error?: DeepScanBlockError | null; missingInputs?: string[] } = {},
+): JarooDeepScanPayload['recoveryForecast'] {
+  return {
+    ...createBlockMeta(blockState, sourceRefs, { fallback: options.fallback, error: options.error }),
+    status: 'unavailable',
+    expectedRecoveryDays: null,
+    expectedRecoveryPeriodLabel: '계산 불가',
+    probabilityWithinOneYear: null,
+    confidence: 'low',
+    confidenceLabel: '낮음',
+    divergenceRatio: null,
+    disclaimer: RECOVERY_FORECAST_DISCLAIMER,
+    models: [],
+    dataQuality: {
+      sampleCount: 0,
+      historyDays: 0,
+      similarPatternSamples: 0,
+      missingInputs: options.missingInputs ?? [],
+      notes: [reason],
+    },
+  }
+}
+
 
 const SOURCE_FROM_VALUES = new Set<DeepScanRawSourceFrom>(['home-handoff', 'ocr', 'holding', 'report', 'news', 'market', 'system'])
 
@@ -442,6 +471,12 @@ function createInvalidInputPayload(rawInput: DeepScanRawInput): JarooDeepScanPay
       deltaLabel: 'blocked:+0',
       caption: '입력값 부족으로 포트폴리오 시뮬레이션을 계산하지 않았어요.',
     },
+    recoveryForecast: createUnavailableRecoveryForecastBlock(
+      'blocked',
+      sourceRefs,
+      '종목 코드 또는 티커가 없어 원금 회수 예측을 계산하지 않았어요.',
+      { fallback, error, missingInputs: ['instrument.code|instrument.ticker'] },
+    ),
     metadata: {
       generatedAt,
       version: 'deepscan-runtime-v1',
@@ -462,6 +497,7 @@ function createInvalidInputPayload(rawInput: DeepScanRawInput): JarooDeepScanPay
         strategy: 'blocked',
         sellNow: 'blocked',
         portfolioSimulation: 'blocked',
+        recoveryForecast: 'blocked',
       },
     },
   } satisfies JarooDeepScanPayload
@@ -884,6 +920,12 @@ function createUsRuntimeFailurePayload(rawInput: DeepScanRawInput, ticker: strin
     },
     sellNow: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), realizedText: '데이터가 없어 즉시 매도 판단을 계산하지 않았어요.', rows: [] },
     portfolioSimulation: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), beforeScore: 0, afterScore: 0, deltaLabel: 'blocked:+0', caption: '데이터가 없어 포트폴리오 점수 변화를 계산하지 않았어요.' },
+    recoveryForecast: createUnavailableRecoveryForecastBlock(
+      'blocked',
+      sourceRefs,
+      'US LLM runtime 실패로 원금 회수 예측을 계산하지 않았어요.',
+      { fallback, error },
+    ),
     metadata: {
       generatedAt,
       version: 'deepscan-runtime-v1',
@@ -902,6 +944,7 @@ function createUsRuntimeFailurePayload(rawInput: DeepScanRawInput, ticker: strin
         strategy: 'blocked',
         sellNow: 'blocked',
         portfolioSimulation: 'blocked',
+        recoveryForecast: 'blocked',
       },
     },
   } satisfies JarooDeepScanPayload
@@ -991,6 +1034,12 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
       },
       sellNow: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), realizedText: '데이터가 없어 즉시 매도 판단을 계산하지 않았어요.', rows: [] },
       portfolioSimulation: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), beforeScore: 0, afterScore: 0, deltaLabel: 'blocked:+0', caption: '데이터가 없어 포트폴리오 점수 변화를 계산하지 않았어요.' },
+      recoveryForecast: createUnavailableRecoveryForecastBlock(
+        'blocked',
+        sourceRefs,
+        'US slim payload를 가져오지 못해 원금 회수 예측을 계산하지 않았어요.',
+        { fallback, error },
+      ),
       metadata: {
         generatedAt,
         version: 'deepscan-runtime-v1',
@@ -1009,6 +1058,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
           strategy: 'blocked',
           sellNow: 'blocked',
           portfolioSimulation: 'blocked',
+          recoveryForecast: 'blocked',
         },
       },
     } satisfies JarooDeepScanPayload
@@ -1068,6 +1118,12 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
       : []),
     createSourceRef('system', `us-llm:${ticker}`, 'OpenRouter US committee runtime', llmDebugId ?? (llmErrors.length > 0 ? `${llmErrors.length} member failures` : undefined)),
   ]
+  const recoveryForecast = createUnavailableRecoveryForecastBlock(
+    'ok',
+    sourceRefsWithPayload,
+    'US DeepScan은 KR 상대수익률 가격 이력 기반 원금 회수 예측 모델 대상이 아니에요.',
+    { fallback: createFallback('recovery-forecast-us-unsupported', 'US 원금 회수 예측 미지원') },
+  )
 
   const heroBodyParts = [
     `현재가 ${formatCurrency(facts.currentPrice, facts.currency)} 확인`,
@@ -1112,6 +1168,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
     strategy,
     sellNow,
     portfolioSimulation,
+    recoveryForecast,
     metadata: {
       generatedAt,
       version: 'deepscan-runtime-v1',
@@ -1129,6 +1186,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
         strategy: strategy.blockState,
         sellNow: sellNow.blockState,
         portfolioSimulation: portfolioSimulation.blockState,
+        recoveryForecast: recoveryForecast.blockState,
       },
     },
   } satisfies JarooDeepScanPayload

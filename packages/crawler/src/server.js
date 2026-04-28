@@ -123,6 +123,7 @@ const DEEPSCAN_MAJOR_BLOCK_KEYS = Object.freeze([
   'strategy',
   'sellNow',
   'portfolioSimulation',
+  'recoveryForecast',
 ]);
 
 function buildJarooDeepScanInputFromQuery(req) {
@@ -232,6 +233,24 @@ function mapJarooDeepScanPayloadToInternalError(payload) {
       afterScore: 0,
       deltaLabel: '0p',
       caption: '내부 오류로 포트폴리오 시뮬레이션을 계산할 수 없습니다.',
+    }),
+    recoveryForecast: createErrorBlock('recoveryForecast', {
+      status: 'unavailable',
+      expectedRecoveryDays: null,
+      expectedRecoveryPeriodLabel: '계산 불가',
+      probabilityWithinOneYear: null,
+      confidence: 'low',
+      confidenceLabel: '낮음',
+      divergenceRatio: null,
+      disclaimer: '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.',
+      models: [],
+      dataQuality: {
+        sampleCount: 0,
+        historyDays: 0,
+        similarPatternSamples: 0,
+        missingInputs: [],
+        notes: ['내부 오류로 원금 회수 예측을 계산할 수 없습니다.'],
+      },
     }),
   };
 

@@ -74,10 +74,11 @@ const EXPECTED_TOP_LEVEL_KEYS = [
   'strategy',
   'sellNow',
   'portfolioSimulation',
+  'recoveryForecast',
   'metadata',
 ] as const
 
-const CONTENT_BLOCK_KEYS = ['hero', 'committee', 'insights', 'strategy', 'sellNow', 'portfolioSimulation'] as const
+const CONTENT_BLOCK_KEYS = ['hero', 'committee', 'insights', 'strategy', 'sellNow', 'portfolioSimulation', 'recoveryForecast'] as const
 
 const samplePayload: BarrelJarooDeepScanPayload = {
   input: {
@@ -209,6 +210,32 @@ const samplePayload: BarrelJarooDeepScanPayload = {
     fallback: null,
     error: null,
   },
+  recoveryForecast: {
+    blockState: 'ok',
+    sourceRefs: [],
+    fallback: null,
+    error: null,
+    status: 'low_confidence',
+    expectedRecoveryDays: 58,
+    expectedRecoveryPeriodLabel: '약 3개월',
+    probabilityWithinOneYear: 61.1,
+    confidence: 'medium',
+    confidenceLabel: '보통',
+    divergenceRatio: 0.42,
+    disclaimer: '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.',
+    models: [
+      { id: 'similarPattern', label: '유사 패턴 통계', weight: 0.4, status: 'ok', medianDays: 96, p25Days: 70, p75Days: 120, probabilityWithinOneYear: 60.3, sampleCount: 12 },
+      { id: 'gbm', label: 'GBM', weight: 0.3, status: 'ok', medianDays: 57, p25Days: 40, p75Days: 90, probabilityWithinOneYear: 58.2, sampleCount: 5000 },
+      { id: 'jumpDiffusion', label: 'Jump-Diffusion', weight: 0.3, status: 'ok', medianDays: 60, p25Days: 42, p75Days: 95, probabilityWithinOneYear: 63.9, sampleCount: 5000 },
+    ],
+    dataQuality: {
+      sampleCount: 120,
+      historyDays: 121,
+      similarPatternSamples: 12,
+      missingInputs: [],
+      notes: ['test recovery forecast'],
+    },
+  },
   metadata: {
     generatedAt: '2026-04-15T12:00:05.000Z',
     version: '2026-04-15',
@@ -228,6 +255,7 @@ const samplePayload: BarrelJarooDeepScanPayload = {
       strategy: 'ok',
       sellNow: 'ok',
       portfolioSimulation: 'ok',
+      recoveryForecast: 'ok',
     },
   },
 }

@@ -1,6 +1,6 @@
 'use client'
 
-import type { JarooDeepScanCommitteeAxis, JarooDeepScanInsightItem } from '../../../packages/contracts/src/deepscan'
+import type { JarooDeepScanCommitteeAxis, JarooDeepScanInsightItem, JarooDeepScanRecoveryForecastBlock } from '../../../packages/contracts/src/deepscan'
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -24,7 +24,7 @@ import { getDeepScanTargetKey } from '@/lib/workflow-types'
 import { cn } from '@/lib/utils'
 
 type TabValue = 'analysis' | 'strategy'
-type SectionKey = 'why' | 'news' | 'scenarioDetail' | 'otherScenarios' | 'sellNow' | 'pfSim'
+type SectionKey = 'why' | 'news' | 'scenarioDetail' | 'otherScenarios' | 'sellNow' | 'recoveryForecast' | 'pfSim'
 type HomeMarketTone = DeepScanCanonicalTargetSession['holding']['marketTone']
 
 const axisToneStyles = {
@@ -153,6 +153,20 @@ function resolveScenarioTone(index: number, total: number): keyof typeof scenari
   return 'positive'
 }
 
+function formatRecoveryProbability(value: number | null) {
+  return typeof value === 'number' ? `${value}%` : 'N/A'
+}
+
+function recoveryStatusLabel(status: JarooDeepScanRecoveryForecastBlock['status']) {
+  if (status === 'ok') {
+    return '예측 가능'
+  }
+  if (status === 'low_confidence') {
+    return '신뢰도 낮음'
+  }
+  return '계산 불가'
+}
+
 function resolveWeekToneClasses(tone: string) {
   if (tone === 'positive') {
     return {
@@ -250,6 +264,7 @@ export default function DeepScanPage() {
     scenarioDetail: false,
     otherScenarios: false,
     sellNow: false,
+    recoveryForecast: true,
     pfSim: false,
   })
   const target = useDeepScanStore((state) => state.target)
@@ -1027,6 +1042,94 @@ export default function DeepScanPage() {
                     </div>
                   )
                 })}
+              </Card>
+            )}
+          </SectionToggle>
+
+          <SectionToggle
+            label='원금 회수 예측'
+            isOpen={openSections.recoveryForecast}
+            onToggle={() => toggleSection('recoveryForecast')}
+            tags={
+              fetchState !== 'success' || !payload ? (
+                <span className='text-sm font-semibold text-[color:var(--jaroo-muted)]'>
+                  {fetchState === 'error' ? '요청 실패' : '로딩 중'}
+                </span>
+              ) : payload.recoveryForecast.blockState !== 'ok' ? (
+                <span className='text-sm font-semibold text-[color:var(--jaroo-warning)]'>
+                  {getDeepScanBlockNotice(payload.recoveryForecast, {
+                    badge: 'Blocked',
+                    title: '원금 회수 예측을 표시할 수 없어요',
+                    body: 'canonical recoveryForecast block이 아직 준비되지 않았어요.',
+                  }).badge}
+                </span>
+              ) : (
+                <span className={cn(
+                  'text-sm font-semibold',
+                  payload.recoveryForecast.status === 'ok'
+                    ? 'text-[color:var(--jaroo-success)]'
+                    : payload.recoveryForecast.status === 'low_confidence'
+                      ? 'text-[color:var(--jaroo-warning)]'
+                      : 'text-[color:var(--jaroo-muted)]',
+                )}>
+                  {payload.recoveryForecast.expectedRecoveryPeriodLabel} · {recoveryStatusLabel(payload.recoveryForecast.status)}
+                </span>
+              )
+            }
+          >
+            {fetchState !== 'success' || !payload ? (
+              <SectionStatusCard notice={fetchState === 'error' ? requestErrorNotice : strategyLoadingNotice} />
+            ) : payload.recoveryForecast.blockState !== 'ok' ? (
+              <SectionStatusCard notice={getDeepScanBlockNotice(payload.recoveryForecast, {
+                badge: 'Blocked',
+                title: '원금 회수 예측을 표시할 수 없어요',
+                body: 'canonical recoveryForecast block이 아직 준비되지 않았어요.',
+              })} />
+            ) : (
+              <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
+                <div className='grid grid-cols-1 gap-2 text-center sm:grid-cols-3'>
+                  <div className='rounded-[18px] bg-[color:var(--jaroo-secondary)] p-3'>
+                    <p className='text-[10px] text-[color:var(--jaroo-muted)]'>예상 기간</p>
+                    <p className='mt-1 text-lg font-semibold text-[color:var(--jaroo-ink)]'>{payload.recoveryForecast.expectedRecoveryPeriodLabel}</p>
+                  </div>
+                  <div className='rounded-[18px] bg-[color:var(--jaroo-secondary)] p-3'>
+                    <p className='text-[10px] text-[color:var(--jaroo-muted)]'>1년 내 회복</p>
+                    <p className='mt-1 text-lg font-semibold text-[color:var(--jaroo-primary)]'>{formatRecoveryProbability(payload.recoveryForecast.probabilityWithinOneYear)}</p>
+                  </div>
+                  <div className='rounded-[18px] bg-[color:var(--jaroo-secondary)] p-3'>
+                    <p className='text-[10px] text-[color:var(--jaroo-muted)]'>신뢰도</p>
+                    <p className='mt-1 text-lg font-semibold text-[color:var(--jaroo-warning)]'>{payload.recoveryForecast.confidenceLabel}</p>
+                  </div>
+                </div>
+
+                <div className='mt-4 space-y-2'>
+                  {payload.recoveryForecast.models.map((model) => (
+                    <div key={model.id} className='flex items-center justify-between gap-3 rounded-[16px] border border-[color:var(--jaroo-border)] px-3 py-2'>
+                      <div className='min-w-0'>
+                        <p className='text-xs font-semibold text-[color:var(--jaroo-ink)]'>{model.label}</p>
+                        <p className='mt-0.5 text-[11px] text-[color:var(--jaroo-muted)]'>
+                          샘플 {model.sampleCount} · 가중치 {Math.round(model.weight * 100)}%
+                        </p>
+                      </div>
+                      <div className='shrink-0 text-right'>
+                        <p className='text-xs font-semibold text-[color:var(--jaroo-ink)]'>{model.medianDays ?? 'N/A'}일</p>
+                        <p className='mt-0.5 text-[11px] text-[color:var(--jaroo-muted)]'>{formatRecoveryProbability(model.probabilityWithinOneYear)}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <p className='mt-3 text-[11px] leading-5 text-[color:var(--jaroo-muted)]'>
+                  데이터 품질: 가격 이력 {payload.recoveryForecast.dataQuality.historyDays}개 · 유사 패턴 {payload.recoveryForecast.dataQuality.similarPatternSamples}개
+                </p>
+                {payload.recoveryForecast.dataQuality.notes.length > 0 ? (
+                  <p className='mt-1 text-[11px] leading-5 text-[color:var(--jaroo-muted)]'>
+                    {payload.recoveryForecast.dataQuality.notes.join(' · ')}
+                  </p>
+                ) : null}
+                <p className='mt-3 rounded-[16px] bg-[color:var(--jaroo-warning-soft)] px-3 py-2 text-[11px] leading-5 text-[color:var(--jaroo-warning)]'>
+                  {payload.recoveryForecast.disclaimer}
+                </p>
               </Card>
             )}
           </SectionToggle>

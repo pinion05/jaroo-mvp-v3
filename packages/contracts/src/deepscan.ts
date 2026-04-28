@@ -18,6 +18,9 @@ export type JarooDeepScanCommitteeMemberErrorKind =
   | 'llm-unknown'
 export type JarooDeepScanSellNowTagTone = 'positive' | 'danger'
 export type JarooDeepScanSellNowValueTone = 'danger'
+export type JarooDeepScanRecoveryForecastStatus = 'ok' | 'low_confidence' | 'unavailable'
+export type JarooDeepScanRecoveryForecastConfidence = 'high' | 'medium' | 'low'
+export type JarooDeepScanRecoveryForecastModelId = 'similarPattern' | 'gbm' | 'jumpDiffusion'
 
 export const JAROO_DEEP_SCAN_TOP_LEVEL_KEYS = [
   'input',
@@ -27,6 +30,7 @@ export const JAROO_DEEP_SCAN_TOP_LEVEL_KEYS = [
   'strategy',
   'sellNow',
   'portfolioSimulation',
+  'recoveryForecast',
   'metadata',
 ] as const
 export type JarooDeepScanTopLevelKey = (typeof JAROO_DEEP_SCAN_TOP_LEVEL_KEYS)[number]
@@ -183,6 +187,39 @@ export type JarooDeepScanPortfolioSimulationBlock = DeepScanBlockMeta & {
   caption: string
 }
 
+export type JarooDeepScanRecoveryForecastModelRow = {
+  id: JarooDeepScanRecoveryForecastModelId
+  label: string
+  weight: number
+  status: JarooDeepScanRecoveryForecastStatus
+  medianDays: number | null
+  p25Days: number | null
+  p75Days: number | null
+  probabilityWithinOneYear: number | null
+  sampleCount: number
+}
+
+export type JarooDeepScanRecoveryForecastDataQuality = {
+  sampleCount: number
+  historyDays: number
+  similarPatternSamples: number
+  missingInputs: string[]
+  notes: string[]
+}
+
+export type JarooDeepScanRecoveryForecastBlock = DeepScanBlockMeta & {
+  status: JarooDeepScanRecoveryForecastStatus
+  expectedRecoveryDays: number | null
+  expectedRecoveryPeriodLabel: string
+  probabilityWithinOneYear: number | null
+  confidence: JarooDeepScanRecoveryForecastConfidence
+  confidenceLabel: string
+  divergenceRatio: number | null
+  disclaimer: string
+  models: JarooDeepScanRecoveryForecastModelRow[]
+  dataQuality: JarooDeepScanRecoveryForecastDataQuality
+}
+
 export type JarooDeepScanInputValidity =
   | {
       valid: true
@@ -204,6 +241,7 @@ export type JarooDeepScanBlockStatus = {
   strategy: DeepScanBlockState
   sellNow: DeepScanBlockState
   portfolioSimulation: DeepScanBlockState
+  recoveryForecast: DeepScanBlockState
 }
 
 export type JarooDeepScanMetadata = {
@@ -225,5 +263,6 @@ export type JarooDeepScanPayload = {
   strategy: JarooDeepScanStrategyBlock
   sellNow: JarooDeepScanSellNowBlock
   portfolioSimulation: JarooDeepScanPortfolioSimulationBlock
+  recoveryForecast: JarooDeepScanRecoveryForecastBlock
   metadata: JarooDeepScanMetadata
 }

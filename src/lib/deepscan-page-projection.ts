@@ -32,6 +32,7 @@ const DEEP_SCAN_BLOCK_LABELS = {
   strategy: '전략',
   sellNow: '지금 팔면',
   portfolioSimulation: '포트폴리오 점수 변화',
+  recoveryForecast: '원금 회수 예측',
 } as const
 
 function normalizeText(value: unknown) {

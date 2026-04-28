@@ -4,6 +4,7 @@ import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
 import { scoreDeepScanKrEvidence, scoreDeepScanKrFromCommittee } from './deepscan-kr-score.js';
 import { invokeDeepScanKrPackage } from './deepscan-kr-package-adapter.js';
 import { buildKrCommitteeAxesFromLlmResults, scoreDeepScanKrCommitteeFromDump } from './deepscan-kr-committee-runtime.js';
+import { buildRecoveryForecast } from './recovery-forecast.js';
 
 const require = createRequire(import.meta.url);
 const {
@@ -19,6 +20,7 @@ const MAJOR_BLOCK_KEYS = Object.freeze([
   'strategy',
   'sellNow',
   'portfolioSimulation',
+  'recoveryForecast',
 ]);
 const SOURCE_TYPES = new Set(['ocr', 'holding', 'report', 'news', 'market', 'system']);
 const FALLBACK_GENERATED_AT = '1970-01-01T00:00:00.000Z';
@@ -316,6 +318,14 @@ function createInputInvalidPayload(rawInput = {}) {
       deltaLabel: '0p',
       caption: '포트폴리오 시뮬레이션을 계산할 수 없습니다.',
     },
+    recoveryForecast: {
+      ...createBlockedBlockMeta({
+        sourceRefs: createBlockSourceRefs(input, 'recoveryForecast'),
+        fallback: invalidFallback,
+        error: invalidError,
+      }),
+      ...createUnavailableRecoveryForecast('종목 코드 또는 티커가 누락되었습니다.', ['instrument.code', 'instrument.ticker']),
+    },
   };
 
   return {
@@ -423,6 +433,14 @@ function createInternalErrorPayload(rawInput = {}) {
       afterScore: 0,
       deltaLabel: '0p',
       caption: '내부 오류로 포트폴리오 시뮬레이션을 계산할 수 없습니다.',
+    },
+    recoveryForecast: {
+      ...createErrorBlockMeta({
+        sourceRefs: createBlockSourceRefs(input, 'recoveryForecast'),
+        fallback: internalFallback,
+        error: internalError,
+      }),
+      ...createUnavailableRecoveryForecast('내부 오류로 원금 회수 예측을 계산할 수 없습니다.', []),
     },
   };
 
@@ -1281,6 +1299,55 @@ function buildPortfolioSimulation(scored) {
   };
 }
 
+
+function createUnavailableRecoveryForecast(reason, missingInputs = []) {
+  return {
+    status: 'unavailable',
+    expectedRecoveryDays: null,
+    expectedRecoveryPeriodLabel: '계산 불가',
+    probabilityWithinOneYear: null,
+    confidence: 'low',
+    confidenceLabel: '낮음',
+    divergenceRatio: null,
+    disclaimer: '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.',
+    models: [],
+    dataQuality: {
+      sampleCount: 0,
+      historyDays: 0,
+      similarPatternSamples: 0,
+      missingInputs,
+      notes: [reason],
+    },
+  };
+}
+
+function buildRecoveryForecastFromEvidence(evidence) {
+  try {
+    const priceHistory = Array.isArray(evidence.recoveryPriceHistory) ? evidence.recoveryPriceHistory : [];
+    const latestHistoryPrice = priceHistory.at(-1)?.close ?? null;
+    const forecast = buildRecoveryForecast({
+      averagePrice: evidence.holding.averagePrice,
+      currentPrice: evidence.currentQuote?.price ?? latestHistoryPrice,
+      priceHistory,
+    });
+    if (!evidence.currentQuote && latestHistoryPrice !== null) {
+      return {
+        ...forecast,
+        dataQuality: {
+          ...forecast.dataQuality,
+          notes: [
+            ...forecast.dataQuality.notes,
+            '현재가는 상대수익률 최신 가격으로 보강했습니다.',
+          ],
+        },
+      };
+    }
+    return forecast;
+  } catch {
+    return createUnavailableRecoveryForecast('원금 회수 예측 모델 계산 중 오류가 발생했습니다.', []);
+  }
+}
+
 export async function buildJarooDeepScanPayload(rawInput = {}) {
   try {
     const input = normalizeInput(rawInput);
@@ -1335,6 +1402,18 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     const strategy = buildStrategy(input, evidence, scored);
     const sellNow = buildSellNow(evidence, scored);
     const portfolioSimulation = buildPortfolioSimulation(scored);
+    const recoveryForecast = buildRecoveryForecastFromEvidence(evidence);
+    const recoveryForecastFallback = recoveryForecast.status === 'ok'
+      ? blockFallback
+      : {
+          used: true,
+          reason: recoveryForecast.dataQuality.notes[0] ?? `recovery-forecast-${recoveryForecast.status}`,
+          label: recoveryForecast.status === 'low_confidence' ? '원금 회수 예측 신뢰도 낮음' : '원금 회수 예측 불가',
+        };
+    const recoveryForecastMeta = createOkBlockMeta({
+      sourceRefs: createBlockSourceRefs(input, 'recoveryForecast', combinedSourceRefs),
+      fallback: recoveryForecastFallback,
+    });
     const heroBodyParts = [...evidence.topFacts];
 
     for (const risk of evidence.topRisks.slice(0, 2)) {
@@ -1454,6 +1533,10 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
               caption: '위원회 축 근거가 부족해 포트폴리오 시뮬레이션을 계산하지 않았습니다.',
             }
           : portfolioSimulation),
+      },
+      recoveryForecast: {
+        ...recoveryForecastMeta,
+        ...recoveryForecast,
       },
     };
 

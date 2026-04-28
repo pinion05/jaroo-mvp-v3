@@ -33,6 +33,7 @@ const MAJOR_BLOCK_KEYS = [
   'strategy',
   'sellNow',
   'portfolioSimulation',
+  'recoveryForecast',
 ] as const
 
 const BLOCK_STATES = new Set(['ok', 'error', 'blocked'])
@@ -210,6 +211,22 @@ function isCanonicalPortfolioSimulationBlock(block: unknown) {
     && hasRequiredNumberFields(block, ['beforeScore', 'afterScore'])
 }
 
+function isCanonicalRecoveryForecastBlock(block: unknown) {
+  const record = asRecord(block)
+  return isBlockMeta(block)
+    && !!record
+    && ['ok', 'low_confidence', 'unavailable'].includes(String(record.status))
+    && typeof record.expectedRecoveryPeriodLabel === 'string'
+    && (typeof record.expectedRecoveryDays === 'number' || record.expectedRecoveryDays === null)
+    && (typeof record.probabilityWithinOneYear === 'number' || record.probabilityWithinOneYear === null)
+    && ['high', 'medium', 'low'].includes(String(record.confidence))
+    && typeof record.confidenceLabel === 'string'
+    && (typeof record.divergenceRatio === 'number' || record.divergenceRatio === null)
+    && typeof record.disclaimer === 'string'
+    && Array.isArray(record.models)
+    && !!asRecord(record.dataQuality)
+}
+
 function isCanonicalPayload(payload: unknown): payload is JarooDeepScanPayload {
   const record = asRecord(payload)
   const metadata = asRecord(record?.metadata)
@@ -242,6 +259,7 @@ function isCanonicalPayload(payload: unknown): payload is JarooDeepScanPayload {
     || !isCanonicalStrategyBlock(record.strategy)
     || !isCanonicalSellNowBlock(record.sellNow)
     || !isCanonicalPortfolioSimulationBlock(record.portfolioSimulation)
+    || !isCanonicalRecoveryForecastBlock(record.recoveryForecast)
   ) {
     return false
   }

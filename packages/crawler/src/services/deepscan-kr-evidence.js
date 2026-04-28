@@ -592,6 +592,7 @@ function extractRelativeReturnSnapshot(relativeReturnPage) {
       return3m: null,
       return6m: null,
       return1y: null,
+      priceHistory: points.map((point) => ({ date: point.date, close: point.value })),
     };
   }
 
@@ -613,6 +614,7 @@ function extractRelativeReturnSnapshot(relativeReturnPage) {
     return3m: computeWindowReturn(90),
     return6m: computeWindowReturn(180),
     return1y: computeWindowReturn(365),
+    priceHistory: points.map((point) => ({ date: point.date, close: point.value })),
   };
 }
 
@@ -1279,6 +1281,7 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
     consensusSnapshot,
     valuationSnapshot,
     relativeReturnSnapshot,
+    recoveryPriceHistory: Array.isArray(relativeReturnSnapshot.priceHistory) ? relativeReturnSnapshot.priceHistory : [],
     styleAnalysisSnapshot,
     ownershipSnapshot,
     financialSnapshot,
