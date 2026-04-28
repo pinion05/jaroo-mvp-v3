@@ -138,6 +138,10 @@ const KR_V12_OWNERSHIP_CHECKED_SOURCES = Object.freeze(getWiseReportKrV12Checked
 ]));
 const KR_V12_SHAREHOLDING_CHECKED_SOURCES = Object.freeze(getWiseReportKrV12CheckedSourceIds(['shareholding']));
 const KR_V12_RECENT_REPORT_CHECKED_SOURCES = Object.freeze(getWiseReportKrV12CheckedSourceIds(['recent-reports']));
+const KR_V12_RECENT_30D_REPORT_CHECKED_SOURCES = Object.freeze([
+  ...KR_V12_RECENT_REPORT_CHECKED_SOURCES,
+  'quotes.asOf',
+]);
 const KR_V12_STYLE_CHECKED_SOURCES = Object.freeze(getWiseReportKrV12CheckedSourceIds(['style-analysis']));
 
 function buildJarooDeepScanInputFromQuery(req) {
@@ -996,7 +1000,7 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
     },
     reports: {
       totalCount: makeSlimV12Fact(evidence.reportSignals?.recentReportCount ?? null, { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows', checkedSources: KR_V12_RECENT_REPORT_CHECKED_SOURCES }),
-      recent30dCount: makeSlimV12Fact(evidence.reportSignals?.recent30dReportCount ?? null, { provider: 'internal', pageId: 'recent-reports', fieldPath: 'computed.recent30dReportCount', checkedSources: KR_V12_RECENT_REPORT_CHECKED_SOURCES }),
+      recent30dCount: makeSlimV12Fact(evidence.reportSignals?.recent30dReportCount ?? null, { provider: 'internal', pageId: 'recent-reports', fieldPath: 'computed.recent30dReportCount', checkedSources: KR_V12_RECENT_30D_REPORT_CHECKED_SOURCES }),
       latestReportDate: makeSlimV12Fact(evidence.timestamps?.reportAsOf ?? null, { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows[0].일자', checkedSources: KR_V12_RECENT_REPORT_CHECKED_SOURCES }),
       recentItems: makeSlimV12Fact(slimPayload.pages?.['recent-reports']?.recentReports?.rows ?? [], { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows', checkedSources: KR_V12_RECENT_REPORT_CHECKED_SOURCES }),
     },

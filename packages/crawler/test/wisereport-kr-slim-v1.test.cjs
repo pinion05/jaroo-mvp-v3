@@ -680,6 +680,11 @@ test('buildWiseReportKrSlimPayloadV12 adds DeepScan krFacts with explicit invest
   assert.match(slim.krFacts.investorFlow.institutionalOwnershipPct.message, /aggregate로 대체하지 않습니다/);
   assert.equal(slim.krFacts.investorFlow.foreignNetBuy.availability, 'missing');
   assert.equal(slim.krFacts.investorFlow.foreignNetBuy.reasonCode, 'investor_net_buy_not_provided_by_wisereport_fnguide');
+  assert.equal(slim.krFacts.reports.recent30dCount.source.fieldPath, 'computed.recent30dReportCount');
+  assert.deepEqual(
+    slim.krFacts.reports.recent30dCount.source.checkedSources,
+    [...getWiseReportKrV12CheckedSourceIds(['recent-reports']), 'quotes.asOf'],
+  );
   assert.equal(slim.krFacts.styleFactors.factors.value[0].name, '베타');
 });
 
