@@ -27,6 +27,10 @@ test('major endpoints are registered on /api/major paths', async () => {
     '/api/major/wisereport-fnguide/kr/companies/:code/slim/v1.1',
   );
   assert.equal(
+    endpointDefinitions.find((item) => item.id === 'wisereport-kr-slim-v1.2')?.primaryPath,
+    '/api/major/wisereport-fnguide/kr/companies/:code/slim/v1.2',
+  );
+  assert.equal(
     endpointDefinitions.find((item) => item.id === 'wisereport-global-slim-v1.1')?.primaryPath,
     '/api/major/wisereport-global/us/companies/:ticker/slim/v1.1',
   );

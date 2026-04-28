@@ -82,32 +82,41 @@ test('holding에서 deepscan slim 요청과 key를 만든다', () => {
 
 test('deepscan slim summary를 fetch 후 메모리 캐시에 저장한다', async () => {
   clearCachedDeepScanSlimSummary()
+  const requestedUrls: string[] = []
 
   const summary = await fetchDeepScanSlimSummary(
     { market: 'KR', identifier: '005930' },
-    async () => new Response(JSON.stringify({
+    async (url) => {
+      requestedUrls.push(String(url))
+      return new Response(JSON.stringify({
       company: { code: '005930', name: '삼성전자' },
       pages: {
         'investment-indicators': { metrics: [{ rows: [{ '항목': 'ROE', latest: '10.85' }] }] },
         opinion: { reportSummaries: [] },
       },
-    }), { status: 200 }),
+    }), { status: 200 })
+    },
   )
 
   assert.equal(summary?.header.identifier, '005930')
+  assert.equal(requestedUrls[0], '/api/deepscan/slim?market=KR&code=005930&version=v1.1')
 
   const cached = await prefetchAndPersistDeepScanSlimSummary(
     { code: '005930', identifierCode: '005930', identifierTicker: undefined } as never,
-    async () => new Response(JSON.stringify({
+    async (url) => {
+      requestedUrls.push(String(url))
+      return new Response(JSON.stringify({
       company: { code: '005930', name: '삼성전자' },
       pages: {
         'investment-indicators': { metrics: [{ rows: [{ '항목': 'ROE', latest: '10.85' }] }] },
         opinion: { reportSummaries: [] },
       },
-    }), { status: 200 }),
+    }), { status: 200 })
+    },
   )
 
   assert.equal(cached?.key, 'KR:005930')
+  assert.equal(requestedUrls[1], '/api/deepscan/slim?market=KR&code=005930&version=v1.1')
   assert.equal(readCachedDeepScanSlimSummary()?.summary.header.name, '삼성전자')
 
   clearCachedDeepScanSlimSummary()

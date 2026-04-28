@@ -3,7 +3,13 @@ const logger = require('../utils/logger.cjs');
 function getPlaywrightChromium() {
   return require('playwright').chromium;
 }
-const { KR_WISEREPORT_PAGE_SPECS, WISEREPORT_KR_PAGES, getPageSpec } = require('./wisereport-kr/page-specs.cjs');
+const {
+  KR_WISEREPORT_PAGE_SPECS,
+  KR_WISEREPORT_V12_PAGE_SPECS,
+  WISEREPORT_KR_PAGES,
+  WISEREPORT_KR_V12_PAGES,
+  getPageSpec,
+} = require('./wisereport-kr/page-specs.cjs');
 const { runCrawlerV1Stage } = require('./wisereport-kr/crawler_v1.cjs');
 const { runCrawlerV2Stage } = require('./wisereport-kr/crawler_v2.cjs');
 const { finalizePageResult, buildAggregateResult } = require('./wisereport-kr/crawler_v3.cjs');
@@ -69,7 +75,7 @@ async function crawlWiseReportKrPage(targetCode, routeRef, options = {}) {
   }
 }
 
-async function crawlWiseReportKr(targetCode, options = {}) {
+async function crawlWiseReportKrWithPageSpecs(targetCode, pageSpecs, options = {}) {
   const code = normalizeCode(targetCode);
   logger.start('Crawler', `WiseReport/FnGuide 구조화 수집 시작 | Code: ${code}`);
 
@@ -77,7 +83,7 @@ async function crawlWiseReportKr(targetCode, options = {}) {
 
   try {
     const pages = await mapWithConcurrency(
-      KR_WISEREPORT_PAGE_SPECS,
+      pageSpecs,
       options.concurrency || DEFAULT_CONCURRENCY,
       async (spec) => runPagePipeline(context, code, spec, options),
     );
@@ -85,7 +91,7 @@ async function crawlWiseReportKr(targetCode, options = {}) {
     const aggregate = buildAggregateResult({
       code,
       pages,
-      pageSpecs: KR_WISEREPORT_PAGE_SPECS,
+      pageSpecs,
     });
 
     logger.summary('Crawler', `구조화 수집 완료 | ${code} | pages:${aggregate.quality.completedPages} | warnings:${aggregate.quality.warningCount}`);
@@ -96,12 +102,24 @@ async function crawlWiseReportKr(targetCode, options = {}) {
   }
 }
 
+async function crawlWiseReportKr(targetCode, options = {}) {
+  return crawlWiseReportKrWithPageSpecs(targetCode, KR_WISEREPORT_PAGE_SPECS, options);
+}
+
+async function crawlWiseReportKrV12(targetCode, options = {}) {
+  return crawlWiseReportKrWithPageSpecs(targetCode, KR_WISEREPORT_V12_PAGE_SPECS, options);
+}
+
 async function getAggregate(targetCode, options = {}) {
   return crawlWiseReportKr(targetCode, options);
 }
 
 async function getCrawl(targetCode, options = {}) {
   return crawlWiseReportKr(targetCode, options);
+}
+
+async function getCrawlV12(targetCode, options = {}) {
+  return crawlWiseReportKrV12(targetCode, options);
 }
 
 async function getCrawlSection(targetCode, routeRef, options = {}) {
@@ -144,11 +162,15 @@ async function crawlMarketData() {
 
 module.exports = {
   KR_WISEREPORT_PAGE_SPECS,
+  KR_WISEREPORT_V12_PAGE_SPECS,
   WISEREPORT_KR_PAGES,
+  WISEREPORT_KR_V12_PAGES,
   getAggregate,
   getCrawl,
+  getCrawlV12,
   getCrawlSection,
   crawlWiseReportKr,
+  crawlWiseReportKrV12,
   crawlWiseReportKrPage,
   crawlMarketData,
 };

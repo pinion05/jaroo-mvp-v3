@@ -326,11 +326,12 @@ test('buildWiseReportKrSlimPayload keeps only business payload for slim aggregat
   });
 });
 
-test('only KR slim v1.1 route remains active while v1 is archived', async () => {
+test('KR slim v1.1 and v1.2 routes remain active while v1 is archived', async () => {
   const { endpointDefinitions, archivedEndpointDefinitions } = await import('../src/server.js');
 
   const definitionV1 = endpointDefinitions.find((item) => item.id === 'wisereport-kr-slim-v1');
   const definitionV11 = endpointDefinitions.find((item) => item.id === 'wisereport-kr-slim-v1.1');
+  const definitionV12 = endpointDefinitions.find((item) => item.id === 'wisereport-kr-slim-v1.2');
   const archivedDefinitionV1 = archivedEndpointDefinitions.find((item) => item.id === 'wisereport-kr-slim-v1');
 
   assert.equal(definitionV1, undefined);
@@ -343,4 +344,10 @@ test('only KR slim v1.1 route remains active while v1 is archived', async () => 
   assert.equal(definitionV11.rawSuccess, true);
   assert.equal(definitionV11.resource, 'wisereport.kr.aggregate.slim.v1.1');
   assert.deepEqual(definitionV11.dataSources, ['wisereport', 'fnguide']);
+
+  assert.ok(definitionV12);
+  assert.equal(definitionV12.primaryPath, '/api/major/wisereport-fnguide/kr/companies/:code/slim/v1.2');
+  assert.equal(definitionV12.rawSuccess, true);
+  assert.equal(definitionV12.resource, 'wisereport.kr.aggregate.slim.v1.2');
+  assert.deepEqual(definitionV12.dataSources, ['wisereport', 'fnguide']);
 });
