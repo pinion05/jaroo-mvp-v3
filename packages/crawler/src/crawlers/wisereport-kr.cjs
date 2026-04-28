@@ -1,4 +1,5 @@
 const logger = require('../utils/logger.cjs');
+const { createReadThroughCache } = require('./wisereport-cache.cjs');
 
 function getPlaywrightChromium() {
   return require('playwright').chromium;
@@ -15,6 +16,7 @@ const { runCrawlerV2Stage } = require('./wisereport-kr/crawler_v2.cjs');
 const { finalizePageResult, buildAggregateResult } = require('./wisereport-kr/crawler_v3.cjs');
 
 const DEFAULT_CONCURRENCY = 3;
+const wisereportKrCache = createReadThroughCache({ name: 'wisereport-kr', logger });
 
 async function mapWithConcurrency(items, limit, iteratee) {
   const results = new Array(items.length);
@@ -65,41 +67,60 @@ async function crawlWiseReportKrPage(targetCode, routeRef, options = {}) {
   }
 
   const code = normalizeCode(targetCode);
-  const { browser, context } = await createBrowserContext();
+  const cacheKey = `kr:page:${code}:${spec.id}`;
 
-  try {
-    return await runPagePipeline(context, code, spec, options);
-  } finally {
-    await context.close();
-    await browser.close();
-  }
+  return wisereportKrCache.readThrough(cacheKey, async () => {
+    const createContext = options.createBrowserContext || createBrowserContext;
+    const pipeline = options.runPagePipeline || runPagePipeline;
+    const { browser, context } = await createContext();
+
+    try {
+      return await pipeline(context, code, spec, options);
+    } finally {
+      await context.close();
+      await browser.close();
+    }
+  }, {
+    ...options,
+    isCacheable: (value) => value && typeof value === 'object' && value.stages?.crawler_v3?.ok !== false,
+  });
 }
 
 async function crawlWiseReportKrWithPageSpecs(targetCode, pageSpecs, options = {}) {
   const code = normalizeCode(targetCode);
-  logger.start('Crawler', `WiseReport/FnGuide 구조화 수집 시작 | Code: ${code}`);
+  const pageIds = pageSpecs.map((spec) => spec.id).join(',');
+  const cacheKey = `kr:aggregate:${code}:${pageIds}`;
 
-  const { browser, context } = await createBrowserContext();
+  return wisereportKrCache.readThrough(cacheKey, async () => {
+    logger.start('Crawler', `WiseReport/FnGuide 구조화 수집 시작 | Code: ${code}`);
 
-  try {
-    const pages = await mapWithConcurrency(
-      pageSpecs,
-      options.concurrency || DEFAULT_CONCURRENCY,
-      async (spec) => runPagePipeline(context, code, spec, options),
-    );
+    const createContext = options.createBrowserContext || createBrowserContext;
+    const pipeline = options.runPagePipeline || runPagePipeline;
+    const { browser, context } = await createContext();
 
-    const aggregate = buildAggregateResult({
-      code,
-      pages,
-      pageSpecs,
-    });
+    try {
+      const pages = await mapWithConcurrency(
+        pageSpecs,
+        options.concurrency || DEFAULT_CONCURRENCY,
+        async (spec) => pipeline(context, code, spec, options),
+      );
 
-    logger.summary('Crawler', `구조화 수집 완료 | ${code} | pages:${aggregate.quality.completedPages} | warnings:${aggregate.quality.warningCount}`);
-    return aggregate;
-  } finally {
-    await context.close();
-    await browser.close();
-  }
+      const aggregate = buildAggregateResult({
+        code,
+        pages,
+        pageSpecs,
+      });
+
+      logger.summary('Crawler', `구조화 수집 완료 | ${code} | pages:${aggregate.quality.completedPages} | warnings:${aggregate.quality.warningCount}`);
+      return aggregate;
+    } finally {
+      await context.close();
+      await browser.close();
+    }
+  }, {
+    ...options,
+    isCacheable: (value) => value && value.stages?.crawler_v3?.ok !== false,
+  });
 }
 
 async function crawlWiseReportKr(targetCode, options = {}) {
@@ -172,5 +193,7 @@ module.exports = {
   crawlWiseReportKr,
   crawlWiseReportKrV12,
   crawlWiseReportKrPage,
+  clearWiseReportKrCache: wisereportKrCache.clear,
+  getWiseReportKrCacheStats: wisereportKrCache.getStats,
   crawlMarketData,
 };

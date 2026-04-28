@@ -6,10 +6,14 @@
  */
 
 import { readFile } from 'node:fs/promises';
+import cacheModule from './wisereport-cache.cjs';
 
 export const WISEREPORT_GLOBAL_BASE_URL = 'https://compglobal.wisereport.co.kr';
 export const WISEREPORT_GLOBAL_DEFAULT_TIMEOUT_MS = 20_000;
 export const WISEREPORT_GLOBAL_DEFAULT_CONCURRENCY = 4;
+
+const { createReadThroughCache } = cacheModule;
+const wisereportGlobalCache = createReadThroughCache({ name: 'wisereport-global' });
 
 const DEFAULT_USER_AGENT = [
   'Mozilla/5.0 (Windows NT 10.0; Win64; x64)',
@@ -404,42 +408,60 @@ export function detectWiseReportGlobalAccess(page = {}) {
 export async function crawlWiseReportGlobal(ticker, opts = {}) {
   const cmpCode = opts.cmpCode ?? normalizeWiseReportGlobalCmpCode(ticker, opts);
   const routes = resolveWiseReportGlobalRoutes(opts.routes);
-  const cookieHeader = await resolveWiseReportGlobalCookieHeader(opts);
-  const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+  const routeIds = routes.map(route => route.id || route.path).join(',');
   const includeHtml = Boolean(opts.includeHtml);
-  const concurrency = Math.max(1, Math.min(Number(opts.concurrency) || WISEREPORT_GLOBAL_DEFAULT_CONCURRENCY, routes.length));
-  const timeoutMs = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : WISEREPORT_GLOBAL_DEFAULT_TIMEOUT_MS;
+  const includeAuxiliary = opts.includeAuxiliary !== false;
+  const basedate = normalizeWiseReportBasedate(opts);
+  const cacheKey = `global:${cmpCode}:${routeIds}:aux=${includeAuxiliary}:html=${includeHtml}:date=${basedate}:base=${opts.baseUrl ?? WISEREPORT_GLOBAL_BASE_URL}`;
 
-  if (!cookieHeader) {
-    throw new Error('WiseReport Global cookies are required. Provide opts.cookieHeader, opts.cookies, opts.cookieFile, or the WISEREPORT_GLOBAL_* / COMPANY_GLOBAL_* environment variables.');
-  }
+  return wisereportGlobalCache.readThrough(cacheKey, async () => {
+    const cookieHeader = await resolveWiseReportGlobalCookieHeader(opts);
+    const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
+    const concurrency = Math.max(1, Math.min(Number(opts.concurrency) || WISEREPORT_GLOBAL_DEFAULT_CONCURRENCY, routes.length));
+    const timeoutMs = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : WISEREPORT_GLOBAL_DEFAULT_TIMEOUT_MS;
 
-  if (typeof fetchImpl !== 'function') {
-    throw new TypeError('fetch implementation is required');
-  }
+    if (!cookieHeader) {
+      throw new Error('WiseReport Global cookies are required. Provide opts.cookieHeader, opts.cookies, opts.cookieFile, or the WISEREPORT_GLOBAL_* / COMPANY_GLOBAL_* environment variables.');
+    }
 
-  const startedAt = Date.now();
-  const pageResults = await mapWithConcurrency(routes, concurrency, route => fetchWiseReportGlobalPage(route, cmpCode, {
+    if (typeof fetchImpl !== 'function') {
+      throw new TypeError('fetch implementation is required');
+    }
+
+    const startedAt = Date.now();
+    const pageResults = await mapWithConcurrency(routes, concurrency, route => fetchWiseReportGlobalPage(route, cmpCode, {
+      ...opts,
+      fetchImpl,
+      cookieHeader,
+      includeHtml,
+      timeoutMs,
+    }));
+
+    const pages = Object.fromEntries(pageResults.map(page => [page.id, page]));
+    const coverage = buildCoverageSummary(pageResults);
+
+    return {
+      ticker: String(ticker ?? '').trim().toUpperCase() || null,
+      cmpCode,
+      fetchedAt: new Date().toISOString(),
+      elapsedMs: Date.now() - startedAt,
+      baseUrl: opts.baseUrl ?? WISEREPORT_GLOBAL_BASE_URL,
+      routeCount: routes.length,
+      coverage,
+      pages,
+    };
+  }, {
     ...opts,
-    fetchImpl,
-    cookieHeader,
-    includeHtml,
-    timeoutMs,
-  }));
+    isCacheable: (value) => value && value.coverage?.failed !== value.routeCount,
+  });
+}
 
-  const pages = Object.fromEntries(pageResults.map(page => [page.id, page]));
-  const coverage = buildCoverageSummary(pageResults);
+export function clearWiseReportGlobalCache(key) {
+  wisereportGlobalCache.clear(key);
+}
 
-  return {
-    ticker: String(ticker ?? '').trim().toUpperCase() || null,
-    cmpCode,
-    fetchedAt: new Date().toISOString(),
-    elapsedMs: Date.now() - startedAt,
-    baseUrl: opts.baseUrl ?? WISEREPORT_GLOBAL_BASE_URL,
-    routeCount: routes.length,
-    coverage,
-    pages,
-  };
+export function getWiseReportGlobalCacheStats() {
+  return wisereportGlobalCache.getStats();
 }
 
 export async function crawlWiseReportGlobalDomainData(ticker, opts = {}) {

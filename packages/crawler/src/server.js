@@ -116,6 +116,32 @@ function parseSingleQueryValue(value) {
   return normalizedValue == null ? undefined : String(normalizedValue).trim() || undefined;
 }
 
+function parseBooleanQuery(value) {
+  const normalized = parseSingleQueryValue(value);
+  if (normalized == null) return false;
+  return /^(1|true|yes|on)$/i.test(normalized);
+}
+
+const WISEREPORT_CACHE_QUERY_PARAMS = Object.freeze(['forceRefresh(optional)', 'bypassCache(optional)', 'cacheTtlMs(optional)']);
+
+function buildWiseReportCacheOptionsFromQuery(req) {
+  const options = {};
+  if (parseBooleanQuery(req.query.forceRefresh) || parseBooleanQuery(req.query.refresh)) {
+    options.forceRefresh = true;
+  }
+  if (parseBooleanQuery(req.query.bypassCache) || parseBooleanQuery(req.query.noCache)) {
+    options.cache = false;
+  }
+  const ttlValue = parseSingleQueryValue(req.query.cacheTtlMs ?? req.query.cacheTTL);
+  if (ttlValue != null) {
+    const ttlMs = Number(ttlValue);
+    if (Number.isFinite(ttlMs) && ttlMs > 0) {
+      options.cacheTtlMs = ttlMs;
+    }
+  }
+  return options;
+}
+
 const DEEPSCAN_MAJOR_BLOCK_KEYS = Object.freeze([
   'hero',
   'committee',
@@ -2238,13 +2264,13 @@ const endpointDefinitions = [
     archived: true,
     archiveReason: 'Retired: only slim v1.1 WiseReport endpoints remain active.',
     params: ['code'],
-    query: [],
+    query: WISEREPORT_CACHE_QUERY_PARAMS,
     count: (data) => Object.keys(normalizeWiseReportKrAggregate(data).pages || {}).length,
     meta: (data) => ({
       pageRouteCount: WISEREPORT_KR_PAGE_ROUTES.length,
       pageKeys: Object.keys(normalizeWiseReportKrAggregate(data).pages || {}),
     }),
-    handler: async (req) => buildWiseReportKrAggregatePayload(await getCrawl(req.params.code), req.params.code),
+    handler: async (req) => buildWiseReportKrAggregatePayload(await getCrawl(req.params.code, buildWiseReportCacheOptionsFromQuery(req)), req.params.code),
   },
   {
     id: 'wisereport-kr-slim-v1',
@@ -2255,9 +2281,9 @@ const endpointDefinitions = [
     archived: true,
     archiveReason: 'Retired: only slim v1.1 WiseReport endpoints remain active.',
     params: ['code'],
-    query: [],
+    query: WISEREPORT_CACHE_QUERY_PARAMS,
     rawSuccess: true,
-    handler: async (req) => buildWiseReportKrSlimPayload(await getCrawl(req.params.code), req.params.code),
+    handler: async (req) => buildWiseReportKrSlimPayload(await getCrawl(req.params.code, buildWiseReportCacheOptionsFromQuery(req)), req.params.code),
   },
   {
     id: 'wisereport-kr-slim-v1.1',
@@ -2266,9 +2292,9 @@ const endpointDefinitions = [
     primaryPath: buildMajorPath('/wisereport-fnguide/kr/companies/:code/slim/v1.1'),
     dataSources: ['wisereport', 'fnguide'],
     params: ['code'],
-    query: [],
+    query: WISEREPORT_CACHE_QUERY_PARAMS,
     rawSuccess: true,
-    handler: async (req) => buildWiseReportKrSlimPayloadV11(await getCrawl(req.params.code), req.params.code),
+    handler: async (req) => buildWiseReportKrSlimPayloadV11(await getCrawl(req.params.code, buildWiseReportCacheOptionsFromQuery(req)), req.params.code),
   },
   {
     id: 'wisereport-kr-slim-v1.2',
@@ -2277,9 +2303,9 @@ const endpointDefinitions = [
     primaryPath: buildMajorPath('/wisereport-fnguide/kr/companies/:code/slim/v1.2'),
     dataSources: ['wisereport', 'fnguide'],
     params: ['code'],
-    query: [],
+    query: WISEREPORT_CACHE_QUERY_PARAMS,
     rawSuccess: true,
-    handler: async (req) => buildWiseReportKrSlimPayloadV12(await getCrawlV12(req.params.code), req.params.code),
+    handler: async (req) => buildWiseReportKrSlimPayloadV12(await getCrawlV12(req.params.code, buildWiseReportCacheOptionsFromQuery(req)), req.params.code),
   },
   ...WISEREPORT_KR_PAGE_ROUTES.map((route) => ({
     id: route.id,
@@ -2290,14 +2316,14 @@ const endpointDefinitions = [
     archived: true,
     archiveReason: 'Retired: KR page-level WiseReport/FnGuide endpoints are disabled in favor of slim v1.1 only.',
     params: ['code'],
-    query: [],
+    query: WISEREPORT_CACHE_QUERY_PARAMS,
     count: 1,
     meta: () => ({
       aggregateRoute: buildDataSourcePath('wisereport-fnguide', '/kr/companies/:code'),
       pageKey: route.pageKey,
       pageSlug: route.slug,
     }),
-    handler: async (req) => crawlWiseReportKrPage(req.params.code, route.pageKey),
+    handler: async (req) => crawlWiseReportKrPage(req.params.code, route.pageKey, buildWiseReportCacheOptionsFromQuery(req)),
   })),
   {
     id: 'market-overview-kr',
@@ -2372,11 +2398,14 @@ const endpointDefinitions = [
     archived: true,
     archiveReason: 'Retired: only slim v1.1 WiseReport endpoints remain active.',
     params: ['ticker'],
-    query: ['routes(optional, comma-separated)'],
+    query: ['routes(optional, comma-separated)', ...WISEREPORT_CACHE_QUERY_PARAMS],
     meta: () => ({ wisereportGlobalRouteCount: WISEREPORT_GLOBAL_ROUTES.length }),
     handler: async (req) => {
       const routes = parseCsvQuery(req.query.routes);
-      return crawlWiseReportGlobal(req.params.ticker, routes.length > 0 ? { routes } : {});
+      return crawlWiseReportGlobal(req.params.ticker, {
+        ...buildWiseReportCacheOptionsFromQuery(req),
+        ...(routes.length > 0 ? { routes } : {}),
+      });
     },
   },
   {
@@ -2388,8 +2417,8 @@ const endpointDefinitions = [
     archived: true,
     archiveReason: 'Retired: only slim v1.1 WiseReport endpoints remain active.',
     params: ['ticker'],
-    query: [],
-    handler: async (req) => crawlWiseReportGlobalDomainData(req.params.ticker),
+    query: WISEREPORT_CACHE_QUERY_PARAMS,
+    handler: async (req) => crawlWiseReportGlobalDomainData(req.params.ticker, buildWiseReportCacheOptionsFromQuery(req)),
   },
   {
     id: 'wisereport-global-slim-v1',
@@ -2400,10 +2429,10 @@ const endpointDefinitions = [
     archived: true,
     archiveReason: 'Retired: only slim v1.1 WiseReport endpoints remain active.',
     params: ['ticker'],
-    query: [],
+    query: WISEREPORT_CACHE_QUERY_PARAMS,
     rawSuccess: true,
     handler: async (req) => buildWiseReportGlobalSlimPayloadV1(
-      await crawlWiseReportGlobalDomainData(req.params.ticker, { routes: WISEREPORT_GLOBAL_COMPANY_SLIM_V1_ROUTE_IDS }),
+      await crawlWiseReportGlobalDomainData(req.params.ticker, { ...buildWiseReportCacheOptionsFromQuery(req), routes: WISEREPORT_GLOBAL_COMPANY_SLIM_V1_ROUTE_IDS }),
       req.params.ticker,
     ),
   },
@@ -2414,10 +2443,10 @@ const endpointDefinitions = [
     primaryPath: buildMajorPath('/wisereport-global/us/companies/:ticker/slim/v1.1'),
     dataSources: ['wisereport-global'],
     params: ['ticker'],
-    query: [],
+    query: WISEREPORT_CACHE_QUERY_PARAMS,
     rawSuccess: true,
     handler: async (req) => buildWiseReportGlobalSlimPayloadV11(
-      await crawlWiseReportGlobalDomainData(req.params.ticker, { routes: WISEREPORT_GLOBAL_COMPANY_SLIM_V1_ROUTE_IDS }),
+      await crawlWiseReportGlobalDomainData(req.params.ticker, { ...buildWiseReportCacheOptionsFromQuery(req), routes: WISEREPORT_GLOBAL_COMPANY_SLIM_V1_ROUTE_IDS }),
       req.params.ticker,
     ),
   },
