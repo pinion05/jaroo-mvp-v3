@@ -690,17 +690,26 @@ function extractAssetManagerHoldings(snapshotPage) {
 
 function extractFnguideShareholderDetails(shareAnalysisPage, snapshotPage) {
   const jsonRows = Array.isArray(shareAnalysisPage?.shareholderDetailsJson?.comp)
-    ? shareAnalysisPage.shareholderDetailsJson.comp
+    ? shareAnalysisPage.shareholderDetailsJson.comp.map((row) => ({
+        row,
+        sourcePath: 'fnguide-shareanalysis.shareholderDetailsJson.comp',
+      }))
     : [];
   const tableRows = Array.isArray(shareAnalysisPage?.shareholderDetails?.rows)
-    ? shareAnalysisPage.shareholderDetails.rows
+    ? shareAnalysisPage.shareholderDetails.rows.map((row) => ({
+        row,
+        sourcePath: 'fnguide-shareanalysis.shareholderDetails.rows',
+      }))
     : [];
   const snapshotRows = Array.isArray(snapshotPage?.snapshotMajorShareholders?.rows)
-    ? snapshotPage.snapshotMajorShareholders.rows
+    ? snapshotPage.snapshotMajorShareholders.rows.map((row) => ({
+        row,
+        sourcePath: 'fnguide-snapshot.snapshotMajorShareholders.rows',
+      }))
     : [];
 
   return [...jsonRows, ...tableRows, ...snapshotRows]
-    .map((row) => ({
+    .map(({ row, sourcePath }) => ({
       groupCode: normalizeText(row.SHER_GB_1),
       groupName: normalizeText(row.SHER_TYPE_NM ?? row.주주구분 ?? row.항목),
       representative: normalizeText(row.MAJ_SHER_NM ?? row.대표주주 ?? row.항목),
@@ -711,8 +720,53 @@ function extractFnguideShareholderDetails(shareAnalysisPage, snapshotPage) {
       groupShares: normalizeShareCount(row.COMM_STK_QTY_SUM),
       groupPct: normalizePercent(row.SHER_RT_SUM),
       lastChangeDate: normalizeDate(row.CHG_DT ?? row.MAX_CHG_DT ?? row.최종변동일),
+      sourcePath,
     }))
     .filter((row) => row.name || row.representative || row.pct !== null || row.shares !== null);
+}
+
+function normalizedOwnershipChangeField(row, field) {
+  return row[field] ?? null;
+}
+
+function optionalOwnershipChangeFieldsMatch(left, right, field) {
+  const leftValue = normalizedOwnershipChangeField(left, field);
+  const rightValue = normalizedOwnershipChangeField(right, field);
+  return leftValue === null || rightValue === null || leftValue === rightValue;
+}
+
+function ownershipChangeRowsMatch(left, right) {
+  const requiredFields = [
+    'holderType',
+    'representative',
+    'name',
+    'tradeDate',
+    'changeReason',
+    'changeShares',
+    'shares',
+    'pct',
+    'changePct',
+  ];
+
+  return requiredFields.every((field) => normalizedOwnershipChangeField(left, field) === normalizedOwnershipChangeField(right, field))
+    && optionalOwnershipChangeFieldsMatch(left, right, 'shareClass')
+    && optionalOwnershipChangeFieldsMatch(left, right, 'previousShares');
+}
+
+function deduplicateOwnershipChanges(rows) {
+  return rows.reduce((acc, row) => {
+    const existing = acc.find((item) => ownershipChangeRowsMatch(item, row));
+    if (existing) {
+      for (const [field, value] of Object.entries(row)) {
+        if ((existing[field] === null || existing[field] === undefined) && value !== null && value !== undefined) {
+          existing[field] = value;
+        }
+      }
+    } else {
+      acc.push(row);
+    }
+    return acc;
+  }, []);
 }
 
 function extractFnguideShareholderChanges(shareAnalysisPage) {
@@ -729,7 +783,7 @@ function extractFnguideShareholderChanges(shareAnalysisPage) {
       }))
     : [];
 
-  return [...jsonRows, ...tableRows]
+  return deduplicateOwnershipChanges([...jsonRows, ...tableRows]
     .map(({ row, sourcePath }) => ({
       holderType: normalizeText(row.주주구분 ?? row.holderType),
       representative: normalizeText(row.대표주주 ?? row.representative),
@@ -744,7 +798,7 @@ function extractFnguideShareholderChanges(shareAnalysisPage) {
       changePct: normalizePercent(row['지분 변동율(%)'] ?? row['변동지분 (%)'] ?? row.changePct),
       sourcePath,
     }))
-    .filter((row) => row.name || row.representative || row.pct !== null || row.shares !== null || row.changeShares !== null);
+    .filter((row) => row.name || row.representative || row.pct !== null || row.shares !== null || row.changeShares !== null));
 }
 
 function extractFnguideShareholderCategories(shareAnalysisPage, snapshotPage) {
@@ -866,7 +920,7 @@ function extractOwnershipSnapshot(shareholdingPage, snapshotPage = null, shareAn
       lastTradeDate: row.lastChangeDate,
       changePct: null,
       changeReason: null,
-      sourcePath: 'fnguide-shareanalysis.shareholderDetailsJson.comp',
+      sourcePath: row.sourcePath,
     })),
   ];
   const knownInstitutionalMajorHoldersWithSources = knownInstitutionalMajorHolderCandidates

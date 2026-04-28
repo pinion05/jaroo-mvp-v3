@@ -607,6 +607,133 @@ test('buildDeepScanKrEvidencePacket uses v1.2 FnGuide ownership pages when prese
   ]);
 });
 
+test('buildDeepScanKrEvidencePacket preserves snapshot major shareholder source paths by origin', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  const packet = buildDeepScanKrEvidencePacket(
+    {
+      instrument: {
+        code: '005930',
+        name: '삼성전자',
+      },
+    },
+    {
+      slim: {
+        schemaVersion: 'wisereport-kr-slim-v1.2',
+        code: '005930',
+        pages: {
+          'fnguide-snapshot': {
+            snapshotMajorShareholders: {
+              rows: [
+                {
+                  항목: '국민연금공단',
+                  보통주: '1,071,914',
+                  지분율: '5.18',
+                  최종변동일: '2026/03/30',
+                },
+              ],
+            },
+          },
+        },
+      },
+    },
+  );
+
+  assert.deepEqual(packet.ownershipSnapshot.knownInstitutionalMajorHolders[0], {
+    name: '국민연금공단',
+    pct: 5.18,
+    shares: 1071914,
+    lastTradeDate: '2026-03-30',
+    changePct: null,
+    changeReason: null,
+  });
+  assert.deepEqual(packet.ownershipSnapshot.knownInstitutionalMajorHolderSourcePaths, [
+    'fnguide-snapshot.snapshotMajorShareholders.rows',
+  ]);
+});
+
+test('buildDeepScanKrEvidencePacket deduplicates FnGuide shareholder change JSON and table rows before capping', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  const tableRows = Array.from({ length: 9 }, (_, index) => {
+    const oneBasedIndex = index + 1;
+    return {
+      주주구분: '주요주주',
+      대표주주: `테스트주주${oneBasedIndex}`,
+      변동주주: `테스트주주${oneBasedIndex}`,
+      변동일: `2026.03.${String(30 - oneBasedIndex).padStart(2, '0')}`,
+      변동사유: '장내매수(+)',
+      증감주: `${oneBasedIndex},000`,
+      변동후주: `${oneBasedIndex},000`,
+      지분율: `${5 + oneBasedIndex / 100}`,
+    };
+  });
+
+  const packet = buildDeepScanKrEvidencePacket(
+    {
+      instrument: {
+        code: '005930',
+        name: '삼성전자',
+      },
+    },
+    {
+      slim: {
+        schemaVersion: 'wisereport-kr-slim-v1.2',
+        code: '005930',
+        pages: {
+          'fnguide-shareanalysis': {
+            shareholderChangesJson: {
+              comp: [
+                {
+                  주주구분: '주요주주',
+                  대표주주: '국민연금공단',
+                  변동주주: '국민연금공단',
+                  변동일: '2026.03.30',
+                  변동사유: '기타(+)',
+                  주식종류: '보통주',
+                  변동전주: '0',
+                  증감주: '1,071,914',
+                  변동후주: '1,071,914',
+                  지분율: '5.18',
+                },
+              ],
+            },
+            shareholderChanges: {
+              rows: [
+                {
+                  주주구분: '주요주주',
+                  대표주주: '국민연금공단',
+                  변동주주: '국민연금공단',
+                  변동일: '2026.03.30',
+                  변동사유: '기타(+)',
+                  증감주: '1,071,914',
+                  변동후주: '1,071,914',
+                  지분율: '5.18',
+                },
+                ...tableRows,
+              ],
+            },
+          },
+        },
+      },
+    },
+  );
+
+  assert.equal(packet.ownershipSnapshot.ownershipChanges.length, 10);
+  assert.equal(
+    packet.ownershipSnapshot.ownershipChanges.filter((row) => row.name === '국민연금공단').length,
+    1,
+  );
+  assert.equal(
+    packet.ownershipSnapshot.ownershipChanges.find((row) => row.name === '국민연금공단')?.sourcePath,
+    'fnguide-shareanalysis.shareholderChangesJson.comp',
+  );
+  assert.equal(
+    packet.ownershipSnapshot.ownershipChanges.some((row) => row.name === '테스트주주9'),
+    true,
+  );
+});
+
 test('buildDeepScanKrEvidencePacket ignores unknown slim page keys, counts recent reports from row-like payloads, and reports missing quote/holding sources deterministically', async () => {
   const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
 
