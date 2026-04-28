@@ -121,3 +121,28 @@ test('deepscan slim summary를 fetch 후 메모리 캐시에 저장한다', asyn
 
   clearCachedDeepScanSlimSummary()
 })
+
+test('home summary prefetch는 KR slim v1.1 endpoint를 한 번만 요청해 v1.2 13-page crawl을 피한다', async () => {
+  clearCachedDeepScanSlimSummary()
+  const requestedUrls: string[] = []
+
+  const cached = await prefetchAndPersistDeepScanSlimSummary(
+    { code: '005930', identifierCode: '005930', identifierTicker: undefined } as never,
+    async (url) => {
+      requestedUrls.push(String(url))
+      return new Response(JSON.stringify({
+        company: { code: '005930', name: '삼성전자' },
+        pages: {
+          'investment-indicators': { metrics: [{ rows: [{ '항목': 'ROE', latest: '10.85' }] }] },
+          opinion: { reportSummaries: [] },
+        },
+      }), { status: 200 })
+    },
+  )
+
+  assert.equal(cached?.key, 'KR:005930')
+  assert.deepEqual(requestedUrls, ['/api/deepscan/slim?market=KR&code=005930&version=v1.1'])
+  assert.equal(requestedUrls.some((url) => url.includes('version=v1.2')), false)
+
+  clearCachedDeepScanSlimSummary()
+})

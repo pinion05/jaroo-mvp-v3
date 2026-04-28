@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 
+const KR_SUMMARY_SLIM_VERSION = 'v1.1'
+const KR_CANONICAL_SLIM_VERSION = 'v1.2'
+
+export function resolveKrDeepScanSlimVersion(version: string | null | undefined) {
+  const normalizedVersion = version?.trim().toLowerCase()
+  return normalizedVersion === KR_CANONICAL_SLIM_VERSION || normalizedVersion === '1.2'
+    ? KR_CANONICAL_SLIM_VERSION
+    : KR_SUMMARY_SLIM_VERSION
+}
+
 export function resolveDeepScanSlimUpstreamPath(searchParams: URLSearchParams) {
   const market = searchParams.get('market')?.trim().toUpperCase()
   const code = searchParams.get('code')?.trim()
@@ -9,7 +19,7 @@ export function resolveDeepScanSlimUpstreamPath(searchParams: URLSearchParams) {
   const version = searchParams.get('version')?.trim().toLowerCase()
 
   if (market === 'KR' && code) {
-    const krVersion = version === 'v1.1' || version === '1.1' ? 'v1.1' : 'v1.2'
+    const krVersion = resolveKrDeepScanSlimVersion(version)
     return `/api/major/wisereport-fnguide/kr/companies/${encodeURIComponent(code)}/slim/${krVersion}`
   }
 
