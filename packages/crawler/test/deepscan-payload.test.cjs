@@ -518,6 +518,7 @@ test('buildJarooDeepScanPayload preserves 9 committee slots and marks failed mem
     assert.deepEqual(businessAxis.members.map((member) => member.score), [null, null, null]);
     assert.equal(businessAxis.members[0].error.errorKind ?? businessAxis.members[0].error.kind, 'llm-upstream-error');
     assert.equal(businessAxis.members[0].error.attempts, 4);
+    assert.equal(businessAxis.members[0].error.retryable, false);
     const marketAxis = payload.committee.axes.find((axis) => axis.label === 'Market Timing');
     assert.ok(marketAxis);
     assert.equal(marketAxis.members.every((member) => member.status === 'success'), true);

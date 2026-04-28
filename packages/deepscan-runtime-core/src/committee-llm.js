@@ -448,7 +448,10 @@ export async function scoreCommitteeMembers({ memberKeys, shared, members, optio
     async (memberKey) => {
       const memberDump = members[memberKey]
       if (typeof memberDump === 'undefined') {
-        throw new Error(`Missing generated runtime dump for ${memberKey}`)
+        throw new CommitteeLlmError('runtime-missing-dump', `Missing generated runtime dump for ${memberKey}`, {
+          attempts: 0,
+          retryable: false,
+        })
       }
       const result = await scoreCommitteeMember(memberKey, { shared, memberDump }, runtimeOptions)
       return [memberKey, result]

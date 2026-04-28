@@ -680,7 +680,7 @@ function buildErrorMember(memberKey, error) {
       kind,
       message: `LLM 응답 실패 · ${attempts}회 시도`,
       attempts,
-      retryable: true,
+      retryable: Boolean(error?.retryable),
     },
   };
 }

@@ -319,3 +319,38 @@ test('scoreCommitteeMembers exhausts initial attempt plus three retries into str
     }
   }
 })
+
+test('scoreCommitteeMembers reports missing generated dumps with runtime taxonomy and no attempts', async () => {
+  const originalKey = process.env.OPENROUTER_API_KEY
+  const logDir = mkdtempSync(join(tmpdir(), 'committee-llm-'))
+  process.env.OPENROUTER_API_KEY = 'test-key'
+
+  try {
+    const { results, errors } = await scoreCommitteeMembers({
+      memberKeys: ['valuation'],
+      shared: { source: 'fixture' },
+      members: {},
+      options: {
+        schemaName: 'jaroo_test_member',
+        title: 'test committee',
+        systemPrompt: (memberKey: string) => `member:${memberKey}`,
+        logDir,
+      },
+    })
+
+    assert.deepEqual(results, {})
+    assert.equal(errors.length, 1)
+    assert.equal(errors[0].member, 'valuation')
+    assert.equal(errors[0].errorKind, 'runtime-missing-dump')
+    assert.equal(errors[0].attempts, 0)
+    assert.equal(errors[0].retryable, false)
+    assert.equal(errors[0].llmResultPresent, false)
+  } finally {
+    rmSync(logDir, { recursive: true, force: true })
+    if (originalKey) {
+      process.env.OPENROUTER_API_KEY = originalKey
+    } else {
+      delete process.env.OPENROUTER_API_KEY
+    }
+  }
+})
