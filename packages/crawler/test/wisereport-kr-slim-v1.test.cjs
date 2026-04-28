@@ -819,7 +819,7 @@ test('buildWiseReportKrSlimPayloadV12 reports failed FnGuide snapshot as source 
   assert.equal(slim.krFacts.investorFlow.institutionalOwnershipPct.reasonCode, 'institutional_aggregate_not_available_in_wisereport_fnguide_sources');
 });
 
-test('buildWiseReportKrSlimPayloadV12 reports failed FnGuide shareanalysis as source error', async () => {
+test('buildWiseReportKrSlimPayloadV12 preserves snapshot shareholder categories when FnGuide shareanalysis fails', async () => {
   const { buildWiseReportKrSlimPayloadV12 } = await import('../src/server.js');
   const slim = buildWiseReportKrSlimPayloadV12(
     createAggregateFixtureV11WithFailedPage('fnguide-shareanalysis', 'shareanalysis timeout'),
@@ -830,7 +830,25 @@ test('buildWiseReportKrSlimPayloadV12 reports failed FnGuide shareanalysis as so
   assert.equal(slim.krFacts.investorFlow.institutionalOwnershipPct.availability, 'error');
   assert.equal(slim.krFacts.investorFlow.institutionalOwnershipPct.reasonCode, 'source_acquisition_failed');
   assert.equal(slim.krFacts.investorFlow.institutionalOwnershipPct.source.pageId, 'fnguide-shareanalysis');
+  assert.equal(slim.krFacts.investorFlow.shareholderCategories.availability, 'present');
+  assert.equal(slim.krFacts.investorFlow.shareholderCategories.source.pageId, 'fnguide-snapshot');
+  assert.equal(slim.krFacts.investorFlow.shareholderCategories.source.fieldPath, 'fnguide-snapshot.shareholderCategories.rows');
+  assert.equal(slim.krFacts.investorFlow.shareholderCategories.value.length, 2);
+  assert.equal(slim.krFacts.investorFlow.shareholderCategories.value[0].category, '최대주주등 (본인+특별관계자)');
+  assert.equal('message' in slim.krFacts.investorFlow.shareholderCategories, false);
+});
+
+test('buildWiseReportKrSlimPayloadV12 reports failed FnGuide shareanalysis for shareholder categories only when snapshot rows are unavailable', async () => {
+  const { buildWiseReportKrSlimPayloadV12 } = await import('../src/server.js');
+  const aggregate = createAggregateFixtureV11WithFailedPage('fnguide-shareanalysis', 'shareanalysis timeout');
+  delete aggregate.pages['fnguide-snapshot'].normalized.shareholderCategories;
+
+  const slim = buildWiseReportKrSlimPayloadV12(aggregate, '005930');
+
+  assertSlimV12PageFailure(slim, 'fnguide-shareanalysis');
   assert.equal(slim.krFacts.investorFlow.shareholderCategories.availability, 'error');
+  assert.equal(slim.krFacts.investorFlow.shareholderCategories.reasonCode, 'source_acquisition_failed');
+  assert.equal(slim.krFacts.investorFlow.shareholderCategories.source.pageId, 'fnguide-shareanalysis');
   assert.match(slim.krFacts.investorFlow.shareholderCategories.message, /shareanalysis timeout/);
 });
 

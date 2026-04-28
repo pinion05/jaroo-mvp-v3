@@ -977,6 +977,9 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind, pa
   const snapshotFailure = pageFailuresById['fnguide-snapshot'] || null;
   const shareAnalysisFailure = pageFailuresById['fnguide-shareanalysis'] || null;
   const foreignOwnershipChartFailure = pageFailuresById['fnguide-foreign-ownership-chart'] || null;
+  const ownershipFailure = snapshotFailure || foreignOwnershipChartFailure;
+  const shareholderCategories = evidence.ownershipSnapshot?.shareholderCategories ?? [];
+  const hasShareholderCategories = shareholderCategories.length > 0;
 
   const foreignOwnershipFact = evidence.ownershipSnapshot?.foreignOwnershipPct !== null && evidence.ownershipSnapshot?.foreignOwnershipPct !== undefined
     ? makeSlimV12Fact(evidence.ownershipSnapshot.foreignOwnershipPct, {
@@ -986,9 +989,9 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind, pa
         checkedSources: ownershipCheckedSources,
         asOf: evidence.ownershipSnapshot.foreignOwnershipAsOf,
       })
-    : (snapshotFailure || foreignOwnershipChartFailure)
-        ? factForSlimV12PageFailure(snapshotFailure || foreignOwnershipChartFailure, {
-            fieldPath: `${(snapshotFailure || foreignOwnershipChartFailure).pageId}.foreignOwnershipPct`,
+    : ownershipFailure
+        ? factForSlimV12PageFailure(ownershipFailure, {
+            fieldPath: `${ownershipFailure.pageId}.foreignOwnershipPct`,
             checkedSources: ownershipCheckedSources,
           })
     : makeSlimV12MissingFact({
@@ -1026,6 +1029,16 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind, pa
     reasonCode: 'top_asset_managers_only',
     message: 'FnGuide Snapshot의 운용사별 보유 현황은 상위 운용사/공모펀드 보고서 기반 partial context이며 기관 전체 보유율 aggregate가 아닙니다.',
   };
+  const shareholderCategoriesFact = hasShareholderCategories
+    ? makeSlimV12Fact(shareholderCategories, {
+        provider: 'fnguide',
+        pageId: shareAnalysisFailure ? 'fnguide-snapshot' : 'fnguide-shareanalysis',
+        fieldPath: shareAnalysisFailure ? 'fnguide-snapshot.shareholderCategories.rows' : 'fnguide-shareanalysis.shareholderCategories.rows',
+        checkedSources: ownershipCheckedSources,
+      })
+    : shareAnalysisFailure
+        ? factForSlimV12PageFailure(shareAnalysisFailure, { fieldPath: 'fnguide-shareanalysis.shareholderCategories.rows', checkedSources: ownershipCheckedSources })
+        : makeSlimV12Fact(shareholderCategories, { provider: 'fnguide', pageId: 'fnguide-shareanalysis', fieldPath: 'fnguide-shareanalysis.shareholderCategories.rows', checkedSources: ownershipCheckedSources });
 
   return {
     quote: {
@@ -1093,9 +1106,7 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind, pa
         : assetManagerHoldings.length > 0
         ? makeSlimV12Fact(assetManagerHoldings, { ...assetManagerFactOptions, availability: 'partial', fieldPath: 'fnguide-snapshot.assetManagerHoldings.rows' })
         : makeSlimV12MissingFact({ ...assetManagerFactOptions, fieldPath: 'fnguide-snapshot.assetManagerHoldings.rows' }),
-      shareholderCategories: shareAnalysisFailure
-        ? factForSlimV12PageFailure(shareAnalysisFailure, { fieldPath: 'fnguide-shareanalysis.shareholderCategories.rows', checkedSources: ownershipCheckedSources })
-        : makeSlimV12Fact(evidence.ownershipSnapshot?.shareholderCategories ?? [], { provider: 'fnguide', pageId: 'fnguide-shareanalysis', fieldPath: 'fnguide-shareanalysis.shareholderCategories.rows', checkedSources: ownershipCheckedSources }),
+      shareholderCategories: shareholderCategoriesFact,
       retailNetBuy: makeSlimV12MissingFact({ provider: 'fnguide', checkedSources: ownershipCheckedSources, reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide', message: noFlowMessage }),
       foreignNetBuy: makeSlimV12MissingFact({ provider: 'fnguide', checkedSources: ownershipCheckedSources, reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide', message: noFlowMessage }),
       institutionalNetBuy: makeSlimV12MissingFact({ provider: 'fnguide', checkedSources: ownershipCheckedSources, reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide', message: noFlowMessage }),
