@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 
 const {
   crawlWiseReportKrPage,
+  crawlWiseReportKr,
   clearWiseReportKrCache,
   getWiseReportKrCacheStats,
 } = require('../src/crawlers/wisereport-kr.cjs');
@@ -125,6 +126,44 @@ test('KR WiseReport page crawl uses cache key by code and page', async () => {
   assert.equal(getWiseReportKrCacheStats().hits, 1);
 });
 
+test('KR WiseReport aggregate crawl caches by completed page quality', async () => {
+  clearWiseReportKrCache();
+  let pipelineCalls = 0;
+  let contextCreates = 0;
+  let contextCloses = 0;
+  let browserCloses = 0;
+
+  const createBrowserContext = async () => {
+    contextCreates += 1;
+    return {
+      context: { close: async () => { contextCloses += 1; } },
+      browser: { close: async () => { browserCloses += 1; } },
+    };
+  };
+  const runPagePipeline = async (_context, code, spec) => ({
+    id: spec.id,
+    sourceKey: spec.sourceKey,
+    legacyKey: spec.legacyKey,
+    code,
+    normalized: { company: { code } },
+    quality: { warnings: [] },
+    sequence: ++pipelineCalls,
+  });
+
+  const options = { createBrowserContext, runPagePipeline, cacheTtlMs: 60_000 };
+  const first = await crawlWiseReportKr('005930', options);
+  const second = await crawlWiseReportKr('005930', options);
+
+  assert.equal(first.cache.status, 'miss');
+  assert.equal(second.cache.status, 'hit');
+  assert.equal(first.quality.completedPages > 0, true);
+  assert.equal(second.quality.completedPages, first.quality.completedPages);
+  assert.equal(pipelineCalls, first.quality.completedPages);
+  assert.equal(contextCreates, 1);
+  assert.equal(contextCloses, 1);
+  assert.equal(browserCloses, 1);
+});
+
 test('Global WiseReport crawl uses cache key by ticker, routes, and options', async () => {
   const {
     crawlWiseReportGlobal,
@@ -156,4 +195,68 @@ test('Global WiseReport crawl uses cache key by ticker, routes, and options', as
   assert.equal(second.pages['company-snap'].text, first.pages['company-snap'].text);
   assert.equal(withHtml.cache.status, 'miss');
   assert.equal(getWiseReportGlobalCacheStats().hits, 1);
+});
+
+test('Global WiseReport crawl validates cookies before serving a cache hit', async () => {
+  const {
+    crawlWiseReportGlobal,
+    clearWiseReportGlobalCache,
+    getWiseReportGlobalCacheStats,
+  } = await import('../src/crawlers/wisereport-global.js');
+
+  clearWiseReportGlobalCache();
+  let fetchCalls = 0;
+  const fetchImpl = async () => {
+    fetchCalls += 1;
+    return createResponse('<html><head><title>NVDA</title></head><body>cached authenticated page</body></html>');
+  };
+  const options = {
+    cookieHeader: 'session=ok',
+    fetchImpl,
+    env: {},
+    routes: ['company-snap'],
+    includeAuxiliary: false,
+    cacheTtlMs: 60_000,
+  };
+
+  const first = await crawlWiseReportGlobal('NVDA', options);
+  await assert.rejects(
+    () => crawlWiseReportGlobal('NVDA', { ...options, cookieHeader: undefined }),
+    /cookies are required/,
+  );
+
+  assert.equal(first.cache.status, 'miss');
+  assert.equal(fetchCalls, 1);
+  assert.equal(getWiseReportGlobalCacheStats().hits, 0);
+});
+
+test('Global WiseReport crawl partitions cache by max text length', async () => {
+  const {
+    crawlWiseReportGlobal,
+    clearWiseReportGlobalCache,
+  } = await import('../src/crawlers/wisereport-global.js');
+
+  clearWiseReportGlobalCache();
+  let fetchCalls = 0;
+  const fetchImpl = async () => {
+    fetchCalls += 1;
+    return createResponse('<html><head><title>NVDA</title></head><body>abcdefghijklmno</body></html>');
+  };
+  const options = {
+    cookieHeader: 'session=ok',
+    fetchImpl,
+    env: {},
+    routes: ['company-snap'],
+    includeAuxiliary: false,
+    cacheTtlMs: 60_000,
+  };
+
+  const truncated = await crawlWiseReportGlobal('NVDA', { ...options, maxTextLength: 4 });
+  const full = await crawlWiseReportGlobal('NVDA', options);
+
+  assert.equal(fetchCalls, 2);
+  assert.equal(truncated.cache.status, 'miss');
+  assert.equal(full.cache.status, 'miss');
+  assert.equal(truncated.pages['company-snap'].text.length, 4);
+  assert.equal(full.pages['company-snap'].text.length > truncated.pages['company-snap'].text.length, true);
 });

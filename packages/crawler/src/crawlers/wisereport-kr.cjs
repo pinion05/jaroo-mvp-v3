@@ -119,7 +119,7 @@ async function crawlWiseReportKrWithPageSpecs(targetCode, pageSpecs, options = {
     }
   }, {
     ...options,
-    isCacheable: (value) => value && value.stages?.crawler_v3?.ok !== false,
+    isCacheable: (value) => value && Number(value.quality?.completedPages) > 0,
   });
 }
 

@@ -412,17 +412,20 @@ export async function crawlWiseReportGlobal(ticker, opts = {}) {
   const includeHtml = Boolean(opts.includeHtml);
   const includeAuxiliary = opts.includeAuxiliary !== false;
   const basedate = normalizeWiseReportBasedate(opts);
-  const cacheKey = `global:${cmpCode}:${routeIds}:aux=${includeAuxiliary}:html=${includeHtml}:date=${basedate}:base=${opts.baseUrl ?? WISEREPORT_GLOBAL_BASE_URL}`;
+  const maxTextLength = Number.isFinite(opts.maxTextLength) && opts.maxTextLength > 0
+    ? Number(opts.maxTextLength)
+    : 'full';
+  const cacheKey = `global:${cmpCode}:${routeIds}:aux=${includeAuxiliary}:html=${includeHtml}:text=${maxTextLength}:date=${basedate}:base=${opts.baseUrl ?? WISEREPORT_GLOBAL_BASE_URL}`;
+  const cookieHeader = await resolveWiseReportGlobalCookieHeader(opts);
+
+  if (!cookieHeader) {
+    throw new Error('WiseReport Global cookies are required. Provide opts.cookieHeader, opts.cookies, opts.cookieFile, or the WISEREPORT_GLOBAL_* / COMPANY_GLOBAL_* environment variables.');
+  }
 
   return wisereportGlobalCache.readThrough(cacheKey, async () => {
-    const cookieHeader = await resolveWiseReportGlobalCookieHeader(opts);
     const fetchImpl = opts.fetchImpl ?? globalThis.fetch;
     const concurrency = Math.max(1, Math.min(Number(opts.concurrency) || WISEREPORT_GLOBAL_DEFAULT_CONCURRENCY, routes.length));
     const timeoutMs = Number(opts.timeoutMs) > 0 ? Number(opts.timeoutMs) : WISEREPORT_GLOBAL_DEFAULT_TIMEOUT_MS;
-
-    if (!cookieHeader) {
-      throw new Error('WiseReport Global cookies are required. Provide opts.cookieHeader, opts.cookies, opts.cookieFile, or the WISEREPORT_GLOBAL_* / COMPANY_GLOBAL_* environment variables.');
-    }
 
     if (typeof fetchImpl !== 'function') {
       throw new TypeError('fetch implementation is required');
