@@ -66,8 +66,8 @@ function isFiniteNumber(value) {
   return typeof value === 'number' && Number.isFinite(value)
 }
 
-function isPositiveNumber(value) {
-  return isFiniteNumber(value) && value > 0
+function isNonNegativeNumber(value) {
+  return isFiniteNumber(value) && value >= 0
 }
 
 function isProbability(value) {
@@ -96,8 +96,8 @@ function normalizeModelResult(key, input) {
   }
 
   const medianRecoveryDays = input.medianRecoveryDays
-  if (!isPositiveNumber(medianRecoveryDays)) {
-    return { model: null, error: `${key}.medianRecoveryDays must be a positive number` }
+  if (!isNonNegativeNumber(medianRecoveryDays)) {
+    return { model: null, error: `${key}.medianRecoveryDays must be a non-negative number` }
   }
 
   const recoveryProbabilityPct = getRecoveryProbabilityPct(input)
@@ -143,6 +143,7 @@ export function normalizeRecoveryForecastModelResults(modelResults) {
 
 export function calculateWeightedAverage(valuesByModel, weights = RECOVERY_FORECAST_MODEL_WEIGHTS) {
   if (!valuesByModel || typeof valuesByModel !== 'object') return null
+  if (!weights || typeof weights !== 'object' || Array.isArray(weights)) return null
 
   let weightedTotal = 0
   let weightTotal = 0
@@ -164,13 +165,19 @@ export function calculateRecoveryForecastConfidence(medianRecoveryDays, threshol
     ? medianRecoveryDays
     : RECOVERY_FORECAST_MODEL_KEYS.map((key) => medianRecoveryDays?.[key])
 
-  if (values.length !== RECOVERY_FORECAST_MODEL_KEYS.length || values.some((value) => !isPositiveNumber(value))) {
+  if (values.length !== RECOVERY_FORECAST_MODEL_KEYS.length || values.some((value) => !isFiniteNumber(value))) {
     return null
   }
 
   const meanRecoveryDays = values.reduce((total, value) => total + value, 0) / values.length
   const spreadDays = Math.max(...values) - Math.min(...values)
-  const divergenceRatio = spreadDays / meanRecoveryDays
+  if (values.some((value) => value < 0) && meanRecoveryDays !== 0) {
+    return null
+  }
+
+  const divergenceRatio = meanRecoveryDays === 0
+    ? (spreadDays === 0 ? 0 : Number.POSITIVE_INFINITY)
+    : spreadDays / meanRecoveryDays
   const level = divergenceRatio < thresholds.highBelow
     ? RECOVERY_FORECAST_CONFIDENCE.HIGH
     : divergenceRatio <= thresholds.mediumMax
@@ -186,6 +193,7 @@ export function calculateRecoveryForecastConfidence(medianRecoveryDays, threshol
 }
 
 export function summarizeRecoveryForecast(modelResults, options = {}) {
+  const forecastOptions = options ?? {}
   const { models, errors } = normalizeRecoveryForecastModelResults(modelResults)
   if (errors.length > 0) {
     return {
@@ -204,9 +212,9 @@ export function summarizeRecoveryForecast(modelResults, options = {}) {
     RECOVERY_FORECAST_MODEL_KEYS.map((key) => [key, models[key].recoveryProbabilityPct]),
   )
 
-  const expectedRecoveryDaysRaw = calculateWeightedAverage(medianValues, options.weights ?? RECOVERY_FORECAST_MODEL_WEIGHTS)
-  const recoveryProbabilityPctRaw = calculateWeightedAverage(probabilityValues, options.weights ?? RECOVERY_FORECAST_MODEL_WEIGHTS)
-  const confidence = calculateRecoveryForecastConfidence(medianValues, options.confidenceThresholds ?? DEFAULT_CONFIDENCE_THRESHOLDS)
+  const expectedRecoveryDaysRaw = calculateWeightedAverage(medianValues, forecastOptions.weights ?? RECOVERY_FORECAST_MODEL_WEIGHTS)
+  const recoveryProbabilityPctRaw = calculateWeightedAverage(probabilityValues, forecastOptions.weights ?? RECOVERY_FORECAST_MODEL_WEIGHTS)
+  const confidence = calculateRecoveryForecastConfidence(medianValues, forecastOptions.confidenceThresholds ?? DEFAULT_CONFIDENCE_THRESHOLDS)
 
   if (expectedRecoveryDaysRaw == null || recoveryProbabilityPctRaw == null || confidence == null) {
     return {
@@ -224,15 +232,15 @@ export function summarizeRecoveryForecast(modelResults, options = {}) {
       : RECOVERY_FORECAST_STATUS.AVAILABLE,
     models,
     consensus: {
-      expectedRecoveryDays: roundTo(expectedRecoveryDaysRaw, options.recoveryDaysDigits ?? 0),
-      recoveryProbabilityPct: roundTo(recoveryProbabilityPctRaw, options.probabilityDigits ?? 1),
+      expectedRecoveryDays: roundTo(expectedRecoveryDaysRaw, forecastOptions.recoveryDaysDigits ?? 0),
+      recoveryProbabilityPct: roundTo(recoveryProbabilityPctRaw, forecastOptions.probabilityDigits ?? 1),
       confidence: {
         level: confidence.level,
-        divergenceRatio: roundTo(confidence.divergenceRatio, options.divergenceDigits ?? 4),
-        spreadDays: roundTo(confidence.spreadDays, options.recoveryDaysDigits ?? 0),
-        meanRecoveryDays: roundTo(confidence.meanRecoveryDays, options.recoveryDaysDigits ?? 1),
+        divergenceRatio: roundTo(confidence.divergenceRatio, forecastOptions.divergenceDigits ?? 4),
+        spreadDays: roundTo(confidence.spreadDays, forecastOptions.recoveryDaysDigits ?? 0),
+        meanRecoveryDays: roundTo(confidence.meanRecoveryDays, forecastOptions.recoveryDaysDigits ?? 1),
       },
-      weights: { ...(options.weights ?? RECOVERY_FORECAST_MODEL_WEIGHTS) },
+      weights: { ...(forecastOptions.weights ?? RECOVERY_FORECAST_MODEL_WEIGHTS) },
     },
     reason: null,
     errors: [],

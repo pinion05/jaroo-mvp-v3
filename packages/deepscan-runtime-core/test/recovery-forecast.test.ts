@@ -37,7 +37,20 @@ test('calculateRecoveryForecastConfidence uses median spread divided by mean med
   })
   assert.equal(calculateRecoveryForecastConfidence([70, 100, 130])?.level, RECOVERY_FORECAST_CONFIDENCE.MEDIUM)
   assert.equal(calculateRecoveryForecastConfidence([20, 100, 180])?.level, RECOVERY_FORECAST_CONFIDENCE.LOW)
-  assert.equal(calculateRecoveryForecastConfidence([0, 100, 180]), null)
+})
+
+test('calculateRecoveryForecastConfidence handles zero-day edge cases safely', () => {
+  assert.deepEqual(calculateRecoveryForecastConfidence([0, 0, 0]), {
+    level: RECOVERY_FORECAST_CONFIDENCE.HIGH,
+    divergenceRatio: 0,
+    spreadDays: 0,
+    meanRecoveryDays: 0,
+  })
+
+  const zeroMeanSpread = calculateRecoveryForecastConfidence([-10, 0, 10])
+  assert.equal(zeroMeanSpread?.level, RECOVERY_FORECAST_CONFIDENCE.LOW)
+  assert.equal(zeroMeanSpread?.divergenceRatio, Number.POSITIVE_INFINITY)
+  assert.equal(calculateRecoveryForecastConfidence([-1, 0, 10]), null)
 })
 
 test('low confidence divergence keeps a consensus but marks forecast status', () => {
@@ -51,6 +64,27 @@ test('low confidence divergence keeps a consensus but marks forecast status', ()
   assert.equal(forecast.consensus?.expectedRecoveryDays, 92)
   assert.equal(forecast.consensus?.confidence.level, RECOVERY_FORECAST_CONFIDENCE.LOW)
   assert.equal(forecast.consensus?.confidence.divergenceRatio, 1.6)
+})
+
+test('summarizeRecoveryForecast accepts zero-day medians as high-confidence consensus', () => {
+  const forecast = summarizeRecoveryForecast({
+    similarPattern: { medianRecoveryDays: 0, recoveryProbabilityPct: 20 },
+    gbm: { medianRecoveryDays: 0, recoveryProbabilityPct: 40 },
+    jumpDiffusion: { medianRecoveryDays: 0, recoveryProbabilityPct: 80 },
+  })
+
+  assert.equal(forecast.status, RECOVERY_FORECAST_STATUS.AVAILABLE)
+  assert.equal(forecast.consensus?.expectedRecoveryDays, 0)
+  assert.equal(forecast.consensus?.confidence.level, RECOVERY_FORECAST_CONFIDENCE.HIGH)
+  assert.equal(forecast.consensus?.confidence.divergenceRatio, 0)
+})
+
+test('summarizeRecoveryForecast treats null options like default options', () => {
+  const forecast = summarizeRecoveryForecast(issueModels, null as unknown as Parameters<typeof summarizeRecoveryForecast>[1])
+
+  assert.equal(forecast.status, RECOVERY_FORECAST_STATUS.AVAILABLE)
+  assert.equal(forecast.consensus?.expectedRecoveryDays, 74)
+  assert.equal(forecast.consensus?.recoveryProbabilityPct, 60.8)
 })
 
 test('missing or invalid required model values return unavailable', () => {
@@ -86,5 +120,9 @@ test('calculateWeightedAverage rejects malformed weights and values', () => {
   assert.equal(calculateWeightedAverage({ similarPattern: 96, gbm: 57, jumpDiffusion: 60 }), 73.5)
   const invalidWeights = { similarPattern: 0.4, gbm: -0.3, jumpDiffusion: 0.3 } as unknown as Parameters<typeof calculateWeightedAverage>[1]
   assert.equal(calculateWeightedAverage({ similarPattern: 96, gbm: 57, jumpDiffusion: 60 }, invalidWeights), null)
+  assert.equal(calculateWeightedAverage(
+    { similarPattern: 96, gbm: 57, jumpDiffusion: 60 },
+    null as unknown as Parameters<typeof calculateWeightedAverage>[1],
+  ), null)
   assert.equal(calculateWeightedAverage({ similarPattern: 96, gbm: Number.NaN, jumpDiffusion: 60 }), null)
 })
