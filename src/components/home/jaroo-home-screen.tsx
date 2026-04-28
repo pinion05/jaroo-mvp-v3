@@ -18,7 +18,11 @@ import {
   type CurrentQuoteItem,
   type HomeHoldingQuoteErrorKind,
 } from '@/lib/home-current-quotes'
-import { fetchHomeQuoteResponseWithTimeout, HOME_QUOTE_FETCH_TIMEOUT_MS } from '@/lib/home-quote-bootstrap'
+import {
+  fetchHomeQuoteResponseWithTimeout,
+  HOME_QUOTE_FETCH_TIMEOUT_MS,
+  resolveUsdKrwRateAfterFailedQuoteResponse,
+} from '@/lib/home-quote-bootstrap'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 import {
@@ -434,11 +438,14 @@ export function JarooHomeScreen() {
                 { cache: 'no-store', signal: abortController.signal },
                 HOME_QUOTE_FETCH_TIMEOUT_MS,
               )
+              if (!fxResponse.ok) {
+                return { rate: null, failed: true }
+              }
               const fxPayload = await fxResponse.json()
               const parsedRate = Number(fxPayload?.data?.rate)
               return {
-                rate: fxResponse.ok && Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : null,
-                failed: !fxResponse.ok || !Number.isFinite(parsedRate) || parsedRate <= 0,
+                rate: Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : null,
+                failed: !Number.isFinite(parsedRate) || parsedRate <= 0,
               }
             } catch (error) {
               if (abortController.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
@@ -462,17 +469,18 @@ export function JarooHomeScreen() {
         const nextFxRate = fxResult.rate
         const fxFetchFailed = fxResult.failed
         const response = quoteResponse
-        const payload = await response.json()
 
         if (abortController.signal.aborted) {
           return
         }
 
         if (!response.ok) {
-          setUsdKrwRate(nextFxRate)
+          setUsdKrwRate((previousRate) => resolveUsdKrwRateAfterFailedQuoteResponse(previousRate, nextFxRate, fxFetchFailed))
           setQuoteStatus('error', '현재 시세 응답이 지연되어 기존 시세로 표시 중이에요. 다시 시도해주세요.', quoteQuery)
           return
         }
+
+        const payload = await response.json()
 
         const nextItems: CurrentQuoteItem[] = Array.isArray(payload?.data?.items) ? payload.data.items : []
         const okItems = nextItems.filter((item) => item.status === 'ok' && typeof item.price === 'number')

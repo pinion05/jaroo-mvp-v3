@@ -1,7 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { hydratePortfolioItemsWithCurrentQuotes } from './home-quote-bootstrap'
+import {
+  hydratePortfolioItemsWithCurrentQuotes,
+  resolveUsdKrwRateAfterFailedQuoteResponse,
+} from './home-quote-bootstrap'
 import type { PortfolioNormalizedItem } from './workflow-types'
 
 function createPortfolioItem(overrides: Partial<PortfolioNormalizedItem> = {}): PortfolioNormalizedItem {
@@ -17,6 +20,17 @@ function createPortfolioItem(overrides: Partial<PortfolioNormalizedItem> = {}): 
     averagePriceCurrency: 'KRW',
     ...overrides,
   }
+}
+
+function createNonOkResponseWithJsonSpy(onJson: () => void) {
+  const response = new Response(null, { status: 500 })
+  Object.defineProperty(response, 'json', {
+    value: async () => {
+      onJson()
+      throw new Error('non-OK responses should not be parsed')
+    },
+  })
+  return response
 }
 
 test('hydratePortfolioItemsWithCurrentQuotes patches quote fields for successful KR quote responses', async () => {
@@ -44,16 +58,67 @@ test('hydratePortfolioItemsWithCurrentQuotes patches quote fields for successful
 })
 
 test('hydratePortfolioItemsWithCurrentQuotes returns error but preserves stale quote fields when quote fetch fails', async () => {
+  let quoteJsonCalls = 0
   const result = await hydratePortfolioItemsWithCurrentQuotes(
     [createPortfolioItem({ currentPrice: 85000, currentProfitRate: 6.3, currentPriceCurrency: 'KRW' })],
-    async () => new Response(JSON.stringify({ error: { message: 'down' } }), { status: 500 }),
+    async () => createNonOkResponseWithJsonSpy(() => {
+      quoteJsonCalls += 1
+    }),
   )
 
   assert.equal(result.quoteStatus, 'error')
   assert.match(result.quoteErrorMessage ?? '', /현재 시세/)
+  assert.equal(quoteJsonCalls, 0)
   assert.equal(result.items[0]?.currentPrice, 85000)
   assert.equal(result.items[0]?.currentProfitRate, 6.3)
   assert.equal(result.items[0]?.currentPriceCurrency, 'KRW')
+})
+
+test('hydratePortfolioItemsWithCurrentQuotes does not parse non-OK FX responses and preserves stale US quote fields', async () => {
+  let fxJsonCalls = 0
+  const staleItem = createPortfolioItem({
+    code: 'PYPL',
+    ticker: 'PYPL',
+    market: 'NASDAQ',
+    marketTone: 'nasdaq',
+    name: 'PayPal Holdings, Inc.',
+    averagePrice: 79577.3278,
+    averagePriceCurrency: 'KRW',
+    currentPrice: 47.51,
+    currentProfitRate: -11.8,
+    currentPriceCurrency: 'USD',
+  })
+
+  const result = await hydratePortfolioItemsWithCurrentQuotes(
+    [staleItem],
+    async (input) => {
+      const url = String(input)
+      if (url === '/api/market/fx/usd-krw') {
+        return createNonOkResponseWithJsonSpy(() => {
+          fxJsonCalls += 1
+        })
+      }
+
+      if (url.startsWith('/api/quotes/current?')) {
+        return new Response(JSON.stringify({
+          data: {
+            items: [{ market: 'US', code: null, ticker: 'PYPL', price: 47.51, currency: 'USD', status: 'ok' }],
+          },
+        }))
+      }
+
+      throw new Error(`unexpected url: ${url}`)
+    },
+  )
+
+  assert.equal(result.quoteStatus, 'error')
+  assert.equal(fxJsonCalls, 0)
+  assert.equal(result.items[0], staleItem)
+})
+
+test('resolveUsdKrwRateAfterFailedQuoteResponse preserves prior FX when quote and FX refresh both fail', () => {
+  assert.equal(resolveUsdKrwRateAfterFailedQuoteResponse(1476.7, null, true), 1476.7)
+  assert.equal(resolveUsdKrwRateAfterFailedQuoteResponse(1476.7, 1400, false), 1400)
 })
 
 test('hydratePortfolioItemsWithCurrentQuotes times out slow quote fetches and keeps stale quote fields', async () => {

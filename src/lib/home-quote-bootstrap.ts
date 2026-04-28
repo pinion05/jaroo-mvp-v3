@@ -31,6 +31,14 @@ type QuoteBootstrapResult = {
   quoteErrorMessage: string | null
 }
 
+export function resolveUsdKrwRateAfterFailedQuoteResponse(
+  previousRate: number | null,
+  nextRate: number | null,
+  fxFetchFailed: boolean,
+) {
+  return fxFetchFailed ? previousRate : nextRate
+}
+
 export async function fetchHomeQuoteResponseWithTimeout(
   fetcher: typeof fetch,
   input: RequestInfo | URL,
@@ -92,9 +100,12 @@ export async function hydratePortfolioItemsWithCurrentQuotes(
       ? (async () => {
           try {
             const response = await fetchHomeQuoteResponseWithTimeout(fetcher, '/api/market/fx/usd-krw', { cache: 'no-store' }, quoteTimeoutMs)
+            if (!response.ok) {
+              return null
+            }
             const payload = await response.json()
             const parsedRate = Number(payload?.data?.rate)
-            return response.ok && Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : null
+            return Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : null
           } catch {
             return null
           }
@@ -103,6 +114,9 @@ export async function hydratePortfolioItemsWithCurrentQuotes(
     (async () => {
       try {
         const response = await fetchHomeQuoteResponseWithTimeout(fetcher, `/api/quotes/current?${quoteQuery}`, { cache: 'no-store' }, quoteTimeoutMs)
+        if (!response.ok) {
+          return { response, payload: null }
+        }
         const payload = await response.json()
         return { response, payload }
       } catch {
@@ -111,7 +125,7 @@ export async function hydratePortfolioItemsWithCurrentQuotes(
     })(),
   ])
 
-  if (!quoteResult?.response.ok) {
+  if (!quoteResult?.response?.ok) {
     return {
       items: portfolioItems,
       quoteQuery,
