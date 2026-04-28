@@ -178,9 +178,12 @@ function readKrFactAsOf(group, key) {
 }
 
 function hasKrFactsEvidence(krFacts) {
-  const factGroups = ['quote', 'consensus', 'profitability', 'valuation', 'ownership', 'investorFlow', 'reports', 'styleFactors'];
-  return factGroups.some((groupKey) => {
-    const group = asObject(krFacts?.[groupKey]);
+  return Object.entries(asObject(krFacts)).some(([groupKey, groupValue]) => {
+    if (groupKey === 'sourceLimitations') {
+      return false;
+    }
+
+    const group = asObject(groupValue);
     return Object.keys(group).some((factKey) => hasEvidence(readKrFactValue(group, factKey)));
   });
 }
@@ -208,9 +211,7 @@ function overlayConsensusSnapshotFromKrFacts(pageSnapshot, krFacts, currentPrice
   const revisionPct = pickFirst(
     normalizePercent(readKrFactValue(consensusFacts, 'targetRevisionPct')),
     pageSnapshot.revisionPct,
-    previousTargetPrice !== null && targetPrice !== null && previousTargetPrice !== 0
-      ? ((targetPrice - previousTargetPrice) / Math.abs(previousTargetPrice)) * 100
-      : null,
+    computeChangePct(targetPrice, previousTargetPrice),
   );
   const recommendationValue = readKrFactValue(consensusFacts, 'recommendation');
   const recommendationScore = normalizeNumber(recommendationValue);
@@ -221,9 +222,7 @@ function overlayConsensusSnapshotFromKrFacts(pageSnapshot, krFacts, currentPrice
     previousTargetPrice,
     targetGapPct: pickFirst(
       normalizePercent(readKrFactValue(consensusFacts, 'targetGapPct')),
-      currentPrice !== null && targetPrice !== null && currentPrice !== 0
-        ? ((targetPrice - currentPrice) / currentPrice) * 100
-        : null,
+      computeChangePct(targetPrice, currentPrice),
       pageSnapshot.targetGapPct,
     ),
     recommendation,
@@ -738,17 +737,13 @@ function extractConsensusSnapshot(consensusPage, opinionPage, currentPrice) {
   );
   const revisionPct = pickFirst(
     readRevisionPctFromRow(opinionConsensusRow),
-    previousTargetPrice !== null && targetPrice !== null && previousTargetPrice !== 0
-      ? ((targetPrice - previousTargetPrice) / Math.abs(previousTargetPrice)) * 100
-      : null,
+    computeChangePct(targetPrice, previousTargetPrice),
   );
   const recommendation = extractRecommendation(opinionPage, consensusPage);
   return {
     targetPrice,
     previousTargetPrice,
-    targetGapPct: currentPrice !== null && targetPrice !== null && currentPrice !== 0
-      ? ((targetPrice - currentPrice) / currentPrice) * 100
-      : null,
+    targetGapPct: computeChangePct(targetPrice, currentPrice),
     recommendation,
     recommendationScore: normalizeNumber(findFirstKeyValue(opinionRows, [/투자의견/i])),
     recommendationCounts: null,
@@ -795,9 +790,7 @@ function extractRelativeReturnSnapshot(relativeReturnPage) {
       return distance !== null && distance >= days;
     }) ?? points[0];
 
-    return candidate && candidate.value !== null && latest.value !== null && candidate.value !== 0
-      ? ((latest.value - candidate.value) / candidate.value) * 100
-      : null;
+    return computeChangePct(latest.value, candidate?.value ?? null);
   };
 
   return {
@@ -1422,15 +1415,11 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
   const marketSnapshot = {
     currentPrice: currentQuote?.price ?? null,
     currency: currentQuote?.currency ?? 'KRW',
-    averagePriceGapPct: currentQuote && holding.averagePrice !== null && holding.averagePrice !== 0
-      ? ((currentQuote.price - holding.averagePrice) / holding.averagePrice) * 100
-      : null,
+    averagePriceGapPct: currentQuote ? computeChangePct(currentQuote.price, holding.averagePrice) : null,
     evaluationPnL: currentQuote && holding.averagePrice !== null && holding.shares !== null
       ? (currentQuote.price - holding.averagePrice) * holding.shares
       : null,
-    evaluationPnLPct: currentQuote && holding.averagePrice !== null && holding.averagePrice !== 0
-      ? ((currentQuote.price - holding.averagePrice) / holding.averagePrice) * 100
-      : null,
+    evaluationPnLPct: currentQuote ? computeChangePct(currentQuote.price, holding.averagePrice) : null,
   };
 
   const consensusSnapshot = overlayConsensusSnapshotFromKrFacts(

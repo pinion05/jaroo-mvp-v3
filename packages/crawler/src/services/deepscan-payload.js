@@ -4,10 +4,10 @@ import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
 import { scoreDeepScanKrEvidence, scoreDeepScanKrFromCommittee } from './deepscan-kr-score.js';
 import { invokeDeepScanKrPackage } from './deepscan-kr-package-adapter.js';
 import { buildKrCommitteeAxesFromLlmResults, scoreDeepScanKrCommitteeFromDump } from './deepscan-kr-committee-runtime.js';
+import { buildWiseReportKrSlimPayloadV12 } from './wisereport-kr-slim-payload.js';
 
 const require = createRequire(import.meta.url);
 const {
-  WISEREPORT_KR_V12_PAGES,
   getCrawlV12,
 } = require('../crawlers/wisereport-kr.cjs');
 
@@ -478,130 +478,8 @@ function normalizeTradeDate(value) {
   return undefined;
 }
 
-function normalizeWiseReportKrAggregate(rawAggregate) {
-  if (rawAggregate && typeof rawAggregate === 'object' && rawAggregate.pages && typeof rawAggregate.pages === 'object') {
-    return rawAggregate;
-  }
-
-  return {
-    pages: rawAggregate && typeof rawAggregate === 'object' ? rawAggregate : {},
-  };
-}
-
-function extractWiseReportKrNormalizedPage(pagePayload) {
-  if (pagePayload && typeof pagePayload === 'object' && pagePayload.normalized && typeof pagePayload.normalized === 'object') {
-    return pagePayload.normalized;
-  }
-
-  return pagePayload;
-}
-
-function isWiseReportKrTablePayload(value) {
-  return Boolean(value)
-    && typeof value === 'object'
-    && !Array.isArray(value)
-    && Array.isArray(value.rows);
-}
-
-function slimWiseReportKrValue(value) {
-  if (Array.isArray(value)) {
-    return value
-      .map((item) => slimWiseReportKrValue(item))
-      .filter((item) => item !== undefined);
-  }
-
-  if (!value || typeof value !== 'object') {
-    return value;
-  }
-
-  if (isWiseReportKrTablePayload(value)) {
-    const tablePayload = {
-      rows: slimWiseReportKrValue(value.rows),
-    };
-
-    if (value.status != null) {
-      tablePayload.status = value.status;
-    }
-    if (value.note != null) {
-      tablePayload.note = value.note;
-    }
-    if (value.dataAvailability && typeof value.dataAvailability === 'object') {
-      if (tablePayload.status == null && value.dataAvailability.status != null) {
-        tablePayload.status = value.dataAvailability.status;
-      }
-      if (tablePayload.note == null && value.dataAvailability.note != null) {
-        tablePayload.note = value.dataAvailability.note;
-      }
-    }
-
-    return tablePayload;
-  }
-
-  return Object.fromEntries(
-    Object.entries(value)
-      .filter(([, nested]) => nested !== undefined)
-      .map(([key, nested]) => [key, slimWiseReportKrValue(nested)]),
-  );
-}
-
-function pickWiseReportKrCompany(rawAggregate, code, pageDefinitions = WISEREPORT_KR_V12_PAGES) {
-  const normalizedAggregate = normalizeWiseReportKrAggregate(rawAggregate);
-
-  for (const page of pageDefinitions) {
-    const company = extractWiseReportKrNormalizedPage(normalizedAggregate.pages?.[page.id])?.company;
-    if (company && typeof company === 'object') {
-      return {
-        code: String(company.code || code || ''),
-        name: normalizeText(company.name) ?? null,
-      };
-    }
-  }
-
-  return {
-    code: String(code || ''),
-    name: null,
-  };
-}
-
-function buildWiseReportKrSlimPayload(rawAggregate, code, pageDefinitions = WISEREPORT_KR_V12_PAGES) {
-  const normalizedAggregate = normalizeWiseReportKrAggregate(rawAggregate);
-  const slimPages = Object.fromEntries(pageDefinitions.map((page) => {
-    const pagePayload = normalizedAggregate.pages?.[page.id];
-    const normalizedPage = extractWiseReportKrNormalizedPage(pagePayload);
-
-    if (!normalizedPage || typeof normalizedPage !== 'object') {
-      return [page.id, null];
-    }
-
-    const {
-      company: _company,
-      sourceType: _sourceType,
-      sourceKey: _sourceKey,
-      bodyTextHead: _bodyTextHead,
-      ...businessPayload
-    } = normalizedPage;
-
-    return [page.id, slimWiseReportKrValue(businessPayload)];
-  }));
-
-  return {
-    code: String(code || ''),
-    company: pickWiseReportKrCompany(rawAggregate, code, pageDefinitions),
-    pages: slimPages,
-  };
-}
-
 async function buildWiseReportKrSlimContractPayload(rawAggregate, code) {
-  const serverModule = await import('../server.js');
-  if (typeof serverModule.buildWiseReportKrSlimPayloadV12 === 'function') {
-    return serverModule.buildWiseReportKrSlimPayloadV12(rawAggregate, code);
-  }
-
-  return {
-    schemaVersion: 'wisereport-kr-slim-v1.2',
-    market: 'KR',
-    ...buildWiseReportKrSlimPayload(rawAggregate, code, WISEREPORT_KR_V12_PAGES),
-  };
+  return buildWiseReportKrSlimPayloadV12(rawAggregate, code);
 }
 
 async function captureSource(sourceId, load) {
