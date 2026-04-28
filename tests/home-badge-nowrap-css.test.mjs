@@ -7,7 +7,11 @@ import { fileURLToPath } from 'node:url'
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = path.dirname(__filename)
 const cssPath = path.join(__dirname, '..', 'src', 'components', 'home', 'jaroo-home-screen.module.css')
-const css = fs.readFileSync(cssPath, 'utf8')
+const css = stripCssComments(fs.readFileSync(cssPath, 'utf8'))
+
+function stripCssComments(source) {
+  return source.replace(/\/\*[\s\S]*?\*\//g, '')
+}
 
 function cssBlock(selector) {
   const escapedSelector = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
