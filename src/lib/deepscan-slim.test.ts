@@ -99,7 +99,7 @@ test('deepscan slim summary를 fetch 후 메모리 캐시에 저장한다', asyn
   )
 
   assert.equal(summary?.header.identifier, '005930')
-  assert.equal(requestedUrls[0], '/api/deepscan/slim?market=KR&code=005930&version=v1.2')
+  assert.equal(requestedUrls[0], '/api/deepscan/slim?market=KR&code=005930&version=v1.1')
 
   const cached = await prefetchAndPersistDeepScanSlimSummary(
     { code: '005930', identifierCode: '005930', identifierTicker: undefined } as never,
@@ -116,7 +116,7 @@ test('deepscan slim summary를 fetch 후 메모리 캐시에 저장한다', asyn
   )
 
   assert.equal(cached?.key, 'KR:005930')
-  assert.equal(requestedUrls[1], '/api/deepscan/slim?market=KR&code=005930&version=v1.2')
+  assert.equal(requestedUrls[1], '/api/deepscan/slim?market=KR&code=005930&version=v1.1')
   assert.equal(readCachedDeepScanSlimSummary()?.summary.header.name, '삼성전자')
 
   clearCachedDeepScanSlimSummary()

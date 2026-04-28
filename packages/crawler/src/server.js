@@ -772,7 +772,7 @@ function hasSlimV12Value(value) {
     return value.trim().length > 0;
   }
   if (Array.isArray(value)) {
-    return value.length > 0;
+    return value.some((item) => hasSlimV12Value(item));
   }
   if (typeof value === 'object') {
     return Object.values(value).some((nested) => hasSlimV12Value(nested));

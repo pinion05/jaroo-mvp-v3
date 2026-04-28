@@ -669,6 +669,39 @@ test('buildWiseReportKrSlimPayloadV12 adds DeepScan krFacts with explicit invest
   assert.equal(slim.krFacts.styleFactors.factors.value[0].name, '베타');
 });
 
+test('buildWiseReportKrSlimPayloadV12 does not count arrays of empty rows as available page evidence', async () => {
+  const { buildWiseReportKrSlimPayloadV12 } = await import('../src/server.js');
+  const aggregate = createAggregateFixtureV11();
+  aggregate.pages['fnguide-snapshot'] = {
+    id: 'fnguide-snapshot',
+    normalized: {
+      company: {
+        code: '005930',
+        name: '삼성전자',
+        title: '삼성전자(A005930) | Snapshot | 기업정보 | Company Guide',
+        headerText: '스냅샷',
+      },
+      sourceType: 'fnguide',
+      sourceKey: 'fnguide스냅샷',
+      bodyTextHead: 'debug text',
+      marketSnapshot: {
+        rows: [null, {}, { key: '', value: '' }],
+      },
+      assetManagerHoldings: {
+        rows: [{ 운용사명: '', 상장주식수내비중: '' }],
+      },
+    },
+  };
+
+  const slim = buildWiseReportKrSlimPayloadV12(aggregate, '005930');
+
+  assert.equal(slim.sourceCoverage.pageCoverage.availableCount, 11);
+  assert.deepEqual(
+    slim.sourceCoverage.pageCoverage.missingPageIds.sort(),
+    ['fnguide-finance', 'fnguide-snapshot'],
+  );
+});
+
 test('buildWiseReportKrSlimPayloadV12 marks ETF corporate financial facts as not_applicable', async () => {
   const { buildWiseReportKrSlimPayloadV12 } = await import('../src/server.js');
   const slim = buildWiseReportKrSlimPayloadV12(createEtfAggregateFixtureV11(), '069500');

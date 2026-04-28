@@ -193,7 +193,7 @@ export function clearCachedDeepScanSlimSummary() {
 export async function fetchDeepScanSlimSummary(request: DeepScanSlimRequest, fetcher: typeof fetch = fetch) {
   const query = request.market === 'US'
     ? `market=US&ticker=${encodeURIComponent(request.identifier)}`
-    : `market=KR&code=${encodeURIComponent(request.identifier)}&version=v1.2`
+    : `market=KR&code=${encodeURIComponent(request.identifier)}&version=v1.1`
 
   const response = await fetcher(`/api/deepscan/slim?${query}`, { cache: 'no-store' })
   if (!response.ok) {
