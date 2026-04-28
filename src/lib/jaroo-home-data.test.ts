@@ -384,3 +384,34 @@ test('home holdings builder maps manual KR/US market selections to home market t
   assert.equal(usHolding?.market, 'US')
   assert.equal(usHolding?.marketTone, 'nasdaq')
 })
+
+test('ETF and ETN home actions enter DeepScan so the loading transition can mount', () => {
+  const [etfHolding, etnHolding] = buildHomeHoldingsFromPortfolioItems([
+    {
+      name: 'KODEX 200',
+      code: '069500',
+      market: 'ETF',
+      marketTone: 'etf',
+      kind: 'etf',
+      quantity: 100,
+      averagePrice: 101400,
+      averagePriceCurrency: 'KRW',
+    },
+    {
+      name: '삼성 인버스 코스피 200 선물 ETN',
+      code: '530092',
+      market: 'ETN',
+      marketTone: 'etf',
+      kind: 'etf',
+      quantity: 10,
+      averagePrice: 12000,
+      averagePriceCurrency: 'KRW',
+    },
+  ])
+
+  assert.equal(etfHolding?.actionLabel, 'ETF 분석')
+  assert.equal(etfHolding?.actionHref, '/deepscan')
+  assert.equal(etnHolding?.actionLabel, 'ETF 분석')
+  assert.equal(etnHolding?.actionHref, '/deepscan')
+  assert.equal(homeHoldings.find((holding) => holding.market === 'ETF')?.actionHref, '/deepscan')
+})

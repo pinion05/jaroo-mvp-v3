@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { Cell, Pie, PieChart, ResponsiveContainer, Treemap, type PieLabelRenderProps, type TreemapNode } from 'recharts'
 import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
+import { shouldUseDeepScanLoadingHandoff } from '@/lib/deepscan-navigation'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
 import { prefetchAndPersistDeepScanSlimSummary } from '@/lib/deepscan-slim'
 import {
@@ -613,7 +614,7 @@ export function JarooHomeScreen() {
     const item = portfolioItems[holdingId]
     const holding = homeHoldings.find((entry) => entry.id === holdingId)
 
-    if (!item || !holding || actionHref !== '/deepscan' || holding.kind !== 'stock') {
+    if (!item || !holding || !shouldUseDeepScanLoadingHandoff({ actionHref, kind: holding.kind })) {
       router.push(actionHref)
       return
     }

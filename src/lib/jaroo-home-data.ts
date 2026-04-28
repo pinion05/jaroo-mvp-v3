@@ -302,7 +302,7 @@ export const homeHoldings: HomeHolding[] = [
     actionLabel: 'ETF 분석',
     actionSubLabel: '섹터 구성 + 회복 시나리오',
     actionCredits: '300cr',
-    actionHref: '/etf',
+    actionHref: '/deepscan',
   },
 ]
 
@@ -1036,7 +1036,7 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
       actionLabel: kind === 'etf' ? 'ETF 분석' : '딥스캔',
       actionSubLabel: kind === 'etf' ? '섹터 구성 + 회복 시나리오' : 'AI 9인 위원회 분석',
       actionCredits: '300cr',
-      actionHref: kind === 'etf' ? '/etf' : '/deepscan',
+      actionHref: '/deepscan',
     }
   })
 }
