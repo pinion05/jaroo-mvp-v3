@@ -5,6 +5,7 @@ import {
   APPLIED_HOME_PORTFOLIO_STORAGE_KEY,
   buildHomeHoldingsFromOcrRows,
   buildHomeHoldingsFromPortfolioItems,
+  buildHomeMarketScore,
   homeHoldings,
   persistAppliedHomePortfolio,
   persistDeepScanTarget,
@@ -414,4 +415,55 @@ test('ETF and ETN home actions preserve ETF analysis while using loading handoff
   assert.equal(etnHolding?.actionLabel, 'ETF 분석')
   assert.equal(etnHolding?.actionHref, '/etf')
   assert.equal(homeHoldings.find((holding) => holding.market === 'ETF')?.actionHref, '/etf')
+})
+
+test('home market score exposes ready state with source and update labels', () => {
+  const [holding] = buildHomeHoldingsFromPortfolioItems([
+    {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KOSPI',
+      marketTone: 'kospi',
+      kind: 'stock',
+      quantity: 10,
+      averagePrice: 80000,
+      averagePriceCurrency: 'KRW',
+      currentPrice: 85200,
+      currentPriceCurrency: 'KRW',
+      currentProfitRate: 6.5,
+      evaluationAmount: undefined,
+      identifierLabel: '005930',
+    },
+  ])
+
+  const marketScore = buildHomeMarketScore([holding], { quoteStatus: 'success', isAppliedPortfolio: true })
+
+  assert.equal(marketScore.status, 'ready')
+  assert.match(marketScore.score, /^\d+$/)
+  assert.equal(marketScore.label, '중립')
+  assert.equal(marketScore.sourceLabel, '출처: 실시간 시세 스냅샷')
+  assert.equal(marketScore.updatedLabel, '방금 갱신')
+  assert.match(marketScore.description, /국내 시장 노출/)
+})
+
+test('home market score has loading, missing, and error fallback states', () => {
+  const loadingScore = buildHomeMarketScore(homeHoldings, { quoteStatus: 'loading' })
+  const missingScore = buildHomeMarketScore([], { quoteStatus: 'idle' })
+  const errorScore = buildHomeMarketScore(homeHoldings, { quoteStatus: 'error' })
+
+  assert.deepEqual(
+    {
+      score: loadingScore.score,
+      status: loadingScore.status,
+      label: loadingScore.label,
+      updatedLabel: loadingScore.updatedLabel,
+    },
+    { score: '-', status: 'loading', label: '계산 중', updatedLabel: '갱신 중' },
+  )
+  assert.equal(missingScore.status, 'fallback')
+  assert.equal(missingScore.sourceLabel, '출처: 포트폴리오 필요')
+  assert.equal(errorScore.status, 'error')
+  assert.equal(errorScore.label, '대체')
+  assert.equal(errorScore.tone, 'red')
+  assert.match(errorScore.description, /시세 갱신 실패/)
 })

@@ -416,6 +416,73 @@
   background: #fff;
 }
 
+.marketScoreCard {
+  background: linear-gradient(135deg, #f7fbff 0%, #f8f8f6 100%);
+  border: 0.5px solid #dce8f4;
+  border-radius: 14px;
+  padding: 13px 14px;
+  margin-bottom: 10px;
+}
+
+.marketScoreHeader {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.marketScoreEyebrow {
+  font-size: 9px;
+  color: #185fa5;
+  letter-spacing: 0.08em;
+  font-weight: 600;
+  margin-bottom: 2px;
+}
+
+.marketScoreTitle {
+  font-size: 14px;
+  font-weight: 600;
+  color: #111;
+}
+
+.marketScoreValueBlock {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.marketScoreValue {
+  font-size: 30px;
+  line-height: 1;
+  font-weight: 600;
+  color: #185fa5;
+}
+
+.marketScoreBadge {
+  font-size: 10px;
+  font-weight: 500;
+  padding: 2px 8px;
+  border-radius: 7px;
+  white-space: nowrap;
+}
+
+.marketScoreDescription {
+  margin: 8px 0 9px;
+  font-size: 11px;
+  line-height: 1.55;
+  color: #555;
+}
+
+.marketScoreMeta {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 9px;
+  color: #999;
+  line-height: 1.4;
+}
+
 .sectionLabel {
   font-size: 11px;
   color: #888;

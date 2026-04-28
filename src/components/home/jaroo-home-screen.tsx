@@ -29,6 +29,7 @@ import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 import {
   buildHomeHoldingsFromPortfolioItems,
+  buildHomeMarketScore,
   homeForecast as defaultHomeForecast,
   momentumSignals as defaultMomentumSignals,
   momentumStages as defaultMomentumStages,
@@ -36,6 +37,7 @@ import {
   type HomeBadgeTone,
   type HomeHolding,
   type HomeMetricTone,
+  type HomeMarketScore,
 } from '@/lib/jaroo-home-data'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
 import { usePortfolioStore } from '@/lib/stores/use-portfolio-store'
@@ -347,6 +349,28 @@ function actionToneClass(item: HomeHolding) {
   }
 
   return styles.buttonBlue
+}
+
+function MarketScoreCard({ marketScore }: { marketScore: HomeMarketScore }) {
+  return (
+    <section className={styles.marketScoreCard} aria-label='시장 점수'>
+      <div className={styles.marketScoreHeader}>
+        <div>
+          <div className={styles.marketScoreEyebrow}>MARKET SCORE</div>
+          <div className={styles.marketScoreTitle}>시장 점수</div>
+        </div>
+        <div className={styles.marketScoreValueBlock}>
+          <span className={styles.marketScoreValue}>{marketScore.score}</span>
+          <span className={cn(styles.marketScoreBadge, badgeToneClass(marketScore.tone))}>{marketScore.label}</span>
+        </div>
+      </div>
+      <p className={styles.marketScoreDescription}>{marketScore.description}</p>
+      <div className={styles.marketScoreMeta}>
+        <span>{marketScore.sourceLabel}</span>
+        <span>{marketScore.updatedLabel}</span>
+      </div>
+    </section>
+  )
 }
 
 export function JarooHomeScreen() {
@@ -693,6 +717,10 @@ export function JarooHomeScreen() {
   )
   const heatmapChartHeight = Math.max(234, 234 + Math.max(0, heatmapChartData.length - 5) * 34)
   const summaryData = useMemo(() => buildPortfolioSummary(homeHoldings, isAppliedPortfolio), [homeHoldings, isAppliedPortfolio])
+  const marketScore = useMemo(
+    () => buildHomeMarketScore(homeHoldings, { quoteStatus, isAppliedPortfolio }),
+    [homeHoldings, isAppliedPortfolio, quoteStatus],
+  )
   const defaultDeepScanHolding = useMemo(() => {
     if (selectedHolding?.kind === 'stock') {
       return selectedHolding
@@ -1046,6 +1074,7 @@ export function JarooHomeScreen() {
         </div>
 
         <div className={styles.body}>
+          <MarketScoreCard marketScore={marketScore} />
           {quoteSurfaceEnabled && quoteStatus === 'error' ? (
             <div className={styles.forecastCard}>
               <div className={styles.forecastLabel}>QUOTE ERROR</div>

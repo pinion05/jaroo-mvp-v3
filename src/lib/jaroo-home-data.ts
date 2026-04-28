@@ -1,5 +1,5 @@
 import { buildDeepScanTargetSession, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding, type DeepScanTargetSession } from '@/lib/deepscan-target'
-import type { PortfolioNormalizedItem } from '@/lib/workflow-types'
+import type { PortfolioNormalizedItem, WorkflowAsyncStatus } from '@/lib/workflow-types'
 import { normalizeStockName, parseOcrNumber, type OcrRow } from '@/lib/screenshot-ocr'
 
 export type HomeBadgeTone = 'amber' | 'red' | 'green'
@@ -9,6 +9,24 @@ export type HomeMarketTone = 'kospi' | 'kosdaq' | 'etf' | 'nasdaq'
 export type HomeActionTone = 'blue' | 'red' | 'green'
 export type MomentumStageTone = 'danger' | 'muted' | 'positive'
 export type AveragePriceCurrency = 'KRW' | 'USD'
+
+export type HomeMarketScoreStatus = 'loading' | 'ready' | 'fallback' | 'error'
+
+export type HomeMarketScore = {
+  score: string
+  status: HomeMarketScoreStatus
+  label: string
+  tone: HomeBadgeTone
+  description: string
+  sourceLabel: string
+  updatedLabel: string
+}
+
+export type BuildHomeMarketScoreOptions = {
+  quoteStatus?: WorkflowAsyncStatus
+  isAppliedPortfolio?: boolean
+  updatedLabel?: string
+}
 
 export type HomeHolding = {
   id: number
@@ -305,6 +323,98 @@ export const homeHoldings: HomeHolding[] = [
     actionHref: '/etf',
   },
 ]
+
+function clampMarketScore(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function hasUsMarketExposure(holdings: HomeHolding[]) {
+  return holdings.some((holding) => holding.marketTone === 'nasdaq' || Boolean(holding.identifierTicker))
+}
+
+function formatMarketScoreUpdatedLabel(quoteStatus: BuildHomeMarketScoreOptions['quoteStatus'], fallbackLabel?: string) {
+  if (fallbackLabel) {
+    return fallbackLabel
+  }
+
+  if (quoteStatus === 'success') {
+    return '방금 갱신'
+  }
+
+  if (quoteStatus === 'loading') {
+    return '갱신 중'
+  }
+
+  if (quoteStatus === 'error') {
+    return '최근 갱신 실패'
+  }
+
+  return '시세 대기'
+}
+
+export function buildHomeMarketScore(holdings: HomeHolding[], options: BuildHomeMarketScoreOptions = {}): HomeMarketScore {
+  const quoteStatus = options.quoteStatus ?? 'idle'
+  const updatedLabel = formatMarketScoreUpdatedLabel(quoteStatus, options.updatedLabel)
+
+  if (quoteStatus === 'loading') {
+    return {
+      score: '-',
+      status: 'loading',
+      label: '계산 중',
+      tone: 'amber',
+      description: '현재 시세를 불러온 뒤 시장 환경 점수를 계산하고 있어요.',
+      sourceLabel: '출처: 홈 시세',
+      updatedLabel,
+    }
+  }
+
+  if (holdings.length === 0) {
+    return {
+      score: '-',
+      status: 'fallback',
+      label: '대기',
+      tone: 'amber',
+      description: '홈 포트폴리오가 적용되면 국내/미국 시장 노출을 기준으로 점수를 보여줘요.',
+      sourceLabel: '출처: 포트폴리오 필요',
+      updatedLabel,
+    }
+  }
+
+  const changeValues = holdings.map((holding) => parseOcrNumber(holding.change)).filter((value): value is number => value !== null)
+  const averageChange = changeValues.length > 0
+    ? changeValues.reduce((sum, value) => sum + value, 0) / changeValues.length
+    : 0
+  const negativeCount = changeValues.filter((value) => value < 0).length
+  const haltPenalty = holdings.filter((holding) => holding.cardTone === 'halt' || holding.signalTone === 'halt').length * 10
+  const diversificationBonus = Math.min(8, new Set(holdings.map((holding) => holding.marketTone)).size * 2)
+  const scoreNumber = Math.round(clampMarketScore(58 + averageChange * 0.8 - negativeCount * 3 - haltPenalty + diversificationBonus, 0, 99))
+  const tone: HomeBadgeTone = quoteStatus === 'error' ? 'red' : scoreNumber >= 70 ? 'green' : scoreNumber >= 45 ? 'amber' : 'red'
+  const label = quoteStatus === 'error'
+    ? '대체'
+    : scoreNumber >= 70
+      ? '우호적'
+      : scoreNumber >= 45
+        ? '중립'
+        : '경계'
+  const sourceLabel = quoteStatus === 'success'
+    ? '출처: 실시간 시세 스냅샷'
+    : options.isAppliedPortfolio
+      ? '출처: 포트폴리오 + 캐시 시세'
+      : '출처: 샘플 포트폴리오'
+  const exposureText = hasUsMarketExposure(holdings) ? '국내·미국 노출' : '국내 시장 노출'
+
+  return {
+    score: String(scoreNumber),
+    status: quoteStatus === 'error' ? 'error' : changeValues.length > 0 ? 'ready' : 'fallback',
+    label,
+    tone,
+    description: quoteStatus === 'error'
+      ? `${exposureText} 기준 대체 점수예요. 시세 갱신 실패로 최신 시장 데이터는 제외했어요.`
+      : `${exposureText}과 종목 손익 흐름을 합산한 홈 전용 시장 점수예요.`,
+    sourceLabel,
+    updatedLabel,
+  }
+}
 
 export const homeForecast = {
   label: "TODAY'S FORECAST",
