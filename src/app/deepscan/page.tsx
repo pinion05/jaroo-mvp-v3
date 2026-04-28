@@ -13,6 +13,7 @@ import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import {
+  buildDeepScanContextQualityNotice,
   buildDeepScanHeroCard,
   buildDeepScanPageHeader,
   buildDeepScanPartialSuccessNotice,
@@ -193,7 +194,7 @@ function resolveWeekToneClasses(tone: string) {
   }
 }
 
-function SectionStatusCard({ notice }: { notice: { badge: string; title: string; body: string } }) {
+function SectionStatusCard({ notice }: { notice: { badge: string; title: string; body: string; nextCheckPoints?: string[] } }) {
   return (
     <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
       <span className='inline-flex rounded-full bg-[color:var(--jaroo-secondary)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-muted)]'>
@@ -201,6 +202,16 @@ function SectionStatusCard({ notice }: { notice: { badge: string; title: string;
       </span>
       <p className='mt-3 text-sm font-semibold text-[color:var(--jaroo-ink)]'>{notice.title}</p>
       <p className='mt-2 text-xs leading-5 text-[color:var(--jaroo-muted)]'>{notice.body}</p>
+      {notice.nextCheckPoints && notice.nextCheckPoints.length > 0 ? (
+        <ul className='mt-3 space-y-1 text-xs leading-5 text-[color:var(--jaroo-muted)]'>
+          {notice.nextCheckPoints.map((checkpoint) => (
+            <li key={checkpoint} className='flex gap-2'>
+              <span aria-hidden='true'>•</span>
+              <span>{checkpoint}</span>
+            </li>
+          ))}
+        </ul>
+      ) : null}
     </Card>
   )
 }
@@ -400,6 +411,7 @@ export default function DeepScanPage() {
   const pageHeader = buildDeepScanPageHeader(requestSeed, payload)
   const heroCard = buildDeepScanHeroCard(requestSeed, fetchState, payload)
   const partialSuccessNotice = buildDeepScanPartialSuccessNotice(payload)
+  const contextQualityNotice = buildDeepScanContextQualityNotice(payload)
   const weekTone = resolveWeekToneClasses(payload?.strategy.weekSignalTone ?? 'neutral')
   const analysisLoadingNotice = {
     badge: 'Loading',
@@ -554,6 +566,10 @@ export default function DeepScanPage() {
               <p className='mt-3 text-sm font-semibold text-[color:var(--jaroo-warning)]'>{partialSuccessNotice.title}</p>
               <p className='mt-1 text-xs leading-5 text-[color:var(--jaroo-warning)]/80'>{partialSuccessNotice.body}</p>
             </Card>
+          ) : null}
+
+          {contextQualityNotice ? (
+            <SectionStatusCard notice={contextQualityNotice} />
           ) : null}
 
           <SectionToggle
@@ -809,6 +825,10 @@ export default function DeepScanPage() {
               <p className='mt-3 text-sm font-semibold text-[color:var(--jaroo-warning)]'>{partialSuccessNotice.title}</p>
               <p className='mt-1 text-xs leading-5 text-[color:var(--jaroo-warning)]/80'>{partialSuccessNotice.body}</p>
             </Card>
+          ) : null}
+
+          {contextQualityNotice ? (
+            <SectionStatusCard notice={contextQualityNotice} />
           ) : null}
 
           {fetchState !== 'success' || !payload ? (

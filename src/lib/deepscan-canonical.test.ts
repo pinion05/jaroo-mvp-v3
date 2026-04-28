@@ -32,6 +32,20 @@ function createTargetSession(overrides: Partial<DeepScanCanonicalTargetSession> 
   }
 }
 
+function createTestContextQuality(): JarooDeepScanPayload['metadata']['contextQuality'] {
+  return {
+    confidence: 'high',
+    score: 100,
+    summary: 'test context quality',
+    pageCoverage: { availableCount: 0, totalKnownPages: 0, availablePageIds: [], missingPageIds: [] },
+    missingSources: [],
+    sourceIssues: [],
+    sourceLimitations: [],
+    llmMemberErrors: [],
+    nextCheckPoints: ['test checkpoint'],
+  }
+}
+
 function createCanonicalPayload(overrides: Partial<JarooDeepScanPayload> = {}): JarooDeepScanPayload {
   const payload: JarooDeepScanPayload = {
     input: {
@@ -133,6 +147,7 @@ function createCanonicalPayload(overrides: Partial<JarooDeepScanPayload> = {}): 
         sellNow: 'ok',
         portfolioSimulation: 'ok',
       },
+      contextQuality: createTestContextQuality(),
     },
   }
 
@@ -322,6 +337,7 @@ test('isDeepScanPayloadReady는 blocked canonical payload도 render 가능한 pa
         sellNow: 'ok',
         portfolioSimulation: 'ok',
       },
+      contextQuality: createTestContextQuality(),
     },
   })
 

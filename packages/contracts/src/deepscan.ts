@@ -197,6 +197,42 @@ export type JarooDeepScanInputValidity =
       raw?: unknown
     }
 
+export type JarooDeepScanContextConfidence = 'low' | 'medium' | 'high'
+
+export type JarooDeepScanSourceIssue = {
+  sourceId: string
+  message: string
+}
+
+export type JarooDeepScanSourceLimitation = {
+  fact: string
+  reasonCode: string
+  message: string
+}
+
+export type JarooDeepScanContextQuality = {
+  confidence: JarooDeepScanContextConfidence
+  score: number
+  summary: string
+  pageCoverage: {
+    availableCount: number
+    totalKnownPages: number
+    availablePageIds: string[]
+    missingPageIds: string[]
+  }
+  missingSources: string[]
+  sourceIssues: JarooDeepScanSourceIssue[]
+  sourceLimitations: JarooDeepScanSourceLimitation[]
+  llmMemberErrors: Array<{
+    memberKey: string
+    kind: JarooDeepScanCommitteeMemberErrorKind | 'llm-unknown'
+    message: string
+    attempts: number
+    retryable?: boolean
+  }>
+  nextCheckPoints: string[]
+}
+
 export type JarooDeepScanBlockStatus = {
   hero: DeepScanBlockState
   committee: DeepScanBlockState
@@ -215,6 +251,7 @@ export type JarooDeepScanMetadata = {
   inputValidity: JarooDeepScanInputValidity
   sourceRefs: DeepScanSourceRef[]
   blockStatus: JarooDeepScanBlockStatus
+  contextQuality: JarooDeepScanContextQuality
 }
 
 export type JarooDeepScanPayload = {

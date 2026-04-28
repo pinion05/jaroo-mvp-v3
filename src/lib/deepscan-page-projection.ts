@@ -25,6 +25,12 @@ export type DeepScanBlockNotice = {
   body: string
 }
 
+export type DeepScanContextQualityNotice = DeepScanBlockNotice & {
+  confidence: 'low' | 'medium' | 'high'
+  score: number
+  nextCheckPoints: string[]
+}
+
 const DEEP_SCAN_BLOCK_LABELS = {
   hero: '핵심 요약',
   committee: 'AI 분석 결과',
@@ -171,5 +177,31 @@ export function buildDeepScanPartialSuccessNotice(payload: JarooDeepScanPayload 
     badge: 'Partial',
     title: '일부 분석 결과만 표시 중이에요',
     body: `${summary} 블록은 오류 또는 보완 필요 상태로 표시됩니다.`,
+  }
+}
+
+export function buildDeepScanContextQualityNotice(payload: JarooDeepScanPayload | null): DeepScanContextQualityNotice | null {
+  const contextQuality = payload?.metadata.contextQuality
+
+  if (!contextQuality) {
+    return null
+  }
+
+  const confidenceLabel = contextQuality.confidence === 'high'
+    ? '높음'
+    : contextQuality.confidence === 'medium'
+      ? '보통'
+      : '낮음'
+  const sourceLimitationSummary = contextQuality.sourceLimitations.length > 0
+    ? ` 제한 필드: ${contextQuality.sourceLimitations.slice(0, 3).map((item) => item.fact).join(', ')}.`
+    : ''
+
+  return {
+    badge: `Context ${contextQuality.confidence}`,
+    title: `분석 컨텍스트 신뢰도 ${confidenceLabel} (${contextQuality.score}/100)`,
+    body: `${contextQuality.summary}${sourceLimitationSummary}`,
+    confidence: contextQuality.confidence,
+    score: contextQuality.score,
+    nextCheckPoints: contextQuality.nextCheckPoints,
   }
 }

@@ -210,6 +210,10 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
   assert.equal(payload.metadata.inputValidity.valid, true);
   assert.equal(payload.metadata.errorCode, undefined);
   assert.equal(payload.metadata.degraded, false);
+  assert.equal(payload.metadata.contextQuality.confidence, 'medium');
+  assert.equal(payload.metadata.contextQuality.pageCoverage.availableCount, 6);
+  assert.equal(payload.metadata.contextQuality.pageCoverage.totalKnownPages, 10);
+  assert.equal(payload.insights.items.some((item) => item.sourceLabel === 'Context quality'), true);
   assert.notEqual(payload.metadata.inputValidity.raw, rawInput);
   assert.equal(payload.metadata.inputValidity.raw.holding.shares, '12');
   assert.equal(payload.hero.score, 76);
@@ -260,6 +264,18 @@ test('buildJarooDeepScanPayload degrades with real missing-source messaging for 
   assertCanonicalPayloadShape(payload);
   assert.equal(payload.metadata.inputValidity.valid, true);
   assert.equal(payload.metadata.degraded, true);
+  assert.equal(payload.metadata.contextQuality.confidence, 'low');
+  assert.equal(payload.metadata.contextQuality.pageCoverage.availableCount, 0);
+  assert.deepEqual(payload.metadata.contextQuality.missingSources, ['slim', 'current-quote']);
+  assert.deepEqual(
+    payload.metadata.contextQuality.sourceLimitations.map((limitation) => limitation.fact),
+    ['foreignOwnershipPct', 'institutionalOwnershipPct', 'packageContext'],
+  );
+  assert.match(payload.metadata.contextQuality.summary, /누락\/실패 소스 slim, current-quote/);
+  assert.equal(
+    payload.metadata.contextQuality.nextCheckPoints.some((checkpoint) => checkpoint.includes('WiseReport KR slim 페이지 수집')),
+    true,
+  );
   assert.equal(payload.hero.score, 6);
   assert.equal(payload.hero.statusText, '경계');
   assert.match(payload.hero.body, /현재가 근거 없음/);
@@ -273,6 +289,9 @@ test('buildJarooDeepScanPayload degrades with real missing-source messaging for 
   assert.equal(payload.portfolioSimulation.afterScore, 0);
   assert.equal(payload.portfolioSimulation.deltaLabel, 'N/A');
   assert.match(payload.portfolioSimulation.caption, /포트폴리오 시뮬레이션을 계산할 수 없습니다/);
+  const contextInsight = payload.insights.items.find((item) => item.sourceLabel === 'Context quality');
+  assert.ok(contextInsight);
+  assert.match(contextInsight.body, /foreignOwnershipPct/);
 
   const allStrings = collectStrings(payload).join('\n');
   assert.doesNotMatch(allStrings, /baseline|placeholder|deterministic placeholder|integration pending/i);
@@ -654,6 +673,10 @@ test('buildJarooDeepScanPayload returns canonical internal-service-error payload
   assert.equal(payload.metadata.inputValidity.valid, false);
   assert.equal(payload.hero.fallback?.reason, 'internal-service-error');
   assert.equal(payload.hero.error?.code, 'internal-service-error');
+  assert.equal(payload.metadata.contextQuality.confidence, 'low');
+  assert.deepEqual(payload.metadata.contextQuality.sourceIssues, [
+    { sourceId: 'deepscan-payload-service', message: 'unexpected internal crawler service failure' },
+  ]);
 
   for (const key of MAJOR_BLOCK_KEYS) {
     assertBlockMeta(payload[key], 'error');

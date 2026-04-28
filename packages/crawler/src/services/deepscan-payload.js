@@ -142,6 +142,206 @@ function createBlockStatus(blocks) {
   return Object.fromEntries(MAJOR_BLOCK_KEYS.map((key) => [key, blocks[key]?.blockState ?? 'missing']));
 }
 
+function clampContextQualityScore(value) {
+  if (!Number.isFinite(value)) {
+    return 0;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(value)));
+}
+
+function createDefaultPageCoverage() {
+  return {
+    availableCount: 0,
+    totalKnownPages: 0,
+    availablePageIds: [],
+    missingPageIds: [],
+  };
+}
+
+function normalizePageCoverage(pageCoverage) {
+  const safePageCoverage = asObject(pageCoverage);
+  const availablePageIds = Array.isArray(safePageCoverage.availablePageIds)
+    ? safePageCoverage.availablePageIds.map((pageId) => normalizeText(pageId)).filter(Boolean)
+    : [];
+  const missingPageIds = Array.isArray(safePageCoverage.missingPageIds)
+    ? safePageCoverage.missingPageIds.map((pageId) => normalizeText(pageId)).filter(Boolean)
+    : [];
+  const totalKnownPages = typeof safePageCoverage.totalKnownPages === 'number' && Number.isFinite(safePageCoverage.totalKnownPages)
+    ? safePageCoverage.totalKnownPages
+    : availablePageIds.length + missingPageIds.length;
+  const availableCount = typeof safePageCoverage.availableCount === 'number' && Number.isFinite(safePageCoverage.availableCount)
+    ? safePageCoverage.availableCount
+    : availablePageIds.length;
+
+  return {
+    availableCount: Math.max(0, Math.round(availableCount)),
+    totalKnownPages: Math.max(0, Math.round(totalKnownPages)),
+    availablePageIds,
+    missingPageIds,
+  };
+}
+
+function normalizeSourceIssue(issue) {
+  const safeIssue = asObject(issue);
+  const sourceId = normalizeText(safeIssue.sourceId);
+
+  if (!sourceId) {
+    return null;
+  }
+
+  return {
+    sourceId,
+    message: normalizeText(safeIssue.message) ?? `${sourceId} unavailable`,
+  };
+}
+
+function normalizeSourceLimitation(limitation) {
+  const safeLimitation = asObject(limitation);
+  const fact = normalizeText(safeLimitation.fact);
+
+  if (!fact) {
+    return null;
+  }
+
+  return {
+    fact,
+    reasonCode: normalizeText(safeLimitation.reasonCode) ?? 'source_fact_unavailable',
+    message: normalizeText(safeLimitation.message) ?? `${fact} is unavailable from attached sources.`,
+  };
+}
+
+function normalizeLlmMemberError(error) {
+  const safeError = asObject(error);
+  const memberKey = normalizeText(safeError.memberKey ?? safeError.member);
+
+  if (!memberKey) {
+    return null;
+  }
+
+  return {
+    memberKey,
+    kind: normalizeText(safeError.errorKind ?? safeError.kind) ?? 'llm-unknown',
+    message: normalizeText(safeError.message) ?? 'LLM committee member failed.',
+    attempts: typeof safeError.attempts === 'number' && Number.isFinite(safeError.attempts) ? Math.max(0, Math.round(safeError.attempts)) : 0,
+    ...(typeof safeError.retryable === 'boolean' ? { retryable: safeError.retryable } : {}),
+  };
+}
+
+function formatContextSourceList(values) {
+  return values.length > 0 ? values.join(', ') : '없음';
+}
+
+function buildContextNextCheckPoints({ pageCoverage, missingSources, sourceIssues, sourceLimitations, llmMemberErrors }) {
+  const nextCheckPoints = [];
+  const missingSet = new Set(missingSources);
+
+  if (missingSet.has('current-quote')) {
+    nextCheckPoints.push('현재가 소스(current-quote)를 재조회해 가격 위치와 sell-now 계산을 확인하세요.');
+  }
+  if (missingSet.has('slim')) {
+    nextCheckPoints.push('WiseReport KR slim 페이지 수집 상태를 확인해 리포트/컨센서스 근거를 확보하세요.');
+  } else if (pageCoverage.totalKnownPages > 0 && pageCoverage.missingPageIds.length > 0) {
+    nextCheckPoints.push(`미확보 WiseReport 페이지 ${pageCoverage.missingPageIds.slice(0, 4).join(', ')}${pageCoverage.missingPageIds.length > 4 ? ' 등' : ''}를 재수집하세요.`);
+  }
+  if (missingSet.has('holding')) {
+    nextCheckPoints.push('보유 수량과 평단 입력을 확인해 포지션 적합성 판단을 보강하세요.');
+  }
+  if (sourceIssues.length > 0) {
+    nextCheckPoints.push(`실패 소스 ${sourceIssues.map((issue) => issue.sourceId).join(', ')}의 수집 오류를 먼저 해결하세요.`);
+  }
+  if (sourceLimitations.length > 0) {
+    nextCheckPoints.push(`소스 제한 필드 ${sourceLimitations.slice(0, 3).map((limitation) => limitation.fact).join(', ')}는 제공 원본에서 구조화 여부를 확인하세요.`);
+  }
+  if (llmMemberErrors.length > 0) {
+    nextCheckPoints.push(`실패한 KR 위원 ${llmMemberErrors.map((error) => error.memberKey).join(', ')} 응답을 재시도하세요.`);
+  }
+
+  if (nextCheckPoints.length === 0) {
+    nextCheckPoints.push('현재 연결된 소스 범위에서는 추가 확인 지점이 없습니다.');
+  }
+
+  return nextCheckPoints.slice(0, 5);
+}
+
+function buildContextQualityMetadata({ evidence, sourceIssues = [], llmMemberErrors = [], fallbackReason } = {}) {
+  const pageCoverage = normalizePageCoverage(evidence?.pageCoverage ?? createDefaultPageCoverage());
+  const missingSources = Array.isArray(evidence?.missingSources)
+    ? evidence.missingSources.map((sourceId) => normalizeText(sourceId)).filter(Boolean)
+    : [];
+  const normalizedSourceIssues = sourceIssues.map(normalizeSourceIssue).filter(Boolean);
+  const sourceLimitations = Array.isArray(evidence?.sourceLimitations)
+    ? evidence.sourceLimitations.map(normalizeSourceLimitation).filter(Boolean)
+    : [];
+  const normalizedLlmErrors = llmMemberErrors.map(normalizeLlmMemberError).filter(Boolean);
+  const coverageRatio = pageCoverage.totalKnownPages > 0 ? pageCoverage.availableCount / pageCoverage.totalKnownPages : 0;
+  const missingPagePenalty = pageCoverage.totalKnownPages > 0 ? (1 - coverageRatio) * 25 : 25;
+  const score = clampContextQualityScore(
+    100
+      - missingPagePenalty
+      - (missingSources.length * 18)
+      - (normalizedSourceIssues.length * 20)
+      - (sourceLimitations.length * 8)
+      - (normalizedLlmErrors.length * 15),
+  );
+  const confidence = score >= 75 && normalizedLlmErrors.length === 0
+    ? 'high'
+    : score >= 45 && normalizedSourceIssues.length === 0
+      ? 'medium'
+      : 'low';
+  const summary = confidence === 'high'
+    ? `컨텍스트 신뢰도 높음: KR 페이지 ${pageCoverage.availableCount}/${pageCoverage.totalKnownPages}, 누락 소스 ${formatContextSourceList(missingSources)}.`
+    : confidence === 'medium'
+      ? `컨텍스트 신뢰도 보통: KR 페이지 ${pageCoverage.availableCount}/${pageCoverage.totalKnownPages}, 제한 필드 ${sourceLimitations.length}건.`
+      : `컨텍스트 신뢰도 낮음: KR 페이지 ${pageCoverage.availableCount}/${pageCoverage.totalKnownPages}, 누락/실패 소스 ${formatContextSourceList([...missingSources, ...normalizedSourceIssues.map((issue) => issue.sourceId)])}.`;
+
+  return {
+    confidence,
+    score,
+    summary: fallbackReason ? `${summary} (${fallbackReason})` : summary,
+    pageCoverage,
+    missingSources,
+    sourceIssues: normalizedSourceIssues,
+    sourceLimitations,
+    llmMemberErrors: normalizedLlmErrors,
+    nextCheckPoints: buildContextNextCheckPoints({
+      pageCoverage,
+      missingSources,
+      sourceIssues: normalizedSourceIssues,
+      sourceLimitations,
+      llmMemberErrors: normalizedLlmErrors,
+    }),
+  };
+}
+
+function createInputInvalidContextQuality() {
+  return {
+    confidence: 'low',
+    score: 0,
+    summary: '컨텍스트 신뢰도 낮음: 종목 코드 또는 티커가 없어 소스 수집을 시작할 수 없습니다.',
+    pageCoverage: createDefaultPageCoverage(),
+    missingSources: ['instrument-identifier'],
+    sourceIssues: [],
+    sourceLimitations: [],
+    llmMemberErrors: [],
+    nextCheckPoints: ['종목 코드 또는 티커를 포함해 DeepScan을 다시 요청하세요.'],
+  };
+}
+
+function createInternalErrorContextQuality() {
+  return {
+    confidence: 'low',
+    score: 0,
+    summary: '컨텍스트 신뢰도 낮음: crawler 내부 오류로 소스 품질을 계산하지 못했습니다.',
+    pageCoverage: createDefaultPageCoverage(),
+    missingSources: [],
+    sourceIssues: [{ sourceId: 'deepscan-payload-service', message: 'unexpected internal crawler service failure' }],
+    sourceLimitations: [],
+    llmMemberErrors: [],
+    nextCheckPoints: ['crawler 내부 오류 로그를 확인한 뒤 같은 요청을 재시도하세요.'],
+  };
+}
+
 function createDeepScanSourceRef({ type = 'system', id, label, at, note } = {}) {
   return {
     type: SOURCE_TYPES.has(type) ? type : 'system',
@@ -335,6 +535,7 @@ function createInputInvalidPayload(rawInput = {}) {
       },
       sourceRefs: metadataSourceRefs,
       blockStatus: createBlockStatus(blocks),
+      contextQuality: createInputInvalidContextQuality(),
     },
   };
 }
@@ -442,6 +643,7 @@ function createInternalErrorPayload(rawInput = {}) {
       },
       sourceRefs: metadataSourceRefs,
       blockStatus: createBlockStatus(blocks),
+      contextQuality: createInternalErrorContextQuality(),
     },
   };
 }
@@ -1100,7 +1302,7 @@ function createEvidenceSourceRefs(input, evidence, sources, sourceIssues) {
   return sourceRefs;
 }
 
-function buildInsights(input, evidence, scored, generatedAt, sourceIssues) {
+function buildInsights(input, evidence, scored, generatedAt, sourceIssues, contextQuality) {
   const dateLabel = (input.selectedAt ?? generatedAt).slice(0, 10);
   const items = [
     {
@@ -1148,6 +1350,17 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues) {
         ...evidence.missingSources.map((sourceId) => `${sourceId} 없음`),
         ...sourceIssues.map((issue) => `${issue.sourceId} 실패`),
       ].join(' / '),
+    });
+  }
+
+  if (contextQuality) {
+    items.push({
+      sourceType: 'system',
+      sourceLabel: 'Context quality',
+      date: generatedAt.slice(0, 10),
+      label: '품질',
+      title: `컨텍스트 신뢰도 ${contextQuality.confidence}`,
+      body: `${contextQuality.summary} 다음 확인: ${contextQuality.nextCheckPoints.join(' / ')}`,
     });
   }
 
@@ -1331,7 +1544,13 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
         }
       : null;
     const blockFallback = llmFallback ?? createEvidenceFallback(evidence, sourceIssues);
-    const insights = buildInsights(input, evidence, scored, generatedAt, sourceIssues);
+    const contextQuality = buildContextQualityMetadata({
+      evidence,
+      sourceIssues,
+      llmMemberErrors: llmCommitteeErrors,
+      fallbackReason: blockFallback?.reason,
+    });
+    const insights = buildInsights(input, evidence, scored, generatedAt, sourceIssues, contextQuality);
     const strategy = buildStrategy(input, evidence, scored);
     const sellNow = buildSellNow(evidence, scored);
     const portfolioSimulation = buildPortfolioSimulation(scored);
@@ -1471,7 +1690,8 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
         },
         sourceRefs: [...createBaseSourceRefs(input), ...combinedSourceRefs],
         blockStatus: createBlockStatus(blocks),
-      },
+        contextQuality,
+      }
     };
   } catch {
     return createInternalErrorPayload(rawInput);

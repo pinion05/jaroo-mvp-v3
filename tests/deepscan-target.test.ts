@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import type { JarooDeepScanPayload } from '../packages/contracts/src/deepscan'
 
 import { buildDeepScanViewModel, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding } from '../src/lib/deepscan-target'
-import { buildDeepScanHeroCard, buildDeepScanPageHeader, buildDeepScanPartialSuccessNotice, getDeepScanBlockNotice } from '../src/lib/deepscan-page-projection'
+import { buildDeepScanContextQualityNotice, buildDeepScanHeroCard, buildDeepScanPageHeader, buildDeepScanPartialSuccessNotice, getDeepScanBlockNotice } from '../src/lib/deepscan-page-projection'
 import { sanitizeOcrRows } from '../src/lib/screenshot-ocr'
 
 const sampleHolding = {
@@ -232,6 +232,17 @@ function createCanonicalPayload(overrides: CanonicalPayloadOverrides = {}): Jaro
         sellNow: 'ok',
         portfolioSimulation: 'ok',
       },
+      contextQuality: {
+        confidence: 'high',
+        score: 100,
+        summary: 'test context quality',
+        pageCoverage: { availableCount: 0, totalKnownPages: 0, availablePageIds: [], missingPageIds: [] },
+        missingSources: [],
+        sourceIssues: [],
+        sourceLimitations: [],
+        llmMemberErrors: [],
+        nextCheckPoints: ['test checkpoint'],
+      },
     },
   }
 
@@ -324,4 +335,33 @@ test('deepscan page projection exposes a page-level partial-success notice when 
     title: '일부 분석 결과만 표시 중이에요',
     body: 'AI 분석 결과, 전략 블록은 오류 또는 보완 필요 상태로 표시됩니다.',
   })
+})
+
+
+test('deepscan page projection exposes context quality and next checks', () => {
+  const payload = createCanonicalPayload({
+    metadata: {
+      contextQuality: {
+        confidence: 'low',
+        score: 18,
+        summary: '컨텍스트 신뢰도 낮음: KR 페이지 0/12, 누락/실패 소스 slim, current-quote.',
+        pageCoverage: { availableCount: 0, totalKnownPages: 12, availablePageIds: [], missingPageIds: ['consensus'] },
+        missingSources: ['slim', 'current-quote'],
+        sourceIssues: [],
+        sourceLimitations: [
+          { fact: 'foreignOwnershipPct', reasonCode: 'not_provided_by_wisereport_fnguide_dump', message: 'WiseReport/FnGuide KR 원본 덤프에 외국인 보유율 집계 필드가 없습니다.' },
+        ],
+        llmMemberErrors: [],
+        nextCheckPoints: ['WiseReport KR slim 페이지 수집 상태를 확인해 리포트/컨센서스 근거를 확보하세요.'],
+      },
+    },
+  })
+
+  const notice = buildDeepScanContextQualityNotice(payload)
+
+  assert.equal(notice?.confidence, 'low')
+  assert.equal(notice?.score, 18)
+  assert.match(notice?.title ?? '', /신뢰도 낮음/)
+  assert.match(notice?.body ?? '', /foreignOwnershipPct/)
+  assert.deepEqual(notice?.nextCheckPoints, ['WiseReport KR slim 페이지 수집 상태를 확인해 리포트/컨센서스 근거를 확보하세요.'])
 })

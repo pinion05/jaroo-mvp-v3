@@ -155,6 +155,17 @@ function createDeepScanPayload(): JarooDeepScanPayload {
         sellNow: 'ok',
         portfolioSimulation: 'ok',
       },
+      contextQuality: {
+        confidence: 'high',
+        score: 100,
+        summary: 'test context quality',
+        pageCoverage: { availableCount: 0, totalKnownPages: 0, availablePageIds: [], missingPageIds: [] },
+        missingSources: [],
+        sourceIssues: [],
+        sourceLimitations: [],
+        llmMemberErrors: [],
+        nextCheckPoints: ['test checkpoint'],
+      },
     },
   }
 }

@@ -210,6 +210,33 @@ function isCanonicalPortfolioSimulationBlock(block: unknown) {
     && hasRequiredNumberFields(block, ['beforeScore', 'afterScore'])
 }
 
+function isStringRecordArray(value: unknown, requiredKeys: string[]) {
+  return Array.isArray(value) && value.every((item) => {
+    const record = asRecord(item)
+    return !!record && requiredKeys.every((key) => typeof record[key] === 'string')
+  })
+}
+
+function isCanonicalContextQuality(value: unknown) {
+  const record = asRecord(value)
+  const pageCoverage = asRecord(record?.pageCoverage)
+
+  return !!record
+    && ['low', 'medium', 'high'].includes(String(record.confidence))
+    && typeof record.score === 'number'
+    && typeof record.summary === 'string'
+    && !!pageCoverage
+    && typeof pageCoverage.availableCount === 'number'
+    && typeof pageCoverage.totalKnownPages === 'number'
+    && isStringArray(pageCoverage.availablePageIds)
+    && isStringArray(pageCoverage.missingPageIds)
+    && isStringArray(record.missingSources)
+    && isStringRecordArray(record.sourceIssues, ['sourceId', 'message'])
+    && isStringRecordArray(record.sourceLimitations, ['fact', 'reasonCode', 'message'])
+    && Array.isArray(record.llmMemberErrors)
+    && isStringArray(record.nextCheckPoints)
+}
+
 function isCanonicalPayload(payload: unknown): payload is JarooDeepScanPayload {
   const record = asRecord(payload)
   const metadata = asRecord(record?.metadata)
@@ -227,6 +254,7 @@ function isCanonicalPayload(payload: unknown): payload is JarooDeepScanPayload {
     || typeof metadata.degraded !== 'boolean'
     || typeof metadata.debugId !== 'string'
     || !Array.isArray(metadata.sourceRefs)
+    || !isCanonicalContextQuality(metadata.contextQuality)
   ) {
     return false
   }

@@ -76,6 +76,17 @@ test('createDeepScanCanonicalResponse는 internal builder payload를 그대로 J
         inputValidity: { valid: true, raw: {} },
         sourceRefs: [],
         blockStatus: { hero: 'ok', committee: 'ok', insights: 'ok', strategy: 'ok', sellNow: 'ok', portfolioSimulation: 'ok' },
+        contextQuality: {
+          confidence: 'high',
+          score: 100,
+          summary: 'test context quality',
+          pageCoverage: { availableCount: 0, totalKnownPages: 0, availablePageIds: [], missingPageIds: [] },
+          missingSources: [],
+          sourceIssues: [],
+          sourceLimitations: [],
+          llmMemberErrors: [],
+          nextCheckPoints: ['test checkpoint'],
+        },
       },
     }),
   )

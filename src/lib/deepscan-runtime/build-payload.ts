@@ -5,6 +5,7 @@ import type {
   DeepScanSourceRef,
   JarooDeepScanCommitteeAxis,
   JarooDeepScanCommitteeMember,
+  JarooDeepScanContextQuality,
   JarooDeepScanInsightItem,
   JarooDeepScanPayload,
   JarooDeepScanPortfolioSimulationBlock,
@@ -375,6 +376,141 @@ function buildInputValidityRaw(rawInput: DeepScanRawInput) {
   return structuredClone(rawInput)
 }
 
+function clampContextQualityScore(value: number) {
+  return Math.max(0, Math.min(100, Math.round(value)))
+}
+
+function createContextQuality({
+  confidence,
+  score,
+  summary,
+  missingSources = [],
+  sourceIssues = [],
+  sourceLimitations = [],
+  llmMemberErrors = [],
+  nextCheckPoints,
+}: {
+  confidence?: JarooDeepScanContextQuality['confidence']
+  score: number
+  summary: string
+  missingSources?: string[]
+  sourceIssues?: JarooDeepScanContextQuality['sourceIssues']
+  sourceLimitations?: JarooDeepScanContextQuality['sourceLimitations']
+  llmMemberErrors?: JarooDeepScanContextQuality['llmMemberErrors']
+  nextCheckPoints?: string[]
+}): JarooDeepScanContextQuality {
+  const normalizedScore = clampContextQualityScore(score)
+  const resolvedConfidence = confidence ?? (
+    normalizedScore >= 75 && sourceIssues.length === 0 && llmMemberErrors.length === 0
+      ? 'high'
+      : normalizedScore >= 45
+        ? 'medium'
+        : 'low'
+  )
+
+  return {
+    confidence: resolvedConfidence,
+    score: normalizedScore,
+    summary,
+    pageCoverage: {
+      availableCount: missingSources.length === 0 && sourceIssues.length === 0 ? 1 : 0,
+      totalKnownPages: 1,
+      availablePageIds: missingSources.length === 0 && sourceIssues.length === 0 ? ['runtime-payload'] : [],
+      missingPageIds: missingSources.length > 0 || sourceIssues.length > 0 ? ['runtime-payload'] : [],
+    },
+    missingSources,
+    sourceIssues,
+    sourceLimitations,
+    llmMemberErrors,
+    nextCheckPoints: nextCheckPoints && nextCheckPoints.length > 0
+      ? nextCheckPoints
+      : ['현재 연결된 소스 범위에서는 추가 확인 지점이 없습니다.'],
+  }
+}
+
+function createInvalidInputContextQuality(): JarooDeepScanContextQuality {
+  return createContextQuality({
+    confidence: 'low',
+    score: 0,
+    summary: '컨텍스트 신뢰도 낮음: 종목 코드 또는 티커가 없어 소스 수집을 시작할 수 없습니다.',
+    missingSources: ['instrument-identifier'],
+    nextCheckPoints: ['종목 코드 또는 티커를 포함해 DeepScan을 다시 요청하세요.'],
+  })
+}
+
+function createRuntimeFailureContextQuality(sourceId: string, message: string): JarooDeepScanContextQuality {
+  return createContextQuality({
+    confidence: 'low',
+    score: 0,
+    summary: `컨텍스트 신뢰도 낮음: ${sourceId} 실패로 runtime payload를 완성하지 못했습니다.`,
+    sourceIssues: [{ sourceId, message }],
+    nextCheckPoints: [`${sourceId} 로그를 확인한 뒤 같은 요청을 재시도하세요.`],
+  })
+}
+
+function buildUsContextQuality({
+  facts,
+  agentResults,
+  llmErrors,
+}: {
+  facts: UsDeepScanFacts
+  agentResults: DeepScanAgentResult[]
+  llmErrors: Array<{ member: string; error: string }>
+}): JarooDeepScanContextQuality {
+  const sourceLimitations: JarooDeepScanContextQuality['sourceLimitations'] = []
+
+  if (typeof facts.currentPrice !== 'number') {
+    sourceLimitations.push({
+      fact: 'currentPrice',
+      reasonCode: 'us_slim_missing_fact',
+      message: 'WiseReport Global slim 원본에서 현재가를 구조화하지 못했습니다.',
+    })
+  }
+  if (!facts.consensus) {
+    sourceLimitations.push({
+      fact: 'consensus',
+      reasonCode: 'us_slim_missing_fact',
+      message: 'WiseReport Global slim 원본에서 컨센서스 관측치를 구조화하지 못했습니다.',
+    })
+  }
+  if (facts.news.length === 0) {
+    sourceLimitations.push({
+      fact: 'news',
+      reasonCode: 'us_slim_missing_fact',
+      message: 'WiseReport Global slim 원본에서 최근 뉴스 항목을 확보하지 못했습니다.',
+    })
+  }
+
+  const lowConfidenceMembers = agentResults.filter((agent) => agent.confidence === 'low')
+  const llmMemberErrors: JarooDeepScanContextQuality['llmMemberErrors'] = llmErrors.map((error) => ({
+    memberKey: error.member,
+    kind: 'llm-unknown',
+    message: error.error,
+    attempts: 1,
+    retryable: true,
+  }))
+  const score = 100 - (sourceLimitations.length * 12) - (lowConfidenceMembers.length * 8) - (llmMemberErrors.length * 15)
+  const nextCheckPoints = [
+    ...(sourceLimitations.length > 0
+      ? [`소스 제한 필드 ${sourceLimitations.map((limitation) => limitation.fact).join(', ')}의 WiseReport Global 구조화 상태를 확인하세요.`]
+      : []),
+    ...(lowConfidenceMembers.length > 0
+      ? [`low-confidence US 위원 ${lowConfidenceMembers.map((agent) => agent.key).join(', ')}의 dump 근거를 확인하세요.`]
+      : []),
+    ...(llmMemberErrors.length > 0
+      ? [`실패한 US 위원 ${llmMemberErrors.map((error) => error.memberKey).join(', ')} 응답을 재시도하세요.`]
+      : []),
+  ]
+
+  return createContextQuality({
+    score,
+    summary: `컨텍스트 신뢰도 ${score >= 75 && llmMemberErrors.length === 0 ? '높음' : score >= 45 ? '보통' : '낮음'}: US slim payload와 ${agentResults.length}/9 위원 응답을 반영했습니다.`,
+    sourceLimitations,
+    llmMemberErrors,
+    nextCheckPoints,
+  })
+}
+
 function createInvalidInputPayload(rawInput: DeepScanRawInput): JarooDeepScanPayload {
   const generatedAt = rawInput.selectedAt ?? new Date().toISOString()
   const sourceRefs = [createSourceRef('system', 'deepscan-input-invalid', 'deepscan invalid input')]
@@ -463,6 +599,7 @@ function createInvalidInputPayload(rawInput: DeepScanRawInput): JarooDeepScanPay
         sellNow: 'blocked',
         portfolioSimulation: 'blocked',
       },
+      contextQuality: createInvalidInputContextQuality(),
     },
   } satisfies JarooDeepScanPayload
 
@@ -903,6 +1040,7 @@ function createUsRuntimeFailurePayload(rawInput: DeepScanRawInput, ticker: strin
         sellNow: 'blocked',
         portfolioSimulation: 'blocked',
       },
+      contextQuality: createRuntimeFailureContextQuality(code, message),
     },
   } satisfies JarooDeepScanPayload
 }
@@ -1010,6 +1148,14 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
           sellNow: 'blocked',
           portfolioSimulation: 'blocked',
         },
+        contextQuality: createContextQuality({
+          confidence: 'low',
+          score: 0,
+          summary: '컨텍스트 신뢰도 낮음: WiseReport Global slim payload를 확보하지 못했습니다.',
+          missingSources: ['us-slim'],
+          sourceIssues: issues.map((issue) => ({ sourceId: issue.id, message: issue.message })),
+          nextCheckPoints: ['US slim fetch 오류 로그를 확인하고 같은 요청을 재시도하세요.'],
+        }),
       },
     } satisfies JarooDeepScanPayload
 
@@ -1079,6 +1225,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
       ? `${generatedSignals.ownershipFlow.primarySource} ownership 공시 ${generatedSignals.ownershipFlow.eventCount}건`
       : null,
   ].filter((part): part is string => Boolean(part))
+  const contextQuality = buildUsContextQuality({ facts, agentResults, llmErrors })
 
   const payload = {
     input: {
@@ -1130,6 +1277,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
         sellNow: sellNow.blockState,
         portfolioSimulation: portfolioSimulation.blockState,
       },
+      contextQuality,
     },
   } satisfies JarooDeepScanPayload
 
