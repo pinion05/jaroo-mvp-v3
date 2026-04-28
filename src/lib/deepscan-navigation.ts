@@ -5,6 +5,13 @@ type DeepScanNavigationCandidate = Pick<HomeHolding, 'kind'> & {
 }
 
 export function shouldUseDeepScanLoadingHandoff(candidate: DeepScanNavigationCandidate) {
-  return candidate.actionHref === '/deepscan' && (candidate.kind === 'stock' || candidate.kind === 'etf')
-}
+  if (candidate.kind === 'stock') {
+    return candidate.actionHref === '/deepscan'
+  }
 
+  if (candidate.kind === 'etf') {
+    return candidate.actionHref === '/deepscan' || candidate.actionHref === '/etf'
+  }
+
+  return false
+}

@@ -385,7 +385,7 @@ test('home holdings builder maps manual KR/US market selections to home market t
   assert.equal(usHolding?.marketTone, 'nasdaq')
 })
 
-test('ETF and ETN home actions enter DeepScan so the loading transition can mount', () => {
+test('ETF and ETN home actions preserve ETF analysis while using loading handoff', () => {
   const [etfHolding, etnHolding] = buildHomeHoldingsFromPortfolioItems([
     {
       name: 'KODEX 200',
@@ -410,8 +410,8 @@ test('ETF and ETN home actions enter DeepScan so the loading transition can moun
   ])
 
   assert.equal(etfHolding?.actionLabel, 'ETF 분석')
-  assert.equal(etfHolding?.actionHref, '/deepscan')
+  assert.equal(etfHolding?.actionHref, '/etf')
   assert.equal(etnHolding?.actionLabel, 'ETF 분석')
-  assert.equal(etnHolding?.actionHref, '/deepscan')
-  assert.equal(homeHoldings.find((holding) => holding.market === 'ETF')?.actionHref, '/deepscan')
+  assert.equal(etnHolding?.actionHref, '/etf')
+  assert.equal(homeHoldings.find((holding) => holding.market === 'ETF')?.actionHref, '/etf')
 })
