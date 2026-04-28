@@ -96,6 +96,7 @@ test('scoreCommitteeMember surfaces upstream OpenRouter errors', async () => {
       () => scoreCommitteeMember('momentum', { shared: {}, memberDump: {} }, {
         systemPrompt: () => 'prompt',
         logDir,
+        retryCount: 0,
       }),
       /bad upstream/,
     )
@@ -105,6 +106,65 @@ test('scoreCommitteeMember surfaces upstream OpenRouter errors', async () => {
     const failureLog = JSON.parse(readFileSync(join(logDir, 'momentum-failure.json'), 'utf8')) as { error?: string; upstream_result?: { error?: { message?: string } } }
     assert.equal(failureLog.error, 'bad upstream')
     assert.equal(failureLog.upstream_result?.error?.message, 'bad upstream')
+  } finally {
+    rmSync(logDir, { recursive: true, force: true })
+    global.fetch = originalFetch
+    if (originalKey) {
+      process.env.OPENROUTER_API_KEY = originalKey
+    } else {
+      delete process.env.OPENROUTER_API_KEY
+    }
+  }
+})
+
+test('scoreCommitteeMember retries invalid JSON before returning a valid verdict', async () => {
+  const originalFetch = global.fetch
+  const originalKey = process.env.OPENROUTER_API_KEY
+  const logDir = mkdtempSync(join(tmpdir(), 'committee-llm-'))
+  process.env.OPENROUTER_API_KEY = 'test-key'
+
+  let fetchCount = 0
+  global.fetch = (async () => {
+    fetchCount += 1
+    if (fetchCount === 1) {
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: '{not-json' } }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
+    return new Response(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                score: 66,
+                reason: '재시도 후 정상 JSON을 받았어요.',
+                confidence: 'medium',
+              }),
+            },
+          },
+        ],
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )
+  }) as typeof fetch
+
+  try {
+    const result = await scoreCommitteeMember('valuation', { shared: {}, memberDump: {} }, {
+      systemPrompt: () => 'prompt',
+      logDir,
+      emptyResponseRetryDelayMs: 1,
+      retryCount: 3,
+    })
+
+    assert.equal(fetchCount, 2)
+    assert.equal(result.score, 66)
+    assert.equal(result.attempts, 2)
+    assert.equal(result.finalStatus, 'success')
+    const firstFailure = JSON.parse(readFileSync(join(logDir, 'valuation-attempt-1-failure.json'), 'utf8')) as { errorKind?: string }
+    assert.equal(firstFailure.errorKind, 'llm-invalid-json')
   } finally {
     rmSync(logDir, { recursive: true, force: true })
     global.fetch = originalFetch
@@ -168,6 +228,87 @@ test('scoreCommitteeMembers limits parallel OpenRouter requests and records conc
     assert.deepEqual(Object.keys(results).sort(), memberKeys.sort())
     const summary = JSON.parse(readFileSync(join(logDir, '_summary-committee.json'), 'utf8')) as { concurrency?: number }
     assert.equal(summary.concurrency, 2)
+  } finally {
+    rmSync(logDir, { recursive: true, force: true })
+    global.fetch = originalFetch
+    if (originalKey) {
+      process.env.OPENROUTER_API_KEY = originalKey
+    } else {
+      delete process.env.OPENROUTER_API_KEY
+    }
+  }
+})
+
+test('scoreCommitteeMembers exhausts initial attempt plus three retries into structured member errors', async () => {
+  const originalFetch = global.fetch
+  const originalKey = process.env.OPENROUTER_API_KEY
+  const logDir = mkdtempSync(join(tmpdir(), 'committee-llm-'))
+  process.env.OPENROUTER_API_KEY = 'test-key'
+
+  let momentumAttempts = 0
+  global.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(String(init?.body ?? '{}')) as { messages?: Array<{ role?: string; content?: string }> }
+    const userMessage = body.messages?.find((message) => message.role === 'user')
+    const content = userMessage?.content ?? ''
+    if (content.includes('"member":"momentum"')) {
+      momentumAttempts += 1
+      return new Response(
+        JSON.stringify({ choices: [{ message: { content: '' } }] }),
+        { status: 200, headers: { 'Content-Type': 'application/json' } },
+      )
+    }
+
+    return new Response(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                score: 72,
+                reason: '정상 위원 응답입니다.',
+                confidence: 'high',
+              }),
+            },
+          },
+        ],
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )
+  }) as typeof fetch
+
+  try {
+    const { results, errors } = await scoreCommitteeMembers({
+      memberKeys: ['valuation', 'momentum'],
+      shared: { source: 'fixture' },
+      members: {
+        valuation: { member: 'valuation' },
+        momentum: { member: 'momentum' },
+      },
+      options: {
+        concurrency: 1,
+        schemaName: 'jaroo_test_member',
+        title: 'test committee',
+        systemPrompt: (memberKey: string) => `member:${memberKey}`,
+        logDir,
+        emptyResponseRetryDelayMs: 1,
+        retryCount: 3,
+      },
+    })
+
+    assert.equal(momentumAttempts, 4)
+    const typedResults = results as Record<string, { score?: number }>
+    assert.equal(typedResults.valuation?.score, 72)
+    assert.equal(errors.length, 1)
+    assert.equal(errors[0].member, 'momentum')
+    assert.equal(errors[0].errorKind, 'llm-empty-content')
+    assert.equal(errors[0].attempts, 4)
+    assert.equal(errors[0].finalStatus, 'error')
+    assert.equal(errors[0].llmResultPresent, false)
+
+    const summary = JSON.parse(readFileSync(join(logDir, '_summary-committee.json'), 'utf8')) as { errors?: Array<{ member?: string; attempts?: number; errorKind?: string }> }
+    assert.equal(summary.errors?.[0]?.member, 'momentum')
+    assert.equal(summary.errors?.[0]?.attempts, 4)
+    assert.equal(summary.errors?.[0]?.errorKind, 'llm-empty-content')
   } finally {
     rmSync(logDir, { recursive: true, force: true })
     global.fetch = originalFetch

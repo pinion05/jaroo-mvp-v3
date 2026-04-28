@@ -854,11 +854,13 @@ function createCommitteeMember(shortLabel, title, score, reason) {
   return {
     shortLabel,
     title,
+    status: 'success',
     reason,
     score,
     scoreLabel: String(score),
     tone: getScoreTone(score),
     iconTone: getScoreIconTone(score),
+    error: null,
   };
 }
 
@@ -1298,6 +1300,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     const llmSourceRefs = [];
     let llmCommitteeErrors = [];
     let llmCommitteeBlocked = false;
+    let llmCommitteePartialError = false;
     let committeeAxes = createCommitteeAxes(evidence, deterministicScored, sources.packageResult);
     const llmAttempted = isKrInput(input) && shouldInvokeKrCommitteeLlm();
 
@@ -1311,23 +1314,20 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
         note: llmCommittee.requestId,
       }));
 
-      if (Object.keys(llmCommittee.results).length > 0) {
-        const llmCommitteeShape = buildKrCommitteeAxesFromLlmResults(evidence, llmCommittee.results);
-        committeeAxes = llmCommitteeShape.axes;
+      const llmCommitteeShape = buildKrCommitteeAxesFromLlmResults(evidence, llmCommittee.results, llmCommittee.errors);
+      committeeAxes = llmCommitteeShape.axes;
+      llmCommitteePartialError = llmCommitteeShape.hasMemberErrors === true;
+      if (!llmCommitteePartialError && llmCommitteeShape.committeeScores) {
         scored = scoreDeepScanKrFromCommittee(evidence, llmCommitteeShape.committeeScores);
-        llmCommitteeBlocked = Object.values(llmCommitteeShape.coverage).some((axis) => axis.omitted === true);
-      } else {
-        committeeAxes = [];
-        llmCommitteeBlocked = true;
       }
     }
 
     const combinedSourceRefs = [...evidenceSourceRefs, ...llmSourceRefs];
-    const llmFallback = llmCommitteeErrors.length > 0 || llmCommitteeBlocked
+    const llmFallback = llmCommitteeErrors.length > 0 || llmCommitteeBlocked || llmCommitteePartialError
       ? {
           used: true,
-          reason: llmCommitteeBlocked ? 'kr-committee-coverage-blocked' : 'weak-data-degradation',
-          label: llmCommitteeBlocked ? '일부 KR 위원 축 근거가 부족합니다.' : `일부 KR 위원 실패 ${llmCommitteeErrors.length}건`,
+          reason: llmCommitteePartialError ? 'kr-committee-member-errors' : llmCommitteeBlocked ? 'kr-committee-coverage-blocked' : 'weak-data-degradation',
+          label: llmCommitteePartialError ? `일부 KR 위원 응답 실패 ${llmCommitteeErrors.length}건` : llmCommitteeBlocked ? '일부 KR 위원 축 근거가 부족합니다.' : `일부 KR 위원 실패 ${llmCommitteeErrors.length}건`,
         }
       : null;
     const blockFallback = llmFallback ?? createEvidenceFallback(evidence, sourceIssues);
@@ -1359,12 +1359,12 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
             }),
           })
         : createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'hero', combinedSourceRefs), fallback: blockFallback })),
-      headline: llmCommitteeBlocked ? `${input.instrument.name} KR DeepScan 위원회 재시도 필요` : `${input.instrument.name} KR DeepScan ${scored.hero.score}점`,
-      body: llmCommitteeBlocked ? 'KR committee axis coverage가 부족해 상위 점수를 계산하지 않았습니다.' : heroBodyParts.join(' · '),
-      statusText: llmCommitteeBlocked ? '재시도 필요' : scored.hero.statusText,
-      score: llmCommitteeBlocked ? 0 : scored.hero.score,
-      scoreLabel: llmCommitteeBlocked ? 'N/A' : `${scored.hero.scoreLabel} · ${scored.hero.score} / 100`,
-      scoreDelta: llmCommitteeBlocked ? '0' : (scored.hero.penalties.length > 0 ? `-${scored.hero.penalties.length}` : '+0'),
+      headline: llmCommitteeBlocked || llmCommitteePartialError ? `${input.instrument.name} KR DeepScan 위원회 재시도 필요` : `${input.instrument.name} KR DeepScan ${scored.hero.score}점`,
+      body: llmCommitteeBlocked || llmCommitteePartialError ? '일부 KR committee member가 LLM 응답 확보에 실패해 축/종합 점수를 보류했습니다. 성공한 위원 판단과 실패 슬롯을 함께 확인하세요.' : heroBodyParts.join(' · '),
+      statusText: llmCommitteeBlocked || llmCommitteePartialError ? '부분 오류' : scored.hero.statusText,
+      score: llmCommitteeBlocked || llmCommitteePartialError ? 0 : scored.hero.score,
+      scoreLabel: llmCommitteeBlocked || llmCommitteePartialError ? 'N/A' : `${scored.hero.scoreLabel} · ${scored.hero.score} / 100`,
+      scoreDelta: llmCommitteeBlocked || llmCommitteePartialError ? '재시도 필요' : (scored.hero.penalties.length > 0 ? `-${scored.hero.penalties.length}` : '+0'),
     };
     const blocks = {
       hero,
@@ -1463,7 +1463,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
       metadata: {
         generatedAt,
         version: DEEP_SCAN_VERSION,
-        degraded: blockFallback !== null || llmCommitteeErrors.length > 0 || llmCommitteeBlocked,
+        degraded: blockFallback !== null || llmCommitteeErrors.length > 0 || llmCommitteeBlocked || llmCommitteePartialError,
         debugId: createDebugId(input),
         inputValidity: {
           valid: true,

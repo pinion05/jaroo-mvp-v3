@@ -58,7 +58,9 @@ test('scoreUsCommitteeMember sends strict OpenRouter schema request and parses J
 test('scoreUsCommitteeMember surfaces upstream OpenRouter errors', async () => {
   const originalFetch = global.fetch
   const originalKey = process.env.OPENROUTER_API_KEY
+  const originalRetryCount = process.env.DEEPSCAN_LLM_RETRY_COUNT
   process.env.OPENROUTER_API_KEY = 'test-key'
+  process.env.DEEPSCAN_LLM_RETRY_COUNT = '0'
 
   global.fetch = (async () => new Response(
     JSON.stringify({ error: { message: 'bad upstream', code: 502 } }),
@@ -76,6 +78,11 @@ test('scoreUsCommitteeMember surfaces upstream OpenRouter errors', async () => {
       process.env.OPENROUTER_API_KEY = originalKey
     } else {
       delete process.env.OPENROUTER_API_KEY
+    }
+    if (originalRetryCount) {
+      process.env.DEEPSCAN_LLM_RETRY_COUNT = originalRetryCount
+    } else {
+      delete process.env.DEEPSCAN_LLM_RETRY_COUNT
     }
   }
 })

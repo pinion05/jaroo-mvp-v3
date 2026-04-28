@@ -612,11 +612,14 @@ function toMember(agent: DeepScanAgentResult): JarooDeepScanCommitteeMember {
   return {
     shortLabel: agent.shortLabel,
     title: agent.label,
+    status: 'success',
     reason: agent.reason,
     score: agent.score,
     scoreLabel: `${agent.score}점`,
     tone: memberTone(agent),
     iconTone: agent.iconTone,
+    confidence: agent.confidence,
+    error: null,
   }
 }
 

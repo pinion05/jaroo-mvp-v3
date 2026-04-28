@@ -6,6 +6,16 @@ export type DeepScanSourceType = (typeof DEEP_SCAN_SOURCE_TYPES)[number]
 
 export type JarooDeepScanCommitteeMemberTone = 'positive' | 'neutral' | 'warning'
 export type JarooDeepScanCommitteeMemberIconTone = 'blue' | 'green' | 'amber' | 'red' | 'purple' | 'teal'
+export type JarooDeepScanCommitteeMemberStatus = 'success' | 'error'
+export type JarooDeepScanCommitteeMemberErrorKind =
+  | 'llm-empty-content'
+  | 'llm-null-content'
+  | 'llm-invalid-json'
+  | 'llm-invalid-schema'
+  | 'llm-upstream-error'
+  | 'llm-timeout-or-network'
+  | 'runtime-missing-dump'
+  | 'llm-unknown'
 export type JarooDeepScanSellNowTagTone = 'positive' | 'danger'
 export type JarooDeepScanSellNowValueTone = 'danger'
 
@@ -78,16 +88,24 @@ export type JarooDeepScanInput = {
 export type JarooDeepScanCommitteeMember = {
   shortLabel: string
   title: string
-  reason: string
-  score: number
+  status: JarooDeepScanCommitteeMemberStatus
+  reason: string | null
+  score: number | null
   scoreLabel: string
   tone: JarooDeepScanCommitteeMemberTone
   iconTone: JarooDeepScanCommitteeMemberIconTone
+  confidence?: 'low' | 'medium' | 'high'
+  error?: {
+    kind: JarooDeepScanCommitteeMemberErrorKind
+    message: string
+    attempts: number
+    retryable?: boolean
+  } | null
 }
 
 export type JarooDeepScanCommitteeAxis = {
   label: string
-  score: number
+  score: number | null
   scoreText: string
   axisStatusText: string
   subtitle: string
