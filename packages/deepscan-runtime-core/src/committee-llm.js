@@ -348,8 +348,9 @@ export async function scoreCommitteeMember(memberKey, dumps, options = {}) {
 
   const maxAttempts = runtimeOptions.retryCount + 1
 
-  for (let attempt = 0; attempt < maxAttempts; attempt += 1) {
-    const attemptNumber = attempt + 1
+  let attemptNumber = 0
+  while (true) {
+    attemptNumber += 1
     try {
       const attemptResult = await requestCommitteeAttempt(memberKey, dumps, runtimeOptions, attemptNumber)
       const { upstreamResponse, result, rawContent, parsed, elapsedMs } = attemptResult
@@ -435,8 +436,6 @@ export async function scoreCommitteeMember(memberKey, dumps, options = {}) {
       throw committeeError
     }
   }
-
-  throw new Error(`OpenRouter retry loop exhausted for ${memberKey}`)
 }
 
 export async function scoreCommitteeMembers({ memberKeys, shared, members, options = {} }) {
