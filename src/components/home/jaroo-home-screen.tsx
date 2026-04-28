@@ -23,8 +23,8 @@ import {
   fetchHomeQuoteResponseWithTimeout,
   HOME_QUOTE_FETCH_TIMEOUT_MS,
   resolveUsdKrwRateAfterFailedQuoteResponse,
-  shouldSkipHomeQuoteHydration,
 } from '@/lib/home-quote-bootstrap'
+import { shouldHydrateHomeQuotes } from '@/lib/home-quote-refresh'
 import { persistSelectedEtfTarget } from '@/lib/jaroo-etf-selected'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
@@ -499,7 +499,6 @@ export function JarooHomeScreen() {
   const portfolioItems = usePortfolioStore((state) => state.items)
   const quoteStatus = usePortfolioStore((state) => state.quoteStatus)
   const quoteErrorMessage = usePortfolioStore((state) => state.quoteErrorMessage)
-  const quoteQueryKey = usePortfolioStore((state) => state.quoteQueryKey)
   const replacePortfolioItems = usePortfolioStore((state) => state.replaceItems)
   const setQuoteStatus = usePortfolioStore((state) => state.setQuoteStatus)
   const patchQuote = usePortfolioStore((state) => state.patchQuote)
@@ -531,8 +530,6 @@ export function JarooHomeScreen() {
   const rawHomeHoldings = useMemo(() => buildHomeHoldingsFromPortfolioItems(portfolioItems), [portfolioItems])
   const portfolioBaseItemsRef = useRef(portfolioBaseItems)
   const rawHomeHoldingsRef = useRef(rawHomeHoldings)
-  const quoteStatusRef = useRef(quoteStatus)
-  const quoteQueryKeyRef = useRef(quoteQueryKey)
   const quoteQuery = useMemo(() => buildHomeCurrentQuoteQuery(rawHomeHoldings), [rawHomeHoldings])
   const quoteSurfaceEnabled = hasPortfolioItems && Boolean(quoteQuery)
   const quoteRunKey = `${portfolioSignature}::${quoteQuery}::${refreshVersion}`
@@ -577,23 +574,18 @@ export function JarooHomeScreen() {
   }, [portfolioBaseItems, rawHomeHoldings])
 
   useEffect(() => {
-    quoteStatusRef.current = quoteStatus
-  }, [quoteStatus])
+    // Read request-owned quote status/query metadata as a snapshot. Subscribing
+    // this effect to those store fields would make setQuoteStatus('loading' |
+    // 'success') clean up the active request and start the same manual refresh
+    // cycle again.
+    const currentQuoteState = usePortfolioStore.getState()
 
-  useEffect(() => {
-    quoteQueryKeyRef.current = quoteQueryKey
-  }, [quoteQueryKey])
-
-  useEffect(() => {
-    if (!quoteSurfaceEnabled) {
-      return
-    }
-
-    if (shouldSkipHomeQuoteHydration({
-      refreshVersion,
-      quoteQueryKey: quoteQueryKeyRef.current,
+    if (!shouldHydrateHomeQuotes({
+      quoteSurfaceEnabled,
       quoteQuery,
-      quoteStatus: quoteStatusRef.current,
+      quoteQueryKey: currentQuoteState.quoteQueryKey,
+      quoteStatus: currentQuoteState.quoteStatus,
+      refreshVersion,
     })) {
       return
     }
