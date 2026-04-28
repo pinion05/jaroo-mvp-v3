@@ -11,6 +11,19 @@ import {
   type CurrentQuoteItem,
 } from './home-current-quotes'
 
+export const HOME_QUOTE_FETCH_TIMEOUT_MS = 4500
+
+export class HomeQuoteTimeoutError extends Error {
+  constructor(message = 'Home quote request timed out') {
+    super(message)
+    this.name = 'HomeQuoteTimeoutError'
+  }
+}
+
+type HomeQuoteBootstrapOptions = {
+  quoteTimeoutMs?: number
+}
+
 type QuoteBootstrapResult = {
   items: PortfolioNormalizedItem[]
   quoteQuery: string
@@ -18,12 +31,51 @@ type QuoteBootstrapResult = {
   quoteErrorMessage: string | null
 }
 
+export async function fetchHomeQuoteResponseWithTimeout(
+  fetcher: typeof fetch,
+  input: RequestInfo | URL,
+  init: RequestInit = {},
+  timeoutMs = HOME_QUOTE_FETCH_TIMEOUT_MS,
+): Promise<Response> {
+  const externalSignal = init.signal
+  const abortController = new AbortController()
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+  if (externalSignal?.aborted) {
+    abortController.abort()
+  }
+
+  const handleExternalAbort = () => abortController.abort()
+  externalSignal?.addEventListener('abort', handleExternalAbort, { once: true })
+
+  try {
+    const timeoutPromise = new Promise<never>((_, reject) => {
+      timeoutId = setTimeout(() => {
+        abortController.abort()
+        reject(new HomeQuoteTimeoutError())
+      }, timeoutMs)
+    })
+
+    return await Promise.race([
+      fetcher(input, { ...init, signal: abortController.signal }),
+      timeoutPromise,
+    ])
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+    externalSignal?.removeEventListener('abort', handleExternalAbort)
+  }
+}
+
 export async function hydratePortfolioItemsWithCurrentQuotes(
   portfolioItems: PortfolioNormalizedItem[],
   fetcher: typeof fetch = fetch,
+  options: HomeQuoteBootstrapOptions = {},
 ): Promise<QuoteBootstrapResult> {
   const rawHomeHoldings = buildHomeHoldingsFromPortfolioItems(portfolioItems)
   const quoteQuery = buildHomeCurrentQuoteQuery(rawHomeHoldings)
+  const quoteTimeoutMs = options.quoteTimeoutMs ?? HOME_QUOTE_FETCH_TIMEOUT_MS
 
   if (!quoteQuery) {
     return {
@@ -39,7 +91,7 @@ export async function hydratePortfolioItemsWithCurrentQuotes(
     hasUsHomeHoldings
       ? (async () => {
           try {
-            const response = await fetcher('/api/market/fx/usd-krw', { cache: 'no-store' })
+            const response = await fetchHomeQuoteResponseWithTimeout(fetcher, '/api/market/fx/usd-krw', { cache: 'no-store' }, quoteTimeoutMs)
             const payload = await response.json()
             const parsedRate = Number(payload?.data?.rate)
             return response.ok && Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : null
@@ -49,23 +101,22 @@ export async function hydratePortfolioItemsWithCurrentQuotes(
         })()
       : Promise.resolve(null),
     (async () => {
-      const response = await fetcher(`/api/quotes/current?${quoteQuery}`, { cache: 'no-store' })
-      const payload = await response.json()
-      return { response, payload }
+      try {
+        const response = await fetchHomeQuoteResponseWithTimeout(fetcher, `/api/quotes/current?${quoteQuery}`, { cache: 'no-store' }, quoteTimeoutMs)
+        const payload = await response.json()
+        return { response, payload }
+      } catch {
+        return null
+      }
     })(),
   ])
 
-  if (!quoteResult.response.ok) {
+  if (!quoteResult?.response.ok) {
     return {
-      items: portfolioItems.map((item) => ({
-        ...item,
-        currentPrice: undefined,
-        currentProfitRate: undefined,
-        currentPriceCurrency: undefined,
-      })),
+      items: portfolioItems,
       quoteQuery,
       quoteStatus: 'error',
-      quoteErrorMessage: '현재 시세를 불러오지 못했어요. 다시 시도해주세요.',
+      quoteErrorMessage: '현재 시세 응답이 지연되어 기존 시세로 표시 중이에요. 다시 시도해주세요.',
     }
   }
 
@@ -106,12 +157,7 @@ export async function hydratePortfolioItemsWithCurrentQuotes(
       if (shouldTreatQuoteFailureAsErrorCard(homeHolding, 'quote-unavailable')) {
         failureCount += 1
       }
-      return {
-        ...item,
-        currentPrice: undefined,
-        currentProfitRate: undefined,
-        currentPriceCurrency: undefined,
-      }
+      return item
     }
 
     const quoteCurrency: 'KRW' | 'USD' = quoteItem.currency === 'USD' || homeHolding.marketTone === 'nasdaq' ? 'USD' : 'KRW'
@@ -120,12 +166,7 @@ export async function hydratePortfolioItemsWithCurrentQuotes(
 
     if (requiresFx && fxResult === null) {
       failureCount += 1
-      return {
-        ...item,
-        currentPrice: undefined,
-        currentProfitRate: undefined,
-        currentPriceCurrency: undefined,
-      }
+      return item
     }
 
     const enrichedHolding = nextHoldingsById.get(homeHolding.id)

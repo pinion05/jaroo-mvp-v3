@@ -43,7 +43,7 @@ test('hydratePortfolioItemsWithCurrentQuotes patches quote fields for successful
   assert.equal(result.items[0]?.currentProfitRate, 6.3)
 })
 
-test('hydratePortfolioItemsWithCurrentQuotes returns error and clears quote fields when quote fetch fails', async () => {
+test('hydratePortfolioItemsWithCurrentQuotes returns error but preserves stale quote fields when quote fetch fails', async () => {
   const result = await hydratePortfolioItemsWithCurrentQuotes(
     [createPortfolioItem({ currentPrice: 85000, currentProfitRate: 6.3, currentPriceCurrency: 'KRW' })],
     async () => new Response(JSON.stringify({ error: { message: 'down' } }), { status: 500 }),
@@ -51,7 +51,23 @@ test('hydratePortfolioItemsWithCurrentQuotes returns error and clears quote fiel
 
   assert.equal(result.quoteStatus, 'error')
   assert.match(result.quoteErrorMessage ?? '', /현재 시세/)
-  assert.equal(result.items[0]?.currentPrice, undefined)
-  assert.equal(result.items[0]?.currentProfitRate, undefined)
-  assert.equal(result.items[0]?.currentPriceCurrency, undefined)
+  assert.equal(result.items[0]?.currentPrice, 85000)
+  assert.equal(result.items[0]?.currentProfitRate, 6.3)
+  assert.equal(result.items[0]?.currentPriceCurrency, 'KRW')
+})
+
+test('hydratePortfolioItemsWithCurrentQuotes times out slow quote fetches and keeps stale quote fields', async () => {
+  const staleItem = createPortfolioItem({ currentPrice: 85000, currentProfitRate: 6.3, currentPriceCurrency: 'KRW' })
+
+  const result = await hydratePortfolioItemsWithCurrentQuotes(
+    [staleItem],
+    async () => new Promise<Response>(() => {
+      // Keep pending until the helper-level timeout aborts the request.
+    }),
+    { quoteTimeoutMs: 5 },
+  )
+
+  assert.equal(result.quoteStatus, 'error')
+  assert.match(result.quoteErrorMessage ?? '', /지연/)
+  assert.equal(result.items[0], staleItem)
 })
