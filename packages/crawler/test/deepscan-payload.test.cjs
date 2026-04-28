@@ -113,6 +113,74 @@ function createStrongKrSources() {
   };
 }
 
+function createKrFactsOnlySources() {
+  const fact = (value, extras = {}) => ({
+    value,
+    availability: extras.availability ?? 'present',
+    source: extras.source ?? { provider: 'fixture' },
+    ...(extras.asOf ? { asOf: extras.asOf } : {}),
+  });
+
+  return {
+    slim: {
+      schemaVersion: 'wisereport-kr-slim-v1.2',
+      market: 'KR',
+      code: '100840',
+      company: {
+        code: '100840',
+        name: 'SNT에너지',
+        market: 'KOSPI',
+      },
+      pages: {},
+      krFacts: {
+        quote: {
+          currentPrice: fact(10000, { source: { provider: 'krx' }, asOf: '2026-04-24' }),
+          currency: fact('KRW'),
+          asOf: fact('2026-04-24'),
+        },
+        consensus: {
+          targetPrice: fact(12000),
+          previousTargetPrice: fact(11000),
+          targetRevisionPct: fact(9.09),
+          recommendation: fact('BUY'),
+        },
+        profitability: {
+          revenueLatest: fact(1710),
+          operatingIncomeLatest: fact(132.8),
+          operatingIncomeYoY: fact(273),
+          netIncomeLatest: fact(125),
+          roe: fact(5.2),
+        },
+        valuation: {
+          per: fact(10),
+          pbr: fact(0.54),
+          roe: fact(5.2),
+        },
+        ownership: {
+          majorHolderPct: fact(52.32),
+          freeFloatPct: fact(43.23),
+          knownInstitutionalMajorHolders: fact([{ name: '국민연금공단', pct: 5.18 }]),
+        },
+        investorFlow: {
+          foreignOwnershipPct: fact(2.73, { asOf: '2026-04-24' }),
+          institutionalOwnershipPct: fact(5.18),
+          assetManagerOwnershipPctSum: fact(2.27, { availability: 'partial' }),
+          assetManagerHoldings: fact([{ name: '삼성자산운용', listedSharePct: 1.2 }], { availability: 'partial' }),
+        },
+        reports: {
+          totalCount: fact(4),
+          recent30dCount: fact(2),
+          latestReportDate: fact('2026-04-23'),
+          recentItems: fact([{ title: 'report-1', date: '2026-04-23' }]),
+        },
+        styleFactors: {
+          factors: fact([{ name: '베타', value: -0.23, peerValue: -0.89 }]),
+        },
+      },
+    },
+  };
+}
+
 function collectStrings(value, bucket = []) {
   if (typeof value === 'string') {
     bucket.push(value);
@@ -234,6 +302,43 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
 
   const allStrings = collectStrings(payload).join('\n');
   assert.doesNotMatch(allStrings, /baseline|placeholder|deterministic placeholder|integration pending/i);
+
+  for (const key of MAJOR_BLOCK_KEYS) {
+    assertBlockMeta(payload[key], 'ok');
+    assert.equal(payload.metadata.blockStatus[key], 'ok');
+  }
+});
+
+test('buildJarooDeepScanPayload consumes KR slim v1.2 krFacts without raw report pages', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+
+  const payload = await buildJarooDeepScanPayload({
+    instrument: {
+      name: 'SNT에너지',
+      code: '100840',
+      market: 'KR',
+    },
+    holding: {
+      shares: '10',
+      averagePrice: '8000',
+    },
+    selectedAt: '2026-04-24T00:00:00.000Z',
+    sources: createKrFactsOnlySources(),
+  });
+
+  assertCanonicalPayloadShape(payload);
+  assert.equal(payload.metadata.degraded, false);
+  assert.equal(payload.metadata.sourceRefs.some((ref) => /krFacts:v1\.2/.test(ref.note ?? '')), true);
+  assert.equal(payload.insights.summaryTags[1], 'facts:v1.2');
+  assert.match(payload.hero.body, /KR slim v1\.2 facts 확보/);
+  assert.match(payload.hero.body, /현재가 10000 KRW 확인/);
+  assert.equal(payload.strategy.currentPriceText, '10000 KRW');
+  assert.equal(payload.strategy.targetPriceText, '컨센서스/패키지 보조 근거 확인');
+  assert.match(payload.sellNow.realizedText, /즉시 매도 판단은/);
+
+  const allStrings = collectStrings(payload).join('\n');
+  assert.doesNotMatch(allStrings, /목표가 근거 없음/);
+  assert.doesNotMatch(allStrings, /KR 리포트 페이지 근거 없음/);
 
   for (const key of MAJOR_BLOCK_KEYS) {
     assertBlockMeta(payload[key], 'ok');

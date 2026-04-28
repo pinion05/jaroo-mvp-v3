@@ -157,6 +157,199 @@ function hasEvidence(value) {
   return Boolean(value);
 }
 
+
+function readKrFactValue(group, key) {
+  const fact = group && typeof group === 'object' && !Array.isArray(group) ? group[key] : null;
+  if (!fact || typeof fact !== 'object' || Array.isArray(fact)) {
+    return hasEvidence(fact) ? fact : null;
+  }
+
+  const availability = normalizeText(fact.availability)?.toLowerCase();
+  if (availability === 'missing' || availability === 'not_applicable' || availability === 'error') {
+    return null;
+  }
+
+  return hasEvidence(fact.value) ? fact.value : null;
+}
+
+function readKrFactAsOf(group, key) {
+  const fact = group && typeof group === 'object' && !Array.isArray(group) ? group[key] : null;
+  return normalizeText(fact?.asOf);
+}
+
+function hasKrFactsEvidence(krFacts) {
+  const factGroups = ['quote', 'consensus', 'profitability', 'valuation', 'ownership', 'investorFlow', 'reports', 'styleFactors'];
+  return factGroups.some((groupKey) => {
+    const group = asObject(krFacts?.[groupKey]);
+    return Object.keys(group).some((factKey) => hasEvidence(readKrFactValue(group, factKey)));
+  });
+}
+
+function buildQuoteFromKrFacts(krFacts) {
+  const quoteFacts = asObject(krFacts?.quote);
+  const price = normalizeNumber(readKrFactValue(quoteFacts, 'currentPrice'));
+  if (price === null) {
+    return null;
+  }
+
+  return {
+    price,
+    currency: normalizeText(readKrFactValue(quoteFacts, 'currency')) ?? 'KRW',
+    asOf: normalizeText(readKrFactValue(quoteFacts, 'asOf')) ?? readKrFactAsOf(quoteFacts, 'currentPrice'),
+    source: normalizeText(quoteFacts.currentPrice?.source?.provider) ?? 'krFacts',
+    status: 'ok',
+  };
+}
+
+function overlayConsensusSnapshotFromKrFacts(pageSnapshot, krFacts, currentPrice) {
+  const consensusFacts = asObject(krFacts?.consensus);
+  const targetPrice = pickFirst(normalizeNumber(readKrFactValue(consensusFacts, 'targetPrice')), pageSnapshot.targetPrice);
+  const previousTargetPrice = pickFirst(normalizeNumber(readKrFactValue(consensusFacts, 'previousTargetPrice')), pageSnapshot.previousTargetPrice);
+  const revisionPct = pickFirst(
+    normalizePercent(readKrFactValue(consensusFacts, 'targetRevisionPct')),
+    pageSnapshot.revisionPct,
+    previousTargetPrice !== null && targetPrice !== null && previousTargetPrice !== 0
+      ? ((targetPrice - previousTargetPrice) / Math.abs(previousTargetPrice)) * 100
+      : null,
+  );
+  const recommendationValue = readKrFactValue(consensusFacts, 'recommendation');
+  const recommendationScore = normalizeNumber(recommendationValue);
+  const recommendation = typeof recommendationValue === 'string' ? normalizeText(recommendationValue) : pageSnapshot.recommendation;
+
+  return {
+    targetPrice,
+    previousTargetPrice,
+    targetGapPct: pickFirst(
+      normalizePercent(readKrFactValue(consensusFacts, 'targetGapPct')),
+      currentPrice !== null && targetPrice !== null && currentPrice !== 0
+        ? ((targetPrice - currentPrice) / currentPrice) * 100
+        : null,
+      pageSnapshot.targetGapPct,
+    ),
+    recommendation,
+    recommendationScore: pickFirst(recommendationScore, pageSnapshot.recommendationScore),
+    recommendationCounts: pageSnapshot.recommendationCounts,
+    revisionDirection: resolveRevisionDirection(revisionPct),
+    revisionPct,
+  };
+}
+
+function overlayValuationSnapshotFromKrFacts(pageSnapshot, krFacts) {
+  const valuationFacts = asObject(krFacts?.valuation);
+  const profitabilityFacts = asObject(krFacts?.profitability);
+  return {
+    per: pickFirst(normalizeNumber(readKrFactValue(valuationFacts, 'per')), pageSnapshot.per),
+    pbr: pickFirst(normalizeNumber(readKrFactValue(valuationFacts, 'pbr')), pageSnapshot.pbr),
+    roe: pickFirst(
+      normalizeNumber(readKrFactValue(valuationFacts, 'roe')),
+      normalizeNumber(readKrFactValue(profitabilityFacts, 'roe')),
+      pageSnapshot.roe,
+    ),
+    evEbitda: pickFirst(normalizeNumber(readKrFactValue(valuationFacts, 'evEbitda')), pageSnapshot.evEbitda),
+  };
+}
+
+function overlayFinancialSnapshotFromKrFacts(pageSnapshot, krFacts) {
+  const profitabilityFacts = asObject(krFacts?.profitability);
+  return {
+    revenueLatest: pickFirst(normalizeNumber(readKrFactValue(profitabilityFacts, 'revenueLatest')), pageSnapshot.revenueLatest),
+    revenuePrev: pickFirst(normalizeNumber(readKrFactValue(profitabilityFacts, 'revenuePrev')), pageSnapshot.revenuePrev),
+    revenueYoY: pickFirst(normalizePercent(readKrFactValue(profitabilityFacts, 'revenueYoY')), pageSnapshot.revenueYoY),
+    operatingIncomeLatest: pickFirst(normalizeNumber(readKrFactValue(profitabilityFacts, 'operatingIncomeLatest')), pageSnapshot.operatingIncomeLatest),
+    operatingIncomePrev: pickFirst(normalizeNumber(readKrFactValue(profitabilityFacts, 'operatingIncomePrev')), pageSnapshot.operatingIncomePrev),
+    operatingIncomeYoY: pickFirst(normalizePercent(readKrFactValue(profitabilityFacts, 'operatingIncomeYoY')), pageSnapshot.operatingIncomeYoY),
+    netIncomeLatest: pickFirst(normalizeNumber(readKrFactValue(profitabilityFacts, 'netIncomeLatest')), pageSnapshot.netIncomeLatest),
+    netIncomePrev: pickFirst(normalizeNumber(readKrFactValue(profitabilityFacts, 'netIncomePrev')), pageSnapshot.netIncomePrev),
+    netIncomeYoY: pickFirst(normalizePercent(readKrFactValue(profitabilityFacts, 'netIncomeYoY')), pageSnapshot.netIncomeYoY),
+    operatingMarginLatest: pickFirst(normalizePercent(readKrFactValue(profitabilityFacts, 'operatingMarginLatest')), pageSnapshot.operatingMarginLatest),
+    netMarginLatest: pickFirst(normalizePercent(readKrFactValue(profitabilityFacts, 'netMarginLatest')), pageSnapshot.netMarginLatest),
+  };
+}
+
+function overlayStyleAnalysisSnapshotFromKrFacts(pageSnapshot, krFacts) {
+  const styleFacts = asObject(krFacts?.styleFactors);
+  const companyName = pickFirst(normalizeText(readKrFactValue(styleFacts, 'companyName')), pageSnapshot.companyName);
+  const peerName = pickFirst(normalizeText(readKrFactValue(styleFacts, 'peerName')), pageSnapshot.peerName);
+  const snapshot = {
+    ...pageSnapshot,
+    factorScores: pickFirst(readKrFactValue(styleFacts, 'factors'), pageSnapshot.factorScores),
+  };
+
+  if (companyName !== null || Object.prototype.hasOwnProperty.call(pageSnapshot, 'companyName')) {
+    snapshot.companyName = companyName;
+  }
+  if (peerName !== null || Object.prototype.hasOwnProperty.call(pageSnapshot, 'peerName')) {
+    snapshot.peerName = peerName;
+  }
+
+  return snapshot;
+}
+
+function overlayOwnershipSnapshotFromKrFacts(pageSnapshot, krFacts) {
+  const ownershipFacts = asObject(krFacts?.ownership);
+  const investorFacts = asObject(krFacts?.investorFlow);
+  const foreignOwnershipPct = pickFirst(normalizePercent(readKrFactValue(investorFacts, 'foreignOwnershipPct')), pageSnapshot.foreignOwnershipPct);
+  const institutionalOwnershipPct = pickFirst(normalizePercent(readKrFactValue(investorFacts, 'institutionalOwnershipPct')), pageSnapshot.institutionalOwnershipPct);
+  const foreignOwnershipHistory = pickFirst(readKrFactValue(investorFacts, 'foreignOwnershipHistory'), pageSnapshot.foreignOwnershipHistory);
+  const assetManagerHoldings = pickFirst(readKrFactValue(investorFacts, 'assetManagerHoldings'), pageSnapshot.assetManagerHoldings);
+  const assetManagerOwnershipPctSum = pickFirst(normalizePercent(readKrFactValue(investorFacts, 'assetManagerOwnershipPctSum')), pageSnapshot.assetManagerOwnershipPctSum);
+  const sourceLimitations = (Array.isArray(pageSnapshot.sourceLimitations) ? pageSnapshot.sourceLimitations : [])
+    .filter((limitation) => !(limitation.fact === 'foreignOwnershipPct' && foreignOwnershipPct !== null))
+    .filter((limitation) => !(limitation.fact === 'institutionalOwnershipPct' && institutionalOwnershipPct !== null));
+
+  return {
+    ...pageSnapshot,
+    majorHolderPct: pickFirst(normalizePercent(readKrFactValue(ownershipFacts, 'majorHolderPct')), pageSnapshot.majorHolderPct),
+    majorHolderShares: pickFirst(normalizeShareCount(readKrFactValue(ownershipFacts, 'majorHolderShares')), pageSnapshot.majorHolderShares),
+    fivePctHolderPct: pickFirst(normalizePercent(readKrFactValue(ownershipFacts, 'fivePctHolderPct')), pageSnapshot.fivePctHolderPct),
+    fivePctHolderShares: pickFirst(normalizeShareCount(readKrFactValue(ownershipFacts, 'fivePctHolderShares')), pageSnapshot.fivePctHolderShares),
+    freeFloatPct: pickFirst(normalizePercent(readKrFactValue(ownershipFacts, 'freeFloatPct')), pageSnapshot.freeFloatPct),
+    freeFloatShares: pickFirst(normalizeShareCount(readKrFactValue(ownershipFacts, 'freeFloatShares')), pageSnapshot.freeFloatShares),
+    foreignOwnershipPct,
+    foreignOwnershipAsOf: pickFirst(readKrFactAsOf(investorFacts, 'foreignOwnershipPct'), pageSnapshot.foreignOwnershipAsOf),
+    foreignOwnershipHistory: Array.isArray(foreignOwnershipHistory) ? foreignOwnershipHistory : pageSnapshot.foreignOwnershipHistory,
+    institutionalOwnershipPct,
+    majorShareholders: pickFirst(readKrFactValue(ownershipFacts, 'majorShareholders'), pageSnapshot.majorShareholders),
+    knownInstitutionalMajorHolders: pickFirst(readKrFactValue(ownershipFacts, 'knownInstitutionalMajorHolders'), pageSnapshot.knownInstitutionalMajorHolders),
+    assetManagerHoldings: Array.isArray(assetManagerHoldings) ? assetManagerHoldings : pageSnapshot.assetManagerHoldings,
+    assetManagerOwnershipPctSum,
+    shareholderCategories: pickFirst(readKrFactValue(investorFacts, 'shareholderCategories'), pageSnapshot.shareholderCategories),
+    sourceLimitations,
+  };
+}
+
+function buildReportSignalsFromKrFacts(pageSignals, krFacts) {
+  const consensusFacts = asObject(krFacts?.consensus);
+  const reportFacts = asObject(krFacts?.reports);
+  const styleFacts = asObject(krFacts?.styleFactors);
+  const recentReportCount = pickFirst(normalizeNumber(readKrFactValue(reportFacts, 'totalCount')), pageSignals.recentReportCount);
+  const recent30dReportCount = pickFirst(normalizeNumber(readKrFactValue(reportFacts, 'recent30dCount')), pageSignals.recent30dReportCount);
+  const recentItems = readKrFactValue(reportFacts, 'recentItems');
+  const hasConsensusFacts = hasEvidence(readKrFactValue(consensusFacts, 'targetPrice'))
+    || hasEvidence(readKrFactValue(consensusFacts, 'targetRevisionPct'))
+    || hasEvidence(readKrFactValue(consensusFacts, 'targetGapPct'));
+  const hasOpinionFacts = hasEvidence(readKrFactValue(consensusFacts, 'recommendation'))
+    || hasEvidence(readKrFactValue(consensusFacts, 'analystOpinionRows'));
+  const hasStyleFacts = hasEvidence(readKrFactValue(styleFacts, 'factors'));
+
+  return {
+    ...pageSignals,
+    consensusAvailable: pageSignals.consensusAvailable || hasConsensusFacts,
+    opinionAvailable: pageSignals.opinionAvailable || hasOpinionFacts,
+    recentReportsAvailable: pageSignals.recentReportsAvailable || (recentReportCount !== null ? recentReportCount > 0 : hasEvidence(recentItems)),
+    styleAnalysisAvailable: pageSignals.styleAnalysisAvailable || hasStyleFacts,
+    recentReportCount,
+    recent30dReportCount,
+  };
+}
+
+function readReportAsOfFromKrFacts(krFacts) {
+  const reportFacts = asObject(krFacts?.reports);
+  return normalizeDate(readKrFactValue(reportFacts, 'latestReportDate'))
+    ?? normalizeDate(readKrFactAsOf(reportFacts, 'latestReportDate'))
+    ?? null;
+}
+
 function resolveKnownPageIds(slimSource, slimPages) {
   const schemaVersion = normalizeText(slimSource?.schemaVersion);
   const declaredTotalPages = slimSource?.sourceCoverage?.pageCoverage?.totalKnownPages;
@@ -1057,7 +1250,7 @@ function countRecentReportsWithinDays(page, asOf, days) {
   return datedRows === 0 ? null : count;
 }
 
-function buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals }) {
+function buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals, hasKrFacts }) {
   const facts = [];
 
   if (currentQuote) {
@@ -1075,6 +1268,8 @@ function buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals }) {
 
   if (pageCoverage.availableCount > 0) {
     facts.push(`KR 리포트 페이지 ${pageCoverage.availableCount}/${pageCoverage.totalKnownPages} 확보`);
+  } else if (hasKrFacts) {
+    facts.push('KR slim v1.2 facts 확보');
   }
 
   if (reportSignals.recentReportCount && reportSignals.recentReportCount > 0) {
@@ -1084,7 +1279,7 @@ function buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals }) {
   return facts.slice(0, 3);
 }
 
-function buildTopRisks({ currentQuote, holding, pageCoverage, sourceCoverage }) {
+function buildTopRisks({ currentQuote, holding, pageCoverage, sourceCoverage, hasKrFacts }) {
   const risks = [];
 
   if (!currentQuote) {
@@ -1099,9 +1294,9 @@ function buildTopRisks({ currentQuote, holding, pageCoverage, sourceCoverage }) 
     risks.push('KR 보유 맥락 없음');
   }
 
-  if (pageCoverage.availableCount === 0) {
+  if (pageCoverage.availableCount === 0 && !hasKrFacts) {
     risks.push('KR 리포트 페이지 근거 없음');
-  } else if (pageCoverage.missingPageIds.length > 0) {
+  } else if (pageCoverage.availableCount > 0 && pageCoverage.missingPageIds.length > 0) {
     risks.push(`미확보 KR 페이지 ${pageCoverage.missingPageIds.length}건`);
   }
 
@@ -1116,6 +1311,8 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
   const slim = asObject(safeSources.slim);
   const slimCompany = asObject(slim.company);
   const slimPages = asObject(slim.pages);
+  const krFacts = asObject(slim.krFacts);
+  const hasKrFacts = hasKrFactsEvidence(krFacts);
   const packageResult = asObject(safeSources.packageResult);
 
   const instrument = {
@@ -1134,6 +1331,7 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
     market: pickFirst(
       normalizeText(packageResult.listingMarket),
       normalizeText(slimPages['company-overview']?.summary?.market),
+      normalizeText(slimCompany.market),
       normalizeText(rawInstrument.market),
       normalizeText(safeInput.market),
     ),
@@ -1160,7 +1358,7 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
 
   holding.hasHoldingContext = holding.shares !== null || holding.averagePrice !== null || holding.evaluationAmount !== null;
 
-  const currentQuote = resolveCurrentQuote(safeSources.quotes, instrument.code);
+  const currentQuote = resolveCurrentQuote(safeSources.quotes, instrument.code) ?? buildQuoteFromKrFacts(krFacts);
   holding.hasFullSellNowInputs = holding.shares !== null && holding.averagePrice !== null && currentQuote !== null;
   const quoteAsOf = normalizeDate(currentQuote?.asOf);
   const selectedAt = normalizeDate(safeInput.selectedAt);
@@ -1168,7 +1366,7 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
   const recentReportRows = collectRows(recentReportsPage);
   const reportAsOf = recentReportRows
     .map((row) => normalizeDate(row.date ?? row.일자 ?? row.작성일 ?? row.publishedAt))
-    .find(Boolean) ?? null;
+    .find(Boolean) ?? readReportAsOfFromKrFacts(krFacts);
 
   const knownPageIds = resolveKnownPageIds(safeSources.slim, slimPages);
   const availablePageIds = knownPageIds.filter((pageId) => hasEvidence(slimPages[pageId]));
@@ -1180,7 +1378,7 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
     availableCount: availablePageIds.length,
   };
 
-  const reportSignals = {
+  let reportSignals = {
     consensusAvailable: hasEvidence(slimPages.consensus),
     opinionAvailable: hasEvidence(slimPages.opinion),
     recentReportsAvailable: hasEvidence(slimPages['recent-reports']),
@@ -1200,12 +1398,14 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
   if (recentReportCount !== null) {
     reportSignals.recentReportsAvailable = recentReportCount > 0;
   }
+  reportSignals = buildReportSignalsFromKrFacts(reportSignals, krFacts);
 
   const sourceCoverage = {
     hasCurrentQuote: currentQuote !== null,
     hasHolding: holding.hasHoldingContext,
     hasPackageResult: Object.keys(packageResult).length > 0,
     availableReportPages: availablePageIds,
+    ...(hasKrFacts ? { hasKrFacts: true } : {}),
   };
 
   const missingSources = [];
@@ -1233,21 +1433,37 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
       : null,
   };
 
-  const consensusSnapshot = extractConsensusSnapshot(slimPages.consensus, slimPages.opinion, marketSnapshot.currentPrice);
-  const valuationSnapshot = extractValuationSnapshot(slimPages['investment-indicators'], slimPages['fnguide-finance']);
-  const relativeReturnSnapshot = extractRelativeReturnSnapshot(slimPages['relative-return']);
-  const styleAnalysisSnapshot = extractStyleAnalysisSnapshot(slimPages['style-analysis']);
-  const ownershipSnapshot = extractOwnershipSnapshot(
-    slimPages.shareholding,
-    slimPages['fnguide-snapshot'],
-    slimPages['fnguide-shareanalysis'],
-    slimPages['fnguide-foreign-ownership-chart'],
+  const consensusSnapshot = overlayConsensusSnapshotFromKrFacts(
+    extractConsensusSnapshot(slimPages.consensus, slimPages.opinion, marketSnapshot.currentPrice),
+    krFacts,
+    marketSnapshot.currentPrice,
   );
-  const financialSnapshot = extractFinancialSnapshot(
-    slimPages['financial-analysis'],
-    slimPages['fnguide-finance'],
-    slimPages['investment-indicators'],
-    slimPages.consensus,
+  const valuationSnapshot = overlayValuationSnapshotFromKrFacts(
+    extractValuationSnapshot(slimPages['investment-indicators'], slimPages['fnguide-finance']),
+    krFacts,
+  );
+  const relativeReturnSnapshot = extractRelativeReturnSnapshot(slimPages['relative-return']);
+  const styleAnalysisSnapshot = overlayStyleAnalysisSnapshotFromKrFacts(
+    extractStyleAnalysisSnapshot(slimPages['style-analysis']),
+    krFacts,
+  );
+  const ownershipSnapshot = overlayOwnershipSnapshotFromKrFacts(
+    extractOwnershipSnapshot(
+      slimPages.shareholding,
+      slimPages['fnguide-snapshot'],
+      slimPages['fnguide-shareanalysis'],
+      slimPages['fnguide-foreign-ownership-chart'],
+    ),
+    krFacts,
+  );
+  const financialSnapshot = overlayFinancialSnapshotFromKrFacts(
+    extractFinancialSnapshot(
+      slimPages['financial-analysis'],
+      slimPages['fnguide-finance'],
+      slimPages['investment-indicators'],
+      slimPages.consensus,
+    ),
+    krFacts,
   );
   const packageContext = buildPackageContext(packageResult);
   const sourceLimitations = [
@@ -1285,7 +1501,7 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
     packageContext,
     sourceLimitations,
     missingSources,
-    topFacts: buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals }),
-    topRisks: buildTopRisks({ currentQuote, holding, pageCoverage, sourceCoverage }),
+    topFacts: buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals, hasKrFacts }),
+    topRisks: buildTopRisks({ currentQuote, holding, pageCoverage, sourceCoverage, hasKrFacts }),
   };
 }

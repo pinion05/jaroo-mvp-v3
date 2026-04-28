@@ -565,6 +565,159 @@ test('buildDeepScanKrEvidencePacket uses v1.2 FnGuide ownership pages when prese
   ]);
 });
 
+test('buildDeepScanKrEvidencePacket consumes v1.2 krFacts directly when raw pages are omitted', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+  const fact = (value, extras = {}) => ({
+    value,
+    availability: extras.availability ?? 'present',
+    source: extras.source ?? { provider: 'fixture' },
+    ...(extras.asOf ? { asOf: extras.asOf } : {}),
+  });
+
+  const packet = buildDeepScanKrEvidencePacket(
+    {
+      instrument: {
+        code: '100840',
+        name: 'SNT에너지',
+      },
+      holding: {
+        shares: '10',
+        averagePrice: '8000',
+      },
+      selectedAt: '2026-04-24T00:00:00.000Z',
+    },
+    {
+      slim: {
+        schemaVersion: 'wisereport-kr-slim-v1.2',
+        market: 'KR',
+        code: '100840',
+        company: {
+          code: '100840',
+          name: 'SNT에너지',
+          market: 'KOSPI',
+        },
+        pages: {},
+        krFacts: {
+          quote: {
+            currentPrice: fact(10000, { source: { provider: 'krx' }, asOf: '2026-04-24' }),
+            currency: fact('KRW'),
+            asOf: fact('2026-04-24'),
+          },
+          consensus: {
+            targetPrice: fact(12000),
+            previousTargetPrice: fact(11000),
+            targetRevisionPct: fact(9.09),
+            targetGapPct: fact(20),
+            recommendation: fact('BUY'),
+          },
+          profitability: {
+            revenueLatest: fact(1710),
+            revenuePrev: fact(2028),
+            revenueYoY: fact(-15.7),
+            operatingIncomeLatest: fact(132.8),
+            operatingIncomePrev: fact(35.6),
+            operatingIncomeYoY: fact(273),
+            netIncomeLatest: fact(125),
+            netIncomePrev: fact(188),
+            netIncomeYoY: fact(-33.5),
+            operatingMarginLatest: fact(7.77),
+            netMarginLatest: fact(7.31),
+            roe: fact(5.2),
+          },
+          valuation: {
+            per: fact(10),
+            pbr: fact(0.54),
+            roe: fact(5.2),
+            evEbitda: fact(3.2),
+          },
+          ownership: {
+            majorHolderPct: fact(52.32),
+            majorHolderShares: fact(1000000),
+            freeFloatPct: fact(43.23),
+            freeFloatShares: fact(820000),
+            majorShareholders: fact([{ name: '최대주주', pct: 52.32 }]),
+            knownInstitutionalMajorHolders: fact([{ name: '국민연금공단', pct: 5.18 }]),
+          },
+          investorFlow: {
+            foreignOwnershipPct: fact(2.73, { asOf: '2026-04-24' }),
+            institutionalOwnershipPct: fact(5.18),
+            foreignOwnershipHistory: fact([{ date: '2026-04-24', foreignOwnershipPct: 2.73 }]),
+            assetManagerOwnershipPctSum: fact(2.27, { availability: 'partial' }),
+            assetManagerHoldings: fact([{ name: '삼성자산운용', listedSharePct: 1.2 }], { availability: 'partial' }),
+            shareholderCategories: fact([{ name: '기관', pct: 5.18 }]),
+          },
+          reports: {
+            totalCount: fact(4),
+            recent30dCount: fact(2),
+            latestReportDate: fact('2026-04-23'),
+            recentItems: fact([{ title: 'report-1', date: '2026-04-23' }]),
+          },
+          styleFactors: {
+            companyName: fact('SNT에너지'),
+            peerName: fact('기계 peer'),
+            factors: fact([{ name: '베타', value: -0.23, peerValue: -0.89 }]),
+          },
+        },
+      },
+    },
+  );
+
+  assert.equal(packet.instrument.market, 'KOSPI');
+  assert.equal(packet.pageCoverage.totalKnownPages, 13);
+  assert.equal(packet.pageCoverage.availableCount, 0);
+  assert.equal(packet.sourceCoverage.hasKrFacts, true);
+  assert.deepEqual(packet.currentQuote, {
+    price: 10000,
+    currency: 'KRW',
+    asOf: '2026-04-24',
+    source: 'krx',
+    status: 'ok',
+  });
+  assert.deepEqual(packet.reportSignals, {
+    consensusAvailable: true,
+    opinionAvailable: true,
+    recentReportsAvailable: true,
+    relativeReturnAvailable: false,
+    styleAnalysisAvailable: true,
+    recentReportCount: 4,
+    recent30dReportCount: 2,
+  });
+  assert.equal(packet.timestamps.reportAsOf, '2026-04-23');
+  assert.equal(packet.consensusSnapshot.targetPrice, 12000);
+  assert.equal(packet.consensusSnapshot.previousTargetPrice, 11000);
+  assert.equal(packet.consensusSnapshot.targetGapPct, 20);
+  assert.equal(packet.consensusSnapshot.recommendation, 'BUY');
+  assert.equal(packet.consensusSnapshot.revisionPct, 9.09);
+  assert.deepEqual(packet.valuationSnapshot, {
+    per: 10,
+    pbr: 0.54,
+    roe: 5.2,
+    evEbitda: 3.2,
+  });
+  assert.equal(packet.financialSnapshot.revenueLatest, 1710);
+  assert.equal(packet.financialSnapshot.operatingIncomeYoY, 273);
+  assert.equal(packet.financialSnapshot.netIncomeYoY, -33.5);
+  assert.equal(packet.ownershipSnapshot.majorHolderPct, 52.32);
+  assert.equal(packet.ownershipSnapshot.freeFloatPct, 43.23);
+  assert.equal(packet.ownershipSnapshot.foreignOwnershipPct, 2.73);
+  assert.equal(packet.ownershipSnapshot.institutionalOwnershipPct, 5.18);
+  assert.equal(packet.ownershipSnapshot.assetManagerOwnershipPctSum, 2.27);
+  assert.equal(packet.ownershipSnapshot.knownInstitutionalMajorHolders[0].name, '국민연금공단');
+  assert.deepEqual(packet.styleAnalysisSnapshot, {
+    factorScores: [{ name: '베타', value: -0.23, peerValue: -0.89 }],
+    companyName: 'SNT에너지',
+    peerName: '기계 peer',
+  });
+  assert.equal(packet.sourceLimitations.some((limitation) => limitation.fact === 'foreignOwnershipPct'), false);
+  assert.equal(packet.sourceLimitations.some((limitation) => limitation.fact === 'institutionalOwnershipPct'), false);
+  assert.deepEqual(packet.topFacts, [
+    '현재가 10000 KRW 확인',
+    '보유 10주 / 평단 8000 확인',
+    'KR slim v1.2 facts 확보',
+  ]);
+  assert.deepEqual(packet.topRisks, []);
+});
+
 test('buildDeepScanKrEvidencePacket ignores unknown slim page keys, counts recent reports from row-like payloads, and reports missing quote/holding sources deterministically', async () => {
   const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
 

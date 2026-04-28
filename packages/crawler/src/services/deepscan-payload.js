@@ -591,6 +591,19 @@ function buildWiseReportKrSlimPayload(rawAggregate, code, pageDefinitions = WISE
   };
 }
 
+async function buildWiseReportKrSlimContractPayload(rawAggregate, code) {
+  const serverModule = await import('../server.js');
+  if (typeof serverModule.buildWiseReportKrSlimPayloadV12 === 'function') {
+    return serverModule.buildWiseReportKrSlimPayloadV12(rawAggregate, code);
+  }
+
+  return {
+    schemaVersion: 'wisereport-kr-slim-v1.2',
+    market: 'KR',
+    ...buildWiseReportKrSlimPayload(rawAggregate, code, WISEREPORT_KR_V12_PAGES),
+  };
+}
+
 async function captureSource(sourceId, load) {
   try {
     return {
@@ -730,10 +743,9 @@ async function resolveKrSourceBundle(rawInput, input) {
 
   const tradeDate = normalizeTradeDate(input.selectedAt ?? input.sourceContext.appliedAt);
   const [slimResult, quotesResult, packageResult] = await Promise.all([
-    captureSource('slim', async () => buildWiseReportKrSlimPayload(
+    captureSource('slim', async () => buildWiseReportKrSlimContractPayload(
       await getCrawlV12(input.instrument.code),
       input.instrument.code,
-      WISEREPORT_KR_V12_PAGES,
     )),
     captureSource('current-quote', async () => getCurrentQuotes({
       codes: input.instrument.code ? [input.instrument.code] : [],
@@ -1049,7 +1061,9 @@ function createEvidenceSourceRefs(input, evidence, sources, sourceIssues) {
       type: 'report',
       id: `wisereport-kr-slim:${identifier}`,
       label: 'KR slim report evidence',
-      note: `pages:${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages}`,
+      note: evidence.sourceCoverage?.hasKrFacts
+        ? `krFacts:v1.2 pages:${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages}`
+        : `pages:${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages}`,
     }));
   }
 
@@ -1121,6 +1135,8 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues) {
       title: 'KR 리포트 페이지 범위',
       body: evidence.pageCoverage.availableCount > 0
         ? `KR 리포트 페이지 ${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages} 확보`
+        : evidence.sourceCoverage?.hasKrFacts
+          ? 'KR slim v1.2 facts 확보'
         : 'KR 리포트 페이지 근거 없음',
     },
     {
@@ -1156,7 +1172,9 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues) {
     items,
     summaryTags: [
       `score:${scored.hero.score}`,
-      `reports:${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages}`,
+      evidence.sourceCoverage?.hasKrFacts && evidence.pageCoverage.availableCount === 0
+        ? 'facts:v1.2'
+        : `reports:${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages}`,
       `decision:${scored.sellNow.decisionBand}`,
     ],
   };
@@ -1340,7 +1358,11 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     for (const risk of evidence.topRisks.slice(0, 2)) {
       heroBodyParts.push(`주의: ${risk}`);
     }
-    if (evidence.pageCoverage.availableCount === 0 && !heroBodyParts.some((part) => part.includes('KR 리포트 페이지 근거 없음'))) {
+    if (
+      evidence.pageCoverage.availableCount === 0
+      && !evidence.sourceCoverage?.hasKrFacts
+      && !heroBodyParts.some((part) => part.includes('KR 리포트 페이지 근거 없음'))
+    ) {
       heroBodyParts.push('주의: KR 리포트 페이지 근거 없음');
     }
     if (heroBodyParts.length === 0 && evidence.missingSources.length > 0) {
