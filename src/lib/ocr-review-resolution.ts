@@ -62,6 +62,22 @@ export function mergeResolvedRowsWithExistingReviewRows(
   }
 }
 
+export function getRowsNeedingInstrumentResolution(
+  resolvedRows: OcrSourceRow[],
+  mergedRows: OcrReviewRow[],
+  candidatesByRowId: Record<string, ResolveCandidate[]>,
+) {
+  const mergedRowsById = new Map(mergedRows.map((row) => [row.id, row]))
+
+  return resolvedRows.filter((row) => {
+    if (candidatesByRowId[row.id]) {
+      return false
+    }
+
+    return mergedRowsById.get(row.id)?.resolutionState === 'unresolved'
+  })
+}
+
 export function applyInstrumentResolutionResult(
   mergedRows: OcrReviewRow[],
   result: ResolvedInstrumentRowsResult,

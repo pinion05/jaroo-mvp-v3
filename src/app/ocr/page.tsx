@@ -27,6 +27,7 @@ import {
   applyInstrumentResolutionFailure,
   applyInstrumentResolutionResult,
   applyReviewCandidate,
+  getRowsNeedingInstrumentResolution,
   mergeResolvedRowsWithExistingReviewRows,
   toReviewRow,
 } from '@/lib/ocr-review-resolution'
@@ -696,14 +697,20 @@ export default function OcrPage() {
 
     let isCancelled = false
     const mergedState = mergeResolvedRowsWithExistingReviewRows(resolvedRows, reviewRows, instrumentCandidatesByRowId)
-    const unresolvedRows = resolvedRows.filter((row) => !mergedState.candidatesByRowId[row.id])
+    const unresolvedRows = getRowsNeedingInstrumentResolution(resolvedRows, mergedState.rows, mergedState.candidatesByRowId)
 
     setReviewRows(mergedState.rows)
     replaceCandidates(mergedState.candidatesByRowId)
     setExpandedRowId((current) => (current && mergedState.candidatesByRowId[current]?.length > 1 ? current : null))
 
     if (unresolvedRows.length === 0) {
-      setResolveStatus('success')
+      const hasFailedRowsAwaitingManualReview = mergedState.rows.some(
+        (row) => !mergedState.candidatesByRowId[row.id] && row.resolutionState === 'manual-required',
+      )
+
+      if (!hasFailedRowsAwaitingManualReview || useOcrReviewStore.getState().resolveStatus !== 'error') {
+        setResolveStatus('success')
+      }
       return
     }
 

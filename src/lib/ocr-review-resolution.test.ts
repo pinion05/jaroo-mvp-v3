@@ -7,6 +7,7 @@ import {
   applyInstrumentResolutionFailure,
   applyInstrumentResolutionResult,
   applyReviewCandidate,
+  getRowsNeedingInstrumentResolution,
   toReviewRow,
 } from './ocr-review-resolution'
 
@@ -77,6 +78,26 @@ test('instrument resolution sends unresolved rows without candidates to the manu
   assert.equal(nextRow?.selectedCandidateId, null)
   assert.equal(nextRow?.resolutionState, 'manual-required')
   assert.equal(nextRow?.resolvedTicker, undefined)
+})
+
+test('instrument resolution only retries rows that are still unresolved and have no candidate result', () => {
+  const unresolvedSourceRow = createSourceRow()
+  const unresolvedRow = toReviewRow(unresolvedSourceRow)
+  const manualRequiredSourceRow = createSourceRow({ id: 'row-2', name: 'Unknown ETF', normalizedName: 'unknown etf' })
+  const manualRequiredRow: OcrReviewRow = {
+    ...toReviewRow(manualRequiredSourceRow),
+    resolutionState: 'manual-required',
+  }
+  const candidateKnownSourceRow = createSourceRow({ id: 'row-3', name: 'Apple', normalizedName: 'apple' })
+  const candidateKnownRow = toReviewRow(candidateKnownSourceRow)
+
+  const rowsNeedingResolution = getRowsNeedingInstrumentResolution(
+    [unresolvedSourceRow, manualRequiredSourceRow, candidateKnownSourceRow],
+    [unresolvedRow, manualRequiredRow, candidateKnownRow],
+    { [candidateKnownRow.id]: [] },
+  )
+
+  assert.deepEqual(rowsNeedingResolution.map((row) => row.id), [unresolvedRow.id])
 })
 
 test('instrument resolution failure exposes unresolved rows as manual-required instead of unresolved', () => {
