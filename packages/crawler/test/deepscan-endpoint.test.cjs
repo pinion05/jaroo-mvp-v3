@@ -130,6 +130,18 @@ test('GET explicit-source deepscan path maps thrown errors to a raw canonical in
     assert.equal(body.metadata.errorCode, 'internal-service-error');
     assert.equal(body.metadata.inputValidity.valid, false);
     assert.equal(body.metadata.inputValidity.reason, 'internal payload assembly failure');
+    assert.equal(body.metadata.contextQuality.confidence, 'low');
+    assert.equal(body.metadata.contextQuality.score, 0);
+    assert.deepEqual(body.metadata.contextQuality.pageCoverage, {
+      availableCount: 0,
+      totalKnownPages: 0,
+      availablePageIds: [],
+      missingPageIds: [],
+    });
+    assert.deepEqual(body.metadata.contextQuality.sourceIssues, [
+      { sourceId: 'deepscan-payload-service', message: 'unexpected internal crawler service failure' },
+    ]);
+    assert.deepEqual(body.metadata.contextQuality.nextCheckPoints, ['crawler 내부 오류 로그를 확인한 뒤 같은 요청을 재시도하세요.']);
     assert.equal(body.hero.blockState, 'error');
     assert.equal(body.hero.headline, 'DeepScan payload 생성 중 오류가 발생했습니다');
     assert.equal(body.hero.body, 'Crawler 서비스 내부 오류로 canonical error payload를 반환했습니다.');

@@ -119,6 +119,7 @@ export {
 
 export {
   buildJarooDeepScanPayload,
+  createInternalErrorContextQuality,
 } from './services/deepscan-payload.js';
 
 export {

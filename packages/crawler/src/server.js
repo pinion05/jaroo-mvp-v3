@@ -6,6 +6,7 @@ import {
   WISEREPORT_KR_V12_PAGES,
   buildDeepScanKrEvidencePacket,
   buildJarooDeepScanPayload,
+  createInternalErrorContextQuality,
   crawlWiseReportGlobal,
   crawlWiseReportGlobalDomainData,
   crawlWiseReportKrPage,
@@ -251,6 +252,7 @@ function mapJarooDeepScanPayloadToInternalError(payload) {
       },
       sourceRefs: Array.isArray(safeMetadata.sourceRefs) ? safeMetadata.sourceRefs : [],
       blockStatus: Object.fromEntries(DEEPSCAN_MAJOR_BLOCK_KEYS.map((key) => [key, 'error'])),
+      contextQuality: createInternalErrorContextQuality(),
     },
   };
 }
