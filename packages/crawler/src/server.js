@@ -780,6 +780,85 @@ function hasSlimV12Value(value) {
   return Boolean(value);
 }
 
+function getSlimV12CheckedSourceId(pageDefinition) {
+  if (!pageDefinition || typeof pageDefinition !== 'object') {
+    return null;
+  }
+
+  const explicitMap = {
+    'company-overview': 'wisereport.company-overview',
+    'financial-analysis': 'wisereport.financial-analysis',
+    'investment-indicators': 'wisereport.investment-indicators',
+    consensus: 'wisereport.consensus',
+    shareholding: 'wisereport.shareholding',
+    'recent-reports': 'wisereport.recent-reports',
+    'fnguide-finance': 'fnguide.finance',
+    'relative-return': 'fnguide.relative-return',
+    opinion: 'fnguide.opinion',
+    'style-analysis': 'fnguide.style-analysis',
+    'fnguide-snapshot': 'fnguide.snapshot',
+    'fnguide-shareanalysis': 'fnguide.shareanalysis',
+    'fnguide-foreign-ownership-chart': 'fnguide.foreign-ownership-chart',
+  };
+
+  return explicitMap[pageDefinition.id] ?? `${pageDefinition.sourceType || 'wisereport'}.${pageDefinition.id}`;
+}
+
+function summarizeSlimV12PageFailure(pageDefinition, pagePayload, slimPage) {
+  if (!pagePayload || typeof pagePayload !== 'object') {
+    return null;
+  }
+
+  const crawlerV1Stage = pagePayload.stages?.crawler_v1 || pagePayload.stage || null;
+  const quality = pagePayload.quality || null;
+  let failure = null;
+
+  if (crawlerV1Stage?.ok === false) {
+    failure = {
+      reasonCode: 'source_acquisition_failed',
+      stage: crawlerV1Stage.strategy || 'crawler_v1',
+      message: crawlerV1Stage.error || 'source acquisition failed',
+    };
+  } else if (quality?.ok === false && !hasSlimV12Value(slimPage)) {
+    failure = {
+      reasonCode: 'source_parse_failed',
+      stage: 'crawler_v3',
+      message: Array.isArray(quality.warnings) && quality.warnings.length
+        ? quality.warnings.join('; ')
+        : 'source parsed without usable slim v1.2 facts',
+    };
+  }
+
+  if (!failure) {
+    return null;
+  }
+
+  return {
+    pageId: pageDefinition.id,
+    sourceType: pageDefinition.sourceType,
+    sourceKey: pageDefinition.sourceKey,
+    checkedSourceId: getSlimV12CheckedSourceId(pageDefinition),
+    title: pageDefinition.title,
+    availability: 'error',
+    reasonCode: failure.reasonCode,
+    stage: failure.stage,
+    message: failure.message,
+    stages: pagePayload.stages || (pagePayload.stage ? { crawler_v1: pagePayload.stage } : {}),
+    quality,
+  };
+}
+
+function buildSlimV12PageFailureDiagnostics(rawAggregate, slimPages) {
+  const normalizedAggregate = normalizeWiseReportKrAggregate(rawAggregate);
+  return WISEREPORT_KR_V12_PAGES
+    .map((pageDefinition) => summarizeSlimV12PageFailure(
+      pageDefinition,
+      normalizedAggregate.pages?.[pageDefinition.id],
+      slimPages?.[pageDefinition.id],
+    ))
+    .filter(Boolean);
+}
+
 function makeSlimV12Source({ provider = 'wisereport', pageId = null, fieldPath = null, checkedSources = null } = {}) {
   return {
     provider,
@@ -820,6 +899,17 @@ function makeSlimV12MissingFact({ provider = 'wisereport', pageId = null, fieldP
     reasonCode,
     message,
   });
+}
+
+function makeSlimV12ErrorFact({ provider = 'wisereport', pageId = null, fieldPath = null, checkedSources = [], reasonCode, message, stage = null }) {
+  return {
+    value: null,
+    availability: 'error',
+    source: makeSlimV12Source({ provider, pageId, fieldPath, checkedSources }),
+    reasonCode,
+    message,
+    ...(stage ? { stage } : {}),
+  };
 }
 
 function makeSlimV12NotApplicableFact({ provider = 'internal', checkedSources = [], reasonCode, message }) {
@@ -865,13 +955,28 @@ function makeSlimV12FinancialFact(value, options, instrumentKind) {
   return makeSlimV12Fact(value, options);
 }
 
-function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
+function factForSlimV12PageFailure(pageFailure, { fieldPath = null, checkedSources = [] } = {}) {
+  return makeSlimV12ErrorFact({
+    provider: pageFailure.sourceType || 'fnguide',
+    pageId: pageFailure.pageId,
+    fieldPath,
+    checkedSources,
+    reasonCode: pageFailure.reasonCode,
+    message: pageFailure.message,
+    stage: pageFailure.stage,
+  });
+}
+
+function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind, pageFailuresById = {}) {
   const noQuoteMessage = 'KR slim v1.2 builder는 WiseReport/FnGuide payload만으로 현재가를 보장하지 않습니다. DeepScan에서는 별도 quotes source를 결합해야 합니다.';
   const noFlowMessage = 'WiseReport/FnGuide KR 내부 source는 외국인 지분율·대차잔고·공매도·지분공시는 제공하지만 개인/외국인/기관 순매수 3분류 집계는 제공하지 않습니다.';
   const notCorporate = instrumentKind === 'etf' || instrumentKind === 'etn';
   const financialSource = { pageId: 'financial-analysis', checkedSources: ['wisereport.financial-analysis', 'wisereport.consensus'] };
   const indicatorSource = { pageId: 'investment-indicators', checkedSources: ['wisereport.investment-indicators'] };
   const ownershipCheckedSources = ['wisereport.shareholding', 'fnguide.snapshot', 'fnguide.shareanalysis', 'fnguide.foreign-ownership-chart'];
+  const snapshotFailure = pageFailuresById['fnguide-snapshot'] || null;
+  const shareAnalysisFailure = pageFailuresById['fnguide-shareanalysis'] || null;
+  const foreignOwnershipChartFailure = pageFailuresById['fnguide-foreign-ownership-chart'] || null;
 
   const foreignOwnershipFact = evidence.ownershipSnapshot?.foreignOwnershipPct !== null && evidence.ownershipSnapshot?.foreignOwnershipPct !== undefined
     ? makeSlimV12Fact(evidence.ownershipSnapshot.foreignOwnershipPct, {
@@ -881,6 +986,11 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
         checkedSources: ownershipCheckedSources,
         asOf: evidence.ownershipSnapshot.foreignOwnershipAsOf,
       })
+    : (snapshotFailure || foreignOwnershipChartFailure)
+        ? factForSlimV12PageFailure(snapshotFailure || foreignOwnershipChartFailure, {
+            fieldPath: `${(snapshotFailure || foreignOwnershipChartFailure).pageId}.foreignOwnershipPct`,
+            checkedSources: ownershipCheckedSources,
+          })
     : makeSlimV12MissingFact({
         provider: 'fnguide',
         pageId: 'fnguide-snapshot',
@@ -895,6 +1005,11 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
         fieldPath: 'fnguide-shareanalysis.institutionalOwnershipPct',
         checkedSources: ownershipCheckedSources,
       })
+    : shareAnalysisFailure
+        ? factForSlimV12PageFailure(shareAnalysisFailure, {
+            fieldPath: 'fnguide-shareanalysis.institutionalOwnershipPct',
+            checkedSources: ownershipCheckedSources,
+          })
     : makeSlimV12MissingFact({
         provider: 'fnguide',
         pageId: 'fnguide-shareanalysis',
@@ -965,14 +1080,22 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
     investorFlow: {
       foreignOwnershipPct: foreignOwnershipFact,
       institutionalOwnershipPct: institutionalOwnershipFact,
-      foreignOwnershipHistory: makeSlimV12Fact(evidence.ownershipSnapshot?.foreignOwnershipHistory ?? [], { provider: 'fnguide', pageId: 'fnguide-foreign-ownership-chart', fieldPath: 'fnguide-foreign-ownership-chart.chartJson.CHART', checkedSources: ownershipCheckedSources }),
-      assetManagerOwnershipPctSum: assetManagerOwnershipPctSum !== null
+      foreignOwnershipHistory: foreignOwnershipChartFailure
+        ? factForSlimV12PageFailure(foreignOwnershipChartFailure, { fieldPath: 'fnguide-foreign-ownership-chart.chartJson.CHART', checkedSources: ownershipCheckedSources })
+        : makeSlimV12Fact(evidence.ownershipSnapshot?.foreignOwnershipHistory ?? [], { provider: 'fnguide', pageId: 'fnguide-foreign-ownership-chart', fieldPath: 'fnguide-foreign-ownership-chart.chartJson.CHART', checkedSources: ownershipCheckedSources }),
+      assetManagerOwnershipPctSum: snapshotFailure
+        ? factForSlimV12PageFailure(snapshotFailure, { fieldPath: 'fnguide-snapshot.assetManagerHoldings.rows[].상장주식수내비중', checkedSources: ownershipCheckedSources })
+        : assetManagerOwnershipPctSum !== null
         ? makeSlimV12Fact(assetManagerOwnershipPctSum, { ...assetManagerFactOptions, availability: 'partial', fieldPath: 'fnguide-snapshot.assetManagerHoldings.rows[].상장주식수내비중' })
         : makeSlimV12MissingFact({ ...assetManagerFactOptions, fieldPath: 'fnguide-snapshot.assetManagerHoldings.rows[].상장주식수내비중' }),
-      assetManagerHoldings: assetManagerHoldings.length > 0
+      assetManagerHoldings: snapshotFailure
+        ? factForSlimV12PageFailure(snapshotFailure, { fieldPath: 'fnguide-snapshot.assetManagerHoldings.rows', checkedSources: ownershipCheckedSources })
+        : assetManagerHoldings.length > 0
         ? makeSlimV12Fact(assetManagerHoldings, { ...assetManagerFactOptions, availability: 'partial', fieldPath: 'fnguide-snapshot.assetManagerHoldings.rows' })
         : makeSlimV12MissingFact({ ...assetManagerFactOptions, fieldPath: 'fnguide-snapshot.assetManagerHoldings.rows' }),
-      shareholderCategories: makeSlimV12Fact(evidence.ownershipSnapshot?.shareholderCategories ?? [], { provider: 'fnguide', pageId: 'fnguide-shareanalysis', fieldPath: 'fnguide-shareanalysis.shareholderCategories.rows', checkedSources: ownershipCheckedSources }),
+      shareholderCategories: shareAnalysisFailure
+        ? factForSlimV12PageFailure(shareAnalysisFailure, { fieldPath: 'fnguide-shareanalysis.shareholderCategories.rows', checkedSources: ownershipCheckedSources })
+        : makeSlimV12Fact(evidence.ownershipSnapshot?.shareholderCategories ?? [], { provider: 'fnguide', pageId: 'fnguide-shareanalysis', fieldPath: 'fnguide-shareanalysis.shareholderCategories.rows', checkedSources: ownershipCheckedSources }),
       retailNetBuy: makeSlimV12MissingFact({ provider: 'fnguide', checkedSources: ownershipCheckedSources, reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide', message: noFlowMessage }),
       foreignNetBuy: makeSlimV12MissingFact({ provider: 'fnguide', checkedSources: ownershipCheckedSources, reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide', message: noFlowMessage }),
       institutionalNetBuy: makeSlimV12MissingFact({ provider: 'fnguide', checkedSources: ownershipCheckedSources, reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide', message: noFlowMessage }),
@@ -997,6 +1120,15 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
         checkedSources: /ownership/i.test(String(limitation.fact || '')) ? ownershipCheckedSources : ['wisereport.shareholding'],
         message: limitation.message,
       })) : []),
+      ...Object.values(pageFailuresById).map((failure) => ({
+        factPath: `pages.${failure.pageId}`,
+        reasonCode: failure.reasonCode,
+        checkedSources: [failure.checkedSourceId || failure.pageId],
+        message: failure.message,
+        availability: 'error',
+        pageId: failure.pageId,
+        stage: failure.stage,
+      })),
       {
         factPath: 'investorFlow.*NetBuy',
         reasonCode: 'investor_net_buy_not_provided_by_wisereport_fnguide',
@@ -1015,6 +1147,8 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
 
 function buildWiseReportKrSlimPayloadV12(rawAggregate, code) {
   const slimV11 = buildWiseReportKrSlimPayloadV11(rawAggregate, code, WISEREPORT_KR_V12_PAGES);
+  const pageFailures = buildSlimV12PageFailureDiagnostics(rawAggregate, slimV11.pages);
+  const pageFailuresById = Object.fromEntries(pageFailures.map((failure) => [failure.pageId, failure]));
   const evidence = buildDeepScanKrEvidencePacket({
     instrument: {
       code: slimV11.company?.code ?? slimV11.code,
@@ -1028,14 +1162,25 @@ function buildWiseReportKrSlimPayloadV12(rawAggregate, code) {
   const availableV12PageIds = WISEREPORT_KR_V12_PAGES
     .map((page) => page.id)
     .filter((pageId) => hasSlimV12Value(slimV11.pages?.[pageId]));
+  const failedV12PageIds = pageFailures.map((failure) => failure.pageId);
   const missingV12PageIds = WISEREPORT_KR_V12_PAGES
     .map((page) => page.id)
-    .filter((pageId) => !hasSlimV12Value(slimV11.pages?.[pageId]));
+    .filter((pageId) => !hasSlimV12Value(slimV11.pages?.[pageId]) && !pageFailuresById[pageId]);
   const v12PageCoverage = {
     totalKnownPages: WISEREPORT_KR_V12_PAGES.length,
     availablePageIds: availableV12PageIds,
     missingPageIds: missingV12PageIds,
+    failedPageIds: failedV12PageIds,
     availableCount: availableV12PageIds.length,
+    failedCount: failedV12PageIds.length,
+    pageStatuses: Object.fromEntries(WISEREPORT_KR_V12_PAGES.map((page) => [page.id, pageFailuresById[page.id]
+      ? {
+          availability: 'error',
+          reasonCode: pageFailuresById[page.id].reasonCode,
+          stage: pageFailuresById[page.id].stage,
+          message: pageFailuresById[page.id].message,
+        }
+      : { availability: hasSlimV12Value(slimV11.pages?.[page.id]) ? 'present' : 'missing' }])),
   };
 
   return {
@@ -1050,6 +1195,7 @@ function buildWiseReportKrSlimPayloadV12(rawAggregate, code) {
     },
     sourceCoverage: {
       pageCoverage: v12PageCoverage,
+      pageFailures,
       sourceCoverage: {
         ...evidence.sourceCoverage,
         availableReportPages: availableV12PageIds,
@@ -1071,7 +1217,7 @@ function buildWiseReportKrSlimPayloadV12(rawAggregate, code) {
       ],
     },
     pages: slimV11.pages,
-    krFacts: buildWiseReportKrSlimFactsV12(slimV11, evidence, instrumentKind),
+    krFacts: buildWiseReportKrSlimFactsV12(slimV11, evidence, instrumentKind, pageFailuresById),
   };
 }
 

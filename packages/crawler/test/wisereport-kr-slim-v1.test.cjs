@@ -517,6 +517,107 @@ function createEtfAggregateFixtureV11() {
   return fixture;
 }
 
+const KR_V12_FAILURE_PAGE_META = Object.freeze({
+  'fnguide-snapshot': {
+    sourceKey: 'fnguide스냅샷',
+    title: '스냅샷',
+    checkedSourceId: 'fnguide.snapshot',
+  },
+  'fnguide-shareanalysis': {
+    sourceKey: 'fnguide지분분석',
+    title: '지분분석',
+    checkedSourceId: 'fnguide.shareanalysis',
+  },
+  'fnguide-foreign-ownership-chart': {
+    sourceKey: 'fnguide외국인지분율차트',
+    title: '외국인 지분율 차트',
+    checkedSourceId: 'fnguide.foreign-ownership-chart',
+  },
+});
+
+function createAggregateFixtureV11WithFailedPage(pageId, message = `${pageId} upstream timeout`) {
+  const fixture = createAggregateFixtureV11();
+  const meta = KR_V12_FAILURE_PAGE_META[pageId];
+  assert.ok(meta, `fixture failure meta exists for ${pageId}`);
+
+  fixture.pages[pageId] = {
+    id: pageId,
+    sourceType: 'fnguide',
+    sourceKey: meta.sourceKey,
+    title: meta.title,
+    source: {
+      requestLog: [{ url: `https://example.test/${pageId}` }],
+      capturedResponses: [],
+    },
+    capture: {
+      bodyTextLength: 0,
+      tables: [],
+    },
+    normalized: {
+      company: {
+        code: '005930',
+        name: '삼성전자',
+        title: meta.title,
+        headerText: meta.title,
+      },
+      sourceType: 'fnguide',
+      sourceKey: meta.sourceKey,
+      bodyTextHead: '',
+    },
+    quality: {
+      ok: false,
+      warnings: [message],
+    },
+    stages: {
+      crawler_v1: {
+        ok: false,
+        strategy: 'crawler_v1',
+        error: message,
+      },
+      crawler_v2: {
+        ok: false,
+        strategy: 'crawler_v2',
+        candidateFieldCount: 0,
+      },
+      crawler_v3: {
+        ok: false,
+        strategy: 'crawler_v3',
+        selectedFieldCount: 0,
+      },
+    },
+  };
+
+  return fixture;
+}
+
+function assertSlimV12PageFailure(slim, pageId) {
+  const meta = KR_V12_FAILURE_PAGE_META[pageId];
+  assert.equal(slim.sourceCoverage.pageCoverage.totalKnownPages, 13);
+  assert.equal(slim.sourceCoverage.pageCoverage.failedCount, 1);
+  assert.deepEqual(slim.sourceCoverage.pageCoverage.failedPageIds, [pageId]);
+  assert.equal(slim.sourceCoverage.pageCoverage.missingPageIds.includes(pageId), false);
+  assert.equal(slim.sourceCoverage.pageCoverage.pageStatuses[pageId].availability, 'error');
+  assert.equal(slim.sourceCoverage.pageCoverage.pageStatuses[pageId].reasonCode, 'source_acquisition_failed');
+
+  assert.deepEqual(slim.sourceCoverage.pageFailures.map((failure) => ({
+    pageId: failure.pageId,
+    checkedSourceId: failure.checkedSourceId,
+    availability: failure.availability,
+    reasonCode: failure.reasonCode,
+  })), [{
+    pageId,
+    checkedSourceId: meta.checkedSourceId,
+    availability: 'error',
+    reasonCode: 'source_acquisition_failed',
+  }]);
+
+  assert.ok(slim.krFacts.sourceLimitations.some((limitation) => (
+    limitation.factPath === `pages.${pageId}`
+    && limitation.availability === 'error'
+    && limitation.checkedSources.includes(meta.checkedSourceId)
+  )));
+}
+
 async function withServer(app, run) {
   const server = await new Promise((resolve) => {
     const instance = app.listen(0, () => resolve(instance));
@@ -700,6 +801,53 @@ test('buildWiseReportKrSlimPayloadV12 does not count arrays of empty rows as ava
     slim.sourceCoverage.pageCoverage.missingPageIds.sort(),
     ['fnguide-finance', 'fnguide-snapshot'],
   );
+});
+
+test('buildWiseReportKrSlimPayloadV12 reports failed FnGuide snapshot as source error', async () => {
+  const { buildWiseReportKrSlimPayloadV12 } = await import('../src/server.js');
+  const slim = buildWiseReportKrSlimPayloadV12(
+    createAggregateFixtureV11WithFailedPage('fnguide-snapshot', 'snapshot timeout'),
+    '005930',
+  );
+
+  assertSlimV12PageFailure(slim, 'fnguide-snapshot');
+  assert.equal(slim.krFacts.investorFlow.assetManagerHoldings.availability, 'error');
+  assert.equal(slim.krFacts.investorFlow.assetManagerHoldings.reasonCode, 'source_acquisition_failed');
+  assert.equal(slim.krFacts.investorFlow.assetManagerHoldings.source.pageId, 'fnguide-snapshot');
+  assert.match(slim.krFacts.investorFlow.assetManagerHoldings.message, /snapshot timeout/);
+  assert.equal(slim.krFacts.investorFlow.institutionalOwnershipPct.availability, 'missing');
+  assert.equal(slim.krFacts.investorFlow.institutionalOwnershipPct.reasonCode, 'institutional_aggregate_not_available_in_wisereport_fnguide_sources');
+});
+
+test('buildWiseReportKrSlimPayloadV12 reports failed FnGuide shareanalysis as source error', async () => {
+  const { buildWiseReportKrSlimPayloadV12 } = await import('../src/server.js');
+  const slim = buildWiseReportKrSlimPayloadV12(
+    createAggregateFixtureV11WithFailedPage('fnguide-shareanalysis', 'shareanalysis timeout'),
+    '005930',
+  );
+
+  assertSlimV12PageFailure(slim, 'fnguide-shareanalysis');
+  assert.equal(slim.krFacts.investorFlow.institutionalOwnershipPct.availability, 'error');
+  assert.equal(slim.krFacts.investorFlow.institutionalOwnershipPct.reasonCode, 'source_acquisition_failed');
+  assert.equal(slim.krFacts.investorFlow.institutionalOwnershipPct.source.pageId, 'fnguide-shareanalysis');
+  assert.equal(slim.krFacts.investorFlow.shareholderCategories.availability, 'error');
+  assert.match(slim.krFacts.investorFlow.shareholderCategories.message, /shareanalysis timeout/);
+});
+
+test('buildWiseReportKrSlimPayloadV12 reports failed FnGuide foreign ownership chart as source error', async () => {
+  const { buildWiseReportKrSlimPayloadV12 } = await import('../src/server.js');
+  const slim = buildWiseReportKrSlimPayloadV12(
+    createAggregateFixtureV11WithFailedPage('fnguide-foreign-ownership-chart', 'foreign chart timeout'),
+    '005930',
+  );
+
+  assertSlimV12PageFailure(slim, 'fnguide-foreign-ownership-chart');
+  assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.availability, 'present');
+  assert.equal(slim.krFacts.investorFlow.foreignOwnershipPct.source.pageId, 'fnguide-snapshot');
+  assert.equal(slim.krFacts.investorFlow.foreignOwnershipHistory.availability, 'error');
+  assert.equal(slim.krFacts.investorFlow.foreignOwnershipHistory.reasonCode, 'source_acquisition_failed');
+  assert.equal(slim.krFacts.investorFlow.foreignOwnershipHistory.source.pageId, 'fnguide-foreign-ownership-chart');
+  assert.match(slim.krFacts.investorFlow.foreignOwnershipHistory.message, /foreign chart timeout/);
 });
 
 test('buildWiseReportKrSlimPayloadV12 marks ETF corporate financial facts as not_applicable', async () => {
