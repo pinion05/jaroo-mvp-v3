@@ -1,6 +1,7 @@
 import type { DeepScanBlockMeta, JarooDeepScanPayload } from '../../packages/contracts/src/deepscan'
 
 import type { DeepScanCanonicalTargetSession } from './deepscan-canonical'
+import type { DeepScanResultCacheEntry, WorkflowAsyncStatus } from './workflow-types'
 
 export type DeepScanPageFetchState = 'idle' | 'loading' | 'success' | 'error'
 
@@ -23,6 +24,50 @@ export type DeepScanBlockNotice = {
   badge: string
   title: string
   body: string
+}
+
+type DeepScanPageCacheInput = {
+  hasTarget: boolean
+  targetKey: string | null
+  requestStatus: WorkflowAsyncStatus
+  activePayload: JarooDeepScanPayload | null
+  activeTargetKey: string | null
+  lastSuccessful: DeepScanResultCacheEntry | null
+}
+
+type DeepScanPageCacheResolution = {
+  payload: JarooDeepScanPayload | null
+  fetchState: DeepScanPageFetchState
+  shouldStartRequest: boolean
+}
+
+export function resolveDeepScanPageCacheState({
+  hasTarget,
+  targetKey,
+  requestStatus,
+  activePayload,
+  activeTargetKey,
+  lastSuccessful,
+}: DeepScanPageCacheInput): DeepScanPageCacheResolution {
+  const currentPayload = targetKey && activeTargetKey === targetKey ? activePayload : null
+  const reusablePayload = targetKey && lastSuccessful?.targetKey === targetKey ? lastSuccessful.payload : null
+  const payload = requestStatus === 'success' ? currentPayload : requestStatus === 'idle' ? (currentPayload ?? reusablePayload) : null
+
+  const fetchState: DeepScanPageFetchState = !hasTarget
+    ? 'idle'
+    : requestStatus === 'loading'
+      ? 'loading'
+      : requestStatus === 'error'
+        ? 'error'
+        : payload
+          ? 'success'
+          : 'idle'
+
+  return {
+    payload,
+    fetchState,
+    shouldStartRequest: hasTarget && requestStatus !== 'loading' && requestStatus !== 'error' && !payload,
+  }
 }
 
 const DEEP_SCAN_BLOCK_LABELS = {

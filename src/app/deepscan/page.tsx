@@ -17,7 +17,7 @@ import {
   buildDeepScanPageHeader,
   buildDeepScanPartialSuccessNotice,
   getDeepScanBlockNotice,
-  type DeepScanPageFetchState,
+  resolveDeepScanPageCacheState,
 } from '@/lib/deepscan-page-projection'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
 import { getDeepScanTargetKey } from '@/lib/workflow-types'
@@ -285,26 +285,22 @@ export default function DeepScanPage() {
         : null,
     [target],
   )
-  const currentPayload = targetKey && activeTargetKey === targetKey ? activePayload : null
-  const reusablePayload = targetKey && lastSuccessful?.targetKey === targetKey ? lastSuccessful.payload : null
-  const payload = requestStatus === 'success' ? currentPayload : requestStatus === 'idle' ? (currentPayload ?? reusablePayload) : null
-  const fetchState: DeepScanPageFetchState = !target
-    ? 'idle'
-    : requestStatus === 'loading'
-      ? 'loading'
-      : requestStatus === 'error'
-        ? 'error'
-        : payload
-          ? 'success'
-          : 'idle'
+  const { payload, fetchState, shouldStartRequest } = resolveDeepScanPageCacheState({
+    hasTarget: Boolean(target),
+    targetKey,
+    requestStatus,
+    activePayload,
+    activeTargetKey,
+    lastSuccessful,
+  })
 
   useEffect(() => {
-    if (!target || requestStatus === 'loading' || requestStatus === 'error' || payload) {
+    if (!shouldStartRequest) {
       return
     }
 
     startRequest()
-  }, [payload, requestStatus, startRequest, target])
+  }, [shouldStartRequest, startRequest])
 
   useEffect(() => {
     if (!requestSeed || requestStatus !== 'loading') {
