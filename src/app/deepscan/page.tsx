@@ -97,7 +97,11 @@ function scorePillClass(score: number) {
   return 'bg-[color:var(--jaroo-warning-soft)] text-[color:var(--jaroo-warning)]'
 }
 
-function resolveAxisTone(score: number) {
+function resolveAxisTone(score: number | null) {
+  if (score === null) {
+    return 'warning' as const
+  }
+
   if (score >= 67) {
     return 'positive' as const
   }
@@ -110,6 +114,10 @@ function resolveAxisTone(score: number) {
 }
 
 function resolveMemberScoreClass(member: JarooDeepScanCommitteeAxis['members'][number]) {
+  if (member.status === 'error') {
+    return 'bg-[color:var(--jaroo-danger-soft)] text-[color:var(--jaroo-danger)]'
+  }
+
   if (member.tone === 'positive') {
     return scorePillClass(75)
   }
@@ -508,7 +516,7 @@ export default function DeepScanPage() {
             <p className='mt-3 text-sm leading-7 text-[color:var(--jaroo-ink)]/80'>{heroCard.body}</p>
             <div className='my-4 h-px bg-[color:var(--jaroo-primary)]/15' />
             <div className='flex items-center gap-3'>
-              <p className='text-base font-semibold text-[color:var(--jaroo-primary-strong)]'>{heroCard.score}</p>
+              <p className='text-base font-semibold text-[color:var(--jaroo-primary-strong)]'>{heroCard.scoreLabel === 'N/A' ? 'N/A' : heroCard.score}</p>
               <Badge className='rounded-[8px] bg-[#b5d4f4] px-3 py-1 text-[11px] text-[color:var(--jaroo-primary-strong)]'>
                 {heroCard.scoreLabel}
               </Badge>
@@ -619,7 +627,7 @@ export default function DeepScanPage() {
                           {axis.axisStatusText}
                         </span>
                         <div className='mt-3 h-1 rounded-full bg-[color:var(--jaroo-secondary)]'>
-                          <div className={cn('h-full rounded-full', toneStyle.bar)} style={{ width: `${Math.max(0, Math.min(axis.score, 100))}%` }} />
+                          <div className={cn('h-full rounded-full', toneStyle.bar)} style={{ width: `${Math.max(0, Math.min(axis.score ?? 0, 100))}%` }} />
                         </div>
                         <p className='mt-2 text-[10px] leading-4 text-[color:var(--jaroo-muted)]/80'>{axis.subtitle}</p>
                       </button>
@@ -644,28 +652,46 @@ export default function DeepScanPage() {
                       </div>
 
                       <div>
-                        {axis.members.map((member) => (
-                          <div
-                            key={`${axis.label}-${member.title}`}
-                            className='flex items-center gap-3 border-b border-[color:var(--jaroo-border)]/80 py-3 first:pt-0 last:border-b-0 last:pb-0'
-                          >
+                        {axis.members.map((member) => {
+                          const isErrorMember = member.status === 'error'
+
+                          return (
                             <div
+                              key={`${axis.label}-${member.title}`}
                               className={cn(
-                                'flex size-10 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold',
-                                memberIconStyles[member.iconTone],
+                                'flex items-center gap-3 border-b border-[color:var(--jaroo-border)]/80 py-3 first:pt-0 last:border-b-0 last:pb-0',
+                                isErrorMember && 'rounded-[16px] border border-[color:var(--jaroo-danger)]/20 bg-[color:var(--jaroo-danger-soft)]/70 px-3',
                               )}
                             >
-                              {member.shortLabel}
+                              <div
+                                className={cn(
+                                  'flex size-10 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold',
+                                  memberIconStyles[member.iconTone],
+                                )}
+                              >
+                                {member.shortLabel}
+                              </div>
+                              <div className='min-w-0 flex-1'>
+                                <p className='text-sm font-semibold text-[color:var(--jaroo-ink)]'>{member.title}</p>
+                                {isErrorMember ? (
+                                  <>
+                                    <p className='mt-1 text-xs font-medium leading-5 text-[color:var(--jaroo-danger)]'>
+                                      {member.error?.message ?? 'LLM 응답 실패'}
+                                    </p>
+                                    <p className='mt-0.5 text-[11px] leading-4 text-[color:var(--jaroo-danger)]/80'>
+                                      다시 실행이 필요합니다.
+                                    </p>
+                                  </>
+                                ) : (
+                                  <p className='mt-1 text-xs leading-5 text-[color:var(--jaroo-muted)]'>{member.reason}</p>
+                                )}
+                              </div>
+                              <span className={cn('shrink-0 rounded-full px-3 py-1 text-xs font-medium', resolveMemberScoreClass(member))}>
+                                {member.scoreLabel}
+                              </span>
                             </div>
-                            <div className='min-w-0 flex-1'>
-                              <p className='text-sm font-semibold text-[color:var(--jaroo-ink)]'>{member.title}</p>
-                              <p className='mt-1 text-xs leading-5 text-[color:var(--jaroo-muted)]'>{member.reason}</p>
-                            </div>
-                            <span className={cn('shrink-0 rounded-full px-3 py-1 text-xs font-medium', resolveMemberScoreClass(member))}>
-                              {member.scoreLabel}
-                            </span>
-                          </div>
-                        ))}
+                          )
+                        })}
                       </div>
                     </div>
                   )

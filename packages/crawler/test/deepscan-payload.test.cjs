@@ -444,13 +444,17 @@ test('buildJarooDeepScanPayload can surface dump-backed KR LLM committee scores 
   }
 });
 
-test('buildJarooDeepScanPayload blocks downstream KR blocks when one committee axis has 0/3 valid members', async () => {
+test('buildJarooDeepScanPayload preserves 9 committee slots and marks failed members after retry exhaustion', async () => {
   const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
   const originalFetch = global.fetch;
   const originalKey = process.env.OPENROUTER_API_KEY;
   const originalEnable = process.env.DEEPSCAN_KR_LLM_ENABLE;
+  const originalRetryDelay = process.env.DEEPSCAN_LLM_EMPTY_RETRY_DELAY_MS;
+  const originalRetryCount = process.env.DEEPSCAN_LLM_RETRY_COUNT;
   process.env.OPENROUTER_API_KEY = 'test-key';
   process.env.DEEPSCAN_KR_LLM_ENABLE = 'true';
+  process.env.DEEPSCAN_LLM_EMPTY_RETRY_DELAY_MS = '1';
+  process.env.DEEPSCAN_LLM_RETRY_COUNT = '3';
 
   global.fetch = (async (_url, init) => {
     const body = JSON.parse(String(init?.body ?? '{}'));
@@ -503,12 +507,29 @@ test('buildJarooDeepScanPayload blocks downstream KR blocks when one committee a
       sources: createStrongKrSources(),
     });
 
-    assert.equal(payload.committee.blockState, 'blocked');
-    assert.equal(payload.committee.axes.some((axis) => axis.label === 'Business Quality'), false);
-    assert.equal(payload.hero.blockState, 'blocked');
-    assert.equal(payload.strategy.blockState, 'blocked');
-    assert.equal(payload.sellNow.blockState, 'blocked');
-    assert.equal(payload.portfolioSimulation.blockState, 'blocked');
+    assert.equal(payload.committee.axes.length, 3);
+    const businessAxis = payload.committee.axes.find((axis) => axis.label === 'Business Quality');
+    assert.ok(businessAxis);
+    assert.equal(businessAxis.score, null);
+    assert.equal(businessAxis.scoreText, 'N/A');
+    assert.match(businessAxis.axisStatusText, /LLM 0\/3 · 오류 3\/3/);
+    assert.equal(businessAxis.members.length, 3);
+    assert.deepEqual(businessAxis.members.map((member) => member.status), ['error', 'error', 'error']);
+    assert.deepEqual(businessAxis.members.map((member) => member.score), [null, null, null]);
+    assert.equal(businessAxis.members[0].error.errorKind ?? businessAxis.members[0].error.kind, 'llm-upstream-error');
+    assert.equal(businessAxis.members[0].error.attempts, 4);
+    assert.equal(businessAxis.members[0].error.retryable, false);
+    const marketAxis = payload.committee.axes.find((axis) => axis.label === 'Market Timing');
+    assert.ok(marketAxis);
+    assert.equal(marketAxis.members.every((member) => member.status === 'success'), true);
+    assert.equal(typeof marketAxis.score, 'number');
+    assert.equal(payload.committee.blockState, 'ok');
+    assert.equal(payload.hero.blockState, 'ok');
+    assert.equal(payload.hero.scoreLabel, 'N/A');
+    assert.equal(payload.hero.statusText, '부분 오류');
+    assert.equal(payload.strategy.blockState, 'ok');
+    assert.equal(payload.sellNow.blockState, 'ok');
+    assert.equal(payload.portfolioSimulation.blockState, 'ok');
     assert.equal(payload.metadata.degraded, true);
   } finally {
     global.fetch = originalFetch;
@@ -518,6 +539,16 @@ test('buildJarooDeepScanPayload blocks downstream KR blocks when one committee a
       delete process.env.OPENROUTER_API_KEY;
     }
     process.env.DEEPSCAN_KR_LLM_ENABLE = originalEnable ?? 'false';
+    if (originalRetryDelay) {
+      process.env.DEEPSCAN_LLM_EMPTY_RETRY_DELAY_MS = originalRetryDelay;
+    } else {
+      delete process.env.DEEPSCAN_LLM_EMPTY_RETRY_DELAY_MS;
+    }
+    if (originalRetryCount) {
+      process.env.DEEPSCAN_LLM_RETRY_COUNT = originalRetryCount;
+    } else {
+      delete process.env.DEEPSCAN_LLM_RETRY_COUNT;
+    }
   }
 });
 

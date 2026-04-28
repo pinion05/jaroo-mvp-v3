@@ -10,6 +10,11 @@ function parsePositiveInteger(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback
 }
 
+function parseNonNegativeInteger(value, fallback) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.round(parsed) : fallback
+}
+
 function ensureLogDir(logDir) {
   mkdirSync(logDir, { recursive: true })
 }
@@ -120,6 +125,40 @@ function extractOpenRouterErrorStatus(result) {
   return typeof result?.error?.code === 'number' && Number.isInteger(result.error.code) ? result.error.code : 502
 }
 
+class CommitteeLlmError extends Error {
+  constructor(kind, message, details = {}) {
+    super(message)
+    this.name = 'CommitteeLlmError'
+    this.kind = kind
+    this.errorKind = kind
+    this.attempt = details.attempt ?? null
+    this.attempts = details.attempts ?? details.attempt ?? null
+    this.status = details.status ?? null
+    this.retryable = details.retryable ?? true
+    this.llmResultPresent = false
+  }
+}
+
+function asCommitteeLlmError(error, fallbackKind, fallbackMessage, details = {}) {
+  if (error instanceof CommitteeLlmError) {
+    return error
+  }
+
+  const message = error instanceof Error ? error.message : (fallbackMessage ?? String(error))
+  return new CommitteeLlmError(fallbackKind, message, details)
+}
+
+function writeAttemptFailureLog(runtimeOptions, memberKey, attempt, payload) {
+  const failureLog = {
+    member: memberKey,
+    attempt,
+    ...payload,
+    timestamp: new Date().toISOString(),
+  }
+  writeLog(runtimeOptions.logDir, `${memberKey}-attempt-${attempt}-failure.json`, failureLog)
+  writeLog(runtimeOptions.logDir, `${memberKey}-failure.json`, failureLog)
+}
+
 function clampScore(score) {
   return Math.min(100, Math.max(0, Math.round(score)))
 }
@@ -227,32 +266,33 @@ async function requestCommitteeAttempt(memberKey, dumps, runtimeOptions, attempt
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'OpenRouter committee request failed'
-    writeLog(runtimeOptions.logDir, `${memberKey}-failure.json`, {
-      member: memberKey,
-      attempt,
+    writeAttemptFailureLog(runtimeOptions, memberKey, attempt, {
+      errorKind: 'llm-timeout-or-network',
       error: message,
       elapsed_ms: Date.now() - startedAt,
-      timestamp: new Date().toISOString(),
     })
-    throw new Error(`OpenRouter request failed for ${memberKey}: ${message}`)
+    throw new CommitteeLlmError('llm-timeout-or-network', `OpenRouter request failed for ${memberKey}: ${message}`, {
+      attempt,
+    })
   }
 
   const result = await upstreamResponse.json().catch(() => null)
   const upstreamErrorMessage = extractOpenRouterErrorMessage(result)
   if (!upstreamResponse.ok || upstreamErrorMessage) {
     const message = upstreamErrorMessage || `OpenRouter committee request failed (${!upstreamResponse.ok ? upstreamResponse.status : extractOpenRouterErrorStatus(result)})`
-    writeLog(runtimeOptions.logDir, `${memberKey}-failure.json`, {
-      member: memberKey,
-      attempt,
+    writeAttemptFailureLog(runtimeOptions, memberKey, attempt, {
+      errorKind: 'llm-upstream-error',
       error: message,
       status: upstreamResponse.status,
       elapsed_ms: Date.now() - startedAt,
       choice: summarizeChoice(result),
       usage: extractUsage(result),
       upstream_result: result,
-      timestamp: new Date().toISOString(),
     })
-    throw new Error(message)
+    throw new CommitteeLlmError('llm-upstream-error', message, {
+      attempt,
+      status: upstreamResponse.status,
+    })
   }
 
   const rawContent = extractTextContent(result?.choices?.[0]?.message?.content)
@@ -261,9 +301,8 @@ async function requestCommitteeAttempt(memberKey, dumps, runtimeOptions, attempt
     try {
       parsed = JSON.parse(rawContent)
     } catch {
-      writeLog(runtimeOptions.logDir, `${memberKey}-failure.json`, {
-        member: memberKey,
-        attempt,
+      writeAttemptFailureLog(runtimeOptions, memberKey, attempt, {
+        errorKind: 'llm-invalid-json',
         error: `OpenRouter returned invalid JSON for ${memberKey}`,
         status: upstreamResponse.status,
         elapsed_ms: Date.now() - startedAt,
@@ -271,9 +310,11 @@ async function requestCommitteeAttempt(memberKey, dumps, runtimeOptions, attempt
         choice: summarizeChoice(result),
         usage: extractUsage(result),
         upstream_result: result,
-        timestamp: new Date().toISOString(),
       })
-      throw new Error(`OpenRouter returned invalid JSON for ${memberKey}`)
+      throw new CommitteeLlmError('llm-invalid-json', `OpenRouter returned invalid JSON for ${memberKey}`, {
+        attempt,
+        status: upstreamResponse.status,
+      })
     }
   }
 
@@ -296,6 +337,7 @@ export async function scoreCommitteeMember(memberKey, dumps, options = {}) {
     temperature: options.temperature ?? 0.1,
     timeoutMs: parsePositiveInteger(options.timeoutMs ?? process.env.DEEPSCAN_LLM_TIMEOUT_MS, 45000),
     emptyResponseRetryDelayMs: parsePositiveInteger(options.emptyResponseRetryDelayMs ?? process.env.DEEPSCAN_LLM_EMPTY_RETRY_DELAY_MS, EMPTY_RESPONSE_RETRY_DELAY_MS),
+    retryCount: parseNonNegativeInteger(options.retryCount ?? process.env.DEEPSCAN_LLM_RETRY_COUNT, 3),
     logDir: options.logDir ?? DEFAULT_LOG_DIR,
     systemPrompt: options.systemPrompt,
   }
@@ -304,83 +346,96 @@ export async function scoreCommitteeMember(memberKey, dumps, options = {}) {
     throw new Error('OPENROUTER_API_KEY is not configured.')
   }
 
-  for (let attempt = 0; attempt < 2; attempt += 1) {
-    const attemptNumber = attempt + 1
-    const attemptResult = await requestCommitteeAttempt(memberKey, dumps, runtimeOptions, attemptNumber)
-    const { upstreamResponse, result, rawContent, parsed, elapsedMs } = attemptResult
+  const maxAttempts = runtimeOptions.retryCount + 1
 
-    if (!rawContent || parsed === null) {
-      const emptyAttemptLog = {
+  let attemptNumber = 0
+  while (true) {
+    attemptNumber += 1
+    try {
+      const attemptResult = await requestCommitteeAttempt(memberKey, dumps, runtimeOptions, attemptNumber)
+      const { upstreamResponse, result, rawContent, parsed, elapsedMs } = attemptResult
+
+      if (!rawContent || parsed === null) {
+        const errorKind = rawContent ? 'llm-null-content' : 'llm-empty-content'
+        writeAttemptFailureLog(runtimeOptions, memberKey, attemptNumber, {
+          errorKind,
+          error: `OpenRouter returned ${rawContent ? 'null' : 'empty'} committee response for ${memberKey}`,
+          empty_content: rawContent.length === 0,
+          status: upstreamResponse.status,
+          elapsed_ms: elapsedMs,
+          raw_content: rawContent,
+          parsed,
+          choice: summarizeChoice(result),
+          usage: extractUsage(result),
+          upstream_result: result,
+        })
+        throw new CommitteeLlmError(errorKind, `OpenRouter returned ${rawContent ? 'null' : 'empty'} committee response for ${memberKey}`, {
+          attempt: attemptNumber,
+          status: upstreamResponse.status,
+        })
+      }
+
+      const coerced = coerceCommitteeResult(parsed)
+      if (!coerced) {
+        writeAttemptFailureLog(runtimeOptions, memberKey, attemptNumber, {
+          errorKind: 'llm-invalid-schema',
+          error: `OpenRouter returned invalid committee schema for ${memberKey}`,
+          status: upstreamResponse.status,
+          elapsed_ms: elapsedMs,
+          raw_content: rawContent,
+          parsed,
+          choice: summarizeChoice(result),
+          usage: extractUsage(result),
+          upstream_result: result,
+        })
+        throw new CommitteeLlmError('llm-invalid-schema', `OpenRouter returned invalid committee schema for ${memberKey}`, {
+          attempt: attemptNumber,
+          status: upstreamResponse.status,
+        })
+      }
+
+      const finalResult = {
+        ...coerced,
+        attempts: attemptNumber,
+        finalStatus: 'success',
+        errorKind: null,
+        llmResultPresent: true,
+        model: runtimeOptions.model,
+      }
+
+      writeLog(runtimeOptions.logDir, `${memberKey}.json`, {
         member: memberKey,
+        model: runtimeOptions.model,
         attempt: attemptNumber,
-        empty_content: rawContent.length === 0,
-        status: upstreamResponse.status,
+        attempts: attemptNumber,
+        finalStatus: 'success',
+        errorKind: null,
+        llmResultPresent: true,
         elapsed_ms: elapsedMs,
+        status: upstreamResponse.status,
         raw_content: rawContent,
         parsed,
+        coerced,
         choice: summarizeChoice(result),
         usage: extractUsage(result),
-        upstream_result: result,
         timestamp: new Date().toISOString(),
-      }
-      writeLog(runtimeOptions.logDir, `${memberKey}-attempt-${attemptNumber}.json`, emptyAttemptLog)
-      if (attempt === 0) {
+      })
+
+      return finalResult
+    } catch (error) {
+      const committeeError = asCommitteeLlmError(error, 'llm-unknown', `OpenRouter committee request failed for ${memberKey}`, {
+        attempt: attemptNumber,
+      })
+      committeeError.attempts = attemptNumber
+      committeeError.retryable = attemptNumber < maxAttempts
+      if (attemptNumber < maxAttempts) {
         await delay(runtimeOptions.emptyResponseRetryDelayMs)
         continue
       }
-
-      writeLog(runtimeOptions.logDir, `${memberKey}-failure.json`, {
-        member: memberKey,
-        attempt: attemptNumber,
-        empty_content: rawContent.length === 0,
-        status: upstreamResponse.status,
-        elapsed_ms: elapsedMs,
-        raw_content: rawContent,
-        parsed,
-        choice: summarizeChoice(result),
-        usage: extractUsage(result),
-        upstream_result: result,
-        timestamp: new Date().toISOString(),
-      })
-      throw new Error(`OpenRouter returned ${rawContent ? 'null' : 'empty'} committee response for ${memberKey}`)
+      committeeError.retryable = false
+      throw committeeError
     }
-
-    const coerced = coerceCommitteeResult(parsed)
-    if (!coerced) {
-      writeLog(runtimeOptions.logDir, `${memberKey}-failure.json`, {
-        member: memberKey,
-        attempt: attemptNumber,
-        error: `OpenRouter returned invalid committee schema for ${memberKey}`,
-        status: upstreamResponse.status,
-        elapsed_ms: elapsedMs,
-        raw_content: rawContent,
-        parsed,
-        choice: summarizeChoice(result),
-        usage: extractUsage(result),
-        upstream_result: result,
-        timestamp: new Date().toISOString(),
-      })
-      throw new Error(`OpenRouter returned invalid committee schema for ${memberKey}`)
-    }
-
-    writeLog(runtimeOptions.logDir, `${memberKey}.json`, {
-      member: memberKey,
-      model: runtimeOptions.model,
-      attempt: attemptNumber,
-      elapsed_ms: elapsedMs,
-      status: upstreamResponse.status,
-      raw_content: rawContent,
-      parsed,
-      coerced,
-      choice: summarizeChoice(result),
-      usage: extractUsage(result),
-      timestamp: new Date().toISOString(),
-    })
-
-    return coerced
   }
-
-  throw new Error(`OpenRouter retry loop exhausted for ${memberKey}`)
 }
 
 export async function scoreCommitteeMembers({ memberKeys, shared, members, options = {} }) {
@@ -392,7 +447,10 @@ export async function scoreCommitteeMembers({ memberKeys, shared, members, optio
     async (memberKey) => {
       const memberDump = members[memberKey]
       if (typeof memberDump === 'undefined') {
-        throw new Error(`Missing generated runtime dump for ${memberKey}`)
+        throw new CommitteeLlmError('runtime-missing-dump', `Missing generated runtime dump for ${memberKey}`, {
+          attempts: 0,
+          retryable: false,
+        })
       }
       const result = await scoreCommitteeMember(memberKey, { shared, memberDump }, runtimeOptions)
       return [memberKey, result]
@@ -408,8 +466,19 @@ export async function scoreCommitteeMembers({ memberKeys, shared, members, optio
       results[fulfilledMember] = result
       return
     }
-    const reason = entry.reason instanceof Error ? entry.reason.message : String(entry.reason)
-    errors.push({ member: memberKey, error: reason })
+    const reason = asCommitteeLlmError(entry.reason, 'llm-unknown', String(entry.reason), {
+      attempts: parseNonNegativeInteger(runtimeOptions.retryCount ?? process.env.DEEPSCAN_LLM_RETRY_COUNT, 3) + 1,
+    })
+    errors.push({
+      member: memberKey,
+      error: reason.message,
+      errorKind: reason.errorKind ?? reason.kind ?? 'llm-unknown',
+      attempts: reason.attempts ?? null,
+      finalStatus: 'error',
+      retryable: false,
+      llmResultPresent: false,
+      model: runtimeOptions.model ?? process.env.DEEPSCAN_LLM_MODEL ?? process.env.OCR_MODEL ?? 'qwen/qwen3.5-flash-02-23',
+    })
   })
 
   const logDir = runtimeOptions.logDir ?? DEFAULT_LOG_DIR
@@ -417,7 +486,16 @@ export async function scoreCommitteeMembers({ memberKeys, shared, members, optio
     summaryKey: runtimeOptions.summaryKey ?? 'committee',
     model: runtimeOptions.model ?? process.env.DEEPSCAN_LLM_MODEL ?? process.env.OCR_MODEL ?? 'qwen/qwen3.5-flash-02-23',
     concurrency: Math.max(1, Math.min(memberKeys.length || 1, concurrency)),
-    members: Object.fromEntries(Object.entries(results).map(([key, value]) => [key, { score: value?.score, confidence: value?.confidence, reason_preview: value?.reason.slice(0, 80) }])),
+    members: Object.fromEntries(Object.entries(results).map(([key, value]) => [key, {
+      score: value?.score,
+      confidence: value?.confidence,
+      reason_preview: value?.reason.slice(0, 80),
+      attempts: value?.attempts ?? null,
+      finalStatus: value?.finalStatus ?? 'success',
+      errorKind: value?.errorKind ?? null,
+      llmResultPresent: value?.llmResultPresent ?? true,
+      model: value?.model ?? runtimeOptions.model ?? null,
+    }])),
     errors,
     timestamp: new Date().toISOString(),
   })

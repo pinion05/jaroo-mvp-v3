@@ -532,31 +532,51 @@ function systemPrompt(memberKey) {
   ].join(' ');
 }
 
-function rollupAxis(axisKey, memberKeys, results) {
-  const validMembers = memberKeys.filter((memberKey) => results[memberKey]);
-  if (validMembers.length === 0) {
-    return {
-      axisKey,
-      validMembers,
-      omitted: true,
-      score: null,
-      memberScores: {},
-    };
+function normalizeLlmMemberErrors(errors, memberKeys) {
+  const direct = new Map();
+  const globalErrors = [];
+
+  for (const error of Array.isArray(errors) ? errors : []) {
+    const member = normalizeText(error?.member);
+    if (!member || member === 'all') {
+      globalErrors.push(error);
+      continue;
+    }
+    direct.set(member, error);
   }
 
-  const memberScores = Object.fromEntries(validMembers.map((memberKey) => [memberKey, results[memberKey].score]));
+  const fallbackGlobalError = globalErrors[0] ?? null;
+  return Object.fromEntries(memberKeys.map((memberKey) => [
+    memberKey,
+    direct.get(memberKey) ?? fallbackGlobalError,
+  ]));
+}
+
+function getAxisScore(axisKey, memberScores) {
   const committee = buildKrCommitteeFromMemberScores(memberScores);
-  const score = axisKey === 'businessQuality'
-    ? committee.businessQuality.score
-    : axisKey === 'marketTiming'
-      ? committee.marketTiming.score
-      : committee.positionFit.score;
+  if (axisKey === 'businessQuality') {
+    return committee.businessQuality.score;
+  }
+  if (axisKey === 'marketTiming') {
+    return committee.marketTiming.score;
+  }
+  return committee.positionFit.score;
+}
+
+function rollupAxis(axisKey, memberKeys, results, errorsByMember) {
+  const validMembers = memberKeys.filter((memberKey) => results[memberKey]);
+  const errorMembers = memberKeys.filter((memberKey) => !results[memberKey]);
+  const memberScores = Object.fromEntries(validMembers.map((memberKey) => [memberKey, results[memberKey].score]));
+  const hasErrors = errorMembers.length > 0;
 
   return {
     axisKey,
     validMembers,
+    errorMembers,
+    errorsByMember,
     omitted: false,
-    score,
+    hasErrors,
+    score: hasErrors ? null : getAxisScore(axisKey, memberScores),
     memberScores,
   };
 }
@@ -629,45 +649,95 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
   };
 }
 
-export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults) {
+function buildSuccessMember(memberKey, result) {
+  return {
+    shortLabel: KR_MEMBER_SPECS[memberKey].shortLabel,
+    title: KR_MEMBER_SPECS[memberKey].title,
+    status: 'success',
+    reason: result.reason,
+    score: result.score,
+    scoreLabel: String(result.score),
+    tone: result.score >= 70 ? 'positive' : result.score >= 55 ? 'neutral' : 'warning',
+    iconTone: result.score >= 70 ? 'green' : result.score >= 55 ? 'blue' : 'amber',
+    confidence: result.confidence,
+    error: null,
+  };
+}
+
+function buildErrorMember(memberKey, error) {
+  const attempts = Number.isFinite(Number(error?.attempts)) ? Number(error.attempts) : 4;
+  const kind = normalizeText(error?.errorKind) ?? 'llm-unknown';
+  return {
+    shortLabel: KR_MEMBER_SPECS[memberKey].shortLabel,
+    title: KR_MEMBER_SPECS[memberKey].title,
+    status: 'error',
+    reason: null,
+    score: null,
+    scoreLabel: 'Error',
+    tone: 'warning',
+    iconTone: 'red',
+    error: {
+      kind,
+      message: `LLM 응답 실패 · ${attempts}회 시도`,
+      attempts,
+      retryable: Boolean(error?.retryable),
+    },
+  };
+}
+
+function axisLabel(axisKey) {
+  return axisKey === 'businessQuality' ? 'Business Quality' : axisKey === 'marketTiming' ? 'Market Timing' : 'Position Fit';
+}
+
+function axisSubtitle(axisKey, hasErrors) {
+  if (hasErrors) {
+    return '일부 LLM 위원 응답 실패로 축 점수를 보류했습니다.';
+  }
+  return axisKey === 'businessQuality'
+    ? '덤프 기반 KR 기업 체력 점수'
+    : axisKey === 'marketTiming'
+      ? '덤프 기반 KR 타이밍 신호 점수'
+      : '덤프 기반 KR 포지션 적합도 점수';
+}
+
+export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErrors = []) {
   const byAxis = {
     businessQuality: ['profitability', 'valuation', 'ownershipStability'],
     marketTiming: ['trend', 'consensusMomentum', 'priceLocation'],
     positionFit: ['avgPriceGap', 'upsideBuffer', 'holdingCompleteness'],
   };
+  const allMemberKeys = Object.values(byAxis).flat();
+  const errorsByMember = normalizeLlmMemberErrors(llmErrors, allMemberKeys);
 
-  const businessAxis = rollupAxis('businessQuality', byAxis.businessQuality, llmResults);
-  const marketAxis = rollupAxis('marketTiming', byAxis.marketTiming, llmResults);
-  const positionAxis = rollupAxis('positionFit', byAxis.positionFit, llmResults);
+  const businessAxis = rollupAxis('businessQuality', byAxis.businessQuality, llmResults, errorsByMember);
+  const marketAxis = rollupAxis('marketTiming', byAxis.marketTiming, llmResults, errorsByMember);
+  const positionAxis = rollupAxis('positionFit', byAxis.positionFit, llmResults, errorsByMember);
 
   const axes = [businessAxis, marketAxis, positionAxis]
-    .filter((axis) => !axis.omitted)
     .map((axis) => ({
-      label: axis.axisKey === 'businessQuality' ? 'Business Quality' : axis.axisKey === 'marketTiming' ? 'Market Timing' : 'Position Fit',
+      label: axisLabel(axis.axisKey),
       score: axis.score,
-      scoreText: `${axis.score} / 100`,
-      axisStatusText: `LLM 위원 ${axis.validMembers.length}/3명 반영`,
-      subtitle: axis.axisKey === 'businessQuality'
-        ? '덤프 기반 KR 기업 체력 점수'
-        : axis.axisKey === 'marketTiming'
-          ? '덤프 기반 KR 타이밍 신호 점수'
-          : '덤프 기반 KR 포지션 적합도 점수',
-      avgLabel: `위원 평균 ${axis.score}`,
-      members: axis.validMembers.map((memberKey) => ({
-        shortLabel: KR_MEMBER_SPECS[memberKey].shortLabel,
-        title: KR_MEMBER_SPECS[memberKey].title,
-        reason: llmResults[memberKey].reason,
-        score: llmResults[memberKey].score,
-        scoreLabel: String(llmResults[memberKey].score),
-        tone: llmResults[memberKey].score >= 70 ? 'positive' : llmResults[memberKey].score >= 55 ? 'neutral' : 'warning',
-        iconTone: llmResults[memberKey].score >= 70 ? 'green' : llmResults[memberKey].score >= 55 ? 'blue' : 'amber',
-      })),
+      scoreText: axis.score === null ? 'N/A' : `${axis.score} / 100`,
+      axisStatusText: axis.hasErrors
+        ? `LLM ${axis.validMembers.length}/3 · 오류 ${axis.errorMembers.length}/3`
+        : 'LLM 위원 3/3명 반영',
+      subtitle: axisSubtitle(axis.axisKey, axis.hasErrors),
+      avgLabel: axis.score === null ? '위원 평균 N/A' : `위원 평균 ${axis.score}`,
+      members: byAxis[axis.axisKey].map((memberKey) => (
+        llmResults[memberKey]
+          ? buildSuccessMember(memberKey, llmResults[memberKey])
+          : buildErrorMember(memberKey, errorsByMember[memberKey])
+      )),
     }));
 
-  const committeeScores = buildKrCommitteeFromMemberScores(Object.fromEntries(Object.entries(llmResults).map(([key, value]) => [key, value.score])));
+  const hasMemberErrors = [businessAxis, marketAxis, positionAxis].some((axis) => axis.hasErrors);
+  const committeeScores = hasMemberErrors
+    ? null
+    : buildKrCommitteeFromMemberScores(Object.fromEntries(Object.entries(llmResults).map(([key, value]) => [key, value.score])));
   return {
     axes,
     committeeScores,
+    hasMemberErrors,
     coverage: {
       businessQuality: businessAxis,
       marketTiming: marketAxis,
