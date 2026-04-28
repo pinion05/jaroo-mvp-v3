@@ -1,13 +1,19 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useMemo, useState, useSyncExternalStore } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { JarooShell } from '@/components/jaroo-shell'
-import { etfAnalysis, type EtfScenarioTone, type EtfTab, type EtfValueTone } from '@/lib/jaroo-data'
+import { type EtfScenarioTone, type EtfTab, type EtfValueTone } from '@/lib/jaroo-data'
+import {
+  getSelectedEtfServerSnapshot,
+  getSelectedEtfSnapshot,
+  resolveSelectedEtfAnalysisFromSnapshot,
+  subscribeSelectedEtfSnapshot,
+} from '@/lib/jaroo-etf-selected'
 import { cn } from '@/lib/utils'
 
 const tabs: Array<{ id: EtfTab; label: string }> = [
@@ -85,6 +91,12 @@ function EtfBottomFooter({ tab, onSwitch }: { tab: EtfTab; onSwitch: () => void 
 
 export default function EtfPage() {
   const [tab, setTab] = useState<EtfTab>('overview')
+  const selectedEtfSnapshot = useSyncExternalStore(
+    subscribeSelectedEtfSnapshot,
+    getSelectedEtfSnapshot,
+    getSelectedEtfServerSnapshot,
+  )
+  const etfAnalysis = useMemo(() => resolveSelectedEtfAnalysisFromSnapshot(selectedEtfSnapshot), [selectedEtfSnapshot])
 
   const handleTabChange = (nextTab: EtfTab) => {
     setTab(nextTab)

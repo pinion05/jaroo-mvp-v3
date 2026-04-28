@@ -25,6 +25,7 @@ import {
   resolveUsdKrwRateAfterFailedQuoteResponse,
   shouldSkipHomeQuoteHydration,
 } from '@/lib/home-quote-bootstrap'
+import { persistSelectedEtfTarget } from '@/lib/jaroo-etf-selected'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 import {
@@ -902,8 +903,14 @@ export function JarooHomeScreen() {
       return
     }
 
+    if (item.actionHref === '/etf' && item.kind === 'etf') {
+      persistSelectedEtfTarget(item)
+      router.push(item.actionHref)
+      return
+    }
+
     await navigateToDeepScanForHolding(item.id, item.actionHref)
-  }, [navigateToDeepScanForHolding])
+  }, [navigateToDeepScanForHolding, router])
 
   const donutChartData = useMemo<DonutChartDatum[]>(
     () => homeHoldings.map((item) => ({ ...item, value: Math.max(item.donutPercent, 0.01) })),
