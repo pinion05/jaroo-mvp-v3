@@ -1,7 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 
-import { buildAppliedHomePortfolioRowsFromConfirmedHoldings, buildMergeRowsFromReviewRows, prepareMergeRowsForApply } from './jaroo-merge-screen'
+import { buildAppliedHomePortfolioRowsFromConfirmedHoldings, buildMergeRowsFromReviewRows, MergeResultRowCard, prepareMergeRowsForApply } from './jaroo-merge-screen'
 import type { OcrReviewRow } from '@/lib/workflow-types'
 
 function createReviewRow(overrides: Partial<OcrReviewRow> = {}): OcrReviewRow {
@@ -97,4 +99,11 @@ test('buildAppliedHomePortfolioRowsFromConfirmedHoldings는 홈 호환 payload�
   assert.equal(appliedRow?.resolvedCode, '005930')
   assert.equal(appliedRow?.resolvedTicker, '005930.KS')
   assert.equal(appliedRow?.averagePriceCurrency, 'KRW')
+})
+
+test('MergeResultRowCard는 수익률 값을 한 번만 렌더링한다', () => {
+  const [mergeRow] = buildMergeRowsFromReviewRows([createReviewRow()])
+  const markup = renderToStaticMarkup(createElement(MergeResultRowCard, { row: mergeRow, isLast: true }))
+
+  assert.equal(markup.match(/-23\.4%/g)?.length, 1)
 })
