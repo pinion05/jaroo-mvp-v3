@@ -1,5 +1,5 @@
 import { buildDeepScanTargetSession, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding, type DeepScanTargetSession } from '@/lib/deepscan-target'
-import type { PortfolioNormalizedItem } from '@/lib/workflow-types'
+import { buildIdentifierLabel, type PortfolioNormalizedItem, type WorkflowAsyncStatus } from '@/lib/workflow-types'
 import { normalizeStockName, parseOcrNumber, type OcrRow } from '@/lib/screenshot-ocr'
 
 export type HomeBadgeTone = 'amber' | 'red' | 'green'
@@ -9,6 +9,65 @@ export type HomeMarketTone = 'kospi' | 'kosdaq' | 'etf' | 'nasdaq'
 export type HomeActionTone = 'blue' | 'red' | 'green'
 export type MomentumStageTone = 'danger' | 'muted' | 'positive'
 export type AveragePriceCurrency = 'KRW' | 'USD'
+
+export type HomeMarketScoreStatus = 'loading' | 'ready' | 'fallback' | 'error'
+
+export type HomeMarketScoreDetail = {
+  label: string
+  value: string
+  meta?: string
+}
+
+export type HomeMarketScore = {
+  score: string
+  status: HomeMarketScoreStatus
+  label: string
+  tone: HomeBadgeTone
+  description: string
+  details: HomeMarketScoreDetail[]
+  sourceLabel: string
+  updatedLabel: string
+}
+
+export type HomeMarketVolatilitySignal = {
+  value?: number | null
+  changePercent?: number | null
+  asOf?: string | null
+}
+
+export type HomeMarketAdrSignal = {
+  value?: number | null
+  change?: number | null
+  asOf?: string | null
+}
+
+export type HomeUsdKrwSignal = {
+  rate?: number | null
+  changePercent?: number | null
+  timestamp?: string | null
+}
+
+export type HomeMarketScoreSignals = {
+  usdKrw?: HomeUsdKrwSignal | null
+  indicators?: {
+    vkospi?: HomeMarketVolatilitySignal | null
+    usVix?: HomeMarketVolatilitySignal | null
+    adr?: {
+      kospi?: HomeMarketAdrSignal | null
+      kosdaq?: HomeMarketAdrSignal | null
+    } | null
+  } | null
+}
+
+type HomeMarketAdrSignals = NonNullable<NonNullable<HomeMarketScoreSignals['indicators']>['adr']>
+
+export type BuildHomeMarketScoreOptions = {
+  quoteStatus?: WorkflowAsyncStatus
+  isAppliedPortfolio?: boolean
+  marketSignalStatus?: WorkflowAsyncStatus
+  marketSignals?: HomeMarketScoreSignals | null
+  updatedLabel?: string
+}
 
 export type HomeHolding = {
   id: number
@@ -305,6 +364,295 @@ export const homeHoldings: HomeHolding[] = [
     actionHref: '/etf',
   },
 ]
+
+const HOME_MARKET_SCORE_BASELINE = 72
+const HOME_MARKET_SCORE_MIN = 0
+const HOME_MARKET_SCORE_MAX = 99
+const HOME_MARKET_SCORE_FAVORABLE_THRESHOLD = 70
+const HOME_MARKET_SCORE_NEUTRAL_THRESHOLD = 45
+const HOME_MARKET_SCORE_VOLATILITY_CALM = 16
+const HOME_MARKET_SCORE_VOLATILITY_ELEVATED = 22
+const HOME_MARKET_SCORE_VOLATILITY_STRESSED = 30
+const HOME_MARKET_SCORE_VIX_MAX_PENALTY = 18
+const HOME_MARKET_SCORE_VKOSPI_MAX_PENALTY = 16
+const HOME_MARKET_SCORE_FX_STRONG_KRW_RATE = 1300
+const HOME_MARKET_SCORE_FX_ELEVATED_RATE = 1400
+const HOME_MARKET_SCORE_FX_STRESSED_RATE = 1450
+const HOME_MARKET_SCORE_FX_CHANGE_WEIGHT = 6
+const HOME_MARKET_SCORE_FX_CHANGE_MAX_PENALTY = 8
+const HOME_MARKET_SCORE_FX_CHANGE_MAX_BONUS = -4
+const HOME_MARKET_SCORE_ADR_WEAK = 75
+const HOME_MARKET_SCORE_ADR_SOFT = 90
+const HOME_MARKET_SCORE_ADR_FIRM = 105
+const HOME_MARKET_SCORE_ADR_STRONG = 120
+
+function clampMarketScore(value: number) {
+  return Math.min(HOME_MARKET_SCORE_MAX, Math.max(HOME_MARKET_SCORE_MIN, value))
+}
+
+function toFiniteNumber(value: number | null | undefined) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : null
+}
+
+function clampPenalty(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function calculateVolatilityPenalty(value: number | null, maxPenalty: number) {
+  if (value === null) {
+    return 0
+  }
+
+  if (value <= HOME_MARKET_SCORE_VOLATILITY_CALM) {
+    return -3
+  }
+
+  if (value <= HOME_MARKET_SCORE_VOLATILITY_ELEVATED) {
+    return (value - HOME_MARKET_SCORE_VOLATILITY_CALM) * 1.2
+  }
+
+  if (value <= HOME_MARKET_SCORE_VOLATILITY_STRESSED) {
+    return 7.2 + (value - HOME_MARKET_SCORE_VOLATILITY_ELEVATED) * 1.1
+  }
+
+  return maxPenalty
+}
+
+function calculateUsdKrwPenalty(usdKrw: HomeUsdKrwSignal | null | undefined) {
+  const rate = toFiniteNumber(usdKrw?.rate)
+  const changePercent = toFiniteNumber(usdKrw?.changePercent)
+  let penalty = 0
+
+  if (rate !== null) {
+    if (rate >= HOME_MARKET_SCORE_FX_STRESSED_RATE) {
+      penalty += 6
+    } else if (rate >= HOME_MARKET_SCORE_FX_ELEVATED_RATE) {
+      penalty += 3
+    } else if (rate <= HOME_MARKET_SCORE_FX_STRONG_KRW_RATE) {
+      penalty -= 2
+    }
+  }
+
+  if (changePercent !== null) {
+    penalty += clampPenalty(
+      changePercent * HOME_MARKET_SCORE_FX_CHANGE_WEIGHT,
+      HOME_MARKET_SCORE_FX_CHANGE_MAX_BONUS,
+      HOME_MARKET_SCORE_FX_CHANGE_MAX_PENALTY,
+    )
+  }
+
+  return penalty
+}
+
+function calculateAdrPenalty(adr: HomeMarketAdrSignals | null | undefined) {
+  const values = [toFiniteNumber(adr?.kospi?.value), toFiniteNumber(adr?.kosdaq?.value)].filter((value): value is number => value !== null)
+  const changes = [toFiniteNumber(adr?.kospi?.change), toFiniteNumber(adr?.kosdaq?.change)].filter((value): value is number => value !== null)
+
+  if (values.length === 0) {
+    return 0
+  }
+
+  const averageAdr = values.reduce((sum, value) => sum + value, 0) / values.length
+  const averageChange = changes.length > 0
+    ? changes.reduce((sum, value) => sum + value, 0) / changes.length
+    : 0
+
+  let penalty = 0
+  if (averageAdr < HOME_MARKET_SCORE_ADR_WEAK) {
+    penalty += 8
+  } else if (averageAdr < HOME_MARKET_SCORE_ADR_SOFT) {
+    penalty += 4
+  } else if (averageAdr >= HOME_MARKET_SCORE_ADR_STRONG) {
+    penalty -= 4
+  } else if (averageAdr >= HOME_MARKET_SCORE_ADR_FIRM) {
+    penalty -= 2
+  }
+
+  if (averageChange < 0) {
+    penalty += 2
+  } else if (averageChange > 0) {
+    penalty -= 1
+  }
+
+  return penalty
+}
+
+function hasUsableMarketSignals(signals: HomeMarketScoreSignals | null | undefined) {
+  return [
+    signals?.usdKrw?.rate,
+    signals?.usdKrw?.changePercent,
+    signals?.indicators?.usVix?.value,
+    signals?.indicators?.vkospi?.value,
+    signals?.indicators?.adr?.kospi?.value,
+    signals?.indicators?.adr?.kosdaq?.value,
+  ].some((value) => toFiniteNumber(value) !== null)
+}
+
+function formatSignedPercent(value: number | null) {
+  if (value === null) {
+    return null
+  }
+
+  return `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`
+}
+
+function formatMarketNumber(value: number | null, digits = 1) {
+  return value === null ? null : value.toFixed(digits)
+}
+
+function formatSignedMarketNumber(value: number | null, digits = 2) {
+  if (value === null) {
+    return null
+  }
+
+  return `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`
+}
+
+function formatMarketScoreUpdatedLabel(status: WorkflowAsyncStatus | undefined, fallbackLabel?: string) {
+  if (fallbackLabel) {
+    return fallbackLabel
+  }
+
+  if (status === 'loading') {
+    return '갱신 중'
+  }
+
+  if (status === 'success') {
+    return '방금 갱신'
+  }
+
+  if (status === 'error') {
+    return '최근 갱신 실패'
+  }
+
+  return '시장지표 대기'
+}
+
+export function buildHomeMarketScore(_holdings: HomeHolding[], options: BuildHomeMarketScoreOptions = {}): HomeMarketScore {
+  const marketSignalStatus = options.marketSignalStatus ?? options.quoteStatus ?? 'idle'
+  const updatedLabel = formatMarketScoreUpdatedLabel(marketSignalStatus, options.updatedLabel)
+  const marketSignals = options.marketSignals ?? null
+  const hasMarketSignals = hasUsableMarketSignals(marketSignals)
+
+  if (marketSignalStatus === 'loading' && !hasMarketSignals) {
+    return {
+      score: '-',
+      status: 'loading',
+      label: '계산 중',
+      tone: 'amber',
+      description: 'VIX, VKOSPI, ADR, USD/KRW 시장지표를 불러와 점수를 계산하고 있어요.',
+      details: [],
+      sourceLabel: '출처: 시장지표',
+      updatedLabel,
+    }
+  }
+
+  if (!hasMarketSignals) {
+    const isError = marketSignalStatus === 'error'
+    return {
+      score: '-',
+      status: isError ? 'error' : 'fallback',
+      label: isError ? '대체' : '대기',
+      tone: isError ? 'red' : 'amber',
+      description: isError
+        ? '시장지표를 불러오지 못해 점수를 계산하지 못했어요. 잠시 뒤 다시 시도해 주세요.'
+        : 'VIX, VKOSPI, ADR, USD/KRW 시장지표가 준비되면 점수를 보여줘요.',
+      details: [],
+      sourceLabel: '출처: 시장지표 필요',
+      updatedLabel,
+    }
+  }
+
+  const usdKrw = marketSignals?.usdKrw ?? null
+  const usVix = marketSignals?.indicators?.usVix ?? null
+  const vkospi = marketSignals?.indicators?.vkospi ?? null
+  const adr = marketSignals?.indicators?.adr ?? null
+  const usVixValue = toFiniteNumber(usVix?.value)
+  const usVixChangePercent = toFiniteNumber(usVix?.changePercent)
+  const vkospiValue = toFiniteNumber(vkospi?.value)
+  const vkospiChangePercent = toFiniteNumber(vkospi?.changePercent)
+  const usdKrwRate = toFiniteNumber(usdKrw?.rate)
+  const usdKrwChangePercent = toFiniteNumber(usdKrw?.changePercent)
+  const kospiAdrValue = toFiniteNumber(adr?.kospi?.value)
+  const kospiAdrChange = toFiniteNumber(adr?.kospi?.change)
+  const kosdaqAdrValue = toFiniteNumber(adr?.kosdaq?.value)
+  const kosdaqAdrChange = toFiniteNumber(adr?.kosdaq?.change)
+  const adrPenalty = calculateAdrPenalty(adr)
+  const riskPenalty =
+    calculateVolatilityPenalty(usVixValue, HOME_MARKET_SCORE_VIX_MAX_PENALTY)
+    + calculateVolatilityPenalty(vkospiValue, HOME_MARKET_SCORE_VKOSPI_MAX_PENALTY)
+    + calculateUsdKrwPenalty(usdKrw)
+    + adrPenalty
+  const scoreNumber = Math.round(clampMarketScore(
+    HOME_MARKET_SCORE_BASELINE - riskPenalty,
+  ))
+  const tone: HomeBadgeTone = scoreNumber >= HOME_MARKET_SCORE_FAVORABLE_THRESHOLD ? 'green' : scoreNumber >= HOME_MARKET_SCORE_NEUTRAL_THRESHOLD ? 'amber' : 'red'
+  const label = scoreNumber >= HOME_MARKET_SCORE_FAVORABLE_THRESHOLD
+    ? '우호적'
+    : scoreNumber >= HOME_MARKET_SCORE_NEUTRAL_THRESHOLD
+      ? '중립'
+      : '경계'
+  const sourceParts = [
+    usVixValue !== null ? 'US VIX' : null,
+    vkospiValue !== null ? 'VKOSPI' : null,
+    adr ? 'ADR' : null,
+    usdKrwRate !== null || usdKrwChangePercent !== null ? 'USD/KRW' : null,
+  ].filter((part): part is string => Boolean(part))
+  const details: HomeMarketScoreDetail[] = []
+  if (usVixValue !== null) {
+    details.push({
+      label: 'US VIX',
+      value: formatMarketNumber(usVixValue) ?? '-',
+      meta: formatSignedPercent(usVixChangePercent) ?? undefined,
+    })
+  }
+  if (vkospiValue !== null) {
+    details.push({
+      label: 'VKOSPI',
+      value: formatMarketNumber(vkospiValue) ?? '-',
+      meta: formatSignedPercent(vkospiChangePercent) ?? undefined,
+    })
+  }
+  if (kospiAdrValue !== null) {
+    details.push({
+      label: 'KOSPI ADR',
+      value: formatMarketNumber(kospiAdrValue, 2) ?? '-',
+      meta: formatSignedMarketNumber(kospiAdrChange) ?? undefined,
+    })
+  }
+  if (kosdaqAdrValue !== null) {
+    details.push({
+      label: 'KOSDAQ ADR',
+      value: formatMarketNumber(kosdaqAdrValue, 2) ?? '-',
+      meta: formatSignedMarketNumber(kosdaqAdrChange) ?? undefined,
+    })
+  }
+  if (usdKrwRate !== null) {
+    details.push({
+      label: 'USD/KRW',
+      value: `${Math.round(usdKrwRate).toLocaleString()}원`,
+      meta: formatSignedPercent(usdKrwChangePercent) ?? undefined,
+    })
+  }
+  const detailParts = [
+    usVixValue !== null ? `VIX ${formatMarketNumber(usVixValue)}` : null,
+    vkospiValue !== null ? `VKOSPI ${formatMarketNumber(vkospiValue)}` : null,
+    usdKrwRate !== null ? `환율 ${Math.round(usdKrwRate).toLocaleString()}원${formatSignedPercent(usdKrwChangePercent) ? `(${formatSignedPercent(usdKrwChangePercent)})` : ''}` : null,
+    kospiAdrValue !== null ? `KOSPI ADR ${formatMarketNumber(kospiAdrValue, 0)}` : null,
+    kosdaqAdrValue !== null ? `KOSDAQ ADR ${formatMarketNumber(kosdaqAdrValue, 0)}` : null,
+  ].filter((part): part is string => Boolean(part))
+
+  return {
+    score: String(scoreNumber),
+    status: 'ready',
+    label,
+    tone,
+    description: `${detailParts.join(' · ')} 기준 시장 리스크 점수예요.`,
+    details,
+    sourceLabel: `출처: ${sourceParts.join(' + ')}`,
+    updatedLabel,
+  }
+}
 
 export const homeForecast = {
   label: "TODAY'S FORECAST",
@@ -924,6 +1272,45 @@ export function buildHomeHoldingsFromPortfolioItems(items: PortfolioNormalizedIt
   }
 
   return buildHomeHoldingsFromOcrRows(items.map((item) => buildAppliedRowFromPortfolioItem(item)))
+}
+
+export function buildPortfolioItemsFromAppliedHomePortfolioRows(rows: AppliedHomePortfolioRow[]): PortfolioNormalizedItem[] {
+  return sanitizeAppliedHomePortfolioRows(rows)
+    .map((row): PortfolioNormalizedItem | null => {
+      const name = row.resolvedName?.trim() || row.name.trim()
+      const quantity = parseOcrNumber(row.quantity)
+      const averagePrice = parseOcrNumber(row.averagePrice)
+
+      if (!name || quantity === null || averagePrice === null) {
+        return null
+      }
+
+      const kind = row.resolvedKind ?? inferHoldingKind(name)
+      const resolvedMarket = row.resolvedMarket?.trim()
+      const market = resolvedMarket || (kind === 'etf' ? 'ETF' : 'OCR')
+      const marketTone = resolveHomeMarketTone(row.resolvedMarketTone, market, kind)
+      const code = row.resolvedCode?.trim() || row.code?.trim() || undefined
+      const ticker = row.resolvedTicker?.trim() || row.ticker?.trim() || undefined
+
+      return {
+        code,
+        ticker,
+        market: resolvedMarket,
+        marketTone,
+        kind,
+        name,
+        quantity,
+        averagePrice,
+        averagePriceCurrency: row.averagePriceCurrency
+          ?? inferCurrencyFromMoneyText(row.averagePrice)
+          ?? (marketTone === 'nasdaq' ? undefined : 'KRW'),
+        currentPrice: row.currentPrice,
+        currentPriceCurrency: row.currentPriceCurrency,
+        currentProfitRate: row.currentProfitRate,
+        identifierLabel: buildIdentifierLabel(ticker, code),
+      }
+    })
+    .filter((item): item is PortfolioNormalizedItem => item !== null)
 }
 
 export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): HomeHolding[] {

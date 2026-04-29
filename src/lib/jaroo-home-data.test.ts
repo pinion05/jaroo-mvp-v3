@@ -5,6 +5,8 @@ import {
   APPLIED_HOME_PORTFOLIO_STORAGE_KEY,
   buildHomeHoldingsFromOcrRows,
   buildHomeHoldingsFromPortfolioItems,
+  buildHomeMarketScore,
+  buildPortfolioItemsFromAppliedHomePortfolioRows,
   homeHoldings,
   persistAppliedHomePortfolio,
   persistDeepScanTarget,
@@ -265,6 +267,44 @@ test('home holdings builder preserves portfolio-store live quote fields on remou
   ])
 })
 
+test('applied home portfolio rows can rehydrate the in-memory portfolio store shape', () => {
+  const restoredItems = buildPortfolioItemsFromAppliedHomePortfolioRows([
+    {
+      name: '마이크로소프트',
+      quantity: '3주',
+      averagePrice: '$972.11',
+      averagePriceCurrency: 'USD',
+      resolvedName: 'Microsoft Corporation',
+      resolvedTicker: 'MSFT',
+      resolvedCode: 'US5949181045',
+      resolvedMarket: 'NASDAQ',
+      resolvedMarketTone: 'nasdaq',
+      resolvedKind: 'stock',
+      currentPrice: 1150,
+      currentPriceCurrency: 'USD',
+      currentProfitRate: 18.3,
+    },
+  ])
+
+  assert.deepEqual(restoredItems, [
+    {
+      code: 'US5949181045',
+      ticker: 'MSFT',
+      market: 'NASDAQ',
+      marketTone: 'nasdaq',
+      kind: 'stock',
+      name: 'Microsoft Corporation',
+      quantity: 3,
+      averagePrice: 972.11,
+      averagePriceCurrency: 'USD',
+      currentPrice: 1150,
+      currentPriceCurrency: 'USD',
+      currentProfitRate: 18.3,
+      identifierLabel: 'MSFT · US5949181045',
+    },
+  ])
+})
+
 test('applied home portfolio handoff는 미국 종목 OCR 평단의 KRW 통화 맥락을 보존한다', () => {
   const restoreWindow = installWindowMock()
 
@@ -414,4 +454,76 @@ test('ETF and ETN home actions preserve ETF analysis while using loading handoff
   assert.equal(etnHolding?.actionLabel, 'ETF 분석')
   assert.equal(etnHolding?.actionHref, '/etf')
   assert.equal(homeHoldings.find((holding) => holding.market === 'ETF')?.actionHref, '/etf')
+})
+
+test('home market score uses market indicators instead of portfolio PnL heuristics', () => {
+  const [holding] = buildHomeHoldingsFromPortfolioItems([
+    {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KOSPI',
+      marketTone: 'kospi',
+      kind: 'stock',
+      quantity: 10,
+      averagePrice: 80000,
+      averagePriceCurrency: 'KRW',
+      currentPrice: 85200,
+      currentPriceCurrency: 'KRW',
+      currentProfitRate: 6.5,
+      evaluationAmount: undefined,
+      identifierLabel: '005930',
+    },
+  ])
+
+  const marketScore = buildHomeMarketScore([holding], {
+    marketSignalStatus: 'success',
+    marketSignals: {
+      usdKrw: { rate: 1476.45, changePercent: 0.26, timestamp: '2026-04-29T04:50:00.000Z' },
+      indicators: {
+        usVix: { value: 18.5, changePercent: -1.2, asOf: '04/29' },
+        vkospi: { value: 17.1, changePercent: -0.4, asOf: '15:30 장마감' },
+        adr: {
+          kospi: { value: 102, change: 1.2, asOf: '2026-04-29' },
+          kosdaq: { value: 88, change: -0.8, asOf: '2026-04-29' },
+        },
+      },
+    },
+  })
+
+  assert.equal(marketScore.status, 'ready')
+  assert.match(marketScore.score, /^\d+$/)
+  assert.equal(marketScore.label, '중립')
+  assert.equal(marketScore.sourceLabel, '출처: US VIX + VKOSPI + ADR + USD/KRW')
+  assert.equal(marketScore.updatedLabel, '방금 갱신')
+  assert.match(marketScore.description, /VIX 18.5/)
+  assert.match(marketScore.description, /환율 1,476원/)
+  assert.deepEqual(marketScore.details, [
+    { label: 'US VIX', value: '18.5', meta: '-1.20%' },
+    { label: 'VKOSPI', value: '17.1', meta: '-0.40%' },
+    { label: 'KOSPI ADR', value: '102.00', meta: '+1.20' },
+    { label: 'KOSDAQ ADR', value: '88.00', meta: '-0.80' },
+    { label: 'USD/KRW', value: '1,476원', meta: '+0.26%' },
+  ])
+})
+
+test('home market score has loading, missing, and error fallback states', () => {
+  const loadingScore = buildHomeMarketScore(homeHoldings, { marketSignalStatus: 'loading' })
+  const missingScore = buildHomeMarketScore([], { marketSignalStatus: 'idle' })
+  const errorScore = buildHomeMarketScore(homeHoldings, { marketSignalStatus: 'error' })
+
+  assert.deepEqual(
+    {
+      score: loadingScore.score,
+      status: loadingScore.status,
+      label: loadingScore.label,
+      updatedLabel: loadingScore.updatedLabel,
+    },
+    { score: '-', status: 'loading', label: '계산 중', updatedLabel: '갱신 중' },
+  )
+  assert.equal(missingScore.status, 'fallback')
+  assert.equal(missingScore.sourceLabel, '출처: 시장지표 필요')
+  assert.equal(errorScore.status, 'error')
+  assert.equal(errorScore.label, '대체')
+  assert.equal(errorScore.tone, 'red')
+  assert.match(errorScore.description, /시장지표를 불러오지 못해/)
 })
