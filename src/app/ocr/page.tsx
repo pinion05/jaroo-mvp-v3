@@ -2,7 +2,7 @@
 
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, ArrowRight, Check, ChevronDown, LoaderCircle, RefreshCcw, ScanSearch } from 'lucide-react'
 import { OcrConflictMergeCard } from '@/components/ocr-conflict-merge-card'
 import { Button } from '@/components/ui/button'
@@ -15,11 +15,11 @@ import {
   resolveMergedOcrRows,
   sanitizeOcrInstrumentCandidateLists,
   sanitizeOcrRows,
-  type OcrInstrumentCandidate,
   type OcrRow,
   type OcrSourceRow,
   type ScreenshotUploadSession,
 } from '@/lib/screenshot-ocr'
+import { hasResolvedIdentifier, resolveIdentifierRowsWithRetry, type OcrIdentifierResolutionResult } from '@/lib/ocr-identifier-resolution'
 import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
 import { useOcrUploadStore } from '@/lib/stores/use-ocr-upload-store'
@@ -34,11 +34,6 @@ type ResolveInstrumentsResponse = {
   rows?: unknown
   candidates?: unknown
   error?: string
-}
-
-type ResolvedInstrumentRowsResult = {
-  rows: OcrSourceRow[]
-  candidatesByRowId: Record<string, OcrInstrumentCandidate[]>
 }
 
 type ManualEditableField =
@@ -85,6 +80,13 @@ function waitForMinimumIdentifierSearchRing(startedAt: number) {
   })
 }
 
+function buildOcrSessionRunKey(session: ScreenshotUploadSession) {
+  return [
+    session.broker,
+    ...session.uploads.map((upload) => `${upload.id}:${upload.fileName}:${upload.imageDataUrl.length}`),
+  ].join('|')
+}
+
 function OcrMetricChip({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
   return (
     <div className='min-w-0 rounded-[14px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
@@ -108,7 +110,7 @@ function OcrRemoveChip({ label, onRemove }: { label: string; onRemove: () => voi
   )
 }
 
-async function resolveInstrumentRows(rows: OcrSourceRow[]): Promise<ResolvedInstrumentRowsResult> {
+async function resolveInstrumentRows(rows: OcrSourceRow[]): Promise<OcrIdentifierResolutionResult> {
   const response = await fetch('/api/instruments/resolve', {
     method: 'POST',
     headers: {
@@ -168,10 +170,6 @@ function inferMarketTone(market?: string) {
   }
 
   return undefined
-}
-
-function hasResolvedIdentifier(row: Pick<OcrReviewRow, 'resolvedName' | 'resolvedTicker' | 'resolvedCode'>) {
-  return Boolean(row.resolvedName?.trim() || row.resolvedTicker?.trim() || row.resolvedCode?.trim())
 }
 
 function isManualRowComplete(row: OcrReviewRow) {
@@ -523,9 +521,12 @@ export default function OcrPage() {
   const [conflicts, setConflicts] = useState<ReturnType<typeof buildMergedOcrResult>['conflicts']>([])
   const [conflictSelections, setConflictSelections] = useState<Record<string, string>>({})
   const [removedRowIds, setRemovedRowIds] = useState<Record<string, true>>({})
+  const ocrRunIdRef = useRef(0)
+  const autoOcrSessionKeyRef = useRef<string | null>(null)
 
   useEffect(() => {
     if (!session) {
+      autoOcrSessionKeyRef.current = null
       setRequestStatus('error', '먼저 /screenshot 에서 분석할 스크린샷을 선택해주세요.')
       setResolveStatus('idle')
       setUploadStatuses({})
@@ -547,6 +548,10 @@ export default function OcrPage() {
   }, [session, setRequestStatus, setResolveStatus])
 
   const runOcrBatch = useCallback(async (currentSession: ScreenshotUploadSession) => {
+    const runId = ocrRunIdRef.current + 1
+    ocrRunIdRef.current = runId
+    const isCurrentRun = () => ocrRunIdRef.current === runId
+
     resetReviewState()
     setRequestStatus('loading')
     setResolveStatus('idle')
@@ -606,6 +611,10 @@ export default function OcrPage() {
           throw new Error(payload?.error || 'OCR 요청에 실패했어요.')
         }
 
+        if (!isCurrentRun()) {
+          return
+        }
+
         const sanitizedRows = sanitizeOcrRows(payload?.rows)
         nextRowsByUpload[upload.id] = sanitizedRows
 
@@ -618,6 +627,10 @@ export default function OcrPage() {
           },
         }))
       } catch (error) {
+        if (!isCurrentRun()) {
+          return
+        }
+
         hasErrors = true
         nextRowsByUpload[upload.id] = []
 
@@ -630,6 +643,10 @@ export default function OcrPage() {
           },
         }))
       }
+    }
+
+    if (!isCurrentRun()) {
+      return
     }
 
     const sourceRows = buildOcrSourceRows(currentSession.uploads, nextRowsByUpload)
@@ -665,6 +682,12 @@ export default function OcrPage() {
       return
     }
 
+    const sessionRunKey = buildOcrSessionRunKey(session)
+    if (autoOcrSessionKeyRef.current === sessionRunKey) {
+      return
+    }
+
+    autoOcrSessionKeyRef.current = sessionRunKey
     void runOcrBatch(session)
   }, [runOcrBatch, session])
 
@@ -732,7 +755,7 @@ export default function OcrPage() {
     setResolveStatus('loading')
     const resolveStartedAt = Date.now()
 
-    void resolveInstrumentRows(unresolvedRows)
+    void resolveIdentifierRowsWithRetry(unresolvedRows, resolveInstrumentRows)
       .then(async (result) => {
         await waitForMinimumIdentifierSearchRing(resolveStartedAt)
 
