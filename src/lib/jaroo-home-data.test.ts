@@ -456,7 +456,7 @@ test('ETF and ETN home actions preserve ETF analysis while using loading handoff
   assert.equal(homeHoldings.find((holding) => holding.market === 'ETF')?.actionHref, '/etf')
 })
 
-test('home market score exposes ready state with source and update labels', () => {
+test('home market score uses market indicators instead of portfolio PnL heuristics', () => {
   const [holding] = buildHomeHoldingsFromPortfolioItems([
     {
       name: '삼성전자',
@@ -475,20 +475,34 @@ test('home market score exposes ready state with source and update labels', () =
     },
   ])
 
-  const marketScore = buildHomeMarketScore([holding], { quoteStatus: 'success', isAppliedPortfolio: true })
+  const marketScore = buildHomeMarketScore([holding], {
+    marketSignalStatus: 'success',
+    marketSignals: {
+      usdKrw: { rate: 1476.45, changePercent: 0.26, timestamp: '2026-04-29T04:50:00.000Z' },
+      indicators: {
+        usVix: { value: 18.5, changePercent: -1.2, asOf: '04/29' },
+        vkospi: { value: 17.1, changePercent: -0.4, asOf: '15:30 장마감' },
+        adr: {
+          kospi: { value: 102, change: 1.2, asOf: '2026-04-29' },
+          kosdaq: { value: 88, change: -0.8, asOf: '2026-04-29' },
+        },
+      },
+    },
+  })
 
   assert.equal(marketScore.status, 'ready')
   assert.match(marketScore.score, /^\d+$/)
   assert.equal(marketScore.label, '중립')
-  assert.equal(marketScore.sourceLabel, '출처: 실시간 시세 스냅샷')
+  assert.equal(marketScore.sourceLabel, '출처: US VIX + VKOSPI + ADR + USD/KRW')
   assert.equal(marketScore.updatedLabel, '방금 갱신')
-  assert.match(marketScore.description, /국내 시장 노출/)
+  assert.match(marketScore.description, /VIX 18.5/)
+  assert.match(marketScore.description, /환율 1,476원/)
 })
 
 test('home market score has loading, missing, and error fallback states', () => {
-  const loadingScore = buildHomeMarketScore(homeHoldings, { quoteStatus: 'loading' })
-  const missingScore = buildHomeMarketScore([], { quoteStatus: 'idle' })
-  const errorScore = buildHomeMarketScore(homeHoldings, { quoteStatus: 'error' })
+  const loadingScore = buildHomeMarketScore(homeHoldings, { marketSignalStatus: 'loading' })
+  const missingScore = buildHomeMarketScore([], { marketSignalStatus: 'idle' })
+  const errorScore = buildHomeMarketScore(homeHoldings, { marketSignalStatus: 'error' })
 
   assert.deepEqual(
     {
@@ -500,9 +514,9 @@ test('home market score has loading, missing, and error fallback states', () => 
     { score: '-', status: 'loading', label: '계산 중', updatedLabel: '갱신 중' },
   )
   assert.equal(missingScore.status, 'fallback')
-  assert.equal(missingScore.sourceLabel, '출처: 포트폴리오 필요')
+  assert.equal(missingScore.sourceLabel, '출처: 시장지표 필요')
   assert.equal(errorScore.status, 'error')
   assert.equal(errorScore.label, '대체')
   assert.equal(errorScore.tone, 'red')
-  assert.match(errorScore.description, /시세 갱신 실패/)
+  assert.match(errorScore.description, /시장지표를 불러오지 못해/)
 })

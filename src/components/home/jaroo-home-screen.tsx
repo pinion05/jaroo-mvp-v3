@@ -40,13 +40,16 @@ import {
   type HomeHolding,
   type HomeMetricTone,
   type HomeMarketScore,
+  type HomeMarketScoreSignals,
 } from '@/lib/jaroo-home-data'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
 import { usePortfolioStore } from '@/lib/stores/use-portfolio-store'
-import { toDeepScanTargetInput } from '@/lib/workflow-types'
+import { toDeepScanTargetInput, type WorkflowAsyncStatus } from '@/lib/workflow-types'
 import styles from './jaroo-home-screen.module.css'
 
 const DONUT_CHART_SIZE = 210
+const HOME_MARKET_FX_SIGNAL_FETCH_TIMEOUT_MS = 2000
+const HOME_MARKET_INDICATOR_FETCH_TIMEOUT_MS = 12000
 
 type ViewMode = 'donut' | 'heatmap'
 type SheetMode = 'score' | 'momentum' | null
@@ -73,6 +76,97 @@ type PortfolioSummary = {
 }
 
 type PortfolioStoreItem = ReturnType<typeof usePortfolioStore.getState>['items'][number]
+
+function asRecord(value: unknown): Record<string, unknown> | null {
+  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
+}
+
+function toFiniteMarketNumber(value: unknown) {
+  const parsed = typeof value === 'number' ? value : Number(value)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function readEnvelopeData(payload: unknown) {
+  const envelope = asRecord(payload)
+  return asRecord(envelope?.data) ?? envelope
+}
+
+function readUsdKrwSignal(payload: unknown): HomeMarketScoreSignals['usdKrw'] {
+  const data = readEnvelopeData(payload)
+  return data
+    ? {
+        rate: toFiniteMarketNumber(data.rate),
+        changePercent: toFiniteMarketNumber(data.changePercent),
+        timestamp: typeof data.timestamp === 'string' ? data.timestamp : null,
+      }
+    : null
+}
+
+function readVolatilitySignal(payload: unknown) {
+  const data = asRecord(payload)
+  return data
+    ? {
+        value: toFiniteMarketNumber(data.value),
+        changePercent: toFiniteMarketNumber(data.changePercent),
+        asOf: typeof data.asOf === 'string' ? data.asOf : null,
+      }
+    : null
+}
+
+function readAdrSignal(payload: unknown) {
+  const data = asRecord(payload)
+  return data
+    ? {
+        value: toFiniteMarketNumber(data.value),
+        change: toFiniteMarketNumber(data.change),
+        asOf: typeof data.asOf === 'string' ? data.asOf : null,
+      }
+    : null
+}
+
+function readMarketIndicatorSignals(payload: unknown): HomeMarketScoreSignals['indicators'] {
+  const data = readEnvelopeData(payload)
+  const adr = asRecord(data?.adr)
+
+  return data
+    ? {
+        vkospi: readVolatilitySignal(data.vkospi),
+        usVix: readVolatilitySignal(data.usVix),
+        adr: adr
+          ? {
+              kospi: readAdrSignal(adr.kospi),
+              kosdaq: readAdrSignal(adr.kosdaq),
+            }
+          : null,
+      }
+    : null
+}
+
+function hasAnyMarketSignal(signals: HomeMarketScoreSignals) {
+  return [
+    signals.usdKrw?.rate,
+    signals.usdKrw?.changePercent,
+    signals.indicators?.vkospi?.value,
+    signals.indicators?.usVix?.value,
+    signals.indicators?.adr?.kospi?.value,
+    signals.indicators?.adr?.kosdaq?.value,
+  ].some((value) => toFiniteMarketNumber(value) !== null)
+}
+
+async function fetchHomeMarketSignalJson(input: RequestInfo | URL, signal: AbortSignal, timeoutMs: number) {
+  const response = await fetchHomeQuoteResponseWithTimeout(
+    fetch,
+    input,
+    { cache: 'no-store', signal },
+    timeoutMs,
+  )
+
+  if (!response.ok) {
+    return null
+  }
+
+  return response.json()
+}
 
 function stripPortfolioQuoteFields(item: PortfolioStoreItem) {
   const { currentPrice, currentProfitRate, currentPriceCurrency, ...baseItem } = item
@@ -402,6 +496,8 @@ export function JarooHomeScreen() {
   const [quoteSummaryMessage, setQuoteSummaryMessage] = useState<string | null>(null)
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [deepScanLoadingTarget, setDeepScanLoadingTarget] = useState<DeepScanLoadingTarget | null>(null)
+  const [marketSignals, setMarketSignals] = useState<HomeMarketScoreSignals | null>(null)
+  const [marketSignalStatus, setMarketSignalStatus] = useState<WorkflowAsyncStatus>('idle')
   const hasCheckedPersistedPortfolioRef = useRef(false)
 
   const portfolioBaseItems = useMemo(() => portfolioItems.map((item) => stripPortfolioQuoteFields(item)), [portfolioItems])
@@ -630,6 +726,63 @@ export function JarooHomeScreen() {
     }
   }, [clearItemQuote, hasUsHomeHoldings, patchQuote, quoteQuery, quoteRunKey, quoteSurfaceEnabled, refreshVersion, setQuoteStatus])
 
+  useEffect(() => {
+    const abortController = new AbortController()
+
+    const hydrateMarketSignals = async () => {
+      setMarketSignalStatus('loading')
+      const nextSignals: HomeMarketScoreSignals = {}
+      let receivedAnySignal = false
+
+      const publishSignals = () => {
+        if (!hasAnyMarketSignal(nextSignals)) {
+          return
+        }
+
+        receivedAnySignal = true
+        setMarketSignals({
+          usdKrw: nextSignals.usdKrw ?? null,
+          indicators: nextSignals.indicators ?? null,
+        })
+        setMarketSignalStatus('success')
+      }
+
+      const usdKrwPromise = fetchHomeMarketSignalJson('/api/market/fx/usd-krw', abortController.signal, HOME_MARKET_FX_SIGNAL_FETCH_TIMEOUT_MS)
+        .then((payload) => {
+          if (abortController.signal.aborted) {
+            return
+          }
+          nextSignals.usdKrw = readUsdKrwSignal(payload)
+          publishSignals()
+        })
+
+      const indicatorsPromise = fetchHomeMarketSignalJson('/api/market/indicators', abortController.signal, HOME_MARKET_INDICATOR_FETCH_TIMEOUT_MS)
+        .then((payload) => {
+          if (abortController.signal.aborted) {
+            return
+          }
+          nextSignals.indicators = readMarketIndicatorSignals(payload)
+          publishSignals()
+        })
+
+      await Promise.allSettled([usdKrwPromise, indicatorsPromise])
+
+      if (abortController.signal.aborted) {
+        return
+      }
+
+      if (!receivedAnySignal) {
+        setMarketSignalStatus('error')
+      }
+    }
+
+    void hydrateMarketSignals()
+
+    return () => {
+      abortController.abort()
+    }
+  }, [refreshVersion])
+
   const homeHoldings = useMemo(() => {
     const quoteApplied = applyCurrentQuotesToHomeHoldings(
       rawHomeHoldings,
@@ -736,8 +889,8 @@ export function JarooHomeScreen() {
   const heatmapChartHeight = Math.max(234, 234 + Math.max(0, heatmapChartData.length - 5) * 34)
   const summaryData = useMemo(() => buildPortfolioSummary(homeHoldings, isAppliedPortfolio), [homeHoldings, isAppliedPortfolio])
   const marketScore = useMemo(
-    () => buildHomeMarketScore(homeHoldings, { quoteStatus, isAppliedPortfolio }),
-    [homeHoldings, isAppliedPortfolio, quoteStatus],
+    () => buildHomeMarketScore(homeHoldings, { marketSignalStatus, marketSignals }),
+    [homeHoldings, marketSignalStatus, marketSignals],
   )
   const defaultDeepScanHolding = useMemo(() => {
     if (selectedHolding?.kind === 'stock') {
