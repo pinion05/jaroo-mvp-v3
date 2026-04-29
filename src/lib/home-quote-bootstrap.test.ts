@@ -2,8 +2,10 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  HOME_QUOTE_FETCH_TIMEOUT_MS,
   hydratePortfolioItemsWithCurrentQuotes,
   resolveUsdKrwRateAfterFailedQuoteResponse,
+  shouldSkipHomeQuoteHydration,
 } from './home-quote-bootstrap'
 import type { PortfolioNormalizedItem } from './workflow-types'
 
@@ -119,6 +121,28 @@ test('hydratePortfolioItemsWithCurrentQuotes does not parse non-OK FX responses 
 test('resolveUsdKrwRateAfterFailedQuoteResponse preserves prior FX when quote and FX refresh both fail', () => {
   assert.equal(resolveUsdKrwRateAfterFailedQuoteResponse(1476.7, null, true), 1476.7)
   assert.equal(resolveUsdKrwRateAfterFailedQuoteResponse(1476.7, 1400, false), 1400)
+})
+
+test('home quote hydration only skips completed matching snapshots, not stale loading state', () => {
+  assert.equal(HOME_QUOTE_FETCH_TIMEOUT_MS <= 2500, true)
+  assert.equal(shouldSkipHomeQuoteHydration({
+    refreshVersion: 0,
+    quoteQueryKey: 'codes=005930',
+    quoteQuery: 'codes=005930',
+    quoteStatus: 'success',
+  }), true)
+  assert.equal(shouldSkipHomeQuoteHydration({
+    refreshVersion: 0,
+    quoteQueryKey: 'codes=005930',
+    quoteQuery: 'codes=005930',
+    quoteStatus: 'loading',
+  }), false)
+  assert.equal(shouldSkipHomeQuoteHydration({
+    refreshVersion: 1,
+    quoteQueryKey: 'codes=005930',
+    quoteQuery: 'codes=005930',
+    quoteStatus: 'success',
+  }), false)
 })
 
 test('hydratePortfolioItemsWithCurrentQuotes times out slow quote fetches and keeps stale quote fields', async () => {

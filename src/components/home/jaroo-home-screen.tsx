@@ -22,6 +22,7 @@ import {
   fetchHomeQuoteResponseWithTimeout,
   HOME_QUOTE_FETCH_TIMEOUT_MS,
   resolveUsdKrwRateAfterFailedQuoteResponse,
+  shouldSkipHomeQuoteHydration,
 } from '@/lib/home-quote-bootstrap'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
@@ -384,6 +385,8 @@ export function JarooHomeScreen() {
   const rawHomeHoldings = useMemo(() => buildHomeHoldingsFromPortfolioItems(portfolioItems), [portfolioItems])
   const portfolioBaseItemsRef = useRef(portfolioBaseItems)
   const rawHomeHoldingsRef = useRef(rawHomeHoldings)
+  const quoteStatusRef = useRef(quoteStatus)
+  const quoteQueryKeyRef = useRef(quoteQueryKey)
   const quoteQuery = useMemo(() => buildHomeCurrentQuoteQuery(rawHomeHoldings), [rawHomeHoldings])
   const quoteSurfaceEnabled = hasPortfolioItems && Boolean(quoteQuery)
   const quoteRunKey = `${portfolioSignature}::${quoteQuery}::${refreshVersion}`
@@ -414,11 +417,24 @@ export function JarooHomeScreen() {
   }, [portfolioBaseItems, rawHomeHoldings])
 
   useEffect(() => {
+    quoteStatusRef.current = quoteStatus
+  }, [quoteStatus])
+
+  useEffect(() => {
+    quoteQueryKeyRef.current = quoteQueryKey
+  }, [quoteQueryKey])
+
+  useEffect(() => {
     if (!quoteSurfaceEnabled) {
       return
     }
 
-    if (refreshVersion === 0 && quoteQueryKey === quoteQuery && (quoteStatus === 'loading' || quoteStatus === 'success')) {
+    if (shouldSkipHomeQuoteHydration({
+      refreshVersion,
+      quoteQueryKey: quoteQueryKeyRef.current,
+      quoteQuery,
+      quoteStatus: quoteStatusRef.current,
+    })) {
       return
     }
 
@@ -569,7 +585,7 @@ export function JarooHomeScreen() {
     return () => {
       abortController.abort()
     }
-  }, [clearItemQuote, hasUsHomeHoldings, patchQuote, quoteQuery, quoteQueryKey, quoteRunKey, quoteStatus, quoteSurfaceEnabled, refreshVersion, setQuoteStatus])
+  }, [clearItemQuote, hasUsHomeHoldings, patchQuote, quoteQuery, quoteRunKey, quoteSurfaceEnabled, refreshVersion, setQuoteStatus])
 
   const homeHoldings = useMemo(() => {
     const quoteApplied = applyCurrentQuotesToHomeHoldings(

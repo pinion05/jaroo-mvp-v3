@@ -11,7 +11,7 @@ import {
   type CurrentQuoteItem,
 } from './home-current-quotes'
 
-export const HOME_QUOTE_FETCH_TIMEOUT_MS = 4500
+export const HOME_QUOTE_FETCH_TIMEOUT_MS = 2000
 
 export class HomeQuoteTimeoutError extends Error {
   constructor(message = 'Home quote request timed out') {
@@ -29,6 +29,22 @@ type QuoteBootstrapResult = {
   quoteQuery: string
   quoteStatus: 'idle' | 'success' | 'error'
   quoteErrorMessage: string | null
+}
+
+type HomeQuoteHydrationSkipInput = {
+  refreshVersion: number
+  quoteQueryKey: string | null
+  quoteQuery: string
+  quoteStatus: 'idle' | 'loading' | 'success' | 'error'
+}
+
+export function shouldSkipHomeQuoteHydration({
+  refreshVersion,
+  quoteQueryKey,
+  quoteQuery,
+  quoteStatus,
+}: HomeQuoteHydrationSkipInput) {
+  return refreshVersion === 0 && quoteQueryKey === quoteQuery && quoteStatus === 'success'
 }
 
 export function resolveUsdKrwRateAfterFailedQuoteResponse(
