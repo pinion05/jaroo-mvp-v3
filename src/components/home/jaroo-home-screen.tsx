@@ -49,7 +49,7 @@ import styles from './jaroo-home-screen.module.css'
 
 const DONUT_CHART_SIZE = 210
 const HOME_MARKET_FX_SIGNAL_FETCH_TIMEOUT_MS = 2000
-const HOME_MARKET_INDICATOR_FETCH_TIMEOUT_MS = 12000
+const HOME_MARKET_INDICATOR_FETCH_TIMEOUT_MS = 30000
 
 type ViewMode = 'donut' | 'heatmap'
 type SheetMode = 'score' | 'momentum' | null
@@ -150,6 +150,15 @@ function hasAnyMarketSignal(signals: HomeMarketScoreSignals) {
     signals.indicators?.usVix?.value,
     signals.indicators?.adr?.kospi?.value,
     signals.indicators?.adr?.kosdaq?.value,
+  ].some((value) => toFiniteMarketNumber(value) !== null)
+}
+
+function hasAnyMarketIndicatorSignal(indicators: HomeMarketScoreSignals['indicators']) {
+  return [
+    indicators?.vkospi?.value,
+    indicators?.usVix?.value,
+    indicators?.adr?.kospi?.value,
+    indicators?.adr?.kosdaq?.value,
   ].some((value) => toFiniteMarketNumber(value) !== null)
 }
 
@@ -744,8 +753,9 @@ export function JarooHomeScreen() {
       setMarketSignalStatus('loading')
       const nextSignals: HomeMarketScoreSignals = {}
       let receivedAnySignal = false
+      let receivedIndicatorSignal = false
 
-      const publishSignals = () => {
+      const publishSignals = (status: WorkflowAsyncStatus) => {
         if (!hasAnyMarketSignal(nextSignals)) {
           return
         }
@@ -755,7 +765,7 @@ export function JarooHomeScreen() {
           usdKrw: nextSignals.usdKrw ?? null,
           indicators: nextSignals.indicators ?? null,
         })
-        setMarketSignalStatus('success')
+        setMarketSignalStatus(status)
       }
 
       const usdKrwPromise = fetchHomeMarketSignalJson('/api/market/fx/usd-krw', abortController.signal, HOME_MARKET_FX_SIGNAL_FETCH_TIMEOUT_MS)
@@ -764,7 +774,7 @@ export function JarooHomeScreen() {
             return
           }
           nextSignals.usdKrw = readUsdKrwSignal(payload)
-          publishSignals()
+          publishSignals(receivedIndicatorSignal ? 'success' : 'loading')
         })
 
       const indicatorsPromise = fetchHomeMarketSignalJson('/api/market/indicators', abortController.signal, HOME_MARKET_INDICATOR_FETCH_TIMEOUT_MS)
@@ -773,7 +783,8 @@ export function JarooHomeScreen() {
             return
           }
           nextSignals.indicators = readMarketIndicatorSignals(payload)
-          publishSignals()
+          receivedIndicatorSignal = hasAnyMarketIndicatorSignal(nextSignals.indicators)
+          publishSignals(receivedIndicatorSignal ? 'success' : 'error')
         })
 
       await Promise.allSettled([usdKrwPromise, indicatorsPromise])
@@ -783,6 +794,11 @@ export function JarooHomeScreen() {
       }
 
       if (!receivedAnySignal) {
+        setMarketSignalStatus('error')
+        return
+      }
+
+      if (!receivedIndicatorSignal) {
         setMarketSignalStatus('error')
       }
     }
