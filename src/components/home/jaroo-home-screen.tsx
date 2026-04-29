@@ -19,6 +19,12 @@ import {
   type CurrentQuoteItem,
   type HomeHoldingQuoteErrorKind,
 } from '@/lib/home-current-quotes'
+import {
+  fetchHomeQuoteResponseWithTimeout,
+  HOME_QUOTE_FETCH_TIMEOUT_MS,
+  resolveUsdKrwRateAfterFailedQuoteResponse,
+  shouldSkipHomeQuoteHydration,
+} from '@/lib/home-quote-bootstrap'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 import {
@@ -380,6 +386,8 @@ export function JarooHomeScreen() {
   const rawHomeHoldings = useMemo(() => buildHomeHoldingsFromPortfolioItems(portfolioItems), [portfolioItems])
   const portfolioBaseItemsRef = useRef(portfolioBaseItems)
   const rawHomeHoldingsRef = useRef(rawHomeHoldings)
+  const quoteStatusRef = useRef(quoteStatus)
+  const quoteQueryKeyRef = useRef(quoteQueryKey)
   const quoteQuery = useMemo(() => buildHomeCurrentQuoteQuery(rawHomeHoldings), [rawHomeHoldings])
   const quoteSurfaceEnabled = hasPortfolioItems && Boolean(quoteQuery)
   const quoteRunKey = `${portfolioSignature}::${quoteQuery}::${refreshVersion}`
@@ -410,60 +418,86 @@ export function JarooHomeScreen() {
   }, [portfolioBaseItems, rawHomeHoldings])
 
   useEffect(() => {
+    quoteStatusRef.current = quoteStatus
+  }, [quoteStatus])
+
+  useEffect(() => {
+    quoteQueryKeyRef.current = quoteQueryKey
+  }, [quoteQueryKey])
+
+  useEffect(() => {
     if (!quoteSurfaceEnabled) {
       return
     }
 
-    if (refreshVersion === 0 && quoteQueryKey === quoteQuery && (quoteStatus === 'loading' || quoteStatus === 'success')) {
+    if (shouldSkipHomeQuoteHydration({
+      refreshVersion,
+      quoteQueryKey: quoteQueryKeyRef.current,
+      quoteQuery,
+      quoteStatus: quoteStatusRef.current,
+    })) {
       return
     }
 
     const abortController = new AbortController()
-
-    const clearAllKnownQuotes = () => {
-      for (const item of portfolioBaseItemsRef.current) {
-        clearItemQuote({ code: item.code, ticker: item.ticker, name: item.name, market: item.market })
-      }
-    }
 
     const hydrateQuotes = async () => {
       setQuoteStatus('loading', null, quoteQuery)
       setQuoteSummaryMessage(null)
       setQuoteFailureKinds({})
 
-      let nextFxRate: number | null = null
-      let fxFetchFailed = false
-
-      if (hasUsHomeHoldings) {
-        try {
-          const fxResponse = await fetch('/api/market/fx/usd-krw', { cache: 'no-store', signal: abortController.signal })
-          const fxPayload = await fxResponse.json()
-          const parsedRate = Number(fxPayload?.data?.rate)
-          if (fxResponse.ok && Number.isFinite(parsedRate) && parsedRate > 0) {
-            nextFxRate = parsedRate
-          } else {
-            fxFetchFailed = true
-          }
-        } catch {
-          fxFetchFailed = true
-        }
-      }
+      const fxRequest = hasUsHomeHoldings
+        ? (async () => {
+            try {
+              const fxResponse = await fetchHomeQuoteResponseWithTimeout(
+                fetch,
+                '/api/market/fx/usd-krw',
+                { cache: 'no-store', signal: abortController.signal },
+                HOME_QUOTE_FETCH_TIMEOUT_MS,
+              )
+              if (!fxResponse.ok) {
+                return { rate: null, failed: true }
+              }
+              const fxPayload = await fxResponse.json()
+              const parsedRate = Number(fxPayload?.data?.rate)
+              return {
+                rate: Number.isFinite(parsedRate) && parsedRate > 0 ? parsedRate : null,
+                failed: !Number.isFinite(parsedRate) || parsedRate <= 0,
+              }
+            } catch (error) {
+              if (abortController.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
+                throw error
+              }
+              return { rate: null, failed: true }
+            }
+          })()
+        : Promise.resolve({ rate: null, failed: false })
 
       try {
-        const response = await fetch(`/api/quotes/current?${quoteQuery}`, { cache: 'no-store', signal: abortController.signal })
-        const payload = await response.json()
+        const [fxResult, quoteResponse] = await Promise.all([
+          fxRequest,
+          fetchHomeQuoteResponseWithTimeout(
+            fetch,
+            `/api/quotes/current?${quoteQuery}`,
+            { cache: 'no-store', signal: abortController.signal },
+            HOME_QUOTE_FETCH_TIMEOUT_MS,
+          ),
+        ])
+        const nextFxRate = fxResult.rate
+        const fxFetchFailed = fxResult.failed
+        const response = quoteResponse
 
         if (abortController.signal.aborted) {
           return
         }
 
         if (!response.ok) {
-          clearAllKnownQuotes()
-          setLiveQuoteSnapshot({ query: quoteQuery, items: [] })
-          setUsdKrwRate(nextFxRate)
-          setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', quoteQuery)
+          setUsdKrwRate((previousRate) => resolveUsdKrwRateAfterFailedQuoteResponse(previousRate, nextFxRate, fxFetchFailed))
+          setQuoteStatus('error', '현재 시세 응답이 지연되어 기존 시세로 표시 중이에요. 다시 시도해주세요.', quoteQuery)
           return
         }
+
+        const payload = await response.json()
 
         const nextItems: CurrentQuoteItem[] = Array.isArray(payload?.data?.items) ? payload.data.items : []
         const okItems = nextItems.filter((item) => item.status === 'ok' && typeof item.price === 'number')
@@ -497,7 +531,6 @@ export function JarooHomeScreen() {
             if (shouldTreatQuoteFailureAsErrorCard(homeHolding, 'quote-unavailable')) {
               nextFailureKinds[itemKey] = 'quote-unavailable'
             }
-            clearItemQuote({ code: item.code, ticker: item.ticker, name: item.name, market: item.market })
             continue
           }
 
@@ -506,7 +539,6 @@ export function JarooHomeScreen() {
           const requiresFx = requiresFxConversion(quoteCurrency, averagePriceCurrency)
           if (requiresFx && (fxFetchFailed || nextFxRate === null)) {
             nextFailureKinds[itemKey] = 'fx-required'
-            clearItemQuote({ code: item.code, ticker: item.ticker, name: item.name, market: item.market })
             continue
           }
 
@@ -543,12 +575,9 @@ export function JarooHomeScreen() {
           return
         }
 
-        clearAllKnownQuotes()
-        setLiveQuoteSnapshot({ query: quoteQuery, items: [] })
-        setUsdKrwRate(nextFxRate)
         setQuoteFailureKinds({})
         setQuoteSummaryMessage(null)
-        setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', quoteQuery)
+        setQuoteStatus('error', '현재 시세 응답이 지연되어 기존 시세로 표시 중이에요. 다시 시도해주세요.', quoteQuery)
       }
     }
 
@@ -557,7 +586,7 @@ export function JarooHomeScreen() {
     return () => {
       abortController.abort()
     }
-  }, [clearItemQuote, hasUsHomeHoldings, patchQuote, quoteQuery, quoteQueryKey, quoteRunKey, quoteStatus, quoteSurfaceEnabled, refreshVersion, setQuoteStatus])
+  }, [clearItemQuote, hasUsHomeHoldings, patchQuote, quoteQuery, quoteRunKey, quoteSurfaceEnabled, refreshVersion, setQuoteStatus])
 
   const homeHoldings = useMemo(() => {
     const quoteApplied = applyCurrentQuotesToHomeHoldings(
