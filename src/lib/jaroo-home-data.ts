@@ -324,8 +324,19 @@ export const homeHoldings: HomeHolding[] = [
   },
 ]
 
-function clampMarketScore(value: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, value))
+const HOME_MARKET_SCORE_BASELINE = 58
+const HOME_MARKET_SCORE_CHANGE_WEIGHT = 0.8
+const HOME_MARKET_SCORE_NEGATIVE_HOLDING_PENALTY = 3
+const HOME_MARKET_SCORE_HALTED_HOLDING_PENALTY = 10
+const HOME_MARKET_SCORE_MARKET_DIVERSIFICATION_BONUS = 2
+const HOME_MARKET_SCORE_MAX_DIVERSIFICATION_BONUS = 8
+const HOME_MARKET_SCORE_MIN = 0
+const HOME_MARKET_SCORE_MAX = 99
+const HOME_MARKET_SCORE_FAVORABLE_THRESHOLD = 70
+const HOME_MARKET_SCORE_NEUTRAL_THRESHOLD = 45
+
+function clampMarketScore(value: number) {
+  return Math.min(HOME_MARKET_SCORE_MAX, Math.max(HOME_MARKET_SCORE_MIN, value))
 }
 
 function hasUsMarketExposure(holdings: HomeHolding[]) {
@@ -385,15 +396,24 @@ export function buildHomeMarketScore(holdings: HomeHolding[], options: BuildHome
     ? changeValues.reduce((sum, value) => sum + value, 0) / changeValues.length
     : 0
   const negativeCount = changeValues.filter((value) => value < 0).length
-  const haltPenalty = holdings.filter((holding) => holding.cardTone === 'halt' || holding.signalTone === 'halt').length * 10
-  const diversificationBonus = Math.min(8, new Set(holdings.map((holding) => holding.marketTone)).size * 2)
-  const scoreNumber = Math.round(clampMarketScore(58 + averageChange * 0.8 - negativeCount * 3 - haltPenalty + diversificationBonus, 0, 99))
-  const tone: HomeBadgeTone = quoteStatus === 'error' ? 'red' : scoreNumber >= 70 ? 'green' : scoreNumber >= 45 ? 'amber' : 'red'
+  const haltPenalty = holdings.filter((holding) => holding.cardTone === 'halt' || holding.signalTone === 'halt').length * HOME_MARKET_SCORE_HALTED_HOLDING_PENALTY
+  const diversificationBonus = Math.min(
+    HOME_MARKET_SCORE_MAX_DIVERSIFICATION_BONUS,
+    new Set(holdings.map((holding) => holding.marketTone)).size * HOME_MARKET_SCORE_MARKET_DIVERSIFICATION_BONUS,
+  )
+  const scoreNumber = Math.round(clampMarketScore(
+    HOME_MARKET_SCORE_BASELINE
+      + averageChange * HOME_MARKET_SCORE_CHANGE_WEIGHT
+      - negativeCount * HOME_MARKET_SCORE_NEGATIVE_HOLDING_PENALTY
+      - haltPenalty
+      + diversificationBonus,
+  ))
+  const tone: HomeBadgeTone = quoteStatus === 'error' ? 'red' : scoreNumber >= HOME_MARKET_SCORE_FAVORABLE_THRESHOLD ? 'green' : scoreNumber >= HOME_MARKET_SCORE_NEUTRAL_THRESHOLD ? 'amber' : 'red'
   const label = quoteStatus === 'error'
     ? '대체'
-    : scoreNumber >= 70
+    : scoreNumber >= HOME_MARKET_SCORE_FAVORABLE_THRESHOLD
       ? '우호적'
-      : scoreNumber >= 45
+      : scoreNumber >= HOME_MARKET_SCORE_NEUTRAL_THRESHOLD
         ? '중립'
         : '경계'
   const sourceLabel = quoteStatus === 'success'
