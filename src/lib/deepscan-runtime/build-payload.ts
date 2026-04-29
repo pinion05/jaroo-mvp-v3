@@ -21,7 +21,7 @@ type UnknownRecord = Record<string, unknown>
 type CanonicalSourceFrom = JarooDeepScanPayload['input']['sourceContext']['from']
 type DeepScanRawSourceFrom = CanonicalSourceFrom | 'home-handoff'
 
-type DeepScanRawInput = {
+export type DeepScanRawInput = {
   instrument: {
     name?: string
     code?: string
@@ -317,6 +317,8 @@ function createBlockMeta(blockState: DeepScanBlockState, sourceRefs: DeepScanSou
 
 
 const SOURCE_FROM_VALUES = new Set<DeepScanRawSourceFrom>(['home-handoff', 'ocr', 'holding', 'report', 'news', 'market', 'system'])
+const KR_MARKETS = new Set(['KR', 'KOSPI', 'KOSDAQ'])
+const KR_TICKER_PATTERN = /^(\d{6})(?:\.(?:KS|KQ))?$/
 
 function parseSourceFrom(value?: string): DeepScanRawSourceFrom {
   if (value && SOURCE_FROM_VALUES.has(value as DeepScanRawSourceFrom)) {
@@ -367,6 +369,57 @@ function buildRawInputFromSearchParams(searchParams: URLSearchParams): DeepScanR
     selectedAt: selectedAt ?? undefined,
     sourceContext: {
       from: parseSourceFrom(from),
+    },
+  }
+}
+
+function normalizeMarketForRoute(value?: string) {
+  return normalizeText(value)?.toUpperCase()
+}
+
+export function extractKrCodeFromTicker(ticker?: string) {
+  const normalizedTicker = normalizeText(ticker)?.toUpperCase()
+  return normalizedTicker?.match(KR_TICKER_PATTERN)?.[1]
+}
+
+export type DeepScanPayloadBuilderRoute = 'kr' | 'us' | 'invalid'
+
+export function resolveDeepScanPayloadBuilderRoute(rawInput: DeepScanRawInput): DeepScanPayloadBuilderRoute {
+  const code = normalizeText(rawInput.instrument.code)
+  const ticker = normalizeText(rawInput.instrument.ticker)
+  const market = normalizeMarketForRoute(rawInput.instrument.market)
+
+  if (!code && !ticker) {
+    return 'invalid'
+  }
+
+  if (market && KR_MARKETS.has(market)) {
+    return 'kr'
+  }
+
+  if (!code && extractKrCodeFromTicker(ticker)) {
+    return 'kr'
+  }
+
+  if (market === 'US' || (!code && ticker)) {
+    return 'us'
+  }
+
+  return 'kr'
+}
+
+export function prepareDeepScanRawInputForBuilder(rawInput: DeepScanRawInput): DeepScanRawInput {
+  const inferredKrCode = extractKrCodeFromTicker(rawInput.instrument.ticker)
+
+  if (rawInput.instrument.code || !inferredKrCode) {
+    return rawInput
+  }
+
+  return {
+    ...rawInput,
+    instrument: {
+      ...rawInput.instrument,
+      code: inferredKrCode,
     },
   }
 }
@@ -1138,17 +1191,17 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
 
 export async function buildDeepScanPayloadFromSearchParams(searchParams: URLSearchParams) {
   const rawInput = buildRawInputFromSearchParams(searchParams)
-  const market = rawInput.instrument.market?.toUpperCase()
+  const route = resolveDeepScanPayloadBuilderRoute(rawInput)
 
-  if (market === 'US' || (!rawInput.instrument.code && rawInput.instrument.ticker)) {
+  if (route === 'us') {
     return buildUsPayload(rawInput)
   }
 
-  if (!rawInput.instrument.code && !rawInput.instrument.ticker) {
+  if (route === 'invalid') {
     return createInvalidInputPayload(rawInput)
   }
 
-  return buildCrawlerDeepScanPayload(rawInput)
+  return buildCrawlerDeepScanPayload(prepareDeepScanRawInputForBuilder(rawInput))
 }
 
 export { buildRawInputFromSearchParams }

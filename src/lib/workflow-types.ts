@@ -266,6 +266,31 @@ export function toDeepScanTargetInput(item: PortfolioNormalizedItem): DeepScanTa
   }
 }
 
-export function getDeepScanTargetKey(target: Pick<DeepScanTargetInput, 'code' | 'ticker' | 'name' | 'market'>) {
-  return [target.code?.trim(), target.ticker?.trim(), target.name.trim(), target.market?.trim()].filter(Boolean).join('|')
+type DeepScanTargetKeyInput = Pick<
+  DeepScanTargetInput,
+  'code' | 'ticker' | 'name' | 'market' | 'quantity' | 'averagePrice' | 'evaluationAmount'
+>
+
+function normalizeDeepScanTargetKeyText(value: string | undefined) {
+  return value?.trim() ?? ''
+}
+
+function normalizeDeepScanTargetKeyNumber(value: number | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return ''
+  }
+
+  return Object.is(value, -0) ? '0' : String(value)
+}
+
+export function getDeepScanTargetKey(target: DeepScanTargetKeyInput) {
+  return [
+    ['code', normalizeDeepScanTargetKeyText(target.code)],
+    ['ticker', normalizeDeepScanTargetKeyText(target.ticker)],
+    ['name', normalizeDeepScanTargetKeyText(target.name)],
+    ['market', normalizeDeepScanTargetKeyText(target.market)],
+    ['quantity', normalizeDeepScanTargetKeyNumber(target.quantity)],
+    ['averagePrice', normalizeDeepScanTargetKeyNumber(target.averagePrice)],
+    ['evaluationAmount', normalizeDeepScanTargetKeyNumber(target.evaluationAmount)],
+  ].map(([label, value]) => `${label}:${value}`).join('|')
 }

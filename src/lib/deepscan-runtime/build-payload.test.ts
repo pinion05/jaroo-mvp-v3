@@ -1,7 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { describeMomentumProvenance, summarizeGeneratedDumpSignals } from './build-payload'
+import {
+  describeMomentumProvenance,
+  extractKrCodeFromTicker,
+  prepareDeepScanRawInputForBuilder,
+  resolveDeepScanPayloadBuilderRoute,
+  summarizeGeneratedDumpSignals,
+  type DeepScanRawInput,
+} from './build-payload'
 
 test('summarizeGeneratedDumpSignals surfaces Polygon OHLC and direct ownership flow summaries', () => {
   const summary = summarizeGeneratedDumpSignals({
@@ -105,4 +112,64 @@ test('describeMomentumProvenance는 provider별 OHLC 문구를 맞춘다', () =>
     sourceRefLabel: 'OHLC 80 bars',
     heroBodyText: 'OHLC 80개 반영',
   })
+})
+
+test('DeepScan runtime routes explicit KR ticker-only requests to the KR builder input', () => {
+  const rawInput: DeepScanRawInput = {
+    instrument: {
+      name: '삼성전자',
+      ticker: '005930.KS',
+      market: 'KR',
+      kind: 'stock',
+    },
+    holding: {
+      shares: '10주',
+      averagePrice: '70,000원',
+    },
+    sourceContext: {
+      from: 'holding',
+    },
+  }
+
+  assert.equal(resolveDeepScanPayloadBuilderRoute(rawInput), 'kr')
+  assert.equal(extractKrCodeFromTicker(rawInput.instrument.ticker), '005930')
+  assert.deepEqual(prepareDeepScanRawInputForBuilder(rawInput).instrument, {
+    name: '삼성전자',
+    code: '005930',
+    ticker: '005930.KS',
+    market: 'KR',
+    kind: 'stock',
+  })
+})
+
+test('DeepScan runtime preserves US ticker-only routing for non-KR tickers', () => {
+  assert.equal(
+    resolveDeepScanPayloadBuilderRoute({
+      instrument: {
+        name: 'Apple',
+        ticker: 'AAPL',
+        kind: 'stock',
+      },
+      sourceContext: {
+        from: 'holding',
+      },
+    }),
+    'us',
+  )
+})
+
+test('DeepScan runtime infers KR builder input from KR-like ticker without explicit market', () => {
+  const rawInput: DeepScanRawInput = {
+    instrument: {
+      name: '카카오',
+      ticker: '035720.KQ',
+      kind: 'stock',
+    },
+    sourceContext: {
+      from: 'holding',
+    },
+  }
+
+  assert.equal(resolveDeepScanPayloadBuilderRoute(rawInput), 'kr')
+  assert.equal(prepareDeepScanRawInputForBuilder(rawInput).instrument.code, '035720')
 })
