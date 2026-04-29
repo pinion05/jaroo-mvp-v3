@@ -461,6 +461,17 @@ function MarketScoreCard({ marketScore }: { marketScore: HomeMarketScore }) {
         </div>
       </div>
       <p className={styles.marketScoreDescription}>{marketScore.description}</p>
+      {marketScore.details.length > 0 ? (
+        <dl className={styles.marketScoreDetails} aria-label='시장 점수 산출 지표'>
+          {marketScore.details.map((detail) => (
+            <div key={detail.label} className={styles.marketScoreDetail}>
+              <dt>{detail.label}</dt>
+              <dd>{detail.value}</dd>
+              {detail.meta ? <span>{detail.meta}</span> : null}
+            </div>
+          ))}
+        </dl>
+      ) : null}
       <div className={styles.marketScoreMeta}>
         <span>{marketScore.sourceLabel}</span>
         <span>{marketScore.updatedLabel}</span>

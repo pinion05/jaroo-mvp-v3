@@ -497,6 +497,13 @@ test('home market score uses market indicators instead of portfolio PnL heuristi
   assert.equal(marketScore.updatedLabel, '방금 갱신')
   assert.match(marketScore.description, /VIX 18.5/)
   assert.match(marketScore.description, /환율 1,476원/)
+  assert.deepEqual(marketScore.details, [
+    { label: 'US VIX', value: '18.5', meta: '-1.20%' },
+    { label: 'VKOSPI', value: '17.1', meta: '-0.40%' },
+    { label: 'KOSPI ADR', value: '102.00', meta: '+1.20' },
+    { label: 'KOSDAQ ADR', value: '88.00', meta: '-0.80' },
+    { label: 'USD/KRW', value: '1,476원', meta: '+0.26%' },
+  ])
 })
 
 test('home market score has loading, missing, and error fallback states', () => {

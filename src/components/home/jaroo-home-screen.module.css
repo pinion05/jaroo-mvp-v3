@@ -474,6 +474,45 @@
   color: #555;
 }
 
+.marketScoreDetails {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 6px;
+  margin: 0 0 9px;
+}
+
+.marketScoreDetail {
+  background: rgba(255, 255, 255, 0.78);
+  border: 0.5px solid #e2ebf4;
+  border-radius: 10px;
+  padding: 6px 8px;
+  min-width: 0;
+}
+
+.marketScoreDetail dt {
+  font-size: 8px;
+  line-height: 1.2;
+  color: #6f8dac;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+}
+
+.marketScoreDetail dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  line-height: 1.1;
+  color: #173e65;
+  font-weight: 700;
+}
+
+.marketScoreDetail span {
+  display: block;
+  margin-top: 2px;
+  font-size: 9px;
+  line-height: 1.2;
+  color: #777;
+}
+
 .marketScoreMeta {
   display: flex;
   justify-content: space-between;

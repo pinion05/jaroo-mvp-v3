@@ -12,12 +12,19 @@ export type AveragePriceCurrency = 'KRW' | 'USD'
 
 export type HomeMarketScoreStatus = 'loading' | 'ready' | 'fallback' | 'error'
 
+export type HomeMarketScoreDetail = {
+  label: string
+  value: string
+  meta?: string
+}
+
 export type HomeMarketScore = {
   score: string
   status: HomeMarketScoreStatus
   label: string
   tone: HomeBadgeTone
   description: string
+  details: HomeMarketScoreDetail[]
   sourceLabel: string
   updatedLabel: string
 }
@@ -493,6 +500,14 @@ function formatMarketNumber(value: number | null, digits = 1) {
   return value === null ? null : value.toFixed(digits)
 }
 
+function formatSignedMarketNumber(value: number | null, digits = 2) {
+  if (value === null) {
+    return null
+  }
+
+  return `${value >= 0 ? '+' : ''}${value.toFixed(digits)}`
+}
+
 function formatMarketScoreUpdatedLabel(status: WorkflowAsyncStatus | undefined, fallbackLabel?: string) {
   if (fallbackLabel) {
     return fallbackLabel
@@ -526,6 +541,7 @@ export function buildHomeMarketScore(_holdings: HomeHolding[], options: BuildHom
       label: '계산 중',
       tone: 'amber',
       description: 'VIX, VKOSPI, ADR, USD/KRW 시장지표를 불러와 점수를 계산하고 있어요.',
+      details: [],
       sourceLabel: '출처: 시장지표',
       updatedLabel,
     }
@@ -541,6 +557,7 @@ export function buildHomeMarketScore(_holdings: HomeHolding[], options: BuildHom
       description: isError
         ? '시장지표를 불러오지 못해 점수를 계산하지 못했어요. 잠시 뒤 다시 시도해 주세요.'
         : 'VIX, VKOSPI, ADR, USD/KRW 시장지표가 준비되면 점수를 보여줘요.',
+      details: [],
       sourceLabel: '출처: 시장지표 필요',
       updatedLabel,
     }
@@ -551,9 +568,15 @@ export function buildHomeMarketScore(_holdings: HomeHolding[], options: BuildHom
   const vkospi = marketSignals?.indicators?.vkospi ?? null
   const adr = marketSignals?.indicators?.adr ?? null
   const usVixValue = toFiniteNumber(usVix?.value)
+  const usVixChangePercent = toFiniteNumber(usVix?.changePercent)
   const vkospiValue = toFiniteNumber(vkospi?.value)
+  const vkospiChangePercent = toFiniteNumber(vkospi?.changePercent)
   const usdKrwRate = toFiniteNumber(usdKrw?.rate)
   const usdKrwChangePercent = toFiniteNumber(usdKrw?.changePercent)
+  const kospiAdrValue = toFiniteNumber(adr?.kospi?.value)
+  const kospiAdrChange = toFiniteNumber(adr?.kospi?.change)
+  const kosdaqAdrValue = toFiniteNumber(adr?.kosdaq?.value)
+  const kosdaqAdrChange = toFiniteNumber(adr?.kosdaq?.change)
   const adrPenalty = calculateAdrPenalty(adr)
   const riskPenalty =
     calculateVolatilityPenalty(usVixValue, HOME_MARKET_SCORE_VIX_MAX_PENALTY)
@@ -575,11 +598,48 @@ export function buildHomeMarketScore(_holdings: HomeHolding[], options: BuildHom
     adr ? 'ADR' : null,
     usdKrwRate !== null || usdKrwChangePercent !== null ? 'USD/KRW' : null,
   ].filter((part): part is string => Boolean(part))
+  const details: HomeMarketScoreDetail[] = []
+  if (usVixValue !== null) {
+    details.push({
+      label: 'US VIX',
+      value: formatMarketNumber(usVixValue) ?? '-',
+      meta: formatSignedPercent(usVixChangePercent) ?? undefined,
+    })
+  }
+  if (vkospiValue !== null) {
+    details.push({
+      label: 'VKOSPI',
+      value: formatMarketNumber(vkospiValue) ?? '-',
+      meta: formatSignedPercent(vkospiChangePercent) ?? undefined,
+    })
+  }
+  if (kospiAdrValue !== null) {
+    details.push({
+      label: 'KOSPI ADR',
+      value: formatMarketNumber(kospiAdrValue, 2) ?? '-',
+      meta: formatSignedMarketNumber(kospiAdrChange) ?? undefined,
+    })
+  }
+  if (kosdaqAdrValue !== null) {
+    details.push({
+      label: 'KOSDAQ ADR',
+      value: formatMarketNumber(kosdaqAdrValue, 2) ?? '-',
+      meta: formatSignedMarketNumber(kosdaqAdrChange) ?? undefined,
+    })
+  }
+  if (usdKrwRate !== null) {
+    details.push({
+      label: 'USD/KRW',
+      value: `${Math.round(usdKrwRate).toLocaleString()}원`,
+      meta: formatSignedPercent(usdKrwChangePercent) ?? undefined,
+    })
+  }
   const detailParts = [
     usVixValue !== null ? `VIX ${formatMarketNumber(usVixValue)}` : null,
     vkospiValue !== null ? `VKOSPI ${formatMarketNumber(vkospiValue)}` : null,
     usdKrwRate !== null ? `환율 ${Math.round(usdKrwRate).toLocaleString()}원${formatSignedPercent(usdKrwChangePercent) ? `(${formatSignedPercent(usdKrwChangePercent)})` : ''}` : null,
-    adr?.kospi?.value != null ? `KOSPI ADR ${formatMarketNumber(toFiniteNumber(adr.kospi.value), 0)}` : null,
+    kospiAdrValue !== null ? `KOSPI ADR ${formatMarketNumber(kospiAdrValue, 0)}` : null,
+    kosdaqAdrValue !== null ? `KOSDAQ ADR ${formatMarketNumber(kosdaqAdrValue, 0)}` : null,
   ].filter((part): part is string => Boolean(part))
 
   return {
@@ -588,6 +648,7 @@ export function buildHomeMarketScore(_holdings: HomeHolding[], options: BuildHom
     label,
     tone,
     description: `${detailParts.join(' · ')} 기준 시장 리스크 점수예요.`,
+    details,
     sourceLabel: `출처: ${sourceParts.join(' + ')}`,
     updatedLabel,
   }
