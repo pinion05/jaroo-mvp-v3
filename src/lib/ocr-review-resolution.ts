@@ -52,8 +52,9 @@ export function mergeResolvedRowsWithExistingReviewRows(
 ) {
   const existingRowsById = new Map(existingRows.map((row) => [row.id, row]))
   const nextRows = resolvedRows.map((row) => existingRowsById.get(row.id) ?? toReviewRow(row))
+  const nextRowIds = new Set(nextRows.map((row) => row.id))
   const nextCandidatesByRowId = Object.fromEntries(
-    Object.entries(existingCandidatesByRowId).filter(([rowId]) => nextRows.some((row) => row.id === rowId)),
+    Object.entries(existingCandidatesByRowId).filter(([rowId]) => nextRowIds.has(rowId)),
   )
 
   return {
