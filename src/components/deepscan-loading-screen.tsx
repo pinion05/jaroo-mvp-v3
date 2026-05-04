@@ -12,19 +12,23 @@ type DeepScanLoadingScreenProps = {
   backHref?: string
 }
 
-const committeeMembers = [
-  { icon: '가', label: '가치\n분석가', state: 'done' },
-  { icon: '성', label: '성장\n전략가', state: 'done' },
-  { icon: '재', label: '재무\n감사관', state: 'done' },
-  { icon: '차', label: '차트\n마스터', state: 'done' },
-  { icon: '수', label: '수급\n추적기', state: 'done' },
-  { icon: '모', label: '모멘텀\n스카우터', state: 'done' },
+type CommitteeMemberState = 'done' | 'active' | 'wait'
+
+const committeeMembers: ReadonlyArray<{ icon: string; label: string; state: CommitteeMemberState }> = [
+  { icon: '가', label: '가치\n분석가', state: 'active' },
+  { icon: '성', label: '성장\n전략가', state: 'active' },
+  { icon: '재', label: '재무\n감사관', state: 'active' },
+  { icon: '차', label: '차트\n마스터', state: 'active' },
+  { icon: '수', label: '수급\n추적기', state: 'active' },
+  { icon: '모', label: '모멘텀\n스카우터', state: 'active' },
   { icon: '심', label: '심리\n분석AI', state: 'active' },
-  { icon: '산', label: '산업\n전문가', state: 'wait' },
-  { icon: '이', label: '이벤트\n스캐너', state: 'wait' },
+  { icon: '산', label: '산업\n전문가', state: 'active' },
+  { icon: '이', label: '이벤트\n스캐너', state: 'active' },
 ] as const
 
-function memberStateClass(state: (typeof committeeMembers)[number]['state']) {
+const activeCommitteeMemberCount = committeeMembers.filter((member) => member.state === 'active').length
+
+function memberStateClass(state: CommitteeMemberState) {
   if (state === 'done') {
     return styles.memberDone
   }
@@ -89,7 +93,7 @@ export function DeepScanLoadingScreen({ name = '선택 종목', identifier, clas
           <div className={styles.stepRow}>
             <div className={cn(styles.stepIcon, styles.stepActive)}>⚡</div>
             <div className={cn(styles.stepLabel, styles.stepLabelActive)}>AI 9인 위원회 분석 중</div>
-            <div className={styles.stepCount}>6 / 9</div>
+            <div className={styles.stepCount}>{activeCommitteeMemberCount} / {committeeMembers.length}</div>
           </div>
           <div className={styles.stepRow}>
             <div className={cn(styles.stepIcon, styles.stepWait)}>📊</div>

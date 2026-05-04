@@ -7,7 +7,6 @@ import { Cell, Pie, PieChart, ResponsiveContainer, Treemap, type PieLabelRenderP
 import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
 import { shouldUseDeepScanLoadingHandoff } from '@/lib/deepscan-navigation'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
-import { prefetchAndPersistDeepScanSlimSummary } from '@/lib/deepscan-slim'
 import {
   applyCurrentQuotesToHomeHoldings,
   buildHomeCurrentQuoteQuery,
@@ -830,28 +829,6 @@ export function JarooHomeScreen() {
   }, [hasUsHomeHoldings, liveQuoteSnapshot, portfolioBaseItems, quoteFailureKinds, quoteQuery, quoteSurfaceEnabled, rawHomeHoldings, usdKrwRate])
 
   const selectedHolding = selectedId === null ? null : homeHoldings.find((item) => item.id === selectedId) ?? null
-  const prefetchedDeepScanHolding = useMemo(() => {
-    if (openStockCardId !== null) {
-      const openedHolding = homeHoldings.find((item) => item.id === openStockCardId) ?? null
-      return openedHolding?.kind === 'stock' ? openedHolding : null
-    }
-
-    return selectedHolding?.kind === 'stock' ? selectedHolding : null
-  }, [homeHoldings, openStockCardId, selectedHolding])
-
-  useEffect(() => {
-    if (!prefetchedDeepScanHolding) {
-      return
-    }
-
-    const timeoutId = window.setTimeout(() => {
-      void prefetchAndPersistDeepScanSlimSummary(prefetchedDeepScanHolding)
-    }, 0)
-
-    return () => {
-      window.clearTimeout(timeoutId)
-    }
-  }, [prefetchedDeepScanHolding])
 
   const handleQuoteRefresh = useCallback(() => {
     if (quoteStatus === 'loading') {
@@ -877,10 +854,6 @@ export function JarooHomeScreen() {
       identifier: getHoldingIdentifierText(holding),
     })
     setDeepScanTarget(toDeepScanTargetInput(item))
-    await Promise.race([
-      prefetchAndPersistDeepScanSlimSummary(holding),
-      new Promise((resolve) => window.setTimeout(resolve, 500)),
-    ]).catch(() => undefined)
 
     if (deepScanNavigationIdRef.current !== navigationId) {
       return

@@ -11,13 +11,17 @@ import {
   type CurrentQuoteItem,
 } from './home-current-quotes'
 
-export const HOME_QUOTE_FETCH_TIMEOUT_MS = 2000
+export const HOME_QUOTE_FETCH_TIMEOUT_MS = 5000
 
 export class HomeQuoteTimeoutError extends Error {
   constructor(message = 'Home quote request timed out') {
     super(message)
     this.name = 'HomeQuoteTimeoutError'
   }
+}
+
+function isAbortError(error: unknown) {
+  return error instanceof Error && error.name === 'AbortError'
 }
 
 type HomeQuoteBootstrapOptions = {
@@ -63,6 +67,7 @@ export async function fetchHomeQuoteResponseWithTimeout(
 ): Promise<Response> {
   const externalSignal = init.signal
   const abortController = new AbortController()
+  let timedOut = false
   let timeoutId: ReturnType<typeof setTimeout> | undefined
 
   if (externalSignal?.aborted) {
@@ -75,6 +80,7 @@ export async function fetchHomeQuoteResponseWithTimeout(
   try {
     const timeoutPromise = new Promise<never>((_, reject) => {
       timeoutId = setTimeout(() => {
+        timedOut = true
         abortController.abort()
         reject(new HomeQuoteTimeoutError())
       }, timeoutMs)
@@ -84,6 +90,12 @@ export async function fetchHomeQuoteResponseWithTimeout(
       fetcher(input, { ...init, signal: abortController.signal }),
       timeoutPromise,
     ])
+  } catch (error) {
+    if (timedOut && isAbortError(error)) {
+      throw new HomeQuoteTimeoutError()
+    }
+
+    throw error
   } finally {
     if (timeoutId) {
       clearTimeout(timeoutId)

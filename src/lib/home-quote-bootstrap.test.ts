@@ -3,6 +3,8 @@ import assert from 'node:assert/strict'
 
 import {
   HOME_QUOTE_FETCH_TIMEOUT_MS,
+  HomeQuoteTimeoutError,
+  fetchHomeQuoteResponseWithTimeout,
   hydratePortfolioItemsWithCurrentQuotes,
   resolveUsdKrwRateAfterFailedQuoteResponse,
   shouldSkipHomeQuoteHydration,
@@ -124,7 +126,7 @@ test('resolveUsdKrwRateAfterFailedQuoteResponse preserves prior FX when quote an
 })
 
 test('home quote hydration only skips completed matching snapshots, not stale loading state', () => {
-  assert.equal(HOME_QUOTE_FETCH_TIMEOUT_MS <= 2500, true)
+  assert.equal(HOME_QUOTE_FETCH_TIMEOUT_MS >= 4000, true)
   assert.equal(shouldSkipHomeQuoteHydration({
     refreshVersion: 0,
     quoteQueryKey: 'codes=005930',
@@ -159,4 +161,45 @@ test('hydratePortfolioItemsWithCurrentQuotes times out slow quote fetches and ke
   assert.equal(result.quoteStatus, 'error')
   assert.match(result.quoteErrorMessage ?? '', /지연/)
   assert.equal(result.items[0], staleItem)
+})
+
+test('fetchHomeQuoteResponseWithTimeout normalizes signal-aware timeout aborts', async () => {
+  const signalAwareFetcher = async (_input: RequestInfo | URL, init?: RequestInit) =>
+    new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => {
+        reject(new DOMException('signal is aborted without reason', 'AbortError'))
+      }, { once: true })
+    })
+
+  await assert.rejects(
+    () => fetchHomeQuoteResponseWithTimeout(signalAwareFetcher, '/api/quotes/current?codes=005930', {}, 5),
+    HomeQuoteTimeoutError,
+  )
+})
+
+test('fetchHomeQuoteResponseWithTimeout preserves external aborts as AbortError', async () => {
+  const externalAbortController = new AbortController()
+  externalAbortController.abort()
+
+  const signalAwareFetcher = async (_input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.signal?.aborted) {
+      throw new DOMException('external abort', 'AbortError')
+    }
+
+    return new Promise<Response>(() => {
+      // Keep pending if the test ever fails to propagate the already-aborted signal.
+    })
+  }
+
+  await assert.rejects(
+    () => fetchHomeQuoteResponseWithTimeout(
+      signalAwareFetcher,
+      '/api/quotes/current?codes=005930',
+      { signal: externalAbortController.signal },
+      50,
+    ),
+    (error) => error instanceof Error
+      && error.name === 'AbortError'
+      && !(error instanceof HomeQuoteTimeoutError),
+  )
 })
