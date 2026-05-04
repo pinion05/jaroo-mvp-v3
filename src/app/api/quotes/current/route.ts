@@ -31,10 +31,18 @@ export async function fetchQuotesCurrentUpstream(
   upstreamUrl: string,
   fetcher: typeof fetch = fetch,
   timeoutMs = getQuotesCurrentProxyTimeoutMs(),
+  externalSignal?: AbortSignal,
 ) {
   const abortController = new AbortController()
   let timedOut = false
   let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+  if (externalSignal?.aborted) {
+    abortController.abort()
+  }
+
+  const handleExternalAbort = () => abortController.abort()
+  externalSignal?.addEventListener('abort', handleExternalAbort, { once: true })
 
   try {
     const timeoutPromise = new Promise<never>((_, reject) => {
@@ -59,14 +67,25 @@ export async function fetchQuotesCurrentUpstream(
     if (timeoutId) {
       clearTimeout(timeoutId)
     }
+    externalSignal?.removeEventListener('abort', handleExternalAbort)
   }
 }
 
-export async function GET(request: NextRequest) {
+type QuotesCurrentRequestOptions = {
+  fetcher?: typeof fetch
+  timeoutMs?: number
+}
+
+export async function handleQuotesCurrentRequest(request: NextRequest, options: QuotesCurrentRequestOptions = {}) {
   const upstreamUrl = buildQuotesCurrentUpstreamUrl(getCrawlerBaseUrl(), request.nextUrl.searchParams)
 
   try {
-    const response = await fetchQuotesCurrentUpstream(upstreamUrl)
+    const response = await fetchQuotesCurrentUpstream(
+      upstreamUrl,
+      options.fetcher ?? fetch,
+      options.timeoutMs ?? getQuotesCurrentProxyTimeoutMs(),
+      request.signal,
+    )
     const body = await response.text()
 
     return new NextResponse(body, {
@@ -76,6 +95,21 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
+    if (request.signal.aborted) {
+      return NextResponse.json(
+        {
+          ok: false,
+          data: null,
+          count: 0,
+          error: {
+            code: 'client-abort',
+            message: 'request aborted',
+          },
+        },
+        { status: 499 },
+      )
+    }
+
     return NextResponse.json(
       {
         ok: false,
@@ -89,4 +123,8 @@ export async function GET(request: NextRequest) {
       { status: error instanceof QuotesCurrentProxyTimeoutError ? 504 : 502 },
     )
   }
+}
+
+export async function GET(request: NextRequest) {
+  return handleQuotesCurrentRequest(request)
 }
