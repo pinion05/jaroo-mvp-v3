@@ -199,6 +199,74 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
   assert.deepEqual(packet.topRisks, ['미확보 KR 페이지 4건']);
 });
 
+test('buildDeepScanKrEvidencePacket flags raw consensus facts that are not projected into canonical snapshots', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  const packet = buildDeepScanKrEvidencePacket(
+    {
+      instrument: {
+        code: '042700',
+        name: '한미반도체',
+        market: 'KOSPI',
+      },
+      holding: {
+        shares: '5',
+        averagePrice: '91280.4878',
+      },
+    },
+    {
+      slim: {
+        code: '042700',
+        company: {
+          code: '042700',
+          name: '한미반도체',
+        },
+        pages: {
+          consensus: {
+            consensusSummary: {
+              rows: [
+                {
+                  재무년월: '2025.12(A)',
+                  '매출액 (억원)': '5,766.8',
+                  '영업이익 (억원)': '2,513.9',
+                  '당기순이익 (억원)': '2,140.1',
+                  'PER (배)': '57.05',
+                  'PBR (배)': '17.51',
+                  'ROE (%)': '34.76',
+                  'EV/EBITDA (배)': '45.14',
+                },
+              ],
+            },
+          },
+        },
+      },
+      quotes: {
+        items: [],
+        missing: [{ market: 'KR', code: '042700', reason: 'dependency-unavailable' }],
+      },
+    },
+  );
+
+  assert.equal(packet.financialSnapshot.revenueLatest, null);
+  assert.equal(packet.valuationSnapshot.per, null);
+  assert.equal(packet.sourceIntegrity.hasProjectionGaps, true);
+  assert.deepEqual(packet.sourceIntegrity.projectionChecks.map((check) => check.factGroup), [
+    'financialSnapshot',
+    'valuationSnapshot',
+  ]);
+  assert.deepEqual(packet.sourceIntegrity.projectionChecks[0].rawSource, {
+    pageId: 'consensus',
+    section: 'consensusSummary',
+    metrics: [
+      { key: 'revenue', label: '매출액' },
+      { key: 'operatingIncome', label: '영업이익' },
+      { key: 'netIncome', label: '당기순이익' },
+    ],
+  });
+  assert.ok(packet.sourceIntegrity.projectionChecks[0].canonicalMissingFields.includes('revenueLatest'));
+  assert.ok(packet.sourceIntegrity.projectionChecks[1].canonicalMissingFields.includes('per'));
+});
+
 test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a direct quote item while keeping safe defaults for missing sources', async () => {
   const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
 

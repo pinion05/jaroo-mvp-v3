@@ -228,6 +228,7 @@ function buildKrFactBank(evidence) {
       consensusAvailable: evidence.reportSignals?.consensusAvailable ?? false,
       opinionAvailable: evidence.reportSignals?.opinionAvailable ?? false,
     }, ['kr_reports']),
+    sourceIntegrity: presentValue(evidence.sourceIntegrity ?? {}, ['source_integrity'], ['Projection diagnostics are for provenance. Do not use raw-present diagnostics as substitute numeric facts.']),
     limitations: presentValue(sourceLimitations, ['source_limitations'], ['Source-specific missing facts must be stated as unavailable from WiseReport, not as analysis failure.']),
   };
 }
@@ -238,6 +239,7 @@ function buildMemberKrFacts(memberKey, evidence) {
     locale: 'KR',
     sourceFlavor: 'wisereport-fnguide-krx',
     sourceLimitations: Array.isArray(evidence.sourceLimitations) ? evidence.sourceLimitations : [],
+    sourceIntegrity: evidence.sourceIntegrity ?? {},
   };
 
   switch (memberKey) {
@@ -345,6 +347,7 @@ function buildSharedDump(input, evidence, sources) {
     styleAnalysisSnapshot: presentValue(evidence.styleAnalysisSnapshot ?? {}, ['style_analysis_snapshot']),
     ownershipSnapshot: presentValue(evidence.ownershipSnapshot ?? {}, ['ownership_snapshot']),
     financialSnapshot: presentValue(evidence.financialSnapshot ?? {}, ['financial_snapshot']),
+    sourceIntegrity: presentValue(evidence.sourceIntegrity ?? {}, ['source_integrity'], ['Projection diagnostics are for provenance. Do not use raw-present diagnostics as substitute numeric facts.']),
     sourceLimitations: presentValue(Array.isArray(evidence.sourceLimitations) ? evidence.sourceLimitations : [], ['source_limitations']),
     topFacts: presentValue(Array.isArray(evidence.topFacts) ? evidence.topFacts : [], ['top_facts']),
     topRisks: presentValue(Array.isArray(evidence.topRisks) ? evidence.topRisks : [], ['top_risks']),
@@ -369,6 +372,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
     pageCoverage: shared.pageCoverage,
     reportSignals: shared.reportSignals,
     sourceCoverage: shared.sourceCoverage,
+    sourceIntegrity: shared.sourceIntegrity,
     topFacts: shared.topFacts,
     topRisks: shared.topRisks,
     packageContext: shared.packageContext,
@@ -523,6 +527,7 @@ function systemPrompt(memberKey) {
     'Prefer memberContext.facts.krFacts when present; it is the source-specific normalized KR slice and should override generic global-shaped assumptions.',
     'Treat package-derived context as supplemental only, never as silent numeric truth.',
     'If a fact is listed in sourceLimitations, describe it as unavailable from the WiseReport source dump rather than claiming analysis context was generally insufficient.',
+    'If sourceIntegrity has raw-present-not-projected checks, do not treat them as substitute numeric facts and do not claim the raw source lacked those metrics; describe the limitation as canonical projection/coverage incomplete.',
     'Missing or unavailable facts must lower confidence and can lower the score, but do not say a fact is missing when a numeric value is present in krFacts or snapshots.',
     'Lead with the strongest numeric or concrete evidence that is actually present.',
     'Mention missing context at most once, briefly, in the final clause only if it materially limits the verdict.',

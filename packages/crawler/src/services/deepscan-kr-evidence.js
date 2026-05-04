@@ -575,6 +575,102 @@ function extractValuationSnapshot(indicatorsPage, financePage) {
   };
 }
 
+const FINANCIAL_RAW_METRIC_SPECS = Object.freeze([
+  { key: 'revenue', label: '매출액', patterns: [/매출/i, /매출액/i, /수익/i] },
+  { key: 'operatingIncome', label: '영업이익', patterns: [/영업이익/i] },
+  { key: 'netIncome', label: '당기순이익', patterns: [/순이익/i, /당기순이익/i] },
+]);
+
+const VALUATION_RAW_METRIC_SPECS = Object.freeze([
+  { key: 'per', label: 'PER', patterns: [/per/i] },
+  { key: 'pbr', label: 'PBR', patterns: [/pbr/i] },
+  { key: 'roe', label: 'ROE', patterns: [/roe/i] },
+  { key: 'evEbitda', label: 'EV/EBITDA', patterns: [/evebitda/i, /ev\/ebitda/i] },
+]);
+
+function hasRawPeriodMetricValue(row, labelPatterns) {
+  if (!row || typeof row !== 'object' || Array.isArray(row)) {
+    return false;
+  }
+
+  if (!normalizeText(row.재무년월 ?? row['재무 년월'] ?? row.period ?? row.date)) {
+    return false;
+  }
+
+  return Object.entries(row).some(([key, value]) => {
+    if (isLabelKey(key)) {
+      return false;
+    }
+
+    const normalizedKey = normalizeLabel(key) ?? key;
+    return labelPatterns.some((pattern) => pattern.test(normalizedKey) || pattern.test(key))
+      && normalizeNumber(value) !== null;
+  });
+}
+
+function collectRawPeriodMetrics(rows, specs) {
+  return specs
+    .filter((spec) => rows.some((row) => hasRawPeriodMetricValue(row, spec.patterns)))
+    .map(({ key, label }) => ({ key, label }));
+}
+
+function missingSnapshotFields(snapshot, fields) {
+  return fields.filter((field) => snapshot?.[field] === null || snapshot?.[field] === undefined);
+}
+
+function buildSourceIntegrityDiagnostics({ slimPages, pageCoverage, financialSnapshot, valuationSnapshot }) {
+  const consensusRows = collectRows(slimPages.consensus);
+  const projectionChecks = [];
+  const missingPageIds = Array.isArray(pageCoverage?.missingPageIds) ? pageCoverage.missingPageIds : [];
+
+  const rawFinancialMetrics = collectRawPeriodMetrics(consensusRows, FINANCIAL_RAW_METRIC_SPECS);
+  const missingFinancialFields = missingSnapshotFields(financialSnapshot, [
+    'revenueLatest',
+    'revenuePrev',
+    'operatingIncomeLatest',
+    'operatingIncomePrev',
+    'netIncomeLatest',
+    'netIncomePrev',
+  ]);
+  if (rawFinancialMetrics.length > 0 && missingFinancialFields.length > 0) {
+    projectionChecks.push({
+      kind: 'raw-present-not-projected',
+      factGroup: 'financialSnapshot',
+      rawSource: {
+        pageId: 'consensus',
+        section: 'consensusSummary',
+        metrics: rawFinancialMetrics,
+      },
+      canonicalMissingFields: missingFinancialFields,
+      blockedByMissingPageIds: missingPageIds.filter((pageId) => ['financial-analysis', 'investment-indicators', 'fnguide-finance'].includes(pageId)),
+      message: 'consensusSummary에 재무 기간 행이 있지만 canonical financialSnapshot으로 투영되지 않았습니다. 원본 부재가 아니라 투영/coverage 제한으로 취급해야 합니다.',
+    });
+  }
+
+  const rawValuationMetrics = collectRawPeriodMetrics(consensusRows, VALUATION_RAW_METRIC_SPECS);
+  const missingValuationFields = missingSnapshotFields(valuationSnapshot, ['per', 'pbr', 'roe', 'evEbitda']);
+  if (rawValuationMetrics.length > 0 && missingValuationFields.length > 0) {
+    projectionChecks.push({
+      kind: 'raw-present-not-projected',
+      factGroup: 'valuationSnapshot',
+      rawSource: {
+        pageId: 'consensus',
+        section: 'consensusSummary',
+        metrics: rawValuationMetrics,
+      },
+      canonicalMissingFields: missingValuationFields,
+      blockedByMissingPageIds: missingPageIds.filter((pageId) => ['investment-indicators', 'fnguide-finance'].includes(pageId)),
+      message: 'consensusSummary에 밸류에이션 기간 행이 있지만 canonical valuationSnapshot으로 투영되지 않았습니다. 원본 부재가 아니라 투영/coverage 제한으로 취급해야 합니다.',
+    });
+  }
+
+  return {
+    schemaVersion: 'jaroo.deepscan.kr-source-integrity.v1',
+    hasProjectionGaps: projectionChecks.length > 0,
+    projectionChecks,
+  };
+}
+
 function extractRelativeReturnSnapshot(relativeReturnPage) {
   const chart = Array.isArray(relativeReturnPage?.chartJson?.CHART) ? relativeReturnPage.chartJson.CHART : [];
   const points = chart
@@ -1249,6 +1345,12 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
     slimPages['investment-indicators'],
     slimPages.consensus,
   );
+  const sourceIntegrity = buildSourceIntegrityDiagnostics({
+    slimPages,
+    pageCoverage,
+    financialSnapshot,
+    valuationSnapshot,
+  });
   const packageContext = buildPackageContext(packageResult);
   const sourceLimitations = [
     ...(Array.isArray(ownershipSnapshot.sourceLimitations) ? ownershipSnapshot.sourceLimitations : []),
@@ -1282,6 +1384,7 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
     styleAnalysisSnapshot,
     ownershipSnapshot,
     financialSnapshot,
+    sourceIntegrity,
     packageContext,
     sourceLimitations,
     missingSources,
