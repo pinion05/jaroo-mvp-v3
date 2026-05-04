@@ -18,7 +18,7 @@ const KRX_DEPENDENCY_ERROR_PATTERNS = [
 
 const WISE_ETF_NAV_DATA_URL = 'https://comp.wisereport.co.kr/ETF/GetNAVData.aspx';
 const NAVER_STOCK_BASIC_URL_PREFIX = 'https://m.stock.naver.com/api/stock/';
-const DEFAULT_NAVER_CURRENT_QUOTES_TIMEOUT_MS = 1_200;
+const DEFAULT_NAVER_CURRENT_QUOTES_TIMEOUT_MS = 3_000;
 const DEFAULT_NAVER_CURRENT_QUOTES_CONCURRENCY = 4;
 const CURRENT_QUOTES_DIR = path.dirname(fileURLToPath(import.meta.url));
 const KR_EXCHANGE_PRODUCT_UNIVERSE_PATH = path.resolve(
@@ -287,6 +287,33 @@ function buildUsProviderNotConfiguredMissing(ticker, providerNames) {
   };
 }
 
+function buildQuoteProviderFailure(source, missing) {
+  return {
+    source,
+    reason: missing?.reason ?? 'unknown',
+    ...(missing?.message ? { message: missing.message } : {}),
+    ...(Array.isArray(missing?.providers) ? { providers: missing.providers } : {}),
+  };
+}
+
+function attachFallbackProviderDiagnostics(krxMissing, naverMissingByCode) {
+  return krxMissing.map((missing) => {
+    const code = normalizeKrCode(missing.code);
+    const naverMissing = code ? naverMissingByCode.get(code) : null;
+    if (!naverMissing) {
+      return missing;
+    }
+
+    return {
+      ...missing,
+      providerFailures: [
+        buildQuoteProviderFailure('naver-finance', naverMissing),
+        buildQuoteProviderFailure('krx', missing),
+      ],
+    };
+  });
+}
+
 function getUsProviderStatuses(providerStatus = null) {
   return {
     polygon: providerStatus?.polygon ?? getProviderStatus('polygon'),
@@ -549,11 +576,19 @@ export async function getKrCurrentQuotes(codes, options = {}) {
     krExchangeProductQuoteFetcher: options.krExchangeProductQuoteFetcher,
   });
   const nonFallbackMissing = naverResult.missing.filter((item) => !/^\d{6}$/.test(String(item.code || '')));
+  const naverMissingByCode = new Map(
+    naverResult.missing
+      .filter((item) => /^\d{6}$/.test(String(item.code || '')))
+      .map((item) => [normalizeKrCode(item.code), item]),
+  );
 
   return {
     asOf: naverResult.asOf ?? krxResult.asOf,
     items: [...naverResult.items, ...krxResult.items],
-    missing: [...krxResult.missing, ...nonFallbackMissing],
+    missing: [
+      ...attachFallbackProviderDiagnostics(krxResult.missing, naverMissingByCode),
+      ...nonFallbackMissing,
+    ],
   };
 }
 
