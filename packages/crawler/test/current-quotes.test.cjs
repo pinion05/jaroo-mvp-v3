@@ -307,6 +307,37 @@ test('getCurrentQuotes falls back to KRX when Naver KR quote is missing', async 
   assert.deepEqual(result.asOf, { kr: '2026-04-16', us: null });
 });
 
+test('getCurrentQuotes preserves Naver and KRX diagnostics when both KR quote providers fail', async () => {
+  const { getCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+
+  const result = await getCurrentQuotes({ codes: ['003720'] }, {
+    naverQuoteFetcher: async () => {
+      throw new Error('synthetic naver timeout');
+    },
+    krxTradeDateResolver: async () => '20260504',
+    krxSnapshotFetcher: async () => {
+      throw new Error('synthetic krx login timeout');
+    },
+  });
+
+  assert.deepEqual(result.items, []);
+  assert.equal(result.missing.length, 1);
+  assert.equal(result.missing[0].code, '003720');
+  assert.equal(result.missing[0].reason, 'runtime-unavailable');
+  assert.deepEqual(result.missing[0].providerFailures, [
+    {
+      source: 'naver-finance',
+      reason: 'provider-timeout',
+      message: 'synthetic naver timeout',
+    },
+    {
+      source: 'krx',
+      reason: 'runtime-unavailable',
+      message: 'synthetic krx login timeout',
+    },
+  ]);
+});
+
 test('getUsCurrentQuotes returns provider-not-configured when polygon and fmp are unavailable', async () => {
   const { getUsCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
 
