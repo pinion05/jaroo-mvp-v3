@@ -4,6 +4,8 @@ import { join } from 'node:path';
 import { scoreCommitteeMembers } from '../../../deepscan-runtime-core/src/committee-llm.js';
 import { buildKrCommitteeFromMemberScores } from './deepscan-kr-score.js';
 
+export const DEFAULT_KR_LLM_TIMEOUT_MS = 180_000;
+
 export const KR_MEMBER_SPECS = Object.freeze({
   profitability: {
     axis: 'Business Quality',
@@ -624,7 +626,7 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
       schemaName: 'jaroo_kr_committee_member',
       title: 'jaroo-mvp-v3 KR DeepScan Committee',
       model: process.env.DEEPSCAN_KR_LLM_MODEL ?? process.env.DEEPSCAN_LLM_MODEL ?? process.env.OCR_MODEL ?? 'qwen/qwen3.5-flash-02-23',
-      timeoutMs: parsePositiveInteger(process.env.DEEPSCAN_KR_LLM_TIMEOUT_MS ?? process.env.DEEPSCAN_LLM_TIMEOUT_MS, 75000),
+      timeoutMs: parsePositiveInteger(process.env.DEEPSCAN_KR_LLM_TIMEOUT_MS ?? process.env.DEEPSCAN_LLM_TIMEOUT_MS, DEFAULT_KR_LLM_TIMEOUT_MS),
       concurrency: parsePositiveInteger(process.env.DEEPSCAN_KR_LLM_CONCURRENCY ?? process.env.DEEPSCAN_LLM_CONCURRENCY, 4),
       summaryKey: input.instrument.code ?? input.instrument.name ?? 'kr',
       logDir,
