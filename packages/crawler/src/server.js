@@ -2817,7 +2817,7 @@ const endpointDefinitions = [
     resource: 'market.quotes.current',
     description: 'Home 화면용 현재가 묶음 데이터를 반환합니다.',
     primaryPath: buildDataSourcePath('krx-polygon-fmp', '/market/quotes/current'),
-    dataSources: ['krx-js-client', 'polygon', 'fmp'],
+    dataSources: ['naver-finance', 'krx-js-client', 'polygon', 'fmp'],
     params: [],
     query: ['codes(optional, csv)', 'tickers(optional, csv)', 'tradeDate(optional, YYYY-MM-DD)'],
     count: (data) => Array.isArray(data?.items) ? data.items.length : 0,

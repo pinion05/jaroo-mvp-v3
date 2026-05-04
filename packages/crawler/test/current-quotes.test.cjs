@@ -22,7 +22,7 @@ test('quotes-current endpoint definition is registered', async () => {
   assert.ok(definition);
   assert.equal(definition.primaryPath, '/api/source/krx-polygon-fmp/market/quotes/current');
   assert.equal('aliases' in definition, false);
-  assert.deepEqual(definition.dataSources, ['krx-js-client', 'polygon', 'fmp']);
+  assert.deepEqual(definition.dataSources, ['naver-finance', 'krx-js-client', 'polygon', 'fmp']);
   assert.ok(definition.query.includes('codes(optional, csv)'));
   assert.ok(definition.query.includes('tickers(optional, csv)'));
 });
@@ -108,6 +108,91 @@ test('getKrxCurrentQuotes returns dependency-unavailable when krx dependency can
   assert.match(result.missing[0].message, /krx-js-client/i);
 });
 
+test('getNaverCurrentQuotes maps Naver mobile stock basic payloads to KR quote items', async () => {
+  const { getNaverCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+  const requestedUrls = [];
+
+  const result = await getNaverCurrentQuotes(['005930.KS'], {
+    naverCurrentQuotesTimeoutMs: null,
+    naverFetchImpl: async (url) => {
+      requestedUrls.push(String(url));
+      return new Response(JSON.stringify({
+        itemCode: '005930',
+        closePrice: '85,200',
+        localTradedAt: '2026-04-30T15:30:00+09:00',
+      }));
+    },
+  });
+
+  assert.deepEqual(requestedUrls, ['https://m.stock.naver.com/api/stock/005930/basic']);
+  assert.deepEqual(result.items, [{
+    market: 'KR',
+    code: '005930',
+    ticker: null,
+    price: 85200,
+    currency: 'KRW',
+    asOf: '2026-04-30T15:30:00+09:00',
+    source: 'naver-finance',
+    status: 'ok',
+  }]);
+  assert.deepEqual(result.missing, []);
+  assert.equal(result.asOf, '2026-04-30T15:30:00+09:00');
+});
+
+test('getCurrentQuotes uses Naver KR quotes first without blocking on KRX snapshot', async () => {
+  const { getCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+  let krxCalled = false;
+
+  const result = await getCurrentQuotes({ codes: ['005930'] }, {
+    naverQuoteFetcher: async (code) => ({
+      market: 'KR',
+      code,
+      ticker: null,
+      price: 85200,
+      currency: 'KRW',
+      asOf: '2026-04-30T15:30:00+09:00',
+      source: 'naver-finance',
+      status: 'ok',
+    }),
+    krxSnapshotFetcher: async () => {
+      krxCalled = true;
+      return [];
+    },
+  });
+
+  assert.equal(krxCalled, false);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].code, '005930');
+  assert.equal(result.items[0].price, 85200);
+  assert.equal(result.items[0].source, 'naver-finance');
+  assert.deepEqual(result.missing, []);
+  assert.deepEqual(result.asOf, { kr: '2026-04-30T15:30:00+09:00', us: null });
+});
+
+test('getCurrentQuotes falls back to KRX when Naver KR quote is missing', async () => {
+  const { getCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+
+  const result = await getCurrentQuotes({ codes: ['005930'] }, {
+    naverQuoteFetcher: async () => null,
+    krxTradeDateResolver: async () => '20260416',
+    krxSnapshotFetcher: async () => [{ code: '005930', 종가: '85200' }],
+  });
+
+  assert.equal(result.items.length, 1);
+  assert.deepEqual(result.items[0], {
+    market: 'KR',
+    code: '005930',
+    ticker: null,
+    price: 85200,
+    currency: 'KRW',
+    asOf: '2026-04-16',
+    source: 'krx',
+    status: 'ok',
+  });
+  assert.deepEqual(result.missing, []);
+  assert.deepEqual(result.asOf, { kr: '2026-04-16', us: null });
+});
+
 test('getUsCurrentQuotes returns provider-not-configured when polygon and fmp are unavailable', async () => {
   const { getUsCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
 
@@ -134,6 +219,7 @@ test('getCurrentQuotes preserves KR success while reporting explicit US provider
   const { getCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
 
   const result = await getCurrentQuotes({ codes: ['005930'], tickers: ['AAPL'] }, {
+    naverQuoteFetcher: async () => null,
     krxTradeDateResolver: async () => '20260416',
     krxSnapshotFetcher: async () => [{ code: '005930', 종가: '85200' }],
     providerStatus: {
