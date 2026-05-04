@@ -19,6 +19,7 @@ const KRX_DEPENDENCY_ERROR_PATTERNS = [
 const WISE_ETF_NAV_DATA_URL = 'https://comp.wisereport.co.kr/ETF/GetNAVData.aspx';
 const NAVER_STOCK_BASIC_URL_PREFIX = 'https://m.stock.naver.com/api/stock/';
 const DEFAULT_NAVER_CURRENT_QUOTES_TIMEOUT_MS = 1_200;
+const DEFAULT_NAVER_CURRENT_QUOTES_CONCURRENCY = 4;
 const CURRENT_QUOTES_DIR = path.dirname(fileURLToPath(import.meta.url));
 const KR_EXCHANGE_PRODUCT_UNIVERSE_PATH = path.resolve(
   CURRENT_QUOTES_DIR,
@@ -91,6 +92,37 @@ function getNaverCurrentQuotesTimeoutMs(options = {}) {
   }
 
   return parsePositiveInteger(process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS, DEFAULT_NAVER_CURRENT_QUOTES_TIMEOUT_MS);
+}
+
+function getNaverCurrentQuotesConcurrency(options = {}) {
+  if (options.naverCurrentQuotesConcurrency !== undefined) {
+    return parsePositiveInteger(options.naverCurrentQuotesConcurrency, DEFAULT_NAVER_CURRENT_QUOTES_CONCURRENCY);
+  }
+
+  return parsePositiveInteger(
+    process.env.NAVER_CURRENT_QUOTES_CONCURRENCY,
+    DEFAULT_NAVER_CURRENT_QUOTES_CONCURRENCY,
+  );
+}
+
+async function mapWithConcurrency(values, concurrency, mapper) {
+  if (values.length === 0) {
+    return [];
+  }
+
+  const results = new Array(values.length);
+  let nextIndex = 0;
+  const workerCount = Math.min(values.length, Math.max(1, concurrency));
+
+  await Promise.all(Array.from({ length: workerCount }, async () => {
+    while (nextIndex < values.length) {
+      const currentIndex = nextIndex;
+      nextIndex += 1;
+      results[currentIndex] = await mapper(values[currentIndex], currentIndex);
+    }
+  }));
+
+  return results;
 }
 
 async function withFetchTimeout(fetchImpl, url, init, timeoutMs) {
@@ -319,7 +351,8 @@ export async function getNaverCurrentQuotes(codes, options = {}) {
     return { asOf: null, items: [], missing: [] };
   }
 
-  const results = await Promise.all(normalizedCodes.map(async (code) => {
+  const concurrency = getNaverCurrentQuotesConcurrency(options);
+  const results = await mapWithConcurrency(normalizedCodes, concurrency, async (code) => {
     if (!/^\d{6}$/.test(code)) {
       return {
         type: 'missing',
@@ -351,7 +384,7 @@ export async function getNaverCurrentQuotes(codes, options = {}) {
         },
       };
     }
-  }));
+  });
 
   const items = results.filter((result) => result.type === 'item').map((result) => result.item);
   const missing = results.filter((result) => result.type === 'missing').map((result) => result.missing);
@@ -495,11 +528,16 @@ export async function getKrCurrentQuotes(codes, options = {}) {
     naverFetchImpl: options.naverFetchImpl,
     fetchImpl: options.fetchImpl,
     naverCurrentQuotesTimeoutMs: options.naverCurrentQuotesTimeoutMs,
+    naverCurrentQuotesConcurrency: options.naverCurrentQuotesConcurrency,
   });
-  const foundCodes = new Set(naverResult.items.map((item) => item.code).filter(Boolean));
-  const fallbackCodes = normalizedCodes.filter((code) => !foundCodes.has(code));
+  const foundCodes = new Set(naverResult.items.map((item) => normalizeKrCode(item.code)).filter(Boolean));
+  const fallbackCodes = normalizedCodes.filter((code) => !foundCodes.has(code) && /^\d{6}$/.test(code));
 
   if (fallbackCodes.length === 0) {
+    return naverResult;
+  }
+
+  if (naverResult.items.length > 0) {
     return naverResult;
   }
 
@@ -510,17 +548,12 @@ export async function getKrCurrentQuotes(codes, options = {}) {
     krExchangeProductTypeResolver: options.krExchangeProductTypeResolver,
     krExchangeProductQuoteFetcher: options.krExchangeProductQuoteFetcher,
   });
-  const fallbackFoundCodes = new Set(krxResult.items.map((item) => item.code).filter(Boolean));
-  const naverMissingByCode = new Map(naverResult.missing.map((item) => [item.code, item]));
-  const unresolvedNaverMissing = fallbackCodes
-    .filter((code) => !fallbackFoundCodes.has(code))
-    .map((code) => naverMissingByCode.get(code))
-    .filter(Boolean);
+  const nonFallbackMissing = naverResult.missing.filter((item) => !/^\d{6}$/.test(String(item.code || '')));
 
   return {
     asOf: naverResult.asOf ?? krxResult.asOf,
     items: [...naverResult.items, ...krxResult.items],
-    missing: krxResult.missing.length > 0 ? krxResult.missing : unresolvedNaverMissing,
+    missing: [...krxResult.missing, ...nonFallbackMissing],
   };
 }
 
@@ -638,6 +671,7 @@ export async function getCurrentQuotes(input = {}, options = {}) {
       naverFetchImpl: options.naverFetchImpl,
       fetchImpl: options.fetchImpl,
       naverCurrentQuotesTimeoutMs: options.naverCurrentQuotesTimeoutMs,
+      naverCurrentQuotesConcurrency: options.naverCurrentQuotesConcurrency,
       krxTradeDateResolver: options.krxTradeDateResolver,
       krxSnapshotFetcher: options.krxSnapshotFetcher,
       krExchangeProductTypeResolver: options.krExchangeProductTypeResolver,

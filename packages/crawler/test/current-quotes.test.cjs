@@ -139,6 +139,40 @@ test('getNaverCurrentQuotes maps Naver mobile stock basic payloads to KR quote i
   assert.equal(result.asOf, '2026-04-30T15:30:00+09:00');
 });
 
+test('getNaverCurrentQuotes limits concurrent Naver mobile quote fetches', async () => {
+  const { getNaverCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+  let inFlight = 0;
+  let maxInFlight = 0;
+
+  const result = await getNaverCurrentQuotes(['000001', '000002', '000003', '000004', '000005'], {
+    naverCurrentQuotesConcurrency: 2,
+    naverQuoteFetcher: async (code) => {
+      inFlight += 1;
+      maxInFlight = Math.max(maxInFlight, inFlight);
+
+      try {
+        await new Promise((resolve) => setTimeout(resolve, 5));
+        return {
+          market: 'KR',
+          code,
+          ticker: null,
+          price: Number(code),
+          currency: 'KRW',
+          asOf: '2026-04-30T15:30:00+09:00',
+          source: 'naver-finance',
+          status: 'ok',
+        };
+      } finally {
+        inFlight -= 1;
+      }
+    },
+  });
+
+  assert.equal(maxInFlight, 2);
+  assert.equal(result.items.length, 5);
+  assert.deepEqual(result.missing, []);
+});
+
 test('getCurrentQuotes uses Naver KR quotes first without blocking on KRX snapshot', async () => {
   const { getCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
   let krxCalled = false;
@@ -166,6 +200,42 @@ test('getCurrentQuotes uses Naver KR quotes first without blocking on KRX snapsh
   assert.equal(result.items[0].price, 85200);
   assert.equal(result.items[0].source, 'naver-finance');
   assert.deepEqual(result.missing, []);
+  assert.deepEqual(result.asOf, { kr: '2026-04-30T15:30:00+09:00', us: null });
+});
+
+test('getCurrentQuotes returns partial Naver KR hits without waiting for KRX fallback', async () => {
+  const { getCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+  let krxCalled = false;
+
+  const result = await getCurrentQuotes({ codes: ['005930', '000000'] }, {
+    naverQuoteFetcher: async (code) => (code === '005930'
+      ? {
+        market: 'KR',
+        code,
+        ticker: null,
+        price: 85200,
+        currency: 'KRW',
+        asOf: '2026-04-30T15:30:00+09:00',
+        source: 'naver-finance',
+        status: 'ok',
+      }
+      : null),
+    krxSnapshotFetcher: async () => {
+      krxCalled = true;
+      return [{ code: '000000', 종가: '1' }];
+    },
+  });
+
+  assert.equal(krxCalled, false);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].code, '005930');
+  assert.equal(result.items[0].source, 'naver-finance');
+  assert.deepEqual(result.missing, [{
+    market: 'KR',
+    code: '000000',
+    ticker: null,
+    reason: 'not-found',
+  }]);
   assert.deepEqual(result.asOf, { kr: '2026-04-30T15:30:00+09:00', us: null });
 });
 
