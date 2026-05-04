@@ -18,7 +18,7 @@ const KRX_DEPENDENCY_ERROR_PATTERNS = [
 
 const WISE_ETF_NAV_DATA_URL = 'https://comp.wisereport.co.kr/ETF/GetNAVData.aspx';
 const NAVER_STOCK_BASIC_URL_PREFIX = 'https://m.stock.naver.com/api/stock/';
-const DEFAULT_NAVER_CURRENT_QUOTES_TIMEOUT_MS = 1_200;
+const DEFAULT_NAVER_CURRENT_QUOTES_TIMEOUT_MS = 3_000;
 const DEFAULT_NAVER_CURRENT_QUOTES_CONCURRENCY = 4;
 const CURRENT_QUOTES_DIR = path.dirname(fileURLToPath(import.meta.url));
 const KR_EXCHANGE_PRODUCT_UNIVERSE_PATH = path.resolve(

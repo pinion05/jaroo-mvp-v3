@@ -139,6 +139,50 @@ test('getNaverCurrentQuotes maps Naver mobile stock basic payloads to KR quote i
   assert.equal(result.asOf, '2026-04-30T15:30:00+09:00');
 });
 
+test('getNaverCurrentQuotes default timeout tolerates OCI-class Naver latency', async () => {
+  const { getNaverCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+  const originalTimeout = process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS;
+  delete process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS;
+
+  try {
+    const result = await getNaverCurrentQuotes(['003720'], {
+      naverFetchImpl: async (_url, init = {}) => {
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(resolve, 1_350);
+          init.signal?.addEventListener('abort', () => {
+            clearTimeout(timeout);
+            reject(Object.assign(new Error('synthetic abort'), { name: 'AbortError' }));
+          }, { once: true });
+        });
+
+        return new Response(JSON.stringify({
+          itemCode: '003720',
+          closePrice: '12,500',
+          localTradedAt: '2026-05-04T16:10:17+09:00',
+        }));
+      },
+    });
+
+    assert.deepEqual(result.items, [{
+      market: 'KR',
+      code: '003720',
+      ticker: null,
+      price: 12500,
+      currency: 'KRW',
+      asOf: '2026-05-04T16:10:17+09:00',
+      source: 'naver-finance',
+      status: 'ok',
+    }]);
+    assert.deepEqual(result.missing, []);
+  } finally {
+    if (originalTimeout === undefined) {
+      delete process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS;
+    } else {
+      process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS = originalTimeout;
+    }
+  }
+});
+
 test('getNaverCurrentQuotes limits concurrent Naver mobile quote fetches', async () => {
   const { getNaverCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
   let inFlight = 0;
