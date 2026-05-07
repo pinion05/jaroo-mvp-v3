@@ -122,6 +122,14 @@ export {
 } from './services/deepscan-payload.js';
 
 export {
+  buildCrawlerCacheIdentity,
+  buildCrawlerCachePayloadEntry,
+  createSupabaseCrawlerCacheClient,
+  getDefaultSupabaseCrawlerCacheClient,
+  readThroughCrawlerCache,
+} from './services/supabase-crawler-cache.js';
+
+export {
   buildDeepScanKrPackageCommand,
   parseDeepScanKrPackageStdout,
   invokeDeepScanKrPackage,

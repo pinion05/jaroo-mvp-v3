@@ -4,6 +4,12 @@ import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
 import { scoreDeepScanKrEvidence, scoreDeepScanKrFromCommittee } from './deepscan-kr-score.js';
 import { invokeDeepScanKrPackage } from './deepscan-kr-package-adapter.js';
 import { buildKrCommitteeAxesFromLlmResults, scoreDeepScanKrCommitteeFromDump } from './deepscan-kr-committee-runtime.js';
+import {
+  getDefaultCrawlerCacheFreshTtlMs,
+  getDefaultCrawlerCacheStaleTtlMs,
+  getDefaultSupabaseCrawlerCacheClient,
+  readThroughCrawlerCache,
+} from './supabase-crawler-cache.js';
 
 const require = createRequire(import.meta.url);
 const {
@@ -24,6 +30,9 @@ const SOURCE_TYPES = new Set(['ocr', 'holding', 'report', 'news', 'market', 'sys
 const FALLBACK_GENERATED_AT = '1970-01-01T00:00:00.000Z';
 const INTERNAL_SERVICE_ERROR_CODE = 'internal-service-error';
 const MIN_PACKAGE_REASON_LENGTH = 8;
+const WISEREPORT_KR_CACHE_ROUTE = 'wisereport-kr-v12-aggregate';
+const WISEREPORT_KR_CACHE_ROUTE_VERSION = 'v12';
+const WISEREPORT_KR_CACHE_SCHEMA_VERSION = 'wisereport-kr-v12-aggregate-v1';
 
 function normalizeText(value) {
   if (typeof value !== 'string') {
@@ -591,6 +600,95 @@ function buildWiseReportKrSlimPayload(rawAggregate, code, pageDefinitions = WISE
   };
 }
 
+function getCrawlerCacheClientFromRawInput(rawInput) {
+  const safeRawInput = asObject(rawInput);
+  const cacheOptions = asObject(safeRawInput.crawlerCache ?? safeRawInput.supabaseCrawlerCache);
+
+  if (Object.hasOwn(cacheOptions, 'client')) {
+    return cacheOptions.client ?? null;
+  }
+
+  if (Object.hasOwn(cacheOptions, 'enabled') && cacheOptions.enabled === false) {
+    return null;
+  }
+
+  return getDefaultSupabaseCrawlerCacheClient();
+}
+
+function getCrawlerCacheTtlOptions(rawInput) {
+  const safeRawInput = asObject(rawInput);
+  const cacheOptions = asObject(safeRawInput.crawlerCache ?? safeRawInput.supabaseCrawlerCache);
+
+  return {
+    freshTtlMs: cacheOptions.freshTtlMs ?? getDefaultCrawlerCacheFreshTtlMs(),
+    staleTtlMs: cacheOptions.staleTtlMs ?? getDefaultCrawlerCacheStaleTtlMs(),
+  };
+}
+
+function buildWiseReportKrCacheDescriptor(input, pageDefinitions = WISEREPORT_KR_V12_PAGES) {
+  const pageIds = pageDefinitions.map((page) => page.id);
+
+  return {
+    source: 'wisereport',
+    market: 'KR',
+    targetIdentifier: input.instrument.code,
+    targetDisplayName: input.instrument.name,
+    targetKind: 'stock',
+    route: WISEREPORT_KR_CACHE_ROUTE,
+    routeVersion: WISEREPORT_KR_CACHE_ROUTE_VERSION,
+    schemaVersion: WISEREPORT_KR_CACHE_SCHEMA_VERSION,
+    authScope: 'public',
+    request: {
+      code: input.instrument.code,
+      pages: pageIds,
+      payload: 'raw-aggregate',
+    },
+    metadata: {
+      consumer: 'deepscan',
+      crawler: 'wisereport-kr',
+      pageCount: pageIds.length,
+    },
+    sourceRefs: [
+      createDeepScanSourceRef({
+        type: 'report',
+        id: `wisereport-kr-v12:${input.instrument.code}`,
+        label: 'WiseReport KR v12 aggregate',
+      }),
+    ],
+  };
+}
+
+async function loadWiseReportKrAggregateWithCache(input, options = {}) {
+  const loadAggregate = typeof options.loadAggregate === 'function'
+    ? options.loadAggregate
+    : (code) => getCrawlV12(code);
+  const pageDefinitions = options.pageDefinitions ?? WISEREPORT_KR_V12_PAGES;
+  const cacheClient = Object.hasOwn(options, 'cacheClient') ? options.cacheClient : getDefaultSupabaseCrawlerCacheClient();
+  const descriptor = buildWiseReportKrCacheDescriptor(input, pageDefinitions);
+
+  const result = await readThroughCrawlerCache({
+    cacheClient,
+    descriptor,
+    load: () => loadAggregate(input.instrument.code),
+    freshTtlMs: options.freshTtlMs ?? getDefaultCrawlerCacheFreshTtlMs(),
+    staleTtlMs: options.staleTtlMs ?? getDefaultCrawlerCacheStaleTtlMs(),
+    allowStaleOnError: options.allowStaleOnError !== false,
+    ...(options.now ? { now: options.now } : {}),
+  });
+
+  return result.value;
+}
+
+async function loadWiseReportKrSlimSource(input, options = {}) {
+  const pageDefinitions = options.pageDefinitions ?? WISEREPORT_KR_V12_PAGES;
+  const aggregate = await loadWiseReportKrAggregateWithCache(input, {
+    ...options,
+    pageDefinitions,
+  });
+
+  return buildWiseReportKrSlimPayload(aggregate, input.instrument.code, pageDefinitions);
+}
+
 async function captureSource(sourceId, load) {
   try {
     return {
@@ -729,12 +827,13 @@ async function resolveKrSourceBundle(rawInput, input) {
   }
 
   const tradeDate = normalizeTradeDate(input.selectedAt ?? input.sourceContext.appliedAt);
+  const cacheClient = getCrawlerCacheClientFromRawInput(rawInput);
+  const cacheTtlOptions = getCrawlerCacheTtlOptions(rawInput);
   const [slimResult, quotesResult, packageResult] = await Promise.all([
-    captureSource('slim', async () => buildWiseReportKrSlimPayload(
-      await getCrawlV12(input.instrument.code),
-      input.instrument.code,
-      WISEREPORT_KR_V12_PAGES,
-    )),
+    captureSource('slim', async () => loadWiseReportKrSlimSource(input, {
+      cacheClient,
+      ...cacheTtlOptions,
+    })),
     captureSource('current-quote', async () => getCurrentQuotes({
       codes: input.instrument.code ? [input.instrument.code] : [],
       tickers: input.instrument.ticker ? [input.instrument.ticker] : [],
@@ -1486,6 +1585,10 @@ export {
   createErrorBlockMeta,
   createOkBlockMeta,
   createInputInvalidPayload,
+  buildWiseReportKrCacheDescriptor,
+  loadWiseReportKrAggregateWithCache,
+  loadWiseReportKrSlimSource,
   maybeResolveKrPackageResult,
+  resolveKrSourceBundle,
   MAJOR_BLOCK_KEYS,
 };
