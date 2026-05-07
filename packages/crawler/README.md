@@ -72,8 +72,8 @@ npm run dev
 | `KRX_PW` | KRX 로그인 비밀번호 |
 | `KAKAO_ID` | Kakao 로그인 ID |
 | `KAKAO_PW` | Kakao 로그인 비밀번호 |
-| `SUPABASE_URL` | optional DeepScan WiseReport 장기 캐시용 Supabase project URL |
-| `SUPABASE_SERVICE_ROLE_KEY` | optional DeepScan WiseReport 장기 캐시 RPC 호출용 service-role key |
+| `SUPABASE_URL` | optional DeepScan WiseReport slim payload 장기 캐시용 Supabase project URL |
+| `SUPABASE_SERVICE_ROLE_KEY` | optional DeepScan WiseReport slim payload 캐시 RPC 호출용 service-role key |
 | `CRAWLER_SUPABASE_CACHE_ENABLE` | optional `false`/`0`이면 Supabase crawler cache 비활성화 |
 | `CRAWLER_SUPABASE_CACHE_FRESH_TTL_MS` | optional fresh cache TTL override |
 | `CRAWLER_SUPABASE_CACHE_STALE_TTL_MS` | optional upstream 실패 시 stale fallback 허용 기간 override |

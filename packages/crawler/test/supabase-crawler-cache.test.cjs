@@ -65,7 +65,7 @@ test('readThroughCrawlerCache returns fresh Supabase hits before calling the cra
       source: 'wisereport',
       market: 'KR',
       targetIdentifier: '005930',
-      route: 'wisereport-kr-v12-aggregate',
+      route: 'wisereport-kr-v12-slim',
       routeVersion: 'v12',
       schemaVersion: 'test-v1',
       request: { code: '005930' },
@@ -109,7 +109,7 @@ test('readThroughCrawlerCache loads and upserts on miss or stale entry', async (
       targetIdentifier: '005930',
       targetDisplayName: '삼성전자',
       targetKind: 'stock',
-      route: 'wisereport-kr-v12-aggregate',
+      route: 'wisereport-kr-v12-slim',
       routeVersion: 'v12',
       schemaVersion: 'test-v1',
       request: { code: '005930' },
@@ -157,7 +157,7 @@ test('readThroughCrawlerCache serves stale Supabase data when the crawler loader
       source: 'wisereport',
       market: 'KR',
       targetIdentifier: '005930',
-      route: 'wisereport-kr-v12-aggregate',
+      route: 'wisereport-kr-v12-slim',
       routeVersion: 'v12',
       schemaVersion: 'test-v1',
       request: { code: '005930' },
@@ -176,21 +176,20 @@ test('readThroughCrawlerCache serves stale Supabase data when the crawler loader
   assert.deepEqual(events.map((event) => event.eventType), ['miss', 'error', 'stale_hit']);
 });
 
-test('loadWiseReportKrSlimSource reads cached WiseReport aggregate before invoking the crawler', async () => {
+test('loadWiseReportKrSlimSource reads cached WiseReport slim payload before invoking the crawler', async () => {
   const { loadWiseReportKrSlimSource } = await import('../src/services/deepscan-payload.js');
-  const cachedAggregate = {
+  const cachedSlim = {
+    code: '005930',
+    company: { code: '005930', name: '삼성전자' },
     pages: {
       'company-overview': {
-        company: { code: '005930', name: '삼성전자' },
-        sourceType: 'wisereport',
-        sourceKey: 'wisereport기업개요',
         summary: { market: 'KOSPI' },
       },
     },
   };
   let loaderCalls = 0;
   const cacheClient = {
-    readPayload: async () => createFreshRow(cachedAggregate),
+    readPayload: async () => createFreshRow(cachedSlim),
     upsertPayload: async () => assert.fail('fresh hit must not write'),
     recordEvent: async () => {},
   };
@@ -213,4 +212,60 @@ test('loadWiseReportKrSlimSource reads cached WiseReport aggregate before invoki
   assert.equal(loaderCalls, 0);
   assert.deepEqual(slim.company, { code: '005930', name: '삼성전자' });
   assert.equal(slim.pages['company-overview'].summary.market, 'KOSPI');
+});
+
+
+test('loadWiseReportKrSlimSource writes slim payloads instead of raw WiseReport aggregates', async () => {
+  const { loadWiseReportKrSlimSource } = await import('../src/services/deepscan-payload.js');
+  const writes = [];
+  let loaderCalls = 0;
+  const rawAggregate = {
+    pages: {
+      'company-overview': {
+        normalized: {
+          company: { code: '005930', name: '삼성전자' },
+          sourceType: 'wisereport',
+          sourceKey: 'wisereport기업개요',
+          bodyTextHead: 'large parser-only text that must not be cached for DeepScan',
+          summary: { market: 'KOSPI' },
+        },
+      },
+    },
+  };
+  const cacheClient = {
+    readPayload: async () => null,
+    upsertPayload: async (entry) => {
+      writes.push(entry);
+      return [{ id: 'written-slim-row' }];
+    },
+    recordEvent: async () => {},
+  };
+
+  const slim = await loadWiseReportKrSlimSource({
+    instrument: {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KR',
+    },
+  }, {
+    cacheClient,
+    loadAggregate: async () => {
+      loaderCalls += 1;
+      return rawAggregate;
+    },
+    freshTtlMs: 1_000,
+    staleTtlMs: 2_000,
+    now: new Date('2026-05-07T00:00:00.000Z'),
+  });
+
+  assert.equal(loaderCalls, 1);
+  assert.deepEqual(slim.company, { code: '005930', name: '삼성전자' });
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].route, 'wisereport-kr-v12-slim');
+  assert.equal(writes[0].schemaVersion, 'wisereport-kr-v12-slim-v1');
+  assert.equal(writes[0].metadata.payloadShape, 'slim');
+  assert.equal(writes[0].payload.company.name, '삼성전자');
+  assert.equal(writes[0].payload.pages['company-overview'].summary.market, 'KOSPI');
+  assert.equal(writes[0].payload.pages['company-overview'].company, undefined);
+  assert.equal(writes[0].payload.pages['company-overview'].bodyTextHead, undefined);
 });

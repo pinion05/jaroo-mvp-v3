@@ -30,9 +30,9 @@ const SOURCE_TYPES = new Set(['ocr', 'holding', 'report', 'news', 'market', 'sys
 const FALLBACK_GENERATED_AT = '1970-01-01T00:00:00.000Z';
 const INTERNAL_SERVICE_ERROR_CODE = 'internal-service-error';
 const MIN_PACKAGE_REASON_LENGTH = 8;
-const WISEREPORT_KR_CACHE_ROUTE = 'wisereport-kr-v12-aggregate';
+const WISEREPORT_KR_CACHE_ROUTE = 'wisereport-kr-v12-slim';
 const WISEREPORT_KR_CACHE_ROUTE_VERSION = 'v12';
-const WISEREPORT_KR_CACHE_SCHEMA_VERSION = 'wisereport-kr-v12-aggregate-v1';
+const WISEREPORT_KR_CACHE_SCHEMA_VERSION = 'wisereport-kr-v12-slim-v1';
 
 function normalizeText(value) {
   if (typeof value !== 'string') {
@@ -641,27 +641,35 @@ function buildWiseReportKrCacheDescriptor(input, pageDefinitions = WISEREPORT_KR
     request: {
       code: input.instrument.code,
       pages: pageIds,
-      payload: 'raw-aggregate',
+      payload: 'deep-slim',
     },
     metadata: {
       consumer: 'deepscan',
       crawler: 'wisereport-kr',
+      payloadShape: 'slim',
       pageCount: pageIds.length,
     },
     sourceRefs: [
       createDeepScanSourceRef({
         type: 'report',
         id: `wisereport-kr-v12:${input.instrument.code}`,
-        label: 'WiseReport KR v12 aggregate',
+        label: 'WiseReport KR v12 slim payload',
       }),
     ],
   };
 }
 
-async function loadWiseReportKrAggregateWithCache(input, options = {}) {
+async function loadWiseReportKrSlimSource(input, options = {}) {
   const loadAggregate = typeof options.loadAggregate === 'function'
     ? options.loadAggregate
     : (code) => getCrawlV12(code);
+  const loadSlim = typeof options.loadSlim === 'function'
+    ? options.loadSlim
+    : async (code, pageDefinitions) => buildWiseReportKrSlimPayload(
+      await loadAggregate(code),
+      code,
+      pageDefinitions,
+    );
   const pageDefinitions = options.pageDefinitions ?? WISEREPORT_KR_V12_PAGES;
   const cacheClient = Object.hasOwn(options, 'cacheClient') ? options.cacheClient : getDefaultSupabaseCrawlerCacheClient();
   const descriptor = buildWiseReportKrCacheDescriptor(input, pageDefinitions);
@@ -669,7 +677,7 @@ async function loadWiseReportKrAggregateWithCache(input, options = {}) {
   const result = await readThroughCrawlerCache({
     cacheClient,
     descriptor,
-    load: () => loadAggregate(input.instrument.code),
+    load: () => loadSlim(input.instrument.code, pageDefinitions),
     freshTtlMs: options.freshTtlMs ?? getDefaultCrawlerCacheFreshTtlMs(),
     staleTtlMs: options.staleTtlMs ?? getDefaultCrawlerCacheStaleTtlMs(),
     allowStaleOnError: options.allowStaleOnError !== false,
@@ -677,16 +685,6 @@ async function loadWiseReportKrAggregateWithCache(input, options = {}) {
   });
 
   return result.value;
-}
-
-async function loadWiseReportKrSlimSource(input, options = {}) {
-  const pageDefinitions = options.pageDefinitions ?? WISEREPORT_KR_V12_PAGES;
-  const aggregate = await loadWiseReportKrAggregateWithCache(input, {
-    ...options,
-    pageDefinitions,
-  });
-
-  return buildWiseReportKrSlimPayload(aggregate, input.instrument.code, pageDefinitions);
 }
 
 async function captureSource(sourceId, load) {
@@ -1586,7 +1584,6 @@ export {
   createOkBlockMeta,
   createInputInvalidPayload,
   buildWiseReportKrCacheDescriptor,
-  loadWiseReportKrAggregateWithCache,
   loadWiseReportKrSlimSource,
   maybeResolveKrPackageResult,
   resolveKrSourceBundle,
