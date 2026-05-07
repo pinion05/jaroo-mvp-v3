@@ -467,23 +467,22 @@ export default function DeepScanPage() {
       }
     >
       <Tabs value={tab} onValueChange={(value) => handleTabChange(value as TabValue)} className='gap-0'>
-        <TabsList
-          variant='line'
-          className='sticky top-0 z-10 -mx-4 flex h-auto w-[calc(100%+2rem)] gap-0 rounded-none border-b border-[color:var(--jaroo-border)] bg-white px-4'
-        >
-          <TabsTrigger
-            value='analysis'
-            className='h-auto rounded-none border-0 px-0 py-3.5 text-sm font-medium text-[color:var(--jaroo-muted)] data-active:text-[color:var(--jaroo-primary)] after:bottom-[-1px] after:h-[2.5px] after:bg-[color:var(--jaroo-primary)]'
-          >
-            분석
-          </TabsTrigger>
-          <TabsTrigger
-            value='strategy'
-            className='h-auto rounded-none border-0 px-0 py-3.5 text-sm font-medium text-[color:var(--jaroo-muted)] data-active:text-[color:var(--jaroo-primary)] after:bottom-[-1px] after:h-[2.5px] after:bg-[color:var(--jaroo-primary)]'
-          >
-            전략
-          </TabsTrigger>
-        </TabsList>
+        <div className='sticky top-0 z-10 -mx-4 border-b border-[color:var(--jaroo-border)] bg-white px-4 py-2'>
+          <TabsList className='grid h-11 w-full grid-cols-2 gap-1 rounded-[20px] bg-[color:var(--jaroo-secondary)] p-1'>
+            <TabsTrigger
+              value='analysis'
+              className='h-full rounded-[16px] border-0 px-0 py-0 text-sm font-semibold text-[color:var(--jaroo-muted)] after:hidden data-active:bg-[color:var(--jaroo-primary)] data-active:text-white data-active:shadow-[0_8px_18px_rgba(24,95,165,0.22)]'
+            >
+              분석
+            </TabsTrigger>
+            <TabsTrigger
+              value='strategy'
+              className='h-full rounded-[16px] border-0 px-0 py-0 text-sm font-semibold text-[color:var(--jaroo-muted)] after:hidden data-active:bg-[color:var(--jaroo-primary)] data-active:text-white data-active:shadow-[0_8px_18px_rgba(24,95,165,0.22)]'
+            >
+              전략
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <TabsContent value='analysis' className='mt-0 space-y-4 py-4'>
           <Card className='rounded-[24px] border-0 bg-[color:var(--jaroo-accent)] p-5 shadow-none'>
