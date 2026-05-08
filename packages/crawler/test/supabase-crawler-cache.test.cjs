@@ -141,13 +141,17 @@ test('readThroughCrawlerCache loads and upserts on miss or stale entry', async (
 test('readThroughCrawlerCache serves stale Supabase data when the crawler loader fails', async () => {
   const { readThroughCrawlerCache } = await import('../src/services/supabase-crawler-cache.js');
   const events = [];
+  const writes = [];
   const cacheClient = {
     readPayload: async () => createFreshRow({ from: 'stale-supabase' }, {
       id: 'stale-row',
       staleAfter: '2026-05-06T00:00:00.000Z',
       expiresAt: '2099-01-02T00:00:00.000Z',
     }),
-    upsertPayload: async () => assert.fail('failed loader must not write'),
+    upsertPayload: async (entry) => {
+      writes.push(entry);
+      return [{ id: 'error-fallback-row' }];
+    },
     recordEvent: async (event) => events.push(event),
   };
 
@@ -171,8 +175,11 @@ test('readThroughCrawlerCache serves stale Supabase data when the crawler loader
   assert.deepEqual(result.value, { from: 'stale-supabase' });
   assert.equal(result.cache.hit, true);
   assert.equal(result.cache.freshness, 'stale');
-  assert.equal(result.cache.payloadId, 'stale-row');
+  assert.equal(result.cache.payloadId, 'error-fallback-row');
   assert.match(result.cache.upstreamError, /crawler failed/);
+  assert.equal(writes.length, 1);
+  assert.equal(writes[0].status, 'error_fallback');
+  assert.match(writes[0].upstreamError.message, /crawler failed/);
   assert.deepEqual(events.map((event) => event.eventType), ['miss', 'error', 'stale_hit']);
 });
 
@@ -268,4 +275,165 @@ test('loadWiseReportKrSlimSource writes slim payloads instead of raw WiseReport 
   assert.equal(writes[0].payload.pages['company-overview'].summary.market, 'KOSPI');
   assert.equal(writes[0].payload.pages['company-overview'].company, undefined);
   assert.equal(writes[0].payload.pages['company-overview'].bodyTextHead, undefined);
+});
+
+
+test('buildCrawlerCachePayloadEntry hashes the exact canonical JSON payload sent to Supabase', async () => {
+  const { buildCrawlerCachePayloadEntry, sha256Hex, stableStringify } = await import('../src/services/supabase-crawler-cache.js');
+  const entry = buildCrawlerCachePayloadEntry({
+    source: 'wisereport',
+    market: 'KR',
+    targetIdentifier: '005930',
+    route: 'wisereport-kr-v12-slim',
+    routeVersion: 'v12',
+    schemaVersion: 'test-v1',
+    request: { code: '005930', omitted: undefined },
+  }, {
+    keep: 'yes',
+    omitted: undefined,
+    when: new Date('2026-05-08T00:00:00.000Z'),
+    arr: [undefined, new Date('2026-05-08T00:00:01.000Z')],
+  }, {
+    now: '2026-05-08T00:00:02.000Z',
+  });
+
+  assert.deepEqual(entry.payload, {
+    arr: [null, '2026-05-08T00:00:01.000Z'],
+    keep: 'yes',
+    when: '2026-05-08T00:00:00.000Z',
+  });
+  const wireJson = JSON.stringify(entry.payload);
+  assert.equal(entry.payloadHash, sha256Hex(wireJson));
+  assert.equal(entry.payloadSizeBytes, Buffer.byteLength(wireJson, 'utf8'));
+  assert.equal(stableStringify({ b: 1, a: undefined }), '{"b":1}');
+});
+
+test('readThroughCrawlerCache normalizes string now values on the read path', async () => {
+  const { readThroughCrawlerCache } = await import('../src/services/supabase-crawler-cache.js');
+  const cacheClient = {
+    readPayload: async () => createFreshRow({ from: 'supabase' }, {
+      staleAfter: '2026-05-08T01:00:00.000Z',
+      expiresAt: '2026-05-09T00:00:00.000Z',
+    }),
+    upsertPayload: async () => assert.fail('fresh hit must not write'),
+    recordEvent: async () => {},
+  };
+
+  const result = await readThroughCrawlerCache({
+    cacheClient,
+    descriptor: {
+      source: 'wisereport',
+      market: 'KR',
+      targetIdentifier: '005930',
+      route: 'wisereport-kr-v12-slim',
+      routeVersion: 'v12',
+      schemaVersion: 'test-v1',
+      request: { code: '005930' },
+    },
+    load: async () => assert.fail('fresh hit must not call loader'),
+    now: '2026-05-08T00:30:00.000Z',
+  });
+
+  assert.equal(result.cache.hit, true);
+  assert.deepEqual(result.value, { from: 'supabase' });
+});
+
+test('readThroughCrawlerCache supports force refresh and bypass controls', async () => {
+  const { readThroughCrawlerCache } = await import('../src/services/supabase-crawler-cache.js');
+  const events = [];
+  const writes = [];
+  let reads = 0;
+  let loads = 0;
+  const descriptor = {
+    source: 'wisereport',
+    market: 'KR',
+    targetIdentifier: '005930',
+    route: 'wisereport-kr-v12-slim',
+    routeVersion: 'v12',
+    schemaVersion: 'test-v1',
+    request: { code: '005930' },
+  };
+  const cacheClient = {
+    readPayload: async () => {
+      reads += 1;
+      return createFreshRow({ from: 'supabase' });
+    },
+    upsertPayload: async (entry) => {
+      writes.push(entry);
+      return [{ id: 'refresh-row' }];
+    },
+    recordEvent: async (event) => events.push(event),
+  };
+
+  const refreshed = await readThroughCrawlerCache({
+    cacheClient,
+    descriptor,
+    forceRefresh: true,
+    load: async () => {
+      loads += 1;
+      return { from: 'crawler' };
+    },
+  });
+
+  assert.equal(reads, 0);
+  assert.equal(loads, 1);
+  assert.equal(refreshed.cache.hit, false);
+  assert.deepEqual(refreshed.value, { from: 'crawler' });
+  assert.deepEqual(events.map((event) => event.eventType), ['refresh', 'write']);
+  assert.equal(writes.length, 1);
+
+  const bypassed = await readThroughCrawlerCache({
+    cacheClient,
+    descriptor,
+    bypassCache: true,
+    load: async () => {
+      loads += 1;
+      return { from: 'bypass' };
+    },
+  });
+
+  assert.equal(reads, 0);
+  assert.equal(loads, 2);
+  assert.equal(bypassed.cache.bypassed, true);
+  assert.deepEqual(bypassed.value, { from: 'bypass' });
+});
+
+test('createSupabaseCrawlerCacheClient handles malformed JSON errors and exposes invalidate RPC', async () => {
+  const { createSupabaseCrawlerCacheClient } = await import('../src/services/supabase-crawler-cache.js');
+  const calls = [];
+  const fetchImpl = async (url, init) => {
+    calls.push({ url, body: JSON.parse(String(init.body)) });
+    if (url.endsWith('/get_crawler_cache_payload')) {
+      return new Response('<html>bad gateway</html>', { status: 502, statusText: 'Bad Gateway' });
+    }
+    return new Response(JSON.stringify([{ invalidated_count: 1 }]), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    });
+  };
+  const client = createSupabaseCrawlerCacheClient({
+    supabaseUrl: 'https://example.supabase.co',
+    serviceRoleKey: 'service-role-key',
+    fetchImpl,
+  });
+
+  await assert.rejects(() => client.readPayload('cache-key'), /Bad Gateway/);
+  const result = await client.invalidatePayload({ source: 'wisereport', targetIdentifier: '005930', route: 'wisereport-kr-v12-slim' });
+  assert.deepEqual(result, [{ invalidated_count: 1 }]);
+  assert.equal(calls[1].url, 'https://example.supabase.co/rest/v1/rpc/invalidate_crawler_cache_payload');
+  assert.equal(calls[1].body.p_source, 'wisereport');
+  assert.equal(calls[1].body.p_target_identifier, '005930');
+});
+
+test('getCrawlerCacheClientFromRawInput honors string disable tokens even when a client is provided', async () => {
+  const { getCrawlerCacheClientFromRawInput, getCrawlerCacheOptions } = await import('../src/services/deepscan-payload.js');
+
+  assert.equal(getCrawlerCacheClientFromRawInput({ crawlerCache: { enabled: 'false', client: {} } }), null);
+  assert.equal(getCrawlerCacheClientFromRawInput({ supabaseCrawlerCache: { enabled: '0', client: {} } }), null);
+  assert.deepEqual(getCrawlerCacheOptions({ crawlerCache: { forceRefresh: 'true', bypassCache: 'off' } }), {
+    freshTtlMs: 21600000,
+    staleTtlMs: 604800000,
+    forceRefresh: true,
+    bypassCache: false,
+  });
 });

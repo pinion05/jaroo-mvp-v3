@@ -6,12 +6,19 @@ const DEFAULT_STALE_TTL_MS = 7 * 24 * 60 * 60_000;
 const CACHE_KEY_PREFIX = 'crawler-cache-v1';
 const DISABLE_TOKENS = new Set(['0', 'false', 'off', 'no', 'disabled']);
 const ENABLE_TOKENS = new Set(['1', 'true', 'on', 'yes', 'enabled']);
+const OMIT_JSON_VALUE = Symbol('omit-json-value');
 
 function normalizeText(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
 
-function normalizeToggle(value) {
+export function normalizeCrawlerCacheToggle(value) {
+  if (typeof value === 'boolean') return value;
+  if (typeof value === 'number') {
+    if (value === 0) return false;
+    if (value === 1) return true;
+  }
+
   const normalized = normalizeText(value)?.toLowerCase();
   if (!normalized) return undefined;
   if (ENABLE_TOKENS.has(normalized)) return true;
@@ -40,20 +47,41 @@ function readPositiveIntegerEnv(names, fallback, env = process.env) {
 }
 
 function isPlainObject(value) {
-  return Boolean(value && typeof value === 'object' && !Array.isArray(value));
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return false;
+  }
+
+  const prototype = Object.getPrototypeOf(value);
+  return prototype === Object.prototype || prototype === null;
 }
 
-function stableJsonValue(value) {
+function stableJsonValue(value, context = 'value') {
+  if (value === undefined || typeof value === 'function' || typeof value === 'symbol') {
+    return context === 'object' ? OMIT_JSON_VALUE : null;
+  }
+
   if (Array.isArray(value)) {
-    return value.map((item) => stableJsonValue(item));
+    return value.map((item) => stableJsonValue(item, 'array'));
   }
 
   if (isPlainObject(value)) {
-    return Object.fromEntries(
-      Object.keys(value)
-        .sort()
-        .map((key) => [key, stableJsonValue(value[key])]),
-    );
+    const entries = [];
+    for (const key of Object.keys(value).sort()) {
+      const nested = stableJsonValue(value[key], 'object');
+      if (nested !== OMIT_JSON_VALUE) {
+        entries.push([key, nested]);
+      }
+    }
+
+    return Object.fromEntries(entries);
+  }
+
+  if (value && typeof value === 'object') {
+    if (typeof value.toJSON === 'function') {
+      return stableJsonValue(value.toJSON(), context);
+    }
+
+    return String(value);
   }
 
   if (typeof value === 'number') {
@@ -64,15 +92,11 @@ function stableJsonValue(value) {
     return value.toString();
   }
 
-  if (value === undefined) {
-    return null;
-  }
-
   return value;
 }
 
 export function stableStringify(value) {
-  return JSON.stringify(stableJsonValue(value));
+  return JSON.stringify(stableJsonValue(value)) ?? 'null';
 }
 
 export function sha256Hex(value) {
@@ -104,8 +128,17 @@ function normalizeTimestamp(value) {
   return Number.isNaN(parsed) ? null : new Date(parsed).toISOString();
 }
 
+function normalizeDateValue(value, fallback = new Date()) {
+  if (value instanceof Date && !Number.isNaN(value.getTime())) {
+    return value;
+  }
+
+  const parsed = new Date(value ?? Date.now());
+  return Number.isNaN(parsed.getTime()) ? fallback : parsed;
+}
+
 function addMs(baseDate, ms) {
-  const base = baseDate instanceof Date ? baseDate : new Date(baseDate);
+  const base = normalizeDateValue(baseDate);
   return new Date(base.getTime() + ms).toISOString();
 }
 
@@ -192,14 +225,15 @@ export function buildCrawlerCacheIdentity(descriptor = {}) {
 
 export function buildCrawlerCachePayloadEntry(descriptor = {}, payload, options = {}) {
   const identity = buildCrawlerCacheIdentity(descriptor);
-  const payloadJson = stableStringify(payload);
-  const now = options.now instanceof Date ? options.now : new Date(options.now ?? Date.now());
+  const canonicalPayload = stableJsonValue(payload);
+  const payloadJson = JSON.stringify(canonicalPayload) ?? 'null';
+  const now = normalizeDateValue(options.now);
   const freshTtlMs = readPositiveInteger(options.freshTtlMs, DEFAULT_FRESH_TTL_MS);
   const staleTtlMs = readPositiveInteger(options.staleTtlMs, DEFAULT_STALE_TTL_MS);
 
   return {
     ...identity,
-    payload,
+    payload: canonicalPayload,
     payloadHash: sha256Hex(payloadJson),
     payloadSizeBytes: Buffer.byteLength(payloadJson, 'utf8'),
     status: normalizeText(options.status) ?? 'fresh',
@@ -220,7 +254,20 @@ async function fetchJsonWithTimeout(fetchImpl, url, init, timeoutMs) {
       signal: controller.signal,
     });
     const text = await response.text();
-    const data = text ? JSON.parse(text) : null;
+    let data = null;
+    if (typeof text === 'string' && text.trim()) {
+      try {
+        data = JSON.parse(text);
+      } catch (error) {
+        if (response.ok) {
+          const parseError = new Error('Supabase RPC returned invalid JSON');
+          parseError.cause = error;
+          throw parseError;
+        }
+
+        data = { message: response.statusText || 'Supabase RPC request failed' };
+      }
+    }
 
     if (!response.ok) {
       const message = data?.message ?? data?.hint ?? response.statusText ?? 'Supabase RPC request failed';
@@ -303,12 +350,22 @@ export function createSupabaseCrawlerCacheClient(options = {}) {
         p_metadata: asMetadataObject(event.metadata),
       });
     },
+    async invalidatePayload(filter = {}) {
+      const safeFilter = filter && typeof filter === 'object' ? filter : {};
+      return rpc('invalidate_crawler_cache_payload', {
+        p_cache_key: safeFilter.cacheKey ?? null,
+        p_source: safeFilter.source ?? null,
+        p_market: safeFilter.market ?? null,
+        p_target_identifier: safeFilter.targetIdentifier ?? null,
+        p_route: safeFilter.route ?? null,
+      });
+    },
   };
 }
 
 export function getDefaultSupabaseCrawlerCacheClient(options = {}) {
   const env = options.env ?? process.env;
-  const toggle = normalizeToggle(env.CRAWLER_SUPABASE_CACHE_ENABLE ?? env.SUPABASE_CRAWLER_CACHE_ENABLE);
+  const toggle = normalizeCrawlerCacheToggle(env.CRAWLER_SUPABASE_CACHE_ENABLE ?? env.SUPABASE_CRAWLER_CACHE_ENABLE);
 
   if (toggle === false) {
     return null;
@@ -368,6 +425,8 @@ export async function readThroughCrawlerCache({
   freshTtlMs = DEFAULT_FRESH_TTL_MS,
   staleTtlMs = DEFAULT_STALE_TTL_MS,
   allowStaleOnError = true,
+  bypassCache = false,
+  forceRefresh = false,
   now = new Date(),
 } = {}) {
   if (typeof load !== 'function') {
@@ -377,14 +436,16 @@ export async function readThroughCrawlerCache({
   const identity = buildCrawlerCacheIdentity(descriptor);
   const eventBase = buildEventBase(identity);
   const startedAt = Date.now();
+  const effectiveNow = normalizeDateValue(now);
 
-  if (!cacheClient) {
+  if (!cacheClient || bypassCache) {
     return {
       value: await load(),
       cache: {
-        enabled: false,
+        enabled: Boolean(cacheClient),
         hit: false,
         cacheKey: identity.cacheKey,
+        ...(bypassCache ? { bypassed: true } : {}),
       },
     };
   }
@@ -394,52 +455,63 @@ export async function readThroughCrawlerCache({
   let readError = null;
 
   try {
-    cachedRow = await cacheClient.readPayload(identity.cacheKey);
-    if (cachedRow && isCacheRowFresh(cachedRow, now)) {
+    if (forceRefresh) {
       await recordEventBestEffort(cacheClient, {
         ...eventBase,
-        payloadId: cachedRow.id,
-        eventType: 'hit',
+        eventType: 'refresh',
         latencyMs: Date.now() - startedAt,
-        metadata: { freshness: 'fresh' },
+        metadata: { reason: 'force-refresh' },
       });
+    } else {
+      cachedRow = await cacheClient.readPayload(identity.cacheKey);
+      if (cachedRow && isCacheRowFresh(cachedRow, effectiveNow)) {
+        await recordEventBestEffort(cacheClient, {
+          ...eventBase,
+          payloadId: cachedRow.id,
+          eventType: 'hit',
+          latencyMs: Date.now() - startedAt,
+          metadata: { freshness: 'fresh' },
+        });
 
-      return {
-        value: getRowPayload(cachedRow),
-        cache: {
-          enabled: true,
-          hit: true,
-          freshness: 'fresh',
-          cacheKey: identity.cacheKey,
-          payloadId: cachedRow.id ?? null,
-        },
-      };
-    }
+        return {
+          value: getRowPayload(cachedRow),
+          cache: {
+            enabled: true,
+            hit: true,
+            freshness: 'fresh',
+            cacheKey: identity.cacheKey,
+            payloadId: cachedRow.id ?? null,
+          },
+        };
+      }
 
-    if (cachedRow && isCacheRowUsableAsStale(cachedRow, now)) {
-      staleCandidate = cachedRow;
+      if (cachedRow && isCacheRowUsableAsStale(cachedRow, effectiveNow)) {
+        staleCandidate = cachedRow;
+      }
     }
   } catch (error) {
     readError = error;
   }
 
-  await recordEventBestEffort(cacheClient, {
-    ...eventBase,
-    payloadId: cachedRow?.id ?? null,
-    eventType: 'miss',
-    latencyMs: Date.now() - startedAt,
-    metadata: {
-      reason: readError ? 'read-error' : staleCandidate ? 'stale' : 'empty',
-      ...(readError ? { readError: errorMessage(readError) } : {}),
-    },
-  });
+  if (!forceRefresh) {
+    await recordEventBestEffort(cacheClient, {
+      ...eventBase,
+      payloadId: cachedRow?.id ?? null,
+      eventType: 'miss',
+      latencyMs: Date.now() - startedAt,
+      metadata: {
+        reason: readError ? 'read-error' : staleCandidate ? 'stale' : 'empty',
+        ...(readError ? { readError: errorMessage(readError) } : {}),
+      },
+    });
+  }
 
   try {
     const loadedValue = await load();
     const entry = buildCrawlerCachePayloadEntry(identity, loadedValue, {
       freshTtlMs,
       staleTtlMs,
-      now,
+      now: effectiveNow,
     });
     let payloadId = null;
     let writeError = null;
@@ -489,13 +561,36 @@ export async function readThroughCrawlerCache({
     });
 
     if (allowStaleOnError && staleCandidate) {
+      const upstreamError = {
+        message: errorMessage(error),
+        recordedAt: effectiveNow.toISOString(),
+      };
+      let fallbackPayloadId = staleCandidate.id ?? null;
+
+      try {
+        const fallbackEntry = buildCrawlerCachePayloadEntry(identity, getRowPayload(staleCandidate), {
+          freshTtlMs,
+          staleTtlMs,
+          now: effectiveNow,
+          status: 'error_fallback',
+          fetchedAt: staleCandidate.fetched_at ?? staleCandidate.fetchedAt ?? effectiveNow,
+          staleAfter: staleCandidate.stale_after ?? staleCandidate.staleAfter ?? null,
+          expiresAt: staleCandidate.expires_at ?? staleCandidate.expiresAt ?? null,
+          upstreamError,
+        });
+        const fallbackResult = await cacheClient.upsertPayload(fallbackEntry);
+        fallbackPayloadId = Array.isArray(fallbackResult) ? fallbackResult[0]?.id ?? fallbackPayloadId : fallbackResult?.id ?? fallbackPayloadId;
+      } catch {
+        // Persisting the error snapshot is best-effort; stale fallback should still work.
+      }
+
       await recordEventBestEffort(cacheClient, {
         ...eventBase,
-        payloadId: staleCandidate.id ?? null,
+        payloadId: fallbackPayloadId,
         eventType: 'stale_hit',
         latencyMs: Date.now() - startedAt,
         errorMessage: errorMessage(error),
-        metadata: { reason: 'upstream-error' },
+        metadata: { reason: 'upstream-error', persistedErrorFallback: fallbackPayloadId !== null },
       });
 
       return {
@@ -505,8 +600,8 @@ export async function readThroughCrawlerCache({
           hit: true,
           freshness: 'stale',
           cacheKey: identity.cacheKey,
-          payloadId: staleCandidate.id ?? null,
-          upstreamError: errorMessage(error),
+          payloadId: fallbackPayloadId,
+          upstreamError: upstreamError.message,
         },
       };
     }

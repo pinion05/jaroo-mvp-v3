@@ -79,6 +79,12 @@ npm run dev
 | `CRAWLER_SUPABASE_CACHE_STALE_TTL_MS` | optional upstream 실패 시 stale fallback 허용 기간 override |
 | `CRAWLER_SUPABASE_CACHE_TIMEOUT_MS` | optional Supabase cache RPC timeout override |
 
+DeepScan 호출별 override는 `crawlerCache` / `supabaseCrawlerCache` 입력으로 전달할 수 있습니다.
+
+- `enabled: false | 'false' | '0' | 'off' | 'no' | 'disabled'` — cache 사용 안 함
+- `forceRefresh: true | 'true' | '1'` — cache read를 건너뛰고 crawl 후 cache write
+- `bypassCache: true | 'true' | '1'` — cache read/write 모두 건너뛰고 crawl
+
 메모:
 
 - KRX 계열 API는 위 값이 없으면 실패할 수 있습니다.

@@ -8,6 +8,7 @@ import {
   getDefaultCrawlerCacheFreshTtlMs,
   getDefaultCrawlerCacheStaleTtlMs,
   getDefaultSupabaseCrawlerCacheClient,
+  normalizeCrawlerCacheToggle,
   readThroughCrawlerCache,
 } from './supabase-crawler-cache.js';
 
@@ -603,25 +604,28 @@ function buildWiseReportKrSlimPayload(rawAggregate, code, pageDefinitions = WISE
 function getCrawlerCacheClientFromRawInput(rawInput) {
   const safeRawInput = asObject(rawInput);
   const cacheOptions = asObject(safeRawInput.crawlerCache ?? safeRawInput.supabaseCrawlerCache);
+  const enabled = normalizeCrawlerCacheToggle(cacheOptions.enabled);
+
+  if (enabled === false) {
+    return null;
+  }
 
   if (Object.hasOwn(cacheOptions, 'client')) {
     return cacheOptions.client ?? null;
   }
 
-  if (Object.hasOwn(cacheOptions, 'enabled') && cacheOptions.enabled === false) {
-    return null;
-  }
-
   return getDefaultSupabaseCrawlerCacheClient();
 }
 
-function getCrawlerCacheTtlOptions(rawInput) {
+function getCrawlerCacheOptions(rawInput) {
   const safeRawInput = asObject(rawInput);
   const cacheOptions = asObject(safeRawInput.crawlerCache ?? safeRawInput.supabaseCrawlerCache);
 
   return {
     freshTtlMs: cacheOptions.freshTtlMs ?? getDefaultCrawlerCacheFreshTtlMs(),
     staleTtlMs: cacheOptions.staleTtlMs ?? getDefaultCrawlerCacheStaleTtlMs(),
+    forceRefresh: normalizeCrawlerCacheToggle(cacheOptions.forceRefresh ?? cacheOptions.refresh) === true,
+    bypassCache: normalizeCrawlerCacheToggle(cacheOptions.bypassCache ?? cacheOptions.bypass) === true,
   };
 }
 
@@ -681,6 +685,8 @@ async function loadWiseReportKrSlimSource(input, options = {}) {
     freshTtlMs: options.freshTtlMs ?? getDefaultCrawlerCacheFreshTtlMs(),
     staleTtlMs: options.staleTtlMs ?? getDefaultCrawlerCacheStaleTtlMs(),
     allowStaleOnError: options.allowStaleOnError !== false,
+    forceRefresh: options.forceRefresh === true,
+    bypassCache: options.bypassCache === true,
     ...(options.now ? { now: options.now } : {}),
   });
 
@@ -826,11 +832,11 @@ async function resolveKrSourceBundle(rawInput, input) {
 
   const tradeDate = normalizeTradeDate(input.selectedAt ?? input.sourceContext.appliedAt);
   const cacheClient = getCrawlerCacheClientFromRawInput(rawInput);
-  const cacheTtlOptions = getCrawlerCacheTtlOptions(rawInput);
+  const cacheOptions = getCrawlerCacheOptions(rawInput);
   const [slimResult, quotesResult, packageResult] = await Promise.all([
     captureSource('slim', async () => loadWiseReportKrSlimSource(input, {
       cacheClient,
-      ...cacheTtlOptions,
+      ...cacheOptions,
     })),
     captureSource('current-quote', async () => getCurrentQuotes({
       codes: input.instrument.code ? [input.instrument.code] : [],
@@ -1584,6 +1590,8 @@ export {
   createOkBlockMeta,
   createInputInvalidPayload,
   buildWiseReportKrCacheDescriptor,
+  getCrawlerCacheClientFromRawInput,
+  getCrawlerCacheOptions,
   loadWiseReportKrSlimSource,
   maybeResolveKrPackageResult,
   resolveKrSourceBundle,

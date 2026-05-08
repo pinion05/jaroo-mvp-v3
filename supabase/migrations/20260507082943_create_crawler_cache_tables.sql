@@ -46,8 +46,6 @@ create index if not exists payloads_status_idx
   on crawler_cache.payloads (status);
 create index if not exists payloads_fetched_at_idx
   on crawler_cache.payloads (fetched_at desc);
-create index if not exists payloads_payload_gin_idx
-  on crawler_cache.payloads using gin (payload jsonb_path_ops);
 create index if not exists payloads_metadata_gin_idx
   on crawler_cache.payloads using gin (metadata jsonb_path_ops);
 

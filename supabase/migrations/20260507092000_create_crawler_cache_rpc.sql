@@ -11,7 +11,8 @@ returns table (
   fetched_at timestamptz,
   cached_at timestamptz,
   stale_after timestamptz,
-  expires_at timestamptz
+  expires_at timestamptz,
+  upstream_error jsonb
 )
 language sql
 stable
@@ -30,7 +31,8 @@ as $$
     payloads.fetched_at,
     payloads.cached_at,
     payloads.stale_after,
-    payloads.expires_at
+    payloads.expires_at,
+    payloads.upstream_error
   from crawler_cache.payloads
   where payloads.cache_key = p_cache_key
     and payloads.status in ('fresh', 'stale', 'error_fallback')

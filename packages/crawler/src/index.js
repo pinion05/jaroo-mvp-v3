@@ -126,6 +126,7 @@ export {
   buildCrawlerCachePayloadEntry,
   createSupabaseCrawlerCacheClient,
   getDefaultSupabaseCrawlerCacheClient,
+  normalizeCrawlerCacheToggle,
   readThroughCrawlerCache,
 } from './services/supabase-crawler-cache.js';
 
