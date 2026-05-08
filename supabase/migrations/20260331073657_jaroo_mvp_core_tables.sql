@@ -36,3 +36,19 @@ create table if not exists public.analysis_results (
 );
 create index if not exists idx_analysis_results_user_id on public.analysis_results(user_id);
 create index if not exists idx_analysis_results_holding_id on public.analysis_results(holding_id);
+
+alter table public.users enable row level security;
+alter table public.holdings enable row level security;
+alter table public.analysis_results enable row level security;
+
+revoke all on table public.users from anon, authenticated;
+revoke all on table public.holdings from anon, authenticated;
+revoke all on table public.analysis_results from anon, authenticated;
+
+grant select, insert, update, delete on table public.users to service_role;
+grant select, insert, update, delete on table public.holdings to service_role;
+grant select, insert, update, delete on table public.analysis_results to service_role;
+
+comment on table public.users is 'Jaroo core user records. RLS enabled; no anon/authenticated client policies until auth ownership mapping is defined.';
+comment on table public.holdings is 'Jaroo core holdings. RLS enabled; no anon/authenticated client policies until auth ownership mapping is defined.';
+comment on table public.analysis_results is 'Jaroo core analysis snapshots. RLS enabled; no anon/authenticated client policies until auth ownership mapping is defined.';
