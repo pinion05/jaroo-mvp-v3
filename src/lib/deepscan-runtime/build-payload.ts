@@ -622,7 +622,7 @@ const US_AGENT_META: Record<UsMemberKey, Pick<DeepScanAgentResult, 'label' | 'sh
   'event-risk': { label: 'Event Risk', shortLabel: 'EVT', iconTone: 'red' },
   'financial-safety': { label: 'Safety', shortLabel: 'SAFE', iconTone: 'purple' },
   'ownership-flow': { label: 'Ownership', shortLabel: 'OWN', iconTone: 'amber' },
-  'portfolio-fit': { label: 'Position Fit', shortLabel: 'FIT', iconTone: 'teal' },
+  'portfolio-fit': { label: '포지션 적합도', shortLabel: 'FIT', iconTone: 'teal' },
 }
 
 function buildUsAgentResultsFromLlm(results: Partial<Record<UsMemberKey, { score: number; reason: string; confidence: 'low' | 'medium' | 'high' }>>): DeepScanAgentResult[] {
@@ -679,17 +679,17 @@ function toMember(agent: DeepScanAgentResult): JarooDeepScanCommitteeMember {
 function buildAxes(agentResults: DeepScanAgentResult[]): JarooDeepScanCommitteeAxis[] {
   const groups = [
     {
-      label: 'Business Quality',
+      label: '사업 품질',
       subtitle: '성장성과 수익성, 밸류에이션을 함께 봅니다.',
       agents: ['growth', 'profitability-quality', 'valuation'] as const,
     },
     {
-      label: 'Market Timing',
+      label: '시장 타이밍',
       subtitle: '모멘텀과 추정치 변화, 이벤트 리스크를 묶어 봅니다.',
       agents: ['momentum', 'estimate-revision', 'event-risk'] as const,
     },
     {
-      label: 'Position Fit',
+      label: '포지션 적합도',
       subtitle: '재무안정성과 소유구조, 내 포지션 적합도를 봅니다.',
       agents: ['financial-safety', 'ownership-flow', 'portfolio-fit'] as const,
     },

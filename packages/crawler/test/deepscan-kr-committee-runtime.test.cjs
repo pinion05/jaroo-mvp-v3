@@ -112,8 +112,8 @@ test('KR committee axes render pending members and score completed members only'
     valuation: { score: 60, reason: '밸류 reason', confidence: 'medium' },
   }, [], ['ownershipStability', 'trend', 'consensusMomentum', 'priceLocation', 'avgPriceGap', 'upsideBuffer', 'holdingCompleteness']);
 
-  const businessAxis = shape.axes.find((axis) => axis.label === 'Business Quality');
-  const marketAxis = shape.axes.find((axis) => axis.label === 'Market Timing');
+  const businessAxis = shape.axes.find((axis) => axis.label === '사업 품질');
+  const marketAxis = shape.axes.find((axis) => axis.label === '시장 타이밍');
 
   assert.equal(shape.hasPendingMembers, true);
   assert.equal(shape.committeeScores, null);

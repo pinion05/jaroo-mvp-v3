@@ -301,7 +301,7 @@ test('buildJarooDeepScanPayload keeps position-fit evidence when the handoff use
     sources: createStrongKrSources(),
   });
 
-  const positionFitAxis = payload.committee.axes.find((axis) => axis.label === 'Position Fit');
+  const positionFitAxis = payload.committee.axes.find((axis) => axis.label === '포지션 적합도');
   assert.ok(positionFitAxis);
   assert.equal(positionFitAxis.score, 84);
   assert.match(positionFitAxis.members[0].reason, /현재가 85200 대비 평단 71000/);
@@ -352,10 +352,10 @@ test('buildJarooDeepScanPayload uses package-derived KR committee wording when a
   assert.ok(reasons.some((reason) => reason.includes('HBM 증설과 AI 수요')))
   assert.ok(reasons.some((reason) => reason.includes('기관 수급은 변동성이 있지만')))
   assert.doesNotMatch(reasons[0], /최근 리포트 2건 기준입니다/)
-  const marketTimingAxis = payload.committee.axes.find((axis) => axis.label === 'Market Timing');
+  const marketTimingAxis = payload.committee.axes.find((axis) => axis.label === '시장 타이밍');
   assert.ok(marketTimingAxis);
   assert.match(marketTimingAxis.members[2].reason, /현재가 85200 KRW와 평단 71000 비교 기준/)
-  const positionFitAxis = payload.committee.axes.find((axis) => axis.label === 'Position Fit');
+  const positionFitAxis = payload.committee.axes.find((axis) => axis.label === '포지션 적합도');
   assert.ok(positionFitAxis);
   assert.equal(positionFitAxis.members[2].reason, '보유 수량, 평단, 현재가가 모두 확인되어 sell-now 계산이 가능합니다.');
 });
@@ -508,7 +508,7 @@ test('buildJarooDeepScanPayload preserves 9 committee slots and marks failed mem
     });
 
     assert.equal(payload.committee.axes.length, 3);
-    const businessAxis = payload.committee.axes.find((axis) => axis.label === 'Business Quality');
+    const businessAxis = payload.committee.axes.find((axis) => axis.label === '사업 품질');
     assert.ok(businessAxis);
     assert.equal(businessAxis.score, null);
     assert.equal(businessAxis.scoreText, 'N/A');
@@ -519,7 +519,7 @@ test('buildJarooDeepScanPayload preserves 9 committee slots and marks failed mem
     assert.equal(businessAxis.members[0].error.errorKind ?? businessAxis.members[0].error.kind, 'llm-upstream-error');
     assert.equal(businessAxis.members[0].error.attempts, 4);
     assert.equal(businessAxis.members[0].error.retryable, false);
-    const marketAxis = payload.committee.axes.find((axis) => axis.label === 'Market Timing');
+    const marketAxis = payload.committee.axes.find((axis) => axis.label === '시장 타이밍');
     assert.ok(marketAxis);
     assert.equal(marketAxis.members.every((member) => member.status === 'success'), true);
     assert.equal(typeof marketAxis.score, 'number');
@@ -615,7 +615,7 @@ test('buildJarooDeepScanPayload returns partial pending committee at soft deadli
     assert.equal(payload.metadata.degraded, true);
     assert.equal(payload.metadata.llmCommittee.status, 'partial');
     assert.equal(payload.metadata.llmCommittee.pending, 1);
-    const businessAxis = payload.committee.axes.find((axis) => axis.label === 'Business Quality');
+    const businessAxis = payload.committee.axes.find((axis) => axis.label === '사업 품질');
     assert.ok(businessAxis);
     assert.equal(businessAxis.members.length, 3);
     assert.equal(businessAxis.members[0].status, 'pending');

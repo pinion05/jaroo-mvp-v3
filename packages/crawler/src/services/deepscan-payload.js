@@ -1035,7 +1035,7 @@ function createCommitteeAxes(evidence, scored, packageResult) {
 
   return [
     {
-      label: 'Business Quality',
+      label: '사업 품질',
       score: scored.committee.businessQuality.score,
       scoreText: `${scored.committee.businessQuality.score} / 100`,
       axisStatusText: `${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages} KR 페이지 반영`,
@@ -1063,7 +1063,7 @@ function createCommitteeAxes(evidence, scored, packageResult) {
       ],
     },
     {
-      label: 'Market Timing',
+      label: '시장 타이밍',
       score: scored.committee.marketTiming.score,
       scoreText: `${scored.committee.marketTiming.score} / 100`,
       axisStatusText: evidence.currentQuote ? '현재가·리포트 모멘텀 반영' : '현재가 근거 부족',
@@ -1093,7 +1093,7 @@ function createCommitteeAxes(evidence, scored, packageResult) {
       ],
     },
     {
-      label: 'Position Fit',
+      label: '포지션 적합도',
       score: scored.committee.positionFit.score,
       scoreText: `${scored.committee.positionFit.score} / 100`,
       axisStatusText: evidence.holding.hasHoldingContext ? '보유 맥락 반영' : '보유 맥락 부족',

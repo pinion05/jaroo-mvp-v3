@@ -12,63 +12,63 @@ export const DEFAULT_KR_LLM_SOFT_DEADLINE_MS = 25_000;
 
 export const KR_MEMBER_SPECS = Object.freeze({
   profitability: {
-    axis: 'Business Quality',
+    axis: '사업 품질',
     shortLabel: '수익성',
     title: '수익성/기본체력',
     role: 'KR profitability analyst',
     focus: 'Judge Korean equity profitability and core business quality from company overview, financial analysis, FnGuide finance evidence, and missing-data warnings.',
   },
   valuation: {
-    axis: 'Business Quality',
+    axis: '사업 품질',
     shortLabel: '밸류',
     title: '밸류에이션',
     role: 'KR valuation analyst',
     focus: 'Judge Korean equity valuation attractiveness from consensus, opinion, investment indicators, current price context, and missing-data warnings.',
   },
   ownershipStability: {
-    axis: 'Business Quality',
+    axis: '사업 품질',
     shortLabel: '지배',
     title: '지분/안정성',
     role: 'KR ownership stability analyst',
     focus: 'Judge ownership stability and reporting resilience from shareholding, style analysis, holding context, and company overview evidence.',
   },
   trend: {
-    axis: 'Market Timing',
+    axis: '시장 타이밍',
     shortLabel: '트렌드',
     title: '트렌드',
     role: 'KR trend analyst',
     focus: 'Judge Korean equity trend quality from relative return, style analysis, report freshness, and current-price evidence.',
   },
   consensusMomentum: {
-    axis: 'Market Timing',
+    axis: '시장 타이밍',
     shortLabel: '컨센',
     title: '컨센서스 모멘텀',
     role: 'KR consensus momentum analyst',
     focus: 'Judge Korean equity consensus momentum from consensus, opinion, and recent report evidence.',
   },
   priceLocation: {
-    axis: 'Market Timing',
+    axis: '시장 타이밍',
     shortLabel: '가격',
     title: '가격 위치',
     role: 'KR price-location analyst',
     focus: 'Judge Korean equity current price position versus average price and reported market context.',
   },
   avgPriceGap: {
-    axis: 'Position Fit',
+    axis: '포지션 적합도',
     shortLabel: '평단',
     title: '평단 격차',
     role: 'KR average-price-gap analyst',
     focus: 'Judge position fit from current price versus average price and current unrealized position context.',
   },
   upsideBuffer: {
-    axis: 'Position Fit',
+    axis: '포지션 적합도',
     shortLabel: '여지',
     title: '상방 버퍼',
     role: 'KR upside buffer analyst',
     focus: 'Judge remaining upside/downside buffer from consensus, opinion, recent reports, and current price evidence.',
   },
   holdingCompleteness: {
-    axis: 'Position Fit',
+    axis: '포지션 적합도',
     shortLabel: '입력',
     title: '입력 완성도',
     role: 'KR holding completeness analyst',
@@ -736,7 +736,7 @@ function buildPendingMember(memberKey) {
 }
 
 function axisLabel(axisKey) {
-  return axisKey === 'businessQuality' ? 'Business Quality' : axisKey === 'marketTiming' ? 'Market Timing' : 'Position Fit';
+  return axisKey === 'businessQuality' ? '사업 품질' : axisKey === 'marketTiming' ? '시장 타이밍' : '포지션 적합도';
 }
 
 function axisSubtitle(axisKey, hasErrors, hasPending) {
