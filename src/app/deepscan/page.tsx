@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
+import { DeepScanLoadingScreen, type FindingProgress } from '@/components/deepscan-loading-screen'
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import {
@@ -171,6 +171,88 @@ function resolveMemberScoreClass(member: JarooDeepScanCommitteeAxis['members'][n
 
 function resolveCommitteeMemberIcon(member: JarooDeepScanCommitteeAxis['members'][number]) {
   return committeeMemberIcons[member.shortLabel] ?? committeeMemberIcons[member.title] ?? BadgeCheck
+}
+
+type LoadingFindingKey = 'quality' | 'timing' | 'position' | 'decision'
+type LoadingFindingProgressMap = Partial<Record<LoadingFindingKey, FindingProgress>>
+
+const loadingFindingAxisKeys = ['quality', 'timing', 'position'] as const
+
+function compactFindingText(value: string | null | undefined) {
+  const normalized = value?.replace(/\s+/g, ' ').trim()
+  if (!normalized) {
+    return ''
+  }
+
+  return normalized.length > 96 ? `${normalized.slice(0, 96)}…` : normalized
+}
+
+function buildAxisFindingProgress(axis: JarooDeepScanCommitteeAxis | undefined): FindingProgress | null {
+  if (!axis) {
+    return null
+  }
+
+  const members = axis.members ?? []
+  const completedMembers = members.filter((member) => member.status === 'success' && compactFindingText(member.reason))
+  const pendingCount = members.filter((member) => member.status === 'pending').length
+  const errorCount = members.filter((member) => member.status === 'error').length
+
+  if (completedMembers.length === 0) {
+    if (errorCount > 0 && pendingCount === 0) {
+      return {
+        badge: '재시도 필요',
+        tone: 'warning',
+        body: `${axis.label} 위원 응답을 아직 한 줄 요약으로 만들 수 없어요. 실패 슬롯을 확인하고 재시도가 필요합니다.`,
+      }
+    }
+
+    return null
+  }
+
+  const leadMember = completedMembers[0]
+  const extraCount = completedMembers.length - 1
+  const memberSuffix = extraCount > 0 ? ` 외 ${extraCount}명` : ''
+
+  return {
+    badge: pendingCount > 0 ? `${completedMembers.length}/${members.length} 응답` : '요약 도착',
+    tone: pendingCount > 0 ? 'active' : 'done',
+    body: `${leadMember.title}${memberSuffix}: ${compactFindingText(leadMember.reason)}`,
+  }
+}
+
+function buildLoadingFindingProgress(payload: JarooDeepScanPayload | null): LoadingFindingProgressMap | undefined {
+  if (!payload) {
+    return undefined
+  }
+
+  const progress: LoadingFindingProgressMap = {}
+
+  loadingFindingAxisKeys.forEach((key, index) => {
+    const axisProgress = buildAxisFindingProgress(payload.committee.axes[index])
+    if (axisProgress) {
+      progress[key] = axisProgress
+    }
+  })
+
+  if (payload.metadata.llmCommittee?.status === 'complete' && payload.sellNow.blockState === 'ok') {
+    progress.decision = {
+      badge: '요약 도착',
+      tone: 'done',
+      body: compactFindingText(payload.sellNow.realizedText) || compactFindingText(payload.portfolioSimulation.caption) || '즉시 매도 판단이 도착했어요.',
+    }
+  }
+
+  return Object.keys(progress).length > 0 ? progress : undefined
+}
+
+function hasCollectedDeepScanEvidence(payload: JarooDeepScanPayload | null) {
+  if (!payload) {
+    return false
+  }
+
+  return payload.metadata.sourceRefs.some((ref) => ref.type === 'report' || ref.type === 'market')
+    || payload.insights.items.length > 0
+    || payload.committee.sourceRefs.some((ref) => ref.type === 'report' || ref.type === 'market')
 }
 
 type DeepScanCommitteeStatusResponse = {
@@ -526,6 +608,9 @@ export default function DeepScanPage() {
   const heroCard = buildDeepScanHeroCard(requestSeed, fetchState, payload)
   const partialSuccessNotice = buildDeepScanPartialSuccessNotice(payload)
   const weekTone = resolveWeekToneClasses(payload?.strategy.weekSignalTone ?? 'neutral')
+  const isCommitteeHydrating = fetchState === 'success' && payload?.metadata.llmCommittee?.status === 'partial'
+  const loadingFindingProgress = buildLoadingFindingProgress(payload)
+  const evidenceCollected = hasCollectedDeepScanEvidence(payload)
   const analysisLoadingNotice = {
     badge: '로딩 중',
     title: 'AI 분석 결과를 불러오는 중',
@@ -542,17 +627,27 @@ export default function DeepScanPage() {
     body: errorMessage ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
   }
 
-  if (fetchState === 'loading') {
+  if (fetchState === 'loading' || isCommitteeHydrating) {
     const identifier = [requestSeed.holding.ticker, requestSeed.holding.code]
       .filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index)
       .join(' · ')
 
     return (
-      <div className='flex min-h-screen justify-center bg-[#e8e8e8]'>
+      <div className='flex min-h-screen justify-center bg-[color:var(--jaroo-canvas)] px-3 py-4 sm:px-6'>
         <DeepScanLoadingScreen
-          className='max-w-[340px] shadow-[0_4px_24px_rgba(0,0,0,.12)]'
+          className='max-w-[390px] overflow-hidden rounded-[32px] border border-white/70 shadow-[0_20px_60px_rgba(12,68,124,0.18)]'
           name={requestSeed.holding.name}
           identifier={identifier}
+          market={requestSeed.holding.market}
+          shares={target?.quantity}
+          averagePrice={target?.averagePrice}
+          averagePriceCurrency={target?.averagePriceCurrency}
+          currentPrice={target?.currentPrice}
+          currentPriceCurrency={target?.currentPriceCurrency}
+          currentProfitRate={target?.currentProfitRate}
+          evaluationAmount={target?.evaluationAmount}
+          findingProgress={loadingFindingProgress}
+          evidenceCollected={evidenceCollected}
           backHref='/home'
         />
       </div>
