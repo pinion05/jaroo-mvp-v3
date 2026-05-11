@@ -4,7 +4,12 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { join } from 'node:path'
 import { tmpdir } from 'node:os'
 
-import { scoreCommitteeMember, scoreCommitteeMembers } from '../src/committee-llm.js'
+import {
+  getCommitteeProgress,
+  scoreCommitteeMember,
+  scoreCommitteeMembers,
+  scoreCommitteeMembersProgressive,
+} from '../src/committee-llm.js'
 
 test('scoreCommitteeMember sends strict OpenRouter schema request and parses JSON response', async () => {
   const originalFetch = global.fetch
@@ -347,6 +352,139 @@ test('scoreCommitteeMembers reports missing generated dumps with runtime taxonom
     assert.equal(errors[0].llmResultPresent, false)
   } finally {
     rmSync(logDir, { recursive: true, force: true })
+    if (originalKey) {
+      process.env.OPENROUTER_API_KEY = originalKey
+    } else {
+      delete process.env.OPENROUTER_API_KEY
+    }
+  }
+})
+
+test('scoreCommitteeMembersProgressive returns partial at soft deadline and updates registry later', async () => {
+  const originalFetch = global.fetch
+  const originalKey = process.env.OPENROUTER_API_KEY
+  const logDir = mkdtempSync(join(tmpdir(), 'committee-llm-'))
+  const requestId = `test-progressive-${Date.now()}`
+  process.env.OPENROUTER_API_KEY = 'test-key'
+
+  global.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+    const body = JSON.parse(String(init?.body ?? '{}')) as { messages?: Array<{ role?: string; content?: string }> }
+    const userMessage = body.messages?.find((message) => message.role === 'user')
+    const content = userMessage?.content ?? ''
+    if (content.includes('"member":"slow"')) {
+      await new Promise((resolve) => setTimeout(resolve, 60))
+    }
+
+    return new Response(
+      JSON.stringify({
+        choices: [
+          {
+            message: {
+              content: JSON.stringify({
+                score: content.includes('"member":"slow"') ? 51 : 74,
+                reason: 'progressive 테스트 응답입니다.',
+                confidence: 'medium',
+              }),
+            },
+          },
+        ],
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )
+  }) as typeof fetch
+
+  try {
+    const startedAt = Date.now()
+    const initial = await scoreCommitteeMembersProgressive({
+      memberKeys: ['fast', 'slow'],
+      shared: { source: 'fixture' },
+      members: {
+        fast: { member: 'fast' },
+        slow: { member: 'slow' },
+      },
+      options: {
+        requestId,
+        concurrency: 2,
+        softDeadlineMs: 10,
+        schemaName: 'jaroo_test_member',
+        title: 'test committee',
+        systemPrompt: (memberKey: string) => `member:${memberKey}`,
+        logDir,
+      },
+    })
+
+    assert.equal(initial.status, 'partial')
+    assert.equal(initial.results.fast.score, 74)
+    assert.deepEqual(initial.pending, ['slow'])
+    assert.ok(Date.now() - startedAt < 50)
+
+    await new Promise((resolve) => setTimeout(resolve, 80))
+    const final = getCommitteeProgress(requestId)
+    assert.equal(final?.status, 'complete')
+    assert.equal(final?.results.slow.score, 51)
+    assert.deepEqual(final?.pending, [])
+  } finally {
+    rmSync(logDir, { recursive: true, force: true })
+    global.fetch = originalFetch
+    if (originalKey) {
+      process.env.OPENROUTER_API_KEY = originalKey
+    } else {
+      delete process.env.OPENROUTER_API_KEY
+    }
+  }
+})
+
+test('scoreCommitteeMembersProgressive evicts completed progress after TTL', async () => {
+  const originalFetch = global.fetch
+  const originalKey = process.env.OPENROUTER_API_KEY
+  const logDir = mkdtempSync(join(tmpdir(), 'committee-llm-'))
+  const requestId = `test-progressive-ttl-${Date.now()}`
+  process.env.OPENROUTER_API_KEY = 'test-key'
+
+  global.fetch = (async () => new Response(
+    JSON.stringify({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              score: 68,
+              reason: 'ttl 테스트 응답입니다.',
+              confidence: 'medium',
+            }),
+          },
+        },
+      ],
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  )) as typeof fetch
+
+  try {
+    const initial = await scoreCommitteeMembersProgressive({
+      memberKeys: ['valuation'],
+      shared: { source: 'fixture' },
+      members: {
+        valuation: { member: 'valuation' },
+      },
+      options: {
+        requestId,
+        concurrency: 1,
+        softDeadlineMs: 0,
+        progressTtlMs: 10,
+        schemaName: 'jaroo_test_member',
+        title: 'test committee',
+        systemPrompt: (memberKey: string) => `member:${memberKey}`,
+        logDir,
+      },
+    })
+
+    assert.equal(initial.status, 'complete')
+    assert.equal(getCommitteeProgress(requestId)?.status, 'complete')
+
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    assert.equal(getCommitteeProgress(requestId), null)
+  } finally {
+    rmSync(logDir, { recursive: true, force: true })
+    global.fetch = originalFetch
     if (originalKey) {
       process.env.OPENROUTER_API_KEY = originalKey
     } else {

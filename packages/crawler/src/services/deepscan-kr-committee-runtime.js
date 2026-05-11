@@ -1,10 +1,14 @@
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
-import { scoreCommitteeMembers } from '../../../deepscan-runtime-core/src/committee-llm.js';
+import {
+  getCommitteeProgress,
+  scoreCommitteeMembersProgressive,
+} from '../../../deepscan-runtime-core/src/committee-llm.js';
 import { buildKrCommitteeFromMemberScores } from './deepscan-kr-score.js';
 
 export const DEFAULT_KR_LLM_TIMEOUT_MS = 180_000;
+export const DEFAULT_KR_LLM_SOFT_DEADLINE_MS = 25_000;
 
 export const KR_MEMBER_SPECS = Object.freeze({
   profitability: {
@@ -565,22 +569,41 @@ function getAxisScore(axisKey, memberScores) {
   return committee.positionFit.score;
 }
 
-function rollupAxis(axisKey, memberKeys, results, errorsByMember) {
+function averageCompletedScore(memberScores) {
+  const scores = Object.values(memberScores).filter((score) => Number.isFinite(Number(score))).map((score) => Number(score));
+  if (scores.length === 0) {
+    return null;
+  }
+
+  return Math.max(0, Math.min(100, Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)));
+}
+
+function rollupAxis(axisKey, memberKeys, results, errorsByMember, pendingMembers) {
   const validMembers = memberKeys.filter((memberKey) => results[memberKey]);
-  const errorMembers = memberKeys.filter((memberKey) => !results[memberKey]);
+  const pendingSet = new Set(Array.isArray(pendingMembers) ? pendingMembers : []);
+  const pendingAxisMembers = memberKeys.filter((memberKey) => pendingSet.has(memberKey));
+  const errorMembers = memberKeys.filter((memberKey) => !results[memberKey] && !pendingSet.has(memberKey));
   const memberScores = Object.fromEntries(validMembers.map((memberKey) => [memberKey, results[memberKey].score]));
   const hasErrors = errorMembers.length > 0;
+  const hasPending = pendingAxisMembers.length > 0;
+  const isComplete = validMembers.length === memberKeys.length;
 
   return {
     axisKey,
     validMembers,
     errorMembers,
+    pendingMembers: pendingAxisMembers,
     errorsByMember,
     omitted: false,
     hasErrors,
-    score: hasErrors ? null : getAxisScore(axisKey, memberScores),
+    hasPending,
+    score: validMembers.length === 0 ? null : isComplete && !hasErrors ? getAxisScore(axisKey, memberScores) : averageCompletedScore(memberScores),
     memberScores,
   };
+}
+
+export function getDeepScanKrCommitteeProgress(requestId) {
+  return getCommitteeProgress(requestId);
 }
 
 export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources) {
@@ -615,19 +638,26 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
       },
       results: {},
       errors: [{ member: 'all', error: 'OPENROUTER_API_KEY is not configured.' }],
+      pending: [],
+      status: 'disabled',
+      completed: 0,
+      softDeadlineMs: 0,
     };
   }
 
-  const { results, errors } = await scoreCommitteeMembers({
+  const softDeadlineMs = parsePositiveInteger(process.env.DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS ?? process.env.DEEPSCAN_LLM_SOFT_DEADLINE_MS, DEFAULT_KR_LLM_SOFT_DEADLINE_MS);
+  const { results, errors, pending, status, completed } = await scoreCommitteeMembersProgressive({
     memberKeys,
     shared,
     members,
     options: {
+      requestId,
       schemaName: 'jaroo_kr_committee_member',
       title: 'jaroo-mvp-v3 KR DeepScan Committee',
       model: process.env.DEEPSCAN_KR_LLM_MODEL ?? process.env.DEEPSCAN_LLM_MODEL ?? process.env.OCR_MODEL ?? 'qwen/qwen3.5-flash-02-23',
       timeoutMs: parsePositiveInteger(process.env.DEEPSCAN_KR_LLM_TIMEOUT_MS ?? process.env.DEEPSCAN_LLM_TIMEOUT_MS, DEFAULT_KR_LLM_TIMEOUT_MS),
       concurrency: parsePositiveInteger(process.env.DEEPSCAN_KR_LLM_CONCURRENCY ?? process.env.DEEPSCAN_LLM_CONCURRENCY, 4),
+      softDeadlineMs,
       summaryKey: input.instrument.code ?? input.instrument.name ?? 'kr',
       logDir,
       systemPrompt,
@@ -648,6 +678,10 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
     },
     results,
     errors,
+    pending,
+    status,
+    completed,
+    softDeadlineMs,
   };
 }
 
@@ -687,13 +721,30 @@ function buildErrorMember(memberKey, error) {
   };
 }
 
+function buildPendingMember(memberKey) {
+  return {
+    shortLabel: KR_MEMBER_SPECS[memberKey].shortLabel,
+    title: KR_MEMBER_SPECS[memberKey].title,
+    status: 'pending',
+    reason: '이 위원은 추가 LLM 응답을 기다리는 중입니다.',
+    score: null,
+    scoreLabel: '고민중...',
+    tone: 'neutral',
+    iconTone: 'blue',
+    error: null,
+  };
+}
+
 function axisLabel(axisKey) {
   return axisKey === 'businessQuality' ? 'Business Quality' : axisKey === 'marketTiming' ? 'Market Timing' : 'Position Fit';
 }
 
-function axisSubtitle(axisKey, hasErrors) {
+function axisSubtitle(axisKey, hasErrors, hasPending) {
   if (hasErrors) {
     return '일부 LLM 위원 응답 실패로 축 점수를 보류했습니다.';
+  }
+  if (hasPending) {
+    return '일부 LLM 위원이 아직 고민 중이라 완료 위원 점수만 임시 반영했습니다.';
   }
   return axisKey === 'businessQuality'
     ? '덤프 기반 KR 기업 체력 점수'
@@ -702,7 +753,7 @@ function axisSubtitle(axisKey, hasErrors) {
       : '덤프 기반 KR 포지션 적합도 점수';
 }
 
-export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErrors = []) {
+export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErrors = [], llmPending = []) {
   const byAxis = {
     businessQuality: ['profitability', 'valuation', 'ownershipStability'],
     marketTiming: ['trend', 'consensusMomentum', 'priceLocation'],
@@ -711,9 +762,9 @@ export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErro
   const allMemberKeys = Object.values(byAxis).flat();
   const errorsByMember = normalizeLlmMemberErrors(llmErrors, allMemberKeys);
 
-  const businessAxis = rollupAxis('businessQuality', byAxis.businessQuality, llmResults, errorsByMember);
-  const marketAxis = rollupAxis('marketTiming', byAxis.marketTiming, llmResults, errorsByMember);
-  const positionAxis = rollupAxis('positionFit', byAxis.positionFit, llmResults, errorsByMember);
+  const businessAxis = rollupAxis('businessQuality', byAxis.businessQuality, llmResults, errorsByMember, llmPending);
+  const marketAxis = rollupAxis('marketTiming', byAxis.marketTiming, llmResults, errorsByMember, llmPending);
+  const positionAxis = rollupAxis('positionFit', byAxis.positionFit, llmResults, errorsByMember, llmPending);
 
   const axes = [businessAxis, marketAxis, positionAxis]
     .map((axis) => ({
@@ -722,24 +773,33 @@ export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErro
       scoreText: axis.score === null ? 'N/A' : `${axis.score} / 100`,
       axisStatusText: axis.hasErrors
         ? `LLM ${axis.validMembers.length}/3 · 오류 ${axis.errorMembers.length}/3`
-        : 'LLM 위원 3/3명 반영',
-      subtitle: axisSubtitle(axis.axisKey, axis.hasErrors),
+        : axis.hasPending
+          ? axis.validMembers.length === 0
+            ? `LLM 위원 응답 대기 중 · ${axis.pendingMembers.length}명 고민중`
+            : `LLM 위원 ${axis.validMembers.length}/3명 반영 · ${axis.pendingMembers.length}명 고민중`
+          : 'LLM 위원 3/3명 반영',
+      subtitle: axisSubtitle(axis.axisKey, axis.hasErrors, axis.hasPending),
       avgLabel: axis.score === null ? '위원 평균 N/A' : `위원 평균 ${axis.score}`,
       members: byAxis[axis.axisKey].map((memberKey) => (
         llmResults[memberKey]
           ? buildSuccessMember(memberKey, llmResults[memberKey])
-          : buildErrorMember(memberKey, errorsByMember[memberKey])
+          : axis.pendingMembers.includes(memberKey)
+            ? buildPendingMember(memberKey)
+            : buildErrorMember(memberKey, errorsByMember[memberKey])
       )),
     }));
 
   const hasMemberErrors = [businessAxis, marketAxis, positionAxis].some((axis) => axis.hasErrors);
+  const hasPendingMembers = [businessAxis, marketAxis, positionAxis].some((axis) => axis.hasPending);
   const committeeScores = hasMemberErrors
+    || hasPendingMembers
     ? null
     : buildKrCommitteeFromMemberScores(Object.fromEntries(Object.entries(llmResults).map(([key, value]) => [key, value.score])));
   return {
     axes,
     committeeScores,
     hasMemberErrors,
+    hasPendingMembers,
     coverage: {
       businessQuality: businessAxis,
       marketTiming: marketAxis,

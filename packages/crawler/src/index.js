@@ -122,6 +122,10 @@ export {
 } from './services/deepscan-payload.js';
 
 export {
+  getDeepScanKrCommitteeProgress,
+} from './services/deepscan-kr-committee-runtime.js';
+
+export {
   buildCrawlerCacheIdentity,
   buildCrawlerCachePayloadEntry,
   createSupabaseCrawlerCacheClient,

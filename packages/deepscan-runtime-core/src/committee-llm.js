@@ -4,6 +4,8 @@ import { join } from 'node:path'
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const DEFAULT_LOG_DIR = join(process.cwd(), '.omx', 'context', 'committee-debug-logs')
 const EMPTY_RESPONSE_RETRY_DELAY_MS = 2000
+const DEFAULT_COMMITTEE_PROGRESS_TTL_MS = 300_000
+const committeeProgressRegistry = new Map()
 
 function parsePositiveInteger(value, fallback) {
   const parsed = Number(value)
@@ -26,6 +28,44 @@ function writeLog(logDir, filename, payload) {
 
 function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms))
+}
+
+function nowIso() {
+  return new Date().toISOString()
+}
+
+async function waitForAllDoneOrSoftDeadline(allDone, softDeadlineMs) {
+  if (softDeadlineMs <= 0) {
+    await allDone
+    return
+  }
+
+  let timeoutId
+  try {
+    await Promise.race([
+      allDone,
+      new Promise((resolve) => {
+        timeoutId = setTimeout(resolve, softDeadlineMs)
+        timeoutId?.unref?.()
+      }),
+    ])
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+  }
+}
+
+function scheduleCommitteeProgressCleanup(job, ttlMs = DEFAULT_COMMITTEE_PROGRESS_TTL_MS) {
+  if (!job?.requestId || job.cleanupScheduled) {
+    return
+  }
+
+  job.cleanupScheduled = true
+  const timeoutId = setTimeout(() => {
+    committeeProgressRegistry.delete(job.requestId)
+  }, Math.max(0, ttlMs))
+  timeoutId?.unref?.()
 }
 
 async function allSettledWithConcurrency(items, concurrency, worker) {
@@ -501,4 +541,140 @@ export async function scoreCommitteeMembers({ memberKeys, shared, members, optio
   })
 
   return { results, errors }
+}
+
+function createMemberError(memberKey, reason, runtimeOptions) {
+  const committeeError = asCommitteeLlmError(reason, 'llm-unknown', String(reason), {
+    attempts: parseNonNegativeInteger(runtimeOptions.retryCount ?? process.env.DEEPSCAN_LLM_RETRY_COUNT, 3) + 1,
+  })
+
+  return {
+    member: memberKey,
+    error: committeeError.message,
+    errorKind: committeeError.errorKind ?? committeeError.kind ?? 'llm-unknown',
+    attempts: committeeError.attempts ?? null,
+    finalStatus: 'error',
+    retryable: false,
+    llmResultPresent: false,
+    model: runtimeOptions.model ?? process.env.DEEPSCAN_LLM_MODEL ?? process.env.OCR_MODEL ?? 'qwen/qwen3.5-flash-02-23',
+  }
+}
+
+function createCommitteeProgressSnapshot(job) {
+  const pending = job.memberKeys.filter((memberKey) => !job.results[memberKey] && !job.errors.some((error) => error.member === memberKey))
+  const status = pending.length > 0
+    ? 'partial'
+    : Object.keys(job.results).length === 0 && job.errors.length > 0
+      ? 'error'
+      : 'complete'
+
+  return {
+    requestId: job.requestId,
+    status,
+    results: { ...job.results },
+    errors: job.errors.map((error) => ({ ...error })),
+    pending,
+    completed: Object.keys(job.results).length,
+    updatedAt: job.updatedAt,
+    softDeadlineMs: job.softDeadlineMs,
+  }
+}
+
+function writeCommitteeSummary(runtimeOptions, memberKeys, concurrency, snapshot) {
+  const logDir = runtimeOptions.logDir ?? DEFAULT_LOG_DIR
+  writeLog(logDir, `_summary-${runtimeOptions.summaryKey ?? 'committee'}.json`, {
+    summaryKey: runtimeOptions.summaryKey ?? 'committee',
+    requestId: snapshot.requestId,
+    status: snapshot.status,
+    model: runtimeOptions.model ?? process.env.DEEPSCAN_LLM_MODEL ?? process.env.OCR_MODEL ?? 'qwen/qwen3.5-flash-02-23',
+    concurrency: Math.max(1, Math.min(memberKeys.length || 1, concurrency)),
+    completed: snapshot.completed,
+    pending: snapshot.pending,
+    members: Object.fromEntries(Object.entries(snapshot.results).map(([key, value]) => [key, {
+      score: value?.score,
+      confidence: value?.confidence,
+      reason_preview: value?.reason?.slice?.(0, 80),
+      attempts: value?.attempts ?? null,
+      finalStatus: value?.finalStatus ?? 'success',
+      errorKind: value?.errorKind ?? null,
+      llmResultPresent: value?.llmResultPresent ?? true,
+      model: value?.model ?? runtimeOptions.model ?? null,
+    }])),
+    errors: snapshot.errors,
+    timestamp: nowIso(),
+  })
+}
+
+export function getCommitteeProgress(requestId) {
+  if (!requestId || !committeeProgressRegistry.has(requestId)) {
+    return null
+  }
+
+  return createCommitteeProgressSnapshot(committeeProgressRegistry.get(requestId))
+}
+
+export async function scoreCommitteeMembersProgressive({ memberKeys, shared, members, options = {} }) {
+  const runtimeOptions = options ?? {}
+  const requestId = runtimeOptions.requestId ?? `committee-${Date.now()}-${Math.random().toString(36).slice(2)}`
+  const concurrency = parsePositiveInteger(runtimeOptions.concurrency ?? process.env.DEEPSCAN_LLM_CONCURRENCY, memberKeys.length || 1)
+  const softDeadlineMs = parseNonNegativeInteger(runtimeOptions.softDeadlineMs ?? process.env.DEEPSCAN_LLM_SOFT_DEADLINE_MS, 0)
+  const job = {
+    requestId,
+    memberKeys: [...memberKeys],
+    results: {},
+    errors: [],
+    updatedAt: nowIso(),
+    softDeadlineMs,
+    cleanupScheduled: false,
+  }
+  committeeProgressRegistry.set(requestId, job)
+
+  let nextIndex = 0
+  const limit = Math.max(1, Math.min(memberKeys.length || 1, concurrency))
+
+  async function runWorker() {
+    while (nextIndex < memberKeys.length) {
+      const currentIndex = nextIndex
+      nextIndex += 1
+      const memberKey = memberKeys[currentIndex]
+
+      try {
+        const memberDump = members[memberKey]
+        if (typeof memberDump === 'undefined') {
+          throw new CommitteeLlmError('runtime-missing-dump', `Missing generated runtime dump for ${memberKey}`, {
+            attempts: 0,
+            retryable: false,
+          })
+        }
+
+        job.results[memberKey] = await scoreCommitteeMember(memberKey, { shared, memberDump }, runtimeOptions)
+      } catch (reason) {
+        job.errors.push(createMemberError(memberKey, reason, runtimeOptions))
+      } finally {
+        job.updatedAt = nowIso()
+      }
+    }
+  }
+
+  const allDone = memberKeys.length === 0
+    ? Promise.resolve()
+    : Promise.all(Array.from({ length: limit }, () => runWorker())).then(() => undefined)
+
+  await waitForAllDoneOrSoftDeadline(allDone, softDeadlineMs)
+
+  const snapshot = createCommitteeProgressSnapshot(job)
+  writeCommitteeSummary(runtimeOptions, memberKeys, concurrency, snapshot)
+
+  void allDone
+    .then(() => {
+      const finalSnapshot = createCommitteeProgressSnapshot(job)
+      writeCommitteeSummary(runtimeOptions, memberKeys, concurrency, finalSnapshot)
+      scheduleCommitteeProgressCleanup(job, parseNonNegativeInteger(runtimeOptions.progressTtlMs, DEFAULT_COMMITTEE_PROGRESS_TTL_MS))
+    })
+    .catch((error) => {
+      console.error(`[committee-llm] background committee job failed: ${requestId}`, error)
+      committeeProgressRegistry.delete(requestId)
+    })
+
+  return snapshot
 }

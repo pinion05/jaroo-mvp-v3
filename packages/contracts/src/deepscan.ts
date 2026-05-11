@@ -6,7 +6,7 @@ export type DeepScanSourceType = (typeof DEEP_SCAN_SOURCE_TYPES)[number]
 
 export type JarooDeepScanCommitteeMemberTone = 'positive' | 'neutral' | 'warning'
 export type JarooDeepScanCommitteeMemberIconTone = 'blue' | 'green' | 'amber' | 'red' | 'purple' | 'teal'
-export type JarooDeepScanCommitteeMemberStatus = 'success' | 'error'
+export type JarooDeepScanCommitteeMemberStatus = 'success' | 'error' | 'pending'
 export type JarooDeepScanCommitteeMemberErrorKind =
   | 'llm-empty-content'
   | 'llm-null-content'
@@ -215,6 +215,14 @@ export type JarooDeepScanMetadata = {
   inputValidity: JarooDeepScanInputValidity
   sourceRefs: DeepScanSourceRef[]
   blockStatus: JarooDeepScanBlockStatus
+  llmCommittee?: {
+    requestId: string
+    status: 'disabled' | 'complete' | 'partial' | 'error'
+    completed: number
+    pending: number
+    errors: number
+    softDeadlineMs?: number
+  }
 }
 
 export type JarooDeepScanPayload = {

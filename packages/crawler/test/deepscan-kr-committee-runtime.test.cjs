@@ -103,3 +103,24 @@ test('KR committee LLM uses an extended default timeout for first attempts', asy
     }
   }
 });
+
+test('KR committee axes render pending members and score completed members only', async () => {
+  const { buildKrCommitteeAxesFromLlmResults } = await import('../src/services/deepscan-kr-committee-runtime.js');
+
+  const shape = buildKrCommitteeAxesFromLlmResults(null, {
+    profitability: { score: 80, reason: '수익성 reason', confidence: 'medium' },
+    valuation: { score: 60, reason: '밸류 reason', confidence: 'medium' },
+  }, [], ['ownershipStability', 'trend', 'consensusMomentum', 'priceLocation', 'avgPriceGap', 'upsideBuffer', 'holdingCompleteness']);
+
+  const businessAxis = shape.axes.find((axis) => axis.label === 'Business Quality');
+  const marketAxis = shape.axes.find((axis) => axis.label === 'Market Timing');
+
+  assert.equal(shape.hasPendingMembers, true);
+  assert.equal(shape.committeeScores, null);
+  assert.equal(businessAxis.score, 70);
+  assert.match(businessAxis.axisStatusText, /2\/3명 반영 · 1명 고민중/);
+  assert.deepEqual(businessAxis.members.map((member) => member.status), ['success', 'success', 'pending']);
+  assert.equal(businessAxis.members[2].scoreLabel, '고민중...');
+  assert.equal(marketAxis.score, null);
+  assert.match(marketAxis.axisStatusText, /LLM 위원 응답 대기 중/);
+});
