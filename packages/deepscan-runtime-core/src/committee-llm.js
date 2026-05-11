@@ -4,6 +4,7 @@ import { join } from 'node:path'
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 const DEFAULT_LOG_DIR = join(process.cwd(), '.omx', 'context', 'committee-debug-logs')
 const EMPTY_RESPONSE_RETRY_DELAY_MS = 2000
+const DEFAULT_COMMITTEE_PROGRESS_TTL_MS = 300_000
 const committeeProgressRegistry = new Map()
 
 function parsePositiveInteger(value, fallback) {
@@ -53,6 +54,18 @@ async function waitForAllDoneOrSoftDeadline(allDone, softDeadlineMs) {
       clearTimeout(timeoutId)
     }
   }
+}
+
+function scheduleCommitteeProgressCleanup(job, ttlMs = DEFAULT_COMMITTEE_PROGRESS_TTL_MS) {
+  if (!job?.requestId || job.cleanupScheduled) {
+    return
+  }
+
+  job.cleanupScheduled = true
+  const timeoutId = setTimeout(() => {
+    committeeProgressRegistry.delete(job.requestId)
+  }, Math.max(0, ttlMs))
+  timeoutId?.unref?.()
 }
 
 async function allSettledWithConcurrency(items, concurrency, worker) {
@@ -612,6 +625,7 @@ export async function scoreCommitteeMembersProgressive({ memberKeys, shared, mem
     errors: [],
     updatedAt: nowIso(),
     softDeadlineMs,
+    cleanupScheduled: false,
   }
   committeeProgressRegistry.set(requestId, job)
 
@@ -651,10 +665,16 @@ export async function scoreCommitteeMembersProgressive({ memberKeys, shared, mem
   const snapshot = createCommitteeProgressSnapshot(job)
   writeCommitteeSummary(runtimeOptions, memberKeys, concurrency, snapshot)
 
-  void allDone.then(() => {
-    const finalSnapshot = createCommitteeProgressSnapshot(job)
-    writeCommitteeSummary(runtimeOptions, memberKeys, concurrency, finalSnapshot)
-  })
+  void allDone
+    .then(() => {
+      const finalSnapshot = createCommitteeProgressSnapshot(job)
+      writeCommitteeSummary(runtimeOptions, memberKeys, concurrency, finalSnapshot)
+      scheduleCommitteeProgressCleanup(job, parseNonNegativeInteger(runtimeOptions.progressTtlMs, DEFAULT_COMMITTEE_PROGRESS_TTL_MS))
+    })
+    .catch((error) => {
+      console.error(`[committee-llm] background committee job failed: ${requestId}`, error)
+      committeeProgressRegistry.delete(requestId)
+    })
 
   return snapshot
 }

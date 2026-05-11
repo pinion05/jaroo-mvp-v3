@@ -433,3 +433,62 @@ test('scoreCommitteeMembersProgressive returns partial at soft deadline and upda
     }
   }
 })
+
+test('scoreCommitteeMembersProgressive evicts completed progress after TTL', async () => {
+  const originalFetch = global.fetch
+  const originalKey = process.env.OPENROUTER_API_KEY
+  const logDir = mkdtempSync(join(tmpdir(), 'committee-llm-'))
+  const requestId = `test-progressive-ttl-${Date.now()}`
+  process.env.OPENROUTER_API_KEY = 'test-key'
+
+  global.fetch = (async () => new Response(
+    JSON.stringify({
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              score: 68,
+              reason: 'ttl 테스트 응답입니다.',
+              confidence: 'medium',
+            }),
+          },
+        },
+      ],
+    }),
+    { status: 200, headers: { 'Content-Type': 'application/json' } },
+  )) as typeof fetch
+
+  try {
+    const initial = await scoreCommitteeMembersProgressive({
+      memberKeys: ['valuation'],
+      shared: { source: 'fixture' },
+      members: {
+        valuation: { member: 'valuation' },
+      },
+      options: {
+        requestId,
+        concurrency: 1,
+        softDeadlineMs: 0,
+        progressTtlMs: 10,
+        schemaName: 'jaroo_test_member',
+        title: 'test committee',
+        systemPrompt: (memberKey: string) => `member:${memberKey}`,
+        logDir,
+      },
+    })
+
+    assert.equal(initial.status, 'complete')
+    assert.equal(getCommitteeProgress(requestId)?.status, 'complete')
+
+    await new Promise((resolve) => setTimeout(resolve, 40))
+    assert.equal(getCommitteeProgress(requestId), null)
+  } finally {
+    rmSync(logDir, { recursive: true, force: true })
+    global.fetch = originalFetch
+    if (originalKey) {
+      process.env.OPENROUTER_API_KEY = originalKey
+    } else {
+      delete process.env.OPENROUTER_API_KEY
+    }
+  }
+})
