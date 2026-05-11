@@ -701,6 +701,7 @@ export default function DeepScanPage() {
                 <div className='grid w-full grid-cols-3 gap-1.5'>
                   {payload.committee.axes.map((axis) => {
                     const tone = resolveAxisTone(axis.score)
+                    const scoreLabel = axis.score === null ? 'N/A' : String(axis.score)
 
                     return (
                       <span
@@ -711,7 +712,7 @@ export default function DeepScanPage() {
                         )}
                         title={`${axis.label} ${axis.scoreText}`}
                       >
-                        {axis.label} {axis.scoreText}
+                        {axis.label} {scoreLabel}
                       </span>
                     )
                   })}
