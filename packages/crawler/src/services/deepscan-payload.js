@@ -1402,14 +1402,26 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     const evidenceSourceRefs = createEvidenceSourceRefs(input, evidence, sources, sourceIssues);
     const llmSourceRefs = [];
     let llmCommitteeErrors = [];
+    let llmCommitteePending = [];
+    let llmCommitteeMetadata = null;
     let llmCommitteeBlocked = false;
     let llmCommitteePartialError = false;
+    let llmCommitteePartialPending = false;
     let committeeAxes = createCommitteeAxes(evidence, deterministicScored, sources.packageResult);
     const llmAttempted = isKrInput(input) && shouldInvokeKrCommitteeLlm();
 
     if (llmAttempted) {
       const llmCommittee = await scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources);
       llmCommitteeErrors = llmCommittee.errors;
+      llmCommitteePending = Array.isArray(llmCommittee.pending) ? llmCommittee.pending : [];
+      llmCommitteeMetadata = {
+        requestId: llmCommittee.requestId,
+        status: llmCommittee.status ?? (llmCommitteePending.length > 0 ? 'partial' : llmCommitteeErrors.length > 0 ? 'error' : 'complete'),
+        completed: Number.isFinite(Number(llmCommittee.completed)) ? Number(llmCommittee.completed) : Object.keys(llmCommittee.results ?? {}).length,
+        pending: llmCommitteePending.length,
+        errors: llmCommitteeErrors.length,
+        softDeadlineMs: llmCommittee.softDeadlineMs,
+      };
       llmSourceRefs.push(createDeepScanSourceRef({
         type: 'system',
         id: `kr-llm:${input.instrument.code ?? input.instrument.name}`,
@@ -1417,20 +1429,29 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
         note: llmCommittee.requestId,
       }));
 
-      const llmCommitteeShape = buildKrCommitteeAxesFromLlmResults(evidence, llmCommittee.results, llmCommittee.errors);
+      const llmCommitteeShape = buildKrCommitteeAxesFromLlmResults(evidence, llmCommittee.results, llmCommittee.errors, llmCommitteePending);
       committeeAxes = llmCommitteeShape.axes;
       llmCommitteePartialError = llmCommitteeShape.hasMemberErrors === true;
+      llmCommitteePartialPending = llmCommitteeShape.hasPendingMembers === true;
       if (!llmCommitteePartialError && llmCommitteeShape.committeeScores) {
         scored = scoreDeepScanKrFromCommittee(evidence, llmCommitteeShape.committeeScores);
       }
     }
 
     const combinedSourceRefs = [...evidenceSourceRefs, ...llmSourceRefs];
-    const llmFallback = llmCommitteeErrors.length > 0 || llmCommitteeBlocked || llmCommitteePartialError
+    const llmFallback = llmCommitteeErrors.length > 0 || llmCommitteeBlocked || llmCommitteePartialError || llmCommitteePartialPending
       ? {
           used: true,
-          reason: llmCommitteePartialError ? 'kr-committee-member-errors' : llmCommitteeBlocked ? 'kr-committee-coverage-blocked' : 'weak-data-degradation',
-          label: llmCommitteePartialError ? `일부 KR 위원 응답 실패 ${llmCommitteeErrors.length}건` : llmCommitteeBlocked ? '일부 KR 위원 축 근거가 부족합니다.' : `일부 KR 위원 실패 ${llmCommitteeErrors.length}건`,
+          reason: llmCommitteePartialError
+            ? 'kr-committee-member-errors'
+            : llmCommitteePartialPending
+              ? 'kr-committee-members-pending'
+              : llmCommitteeBlocked ? 'kr-committee-coverage-blocked' : 'weak-data-degradation',
+          label: llmCommitteePartialError
+            ? `일부 KR 위원 응답 실패 ${llmCommitteeErrors.length}건`
+            : llmCommitteePartialPending
+              ? `일부 KR 위원 분석 보강 중 ${llmCommitteePending.length}명`
+              : llmCommitteeBlocked ? '일부 KR 위원 축 근거가 부족합니다.' : `일부 KR 위원 실패 ${llmCommitteeErrors.length}건`,
         }
       : null;
     const blockFallback = llmFallback ?? createEvidenceFallback(evidence, sourceIssues);
@@ -1566,7 +1587,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
       metadata: {
         generatedAt,
         version: DEEP_SCAN_VERSION,
-        degraded: blockFallback !== null || llmCommitteeErrors.length > 0 || llmCommitteeBlocked || llmCommitteePartialError,
+        degraded: blockFallback !== null || llmCommitteeErrors.length > 0 || llmCommitteeBlocked || llmCommitteePartialError || llmCommitteePartialPending,
         debugId: createDebugId(input),
         inputValidity: {
           valid: true,
@@ -1574,6 +1595,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
         },
         sourceRefs: [...createBaseSourceRefs(input), ...combinedSourceRefs],
         blockStatus: createBlockStatus(blocks),
+        ...(llmCommitteeMetadata ? { llmCommittee: llmCommitteeMetadata } : {}),
       },
     };
   } catch {

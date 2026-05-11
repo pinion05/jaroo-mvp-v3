@@ -1,6 +1,6 @@
 'use client'
 
-import type { JarooDeepScanCommitteeAxis, JarooDeepScanInsightItem } from '../../../packages/contracts/src/deepscan'
+import type { JarooDeepScanCommitteeAxis, JarooDeepScanInsightItem, JarooDeepScanPayload } from '../../../packages/contracts/src/deepscan'
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
@@ -114,6 +114,10 @@ function resolveAxisTone(score: number | null) {
 }
 
 function resolveMemberScoreClass(member: JarooDeepScanCommitteeAxis['members'][number]) {
+  if (member.status === 'pending') {
+    return 'bg-[color:var(--jaroo-secondary)] text-[color:var(--jaroo-muted)]'
+  }
+
   if (member.status === 'error') {
     return 'bg-[color:var(--jaroo-danger-soft)] text-[color:var(--jaroo-danger)]'
   }
@@ -127,6 +131,17 @@ function resolveMemberScoreClass(member: JarooDeepScanCommitteeAxis['members'][n
   }
 
   return scorePillClass(35)
+}
+
+type DeepScanCommitteeStatusResponse = {
+  ok?: boolean
+  requestId?: string
+  status?: 'partial' | 'complete' | 'error' | 'not_found'
+  completed?: number
+  pending?: string[]
+  errors?: unknown[]
+  softDeadlineMs?: number
+  committeeAxes?: JarooDeepScanCommitteeAxis[]
 }
 
 function resolveInsightTone(item: JarooDeepScanInsightItem): keyof typeof newsToneStyles {
@@ -260,6 +275,7 @@ export default function DeepScanPage() {
   const lastSuccessful = useDeepScanStore((state) => state.lastSuccessful)
   const startRequest = useDeepScanStore((state) => state.startRequest)
   const finishSuccess = useDeepScanStore((state) => state.finishSuccess)
+  const updateActivePayload = useDeepScanStore((state) => state.updateActivePayload)
   const finishError = useDeepScanStore((state) => state.finishError)
   const abandonInFlight = useDeepScanStore((state) => state.abandonInFlight)
 
@@ -349,6 +365,79 @@ export default function DeepScanPage() {
       }
     }
   }, [abandonInFlight, finishError, finishSuccess, requestSeed, requestStatus])
+
+  useEffect(() => {
+    const llmCommittee = payload?.metadata.llmCommittee
+    if (fetchState !== 'success' || !payload || llmCommittee?.status !== 'partial' || !llmCommittee.requestId) {
+      return
+    }
+
+    let stopped = false
+    let timeoutId: ReturnType<typeof setTimeout> | null = null
+
+    const poll = async () => {
+      try {
+        const response = await fetch(`/api/deepscan/committee-status?requestId=${encodeURIComponent(llmCommittee.requestId)}`, { cache: 'no-store' })
+        const body = (await response.json()) as DeepScanCommitteeStatusResponse
+
+        if (stopped || !body.ok || body.requestId !== llmCommittee.requestId) {
+          return
+        }
+
+        if (body.status === 'not_found') {
+          return
+        }
+
+        updateActivePayload((currentPayload: JarooDeepScanPayload) => {
+          const currentCommittee = currentPayload.metadata.llmCommittee
+          if (currentCommittee?.requestId !== llmCommittee.requestId) {
+            return currentPayload
+          }
+
+          const nextStatus = body.status === 'complete' || body.status === 'partial' || body.status === 'error'
+            ? body.status
+            : currentCommittee.status
+          return {
+            ...currentPayload,
+            committee: Array.isArray(body.committeeAxes)
+              ? {
+                  ...currentPayload.committee,
+                  axes: body.committeeAxes,
+                }
+              : currentPayload.committee,
+            metadata: {
+              ...currentPayload.metadata,
+              llmCommittee: {
+                ...currentCommittee,
+                status: nextStatus,
+                completed: typeof body.completed === 'number' ? body.completed : currentCommittee.completed,
+                pending: Array.isArray(body.pending) ? body.pending.length : currentCommittee.pending,
+                errors: Array.isArray(body.errors) ? body.errors.length : currentCommittee.errors,
+                softDeadlineMs: body.softDeadlineMs ?? currentCommittee.softDeadlineMs,
+              },
+            },
+          }
+        })
+
+        if (body.status === 'partial') {
+          timeoutId = setTimeout(poll, 2500)
+        }
+      } catch {
+        if (!stopped) {
+          timeoutId = setTimeout(poll, 5000)
+        }
+      }
+    }
+
+    timeoutId = setTimeout(poll, 1500)
+
+    return () => {
+      stopped = true
+      if (timeoutId) {
+        clearTimeout(timeoutId)
+      }
+    }
+  }, [fetchState, payload, updateActivePayload])
 
   const scrollContentToTop = () => {
     const container = document.querySelector<HTMLElement>("[data-slot='jaroo-shell-main']")
@@ -649,6 +738,7 @@ export default function DeepScanPage() {
                       <div>
                         {axis.members.map((member) => {
                           const isErrorMember = member.status === 'error'
+                          const isPendingMember = member.status === 'pending'
 
                           return (
                             <div
@@ -656,6 +746,7 @@ export default function DeepScanPage() {
                               className={cn(
                                 'flex items-center gap-3 border-b border-[color:var(--jaroo-border)]/80 py-3 first:pt-0 last:border-b-0 last:pb-0',
                                 isErrorMember && 'rounded-[16px] border border-[color:var(--jaroo-danger)]/20 bg-[color:var(--jaroo-danger-soft)]/70 px-3',
+                                isPendingMember && 'rounded-[16px] border border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)]/70 px-3',
                               )}
                             >
                               <div
@@ -675,6 +766,15 @@ export default function DeepScanPage() {
                                     </p>
                                     <p className='mt-0.5 text-[11px] leading-4 text-[color:var(--jaroo-danger)]/80'>
                                       다시 실행이 필요합니다.
+                                    </p>
+                                  </>
+                                ) : isPendingMember ? (
+                                  <>
+                                    <p className='mt-1 text-xs font-medium leading-5 text-[color:var(--jaroo-muted)]'>
+                                      {member.reason ?? '이 위원은 추가 LLM 응답을 기다리는 중입니다.'}
+                                    </p>
+                                    <p className='mt-0.5 text-[11px] leading-4 text-[color:var(--jaroo-muted)]/80'>
+                                      완료되는 대로 자동 반영합니다.
                                     </p>
                                   </>
                                 ) : (

@@ -552,6 +552,98 @@ test('buildJarooDeepScanPayload preserves 9 committee slots and marks failed mem
   }
 });
 
+test('buildJarooDeepScanPayload returns partial pending committee at soft deadline', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+  const originalFetch = global.fetch;
+  const originalKey = process.env.OPENROUTER_API_KEY;
+  const originalEnable = process.env.DEEPSCAN_KR_LLM_ENABLE;
+  const originalSoftDeadline = process.env.DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS;
+  const originalConcurrency = process.env.DEEPSCAN_KR_LLM_CONCURRENCY;
+  process.env.OPENROUTER_API_KEY = 'test-key';
+  process.env.DEEPSCAN_KR_LLM_ENABLE = 'true';
+  process.env.DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS = '10';
+  process.env.DEEPSCAN_KR_LLM_CONCURRENCY = '9';
+
+  global.fetch = (async (_url, init) => {
+    const body = JSON.parse(String(init?.body ?? '{}'));
+    const userMessage = Array.isArray(body?.messages) ? body.messages.find((message) => message.role === 'user') : null;
+    const content = typeof userMessage?.content === 'string' ? userMessage.content : '';
+    const match = content.match(/\"member\":\"([^\"]+)\"/);
+    const memberKey = match?.[1];
+    if (memberKey === 'profitability') {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            score: memberKey === 'valuation' ? 60 : 70,
+            reason: `${memberKey} partial reason`,
+            confidence: 'medium',
+          }),
+        },
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  try {
+    const startedAt = Date.now();
+    const payload = await buildJarooDeepScanPayload({
+      instrument: {
+        name: '삼성전자',
+        code: '005930',
+        market: 'KR',
+      },
+      holding: {
+        shares: '12',
+        averagePrice: '71000',
+        evaluationAmount: '1022400',
+      },
+      selectedAt: '2026-04-14T00:00:00.000Z',
+      sourceContext: {
+        from: 'holding',
+      },
+      sources: createStrongKrSources(),
+    });
+
+    assert.ok(Date.now() - startedAt < 70);
+    assert.equal(payload.committee.blockState, 'ok');
+    assert.equal(payload.metadata.degraded, true);
+    assert.equal(payload.metadata.llmCommittee.status, 'partial');
+    assert.equal(payload.metadata.llmCommittee.pending, 1);
+    const businessAxis = payload.committee.axes.find((axis) => axis.label === 'Business Quality');
+    assert.ok(businessAxis);
+    assert.equal(businessAxis.members.length, 3);
+    assert.equal(businessAxis.members[0].status, 'pending');
+    assert.equal(businessAxis.members[0].scoreLabel, '고민중...');
+    assert.match(businessAxis.axisStatusText, /고민중/);
+    assert.doesNotMatch(payload.hero.headline, /재시도 필요/);
+  } finally {
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    global.fetch = originalFetch;
+    if (originalKey) {
+      process.env.OPENROUTER_API_KEY = originalKey;
+    } else {
+      delete process.env.OPENROUTER_API_KEY;
+    }
+    process.env.DEEPSCAN_KR_LLM_ENABLE = originalEnable ?? 'false';
+    if (originalSoftDeadline) {
+      process.env.DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS = originalSoftDeadline;
+    } else {
+      delete process.env.DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS;
+    }
+    if (originalConcurrency) {
+      process.env.DEEPSCAN_KR_LLM_CONCURRENCY = originalConcurrency;
+    } else {
+      delete process.env.DEEPSCAN_KR_LLM_CONCURRENCY;
+    }
+  }
+});
+
 test('buildKrPackageInvocationInput converts deepscan holding handoff strings into package input fields', async () => {
   const { buildKrPackageInvocationInput } = await import('../src/services/deepscan-payload.js');
 

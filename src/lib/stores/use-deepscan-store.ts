@@ -17,6 +17,7 @@ type DeepScanStoreActions = {
   setTarget: (target: DeepScanTargetInput | null) => void
   startRequest: () => void
   finishSuccess: (payload: JarooDeepScanPayload, completedAt?: string) => void
+  updateActivePayload: (updater: (payload: JarooDeepScanPayload) => JarooDeepScanPayload) => void
   finishError: (errorMessage: string) => void
   abandonInFlight: () => void
   clear: () => void
@@ -76,6 +77,23 @@ export const useDeepScanStore = create<DeepScanStoreState & DeepScanStoreActions
         : null,
     })
   },
+  updateActivePayload: (updater) =>
+    set((state) => {
+      if (!state.activePayload) {
+        return state
+      }
+
+      const nextPayload = updater(state.activePayload)
+      return {
+        activePayload: nextPayload,
+        lastSuccessful: state.lastSuccessful
+          ? {
+              ...state.lastSuccessful,
+              payload: nextPayload,
+            }
+          : state.lastSuccessful,
+      }
+    }),
   finishError: (errorMessage) => {
     const { target } = get()
     set({
