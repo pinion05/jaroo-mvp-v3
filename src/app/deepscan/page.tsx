@@ -698,18 +698,24 @@ export default function DeepScanPage() {
                   }).badge}
                 </span>
               ) : (
-                payload.committee.axes.map((axis) => {
-                  const tone = resolveAxisTone(axis.score)
+                <div className='grid w-full grid-cols-3 gap-1.5'>
+                  {payload.committee.axes.map((axis) => {
+                    const tone = resolveAxisTone(axis.score)
 
-                  return (
-                    <span
-                      key={axis.label}
-                      className={cn('rounded-full px-2.5 py-1 text-[11px] font-medium', axisToneStyles[tone].badge)}
-                    >
-                      {axis.label} {axis.scoreText}
-                    </span>
-                  )
-                })
+                    return (
+                      <span
+                        key={axis.label}
+                        className={cn(
+                          'min-w-0 truncate rounded-full px-2 py-1 text-center text-[10px] font-medium leading-4',
+                          axisToneStyles[tone].badge,
+                        )}
+                        title={`${axis.label} ${axis.scoreText}`}
+                      >
+                        {axis.label} {axis.scoreText}
+                      </span>
+                    )
+                  })}
+                </div>
               )
             }
           >
