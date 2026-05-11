@@ -267,9 +267,9 @@ test('deepscan page projection exposes an explicit loading hero while canonical 
   const hero = buildDeepScanHeroCard({ holding: sampleHolding, selectedAt: '2026-04-15T15:00:00.000Z' }, 'loading', null)
 
   assert.match(hero.headline, /불러오는 중/)
-  assert.match(hero.body, /canonical payload/i)
+  assert.match(hero.body, /표준 분석 데이터/)
   assert.equal(hero.statusText, '로딩 중')
-  assert.equal(hero.scoreLabel, 'Loading')
+  assert.equal(hero.scoreLabel, '로딩 중')
   assert.equal(hero.scoreDelta, '불러오는 중')
 })
 
@@ -297,7 +297,7 @@ test('deepscan page projection surfaces canonical blocked block fallback instead
   )
 
   assert.deepEqual(notice, {
-    badge: 'Blocked',
+    badge: '보류',
     title: '입력 확인 필요',
     body: '종목 코드 또는 티커가 필요합니다.',
   })

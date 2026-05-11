@@ -203,15 +203,15 @@ function createBaseSourceRefs(input) {
     createDeepScanSourceRef({
       type: input.sourceContext.from,
       id: `input:${identifier}`,
-      label: 'deepscan input',
+      label: '딥스캔 입력값',
       at: input.sourceContext.appliedAt ?? input.selectedAt,
       note: input.sourceContext.sessionKey ? `session:${input.sourceContext.sessionKey}` : undefined,
     }),
     createDeepScanSourceRef({
       type: 'system',
       id: 'deepscan-payload-service',
-      label: 'crawler deepscan payload service',
-      note: 'KR evidence-backed payload assembly',
+      label: '크롤러 딥스캔 데이터 조립 서비스',
+      note: '국내 근거 기반 분석 데이터 조립',
     }),
   ];
 
@@ -220,7 +220,7 @@ function createBaseSourceRefs(input) {
       createDeepScanSourceRef({
         type: 'holding',
         id: `holding:${identifier}`,
-        label: 'holding snapshot',
+        label: '보유 정보 스냅샷',
         at: input.selectedAt,
       }),
     );
@@ -247,13 +247,13 @@ function createInputInvalidPayload(rawInput = {}) {
   const metadataSourceRefs = createBaseSourceRefs(input);
   const invalidError = createDeepScanBlockError({
     code: 'input-invalid',
-    message: 'instrument code or ticker is required',
+    message: '종목 코드 또는 티커가 필요합니다',
     retryable: false,
   });
   const invalidFallback = {
     used: true,
     reason: 'input-invalid',
-    label: 'instrument code or ticker required',
+    label: '종목 코드 또는 티커 필요',
   };
   const blocks = {
     hero: {
@@ -263,7 +263,7 @@ function createInputInvalidPayload(rawInput = {}) {
         error: invalidError,
       }),
       headline: '입력 정보를 확인해주세요',
-      body: 'DeepScan canonical payload를 만들려면 종목 코드 또는 티커가 필요합니다.',
+      body: 'DeepScan 표준 분석 데이터를 만들려면 종목 코드 또는 티커가 필요합니다.',
       statusText: '입력 부족',
       score: 0,
       scoreLabel: 'N/A',
@@ -293,15 +293,15 @@ function createInputInvalidPayload(rawInput = {}) {
         fallback: invalidFallback,
         error: invalidError,
       }),
-      weekSignal: 'Unavailable',
+      weekSignal: '사용 불가',
       weekSignalTone: 'neutral',
-      weekBadgeText: 'Blocked',
+      weekBadgeText: '보류',
       scenarioLabel: '입력 확인 필요',
       scenarioProbability: '0%',
-      scenarioPeriod: 'N/A',
+      scenarioPeriod: '정보 없음',
       scenarioCondition: '종목 코드 또는 티커가 누락되었습니다.',
-      currentPriceText: 'N/A',
-      targetPriceText: 'N/A',
+      currentPriceText: '정보 없음',
+      targetPriceText: '정보 없음',
       scenarioDetails: [],
       otherScenarios: [],
       otherScenarioTags: [],
@@ -355,13 +355,13 @@ function createInternalErrorPayload(rawInput = {}) {
   const metadataSourceRefs = createBaseSourceRefs(input);
   const internalError = createDeepScanBlockError({
     code: INTERNAL_SERVICE_ERROR_CODE,
-    message: 'unexpected internal crawler service failure',
+    message: '예상치 못한 크롤러 서비스 내부 오류',
     retryable: true,
   });
   const internalFallback = {
     used: true,
     reason: INTERNAL_SERVICE_ERROR_CODE,
-    label: 'canonical internal error payload',
+    label: '표준 내부 오류 데이터',
   };
   const blocks = {
     hero: {
@@ -370,8 +370,8 @@ function createInternalErrorPayload(rawInput = {}) {
         fallback: internalFallback,
         error: internalError,
       }),
-      headline: 'DeepScan payload 생성 중 오류가 발생했습니다',
-      body: 'Crawler 서비스 내부 오류로 canonical error payload를 반환했습니다.',
+      headline: 'DeepScan 데이터 생성 중 오류가 발생했습니다',
+      body: '크롤러 서비스 내부 오류로 표준 오류 데이터를 반환했습니다.',
       statusText: '서비스 오류',
       score: 0,
       scoreLabel: 'N/A',
@@ -401,15 +401,15 @@ function createInternalErrorPayload(rawInput = {}) {
         fallback: internalFallback,
         error: internalError,
       }),
-      weekSignal: 'Unavailable',
+      weekSignal: '사용 불가',
       weekSignalTone: 'neutral',
-      weekBadgeText: 'Error',
+      weekBadgeText: '오류',
       scenarioLabel: '서비스 오류',
       scenarioProbability: '0%',
-      scenarioPeriod: 'N/A',
+      scenarioPeriod: '정보 없음',
       scenarioCondition: '내부 오류로 전략 시나리오를 계산할 수 없습니다.',
-      currentPriceText: 'N/A',
-      targetPriceText: 'N/A',
+      currentPriceText: '정보 없음',
+      targetPriceText: '정보 없음',
       scenarioDetails: [],
       otherScenarios: [],
       otherScenarioTags: [],
@@ -420,7 +420,7 @@ function createInternalErrorPayload(rawInput = {}) {
         fallback: internalFallback,
         error: internalError,
       }),
-      realizedText: '내부 오류로 sell-now canonical block을 만들 수 없습니다.',
+      realizedText: '내부 오류로 즉시 매도 판단 블록을 만들 수 없습니다.',
       rows: [],
     },
     portfolioSimulation: {
@@ -657,7 +657,7 @@ function buildWiseReportKrCacheDescriptor(input, pageDefinitions = WISEREPORT_KR
       createDeepScanSourceRef({
         type: 'report',
         id: `wisereport-kr-v12:${input.instrument.code}`,
-        label: 'WiseReport KR v12 slim payload',
+        label: '와이즈리포트 국내 요약 데이터',
       }),
     ],
   };
@@ -953,6 +953,23 @@ function getScenarioLabel(decisionBand) {
   }
 }
 
+function getDecisionBandLabel(decisionBand) {
+  switch (decisionBand) {
+    case 'hold':
+      return '보유 유지';
+    case 'trim':
+      return '일부 축소';
+    case 'exit-watch':
+      return '축소 대기';
+    case 'exit-now':
+      return '즉시 축소';
+    case 'blocked':
+      return '보류';
+    default:
+      return '근거 부족';
+  }
+}
+
 function createCommitteeMember(shortLabel, title, score, reason) {
   return {
     shortLabel,
@@ -1119,8 +1136,8 @@ function createCommitteeAxes(evidence, scored, packageResult) {
           '입력 완성도',
           scored.committee.positionFit.holdingCompleteness,
           evidence.holding.hasFullSellNowInputs
-            ? '보유 수량, 평단, 현재가가 모두 확인되어 sell-now 계산이 가능합니다.'
-            : '보유 수량·평단·현재가 중 일부가 없어 sell-now 계산이 제한됩니다.',
+            ? '보유 수량, 평단, 현재가가 모두 확인되어 즉시 매도 계산이 가능합니다.'
+            : '보유 수량·평단·현재가 중 일부가 없어 즉시 매도 계산이 제한됩니다.',
         ),
       ],
     },
@@ -1151,8 +1168,8 @@ function createEvidenceSourceRefs(input, evidence, sources, sourceIssues) {
     sourceRefs.push(createDeepScanSourceRef({
       type: 'report',
       id: `wisereport-kr-slim:${identifier}`,
-      label: 'KR slim report evidence',
-      note: `pages:${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages}`,
+      label: '국내 요약 리포트 근거',
+      note: `페이지 ${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages}`,
     }));
   }
 
@@ -1160,7 +1177,7 @@ function createEvidenceSourceRefs(input, evidence, sources, sourceIssues) {
     sourceRefs.push(createDeepScanSourceRef({
       type: 'market',
       id: `current-quote:${identifier}`,
-      label: 'current quote',
+      label: '현재가',
       at: evidence.currentQuote.asOf ?? input.selectedAt,
       note: evidence.currentQuote.source ?? undefined,
     }));
@@ -1168,8 +1185,8 @@ function createEvidenceSourceRefs(input, evidence, sources, sourceIssues) {
     sourceRefs.push(createDeepScanSourceRef({
       type: 'market',
       id: `current-quote:${identifier}`,
-      label: 'current quote lookup',
-      note: 'no matching current quote',
+      label: '현재가 조회',
+      note: '일치하는 현재가 없음',
     }));
   }
 
@@ -1177,7 +1194,7 @@ function createEvidenceSourceRefs(input, evidence, sources, sourceIssues) {
     sourceRefs.push(createDeepScanSourceRef({
       type: 'report',
       id: `package-result:${identifier}`,
-      label: 'KR package supplemental evidence',
+      label: '국내 패키지 보조 근거',
       at: sources.packageResult.timestamp,
       note: normalizeText(sources.packageResult.listingMarket) ?? undefined,
     }));
@@ -1187,7 +1204,7 @@ function createEvidenceSourceRefs(input, evidence, sources, sourceIssues) {
     sourceRefs.push(createDeepScanSourceRef({
       type: 'system',
       id: `missing-source:${missingSource}:${identifier}`,
-      label: `${missingSource} missing`,
+      label: `${missingSource} 누락`,
     }));
   }
 
@@ -1195,7 +1212,7 @@ function createEvidenceSourceRefs(input, evidence, sources, sourceIssues) {
     sourceRefs.push(createDeepScanSourceRef({
       type: 'system',
       id: `source-issue:${issue.sourceId}:${identifier}`,
-      label: `${issue.sourceId} unavailable`,
+      label: `${issue.sourceId} 사용 불가`,
       note: issue.message,
     }));
   }
@@ -1208,7 +1225,7 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues) {
   const items = [
     {
       sourceType: evidence.currentQuote ? 'market' : 'system',
-      sourceLabel: 'Current quote',
+      sourceLabel: '현재가',
       date: evidence.currentQuote?.asOf ?? dateLabel,
       label: '현재가',
       title: `${input.instrument.name} 현재가 근거`,
@@ -1218,17 +1235,17 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues) {
     },
     {
       sourceType: 'report',
-      sourceLabel: 'KR report pages',
+      sourceLabel: '국내 리포트',
       date: dateLabel,
       label: '리포트',
-      title: 'KR 리포트 페이지 범위',
+      title: '국내 리포트 페이지 범위',
       body: evidence.pageCoverage.availableCount > 0
-        ? `KR 리포트 페이지 ${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages} 확보`
-        : 'KR 리포트 페이지 근거 없음',
+        ? `국내 리포트 페이지 ${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages} 확보`
+        : '국내 리포트 페이지 근거 없음',
     },
     {
       sourceType: evidence.holding.hasHoldingContext ? 'holding' : 'system',
-      sourceLabel: 'Holding context',
+      sourceLabel: '보유 맥락',
       date: dateLabel,
       label: '보유',
       title: '보유 포지션 맥락',
@@ -1236,14 +1253,14 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues) {
         ? (evidence.holding.hasFullSellNowInputs
           ? `보유 ${formatNumber(evidence.holding.shares)}주 / 평단 ${formatNumber(evidence.holding.averagePrice)} 확인`
           : '보유 맥락 일부 확인')
-        : 'KR 보유 맥락 없음',
+        : '국내 보유 맥락 없음',
     },
   ];
 
   if (sourceIssues.length > 0 || evidence.missingSources.length > 0) {
     items.push({
       sourceType: 'system',
-      sourceLabel: 'Source coverage',
+      sourceLabel: '소스 범위',
       date: generatedAt.slice(0, 10),
       label: '소스',
       title: '누락 또는 실패한 소스',
@@ -1255,12 +1272,12 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues) {
   }
 
   return {
-    sectionLabel: 'KR evidence snapshot',
+    sectionLabel: '국내 근거 스냅샷',
     items,
     summaryTags: [
-      `score:${scored.hero.score}`,
-      `reports:${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages}`,
-      `decision:${scored.sellNow.decisionBand}`,
+      `점수 ${scored.hero.score}`,
+      `리포트 ${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages}`,
+      `판단 ${getDecisionBandLabel(scored.sellNow.decisionBand)}`,
     ],
   };
 }
@@ -1282,7 +1299,7 @@ function buildStrategy(input, evidence, scored) {
     weekBadgeText: scored.hero.statusText,
     scenarioLabel: getScenarioLabel(decisionBand),
     scenarioProbability: `${Math.max(5, scored.hero.score)}%`,
-    scenarioPeriod: evidence.currentQuote?.asOf ? `${evidence.currentQuote.asOf} 기준 1-2주` : '1-2 weeks',
+    scenarioPeriod: evidence.currentQuote?.asOf ? `${evidence.currentQuote.asOf} 기준 1-2주` : '1~2주',
     scenarioCondition: evidence.topRisks[0] ?? '추가 리스크 없음',
     currentPriceText,
     targetPriceText: evidence.reportSignals.consensusAvailable || evidence.sourceCoverage.hasPackageResult
@@ -1301,7 +1318,7 @@ function buildStrategy(input, evidence, scored) {
         condition: evidence.topRisks[0] ?? '추가 리스크를 다시 확인합니다.',
       },
     ],
-    otherScenarioTags: [decisionBand, evidence.currentQuote ? 'quote:ok' : 'quote:missing'],
+    otherScenarioTags: [getDecisionBandLabel(decisionBand), evidence.currentQuote ? '현재가 확인' : '현재가 없음'],
   };
 }
 
@@ -1312,21 +1329,21 @@ function buildSellNow(evidence, scored) {
       rows: [
         {
           label: '판단 상태',
-          value: 'blocked',
-          tag: 'decision',
+          value: '판단 보류',
+          tag: '판단',
           tagTone: 'warning',
           emphasis: true,
         },
         {
           label: '현재가',
           value: evidence.currentQuote ? formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency) : '현재가 근거 없음',
-          tag: 'quote',
+          tag: '현재가',
           tagTone: evidence.currentQuote ? 'positive' : 'warning',
         },
         {
           label: '평단',
           value: evidence.holding.averagePrice !== null ? formatNumber(evidence.holding.averagePrice) : '평단 근거 없음',
-          tag: 'avg',
+          tag: '평단',
           tagTone: evidence.holding.averagePrice !== null ? 'neutral' : 'warning',
         },
       ],
@@ -1334,32 +1351,33 @@ function buildSellNow(evidence, scored) {
   }
 
   const currency = evidence.currentQuote?.currency ?? 'KRW';
+  const decisionBandLabel = getDecisionBandLabel(scored.sellNow.decisionBand);
   return {
-    realizedText: `현재가 기준 평가손익 ${formatSignedNumber(scored.sellNow.evaluationPnL)} ${currency} (${formatSignedPercent(scored.sellNow.evaluationPnLPct)}). 즉시 매도 판단은 ${scored.sellNow.decisionBand} 입니다.`,
+    realizedText: `현재가 기준 평가손익 ${formatSignedNumber(scored.sellNow.evaluationPnL)} ${currency} (${formatSignedPercent(scored.sellNow.evaluationPnLPct)}). 즉시 매도 판단은 ${decisionBandLabel}입니다.`,
     rows: [
       {
         label: '판단 밴드',
-        value: scored.sellNow.decisionBand,
-        tag: 'decision',
+        value: decisionBandLabel,
+        tag: '판단',
         tagTone: 'positive',
         emphasis: true,
       },
       {
         label: '현재가',
         value: formatCurrencyValue(scored.sellNow.currentPrice, currency),
-        tag: 'quote',
+        tag: '현재가',
         tagTone: 'positive',
       },
       {
         label: '평단',
         value: formatNumber(scored.sellNow.averagePrice),
-        tag: 'avg',
+        tag: '평단',
         tagTone: 'neutral',
       },
       {
         label: '평가손익',
         value: `${formatSignedNumber(scored.sellNow.evaluationPnL)} ${currency} / ${formatSignedPercent(scored.sellNow.evaluationPnLPct)}`,
-        tag: 'pnl',
+        tag: '손익',
         tagTone: scored.sellNow.evaluationPnL >= 0 ? 'positive' : 'danger',
       },
     ],
@@ -1379,8 +1397,12 @@ function buildPortfolioSimulation(scored) {
   return {
     beforeScore: scored.portfolioSimulation.beforeScore,
     afterScore: scored.portfolioSimulation.afterScore,
-    deltaLabel: scored.portfolioSimulation.deltaLabel,
-    caption: `${scored.sellNow.decisionBand} 판단 기준 포지션 제거 시 포트폴리오 점수 ${scored.portfolioSimulation.beforeScore} → ${scored.portfolioSimulation.afterScore}.`,
+    deltaLabel: scored.portfolioSimulation.deltaLabel
+      .replace(/^hold:/, '보유:')
+      .replace(/^trim:/, '축소:')
+      .replace(/^exit-watch:/, '축소대기:')
+      .replace(/^exit-now:/, '즉시축소:'),
+    caption: `${getDecisionBandLabel(scored.sellNow.decisionBand)} 판단 기준 포지션 제거 시 포트폴리오 점수 ${scored.portfolioSimulation.beforeScore} → ${scored.portfolioSimulation.afterScore}.`,
   };
 }
 
@@ -1425,7 +1447,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
       llmSourceRefs.push(createDeepScanSourceRef({
         type: 'system',
         id: `kr-llm:${input.instrument.code ?? input.instrument.name}`,
-        label: 'KR LLM committee runtime',
+        label: '국내 LLM 위원회 실행 기록',
         note: llmCommittee.requestId,
       }));
 
@@ -1448,10 +1470,10 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
               ? 'kr-committee-members-pending'
               : llmCommitteeBlocked ? 'kr-committee-coverage-blocked' : 'weak-data-degradation',
           label: llmCommitteePartialError
-            ? `일부 KR 위원 응답 실패 ${llmCommitteeErrors.length}건`
+            ? `일부 국내 위원 응답 실패 ${llmCommitteeErrors.length}건`
             : llmCommitteePartialPending
-              ? `일부 KR 위원 분석 보강 중 ${llmCommitteePending.length}명`
-              : llmCommitteeBlocked ? '일부 KR 위원 축 근거가 부족합니다.' : `일부 KR 위원 실패 ${llmCommitteeErrors.length}건`,
+              ? `일부 국내 위원 분석 보강 중 ${llmCommitteePending.length}명`
+              : llmCommitteeBlocked ? '일부 국내 위원 축 근거가 부족합니다.' : `일부 국내 위원 실패 ${llmCommitteeErrors.length}건`,
         }
       : null;
     const blockFallback = llmFallback ?? createEvidenceFallback(evidence, sourceIssues);
@@ -1464,8 +1486,8 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     for (const risk of evidence.topRisks.slice(0, 2)) {
       heroBodyParts.push(`주의: ${risk}`);
     }
-    if (evidence.pageCoverage.availableCount === 0 && !heroBodyParts.some((part) => part.includes('KR 리포트 페이지 근거 없음'))) {
-      heroBodyParts.push('주의: KR 리포트 페이지 근거 없음');
+    if (evidence.pageCoverage.availableCount === 0 && !heroBodyParts.some((part) => part.includes('국내 리포트 페이지 근거 없음'))) {
+      heroBodyParts.push('주의: 국내 리포트 페이지 근거 없음');
     }
     if (heroBodyParts.length === 0 && evidence.missingSources.length > 0) {
       heroBodyParts.push(`누락 소스: ${evidence.missingSources.join(', ')}`);
@@ -1478,13 +1500,13 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
             fallback: blockFallback,
             error: createDeepScanBlockError({
               code: 'kr-committee-coverage-blocked',
-              message: 'KR hero block is blocked because committee axis coverage is insufficient.',
+              message: '위원회 축 근거가 부족해 대표 분석 블록이 보류되었습니다.',
               retryable: true,
             }),
           })
         : createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'hero', combinedSourceRefs), fallback: blockFallback })),
-      headline: llmCommitteeBlocked || llmCommitteePartialError ? `${input.instrument.name} KR DeepScan 위원회 재시도 필요` : `${input.instrument.name} KR DeepScan ${scored.hero.score}점`,
-      body: llmCommitteeBlocked || llmCommitteePartialError ? '일부 KR committee member가 LLM 응답 확보에 실패해 축/종합 점수를 보류했습니다. 성공한 위원 판단과 실패 슬롯을 함께 확인하세요.' : heroBodyParts.join(' · '),
+      headline: llmCommitteeBlocked || llmCommitteePartialError ? `${input.instrument.name} 국내 DeepScan 위원회 재시도 필요` : `${input.instrument.name} 국내 DeepScan ${scored.hero.score}점`,
+      body: llmCommitteeBlocked || llmCommitteePartialError ? '일부 국내 위원이 LLM 응답 확보에 실패해 축/종합 점수를 보류했습니다. 성공한 위원 판단과 실패 슬롯을 함께 확인하세요.' : heroBodyParts.join(' · '),
       statusText: llmCommitteeBlocked || llmCommitteePartialError ? '부분 오류' : scored.hero.statusText,
       score: llmCommitteeBlocked || llmCommitteePartialError ? 0 : scored.hero.score,
       scoreLabel: llmCommitteeBlocked || llmCommitteePartialError ? 'N/A' : `${scored.hero.scoreLabel} · ${scored.hero.score} / 100`,
@@ -1499,7 +1521,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
               fallback: blockFallback,
               error: createDeepScanBlockError({
                 code: 'kr-committee-coverage-blocked',
-                message: 'KR committee axis coverage is insufficient for downstream computation.',
+                message: '위원회 축 근거가 부족해 후속 계산이 보류되었습니다.',
                 retryable: true,
               }),
             })
@@ -1517,7 +1539,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
               fallback: blockFallback,
               error: createDeepScanBlockError({
                 code: 'kr-committee-coverage-blocked',
-                message: 'KR strategy block is blocked because committee axis coverage is insufficient.',
+                message: '위원회 축 근거가 부족해 전략 블록이 보류되었습니다.',
                 retryable: true,
               }),
             })
@@ -1531,9 +1553,9 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
               scenarioProbability: '0%',
               scenarioPeriod: '대기',
               scenarioCondition: '위원회 축 근거가 부족해 전략 시나리오를 계산하지 않았습니다.',
-              currentPriceText: 'N/A',
-              targetPriceText: 'N/A',
-              scenarioDetails: ['KR LLM committee 재시도가 필요합니다.'],
+              currentPriceText: '정보 없음',
+              targetPriceText: '정보 없음',
+              scenarioDetails: ['국내 LLM 위원회 재시도가 필요합니다.'],
               otherScenarios: [],
               otherScenarioTags: [],
             }
@@ -1546,7 +1568,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
               fallback: blockFallback,
               error: createDeepScanBlockError({
                 code: 'kr-committee-coverage-blocked',
-                message: 'KR sell-now block is blocked because committee axis coverage is insufficient.',
+                message: '위원회 축 근거가 부족해 즉시 매도 판단 블록이 보류되었습니다.',
                 retryable: true,
               }),
             })
@@ -1565,7 +1587,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
               fallback: blockFallback,
               error: createDeepScanBlockError({
                 code: 'kr-committee-coverage-blocked',
-                message: 'KR portfolio simulation is blocked because committee axis coverage is insufficient.',
+                message: '위원회 축 근거가 부족해 포트폴리오 시뮬레이션이 보류되었습니다.',
                 retryable: true,
               }),
             })

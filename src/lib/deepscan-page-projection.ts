@@ -163,10 +163,10 @@ export function buildDeepScanHeroCard(
   if (fetchState === 'loading' || fetchState === 'idle') {
     return {
       headline: `${targetSession.holding.name} DeepScan을 불러오는 중`,
-      body: '선택한 종목의 canonical payload를 요청하고 있어요. 기존 heuristic 분석 문구는 표시하지 않습니다.',
+      body: '선택한 종목의 표준 분석 데이터를 요청하고 있어요. 임시 분석 문구는 표시하지 않습니다.',
       statusText: '로딩 중',
       score: 0,
-      scoreLabel: 'Loading',
+      scoreLabel: '로딩 중',
       scoreDelta: '불러오는 중',
       statusToneClass: 'text-[color:var(--jaroo-primary)]',
     }
@@ -174,10 +174,10 @@ export function buildDeepScanHeroCard(
 
   return {
     headline: 'DeepScan을 불러오지 못했어요',
-    body: `${targetSession.holding.name} canonical payload 요청에 실패했습니다. 잠시 후 다시 시도해주세요.`,
+    body: `${targetSession.holding.name} 표준 분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.`,
     statusText: '요청 실패',
     score: 0,
-    scoreLabel: 'Error',
+    scoreLabel: '오류',
     scoreDelta: '오류',
     statusToneClass: 'text-[color:var(--jaroo-danger)]',
   }
@@ -188,7 +188,7 @@ export function getDeepScanBlockNotice(
   fallback: DeepScanBlockNotice,
 ): DeepScanBlockNotice {
   return {
-    badge: block.blockState === 'error' ? 'Error' : block.blockState === 'blocked' ? 'Blocked' : fallback.badge,
+    badge: block.blockState === 'error' ? '오류' : block.blockState === 'blocked' ? '보류' : fallback.badge,
     title: block.fallback?.label ?? fallback.title,
     body: block.error?.message ?? block.fallback?.reason ?? fallback.body,
   }

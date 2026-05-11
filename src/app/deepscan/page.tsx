@@ -501,7 +501,7 @@ export default function DeepScanPage() {
       >
         <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-5 shadow-none'>
           <span className='inline-flex rounded-full bg-[color:var(--jaroo-warning-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-warning)]'>
-            Empty
+            비어 있음
           </span>
           <h1 className='mt-3 text-xl font-semibold text-[color:var(--jaroo-ink)]'>{missingTargetTitle}</h1>
           <p className='mt-2 text-sm leading-6 text-[color:var(--jaroo-muted)]'>
@@ -527,19 +527,19 @@ export default function DeepScanPage() {
   const partialSuccessNotice = buildDeepScanPartialSuccessNotice(payload)
   const weekTone = resolveWeekToneClasses(payload?.strategy.weekSignalTone ?? 'neutral')
   const analysisLoadingNotice = {
-    badge: 'Loading',
+    badge: '로딩 중',
     title: 'AI 분석 결과를 불러오는 중',
-    body: '선택한 종목의 canonical committee/insights payload를 요청하고 있어요.',
+    body: '선택한 종목의 위원회·인사이트 분석 데이터를 요청하고 있어요.',
   }
   const strategyLoadingNotice = {
-    badge: 'Loading',
+    badge: '로딩 중',
     title: '전략 데이터를 불러오는 중',
-    body: '선택한 종목의 canonical strategy/sell-now payload를 요청하고 있어요.',
+    body: '선택한 종목의 전략·즉시 매도 분석 데이터를 요청하고 있어요.',
   }
   const requestErrorNotice = {
-    badge: 'Error',
+    badge: '오류',
     title: 'DeepScan 데이터를 표시할 수 없어요',
-    body: errorMessage ?? 'canonical payload 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
+    body: errorMessage ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
   }
 
   if (fetchState === 'loading') {
@@ -692,9 +692,9 @@ export default function DeepScanPage() {
               ) : payload.committee.blockState !== 'ok' ? (
                 <span className='rounded-full bg-[color:var(--jaroo-warning-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-warning)]'>
                   {getDeepScanBlockNotice(payload.committee, {
-                    badge: 'Blocked',
+                    badge: '보류',
                     title: '위원회 분석을 표시할 수 없어요',
-                    body: 'canonical committee block이 아직 준비되지 않았어요.',
+                    body: '위원회 분석 블록이 아직 준비되지 않았어요.',
                   }).badge}
                 </span>
               ) : (
@@ -724,15 +724,15 @@ export default function DeepScanPage() {
               <SectionStatusCard notice={fetchState === 'error' ? requestErrorNotice : analysisLoadingNotice} />
             ) : payload.committee.blockState !== 'ok' ? (
               <SectionStatusCard notice={getDeepScanBlockNotice(payload.committee, {
-                badge: 'Blocked',
+                badge: '보류',
                 title: '위원회 분석을 표시할 수 없어요',
-                body: 'canonical committee block이 아직 준비되지 않았어요.',
+                body: '위원회 분석 블록이 아직 준비되지 않았어요.',
               })} />
             ) : payload.committee.axes.length === 0 ? (
               <SectionStatusCard notice={{
-                badge: 'Empty',
+                badge: '비어 있음',
                 title: '위원회 축 데이터가 비어 있어요',
-                body: 'crawler가 canonical committee axes를 비어 있는 상태로 반환했습니다.',
+                body: '크롤러가 위원회 축 데이터를 비어 있는 상태로 반환했습니다.',
               }} />
             ) : (
               <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
@@ -856,9 +856,9 @@ export default function DeepScanPage() {
               ) : payload.insights.blockState !== 'ok' ? (
                 <span className='rounded-full bg-[color:var(--jaroo-warning-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-warning)]'>
                   {getDeepScanBlockNotice(payload.insights, {
-                    badge: 'Blocked',
+                    badge: '보류',
                     title: '인사이트를 표시할 수 없어요',
-                    body: 'canonical insights block이 아직 준비되지 않았어요.',
+                    body: '인사이트 분석 블록이 아직 준비되지 않았어요.',
                   }).badge}
                 </span>
               ) : (
@@ -877,15 +877,15 @@ export default function DeepScanPage() {
               <SectionStatusCard notice={fetchState === 'error' ? requestErrorNotice : analysisLoadingNotice} />
             ) : payload.insights.blockState !== 'ok' ? (
               <SectionStatusCard notice={getDeepScanBlockNotice(payload.insights, {
-                badge: 'Blocked',
+                badge: '보류',
                 title: '인사이트를 표시할 수 없어요',
-                body: 'canonical insights block이 아직 준비되지 않았어요.',
+                body: '인사이트 분석 블록이 아직 준비되지 않았어요.',
               })} />
             ) : payload.insights.items.length === 0 ? (
               <SectionStatusCard notice={{
-                badge: 'Empty',
+                badge: '비어 있음',
                 title: '인사이트 항목이 없어요',
-                body: 'crawler가 canonical insights items를 비어 있는 상태로 반환했습니다.',
+                body: '크롤러가 인사이트 항목을 비어 있는 상태로 반환했습니다.',
               }} />
             ) : (
               <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] px-4 py-2 shadow-none'>
@@ -959,9 +959,9 @@ export default function DeepScanPage() {
             <SectionStatusCard notice={fetchState === 'error' ? requestErrorNotice : strategyLoadingNotice} />
           ) : payload.strategy.blockState !== 'ok' ? (
             <SectionStatusCard notice={getDeepScanBlockNotice(payload.strategy, {
-              badge: 'Blocked',
+              badge: '보류',
               title: '전략 블록을 표시할 수 없어요',
-              body: 'canonical strategy block이 아직 준비되지 않았어요.',
+              body: '전략 분석 블록이 아직 준비되지 않았어요.',
             })} />
           ) : (
             <>
@@ -1041,9 +1041,9 @@ export default function DeepScanPage() {
               ) : payload.strategy.blockState !== 'ok' ? (
                 <span className='rounded-full bg-[color:var(--jaroo-warning-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-warning)]'>
                   {getDeepScanBlockNotice(payload.strategy, {
-                    badge: 'Blocked',
+                    badge: '보류',
                     title: '다른 시나리오를 표시할 수 없어요',
-                    body: 'canonical strategy block이 아직 준비되지 않았어요.',
+                    body: '전략 분석 블록이 아직 준비되지 않았어요.',
                   }).badge}
                 </span>
               ) : (
@@ -1062,15 +1062,15 @@ export default function DeepScanPage() {
               <SectionStatusCard notice={fetchState === 'error' ? requestErrorNotice : strategyLoadingNotice} />
             ) : payload.strategy.blockState !== 'ok' ? (
               <SectionStatusCard notice={getDeepScanBlockNotice(payload.strategy, {
-                badge: 'Blocked',
+                badge: '보류',
                 title: '다른 시나리오를 표시할 수 없어요',
-                body: 'canonical strategy block이 아직 준비되지 않았어요.',
+                body: '전략 분석 블록이 아직 준비되지 않았어요.',
               })} />
             ) : payload.strategy.otherScenarios.length === 0 ? (
               <SectionStatusCard notice={{
-                badge: 'Empty',
+                badge: '비어 있음',
                 title: '비교 시나리오가 없어요',
-                body: 'crawler가 canonical otherScenarios를 비어 있는 상태로 반환했습니다.',
+                body: '크롤러가 비교 시나리오를 비어 있는 상태로 반환했습니다.',
               }} />
             ) : (
               <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] px-4 py-2 shadow-none'>
@@ -1112,9 +1112,9 @@ export default function DeepScanPage() {
               ) : payload.sellNow.blockState !== 'ok' ? (
                 <span className='text-sm font-semibold text-[color:var(--jaroo-warning)]'>
                   {getDeepScanBlockNotice(payload.sellNow, {
-                    badge: 'Blocked',
-                    title: 'sell-now를 표시할 수 없어요',
-                    body: 'canonical sell-now block이 아직 준비되지 않았어요.',
+                    badge: '보류',
+                    title: '즉시 매도 판단을 표시할 수 없어요',
+                    body: '즉시 매도 판단 블록이 아직 준비되지 않았어요.',
                   }).badge}
                 </span>
               ) : (
@@ -1126,9 +1126,9 @@ export default function DeepScanPage() {
               <SectionStatusCard notice={fetchState === 'error' ? requestErrorNotice : strategyLoadingNotice} />
             ) : payload.sellNow.blockState !== 'ok' ? (
               <SectionStatusCard notice={getDeepScanBlockNotice(payload.sellNow, {
-                badge: 'Blocked',
-                title: 'sell-now를 표시할 수 없어요',
-                body: 'canonical sell-now block이 아직 준비되지 않았어요.',
+                badge: '보류',
+                title: '즉시 매도 판단을 표시할 수 없어요',
+                body: '즉시 매도 판단 블록이 아직 준비되지 않았어요.',
               })} />
             ) : (
               <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] px-4 py-2 shadow-none'>
@@ -1187,9 +1187,9 @@ export default function DeepScanPage() {
               ) : payload.portfolioSimulation.blockState !== 'ok' ? (
                 <span className='text-sm font-semibold text-[color:var(--jaroo-warning)]'>
                   {getDeepScanBlockNotice(payload.portfolioSimulation, {
-                    badge: 'Blocked',
+                    badge: '보류',
                     title: '포트폴리오 시뮬레이션을 표시할 수 없어요',
-                    body: 'canonical portfolioSimulation block이 아직 준비되지 않았어요.',
+                    body: '포트폴리오 시뮬레이션 블록이 아직 준비되지 않았어요.',
                   }).badge}
                 </span>
               ) : (
@@ -1203,9 +1203,9 @@ export default function DeepScanPage() {
               <SectionStatusCard notice={fetchState === 'error' ? requestErrorNotice : strategyLoadingNotice} />
             ) : payload.portfolioSimulation.blockState !== 'ok' ? (
               <SectionStatusCard notice={getDeepScanBlockNotice(payload.portfolioSimulation, {
-                badge: 'Blocked',
+                badge: '보류',
                 title: '포트폴리오 시뮬레이션을 표시할 수 없어요',
-                body: 'canonical portfolioSimulation block이 아직 준비되지 않았어요.',
+                body: '포트폴리오 시뮬레이션 블록이 아직 준비되지 않았어요.',
               })} />
             ) : (
               <Card className='rounded-[24px] border-0 bg-[color:var(--jaroo-secondary)] p-5 text-center shadow-none'>

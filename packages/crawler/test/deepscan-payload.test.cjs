@@ -222,15 +222,15 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
   assert.equal(payload.committee.axes[0].score, 65);
   assert.equal(payload.committee.axes[1].score, 83);
   assert.equal(payload.committee.axes[2].score, 84);
-  assert.deepEqual(payload.insights.summaryTags, ['score:76', 'reports:6/10', 'decision:hold']);
+  assert.deepEqual(payload.insights.summaryTags, ['점수 76', '리포트 6/10', '판단 보유 유지']);
   assert.equal(payload.strategy.weekSignal, '관찰 지속');
   assert.equal(payload.strategy.currentPriceText, '85200 KRW');
   assert.equal(payload.strategy.targetPriceText, '컨센서스/패키지 보조 근거 확인');
-  assert.equal(payload.sellNow.realizedText, '현재가 기준 평가손익 +170400 KRW (+20%). 즉시 매도 판단은 hold 입니다.');
+  assert.equal(payload.sellNow.realizedText, '현재가 기준 평가손익 +170400 KRW (+20%). 즉시 매도 판단은 보유 유지입니다.');
   assert.equal(payload.sellNow.rows.length, 4);
   assert.equal(payload.portfolioSimulation.beforeScore, 82);
   assert.equal(payload.portfolioSimulation.afterScore, 84);
-  assert.equal(payload.portfolioSimulation.deltaLabel, 'hold:+2');
+  assert.equal(payload.portfolioSimulation.deltaLabel, '보유:+2');
 
   const allStrings = collectStrings(payload).join('\n');
   assert.doesNotMatch(allStrings, /baseline|placeholder|deterministic placeholder|integration pending/i);
@@ -263,10 +263,10 @@ test('buildJarooDeepScanPayload degrades with real missing-source messaging for 
   assert.equal(payload.hero.score, 6);
   assert.equal(payload.hero.statusText, '경계');
   assert.match(payload.hero.body, /현재가 근거 없음/);
-  assert.match(payload.hero.body, /KR 리포트 페이지 근거 없음/);
+  assert.match(payload.hero.body, /국내 리포트 페이지 근거 없음/);
   assert.equal(payload.committee.axes.length, 3);
   assert.doesNotMatch(payload.committee.axes[0].members[0].reason, /package-result 없음/);
-  assert.deepEqual(payload.insights.summaryTags, ['score:6', 'reports:0/10', 'decision:blocked']);
+  assert.deepEqual(payload.insights.summaryTags, ['점수 6', '리포트 0/10', '판단 보류']);
   assert.match(payload.strategy.currentPriceText, /현재가 근거 없음/);
   assert.match(payload.sellNow.realizedText, /즉시 매도 판단을 계산하지 못했습니다/);
   assert.equal(payload.portfolioSimulation.beforeScore, 0);
@@ -305,7 +305,7 @@ test('buildJarooDeepScanPayload keeps position-fit evidence when the handoff use
   assert.ok(positionFitAxis);
   assert.equal(positionFitAxis.score, 84);
   assert.match(positionFitAxis.members[0].reason, /현재가 85200 대비 평단 71000/);
-  assert.equal(positionFitAxis.members[2].reason, '보유 수량, 평단, 현재가가 모두 확인되어 sell-now 계산이 가능합니다.');
+  assert.equal(positionFitAxis.members[2].reason, '보유 수량, 평단, 현재가가 모두 확인되어 즉시 매도 계산이 가능합니다.');
   assert.match(payload.sellNow.realizedText, /\+170400 KRW/);
 });
 
@@ -357,7 +357,7 @@ test('buildJarooDeepScanPayload uses package-derived KR committee wording when a
   assert.match(marketTimingAxis.members[2].reason, /현재가 85200 KRW와 평단 71000 비교 기준/)
   const positionFitAxis = payload.committee.axes.find((axis) => axis.label === '포지션 적합도');
   assert.ok(positionFitAxis);
-  assert.equal(positionFitAxis.members[2].reason, '보유 수량, 평단, 현재가가 모두 확인되어 sell-now 계산이 가능합니다.');
+  assert.equal(positionFitAxis.members[2].reason, '보유 수량, 평단, 현재가가 모두 확인되어 즉시 매도 계산이 가능합니다.');
 });
 
 test('buildJarooDeepScanPayload can surface dump-backed KR LLM committee scores and reasons', async () => {
