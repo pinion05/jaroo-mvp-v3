@@ -4,7 +4,22 @@ import type { JarooDeepScanCommitteeAxis, JarooDeepScanInsightItem, JarooDeepSca
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
-import { ChevronDown } from 'lucide-react'
+import {
+  Activity,
+  BadgeCheck,
+  BadgePercent,
+  ChartCandlestick,
+  CircleDollarSign,
+  ClipboardCheck,
+  Landmark,
+  LineChart,
+  MapPin,
+  Scale,
+  ShieldCheck,
+  TrendingUp,
+  type LucideIcon,
+  ChevronDown,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
@@ -59,6 +74,27 @@ const memberIconStyles = {
   purple: 'bg-[#eeedfe] text-[#534ab7]',
   teal: 'bg-[#e1f5ee] text-[#0f6e56]',
 } as const
+
+const committeeMemberIcons: Record<string, LucideIcon> = {
+  수익성: BadgePercent,
+  밸류: Scale,
+  지배: ShieldCheck,
+  트렌드: TrendingUp,
+  컨센: LineChart,
+  가격: MapPin,
+  평단: CircleDollarSign,
+  여지: ChartCandlestick,
+  입력: ClipboardCheck,
+  VAL: Scale,
+  GROW: TrendingUp,
+  PROF: BadgePercent,
+  MOM: Activity,
+  REV: LineChart,
+  EVT: ChartCandlestick,
+  SAFE: Landmark,
+  OWN: ShieldCheck,
+  FIT: ClipboardCheck,
+}
 
 const newsToneStyles = {
   positive: 'bg-[color:var(--jaroo-success-soft)] text-[color:var(--jaroo-success)]',
@@ -131,6 +167,10 @@ function resolveMemberScoreClass(member: JarooDeepScanCommitteeAxis['members'][n
   }
 
   return scorePillClass(35)
+}
+
+function resolveCommitteeMemberIcon(member: JarooDeepScanCommitteeAxis['members'][number]) {
+  return committeeMemberIcons[member.shortLabel] ?? committeeMemberIcons[member.title] ?? BadgeCheck
 }
 
 type DeepScanCommitteeStatusResponse = {
@@ -739,6 +779,7 @@ export default function DeepScanPage() {
                         {axis.members.map((member) => {
                           const isErrorMember = member.status === 'error'
                           const isPendingMember = member.status === 'pending'
+                          const MemberIcon = resolveCommitteeMemberIcon(member)
 
                           return (
                             <div
@@ -754,8 +795,9 @@ export default function DeepScanPage() {
                                   'flex size-10 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold',
                                   memberIconStyles[member.iconTone],
                                 )}
+                                aria-label={member.shortLabel}
                               >
-                                {member.shortLabel}
+                                <MemberIcon className='size-4' aria-hidden />
                               </div>
                               <div className='min-w-0 flex-1'>
                                 <p className='text-sm font-semibold text-[color:var(--jaroo-ink)]'>{member.title}</p>
