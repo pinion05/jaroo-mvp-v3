@@ -457,6 +457,37 @@ function pickOpinionConsensusRow(opinionPage) {
     ?? null;
 }
 
+function isConsensusOpinionRow(row) {
+  const estimator = normalizeText(row?.추정기관 ?? row?.기관 ?? row?.broker ?? row?.증권사);
+  return estimator ? /consensus|컨센서스/i.test(estimator) : false;
+}
+
+function extractAnalystTargetStats(opinionPage) {
+  const targetRows = collectRows(opinionPage)
+    .map((row) => ({
+      row,
+      targetPrice: readTargetPriceFromRow(row),
+    }))
+    .filter((item) => item.targetPrice !== null);
+  const brokerRows = targetRows.filter((item) => !isConsensusOpinionRow(item.row));
+  const sourceRows = brokerRows.length > 0 ? brokerRows : targetRows;
+  const targetPrices = sourceRows.map((item) => item.targetPrice).filter((value) => value !== null);
+
+  if (targetPrices.length === 0) {
+    return {
+      analystCount: null,
+      highestTargetPrice: null,
+      lowestTargetPrice: null,
+    };
+  }
+
+  return {
+    analystCount: brokerRows.length > 0 ? brokerRows.length : null,
+    highestTargetPrice: targetPrices.length > 1 ? Math.max(...targetPrices) : null,
+    lowestTargetPrice: targetPrices.length > 1 ? Math.min(...targetPrices) : null,
+  };
+}
+
 function readTargetPriceFromRow(row) {
   if (!row || typeof row !== 'object') {
     return null;
@@ -534,6 +565,7 @@ function extractConsensusSnapshot(consensusPage, opinionPage, currentPrice) {
   const consensusRows = collectRows(consensusPage);
   const opinionConsensusRow = pickOpinionConsensusRow(opinionPage);
   const opinionRows = opinionConsensusRow ? [opinionConsensusRow] : [];
+  const analystTargetStats = extractAnalystTargetStats(opinionPage);
   const targetPrice = pickFirst(
     readTargetPriceFromRow(opinionConsensusRow),
     normalizeNumber(findFirstKeyValue(consensusRows, [/목표주가/i, /목표가/i, /targetprice/i])),
@@ -559,6 +591,9 @@ function extractConsensusSnapshot(consensusPage, opinionPage, currentPrice) {
     recommendation,
     recommendationScore: normalizeNumber(findFirstKeyValue(opinionRows, [/투자의견/i])),
     recommendationCounts: null,
+    analystCount: analystTargetStats.analystCount,
+    highestTargetPrice: analystTargetStats.highestTargetPrice,
+    lowestTargetPrice: analystTargetStats.lowestTargetPrice,
     revisionDirection: resolveRevisionDirection(revisionPct),
     revisionPct,
   };

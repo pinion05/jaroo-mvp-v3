@@ -265,7 +265,7 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
       date: '2026-04-14',
       label: '컨센서스',
       title: '삼성전자 증권사 컨센서스',
-      body: '평균 목표가 100000 KRW · 현재가 대비 +17.37% · 투자의견 BUY',
+      body: '평균 목표가 100000 KRW · 현재가 대비 +17.37% · 매수 의견이 우세해요 · 투자의견 BUY',
     },
   );
   assert.equal(payload.strategy.weekSignal, '관찰 지속');

@@ -413,18 +413,44 @@ function buildWeek52LoadingQuickFact(quickQuote: LoadingQuickQuote | null): Load
 }
 
 function parseLoadingConsensusBody(body: string) {
+  const analystCountMatch = body.match(/증권사\s*(\d+)\s*곳/u)
   const targetMatch = body.match(/평균\s*목표가\s*([0-9,]+(?:\.\d+)?)\s*(KRW|USD|원|달러)?/iu)
   const upsideMatch = body.match(/현재가\s*대비\s*([+-]?\d+(?:\.\d+)?)%/u)
   const opinionMatch = body.match(/투자의견\s*([0-9]+(?:\.\d+)?)/u)
+  const highTargetMatch = body.match(/최고\s*([0-9,]+(?:\.\d+)?)\s*(KRW|USD|원|달러)?/iu)
+  const lowTargetMatch = body.match(/최저\s*([0-9,]+(?:\.\d+)?)\s*(KRW|USD|원|달러)?/iu)
+  const summaryMatch = body.match(/(모두 매수 의견이에요|매수 의견이 우세해요|의견이 갈리고 있어요|신중한 의견이 많아요)/u)
   const targetValue = targetMatch?.[1] ? Number(targetMatch[1].replace(/,/gu, '')) : undefined
-  const targetCurrency = targetMatch?.[2]?.toUpperCase() === 'USD' || targetMatch?.[2] === '달러' ? 'USD' : 'KRW'
+  const targetCurrency: WorkflowMoneyCurrency = targetMatch?.[2]?.toUpperCase() === 'USD' || targetMatch?.[2] === '달러' ? 'USD' : 'KRW'
   const upsidePct = upsideMatch?.[1] ? Number(upsideMatch[1]) : undefined
   const opinionScore = opinionMatch?.[1] ? Number(opinionMatch[1]) : undefined
+  const highTargetValue = highTargetMatch?.[1] ? Number(highTargetMatch[1].replace(/,/gu, '')) : undefined
+  const highTargetCurrency: WorkflowMoneyCurrency = highTargetMatch?.[2]?.toUpperCase() === 'USD' || highTargetMatch?.[2] === '달러' ? 'USD' : targetCurrency
+  const lowTargetValue = lowTargetMatch?.[1] ? Number(lowTargetMatch[1].replace(/,/gu, '')) : undefined
+  const lowTargetCurrency: WorkflowMoneyCurrency = lowTargetMatch?.[2]?.toUpperCase() === 'USD' || lowTargetMatch?.[2] === '달러' ? 'USD' : targetCurrency
+  const currentPrice = typeof targetValue === 'number'
+    && Number.isFinite(targetValue)
+    && typeof upsidePct === 'number'
+    && Number.isFinite(upsidePct)
+    && 1 + upsidePct / 100 !== 0
+    ? targetValue / (1 + upsidePct / 100)
+    : undefined
 
   return {
+    analystCountLabel: analystCountMatch?.[1] ? `증권사 ${analystCountMatch[1]}곳` : undefined,
     targetPriceLabel: typeof targetValue === 'number' && Number.isFinite(targetValue)
       ? formatLoadingMoney(targetValue, targetCurrency)
       : undefined,
+    currentPriceLabel: typeof currentPrice === 'number' && Number.isFinite(currentPrice)
+      ? formatLoadingMoney(currentPrice, targetCurrency)
+      : undefined,
+    highTargetLabel: typeof highTargetValue === 'number' && Number.isFinite(highTargetValue)
+      ? formatLoadingMoney(highTargetValue, highTargetCurrency)
+      : undefined,
+    lowTargetLabel: typeof lowTargetValue === 'number' && Number.isFinite(lowTargetValue)
+      ? formatLoadingMoney(lowTargetValue, lowTargetCurrency)
+      : undefined,
+    summary: summaryMatch?.[1],
     upsideLabel: typeof upsidePct === 'number' && Number.isFinite(upsidePct)
       ? formatLoadingPercent(upsidePct)
       : undefined,
@@ -454,6 +480,11 @@ function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null): L
       ? {
         consensus: {
           targetPriceLabel: parsedConsensus.targetPriceLabel,
+          ...(parsedConsensus.currentPriceLabel ? { currentPriceLabel: parsedConsensus.currentPriceLabel } : {}),
+          ...(parsedConsensus.analystCountLabel ? { analystCountLabel: parsedConsensus.analystCountLabel } : {}),
+          ...(parsedConsensus.highTargetLabel ? { highTargetLabel: parsedConsensus.highTargetLabel } : {}),
+          ...(parsedConsensus.lowTargetLabel ? { lowTargetLabel: parsedConsensus.lowTargetLabel } : {}),
+          ...(parsedConsensus.summary ? { summary: parsedConsensus.summary } : {}),
           ...(parsedConsensus.upsideLabel ? { upsideLabel: parsedConsensus.upsideLabel } : {}),
           ...(typeof parsedConsensus.upsidePct === 'number' ? { upsidePct: parsedConsensus.upsidePct } : {}),
           ...(parsedConsensus.opinionLabel ? { opinionLabel: parsedConsensus.opinionLabel } : {}),

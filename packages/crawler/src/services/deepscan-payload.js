@@ -895,6 +895,42 @@ function formatCurrencyValue(value, currency) {
     : 'N/A';
 }
 
+function resolveConsensusOpinionSummary(consensusSnapshot) {
+  const score = consensusSnapshot?.recommendationScore;
+  if (typeof score === 'number' && Number.isFinite(score)) {
+    if (score >= 4.2) {
+      return '모두 매수 의견이에요';
+    }
+
+    if (score >= 3.5) {
+      return '매수 의견이 우세해요';
+    }
+
+    if (score >= 2.5) {
+      return '의견이 갈리고 있어요';
+    }
+
+    return '신중한 의견이 많아요';
+  }
+
+  const recommendation = typeof consensusSnapshot?.recommendation === 'string'
+    ? consensusSnapshot.recommendation.trim()
+    : '';
+  if (/strong\s*buy|매수|buy/i.test(recommendation)) {
+    return '매수 의견이 우세해요';
+  }
+
+  if (/hold|neutral|중립/i.test(recommendation)) {
+    return '의견이 갈리고 있어요';
+  }
+
+  if (/sell|underperform|매도/i.test(recommendation)) {
+    return '신중한 의견이 많아요';
+  }
+
+  return null;
+}
+
 function getScoreTone(score) {
   if (score >= 70) {
     return 'positive';
@@ -1478,6 +1514,19 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
   const consensusRecommendation = typeof consensusSnapshot.recommendation === 'string' && consensusSnapshot.recommendation.trim()
     ? consensusSnapshot.recommendation.trim()
     : null;
+  const consensusOpinionSummary = resolveConsensusOpinionSummary(consensusSnapshot);
+  const consensusRecommendationScore = typeof consensusSnapshot.recommendationScore === 'number' && Number.isFinite(consensusSnapshot.recommendationScore)
+    ? consensusSnapshot.recommendationScore
+    : null;
+  const consensusAnalystCount = typeof consensusSnapshot.analystCount === 'number' && Number.isFinite(consensusSnapshot.analystCount)
+    ? consensusSnapshot.analystCount
+    : null;
+  const consensusHighestTargetPrice = typeof consensusSnapshot.highestTargetPrice === 'number' && Number.isFinite(consensusSnapshot.highestTargetPrice)
+    ? consensusSnapshot.highestTargetPrice
+    : null;
+  const consensusLowestTargetPrice = typeof consensusSnapshot.lowestTargetPrice === 'number' && Number.isFinite(consensusSnapshot.lowestTargetPrice)
+    ? consensusSnapshot.lowestTargetPrice
+    : null;
   const items = [
     {
       sourceType: evidence.currentQuote ? 'market' : 'system',
@@ -1508,12 +1557,18 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
           title: `${input.instrument.name} 증권사 컨센서스`,
           body: [
             consensusTargetPrice !== null
-              ? `평균 목표가 ${formatCurrencyValue(consensusTargetPrice, evidence.currentQuote?.currency ?? 'KRW')}`
+              ? `${consensusAnalystCount !== null ? `증권사 ${consensusAnalystCount}곳 ` : ''}평균 목표가 ${formatCurrencyValue(consensusTargetPrice, evidence.currentQuote?.currency ?? 'KRW')}`
               : null,
             consensusTargetGapPct !== null
               ? `현재가 대비 ${formatSignedPercent(consensusTargetGapPct)}`
               : null,
-            consensusRecommendation ? `투자의견 ${consensusRecommendation}` : null,
+            consensusOpinionSummary,
+            consensusRecommendationScore !== null
+              ? `투자의견 ${formatNumber(consensusRecommendationScore)}`
+              : (consensusRecommendation ? `투자의견 ${consensusRecommendation}` : null),
+            consensusHighestTargetPrice !== null && consensusLowestTargetPrice !== null
+              ? `최고 ${formatCurrencyValue(consensusHighestTargetPrice, evidence.currentQuote?.currency ?? 'KRW')} / 최저 ${formatCurrencyValue(consensusLowestTargetPrice, evidence.currentQuote?.currency ?? 'KRW')}`
+              : null,
           ].filter(Boolean).join(' · '),
         }]
       : []),
