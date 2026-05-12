@@ -34,6 +34,7 @@ type DeepScanLoadingScreenProps = {
   currentProfitRate?: string | number
   evaluationAmount?: string | number
   findingProgress?: Partial<Record<FindingKey, FindingProgress>>
+  quickFacts?: LoadingQuickFact[]
   performanceComment?: LoadingPerformanceComment
   evidenceCollected?: boolean
   resultsReady?: boolean
@@ -57,6 +58,15 @@ export type LoadingPerformanceComment = {
   asOf?: string
   body: string
   lines?: string[]
+}
+
+export type LoadingQuickFact = {
+  key: string
+  category: string
+  badge: string
+  tone: 'info' | 'positive' | 'warning'
+  body: string
+  detail?: string
 }
 
 type FindingDefinition = {
@@ -311,6 +321,18 @@ function findingBadgeClass(tone: FindingProgressTone) {
   return styles.badgeActive
 }
 
+function quickFactBadgeClass(tone: LoadingQuickFact['tone']) {
+  if (tone === 'positive') {
+    return styles.badgeDone
+  }
+
+  if (tone === 'warning') {
+    return styles.badgeWarning
+  }
+
+  return styles.badgeActive
+}
+
 export function DeepScanLoadingScreen({
   name = '선택 종목',
   identifier,
@@ -324,6 +346,7 @@ export function DeepScanLoadingScreen({
   currentProfitRate,
   evaluationAmount,
   findingProgress,
+  quickFacts = [],
   performanceComment,
   evidenceCollected = false,
   resultsReady = false,
@@ -430,6 +453,24 @@ export function DeepScanLoadingScreen({
               ))}
             </ul>
           </section>
+        ) : null}
+
+        {quickFacts.length > 0 ? (
+          <>
+            <div className={styles.sectionLabel}>빠른 시장 체크</div>
+            <section className={styles.quickFactsCard} aria-label='빠른 시장 체크'>
+              {quickFacts.map((fact) => (
+                <article key={fact.key} className={styles.quickFact}>
+                  <div className={styles.findingTop}>
+                    <span className={styles.findingCat}>{fact.category}</span>
+                    <span className={cn(styles.findingBadge, quickFactBadgeClass(fact.tone))}>{fact.badge}</span>
+                  </div>
+                  <p className={styles.findingText}>{fact.body}</p>
+                  {fact.detail ? <p className={styles.quickFactDetail}>{fact.detail}</p> : null}
+                </article>
+              ))}
+            </section>
+          </>
         ) : null}
 
         <div className={styles.metaInfo} role='status' aria-live='polite'>

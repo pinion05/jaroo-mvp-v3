@@ -1468,6 +1468,16 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
   const quoteVolume = typeof evidence.currentQuote?.volume === 'number' && Number.isFinite(evidence.currentQuote.volume)
     ? evidence.currentQuote.volume
     : null;
+  const consensusSnapshot = evidence.consensusSnapshot ?? {};
+  const consensusTargetPrice = typeof consensusSnapshot.targetPrice === 'number' && Number.isFinite(consensusSnapshot.targetPrice)
+    ? consensusSnapshot.targetPrice
+    : null;
+  const consensusTargetGapPct = typeof consensusSnapshot.targetGapPct === 'number' && Number.isFinite(consensusSnapshot.targetGapPct)
+    ? consensusSnapshot.targetGapPct
+    : null;
+  const consensusRecommendation = typeof consensusSnapshot.recommendation === 'string' && consensusSnapshot.recommendation.trim()
+    ? consensusSnapshot.recommendation.trim()
+    : null;
   const items = [
     {
       sourceType: evidence.currentQuote ? 'market' : 'system',
@@ -1487,6 +1497,24 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
           label: '거래량',
           title: `${input.instrument.name} 거래량`,
           body: `거래량 ${formatNumber(quoteVolume)}주 확인`,
+        }]
+      : []),
+    ...(consensusTargetPrice !== null || consensusRecommendation
+      ? [{
+          sourceType: 'report',
+          sourceLabel: '증권사 의견',
+          date: dateLabel,
+          label: '컨센서스',
+          title: `${input.instrument.name} 증권사 컨센서스`,
+          body: [
+            consensusTargetPrice !== null
+              ? `평균 목표가 ${formatCurrencyValue(consensusTargetPrice, evidence.currentQuote?.currency ?? 'KRW')}`
+              : null,
+            consensusTargetGapPct !== null
+              ? `현재가 대비 ${formatSignedPercent(consensusTargetGapPct)}`
+              : null,
+            consensusRecommendation ? `투자의견 ${consensusRecommendation}` : null,
+          ].filter(Boolean).join(' · '),
         }]
       : []),
     {

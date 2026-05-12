@@ -89,6 +89,7 @@
 .stockHeader,
 .contextCard,
 .commentaryCard,
+.quickFactsCard,
 .findingCard,
 .scoreCard,
 .committeeWrap {
@@ -270,6 +271,27 @@
   height: 4px;
   border-radius: 999px;
   background: var(--ds-blue);
+}
+
+.quickFactsCard {
+  overflow: hidden;
+  margin-bottom: 12px;
+}
+
+.quickFact {
+  padding: 12px 14px;
+  border-bottom: 0.5px solid var(--ds-line);
+}
+
+.quickFact:last-child {
+  border-bottom: none;
+}
+
+.quickFactDetail {
+  margin: 5px 0 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ds-blue);
 }
 
 .metaInfo {
