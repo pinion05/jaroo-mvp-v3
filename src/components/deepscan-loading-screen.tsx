@@ -70,8 +70,10 @@ export type LoadingQuickFact = {
   indicator?: {
     positionPct: number
     markerLabel?: string
+    deltaLabels?: string[]
     leftLabel: string
     rightLabel: string
+    caption?: string
   }
 }
 
@@ -465,39 +467,59 @@ export function DeepScanLoadingScreen({
           <>
             <div className={styles.sectionLabel}>빠른 시장 체크</div>
             <section className={styles.quickFactsCard} aria-label='빠른 시장 체크'>
-              {quickFacts.map((fact) => (
-                <article key={fact.key} className={styles.quickFact}>
-                  <div className={styles.findingTop}>
-                    <span className={styles.findingCat}>{fact.category}</span>
-                    <span className={cn(styles.findingBadge, quickFactBadgeClass(fact.tone))}>{fact.badge}</span>
-                  </div>
-                  <p className={styles.findingText}>{fact.body}</p>
-                  {fact.detail ? <p className={styles.quickFactDetail}>{fact.detail}</p> : null}
-                  {fact.indicator ? (
-                    <div
-                      className={styles.positionIndicator}
-                      aria-label={`${fact.category}: ${fact.indicator.leftLabel}부터 ${fact.indicator.rightLabel} 사이 ${fact.indicator.markerLabel ?? '현재 위치'}`}
-                    >
-                      <div className={styles.positionScale}>
-                        <span className={styles.positionTrack} aria-hidden='true' />
-                        <span
-                          className={styles.positionMarker}
-                          style={{ top: `${100 - fact.indicator.positionPct}%` }}
-                          aria-hidden='true'
-                        >
-                          <span className={styles.positionMarkerDot} />
-                          {fact.indicator.markerLabel ? <span className={styles.positionMarkerLabel}>{fact.indicator.markerLabel}</span> : null}
-                        </span>
-                      </div>
-                      <div className={styles.positionLabels}>
-                        <span className={styles.positionHighLabel}>{fact.indicator.rightLabel}</span>
-                        <span className={styles.positionRangeCaption}>52주 가격 범위</span>
-                        <span className={styles.positionLowLabel}>{fact.indicator.leftLabel}</span>
-                      </div>
+              {quickFacts.map((fact) => {
+                const indicator = fact.indicator
+                const segmentLabel = indicator && fact.detail ? fact.detail.replace(/이에요$|예요$/u, '') : fact.badge
+                const markerTopPct = indicator ? 100 - indicator.positionPct : 0
+                const calloutTopPct = Math.min(84, Math.max(16, markerTopPct))
+
+                return (
+                  <article key={fact.key} className={cn(styles.quickFact, indicator ? styles.positionQuickFact : undefined)}>
+                    <div className={styles.findingTop}>
+                      <span className={styles.findingCat}>{fact.category}</span>
+                      <span className={cn(styles.findingBadge, indicator ? styles.positionSegmentBadge : quickFactBadgeClass(fact.tone))}>
+                        {segmentLabel}
+                      </span>
                     </div>
-                  ) : null}
-                </article>
-              ))}
+                    {indicator ? (
+                      <div
+                        className={styles.positionIndicator}
+                        aria-label={`${fact.category}: ${indicator.leftLabel}부터 ${indicator.rightLabel} 사이 ${indicator.markerLabel ?? '현재 위치'}`}
+                      >
+                        <div className={styles.positionScale}>
+                          <span className={styles.positionTrack} aria-hidden='true' />
+                          <span
+                            className={styles.positionMarker}
+                            style={{ top: `${markerTopPct}%` }}
+                            aria-hidden='true'
+                          >
+                            <span className={styles.positionMarkerDot} />
+                            <span className={styles.positionLeader} />
+                          </span>
+                        </div>
+                        <div className={styles.positionReadout}>
+                          <span className={styles.positionHighLabel}>{indicator.rightLabel}</span>
+                          <div className={styles.positionCurrentCallout} style={{ top: `${calloutTopPct}%` }}>
+                            {indicator.markerLabel ? <strong>{indicator.markerLabel}</strong> : null}
+                            {indicator.deltaLabels?.length ? (
+                              <span className={styles.positionDeltaLine}>{indicator.deltaLabels.join(' · ')}</span>
+                            ) : (
+                              <span className={styles.positionDeltaLine}>{fact.body}</span>
+                            )}
+                          </div>
+                          <span className={styles.positionRangeCaption}>{indicator.caption ?? '52주 가격 범위'}</span>
+                          <span className={styles.positionLowLabel}>{indicator.leftLabel}</span>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <p className={styles.findingText}>{fact.body}</p>
+                        {fact.detail ? <p className={styles.quickFactDetail}>{fact.detail}</p> : null}
+                      </>
+                    )}
+                  </article>
+                )
+              })}
             </section>
           </>
         ) : null}

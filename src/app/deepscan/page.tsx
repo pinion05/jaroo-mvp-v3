@@ -405,8 +405,10 @@ function buildWeek52LoadingQuickFact(quickQuote: LoadingQuickQuote | null): Load
     indicator: {
       positionPct: rangePositionPct,
       markerLabel: `현재 ${formatLoadingMoney(currentPrice, currency)}`,
+      deltaLabels: [`최저 대비 ${formatLoadingPercent(lowGapPct)}`, `최고 대비 ${formatLoadingPercent(highGapPct)}`],
       leftLabel: `최저 ${formatLoadingMoney(low, currency)}`,
       rightLabel: `최고 ${formatLoadingMoney(high, currency)}`,
+      caption: '52주 가격 범위',
     },
   }
 }
