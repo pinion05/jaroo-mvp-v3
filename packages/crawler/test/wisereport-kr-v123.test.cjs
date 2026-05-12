@@ -215,6 +215,34 @@ test('runCrawlerV2Stage extracts WiseReport c101 company performance comment tex
   assert.equal(result.candidates.companyOverviewComment[0].value.asOf, '2026-04-10');
 });
 
+test('runCrawlerV2Stage ignores comment sections without body text', () => {
+  const result = runCrawlerV2Stage({
+    spec: {
+      id: 'company-status',
+      sourceKey: 'wisereport기업현황',
+      sourceType: 'wisereport',
+    },
+    code: '005930',
+    v1: {
+      source: { capturedResponses: [], iframes: [] },
+      capture: {
+        title: '삼성전자 - 기업현황 - 기업모니터',
+        company: { code: '005930', name: '삼성전자' },
+        bodyTextHead: '요약',
+        tables: [],
+        textSections: [
+          {
+            heading: '기업실적코멘트',
+            text: '[기준:2026.04.10]',
+          },
+        ],
+      },
+    },
+  });
+
+  assert.equal(result.candidates.performanceComment, undefined);
+});
+
 test('finalizeNormalizedPayload preserves fields and reports provenance', () => {
   const result = finalizeNormalizedPayload({
     spec: { id: 'relative-return', sourceKey: 'fnguide상대수익률', sourceType: 'fnguide' },

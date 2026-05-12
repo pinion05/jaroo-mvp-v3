@@ -141,6 +141,9 @@ function parseCommentTextSection(section) {
 
   const asOfMatch = rawText.match(/\[\s*기준\s*:?\s*([^\]]+)\]/u);
   const body = normalizeText(rawText.replace(/\[\s*기준\s*:?\s*[^\]]+\]\s*/u, ''));
+  if (!body) {
+    return null;
+  }
   const sentences = body
     .split(/(?<=\.)\s+/u)
     .map((item) => normalizeText(item))

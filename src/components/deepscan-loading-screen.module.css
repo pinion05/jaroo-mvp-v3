@@ -187,7 +187,7 @@
   margin-bottom: 12px;
   opacity: 0;
   transform: translateY(6px);
-  animation: riseIn 0.5s 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: rise-in 0.5s 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .contextTop {
@@ -219,7 +219,7 @@
   margin-bottom: 12px;
   opacity: 0;
   transform: translateY(6px);
-  animation: riseIn 0.5s 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: rise-in 0.5s 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 .commentaryTop {
@@ -456,7 +456,7 @@
   width: 48%;
   border-radius: 999px;
   background: linear-gradient(90deg, var(--ds-blue), #fac775);
-  animation: progressPulse 1.8s ease-in-out infinite;
+  animation: progress-pulse 1.8s ease-in-out infinite;
 }
 
 .scoreDesc {
@@ -683,14 +683,14 @@
   }
 }
 
-@keyframes riseIn {
+@keyframes rise-in {
   to {
     opacity: 1;
     transform: translateY(0);
   }
 }
 
-@keyframes softReveal {
+@keyframes soft-reveal {
   from {
     opacity: 0;
     transform: translateY(4px);
@@ -702,7 +702,7 @@
   }
 }
 
-@keyframes progressPulse {
+@keyframes progress-pulse {
   0%,
   100% {
     transform: translateX(-18%);
@@ -720,7 +720,7 @@
 }
 
 .findingAnswered {
-  animation: softReveal 0.35s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: soft-reveal 0.35s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .findingContent {
