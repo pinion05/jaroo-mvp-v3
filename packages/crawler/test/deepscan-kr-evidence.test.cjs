@@ -67,6 +67,7 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
             code: '005930',
             price: 85200,
             currency: 'KRW',
+            volume: 1234567,
             asOf: null,
             source: 'krx',
             status: 'ok',
@@ -116,6 +117,7 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
   assert.deepEqual(packet.currentQuote, {
     price: 85200,
     currency: 'KRW',
+    volume: 1234567,
     asOf: '2026-04-14',
     source: 'krx',
     status: 'ok',
@@ -137,6 +139,7 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
     'style-analysis',
   ]);
   assert.deepEqual(packet.pageCoverage.missingPageIds, [
+    'company-status',
     'financial-analysis',
     'investment-indicators',
     'shareholding',
@@ -162,8 +165,10 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
     recentReportsAvailable: true,
     relativeReturnAvailable: true,
     styleAnalysisAvailable: true,
+    performanceCommentAvailable: false,
     recentReportCount: 2,
     recent30dReportCount: null,
+    performanceCommentAsOf: null,
   });
   assert.deepEqual(packet.consensusSnapshot, {
     targetPrice: 100000,
@@ -194,9 +199,9 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
   assert.deepEqual(packet.topFacts, [
     '현재가 85200 KRW 확인',
     '보유 12주 / 평단 71000 확인',
-    'KR 리포트 페이지 6/10 확보',
+    'KR 리포트 페이지 6/11 확보',
   ]);
-  assert.deepEqual(packet.topRisks, ['미확보 KR 페이지 4건']);
+  assert.deepEqual(packet.topRisks, ['미확보 KR 페이지 5건']);
 });
 
 test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a direct quote item while keeping safe defaults for missing sources', async () => {
@@ -250,9 +255,9 @@ test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a dire
     evaluationPnLPct: null,
   });
   assert.equal(packet.pageCoverage.availableCount, 0);
-  assert.equal(packet.pageCoverage.totalKnownPages, 10);
+  assert.equal(packet.pageCoverage.totalKnownPages, 11);
   assert.equal(packet.pageCoverage.availablePageIds.length, 0);
-  assert.equal(packet.pageCoverage.missingPageIds.length, 10);
+  assert.equal(packet.pageCoverage.missingPageIds.length, 11);
   assert.deepEqual(packet.sourceCoverage, {
     hasCurrentQuote: true,
     hasHolding: true,
@@ -265,8 +270,10 @@ test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a dire
     recentReportsAvailable: false,
     relativeReturnAvailable: false,
     styleAnalysisAvailable: false,
+    performanceCommentAvailable: false,
     recentReportCount: null,
     recent30dReportCount: null,
+    performanceCommentAsOf: null,
   });
   assert.equal(packet.packageContext.available, false);
   assert.deepEqual(packet.packageContext.summaryFacts, []);
@@ -552,7 +559,7 @@ test('buildDeepScanKrEvidencePacket uses v1.2 FnGuide ownership pages when prese
     },
   );
 
-  assert.equal(packet.pageCoverage.totalKnownPages, 13);
+  assert.equal(packet.pageCoverage.totalKnownPages, 14);
   assert.equal(packet.pageCoverage.availableCount, 4);
   assert.equal(packet.ownershipSnapshot.foreignOwnershipPct, 2.73);
   assert.equal(packet.ownershipSnapshot.foreignOwnershipAsOf, '2026-04-24');
@@ -561,7 +568,7 @@ test('buildDeepScanKrEvidencePacket uses v1.2 FnGuide ownership pages when prese
   assert.equal(packet.sourceLimitations.some((limitation) => limitation.fact === 'foreignOwnershipPct'), false);
   assert.equal(packet.sourceLimitations.some((limitation) => limitation.fact === 'institutionalOwnershipPct'), true);
   assert.deepEqual(packet.topFacts, [
-    'KR 리포트 페이지 4/13 확보',
+    'KR 리포트 페이지 4/14 확보',
   ]);
 });
 
@@ -609,7 +616,7 @@ test('buildDeepScanKrEvidencePacket ignores unknown slim page keys, counts recen
   assert.equal(packet.currentQuote, null);
   assert.deepEqual(packet.pageCoverage.availablePageIds, ['recent-reports']);
   assert.equal(packet.pageCoverage.availableCount, 1);
-  assert.equal(packet.pageCoverage.missingPageIds.length, 9);
+  assert.equal(packet.pageCoverage.missingPageIds.length, 10);
   assert.deepEqual(packet.sourceCoverage, {
     hasCurrentQuote: false,
     hasHolding: false,
@@ -622,18 +629,20 @@ test('buildDeepScanKrEvidencePacket ignores unknown slim page keys, counts recen
     recentReportsAvailable: true,
     relativeReturnAvailable: false,
     styleAnalysisAvailable: false,
+    performanceCommentAvailable: false,
     recentReportCount: 1,
     recent30dReportCount: null,
+    performanceCommentAsOf: null,
   });
   assert.deepEqual(packet.missingSources, ['current-quote', 'holding']);
   assert.deepEqual(packet.topFacts, [
-    'KR 리포트 페이지 1/10 확보',
+    'KR 리포트 페이지 1/11 확보',
     '최근 리포트 1건 확인',
   ]);
   assert.deepEqual(packet.topRisks, [
     '현재가 근거 없음',
     'KR 보유 맥락 없음',
-    '미확보 KR 페이지 9건',
+    '미확보 KR 페이지 10건',
   ]);
 });
 

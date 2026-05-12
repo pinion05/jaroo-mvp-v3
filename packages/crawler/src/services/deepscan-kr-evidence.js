@@ -954,9 +954,14 @@ function normalizeQuoteRecord(item, aggregate = null) {
     return null;
   }
 
+  const volume = normalizeNumber(item.volume ?? item.tradingVolume ?? item.accumulatedTradingVolume ?? item.거래량);
+  const tradingValue = normalizeNumber(item.tradingValue ?? item.tradingAmount ?? item.accumulatedTradingValue ?? item.거래대금);
+
   return {
     price,
     currency: normalizeText(item.currency),
+    ...(volume !== null ? { volume } : {}),
+    ...(tradingValue !== null ? { tradingValue } : {}),
     asOf: resolveAggregateAsOf(aggregate, item),
     source: normalizeText(item.source),
     status: normalizeText(item.status),
@@ -1055,6 +1060,35 @@ function countRecentReportsWithinDays(page, asOf, days) {
   }
 
   return datedRows === 0 ? null : count;
+}
+
+function normalizeCommentaryEntry(value) {
+  const entry = asObject(value);
+  const text = normalizeText(entry.text);
+  if (!text) {
+    return null;
+  }
+
+  return {
+    title: normalizeText(entry.title),
+    asOf: normalizeDate(entry.asOf) ?? normalizeDate(entry.asOfText) ?? null,
+    text,
+    sentences: Array.isArray(entry.sentences)
+      ? entry.sentences.map((sentence) => normalizeText(sentence)).filter(Boolean)
+      : [],
+  };
+}
+
+function extractBusinessCommentary(page) {
+  const statusPage = asObject(page);
+  const companyOverviewComment = normalizeCommentaryEntry(statusPage.companyOverviewComment);
+  const performanceComment = normalizeCommentaryEntry(statusPage.performanceComment);
+
+  return {
+    companyOverviewComment,
+    performanceComment,
+    available: Boolean(companyOverviewComment || performanceComment),
+  };
 }
 
 function buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals }) {
@@ -1169,6 +1203,7 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
   const reportAsOf = recentReportRows
     .map((row) => normalizeDate(row.date ?? row.일자 ?? row.작성일 ?? row.publishedAt))
     .find(Boolean) ?? null;
+  const businessCommentary = extractBusinessCommentary(slimPages['company-status']);
 
   const knownPageIds = resolveKnownPageIds(safeSources.slim, slimPages);
   const availablePageIds = knownPageIds.filter((pageId) => hasEvidence(slimPages[pageId]));
@@ -1186,8 +1221,10 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
     recentReportsAvailable: hasEvidence(slimPages['recent-reports']),
     relativeReturnAvailable: hasEvidence(slimPages['relative-return']),
     styleAnalysisAvailable: hasEvidence(slimPages['style-analysis']),
+    performanceCommentAvailable: Boolean(businessCommentary.performanceComment),
     recentReportCount: null,
     recent30dReportCount: null,
+    performanceCommentAsOf: businessCommentary.performanceComment?.asOf ?? null,
   };
 
   const recentReportCount = countRecentReports(slimPages['recent-reports']);
@@ -1282,6 +1319,7 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
     styleAnalysisSnapshot,
     ownershipSnapshot,
     financialSnapshot,
+    businessCommentary,
     packageContext,
     sourceLimitations,
     missingSources,

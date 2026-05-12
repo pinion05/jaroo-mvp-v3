@@ -60,6 +60,14 @@ type HeatmapChartDatum = HomeHolding & { value: number; name: string }
 type DeepScanLoadingTarget = {
   name: string
   identifier?: string
+  market?: string
+  shares?: number
+  averagePrice?: number
+  averagePriceCurrency?: 'KRW' | 'USD'
+  currentPrice?: number
+  currentPriceCurrency?: 'KRW' | 'USD'
+  currentProfitRate?: number
+  evaluationAmount?: number
 }
 
 type PortfolioSummary = {
@@ -852,6 +860,14 @@ export function JarooHomeScreen() {
     setDeepScanLoadingTarget({
       name: holding.name,
       identifier: getHoldingIdentifierText(holding),
+      market: holding.market,
+      shares: item.quantity,
+      averagePrice: item.averagePrice,
+      averagePriceCurrency: item.averagePriceCurrency,
+      currentPrice: item.currentPrice,
+      currentPriceCurrency: item.currentPriceCurrency,
+      currentProfitRate: item.currentProfitRate,
+      evaluationAmount: item.evaluationAmount,
     })
     setDeepScanTarget(toDeepScanTargetInput(item))
 
@@ -1536,6 +1552,14 @@ export function JarooHomeScreen() {
             <DeepScanLoadingScreen
               name={deepScanLoadingTarget.name}
               identifier={deepScanLoadingTarget.identifier}
+              market={deepScanLoadingTarget.market}
+              shares={deepScanLoadingTarget.shares}
+              averagePrice={deepScanLoadingTarget.averagePrice}
+              averagePriceCurrency={deepScanLoadingTarget.averagePriceCurrency}
+              currentPrice={deepScanLoadingTarget.currentPrice}
+              currentPriceCurrency={deepScanLoadingTarget.currentPriceCurrency}
+              currentProfitRate={deepScanLoadingTarget.currentProfitRate}
+              evaluationAmount={deepScanLoadingTarget.evaluationAmount}
               onBack={cancelDeepScanLoading}
             />
           </div>

@@ -907,15 +907,19 @@
   z-index: 60;
   display: flex;
   justify-content: center;
-  background: #e8e8e8;
+  padding: 1rem 0.75rem;
+  background: var(--jaroo-canvas);
 }
 
 .deepScanLoadingInner {
   width: 100%;
-  max-width: 340px;
-  min-height: 100vh;
+  max-width: 390px;
+  min-height: calc(100vh - 2rem);
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  border-radius: 32px;
   background: #fff;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 20px 60px rgba(12, 68, 124, 0.18);
 }
 
 .sheetOverlay {

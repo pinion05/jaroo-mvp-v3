@@ -14,6 +14,9 @@ const {
   runCrawlerV1Stage,
   waitForPageReady,
 } = require('../src/crawlers/wisereport-kr/crawler_v1.cjs');
+const {
+  runCrawlerV2Stage,
+} = require('../src/crawlers/wisereport-kr/crawler_v2.cjs');
 
 test('compactHeaderParts removes consecutive duplicates and blanks', () => {
   assert.deepEqual(compactHeaderParts([' 회계연도 ', '회계연도', '', ' (남) ', '(남)', '2025/12']), ['회계연도', '(남)', '2025/12']);
@@ -175,6 +178,71 @@ test('selectPreferredCandidate prioritizes network over dom and iframe', () => {
   assert.deepEqual(selected.value, { a: 3 });
 });
 
+test('runCrawlerV2Stage extracts WiseReport c101 company performance comment text sections', () => {
+  const result = runCrawlerV2Stage({
+    spec: {
+      id: 'company-status',
+      sourceKey: 'wisereport기업현황',
+      sourceType: 'wisereport',
+    },
+    code: '005930',
+    v1: {
+      source: { capturedResponses: [], iframes: [] },
+      capture: {
+        title: '삼성전자 - 기업현황 - 기업모니터',
+        company: { code: '005930', name: '삼성전자' },
+        bodyTextHead: '요약',
+        tables: [],
+        textSections: [
+          {
+            heading: '기업개요',
+            text: '[기준:2026.04.10]\n동사는 1969년 설립된 글로벌 전자 기업으로 DX, DS 두 부문으로 구성되어 있음.',
+          },
+          {
+            heading: '기업실적코멘트',
+            text: '[기준:2026.04.10]\n2025년 결산 전년동기 대비 연결기준 매출액은 10.9% 증가, 영업이익은 33.2% 증가, 당기순이익은 31.6% 증가.\nAI 인프라 경쟁으로 데이터센터 업체들의 CAPEX 확대로 서버향 메모리 수요가 공급량을 초과하여 실적이 개선됨.',
+          },
+        ],
+      },
+    },
+  });
+
+  const performanceComment = result.candidates.performanceComment[0].value;
+  assert.equal(performanceComment.title, '기업실적코멘트');
+  assert.equal(performanceComment.asOf, '2026-04-10');
+  assert.match(performanceComment.text, /매출액은 10\.9% 증가/);
+  assert.match(performanceComment.text, /CAPEX/);
+  assert.equal(result.candidates.companyOverviewComment[0].value.asOf, '2026-04-10');
+});
+
+test('runCrawlerV2Stage ignores comment sections without body text', () => {
+  const result = runCrawlerV2Stage({
+    spec: {
+      id: 'company-status',
+      sourceKey: 'wisereport기업현황',
+      sourceType: 'wisereport',
+    },
+    code: '005930',
+    v1: {
+      source: { capturedResponses: [], iframes: [] },
+      capture: {
+        title: '삼성전자 - 기업현황 - 기업모니터',
+        company: { code: '005930', name: '삼성전자' },
+        bodyTextHead: '요약',
+        tables: [],
+        textSections: [
+          {
+            heading: '기업실적코멘트',
+            text: '[기준:2026.04.10]',
+          },
+        ],
+      },
+    },
+  });
+
+  assert.equal(result.candidates.performanceComment, undefined);
+});
+
 test('finalizeNormalizedPayload preserves fields and reports provenance', () => {
   const result = finalizeNormalizedPayload({
     spec: { id: 'relative-return', sourceKey: 'fnguide상대수익률', sourceType: 'fnguide' },
@@ -294,6 +362,7 @@ test('buildWiseReportKrSlimPayload keeps only business payload for slim aggregat
       name: '삼성전자',
     },
     pages: {
+      'company-status': null,
       'company-overview': {
         summary: {
           market: 'KOSPI',

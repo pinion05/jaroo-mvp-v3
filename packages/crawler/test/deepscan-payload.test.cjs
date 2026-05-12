@@ -48,6 +48,17 @@ function createStrongKrSources() {
         name: '삼성전자',
       },
       pages: {
+        'company-status': {
+          performanceComment: {
+            title: '기업실적코멘트',
+            asOf: '2026-04-10',
+            text: '2025년 결산 전년동기 대비 연결기준 매출액은 10.9% 증가, 영업이익은 33.2% 증가. AI 인프라 경쟁으로 서버향 메모리 수요가 공급량을 초과하여 실적이 개선됨.',
+            sentences: [
+              '2025년 결산 전년동기 대비 연결기준 매출액은 10.9% 증가, 영업이익은 33.2% 증가.',
+              'AI 인프라 경쟁으로 서버향 메모리 수요가 공급량을 초과하여 실적이 개선됨.',
+            ],
+          },
+        },
         'company-overview': {
           summary: {
             market: 'KOSPI',
@@ -88,6 +99,7 @@ function createStrongKrSources() {
           code: '005930',
           price: 85200,
           currency: 'KRW',
+          volume: 1234567,
           asOf: null,
           source: 'krx',
           status: 'ok',
@@ -222,7 +234,29 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
   assert.equal(payload.committee.axes[0].score, 65);
   assert.equal(payload.committee.axes[1].score, 83);
   assert.equal(payload.committee.axes[2].score, 84);
-  assert.deepEqual(payload.insights.summaryTags, ['점수 76', '리포트 6/10', '판단 보유 유지']);
+  assert.deepEqual(payload.insights.summaryTags, ['점수 76', '리포트 7/11', '판단 보유 유지']);
+  assert.deepEqual(
+    payload.insights.items.find((item) => item.sourceLabel === '거래량'),
+    {
+      sourceType: 'market',
+      sourceLabel: '거래량',
+      date: '2026-04-14',
+      label: '거래량',
+      title: '삼성전자 거래량',
+      body: '거래량 1234567주 확인',
+    },
+  );
+  assert.deepEqual(
+    payload.insights.items.find((item) => item.sourceLabel === '기업실적코멘트'),
+    {
+      sourceType: 'report',
+      sourceLabel: '기업실적코멘트',
+      date: '2026-04-10',
+      label: '실적',
+      title: '기업실적코멘트 쉽게 보기',
+      body: '2025년 기준, 매출은 10.9% 늘었어요.\n본업 이익은 33.2% 늘었어요.\nAI 인프라 경쟁으로 서버용 메모리 수요가 물건이 모자랄 만큼 많아져 실적이 좋아졌어요.',
+    },
+  );
   assert.equal(payload.strategy.weekSignal, '관찰 지속');
   assert.equal(payload.strategy.currentPriceText, '85200 KRW');
   assert.equal(payload.strategy.targetPriceText, '컨센서스/패키지 보조 근거 확인');
@@ -238,6 +272,77 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
   for (const key of MAJOR_BLOCK_KEYS) {
     assertBlockMeta(payload[key], 'ok');
     assert.equal(payload.metadata.blockStatus[key], 'ok');
+  }
+});
+
+
+test('buildJarooDeepScanPayload uses LLM to simplify WiseReport performance comment into three numeric-preserving lines', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+  const originalFetch = global.fetch;
+  const originalKey = process.env.OPENROUTER_API_KEY;
+  const originalSummaryEnable = process.env.DEEPSCAN_COMMENTARY_SUMMARY_ENABLE;
+  const originalKrLlmEnable = process.env.DEEPSCAN_KR_LLM_ENABLE;
+  process.env.OPENROUTER_API_KEY = 'test-key';
+  process.env.DEEPSCAN_COMMENTARY_SUMMARY_ENABLE = 'true';
+  process.env.DEEPSCAN_KR_LLM_ENABLE = 'false';
+
+  global.fetch = (async (_url, init) => {
+    const body = JSON.parse(String(init?.body ?? '{}'));
+    assert.equal(body.response_format?.json_schema?.name, 'jaroo_performance_comment_summary');
+    const userMessage = Array.isArray(body?.messages) ? body.messages.find((message) => message.role === 'user') : null;
+    assert.match(String(userMessage?.content ?? ''), /10.9%/);
+
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            lines: [
+              '2025년 매출은 10.9% 늘었어요.',
+              '본업 이익은 33.2% 늘었어요.',
+              '서버 메모리가 부족할 만큼 수요가 많았어요.',
+            ],
+          }),
+        },
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  try {
+    const payload = await buildJarooDeepScanPayload({
+      instrument: {
+        name: '삼성전자',
+        code: '005930',
+        market: 'KR',
+      },
+      selectedAt: '2026-04-14T00:00:00.000Z',
+      sourceContext: {
+        from: 'holding',
+        sessionKey: 'session-1',
+        appliedAt: '2026-04-15T00:00:00.000Z',
+      },
+      sources: createStrongKrSources(),
+    });
+
+    assert.equal(
+      payload.insights.items.find((item) => item.sourceLabel === '기업실적코멘트')?.body,
+      '2025년 매출은 10.9% 늘었어요.\n본업 이익은 33.2% 늘었어요.\n서버 메모리가 부족할 만큼 수요가 많았어요.',
+    );
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey) {
+      process.env.OPENROUTER_API_KEY = originalKey;
+    } else {
+      delete process.env.OPENROUTER_API_KEY;
+    }
+    if (originalSummaryEnable) {
+      process.env.DEEPSCAN_COMMENTARY_SUMMARY_ENABLE = originalSummaryEnable;
+    } else {
+      delete process.env.DEEPSCAN_COMMENTARY_SUMMARY_ENABLE;
+    }
+    process.env.DEEPSCAN_KR_LLM_ENABLE = originalKrLlmEnable ?? 'false';
   }
 });
 
@@ -266,7 +371,7 @@ test('buildJarooDeepScanPayload degrades with real missing-source messaging for 
   assert.match(payload.hero.body, /국내 리포트 페이지 근거 없음/);
   assert.equal(payload.committee.axes.length, 3);
   assert.doesNotMatch(payload.committee.axes[0].members[0].reason, /package-result 없음/);
-  assert.deepEqual(payload.insights.summaryTags, ['점수 6', '리포트 0/10', '판단 보류']);
+  assert.deepEqual(payload.insights.summaryTags, ['점수 6', '리포트 0/11', '판단 보류']);
   assert.match(payload.strategy.currentPriceText, /현재가 근거 없음/);
   assert.match(payload.sellNow.realizedText, /즉시 매도 판단을 계산하지 못했습니다/);
   assert.equal(payload.portfolioSimulation.beforeScore, 0);

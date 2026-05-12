@@ -235,6 +235,34 @@ async function capturePageDom(page, spec, code) {
       .filter((script) => script.id || /chartData|template|ajax|json|highcharts|BandChart|c1050001|c1080001/i.test(script.snippet))
       .slice(0, 30);
 
+    const textSections = Array.from(document.querySelectorAll('h5, h6'))
+      .slice(0, 80)
+      .map((heading) => {
+        const blocks = [];
+        let cursor = heading.nextElementSibling;
+        while (cursor && blocks.length < 8) {
+          if (/^H[1-6]$/i.test(cursor.tagName)) {
+            break;
+          }
+          if (!['SCRIPT', 'STYLE', 'NOSCRIPT'].includes(cursor.tagName)) {
+            const text = clean(cursor.innerText || cursor.textContent || '');
+            if (text) {
+              blocks.push(text);
+            }
+          }
+          cursor = cursor.nextElementSibling;
+        }
+
+        return {
+          heading: clean(heading.innerText || heading.textContent || ''),
+          headingTag: heading.tagName.toLowerCase(),
+          className: heading.className || null,
+          text: blocks.join('\n').slice(0, 5000),
+          blocks: blocks.slice(0, 4),
+        };
+      })
+      .filter((section) => section.heading && section.text);
+
     return {
       title: document.title,
       finalUrl: location.href,
@@ -255,6 +283,7 @@ async function capturePageDom(page, spec, code) {
       },
       chartAssets,
       scriptEvidence,
+      textSections,
       rootBlocks: Array.from(document.body.children || []).slice(0, 20).map((element) => ({
         tag: element.tagName.toLowerCase(),
         id: element.id || null,
@@ -441,6 +470,7 @@ async function runCrawlerV1Stage(context, code, spec, options = {}) {
         },
         chartAssets: [],
         scriptEvidence: [],
+        textSections: [],
         rootBlocks: [],
       },
       stage: {

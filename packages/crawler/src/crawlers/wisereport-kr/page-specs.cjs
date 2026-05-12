@@ -4,6 +4,15 @@ function compactArray(values) {
 
 const KR_WISEREPORT_PAGE_SPECS = Object.freeze([
   {
+    id: 'company-status',
+    legacyKey: 'companyStatus',
+    sourceKey: 'wisereport기업현황',
+    sourceType: 'wisereport',
+    title: '기업현황',
+    url: (code) => `https://comp.wisereport.co.kr/company/c1010001.aspx?cmp_cd=${code}&cn=&menuType=block`,
+    waitForSelectors: ['h5.bg8', 'h5.bg7', '.PageContentContainer'],
+  },
+  {
     id: 'company-overview',
     legacyKey: 'companyOverview',
     sourceKey: 'wisereport기업개요',

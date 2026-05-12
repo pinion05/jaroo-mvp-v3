@@ -119,6 +119,7 @@ test('getNaverCurrentQuotes maps Naver mobile stock basic payloads to KR quote i
       return new Response(JSON.stringify({
         itemCode: '005930',
         closePrice: '85,200',
+        accumulatedTradingVolume: '1,234,567',
         localTradedAt: '2026-04-30T15:30:00+09:00',
       }));
     },
@@ -131,6 +132,7 @@ test('getNaverCurrentQuotes maps Naver mobile stock basic payloads to KR quote i
     ticker: null,
     price: 85200,
     currency: 'KRW',
+    volume: 1234567,
     asOf: '2026-04-30T15:30:00+09:00',
     source: 'naver-finance',
     status: 'ok',
@@ -247,6 +249,75 @@ test('getCurrentQuotes uses Naver KR quotes first without blocking on KRX snapsh
   assert.deepEqual(result.asOf, { kr: '2026-04-30T15:30:00+09:00', us: null });
 });
 
+test('getCurrentQuotes can enrich Naver KR quote volume from KRX snapshot when requested', async () => {
+  const { getCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+
+  const result = await getCurrentQuotes({ codes: ['005930'] }, {
+    enrichKrVolumeFromKrx: true,
+    naverQuoteFetcher: async (code) => ({
+      market: 'KR',
+      code,
+      ticker: null,
+      price: 85200,
+      currency: 'KRW',
+      asOf: '2026-04-30T15:30:00+09:00',
+      source: 'naver-finance',
+      status: 'ok',
+    }),
+    krxTradeDateResolver: async () => '20260430',
+    krxSnapshotFetcher: async () => [{
+      code: '005930',
+      종가: '85100',
+      거래량: '1,234,567',
+      거래대금: '105185108400',
+    }],
+  });
+
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].code, '005930');
+  assert.equal(result.items[0].price, 85200);
+  assert.equal(result.items[0].source, 'naver-finance');
+  assert.equal(result.items[0].volume, 1234567);
+  assert.equal(result.items[0].tradingValue, 105185108400);
+  assert.deepEqual(result.missing, []);
+  assert.deepEqual(result.asOf, { kr: '2026-04-30T15:30:00+09:00', us: null });
+});
+
+test('getCurrentQuotes does not enrich Naver KR quote when volume already exists', async () => {
+  const { getCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+  let krxCalled = false;
+
+  const result = await getCurrentQuotes({ codes: ['005930'] }, {
+    enrichKrVolumeFromKrx: true,
+    naverQuoteFetcher: async (code) => ({
+      market: 'KR',
+      code,
+      ticker: null,
+      price: 85200,
+      currency: 'KRW',
+      volume: 1234567,
+      asOf: '2026-04-30T15:30:00+09:00',
+      source: 'naver-finance',
+      status: 'ok',
+    }),
+    krxSnapshotFetcher: async () => {
+      krxCalled = true;
+      return [{
+        code: '005930',
+        종가: '85100',
+        거래량: '1,234,568',
+        거래대금: '105185108400',
+      }];
+    },
+  });
+
+  assert.equal(krxCalled, false);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].source, 'naver-finance');
+  assert.equal(result.items[0].volume, 1234567);
+  assert.equal(result.items[0].tradingValue, undefined);
+});
+
 test('getCurrentQuotes returns partial Naver KR hits without waiting for KRX fallback', async () => {
   const { getCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
   let krxCalled = false;
@@ -289,7 +360,7 @@ test('getCurrentQuotes falls back to KRX when Naver KR quote is missing', async 
   const result = await getCurrentQuotes({ codes: ['005930'] }, {
     naverQuoteFetcher: async () => null,
     krxTradeDateResolver: async () => '20260416',
-    krxSnapshotFetcher: async () => [{ code: '005930', 종가: '85200' }],
+    krxSnapshotFetcher: async () => [{ code: '005930', 종가: '85200', 거래량: '1,234,567', 거래대금: '105185108400' }],
   });
 
   assert.equal(result.items.length, 1);
@@ -299,6 +370,8 @@ test('getCurrentQuotes falls back to KRX when Naver KR quote is missing', async 
     ticker: null,
     price: 85200,
     currency: 'KRW',
+    volume: 1234567,
+    tradingValue: 105185108400,
     asOf: '2026-04-16',
     source: 'krx',
     status: 'ok',
