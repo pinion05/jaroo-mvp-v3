@@ -294,6 +294,84 @@
   color: var(--ds-blue);
 }
 
+.positionIndicator {
+  margin-top: 12px;
+}
+
+.positionScale {
+  position: relative;
+  height: 38px;
+}
+
+.positionTrack,
+.positionFill {
+  position: absolute;
+  top: 21px;
+  left: 0;
+  height: 8px;
+  border-radius: 999px;
+}
+
+.positionTrack {
+  right: 0;
+  background: linear-gradient(90deg, #dff4e7 0%, #fff0cc 52%, #ffe1df 100%);
+  box-shadow: inset 0 0 0 1px rgba(12, 68, 124, 0.06);
+}
+
+.positionFill {
+  min-width: 8px;
+  background: linear-gradient(90deg, var(--ds-green) 0%, #f2b84b 58%, var(--ds-red) 100%);
+  opacity: 0.78;
+}
+
+.positionMarker {
+  position: absolute;
+  top: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  transform: translateX(-50%);
+}
+
+.positionMarkerLabel {
+  padding: 2px 7px;
+  border: 0.5px solid var(--ds-blue-border);
+  border-radius: 999px;
+  background: #fff;
+  color: var(--ds-blue);
+  font-size: 10px;
+  font-weight: 800;
+  line-height: 1.2;
+  white-space: nowrap;
+  box-shadow: 0 4px 10px rgba(28, 85, 133, 0.08);
+}
+
+.positionMarkerDot {
+  width: 14px;
+  height: 14px;
+  border: 3px solid #fff;
+  border-radius: 999px;
+  background: var(--ds-blue);
+  box-shadow: 0 4px 10px rgba(28, 85, 133, 0.26);
+}
+
+.positionLabels {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 2px;
+  color: var(--ds-muted);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.3;
+}
+
+.positionLabels span:last-child {
+  text-align: right;
+}
+
 .metaInfo {
   padding: 10px 12px;
   background: #f8f8f8;

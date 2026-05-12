@@ -341,6 +341,15 @@ function formatLoadingPercent(value: number | undefined) {
   return `${sign}${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 }).format(value)}%`
 }
 
+function formatLoadingMoney(value: number, currency: WorkflowMoneyCurrency = 'KRW') {
+  const suffix = currency === 'USD' ? '달러' : '원'
+  return `${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(value)}${suffix}`
+}
+
+function clampLoadingPercent(value: number) {
+  return Math.min(100, Math.max(0, value))
+}
+
 function resolveWeek52PositionLabel(lowGapPct: number | undefined, highGapPct: number | undefined) {
   if (typeof highGapPct === 'number' && highGapPct >= -10) {
     return '고점 근처예요'
@@ -376,12 +385,16 @@ function buildWeek52LoadingQuickFact(quickQuote: LoadingQuickQuote | null): Load
     || currentPrice <= 0
     || high <= 0
     || low <= 0
+    || high <= low
   ) {
     return null
   }
 
   const lowGapPct = ((currentPrice - low) / low) * 100
   const highGapPct = ((currentPrice - high) / high) * 100
+  const rangePositionPct = clampLoadingPercent(((currentPrice - low) / (high - low)) * 100)
+  const currency = quickQuote?.currentPriceCurrency ?? 'KRW'
+
   return {
     key: 'week52-position',
     category: '가격 위치',
@@ -389,6 +402,12 @@ function buildWeek52LoadingQuickFact(quickQuote: LoadingQuickQuote | null): Load
     tone: 'info',
     body: `52주 최저 대비 ${formatLoadingPercent(lowGapPct)}, 최고 대비 ${formatLoadingPercent(highGapPct)}`,
     detail: resolveWeek52PositionLabel(lowGapPct, highGapPct),
+    indicator: {
+      positionPct: rangePositionPct,
+      markerLabel: `현재 ${formatLoadingMoney(currentPrice, currency)}`,
+      leftLabel: `최저 ${formatLoadingMoney(low, currency)}`,
+      rightLabel: `최고 ${formatLoadingMoney(high, currency)}`,
+    },
   }
 }
 

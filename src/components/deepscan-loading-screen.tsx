@@ -67,6 +67,12 @@ export type LoadingQuickFact = {
   tone: 'info' | 'positive' | 'warning'
   body: string
   detail?: string
+  indicator?: {
+    positionPct: number
+    markerLabel?: string
+    leftLabel: string
+    rightLabel: string
+  }
 }
 
 type FindingDefinition = {
@@ -467,6 +473,33 @@ export function DeepScanLoadingScreen({
                   </div>
                   <p className={styles.findingText}>{fact.body}</p>
                   {fact.detail ? <p className={styles.quickFactDetail}>{fact.detail}</p> : null}
+                  {fact.indicator ? (
+                    <div
+                      className={styles.positionIndicator}
+                      aria-label={`${fact.category}: ${fact.indicator.leftLabel}부터 ${fact.indicator.rightLabel} 사이 ${fact.indicator.markerLabel ?? '현재 위치'}`}
+                    >
+                      <div className={styles.positionScale}>
+                        <span className={styles.positionTrack} aria-hidden='true' />
+                        <span
+                          className={styles.positionFill}
+                          style={{ width: `${fact.indicator.positionPct}%` }}
+                          aria-hidden='true'
+                        />
+                        <span
+                          className={styles.positionMarker}
+                          style={{ left: `${fact.indicator.positionPct}%` }}
+                          aria-hidden='true'
+                        >
+                          {fact.indicator.markerLabel ? <span className={styles.positionMarkerLabel}>{fact.indicator.markerLabel}</span> : null}
+                          <span className={styles.positionMarkerDot} />
+                        </span>
+                      </div>
+                      <div className={styles.positionLabels}>
+                        <span>{fact.indicator.leftLabel}</span>
+                        <span>{fact.indicator.rightLabel}</span>
+                      </div>
+                    </div>
+                  ) : null}
                 </article>
               ))}
             </section>
