@@ -408,8 +408,31 @@ function buildWeek52LoadingQuickFact(quickQuote: LoadingQuickQuote | null): Load
       deltaLabels: [`최저 대비 ${formatLoadingPercent(lowGapPct)}`, `최고 대비 ${formatLoadingPercent(highGapPct)}`],
       leftLabel: `최저 ${formatLoadingMoney(low, currency)}`,
       rightLabel: `최고 ${formatLoadingMoney(high, currency)}`,
-      caption: '52주 가격 범위',
     },
+  }
+}
+
+function parseLoadingConsensusBody(body: string) {
+  const targetMatch = body.match(/평균\s*목표가\s*([0-9,]+(?:\.\d+)?)\s*(KRW|USD|원|달러)?/iu)
+  const upsideMatch = body.match(/현재가\s*대비\s*([+-]?\d+(?:\.\d+)?)%/u)
+  const opinionMatch = body.match(/투자의견\s*([0-9]+(?:\.\d+)?)/u)
+  const targetValue = targetMatch?.[1] ? Number(targetMatch[1].replace(/,/gu, '')) : undefined
+  const targetCurrency = targetMatch?.[2]?.toUpperCase() === 'USD' || targetMatch?.[2] === '달러' ? 'USD' : 'KRW'
+  const upsidePct = upsideMatch?.[1] ? Number(upsideMatch[1]) : undefined
+  const opinionScore = opinionMatch?.[1] ? Number(opinionMatch[1]) : undefined
+
+  return {
+    targetPriceLabel: typeof targetValue === 'number' && Number.isFinite(targetValue)
+      ? formatLoadingMoney(targetValue, targetCurrency)
+      : undefined,
+    upsideLabel: typeof upsidePct === 'number' && Number.isFinite(upsidePct)
+      ? formatLoadingPercent(upsidePct)
+      : undefined,
+    upsidePct: typeof upsidePct === 'number' && Number.isFinite(upsidePct) ? upsidePct : undefined,
+    opinionLabel: typeof opinionScore === 'number' && Number.isFinite(opinionScore)
+      ? new Intl.NumberFormat('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(opinionScore)
+      : undefined,
+    opinionScore: typeof opinionScore === 'number' && Number.isFinite(opinionScore) ? opinionScore : undefined,
   }
 }
 
@@ -419,13 +442,25 @@ function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null): L
     return null
   }
 
-  const isPositive = /매수|buy|상향|positive/i.test(consensus.body)
+  const parsedConsensus = parseLoadingConsensusBody(consensus.body)
+  const isPositive = /매수|buy|상향|positive/i.test(consensus.body) || (parsedConsensus.upsidePct ?? 0) > 0 || (parsedConsensus.opinionScore ?? 0) >= 3.5
   return {
     key: 'analyst-consensus',
     category: '증권사 의견',
     badge: isPositive ? '긍정' : '정보',
     tone: isPositive ? 'positive' : 'info',
     body: consensus.body,
+    ...(parsedConsensus.targetPriceLabel
+      ? {
+        consensus: {
+          targetPriceLabel: parsedConsensus.targetPriceLabel,
+          ...(parsedConsensus.upsideLabel ? { upsideLabel: parsedConsensus.upsideLabel } : {}),
+          ...(typeof parsedConsensus.upsidePct === 'number' ? { upsidePct: parsedConsensus.upsidePct } : {}),
+          ...(parsedConsensus.opinionLabel ? { opinionLabel: parsedConsensus.opinionLabel } : {}),
+          ...(typeof parsedConsensus.opinionScore === 'number' ? { opinionScore: parsedConsensus.opinionScore } : {}),
+        },
+      }
+      : {}),
   }
 }
 

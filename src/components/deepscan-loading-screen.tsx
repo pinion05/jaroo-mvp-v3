@@ -73,7 +73,13 @@ export type LoadingQuickFact = {
     deltaLabels?: string[]
     leftLabel: string
     rightLabel: string
-    caption?: string
+  }
+  consensus?: {
+    targetPriceLabel: string
+    upsideLabel?: string
+    upsidePct?: number
+    opinionLabel?: string
+    opinionScore?: number
   }
 }
 
@@ -469,16 +475,21 @@ export function DeepScanLoadingScreen({
             <section className={styles.quickFactsCard} aria-label='빠른 시장 체크'>
               {quickFacts.map((fact) => {
                 const indicator = fact.indicator
+                const consensus = fact.consensus
                 const segmentLabel = indicator && fact.detail ? fact.detail.replace(/이에요$|예요$/u, '') : fact.badge
                 const markerTopPct = indicator ? 100 - indicator.positionPct : 0
                 const calloutTopPct = Math.min(84, Math.max(16, markerTopPct))
+                const upsidePct = consensus?.upsidePct
+                const upsideMeterPct = typeof upsidePct === 'number' ? Math.min(100, Math.max(6, Math.abs(upsidePct) / 40 * 100)) : 44
+                const opinionScore = consensus?.opinionScore
+                const opinionPct = typeof opinionScore === 'number' ? Math.min(100, Math.max(0, opinionScore / 5 * 100)) : 0
 
                 return (
-                  <article key={fact.key} className={cn(styles.quickFact, indicator ? styles.positionQuickFact : undefined)}>
+                  <article key={fact.key} className={cn(styles.quickFact, indicator ? styles.positionQuickFact : undefined, consensus ? styles.consensusQuickFact : undefined)}>
                     <div className={styles.findingTop}>
                       <span className={styles.findingCat}>{fact.category}</span>
-                      <span className={cn(styles.findingBadge, indicator ? styles.positionSegmentBadge : quickFactBadgeClass(fact.tone))}>
-                        {segmentLabel}
+                      <span className={cn(styles.findingBadge, indicator || consensus ? styles.positionSegmentBadge : quickFactBadgeClass(fact.tone))}>
+                        {consensus?.upsideLabel ?? segmentLabel}
                       </span>
                     </div>
                     {indicator ? (
@@ -507,9 +518,35 @@ export function DeepScanLoadingScreen({
                               <span className={styles.positionDeltaLine}>{fact.body}</span>
                             )}
                           </div>
-                          <span className={styles.positionRangeCaption}>{indicator.caption ?? '52주 가격 범위'}</span>
                           <span className={styles.positionLowLabel}>{indicator.leftLabel}</span>
                         </div>
+                      </div>
+                    ) : consensus ? (
+                      <div className={styles.consensusInsight} aria-label={`${fact.category}: ${fact.body}`}>
+                        <div className={styles.consensusTargetBlock}>
+                          <span className={styles.consensusEyebrow}>평균 목표가</span>
+                          <strong>{consensus.targetPriceLabel}</strong>
+                        </div>
+                        <div className={styles.consensusUpsideBlock}>
+                          <div className={styles.consensusUpsideTop}>
+                            <span>현재가</span>
+                            <strong>목표가</strong>
+                          </div>
+                          <div className={styles.consensusRail} aria-hidden='true'>
+                            <span className={styles.consensusRailFill} style={{ width: `${upsideMeterPct}%` }} />
+                            <span className={styles.consensusRailDot} />
+                          </div>
+                          <p>{consensus.upsideLabel ? `현재가 대비 ${consensus.upsideLabel}` : fact.body}</p>
+                        </div>
+                        {consensus.opinionLabel ? (
+                          <div className={styles.consensusOpinionBlock}>
+                            <span>투자의견</span>
+                            <strong>{consensus.opinionLabel}</strong>
+                            <div className={styles.consensusOpinionMeter} aria-hidden='true'>
+                              <span style={{ width: `${opinionPct}%` }} />
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     ) : (
                       <>
