@@ -141,6 +141,41 @@ test('getNaverCurrentQuotes maps Naver mobile stock basic payloads to KR quote i
   assert.equal(result.asOf, '2026-04-30T15:30:00+09:00');
 });
 
+test('getNaverCurrentQuotes fills volume from the Naver price endpoint when basic omits it', async () => {
+  const { getNaverCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+  const requestedUrls = [];
+
+  const result = await getNaverCurrentQuotes(['005930'], {
+    naverCurrentQuotesTimeoutMs: null,
+    naverFetchImpl: async (url) => {
+      requestedUrls.push(String(url));
+      if (String(url).endsWith('/basic')) {
+        return new Response(JSON.stringify({
+          itemCode: '005930',
+          closePrice: '85,200',
+          localTradedAt: '2026-04-30T15:30:00+09:00',
+        }));
+      }
+
+      return new Response(JSON.stringify([{
+        localTradedAt: '2026-04-30',
+        closePrice: '85,200',
+        accumulatedTradingVolume: 1234567,
+      }]));
+    },
+  });
+
+  assert.deepEqual(requestedUrls, [
+    'https://m.stock.naver.com/api/stock/005930/basic',
+    'https://m.stock.naver.com/api/stock/005930/price?page=1&pageSize=1',
+  ]);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].price, 85200);
+  assert.equal(result.items[0].volume, 1234567);
+  assert.equal(result.items[0].source, 'naver-finance');
+  assert.deepEqual(result.missing, []);
+});
+
 test('getNaverCurrentQuotes default timeout tolerates OCI-class Naver latency', async () => {
   const { getNaverCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
   const originalTimeout = process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS;
