@@ -283,6 +283,41 @@ test('getCurrentQuotes can enrich Naver KR quote volume from KRX snapshot when r
   assert.deepEqual(result.asOf, { kr: '2026-04-30T15:30:00+09:00', us: null });
 });
 
+test('getCurrentQuotes does not enrich Naver KR quote when volume already exists', async () => {
+  const { getCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+  let krxCalled = false;
+
+  const result = await getCurrentQuotes({ codes: ['005930'] }, {
+    enrichKrVolumeFromKrx: true,
+    naverQuoteFetcher: async (code) => ({
+      market: 'KR',
+      code,
+      ticker: null,
+      price: 85200,
+      currency: 'KRW',
+      volume: 1234567,
+      asOf: '2026-04-30T15:30:00+09:00',
+      source: 'naver-finance',
+      status: 'ok',
+    }),
+    krxSnapshotFetcher: async () => {
+      krxCalled = true;
+      return [{
+        code: '005930',
+        종가: '85100',
+        거래량: '1,234,568',
+        거래대금: '105185108400',
+      }];
+    },
+  });
+
+  assert.equal(krxCalled, false);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].source, 'naver-finance');
+  assert.equal(result.items[0].volume, 1234567);
+  assert.equal(result.items[0].tradingValue, undefined);
+});
+
 test('getCurrentQuotes returns partial Naver KR hits without waiting for KRX fallback', async () => {
   const { getCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
   let krxCalled = false;

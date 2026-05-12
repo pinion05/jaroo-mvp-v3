@@ -436,7 +436,7 @@ function shouldEnrichKrQuoteWithKrx(item) {
     return false;
   }
 
-  return parseQuoteNumber(item.volume) === null || parseQuoteNumber(item.tradingValue) === null;
+  return parseQuoteNumber(item.volume) === null;
 }
 
 async function enrichKrQuoteVolumesFromKrx(naverResult, options = {}) {
