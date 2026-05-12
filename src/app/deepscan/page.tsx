@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { DeepScanLoadingScreen, type FindingProgress } from '@/components/deepscan-loading-screen'
+import { DeepScanLoadingScreen, type FindingProgress, type LoadingPerformanceComment } from '@/components/deepscan-loading-screen'
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import {
@@ -245,6 +245,30 @@ function buildLoadingFindingProgress(payload: JarooDeepScanPayload | null): Load
   return Object.keys(progress).length > 0 ? progress : undefined
 }
 
+function buildLoadingPerformanceComment(payload: JarooDeepScanPayload | null): LoadingPerformanceComment | undefined {
+  const comment = payload?.insights.items.find((item) => item.sourceLabel === '기업실적코멘트' || item.title === '기업실적코멘트')
+  if (!comment?.body?.trim()) {
+    return undefined
+  }
+
+  const lines = comment.body.split(/\n+/).map((line) => line.trim()).filter(Boolean)
+
+  return {
+    asOf: comment.date,
+    body: comment.body,
+    ...(lines.length > 1 ? { lines } : {}),
+  }
+}
+
+function buildLoadingTradingVolume(payload: JarooDeepScanPayload | null) {
+  const volume = payload?.insights.items.find((item) => item.sourceLabel === '거래량' || item.label === '거래량')
+  if (!volume?.body?.trim()) {
+    return undefined
+  }
+
+  return volume.body.replace(/^거래량\s*/u, '').replace(/\s*확인$/u, '').trim()
+}
+
 function hasCollectedDeepScanEvidence(payload: JarooDeepScanPayload | null) {
   if (!payload) {
     return false
@@ -389,6 +413,7 @@ export default function DeepScanPage() {
     sellNow: false,
     pfSim: false,
   })
+  const [confirmedResultsTargetKey, setConfirmedResultsTargetKey] = useState<string | null>(null)
   const target = useDeepScanStore((state) => state.target)
   const requestStatus = useDeepScanStore((state) => state.requestStatus)
   const errorMessage = useDeepScanStore((state) => state.errorMessage)
@@ -567,9 +592,15 @@ export default function DeepScanPage() {
   }
 
   const handleRetry = useCallback(() => {
+    setConfirmedResultsTargetKey(null)
     startRequest()
     scrollContentToTop()
   }, [startRequest])
+
+  const handleViewResults = useCallback(() => {
+    setConfirmedResultsTargetKey(targetKey)
+    scrollContentToTop()
+  }, [targetKey])
 
   const missingTargetTitle = '분석할 종목이 없습니다'
 
@@ -609,7 +640,11 @@ export default function DeepScanPage() {
   const partialSuccessNotice = buildDeepScanPartialSuccessNotice(payload)
   const weekTone = resolveWeekToneClasses(payload?.strategy.weekSignalTone ?? 'neutral')
   const isCommitteeHydrating = fetchState === 'success' && payload?.metadata.llmCommittee?.status === 'partial'
+  const resultsReady = fetchState === 'success' && Boolean(payload) && !isCommitteeHydrating
+  const hasConfirmedResultsView = targetKey !== null && confirmedResultsTargetKey === targetKey
   const loadingFindingProgress = buildLoadingFindingProgress(payload)
+  const loadingPerformanceComment = buildLoadingPerformanceComment(payload)
+  const loadingTradingVolume = buildLoadingTradingVolume(payload)
   const evidenceCollected = hasCollectedDeepScanEvidence(payload)
   const analysisLoadingNotice = {
     badge: '로딩 중',
@@ -627,7 +662,7 @@ export default function DeepScanPage() {
     body: errorMessage ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
   }
 
-  if (fetchState === 'loading' || isCommitteeHydrating) {
+  if (fetchState === 'loading' || isCommitteeHydrating || (resultsReady && !hasConfirmedResultsView)) {
     const identifier = [requestSeed.holding.ticker, requestSeed.holding.code]
       .filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index)
       .join(' · ')
@@ -644,10 +679,14 @@ export default function DeepScanPage() {
           averagePriceCurrency={target?.averagePriceCurrency}
           currentPrice={target?.currentPrice}
           currentPriceCurrency={target?.currentPriceCurrency}
+          tradingVolume={loadingTradingVolume}
           currentProfitRate={target?.currentProfitRate}
           evaluationAmount={target?.evaluationAmount}
           findingProgress={loadingFindingProgress}
+          performanceComment={loadingPerformanceComment}
           evidenceCollected={evidenceCollected}
+          resultsReady={resultsReady}
+          onViewResults={handleViewResults}
           backHref='/home'
         />
       </div>
@@ -998,7 +1037,7 @@ export default function DeepScanPage() {
                       </span>
                     </div>
                     <p className='mt-2 text-sm font-semibold leading-6 text-[color:var(--jaroo-ink)]'>{item.title}</p>
-                    <p className='mt-1 text-xs leading-5 text-[color:var(--jaroo-muted)]'>{item.body}</p>
+                    <p className='mt-1 whitespace-pre-line text-xs leading-5 text-[color:var(--jaroo-muted)]'>{item.body}</p>
                   </div>
                 ))}
               </Card>

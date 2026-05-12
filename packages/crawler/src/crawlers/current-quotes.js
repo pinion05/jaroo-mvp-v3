@@ -360,12 +360,19 @@ async function getNaverCurrentQuote(code, options = {}) {
     return null;
   }
 
+  const volume = parseQuoteNumber(
+    payload?.accumulatedTradingVolume
+    ?? payload?.tradeVolume
+    ?? payload?.volume,
+  );
+
   return {
     market: 'KR',
     code: normalizedCode,
     ticker: null,
     price,
     currency: 'KRW',
+    ...(volume !== null ? { volume } : {}),
     asOf: typeof payload?.localTradedAt === 'string' ? payload.localTradedAt : null,
     source: 'naver-finance',
     status: 'ok',
@@ -475,12 +482,17 @@ export async function getKrxCurrentQuotes(codes, options = {}) {
         continue;
       }
 
+      const volume = parseQuoteNumber(row?.['거래량']);
+      const tradingValue = parseQuoteNumber(row?.['거래대금']);
+
       items.push({
         market: 'KR',
         code,
         ticker: null,
         price,
         currency: 'KRW',
+        ...(volume !== null ? { volume } : {}),
+        ...(tradingValue !== null ? { tradingValue } : {}),
         asOf: yyyymmddToIsoDate(tradeDate),
         source: 'krx',
         status: 'ok',
@@ -601,12 +613,15 @@ async function getUsQuoteFromPolygon(ticker) {
     return null;
   }
 
+  const volume = parseQuoteNumber(result?.v);
+
   return {
     market: 'US',
     code: null,
     ticker,
     price: +price.toFixed(2),
     currency: 'USD',
+    ...(volume !== null ? { volume } : {}),
     asOf: Number.isFinite(result?.t) ? new Date(result.t).toISOString() : null,
     source: 'polygon',
     status: 'ok',

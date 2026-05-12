@@ -44,6 +44,37 @@ function collectForbiddenKeyHits(value, path = '$', hits = []) {
 function createAggregateFixture() {
   return {
     pages: {
+      'company-status': {
+        id: 'company-status',
+        normalized: {
+          company: {
+            code: '005930',
+            name: '삼성전자',
+            title: '삼성전자',
+            headerText: '기업현황',
+          },
+          sourceType: 'wisereport',
+          sourceKey: 'wisereport기업현황',
+          bodyTextHead: 'debug text',
+          companyOverviewComment: {
+            title: '기업개요',
+            asOf: '2026-04-10',
+            asOfText: '2026.04.10',
+            text: '동사는 1969년 설립된 글로벌 전자 기업으로 DX, DS 두 부문으로 구성되어 있음.',
+            sentences: ['동사는 1969년 설립된 글로벌 전자 기업으로 DX, DS 두 부문으로 구성되어 있음.'],
+          },
+          performanceComment: {
+            title: '기업실적코멘트',
+            asOf: '2026-04-10',
+            asOfText: '2026.04.10',
+            text: '2025년 결산 전년동기 대비 연결기준 매출액은 10.9% 증가, 영업이익은 33.2% 증가, 당기순이익은 31.6% 증가. AI 인프라 경쟁으로 데이터센터 업체들의 CAPEX 확대로 서버향 메모리 수요가 공급량을 초과하여 실적이 개선됨.',
+            sentences: [
+              '2025년 결산 전년동기 대비 연결기준 매출액은 10.9% 증가, 영업이익은 33.2% 증가, 당기순이익은 31.6% 증가.',
+              'AI 인프라 경쟁으로 데이터센터 업체들의 CAPEX 확대로 서버향 메모리 수요가 공급량을 초과하여 실적이 개선됨.',
+            ],
+          },
+        },
+      },
       'company-overview': {
         id: 'company-overview',
         source: { requestLog: [{ url: 'https://example.test' }], capturedResponses: [{ id: 1 }] },
@@ -538,6 +569,7 @@ test('buildWiseReportKrSlimPayload keeps only slim business fields', async () =>
   assert.equal(slim.code, '005930');
   assert.deepEqual(slim.company, { code: '005930', name: '삼성전자' });
   assert.deepEqual(Object.keys(slim.pages), [
+    'company-status',
     'company-overview',
     'financial-analysis',
     'investment-indicators',
@@ -549,6 +581,17 @@ test('buildWiseReportKrSlimPayload keeps only slim business fields', async () =>
     'opinion',
     'style-analysis',
   ]);
+
+  assert.deepEqual(slim.pages['company-status'].performanceComment, {
+    title: '기업실적코멘트',
+    asOf: '2026-04-10',
+    asOfText: '2026.04.10',
+    text: '2025년 결산 전년동기 대비 연결기준 매출액은 10.9% 증가, 영업이익은 33.2% 증가, 당기순이익은 31.6% 증가. AI 인프라 경쟁으로 데이터센터 업체들의 CAPEX 확대로 서버향 메모리 수요가 공급량을 초과하여 실적이 개선됨.',
+    sentences: [
+      '2025년 결산 전년동기 대비 연결기준 매출액은 10.9% 증가, 영업이익은 33.2% 증가, 당기순이익은 31.6% 증가.',
+      'AI 인프라 경쟁으로 데이터센터 업체들의 CAPEX 확대로 서버향 메모리 수요가 공급량을 초과하여 실적이 개선됨.',
+    ],
+  });
 
   assert.deepEqual(slim.pages['company-overview'], {
     profile: [
@@ -641,8 +684,8 @@ test('buildWiseReportKrSlimPayloadV12 adds DeepScan krFacts with explicit invest
   assert.equal(slim.schemaVersion, 'wisereport-kr-slim-v1.2');
   assert.equal(slim.market, 'KR');
   assert.equal(slim.company.instrumentKind, 'stock');
-  assert.equal(slim.sourceCoverage.pageCoverage.totalKnownPages, 13);
-  assert.equal(slim.sourceCoverage.pageCoverage.availableCount, 12);
+  assert.equal(slim.sourceCoverage.pageCoverage.totalKnownPages, 14);
+  assert.equal(slim.sourceCoverage.pageCoverage.availableCount, 13);
   assert.deepEqual(slim.sourceCoverage.pageCoverage.missingPageIds, ['fnguide-finance']);
   assert.equal(slim.krFacts.consensus.targetPrice.value, 100000);
   assert.equal(slim.krFacts.consensus.previousTargetPrice.value, 90000);
@@ -666,6 +709,8 @@ test('buildWiseReportKrSlimPayloadV12 adds DeepScan krFacts with explicit invest
   assert.match(slim.krFacts.investorFlow.institutionalOwnershipPct.message, /aggregate로 대체하지 않습니다/);
   assert.equal(slim.krFacts.investorFlow.foreignNetBuy.availability, 'missing');
   assert.equal(slim.krFacts.investorFlow.foreignNetBuy.reasonCode, 'investor_net_buy_not_provided_by_wisereport_fnguide');
+  assert.equal(slim.krFacts.businessCommentary.performanceComment.value.asOf, '2026-04-10');
+  assert.match(slim.krFacts.businessCommentary.performanceComment.value.text, /CAPEX/);
   assert.equal(slim.krFacts.styleFactors.factors.value[0].name, '베타');
 });
 
@@ -695,7 +740,7 @@ test('buildWiseReportKrSlimPayloadV12 does not count arrays of empty rows as ava
 
   const slim = buildWiseReportKrSlimPayloadV12(aggregate, '005930');
 
-  assert.equal(slim.sourceCoverage.pageCoverage.availableCount, 11);
+  assert.equal(slim.sourceCoverage.pageCoverage.availableCount, 12);
   assert.deepEqual(
     slim.sourceCoverage.pageCoverage.missingPageIds.sort(),
     ['fnguide-finance', 'fnguide-snapshot'],

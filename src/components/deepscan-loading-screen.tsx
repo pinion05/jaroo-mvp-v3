@@ -30,13 +30,17 @@ type DeepScanLoadingScreenProps = {
   averagePriceCurrency?: MoneyCurrency
   currentPrice?: string | number
   currentPriceCurrency?: MoneyCurrency
+  tradingVolume?: string | number
   currentProfitRate?: string | number
   evaluationAmount?: string | number
   findingProgress?: Partial<Record<FindingKey, FindingProgress>>
+  performanceComment?: LoadingPerformanceComment
   evidenceCollected?: boolean
+  resultsReady?: boolean
   className?: string
   onBack?: () => void
   backHref?: string
+  onViewResults?: () => void
 }
 
 type CommitteeMemberState = 'done' | 'active' | 'wait'
@@ -47,6 +51,12 @@ export type FindingProgress = {
   badge: string
   body: string
   tone: FindingProgressTone
+}
+
+export type LoadingPerformanceComment = {
+  asOf?: string
+  body: string
+  lines?: string[]
 }
 
 type FindingDefinition = {
@@ -102,6 +112,13 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 2 }).format(value)
 }
 
+function formatCompactNumber(value: number) {
+  return new Intl.NumberFormat('ko-KR', {
+    notation: 'compact',
+    maximumFractionDigits: 1,
+  }).format(value)
+}
+
 function formatSignedPercent(value: string | number | undefined) {
   if (typeof value === 'string' && value.trim()) {
     return value.trim().includes('%') ? value.trim() : `${value.trim()}%`
@@ -136,6 +153,57 @@ function formatMoney(value: string | number | undefined, currency: MoneyCurrency
   return `${formatNumber(numericValue)}원`
 }
 
+function calculateFallbackEvaluationAmount({
+  evaluationAmount,
+  currentPrice,
+  shares,
+  averagePrice,
+  currentProfitRate,
+}: Pick<DeepScanLoadingScreenProps, 'evaluationAmount' | 'currentPrice' | 'shares' | 'averagePrice' | 'currentProfitRate'>) {
+  if (parseNumericValue(evaluationAmount) !== null) {
+    return evaluationAmount
+  }
+
+  const shareCount = parseNumericValue(shares)
+  if (shareCount === null) {
+    return undefined
+  }
+
+  const currentPriceValue = parseNumericValue(currentPrice)
+  if (currentPriceValue !== null) {
+    return currentPriceValue * shareCount
+  }
+
+  const averagePriceValue = parseNumericValue(averagePrice)
+  const profitRateValue = parseNumericValue(currentProfitRate)
+  if (averagePriceValue !== null && profitRateValue !== null) {
+    return averagePriceValue * (1 + profitRateValue / 100) * shareCount
+  }
+
+  return undefined
+}
+
+function compactCommentLine(value: string, maxLength = 74) {
+  const normalized = value.replace(/\s+/g, ' ').trim()
+  if (normalized.length <= maxLength) {
+    return normalized
+  }
+
+  return `${normalized.slice(0, maxLength - 1).trim()}…`
+}
+
+function getCommentLines(comment: LoadingPerformanceComment) {
+  const explicitLines = Array.isArray(comment.lines) ? comment.lines : []
+  const sourceLines = explicitLines.length > 0 ? explicitLines : comment.body.split(/\n+/)
+  const lines = sourceLines.map((line) => compactCommentLine(line)).filter(Boolean).slice(0, 3)
+
+  if (lines.length > 0) {
+    return lines
+  }
+
+  return [compactCommentLine(comment.body, 168)].filter(Boolean)
+}
+
 function formatShares(value: string | number | undefined) {
   if (typeof value === 'string' && value.trim()) {
     const trimmed = value.trim()
@@ -144,6 +212,20 @@ function formatShares(value: string | number | undefined) {
 
   const numericValue = parseNumericValue(value)
   return numericValue === null ? null : `${formatNumber(numericValue)}주`
+}
+
+function formatTradingVolume(value: string | number | undefined) {
+  if (typeof value === 'string' && value.trim()) {
+    const trimmed = value.trim()
+    return /주$/.test(trimmed) ? trimmed : `${trimmed}주`
+  }
+
+  const numericValue = parseNumericValue(value)
+  if (numericValue === null) {
+    return null
+  }
+
+  return `${formatCompactNumber(numericValue)}주`
 }
 
 function memberStateClass(state: CommitteeMemberState) {
@@ -224,25 +306,37 @@ export function DeepScanLoadingScreen({
   averagePriceCurrency = 'KRW',
   currentPrice,
   currentPriceCurrency = averagePriceCurrency,
+  tradingVolume,
   currentProfitRate,
   evaluationAmount,
   findingProgress,
+  performanceComment,
   evidenceCollected = false,
+  resultsReady = false,
   className,
   onBack,
   backHref = '/home',
+  onViewResults,
 }: DeepScanLoadingScreenProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const targetLine = [identifier, market].filter(Boolean).join(' · ')
   const sharesText = formatShares(shares)
   const averagePriceText = formatMoney(averagePrice, averagePriceCurrency)
   const currentPriceText = formatMoney(currentPrice, currentPriceCurrency)
-  const evaluationAmountText = formatMoney(evaluationAmount, currentPriceCurrency)
+  const tradingVolumeText = formatTradingVolume(tradingVolume)
+  const evaluationAmountText = formatMoney(
+    calculateFallbackEvaluationAmount({ evaluationAmount, currentPrice, shares, averagePrice, currentProfitRate }),
+    currentPriceCurrency,
+  )
   const profitRateText = formatSignedPercent(currentProfitRate)
   const metaMessage = metaMessages[Math.min(metaMessages.length - 1, Math.floor(elapsedSeconds / 5))]
   const findings = buildFindingDefinitions()
 
   useEffect(() => {
+    if (resultsReady) {
+      return undefined
+    }
+
     const intervalId = window.setInterval(() => {
       setElapsedSeconds((seconds) => seconds + 1)
     }, 1000)
@@ -250,7 +344,7 @@ export function DeepScanLoadingScreen({
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [])
+  }, [resultsReady])
 
   return (
     <div className={cn(styles.loadingCard, className)}>
@@ -259,7 +353,7 @@ export function DeepScanLoadingScreen({
         <div className={styles.topTitle}>딥스캔 결과</div>
         <div className={styles.liveTag} aria-live='polite'>
           <span className={styles.liveDot} aria-hidden='true' />
-          분석 중
+          {resultsReady ? '분석 완료' : '분석 중'}
         </div>
       </div>
 
@@ -277,7 +371,7 @@ export function DeepScanLoadingScreen({
               </p>
             </div>
           </div>
-          <div className={styles.stockMetaGrid}>
+          <div className={cn(styles.stockMetaGrid, tradingVolumeText && styles.stockMetaGridThree)}>
             <div>
               <span className={styles.metaLabel}>평단가</span>
               <span className={styles.metaValue}>{averagePriceText ?? '확인 중'}</span>
@@ -286,20 +380,43 @@ export function DeepScanLoadingScreen({
               <span className={styles.metaLabel}>평가금액</span>
               <span className={styles.metaValue}>{evaluationAmountText ?? '계산 중'}</span>
             </div>
+            {tradingVolumeText ? (
+              <div>
+                <span className={styles.metaLabel}>거래량</span>
+                <span className={styles.metaValue}>{tradingVolumeText}</span>
+              </div>
+            ) : null}
           </div>
         </section>
 
-        <section className={styles.contextCard} aria-label='현재 상황'>
-          <div className={styles.contextTop}>
-            <Sparkles className={styles.contextIcon} aria-hidden />
-            <span>현재 상황</span>
-          </div>
-          <p>
-            {[profitRateText ? `손익률 ${profitRateText}` : null, averagePriceText ? `평단 ${averagePriceText}` : null]
-              .filter(Boolean)
-              .join(' · ') || '보유 포지션'} 기준으로 회복 가능성, 리스크, 즉시 매도 판단을 순서대로 분석하고 있어요.
-          </p>
-        </section>
+        {!resultsReady ? (
+          <section className={styles.contextCard} aria-label='현재 상황'>
+            <div className={styles.contextTop}>
+              <Sparkles className={styles.contextIcon} aria-hidden />
+              <span>현재 상황</span>
+            </div>
+            <p>
+              {[profitRateText ? `손익률 ${profitRateText}` : null, averagePriceText ? `평단 ${averagePriceText}` : null]
+                .filter(Boolean)
+                .join(' · ') || '보유 포지션'} 기준으로 회복 가능성, 리스크, 즉시 매도 판단을 순서대로 분석하고 있어요.
+            </p>
+          </section>
+        ) : null}
+
+        {performanceComment ? (
+          <section className={styles.commentaryCard} aria-label='기업실적코멘트'>
+            <div className={styles.commentaryTop}>
+              <Factory className={styles.commentaryIcon} aria-hidden />
+              <span>기업실적코멘트</span>
+              {performanceComment.asOf ? <span className={styles.commentaryDate}>기준 {performanceComment.asOf}</span> : null}
+            </div>
+            <ul className={styles.commentaryLines}>
+              {getCommentLines(performanceComment).map((line, index) => (
+                <li key={`${index}-${line}`}>{line}</li>
+              ))}
+            </ul>
+          </section>
+        ) : null}
 
         <div className={styles.metaInfo} role='status' aria-live='polite'>
           <span className={styles.metaIcon} aria-hidden='true'>{metaMessage.icon}</span>
@@ -347,19 +464,21 @@ export function DeepScanLoadingScreen({
 
         <section className={styles.scoreCard} aria-label='최종 점수 준비 상태'>
           <div className={styles.scoreLabel}>자루의 확신도</div>
-          <div className={styles.scoreValue}>계산 중</div>
+          <div className={styles.scoreValue}>{resultsReady ? '준비 완료' : '계산 중'}</div>
           <div className={styles.scoreBar} aria-hidden='true'>
             <div className={styles.scoreBarFill} />
           </div>
-          <p className={styles.scoreDesc}>위원회 의견이 도착하면 점수와 판단을 바로 보여드릴게요.</p>
+          <p className={styles.scoreDesc}>
+            {resultsReady ? '아래 버튼을 누르면 상세 결과 화면으로 이동해요.' : '위원회 의견이 도착하면 점수와 판단을 바로 보여드릴게요.'}
+          </p>
         </section>
 
         <div className={styles.stepsWrap} aria-label='분석 단계'>
           {[
             { label: '대상 종목 확인', state: 'done' },
             { label: '근거 데이터 수집', state: evidenceCollected ? 'done' : 'active' },
-            { label: 'AI 9인 위원회 응답 대기', state: evidenceCollected ? 'active' : 'wait' },
-            { label: '최종 리포트 생성', state: 'wait' },
+            { label: 'AI 9인 위원회 응답 대기', state: resultsReady ? 'done' : evidenceCollected ? 'active' : 'wait' },
+            { label: '최종 리포트 생성', state: resultsReady ? 'done' : 'wait' },
           ].map((step, index) => {
             const isDone = step.state === 'done'
             const isActive = step.state === 'active'
@@ -372,18 +491,18 @@ export function DeepScanLoadingScreen({
                 <div className={cn(styles.stepLabel, isDone && styles.stepLabelDone, isActive && styles.stepLabelActive, !isDone && !isActive && styles.stepLabelWait)}>
                   {step.label}
                 </div>
-                {index === 2 ? <div className={styles.stepCount}>{pendingCommitteeMemberCount}명 대기</div> : null}
+                {index === 2 ? <div className={styles.stepCount}>{resultsReady ? '완료' : `${pendingCommitteeMemberCount}명 대기`}</div> : null}
               </div>
             )
           })}
         </div>
 
         <section className={styles.committeeWrap} aria-label='AI 위원회 진행 상태'>
-          <div className={styles.committeeTitle}>AI 9인 위원회 응답 대기 중</div>
+          <div className={styles.committeeTitle}>{resultsReady ? 'AI 9인 위원회 응답 완료' : 'AI 9인 위원회 응답 대기 중'}</div>
           <div className={styles.membersGrid}>
             {committeeMembers.map((member) => (
               <div key={member.key} className={styles.member}>
-                <div className={cn(styles.memberIcon, memberStateClass(member.state))}>
+                <div className={cn(styles.memberIcon, memberStateClass(resultsReady ? 'done' : member.state))}>
                   <member.Icon className={styles.memberSvgIcon} aria-hidden />
                 </div>
                 <div className={styles.memberName}>
@@ -399,8 +518,8 @@ export function DeepScanLoadingScreen({
           </div>
         </section>
 
-        <button type='button' className={styles.primaryButton} disabled>
-          상세 결과 준비 중
+        <button type='button' className={styles.primaryButton} disabled={!resultsReady} onClick={onViewResults}>
+          {resultsReady ? '상세 결과 보기' : '상세 결과 준비 중'}
         </button>
         <p className={styles.privacy}>분석 결과는 투자 권유가 아닌 참고 자료입니다.</p>
       </div>

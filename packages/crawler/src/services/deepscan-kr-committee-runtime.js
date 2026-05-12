@@ -233,7 +233,10 @@ function buildKrFactBank(evidence) {
       recent30dReportCount: evidence.reportSignals?.recent30dReportCount ?? null,
       consensusAvailable: evidence.reportSignals?.consensusAvailable ?? false,
       opinionAvailable: evidence.reportSignals?.opinionAvailable ?? false,
+      performanceCommentAvailable: evidence.reportSignals?.performanceCommentAvailable ?? false,
+      performanceCommentAsOf: evidence.reportSignals?.performanceCommentAsOf ?? null,
     }, ['kr_reports']),
+    businessCommentary: snapshotValue(evidence.businessCommentary ?? {}, ['kr_business_commentary']),
     limitations: presentValue(sourceLimitations, ['source_limitations'], ['Source-specific missing facts must be stated as unavailable from WiseReport, not as analysis failure.']),
   };
 }
@@ -259,6 +262,7 @@ function buildMemberKrFacts(memberKey, evidence) {
         reports: {
           recentReportCount: evidence.reportSignals?.recentReportCount ?? null,
           recent30dReportCount: evidence.reportSignals?.recent30dReportCount ?? null,
+          performanceComment: evidence.businessCommentary?.performanceComment ?? null,
         },
       };
     case 'valuation':
@@ -282,12 +286,14 @@ function buildMemberKrFacts(memberKey, evidence) {
         relativeReturn: evidence.relativeReturnSnapshot ?? {},
         styleFactors: evidence.styleAnalysisSnapshot ?? {},
         reports: evidence.reportSignals ?? {},
+        businessCommentary: evidence.businessCommentary ?? {},
       };
     case 'consensusMomentum':
       return {
         ...base,
         consensus: evidence.consensusSnapshot ?? {},
         reports: evidence.reportSignals ?? {},
+        businessCommentary: evidence.businessCommentary ?? {},
       };
     case 'priceLocation':
       return {
@@ -312,6 +318,7 @@ function buildMemberKrFacts(memberKey, evidence) {
         consensus: evidence.consensusSnapshot ?? {},
         valuation: evidence.valuationSnapshot ?? {},
         reports: evidence.reportSignals ?? {},
+        businessCommentary: evidence.businessCommentary ?? {},
       };
     case 'holdingCompleteness':
       return {
@@ -351,6 +358,7 @@ function buildSharedDump(input, evidence, sources) {
     styleAnalysisSnapshot: presentValue(evidence.styleAnalysisSnapshot ?? {}, ['style_analysis_snapshot']),
     ownershipSnapshot: presentValue(evidence.ownershipSnapshot ?? {}, ['ownership_snapshot']),
     financialSnapshot: presentValue(evidence.financialSnapshot ?? {}, ['financial_snapshot']),
+    businessCommentary: presentValue(evidence.businessCommentary ?? {}, ['business_commentary']),
     sourceLimitations: presentValue(Array.isArray(evidence.sourceLimitations) ? evidence.sourceLimitations : [], ['source_limitations']),
     topFacts: presentValue(Array.isArray(evidence.topFacts) ? evidence.topFacts : [], ['top_facts']),
     topRisks: presentValue(Array.isArray(evidence.topRisks) ? evidence.topRisks : [], ['top_risks']),

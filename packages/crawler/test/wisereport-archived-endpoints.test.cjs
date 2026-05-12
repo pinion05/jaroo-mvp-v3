@@ -18,6 +18,7 @@ async function withServer(app, run) {
 const EXPECTED_ARCHIVED_IDS = [
   'wisereport-kr',
   'wisereport-kr-slim-v1',
+  'wisereport-kr-company-status',
   'wisereport-kr-company-overview',
   'wisereport-kr-financial-analysis',
   'wisereport-kr-investment-indicators',

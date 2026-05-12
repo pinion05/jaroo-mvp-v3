@@ -88,6 +88,7 @@
 
 .stockHeader,
 .contextCard,
+.commentaryCard,
 .findingCard,
 .scoreCard,
 .committeeWrap {
@@ -162,6 +163,10 @@
   gap: 10px;
 }
 
+.stockMetaGridThree {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
 .metaLabel {
   display: block;
   color: var(--ds-muted);
@@ -205,6 +210,66 @@
   font-size: 12px;
   color: #5a3a08;
   line-height: 1.58;
+}
+
+.commentaryCard {
+  background: linear-gradient(135deg, #f4f8fc 0%, #fbfdff 100%);
+  border-color: #d7e8f7;
+  padding: 12px 14px;
+  margin-bottom: 12px;
+  opacity: 0;
+  transform: translateY(6px);
+  animation: riseIn 0.5s 0.28s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+.commentaryTop {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 800;
+  color: var(--ds-blue);
+}
+
+.commentaryIcon {
+  width: 14px;
+  height: 14px;
+}
+
+.commentaryDate {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: 700;
+  color: #6b8aae;
+  white-space: nowrap;
+}
+
+.commentaryLines {
+  display: grid;
+  gap: 5px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.commentaryLines li {
+  position: relative;
+  padding-left: 13px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #24435f;
+}
+
+.commentaryLines li::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0.72em;
+  width: 4px;
+  height: 4px;
+  border-radius: 999px;
+  background: var(--ds-blue);
 }
 
 .metaInfo {
@@ -551,7 +616,24 @@
   color: var(--ds-blue);
   font-size: 14px;
   font-weight: 800;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease;
+}
+
+.primaryButton:not(:disabled):hover {
+  background: var(--ds-blue);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(24, 95, 165, 0.18);
+  transform: translateY(-1px);
+}
+
+.primaryButton:not(:disabled):active {
+  transform: translateY(0);
+}
+
+.primaryButton:disabled {
   cursor: not-allowed;
+  opacity: 0.82;
 }
 
 .privacy {
@@ -691,11 +773,13 @@
   .memberActive,
   .scoreBarFill,
   .contextCard,
+  .commentaryCard,
   .findingAnswered {
     animation: none;
   }
 
-  .contextCard {
+  .contextCard,
+  .commentaryCard {
     opacity: 1;
     transform: none;
   }

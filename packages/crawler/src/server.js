@@ -423,6 +423,7 @@ function buildMajorPath(suffix = '') {
 }
 
 const WISEREPORT_KR_ROUTE_DESCRIPTIONS = Object.freeze({
+  'company-status': '한국 상장사 WiseReport 기업현황/기업실적코멘트 구조화 데이터를 반환합니다.',
   'company-overview': '한국 상장사 WiseReport 기업개요 구조화 데이터를 반환합니다.',
   'financial-analysis': '한국 상장사 WiseReport 재무분석 구조화 데이터를 반환합니다.',
   'investment-indicators': '한국 상장사 WiseReport 투자지표 구조화 데이터를 반환합니다.',
@@ -985,6 +986,10 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
       latestReportDate: makeSlimV12Fact(evidence.timestamps?.reportAsOf ?? null, { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows[0].일자' }),
       recentItems: makeSlimV12Fact(slimPayload.pages?.['recent-reports']?.recentReports?.rows ?? [], { pageId: 'recent-reports', fieldPath: 'recent-reports.recentReports.rows' }),
     },
+    businessCommentary: {
+      companyOverviewComment: makeSlimV12Fact(evidence.businessCommentary?.companyOverviewComment ?? null, { pageId: 'company-status', fieldPath: 'company-status.companyOverviewComment' }),
+      performanceComment: makeSlimV12Fact(evidence.businessCommentary?.performanceComment ?? null, { pageId: 'company-status', fieldPath: 'company-status.performanceComment' }),
+    },
     styleFactors: {
       companyName: makeSlimV12Fact(evidence.styleAnalysisSnapshot?.companyName ?? null, { provider: 'fnguide', pageId: 'style-analysis', fieldPath: 'style-analysis.factorScores.CHART_H[0].NAME' }),
       peerName: makeSlimV12Fact(evidence.styleAnalysisSnapshot?.peerName ?? null, { provider: 'fnguide', pageId: 'style-analysis', fieldPath: 'style-analysis.factorScores.CHART_H[1].NAME' }),
@@ -1055,6 +1060,7 @@ function buildWiseReportKrSlimPayloadV12(rawAggregate, code) {
         availableReportPages: availableV12PageIds,
       },
       checkedSources: [
+        'wisereport.company-status',
         'wisereport.company-overview',
         'wisereport.financial-analysis',
         'wisereport.investment-indicators',
@@ -2232,7 +2238,7 @@ const endpointDefinitions = [
   {
     id: 'wisereport-kr',
     resource: 'wisereport.kr.aggregate',
-    description: '한국 상장사 WiseReport/FnGuide 10개 페이지의 구조화 aggregate 데이터를 반환합니다.',
+    description: '한국 상장사 WiseReport/FnGuide 11개 페이지의 구조화 aggregate 데이터를 반환합니다.',
     primaryPath: buildDataSourcePath('wisereport-fnguide', '/kr/companies/:code'),
     dataSources: ['wisereport', 'fnguide'],
     archived: true,
@@ -2249,7 +2255,7 @@ const endpointDefinitions = [
   {
     id: 'wisereport-kr-slim-v1',
     resource: 'wisereport.kr.aggregate.slim.v1',
-    description: '한국 상장사 WiseReport/FnGuide 10개 페이지의 비즈니스 전용 slim aggregate 데이터를 raw JSON으로 반환합니다.',
+    description: '한국 상장사 WiseReport/FnGuide 11개 페이지의 비즈니스 전용 slim aggregate 데이터를 raw JSON으로 반환합니다.',
     primaryPath: buildDataSourcePath('wisereport-fnguide', '/kr/companies/:code/slim/v1'),
     dataSources: ['wisereport', 'fnguide'],
     archived: true,
@@ -2262,7 +2268,7 @@ const endpointDefinitions = [
   {
     id: 'wisereport-kr-slim-v1.1',
     resource: 'wisereport.kr.aggregate.slim.v1.1',
-    description: '한국 상장사 WiseReport/FnGuide 10개 페이지의 slim v1.1 데이터를 raw JSON으로 반환합니다. parser-created spacer column, UI control text, non-business tab sections를 정리합니다.',
+    description: '한국 상장사 WiseReport/FnGuide 11개 페이지의 slim v1.1 데이터를 raw JSON으로 반환합니다. parser-created spacer column, UI control text, non-business tab sections를 정리합니다.',
     primaryPath: buildMajorPath('/wisereport-fnguide/kr/companies/:code/slim/v1.1'),
     dataSources: ['wisereport', 'fnguide'],
     params: ['code'],

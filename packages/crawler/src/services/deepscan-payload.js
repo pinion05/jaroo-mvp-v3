@@ -34,6 +34,8 @@ const MIN_PACKAGE_REASON_LENGTH = 8;
 const WISEREPORT_KR_CACHE_ROUTE = 'wisereport-kr-v12-slim';
 const WISEREPORT_KR_CACHE_ROUTE_VERSION = 'v12';
 const WISEREPORT_KR_CACHE_SCHEMA_VERSION = 'wisereport-kr-v12-slim-v1';
+const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
+const DEFAULT_COMMENTARY_SUMMARY_TIMEOUT_MS = 8_000;
 
 function normalizeText(value) {
   if (typeof value !== 'string') {
@@ -141,6 +143,11 @@ function safeReadSourceType(rawInput) {
 
 function deriveGeneratedAt(input) {
   return input.sourceContext.appliedAt ?? input.selectedAt ?? FALLBACK_GENERATED_AT;
+}
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
 }
 
 function createDebugId(input) {
@@ -1220,8 +1227,249 @@ function createEvidenceSourceRefs(input, evidence, sources, sourceIssues) {
   return sourceRefs;
 }
 
-function buildInsights(input, evidence, scored, generatedAt, sourceIssues) {
+
+function shouldSummarizePerformanceCommentWithLlm() {
+  const explicitToggle = normalizeText(process.env.DEEPSCAN_COMMENTARY_SUMMARY_ENABLE)?.toLowerCase();
+  if (['0', 'false', 'off', 'no'].includes(explicitToggle ?? '')) {
+    return false;
+  }
+
+  if (!process.env.OPENROUTER_API_KEY) {
+    return false;
+  }
+
+  if (['1', 'true', 'on', 'yes'].includes(explicitToggle ?? '')) {
+    return true;
+  }
+
+  return shouldInvokeKrCommitteeLlm();
+}
+
+function createCommentarySummarySchema() {
+  return {
+    name: 'jaroo_performance_comment_summary',
+    strict: true,
+    schema: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        lines: {
+          type: 'array',
+          minItems: 3,
+          maxItems: 3,
+          items: {
+            type: 'string',
+            minLength: 1,
+            maxLength: 90,
+          },
+        },
+      },
+      required: ['lines'],
+    },
+  };
+}
+
+function extractTextContent(content) {
+  if (typeof content === 'string') {
+    return content;
+  }
+
+  if (Array.isArray(content)) {
+    return content
+      .map((part) => (typeof part?.text === 'string' ? part.text : ''))
+      .join('')
+      .trim();
+  }
+
+  return '';
+}
+
+function normalizeSummaryLines(value) {
+  const lines = Array.isArray(value)
+    ? value
+    : typeof value === 'string'
+      ? value.split(/\n+/)
+      : [];
+
+  return lines
+    .map((line) => normalizeText(String(line ?? '').replace(/^\s*(?:[-•]|\d+[.)])\s+/, '')))
+    .filter(Boolean)
+    .slice(0, 3);
+}
+
+function extractNumericCores(value) {
+  const text = normalizeText(value) ?? '';
+  const matches = text.match(/(?<![A-Za-z가-힣])[+\-−]?\d+(?:[.,]\d+)*/gu) ?? [];
+  return [...new Set(matches.map((token) => token.replace('−', '-').replace(/,/g, '')).filter(Boolean))];
+}
+
+function summaryPreservesNumbers(sourceText, summaryLines) {
+  const sourceNumbers = extractNumericCores(sourceText);
+  if (sourceNumbers.length === 0) {
+    return true;
+  }
+
+  const summaryText = summaryLines.join(' ').replace(/,/g, '');
+  return sourceNumbers.every((number) => summaryText.includes(number));
+}
+
+function simplifyCommentaryText(text) {
+  return text
+    .replace(/전년동기\s*대비/g, '작년 같은 때보다')
+    .replace(/연결기준/g, '')
+    .replace(/매출액/g, '매출')
+    .replace(/영업이익/g, '본업 이익')
+    .replace(/당기순이익/g, '순이익')
+    .replace(/CAPEX/gi, '투자')
+    .replace(/서버향/g, '서버용')
+    .replace(/공급량을 초과하여/g, '물건이 모자랄 만큼 많아져')
+    .replace(/공급량을 초과/g, '물건이 모자랄 만큼 많아져')
+    .replace(/실적이 개선됨/g, '실적이 좋아졌어요')
+    .replace(/전망됨/g, '예상돼요')
+    .replace(/예상됨/g, '예상돼요')
+    .replace(/확대가 전망/g, '늘어날 것으로 보여요')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function trimLine(value, maxLength = 74) {
+  const normalized = normalizeText(value.replace(/\s+/g, ' ')) ?? '';
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, maxLength - 1).trim()}…`;
+}
+
+function extractMetricPercent(text, metricName) {
+  const escapedMetric = metricName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = text.match(new RegExp(`${escapedMetric}[^0-9+\\-−]{0,20}([+\\-−]?\\d+(?:\\.\\d+)?%)`));
+  return match?.[1]?.replace('−', '-') ?? null;
+}
+
+function createLocalPerformanceCommentSummary(comment) {
+  const text = String(comment?.text ?? '');
+  const sourceSentences = Array.isArray(comment?.sentences) && comment.sentences.length > 0
+    ? comment.sentences
+    : text.split(/(?<=[.!?。]|다\.|요\.)\s+/);
+  const year = text.match(/(?<![A-Za-z가-힣])(\d{4}년)/u)?.[1] ?? null;
+  const sales = extractMetricPercent(text, '매출액') ?? extractMetricPercent(text, '매출');
+  const operatingProfit = extractMetricPercent(text, '영업이익');
+  const netProfit = extractMetricPercent(text, '당기순이익') ?? extractMetricPercent(text, '순이익');
+  const metricLines = [];
+
+  if (sales) {
+    metricLines.push(`${year ? `${year} 기준, ` : ''}매출은 ${sales} 늘었어요.`);
+  }
+  if (operatingProfit || netProfit) {
+    metricLines.push([
+      operatingProfit ? `본업 이익은 ${operatingProfit} 늘었어요.` : null,
+      netProfit ? `순이익은 ${netProfit} 늘었어요.` : null,
+    ].filter(Boolean).join(' '));
+  }
+
+  const simplified = sourceSentences
+    .filter((sentence) => metricLines.length === 0 || !/(매출액|매출|영업이익|당기순이익|순이익)/.test(sentence))
+    .map((sentence) => trimLine(simplifyCommentaryText(sentence)))
+    .filter(Boolean)
+    .filter((line) => !metricLines.some((metricLine) => metricLine.includes(line) || line.includes(metricLine)));
+  const lines = [...metricLines, ...simplified].map((line) => trimLine(line)).slice(0, 3);
+
+  if (lines.length === 2) {
+    lines.push('어려운 말보다 숫자와 수요 변화를 먼저 보면 돼요.');
+  }
+
+  return lines.length === 3 ? lines : [];
+}
+
+async function summarizePerformanceCommentForLoading(input, performanceComment) {
+  if (!performanceComment?.text) {
+    return null;
+  }
+
+  const fallbackLines = createLocalPerformanceCommentSummary(performanceComment);
+  if (!shouldSummarizePerformanceCommentWithLlm()) {
+    return fallbackLines.length === 3 ? { lines: fallbackLines, method: 'local' } : null;
+  }
+
+  const model = process.env.DEEPSCAN_COMMENTARY_SUMMARY_MODEL
+    ?? process.env.DEEPSCAN_KR_LLM_MODEL
+    ?? process.env.DEEPSCAN_LLM_MODEL
+    ?? process.env.OCR_MODEL
+    ?? 'qwen/qwen3.5-flash-02-23';
+  const timeoutMs = parsePositiveInteger(
+    process.env.DEEPSCAN_COMMENTARY_SUMMARY_TIMEOUT_MS ?? process.env.DEEPSCAN_LLM_TIMEOUT_MS,
+    DEFAULT_COMMENTARY_SUMMARY_TIMEOUT_MS,
+  );
+
+  try {
+    const upstreamResponse = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.OPENROUTER_API_KEY}`,
+        'Content-Type': 'application/json',
+        'HTTP-Referer': process.env.DEEPSCAN_OPENROUTER_REFERER ?? 'http://localhost:3000',
+        'X-Title': 'jaroo-mvp-v3 DeepScan Commentary Summary',
+      },
+      signal: AbortSignal.timeout(timeoutMs),
+      body: JSON.stringify({
+        model,
+        temperature: 0.1,
+        provider: { require_parameters: true },
+        response_format: {
+          type: 'json_schema',
+          json_schema: createCommentarySummarySchema(),
+        },
+        messages: [
+          {
+            role: 'system',
+            content: [
+              '너는 한국 주식 리포트를 중학생도 이해할 수 있게 쉬운 한국어로 바꾸는 편집자다.',
+              '전문용어는 쉬운 말로 풀어쓰고, 원문에 나온 숫자/연도/퍼센트는 절대 빼거나 바꾸지 마라.',
+              '정확히 3줄로 요약하라. 각 줄은 짧고 자연스러운 문장이어야 한다.',
+            ].join(' '),
+          },
+          {
+            role: 'user',
+            content: JSON.stringify({
+              company: input.instrument.name,
+              code: input.instrument.code,
+              asOf: performanceComment.asOf,
+              sourceText: performanceComment.text,
+            }),
+          },
+        ],
+      }),
+    });
+
+    const result = await upstreamResponse.json().catch(() => null);
+    if (!upstreamResponse.ok || result?.error) {
+      return fallbackLines.length === 3 ? { lines: fallbackLines, method: 'local-fallback' } : null;
+    }
+
+    const rawContent = extractTextContent(result?.choices?.[0]?.message?.content);
+    const parsed = rawContent ? JSON.parse(rawContent) : null;
+    const lines = normalizeSummaryLines(parsed?.lines);
+    if (lines.length !== 3 || !summaryPreservesNumbers(performanceComment.text, lines)) {
+      return fallbackLines.length === 3 ? { lines: fallbackLines, method: 'local-fallback' } : null;
+    }
+
+    return { lines, method: 'llm' };
+  } catch {
+    return fallbackLines.length === 3 ? { lines: fallbackLines, method: 'local-fallback' } : null;
+  }
+}
+
+function buildInsights(input, evidence, scored, generatedAt, sourceIssues, options = {}) {
   const dateLabel = (input.selectedAt ?? generatedAt).slice(0, 10);
+  const performanceComment = evidence.businessCommentary?.performanceComment ?? null;
+  const performanceCommentSummary = options.performanceCommentSummary ?? null;
+  const performanceCommentBody = Array.isArray(performanceCommentSummary?.lines) && performanceCommentSummary.lines.length === 3
+    ? performanceCommentSummary.lines.join('\n')
+    : performanceComment?.text;
+  const quoteVolume = typeof evidence.currentQuote?.volume === 'number' && Number.isFinite(evidence.currentQuote.volume)
+    ? evidence.currentQuote.volume
+    : null;
   const items = [
     {
       sourceType: evidence.currentQuote ? 'market' : 'system',
@@ -1233,6 +1481,16 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues) {
         ? `${formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency)} 확인`
         : '현재가 근거 없음',
     },
+    ...(quoteVolume !== null
+      ? [{
+          sourceType: 'market',
+          sourceLabel: '거래량',
+          date: evidence.currentQuote?.asOf ?? dateLabel,
+          label: '거래량',
+          title: `${input.instrument.name} 거래량`,
+          body: `거래량 ${formatNumber(quoteVolume)}주 확인`,
+        }]
+      : []),
     {
       sourceType: 'report',
       sourceLabel: '국내 리포트',
@@ -1243,6 +1501,16 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues) {
         ? `국내 리포트 페이지 ${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages} 확보`
         : '국내 리포트 페이지 근거 없음',
     },
+    ...(performanceComment?.text
+      ? [{
+          sourceType: 'report',
+          sourceLabel: '기업실적코멘트',
+          date: performanceComment.asOf ?? dateLabel,
+          label: '실적',
+          title: '기업실적코멘트 쉽게 보기',
+          body: performanceCommentBody,
+        }]
+      : []),
     {
       sourceType: evidence.holding.hasHoldingContext ? 'holding' : 'system',
       sourceLabel: '보유 맥락',
@@ -1430,6 +1698,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     let llmCommitteePartialError = false;
     let llmCommitteePartialPending = false;
     let committeeAxes = createCommitteeAxes(evidence, deterministicScored, sources.packageResult);
+    const performanceCommentSummaryPromise = summarizePerformanceCommentForLoading(input, evidence.businessCommentary?.performanceComment);
     const llmAttempted = isKrInput(input) && shouldInvokeKrCommitteeLlm();
 
     if (llmAttempted) {
@@ -1477,7 +1746,8 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
         }
       : null;
     const blockFallback = llmFallback ?? createEvidenceFallback(evidence, sourceIssues);
-    const insights = buildInsights(input, evidence, scored, generatedAt, sourceIssues);
+    const performanceCommentSummary = await performanceCommentSummaryPromise;
+    const insights = buildInsights(input, evidence, scored, generatedAt, sourceIssues, { performanceCommentSummary });
     const strategy = buildStrategy(input, evidence, scored);
     const sellNow = buildSellNow(evidence, scored);
     const portfolioSimulation = buildPortfolioSimulation(scored);

@@ -4,6 +4,7 @@ const {
   findTablesByClass,
   keyValueRowsFromTable,
   measureCompleteness,
+  normalizeText,
   parseCompanyFromTitle,
   recordsFromTable,
   selectCapturedResponses,
@@ -111,6 +112,49 @@ function pairsFromTableCells(table) {
   };
 }
 
+function findTextSectionByHeading(capture, heading) {
+  const normalizedHeading = normalizeText(heading);
+  return (capture?.textSections || []).find((section) => normalizeText(section?.heading) === normalizedHeading) || null;
+}
+
+function parseKoreanAsOfDate(value) {
+  const normalized = normalizeText(value);
+  if (!normalized) {
+    return null;
+  }
+  const match = normalized.match(/(\d{4})[./-](\d{1,2})[./-](\d{1,2})/);
+  if (!match) {
+    return normalized;
+  }
+  return `${match[1]}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}`;
+}
+
+function parseCommentTextSection(section) {
+  if (!section) {
+    return null;
+  }
+
+  const rawText = normalizeText(section.text);
+  if (!rawText) {
+    return null;
+  }
+
+  const asOfMatch = rawText.match(/\[\s*기준\s*:?\s*([^\]]+)\]/u);
+  const body = normalizeText(rawText.replace(/\[\s*기준\s*:?\s*[^\]]+\]\s*/u, ''));
+  const sentences = body
+    .split(/(?<=\.)\s+/u)
+    .map((item) => normalizeText(item))
+    .filter(Boolean);
+
+  return {
+    title: normalizeText(section.heading),
+    asOf: parseKoreanAsOfDate(asOfMatch?.[1]),
+    asOfText: asOfMatch ? normalizeText(asOfMatch[1]) : null,
+    text: body,
+    sentences,
+  };
+}
+
 function firstParsedJsonResponse(responses, pattern) {
   return selectCapturedResponses(responses, pattern).find((response) => response.parsedBody && typeof response.parsedBody === 'object');
 }
@@ -135,6 +179,22 @@ function runCrawlerV2Stage({ spec, code, v1 }) {
   let candidates = {};
 
   switch (spec.id) {
+    case 'company-status':
+      candidates = {
+        companyOverviewComment: [candidate(
+          'companyOverviewComment',
+          'dom',
+          parseCommentTextSection(findTextSectionByHeading(capture, '기업개요')),
+          { heading: '기업개요' },
+        )],
+        performanceComment: [candidate(
+          'performanceComment',
+          'dom',
+          parseCommentTextSection(findTextSectionByHeading(capture, '기업실적코멘트')),
+          { heading: '기업실적코멘트' },
+        )],
+      };
+      break;
     case 'company-overview':
       candidates = {
         profile: [candidateFromTable('profile', byId('cTB201'), keyValueRowsFromTable)],

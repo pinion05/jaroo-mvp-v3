@@ -119,6 +119,7 @@ test('getNaverCurrentQuotes maps Naver mobile stock basic payloads to KR quote i
       return new Response(JSON.stringify({
         itemCode: '005930',
         closePrice: '85,200',
+        accumulatedTradingVolume: '1,234,567',
         localTradedAt: '2026-04-30T15:30:00+09:00',
       }));
     },
@@ -131,6 +132,7 @@ test('getNaverCurrentQuotes maps Naver mobile stock basic payloads to KR quote i
     ticker: null,
     price: 85200,
     currency: 'KRW',
+    volume: 1234567,
     asOf: '2026-04-30T15:30:00+09:00',
     source: 'naver-finance',
     status: 'ok',
@@ -289,7 +291,7 @@ test('getCurrentQuotes falls back to KRX when Naver KR quote is missing', async 
   const result = await getCurrentQuotes({ codes: ['005930'] }, {
     naverQuoteFetcher: async () => null,
     krxTradeDateResolver: async () => '20260416',
-    krxSnapshotFetcher: async () => [{ code: '005930', 종가: '85200' }],
+    krxSnapshotFetcher: async () => [{ code: '005930', 종가: '85200', 거래량: '1,234,567', 거래대금: '105185108400' }],
   });
 
   assert.equal(result.items.length, 1);
@@ -299,6 +301,8 @@ test('getCurrentQuotes falls back to KRX when Naver KR quote is missing', async 
     ticker: null,
     price: 85200,
     currency: 'KRW',
+    volume: 1234567,
+    tradingValue: 105185108400,
     asOf: '2026-04-16',
     source: 'krx',
     status: 'ok',
