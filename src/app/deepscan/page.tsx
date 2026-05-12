@@ -35,7 +35,7 @@ import {
   resolveDeepScanPageCacheState,
 } from '@/lib/deepscan-page-projection'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
-import { getDeepScanTargetKey } from '@/lib/workflow-types'
+import { getDeepScanTargetKey, type WorkflowMoneyCurrency } from '@/lib/workflow-types'
 import { cn } from '@/lib/utils'
 
 type TabValue = 'analysis' | 'strategy'
@@ -175,6 +175,24 @@ function resolveCommitteeMemberIcon(member: JarooDeepScanCommitteeAxis['members'
 
 type LoadingFindingKey = 'quality' | 'timing' | 'position' | 'decision'
 type LoadingFindingProgressMap = Partial<Record<LoadingFindingKey, FindingProgress>>
+type LoadingQuickQuote = {
+  targetKey: string
+  currentPrice?: number
+  currentPriceCurrency?: WorkflowMoneyCurrency
+  tradingVolume?: number
+}
+type QuotesCurrentProxyResponse = {
+  ok?: boolean
+  data?: {
+    items?: Array<{
+      code?: string | null
+      ticker?: string | null
+      price?: number
+      currency?: string | null
+      volume?: number
+    }>
+  }
+}
 
 const loadingFindingAxisKeys = ['quality', 'timing', 'position'] as const
 const MAX_FINDING_TEXT_LENGTH = 96
@@ -270,6 +288,60 @@ function buildLoadingTradingVolume(payload: JarooDeepScanPayload | null) {
   }
 
   return volume.body.replace(/^거래량\s*/u, '').replace(/\s*확인$/u, '').trim()
+}
+
+function normalizeDeepScanCode(value: string | undefined) {
+  const normalized = value?.trim()
+  if (!normalized) {
+    return undefined
+  }
+
+  const exactCode = normalized.match(/^\d{6}$/u)
+  if (exactCode) {
+    return exactCode[0]
+  }
+
+  const embeddedCode = normalized.match(/(?:^|[^0-9])(\d{6})(?:[^0-9]|$)/u)
+  return embeddedCode?.[1]
+}
+
+function normalizeDeepScanTicker(value: string | undefined) {
+  const normalized = value?.trim().toUpperCase()
+  return normalized || undefined
+}
+
+function buildLoadingQuickQuoteUrl(target: { code?: string; ticker?: string } | null) {
+  const code = normalizeDeepScanCode(target?.code)
+  const ticker = normalizeDeepScanTicker(target?.ticker)
+  if (!code && !ticker) {
+    return undefined
+  }
+
+  const searchParams = new URLSearchParams()
+  if (code) {
+    searchParams.set('codes', code)
+  } else if (ticker) {
+    searchParams.set('tickers', ticker)
+  }
+
+  return `/api/quotes/current?${searchParams.toString()}`
+}
+
+function normalizeQuoteCurrency(value: string | null | undefined): WorkflowMoneyCurrency | undefined {
+  return value === 'KRW' || value === 'USD' ? value : undefined
+}
+
+function selectLoadingQuickQuoteItem(
+  body: QuotesCurrentProxyResponse,
+  target: { code?: string; ticker?: string } | null,
+) {
+  const items = Array.isArray(body.data?.items) ? body.data.items : []
+  const code = normalizeDeepScanCode(target?.code)
+  const ticker = normalizeDeepScanTicker(target?.ticker)
+
+  return items.find((item) => code && normalizeDeepScanCode(item.code ?? undefined) === code)
+    ?? items.find((item) => ticker && normalizeDeepScanTicker(item.ticker ?? undefined) === ticker)
+    ?? items[0]
 }
 
 function hasCollectedDeepScanEvidence(payload: JarooDeepScanPayload | null) {
@@ -428,6 +500,7 @@ export default function DeepScanPage() {
   const updateActivePayload = useDeepScanStore((state) => state.updateActivePayload)
   const finishError = useDeepScanStore((state) => state.finishError)
   const abandonInFlight = useDeepScanStore((state) => state.abandonInFlight)
+  const [loadingQuickQuote, setLoadingQuickQuote] = useState<LoadingQuickQuote | null>(null)
 
   const targetKey = useMemo(() => (target ? getDeepScanTargetKey(target) : null), [target])
   const requestSeed = useMemo<DeepScanCanonicalTargetSession | null>(
@@ -467,6 +540,56 @@ export default function DeepScanPage() {
 
     startRequest()
   }, [shouldStartRequest, startRequest])
+
+  useEffect(() => {
+    const quickQuoteUrl = buildLoadingQuickQuoteUrl(target)
+    if (!quickQuoteUrl || !targetKey) {
+      return
+    }
+
+    const requestedTargetKey = targetKey
+    const controller = new AbortController()
+
+    const run = async () => {
+      try {
+        const response = await fetch(quickQuoteUrl, { cache: 'no-store', signal: controller.signal })
+        if (!response.ok) {
+          return
+        }
+
+        const body = (await response.json()) as QuotesCurrentProxyResponse
+        if (!body.ok || controller.signal.aborted) {
+          return
+        }
+
+        const item = selectLoadingQuickQuoteItem(body, target)
+        if (!item) {
+          return
+        }
+
+        setLoadingQuickQuote({
+          targetKey: requestedTargetKey,
+          ...(typeof item.price === 'number' && Number.isFinite(item.price)
+            ? { currentPrice: item.price }
+            : {}),
+          ...(typeof item.volume === 'number' && Number.isFinite(item.volume)
+            ? { tradingVolume: item.volume }
+            : {}),
+          ...(normalizeQuoteCurrency(item.currency)
+            ? { currentPriceCurrency: normalizeQuoteCurrency(item.currency) }
+            : {}),
+        })
+      } catch {
+        // The loading page should not fail just because quick quote decoration is unavailable.
+      }
+    }
+
+    void run()
+
+    return () => {
+      controller.abort()
+    }
+  }, [target, targetKey])
 
   useEffect(() => {
     if (!requestSeed || requestStatus !== 'loading') {
@@ -652,7 +775,10 @@ export default function DeepScanPage() {
   const hasConfirmedResultsView = targetKey !== null && confirmedResultsTargetKey === targetKey
   const loadingFindingProgress = buildLoadingFindingProgress(payload)
   const loadingPerformanceComment = buildLoadingPerformanceComment(payload)
-  const loadingTradingVolume = buildLoadingTradingVolume(payload)
+  const activeLoadingQuickQuote = loadingQuickQuote?.targetKey === targetKey ? loadingQuickQuote : null
+  const loadingTradingVolume = activeLoadingQuickQuote?.tradingVolume ?? buildLoadingTradingVolume(payload)
+  const loadingCurrentPrice = target?.currentPrice ?? activeLoadingQuickQuote?.currentPrice
+  const loadingCurrentPriceCurrency = target?.currentPriceCurrency ?? activeLoadingQuickQuote?.currentPriceCurrency
   const evidenceCollected = hasCollectedDeepScanEvidence(payload)
   const analysisLoadingNotice = {
     badge: '로딩 중',
@@ -685,8 +811,8 @@ export default function DeepScanPage() {
           shares={target?.quantity}
           averagePrice={target?.averagePrice}
           averagePriceCurrency={target?.averagePriceCurrency}
-          currentPrice={target?.currentPrice}
-          currentPriceCurrency={target?.currentPriceCurrency}
+          currentPrice={loadingCurrentPrice}
+          currentPriceCurrency={loadingCurrentPriceCurrency}
           tradingVolume={loadingTradingVolume}
           currentProfitRate={target?.currentProfitRate}
           evaluationAmount={target?.evaluationAmount}
