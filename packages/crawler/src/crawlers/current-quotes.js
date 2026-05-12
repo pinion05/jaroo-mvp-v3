@@ -430,6 +430,61 @@ export async function getNaverCurrentQuotes(codes, options = {}) {
   };
 }
 
+function shouldEnrichKrQuoteWithKrx(item) {
+  const code = normalizeKrCode(item?.code);
+  if (!/^\d{6}$/.test(code) || item?.status !== 'ok') {
+    return false;
+  }
+
+  return parseQuoteNumber(item.volume) === null || parseQuoteNumber(item.tradingValue) === null;
+}
+
+async function enrichKrQuoteVolumesFromKrx(naverResult, options = {}) {
+  const enrichCodes = uniqueStrings(
+    naverResult.items
+      .filter((item) => shouldEnrichKrQuoteWithKrx(item))
+      .map((item) => item.code),
+    normalizeKrCode,
+  );
+
+  if (enrichCodes.length === 0) {
+    return naverResult;
+  }
+
+  const krxResult = await getKrxCurrentQuotes(enrichCodes, {
+    tradeDate: options.tradeDate,
+    krxTradeDateResolver: options.krxTradeDateResolver,
+    krxSnapshotFetcher: options.krxSnapshotFetcher,
+    krExchangeProductTypeResolver: options.krExchangeProductTypeResolver,
+    krExchangeProductQuoteFetcher: options.krExchangeProductQuoteFetcher,
+  });
+  const krxItemsByCode = new Map(
+    krxResult.items.map((item) => [normalizeKrCode(item.code), item]),
+  );
+  const items = naverResult.items.map((item) => {
+    const krxItem = krxItemsByCode.get(normalizeKrCode(item.code));
+    if (!krxItem) {
+      return item;
+    }
+
+    return {
+      ...item,
+      ...(parseQuoteNumber(item.volume) === null && parseQuoteNumber(krxItem.volume) !== null
+        ? { volume: krxItem.volume }
+        : {}),
+      ...(parseQuoteNumber(item.tradingValue) === null && parseQuoteNumber(krxItem.tradingValue) !== null
+        ? { tradingValue: krxItem.tradingValue }
+        : {}),
+    };
+  });
+
+  return {
+    ...naverResult,
+    asOf: naverResult.asOf ?? krxResult.asOf,
+    items,
+  };
+}
+
 export function normalizeQuoteInputs(input = {}) {
   return {
     codes: uniqueStrings(input.codes || [], normalizeKrCode),
@@ -569,15 +624,18 @@ export async function getKrCurrentQuotes(codes, options = {}) {
     naverCurrentQuotesTimeoutMs: options.naverCurrentQuotesTimeoutMs,
     naverCurrentQuotesConcurrency: options.naverCurrentQuotesConcurrency,
   });
-  const foundCodes = new Set(naverResult.items.map((item) => normalizeKrCode(item.code)).filter(Boolean));
+  const primaryResult = options.enrichKrVolumeFromKrx
+    ? await enrichKrQuoteVolumesFromKrx(naverResult, options)
+    : naverResult;
+  const foundCodes = new Set(primaryResult.items.map((item) => normalizeKrCode(item.code)).filter(Boolean));
   const fallbackCodes = normalizedCodes.filter((code) => !foundCodes.has(code) && /^\d{6}$/.test(code));
 
   if (fallbackCodes.length === 0) {
-    return naverResult;
+    return primaryResult;
   }
 
-  if (naverResult.items.length > 0) {
-    return naverResult;
+  if (primaryResult.items.length > 0) {
+    return primaryResult;
   }
 
   const krxResult = await getKrxCurrentQuotes(fallbackCodes, {
@@ -587,16 +645,16 @@ export async function getKrCurrentQuotes(codes, options = {}) {
     krExchangeProductTypeResolver: options.krExchangeProductTypeResolver,
     krExchangeProductQuoteFetcher: options.krExchangeProductQuoteFetcher,
   });
-  const nonFallbackMissing = naverResult.missing.filter((item) => !/^\d{6}$/.test(String(item.code || '')));
+  const nonFallbackMissing = primaryResult.missing.filter((item) => !/^\d{6}$/.test(String(item.code || '')));
   const naverMissingByCode = new Map(
-    naverResult.missing
+    primaryResult.missing
       .filter((item) => /^\d{6}$/.test(String(item.code || '')))
       .map((item) => [normalizeKrCode(item.code), item]),
   );
 
   return {
-    asOf: naverResult.asOf ?? krxResult.asOf,
-    items: [...naverResult.items, ...krxResult.items],
+    asOf: primaryResult.asOf ?? krxResult.asOf,
+    items: [...primaryResult.items, ...krxResult.items],
     missing: [
       ...attachFallbackProviderDiagnostics(krxResult.missing, naverMissingByCode),
       ...nonFallbackMissing,
@@ -722,6 +780,7 @@ export async function getCurrentQuotes(input = {}, options = {}) {
       fetchImpl: options.fetchImpl,
       naverCurrentQuotesTimeoutMs: options.naverCurrentQuotesTimeoutMs,
       naverCurrentQuotesConcurrency: options.naverCurrentQuotesConcurrency,
+      enrichKrVolumeFromKrx: options.enrichKrVolumeFromKrx,
       krxTradeDateResolver: options.krxTradeDateResolver,
       krxSnapshotFetcher: options.krxSnapshotFetcher,
       krExchangeProductTypeResolver: options.krExchangeProductTypeResolver,

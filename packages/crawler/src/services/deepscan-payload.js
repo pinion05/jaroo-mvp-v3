@@ -849,7 +849,7 @@ async function resolveKrSourceBundle(rawInput, input) {
       codes: input.instrument.code ? [input.instrument.code] : [],
       tickers: input.instrument.ticker ? [input.instrument.ticker] : [],
       ...(tradeDate ? { tradeDate } : {}),
-    })),
+    }, { enrichKrVolumeFromKrx: true })),
     maybeResolveKrPackageResult(rawInput, input),
   ]);
 
