@@ -481,22 +481,18 @@ export function DeepScanLoadingScreen({
                       <div className={styles.positionScale}>
                         <span className={styles.positionTrack} aria-hidden='true' />
                         <span
-                          className={styles.positionFill}
-                          style={{ width: `${fact.indicator.positionPct}%` }}
-                          aria-hidden='true'
-                        />
-                        <span
                           className={styles.positionMarker}
-                          style={{ left: `${fact.indicator.positionPct}%` }}
+                          style={{ top: `${100 - fact.indicator.positionPct}%` }}
                           aria-hidden='true'
                         >
-                          {fact.indicator.markerLabel ? <span className={styles.positionMarkerLabel}>{fact.indicator.markerLabel}</span> : null}
                           <span className={styles.positionMarkerDot} />
+                          {fact.indicator.markerLabel ? <span className={styles.positionMarkerLabel}>{fact.indicator.markerLabel}</span> : null}
                         </span>
                       </div>
                       <div className={styles.positionLabels}>
-                        <span>{fact.indicator.leftLabel}</span>
-                        <span>{fact.indicator.rightLabel}</span>
+                        <span className={styles.positionHighLabel}>{fact.indicator.rightLabel}</span>
+                        <span className={styles.positionRangeCaption}>52주 가격 범위</span>
+                        <span className={styles.positionLowLabel}>{fact.indicator.leftLabel}</span>
                       </div>
                     </div>
                   ) : null}
