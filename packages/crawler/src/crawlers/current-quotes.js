@@ -18,6 +18,7 @@ const KRX_DEPENDENCY_ERROR_PATTERNS = [
 
 const WISE_ETF_NAV_DATA_URL = 'https://comp.wisereport.co.kr/ETF/GetNAVData.aspx';
 const NAVER_STOCK_BASIC_URL_PREFIX = 'https://m.stock.naver.com/api/stock/';
+const NAVER_STOCK_PRICE_PATH_SUFFIX = '/price?page=1&pageSize=1';
 const DEFAULT_NAVER_CURRENT_QUOTES_TIMEOUT_MS = 3_000;
 const DEFAULT_NAVER_CURRENT_QUOTES_CONCURRENCY = 4;
 const CURRENT_QUOTES_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -360,11 +361,22 @@ async function getNaverCurrentQuote(code, options = {}) {
     return null;
   }
 
-  const volume = parseQuoteNumber(
+  let volume = parseQuoteNumber(
     payload?.accumulatedTradingVolume
     ?? payload?.tradeVolume
     ?? payload?.volume,
   );
+  if (volume === null) {
+    try {
+      volume = await getNaverCurrentQuoteVolume(normalizedCode, {
+        fetchImpl,
+        timeoutMs,
+        naverPriceFetcher: options.naverPriceFetcher,
+      });
+    } catch {
+      volume = null;
+    }
+  }
 
   return {
     market: 'KR',
@@ -377,6 +389,46 @@ async function getNaverCurrentQuote(code, options = {}) {
     source: 'naver-finance',
     status: 'ok',
   };
+}
+
+async function getNaverCurrentQuoteVolume(code, options = {}) {
+  if (typeof options.naverPriceFetcher === 'function') {
+    const pricePayload = await options.naverPriceFetcher(code);
+    const latestPrice = Array.isArray(pricePayload) ? pricePayload[0] : pricePayload;
+    return parseQuoteNumber(
+      latestPrice?.accumulatedTradingVolume
+      ?? latestPrice?.tradeVolume
+      ?? latestPrice?.volume,
+    );
+  }
+
+  const response = await withFetchTimeout(
+    options.fetchImpl,
+    `${NAVER_STOCK_BASIC_URL_PREFIX}${encodeURIComponent(code)}${NAVER_STOCK_PRICE_PATH_SUFFIX}`,
+    {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'Mozilla/5.0',
+      },
+    },
+    options.timeoutMs,
+  );
+
+  if (response.status === 404 || response.status === 409) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Naver current quote volume returned HTTP ${response.status}`);
+  }
+
+  const pricePayload = await response.json();
+  const latestPrice = Array.isArray(pricePayload) ? pricePayload[0] : pricePayload;
+  return parseQuoteNumber(
+    latestPrice?.accumulatedTradingVolume
+    ?? latestPrice?.tradeVolume
+    ?? latestPrice?.volume,
+  );
 }
 
 export async function getNaverCurrentQuotes(codes, options = {}) {
@@ -619,6 +671,7 @@ export async function getKrCurrentQuotes(codes, options = {}) {
 
   const naverResult = await getNaverCurrentQuotes(normalizedCodes, {
     naverQuoteFetcher: options.naverQuoteFetcher,
+    naverPriceFetcher: options.naverPriceFetcher,
     naverFetchImpl: options.naverFetchImpl,
     fetchImpl: options.fetchImpl,
     naverCurrentQuotesTimeoutMs: options.naverCurrentQuotesTimeoutMs,
@@ -776,6 +829,7 @@ export async function getCurrentQuotes(input = {}, options = {}) {
     getKrCurrentQuotes(codes, {
       tradeDate,
       naverQuoteFetcher: options.naverQuoteFetcher,
+      naverPriceFetcher: options.naverPriceFetcher,
       naverFetchImpl: options.naverFetchImpl,
       fetchImpl: options.fetchImpl,
       naverCurrentQuotesTimeoutMs: options.naverCurrentQuotesTimeoutMs,
