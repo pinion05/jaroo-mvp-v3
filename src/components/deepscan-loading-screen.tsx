@@ -429,6 +429,9 @@ export function DeepScanLoadingScreen({
   const profitRateText = formatSignedPercent(currentProfitRate)
   const metaMessage = metaMessages[Math.min(metaMessages.length - 1, Math.floor(elapsedSeconds / 5))]
   const findings = buildFindingDefinitions()
+  const hasConsensusFact = quickFacts.some((fact) => fact.key === 'analyst-consensus' || Boolean(fact.consensus))
+  const showConsensusSkeleton = !resultsReady && !hasConsensusFact
+  const showQuickFactsSection = quickFacts.length > 0 || showConsensusSkeleton
 
   useEffect(() => {
     if (resultsReady) {
@@ -516,7 +519,7 @@ export function DeepScanLoadingScreen({
           </section>
         ) : null}
 
-        {quickFacts.length > 0 ? (
+        {showQuickFactsSection ? (
           <>
             <div className={styles.sectionLabel}>빠른 시장 체크</div>
             <section className={styles.quickFactsCard} aria-label='빠른 시장 체크'>
@@ -615,6 +618,37 @@ export function DeepScanLoadingScreen({
                   </article>
                 )
               })}
+              {showConsensusSkeleton ? (
+                <article className={cn(styles.quickFact, styles.consensusQuickFact, styles.consensusSkeletonFact)} aria-label='증권사 의견 조회 중'>
+                  <div className={styles.findingTop}>
+                    <span className={styles.findingCat}>증권사 의견</span>
+                    <span className={cn(styles.findingBadge, styles.positionSegmentBadge)}>조회 중</span>
+                  </div>
+                  <div className={styles.consensusInsight} aria-hidden='true'>
+                    <div className={styles.consensusChartTop}>
+                      <div className={styles.consensusSkeletonHeader}>
+                        <span className={cn(styles.consensusSkeletonBlock, styles.consensusSkeletonEyebrow)} />
+                        <span className={cn(styles.consensusSkeletonBlock, styles.consensusSkeletonValue)} />
+                      </div>
+                      <span className={cn(styles.consensusSkeletonBlock, styles.consensusSkeletonBadge)} />
+                    </div>
+                    <div className={cn(styles.consensusLineChart, styles.consensusSkeletonChart)}>
+                      <span className={cn(styles.consensusSkeletonLine, styles.consensusSkeletonCurrentLine)} />
+                      <span className={cn(styles.consensusSkeletonLine, styles.consensusSkeletonTargetLine)} />
+                      <div className={styles.consensusChartLegend}>
+                        <span><i className={styles.consensusCurrentSwatch} />현재가 확인 중</span>
+                        <span><i className={styles.consensusTargetSwatch} />목표가 수집 중</span>
+                      </div>
+                    </div>
+                    <span className={cn(styles.consensusSkeletonBlock, styles.consensusSkeletonSummary)} />
+                    <div className={styles.consensusRangeRow}>
+                      <span className={styles.consensusSkeletonPill}>최고 목표가</span>
+                      <span className={styles.consensusSkeletonPill}>최저 목표가</span>
+                      <span className={styles.consensusSkeletonPill}>투자의견</span>
+                    </div>
+                  </div>
+                </article>
+              ) : null}
             </section>
           </>
         ) : null}
