@@ -1394,8 +1394,6 @@ async function summarizePerformanceCommentForLoading(input, performanceComment) 
 
   const model = process.env.DEEPSCAN_COMMENTARY_SUMMARY_MODEL
     ?? process.env.DEEPSCAN_KR_LLM_MODEL
-    ?? process.env.DEEPSCAN_LLM_MODEL
-    ?? process.env.OCR_MODEL
     ?? 'qwen/qwen3.5-flash-02-23';
   const timeoutMs = parsePositiveInteger(
     process.env.DEEPSCAN_COMMENTARY_SUMMARY_TIMEOUT_MS ?? process.env.DEEPSCAN_LLM_TIMEOUT_MS,

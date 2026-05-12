@@ -87,6 +87,8 @@ const metaMessages = [
 ] as const
 
 const pendingCommitteeMemberCount = committeeMembers.length
+const COMMENT_LINE_MAX_LENGTH = 74
+const COMMENT_BODY_MAX_LENGTH = 168
 
 function formatElapsedTime(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
@@ -183,7 +185,19 @@ function calculateFallbackEvaluationAmount({
   return undefined
 }
 
-function compactCommentLine(value: string, maxLength = 74) {
+function hasDisplayValue(value: unknown): boolean {
+  if (Array.isArray(value)) {
+    return value.some(hasDisplayValue)
+  }
+
+  if (value && typeof value === 'object') {
+    return Object.values(value).some(hasDisplayValue)
+  }
+
+  return typeof value === 'string' ? value.trim().length > 0 : Boolean(value)
+}
+
+function compactCommentLine(value: string, maxLength = COMMENT_LINE_MAX_LENGTH) {
   const normalized = value.replace(/\s+/g, ' ').trim()
   if (normalized.length <= maxLength) {
     return normalized
@@ -194,14 +208,14 @@ function compactCommentLine(value: string, maxLength = 74) {
 
 function getCommentLines(comment: LoadingPerformanceComment) {
   const explicitLines = Array.isArray(comment.lines) ? comment.lines : []
-  const sourceLines = explicitLines.length > 0 ? explicitLines : comment.body.split(/\n+/)
+  const sourceLines = hasDisplayValue(explicitLines) ? explicitLines : comment.body.split(/\n+/)
   const lines = sourceLines.map((line) => compactCommentLine(line)).filter(Boolean).slice(0, 3)
 
-  if (lines.length > 0) {
+  if (hasDisplayValue(lines)) {
     return lines
   }
 
-  return [compactCommentLine(comment.body, 168)].filter(Boolean)
+  return [compactCommentLine(comment.body, COMMENT_BODY_MAX_LENGTH)].filter(Boolean)
 }
 
 function formatShares(value: string | number | undefined) {

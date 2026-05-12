@@ -177,6 +177,7 @@ type LoadingFindingKey = 'quality' | 'timing' | 'position' | 'decision'
 type LoadingFindingProgressMap = Partial<Record<LoadingFindingKey, FindingProgress>>
 
 const loadingFindingAxisKeys = ['quality', 'timing', 'position'] as const
+const MAX_FINDING_TEXT_LENGTH = 96
 
 function compactFindingText(value: string | null | undefined) {
   const normalized = value?.replace(/\s+/g, ' ').trim()
@@ -184,7 +185,9 @@ function compactFindingText(value: string | null | undefined) {
     return ''
   }
 
-  return normalized.length > 96 ? `${normalized.slice(0, 96)}…` : normalized
+  return normalized.length > MAX_FINDING_TEXT_LENGTH
+    ? `${normalized.slice(0, MAX_FINDING_TEXT_LENGTH - 1).trim()}…`
+    : normalized
 }
 
 function buildAxisFindingProgress(axis: JarooDeepScanCommitteeAxis | undefined): FindingProgress | null {
