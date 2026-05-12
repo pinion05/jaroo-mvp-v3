@@ -237,7 +237,7 @@ function buildLoadingFindingProgress(payload: JarooDeepScanPayload | null): Load
     }
   })
 
-  if (payload.metadata.llmCommittee?.status === 'complete' && payload.sellNow.blockState === 'ok') {
+  if (payload.metadata.llmCommittee?.status !== 'partial' && payload.sellNow.blockState === 'ok') {
     progress.decision = {
       badge: '요약 도착',
       tone: 'done',
@@ -534,19 +534,24 @@ export default function DeepScanPage() {
           return
         }
 
-        if (body.status === 'not_found') {
-          return
-        }
-
         updateActivePayload((currentPayload: JarooDeepScanPayload) => {
           const currentCommittee = currentPayload.metadata.llmCommittee
           if (currentCommittee?.requestId !== llmCommittee.requestId) {
             return currentPayload
           }
 
-          const nextStatus = body.status === 'complete' || body.status === 'partial' || body.status === 'error'
+          const nextStatus = body.status === 'not_found'
+            ? 'error'
+            : body.status === 'complete' || body.status === 'partial' || body.status === 'error'
             ? body.status
             : currentCommittee.status
+          const nextPending = body.status === 'not_found'
+            ? 0
+            : Array.isArray(body.pending) ? body.pending.length : currentCommittee.pending
+          const nextErrors = body.status === 'not_found'
+            ? Math.max(currentCommittee.errors, 1)
+            : Array.isArray(body.errors) ? body.errors.length : currentCommittee.errors
+
           return {
             ...currentPayload,
             committee: Array.isArray(body.committeeAxes)
@@ -561,8 +566,8 @@ export default function DeepScanPage() {
                 ...currentCommittee,
                 status: nextStatus,
                 completed: typeof body.completed === 'number' ? body.completed : currentCommittee.completed,
-                pending: Array.isArray(body.pending) ? body.pending.length : currentCommittee.pending,
-                errors: Array.isArray(body.errors) ? body.errors.length : currentCommittee.errors,
+                pending: nextPending,
+                errors: nextErrors,
                 softDeadlineMs: body.softDeadlineMs ?? currentCommittee.softDeadlineMs,
               },
             },
