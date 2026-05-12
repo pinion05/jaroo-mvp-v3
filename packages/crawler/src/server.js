@@ -116,6 +116,11 @@ function parseSingleQueryValue(value) {
   return normalizedValue == null ? undefined : String(normalizedValue).trim() || undefined;
 }
 
+function parseBooleanQuery(value) {
+  const normalizedValue = parseSingleQueryValue(value)?.toLowerCase();
+  return normalizedValue === '1' || normalizedValue === 'true' || normalizedValue === 'yes' || normalizedValue === 'on';
+}
+
 const DEEPSCAN_MAJOR_BLOCK_KEYS = Object.freeze([
   'hero',
   'committee',
@@ -2825,7 +2830,7 @@ const endpointDefinitions = [
     primaryPath: buildDataSourcePath('krx-polygon-fmp', '/market/quotes/current'),
     dataSources: ['naver-finance', 'krx-js-client', 'polygon', 'fmp'],
     params: [],
-    query: ['codes(optional, csv)', 'tickers(optional, csv)', 'tradeDate(optional, YYYY-MM-DD)'],
+    query: ['codes(optional, csv)', 'tickers(optional, csv)', 'tradeDate(optional, YYYY-MM-DD)', 'includeContext(optional, boolean)'],
     count: (data) => Array.isArray(data?.items) ? data.items.length : 0,
     handler: async (req) => {
       const codes = parseCsvQuery(req.query.codes);
@@ -2842,6 +2847,8 @@ const endpointDefinitions = [
         codes,
         tickers,
         tradeDate,
+      }, {
+        includeNaverQuoteContext: parseBooleanQuery(req.query.includeContext),
       });
     },
   },

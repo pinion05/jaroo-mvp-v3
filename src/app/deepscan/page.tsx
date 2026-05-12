@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { DeepScanLoadingScreen, type FindingProgress, type LoadingPerformanceComment } from '@/components/deepscan-loading-screen'
+import { DeepScanLoadingScreen, type FindingProgress, type LoadingPerformanceComment, type LoadingQuickFact } from '@/components/deepscan-loading-screen'
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import {
@@ -180,6 +180,8 @@ type LoadingQuickQuote = {
   currentPrice?: number
   currentPriceCurrency?: WorkflowMoneyCurrency
   tradingVolume?: number
+  week52High?: number
+  week52Low?: number
 }
 type QuotesCurrentProxyResponse = {
   ok?: boolean
@@ -190,6 +192,8 @@ type QuotesCurrentProxyResponse = {
       price?: number
       currency?: string | null
       volume?: number
+      week52High?: number
+      week52Low?: number
     }>
   }
 }
@@ -320,11 +324,182 @@ function buildLoadingQuickQuoteUrl(target: { code?: string; ticker?: string } | 
   const searchParams = new URLSearchParams()
   if (code) {
     searchParams.set('codes', code)
+    searchParams.set('includeContext', '1')
   } else if (ticker) {
     searchParams.set('tickers', ticker)
   }
 
   return `/api/quotes/current?${searchParams.toString()}`
+}
+
+function formatLoadingPercent(value: number | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return undefined
+  }
+
+  const sign = value > 0 ? '+' : ''
+  return `${sign}${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 }).format(value)}%`
+}
+
+function formatLoadingMoney(value: number, currency: WorkflowMoneyCurrency = 'KRW') {
+  const suffix = currency === 'USD' ? '달러' : '원'
+  return `${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(value)}${suffix}`
+}
+
+function clampLoadingPercent(value: number) {
+  return Math.min(100, Math.max(0, value))
+}
+
+function resolveWeek52PositionLabel(lowGapPct: number | undefined, highGapPct: number | undefined) {
+  if (typeof highGapPct === 'number' && highGapPct >= -10) {
+    return '고점 근처예요'
+  }
+
+  if (typeof lowGapPct !== 'number') {
+    return '가격 위치를 확인했어요'
+  }
+
+  if (lowGapPct <= 20) {
+    return '바닥권 근처예요'
+  }
+
+  if (lowGapPct <= 50) {
+    return '중하단 구간이에요'
+  }
+
+  if (lowGapPct <= 80) {
+    return '중상단 구간이에요'
+  }
+
+  return '고점권에 가까워요'
+}
+
+function buildWeek52LoadingQuickFact(quickQuote: LoadingQuickQuote | null): LoadingQuickFact | null {
+  const currentPrice = quickQuote?.currentPrice
+  const high = quickQuote?.week52High
+  const low = quickQuote?.week52Low
+  if (
+    typeof currentPrice !== 'number'
+    || typeof high !== 'number'
+    || typeof low !== 'number'
+    || currentPrice <= 0
+    || high <= 0
+    || low <= 0
+    || high <= low
+  ) {
+    return null
+  }
+
+  const lowGapPct = ((currentPrice - low) / low) * 100
+  const highGapPct = ((currentPrice - high) / high) * 100
+  const rangePositionPct = clampLoadingPercent(((currentPrice - low) / (high - low)) * 100)
+  const currency = quickQuote?.currentPriceCurrency ?? 'KRW'
+
+  return {
+    key: 'week52-position',
+    category: '가격 위치',
+    badge: '정보',
+    tone: 'info',
+    body: `52주 최저 대비 ${formatLoadingPercent(lowGapPct)}, 최고 대비 ${formatLoadingPercent(highGapPct)}`,
+    detail: resolveWeek52PositionLabel(lowGapPct, highGapPct),
+    indicator: {
+      positionPct: rangePositionPct,
+      markerLabel: `현재 ${formatLoadingMoney(currentPrice, currency)}`,
+      deltaLabels: [`최저 대비 ${formatLoadingPercent(lowGapPct)}`, `최고 대비 ${formatLoadingPercent(highGapPct)}`],
+      leftLabel: `최저 ${formatLoadingMoney(low, currency)}`,
+      rightLabel: `최고 ${formatLoadingMoney(high, currency)}`,
+    },
+  }
+}
+
+function parseLoadingConsensusBody(body: string) {
+  const analystCountMatch = body.match(/증권사\s*(\d+)\s*곳/u)
+  const targetMatch = body.match(/평균\s*목표가\s*([0-9,]+(?:\.\d+)?)\s*(KRW|USD|원|달러)?/iu)
+  const upsideMatch = body.match(/현재가\s*대비\s*([+-]?\d+(?:\.\d+)?)%/u)
+  const opinionMatch = body.match(/투자의견\s*([0-9]+(?:\.\d+)?)/u)
+  const highTargetMatch = body.match(/최고\s*([0-9,]+(?:\.\d+)?)\s*(KRW|USD|원|달러)?/iu)
+  const lowTargetMatch = body.match(/최저\s*([0-9,]+(?:\.\d+)?)\s*(KRW|USD|원|달러)?/iu)
+  const summaryMatch = body.match(/(모두 매수 의견이에요|매수 의견이 우세해요|의견이 갈리고 있어요|신중한 의견이 많아요)/u)
+  const targetValue = targetMatch?.[1] ? Number(targetMatch[1].replace(/,/gu, '')) : undefined
+  const targetCurrency: WorkflowMoneyCurrency = targetMatch?.[2]?.toUpperCase() === 'USD' || targetMatch?.[2] === '달러' ? 'USD' : 'KRW'
+  const upsidePct = upsideMatch?.[1] ? Number(upsideMatch[1]) : undefined
+  const opinionScore = opinionMatch?.[1] ? Number(opinionMatch[1]) : undefined
+  const highTargetValue = highTargetMatch?.[1] ? Number(highTargetMatch[1].replace(/,/gu, '')) : undefined
+  const highTargetCurrency: WorkflowMoneyCurrency = highTargetMatch?.[2]?.toUpperCase() === 'USD' || highTargetMatch?.[2] === '달러' ? 'USD' : targetCurrency
+  const lowTargetValue = lowTargetMatch?.[1] ? Number(lowTargetMatch[1].replace(/,/gu, '')) : undefined
+  const lowTargetCurrency: WorkflowMoneyCurrency = lowTargetMatch?.[2]?.toUpperCase() === 'USD' || lowTargetMatch?.[2] === '달러' ? 'USD' : targetCurrency
+  const currentPrice = typeof targetValue === 'number'
+    && Number.isFinite(targetValue)
+    && typeof upsidePct === 'number'
+    && Number.isFinite(upsidePct)
+    && 1 + upsidePct / 100 !== 0
+    ? targetValue / (1 + upsidePct / 100)
+    : undefined
+
+  return {
+    analystCountLabel: analystCountMatch?.[1] ? `증권사 ${analystCountMatch[1]}곳` : undefined,
+    targetPriceLabel: typeof targetValue === 'number' && Number.isFinite(targetValue)
+      ? formatLoadingMoney(targetValue, targetCurrency)
+      : undefined,
+    currentPriceLabel: typeof currentPrice === 'number' && Number.isFinite(currentPrice)
+      ? formatLoadingMoney(currentPrice, targetCurrency)
+      : undefined,
+    highTargetLabel: typeof highTargetValue === 'number' && Number.isFinite(highTargetValue)
+      ? formatLoadingMoney(highTargetValue, highTargetCurrency)
+      : undefined,
+    lowTargetLabel: typeof lowTargetValue === 'number' && Number.isFinite(lowTargetValue)
+      ? formatLoadingMoney(lowTargetValue, lowTargetCurrency)
+      : undefined,
+    summary: summaryMatch?.[1],
+    upsideLabel: typeof upsidePct === 'number' && Number.isFinite(upsidePct)
+      ? formatLoadingPercent(upsidePct)
+      : undefined,
+    upsidePct: typeof upsidePct === 'number' && Number.isFinite(upsidePct) ? upsidePct : undefined,
+    opinionLabel: typeof opinionScore === 'number' && Number.isFinite(opinionScore)
+      ? new Intl.NumberFormat('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(opinionScore)
+      : undefined,
+    opinionScore: typeof opinionScore === 'number' && Number.isFinite(opinionScore) ? opinionScore : undefined,
+  }
+}
+
+function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null): LoadingQuickFact | null {
+  const consensus = payload?.insights.items.find((item) => item.sourceLabel === '증권사 의견' || item.label === '컨센서스')
+  if (!consensus?.body?.trim()) {
+    return null
+  }
+
+  const parsedConsensus = parseLoadingConsensusBody(consensus.body)
+  const isPositive = /매수|buy|상향|positive/i.test(consensus.body) || (parsedConsensus.upsidePct ?? 0) > 0 || (parsedConsensus.opinionScore ?? 0) >= 3.5
+  return {
+    key: 'analyst-consensus',
+    category: '증권사 의견',
+    badge: isPositive ? '긍정' : '정보',
+    tone: isPositive ? 'positive' : 'info',
+    body: consensus.body,
+    ...(parsedConsensus.targetPriceLabel
+      ? {
+        consensus: {
+          targetPriceLabel: parsedConsensus.targetPriceLabel,
+          ...(parsedConsensus.currentPriceLabel ? { currentPriceLabel: parsedConsensus.currentPriceLabel } : {}),
+          ...(parsedConsensus.analystCountLabel ? { analystCountLabel: parsedConsensus.analystCountLabel } : {}),
+          ...(parsedConsensus.highTargetLabel ? { highTargetLabel: parsedConsensus.highTargetLabel } : {}),
+          ...(parsedConsensus.lowTargetLabel ? { lowTargetLabel: parsedConsensus.lowTargetLabel } : {}),
+          ...(parsedConsensus.summary ? { summary: parsedConsensus.summary } : {}),
+          ...(parsedConsensus.upsideLabel ? { upsideLabel: parsedConsensus.upsideLabel } : {}),
+          ...(typeof parsedConsensus.upsidePct === 'number' ? { upsidePct: parsedConsensus.upsidePct } : {}),
+          ...(parsedConsensus.opinionLabel ? { opinionLabel: parsedConsensus.opinionLabel } : {}),
+          ...(typeof parsedConsensus.opinionScore === 'number' ? { opinionScore: parsedConsensus.opinionScore } : {}),
+        },
+      }
+      : {}),
+  }
+}
+
+function buildLoadingQuickFacts(payload: JarooDeepScanPayload | null, quickQuote: LoadingQuickQuote | null): LoadingQuickFact[] {
+  return [
+    buildWeek52LoadingQuickFact(quickQuote),
+    buildConsensusLoadingQuickFact(payload),
+  ].filter((fact): fact is LoadingQuickFact => Boolean(fact))
 }
 
 function normalizeQuoteCurrency(value: string | null | undefined): WorkflowMoneyCurrency | undefined {
@@ -575,6 +750,12 @@ export default function DeepScanPage() {
           ...(typeof item.volume === 'number' && Number.isFinite(item.volume)
             ? { tradingVolume: item.volume }
             : {}),
+          ...(typeof item.week52High === 'number' && Number.isFinite(item.week52High)
+            ? { week52High: item.week52High }
+            : {}),
+          ...(typeof item.week52Low === 'number' && Number.isFinite(item.week52Low)
+            ? { week52Low: item.week52Low }
+            : {}),
           ...(normalizeQuoteCurrency(item.currency)
             ? { currentPriceCurrency: normalizeQuoteCurrency(item.currency) }
             : {}),
@@ -779,6 +960,7 @@ export default function DeepScanPage() {
   const loadingTradingVolume = activeLoadingQuickQuote?.tradingVolume ?? buildLoadingTradingVolume(payload)
   const loadingCurrentPrice = target?.currentPrice ?? activeLoadingQuickQuote?.currentPrice
   const loadingCurrentPriceCurrency = target?.currentPriceCurrency ?? activeLoadingQuickQuote?.currentPriceCurrency
+  const loadingQuickFacts = buildLoadingQuickFacts(payload, activeLoadingQuickQuote)
   const evidenceCollected = hasCollectedDeepScanEvidence(payload)
   const analysisLoadingNotice = {
     badge: '로딩 중',
@@ -817,6 +999,7 @@ export default function DeepScanPage() {
           currentProfitRate={target?.currentProfitRate}
           evaluationAmount={target?.evaluationAmount}
           findingProgress={loadingFindingProgress}
+          quickFacts={loadingQuickFacts}
           performanceComment={loadingPerformanceComment}
           evidenceCollected={evidenceCollected}
           resultsReady={resultsReady}

@@ -19,6 +19,7 @@ const KRX_DEPENDENCY_ERROR_PATTERNS = [
 const WISE_ETF_NAV_DATA_URL = 'https://comp.wisereport.co.kr/ETF/GetNAVData.aspx';
 const NAVER_STOCK_BASIC_URL_PREFIX = 'https://m.stock.naver.com/api/stock/';
 const NAVER_STOCK_PRICE_PATH_SUFFIX = '/price?page=1&pageSize=1';
+const NAVER_STOCK_INTEGRATION_PATH_SUFFIX = '/integration';
 const DEFAULT_NAVER_CURRENT_QUOTES_TIMEOUT_MS = 3_000;
 const DEFAULT_NAVER_CURRENT_QUOTES_CONCURRENCY = 4;
 const CURRENT_QUOTES_DIR = path.dirname(fileURLToPath(import.meta.url));
@@ -174,6 +175,18 @@ function parseQuoteNumber(value) {
 
   const parsed = Number(text.replace(/[\s,]/g, '').replace(/%$/, ''));
   return Number.isFinite(parsed) ? parsed : null;
+}
+
+function findNaverTotalInfoValue(payload, keys) {
+  const totalInfos = Array.isArray(payload?.totalInfos) ? payload.totalInfos : [];
+  const normalizedKeys = keys.map((key) => String(key).toLowerCase());
+  const found = totalInfos.find((item) => {
+    const code = String(item?.code ?? '').toLowerCase();
+    const key = String(item?.key ?? '').toLowerCase();
+    return normalizedKeys.some((expected) => code === expected || key.includes(expected));
+  });
+
+  return found?.value;
 }
 
 function classifyKrxFailure(error) {
@@ -377,6 +390,13 @@ async function getNaverCurrentQuote(code, options = {}) {
       volume = null;
     }
   }
+  const quoteContext = options.includeNaverQuoteContext
+    ? await getNaverCurrentQuoteContext(normalizedCode, {
+        fetchImpl,
+        timeoutMs,
+        naverIntegrationFetcher: options.naverIntegrationFetcher,
+      })
+    : null;
 
   return {
     market: 'KR',
@@ -385,10 +405,61 @@ async function getNaverCurrentQuote(code, options = {}) {
     price,
     currency: 'KRW',
     ...(volume !== null ? { volume } : {}),
+    ...(quoteContext?.week52High !== null && quoteContext?.week52High !== undefined
+      ? { week52High: quoteContext.week52High }
+      : {}),
+    ...(quoteContext?.week52Low !== null && quoteContext?.week52Low !== undefined
+      ? { week52Low: quoteContext.week52Low }
+      : {}),
     asOf: typeof payload?.localTradedAt === 'string' ? payload.localTradedAt : null,
     source: 'naver-finance',
     status: 'ok',
   };
+}
+
+async function getNaverCurrentQuoteContext(code, options = {}) {
+  try {
+    const payload = typeof options.naverIntegrationFetcher === 'function'
+      ? await options.naverIntegrationFetcher(code)
+      : await fetchNaverCurrentQuoteContext(code, options);
+
+    return {
+      week52High: parseQuoteNumber(
+        payload?.highPriceOf52Weeks
+        ?? findNaverTotalInfoValue(payload, ['highPriceOf52Weeks', '52주 최고']),
+      ),
+      week52Low: parseQuoteNumber(
+        payload?.lowPriceOf52Weeks
+        ?? findNaverTotalInfoValue(payload, ['lowPriceOf52Weeks', '52주 최저']),
+      ),
+    };
+  } catch {
+    return null;
+  }
+}
+
+async function fetchNaverCurrentQuoteContext(code, options = {}) {
+  const response = await withFetchTimeout(
+    options.fetchImpl,
+    `${NAVER_STOCK_BASIC_URL_PREFIX}${encodeURIComponent(code)}${NAVER_STOCK_INTEGRATION_PATH_SUFFIX}`,
+    {
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'Mozilla/5.0',
+      },
+    },
+    options.timeoutMs,
+  );
+
+  if (response.status === 404 || response.status === 409) {
+    return null;
+  }
+
+  if (!response.ok) {
+    throw new Error(`Naver current quote context returned HTTP ${response.status}`);
+  }
+
+  return response.json();
 }
 
 async function getNaverCurrentQuoteVolume(code, options = {}) {
@@ -672,6 +743,8 @@ export async function getKrCurrentQuotes(codes, options = {}) {
   const naverResult = await getNaverCurrentQuotes(normalizedCodes, {
     naverQuoteFetcher: options.naverQuoteFetcher,
     naverPriceFetcher: options.naverPriceFetcher,
+    naverIntegrationFetcher: options.naverIntegrationFetcher,
+    includeNaverQuoteContext: options.includeNaverQuoteContext,
     naverFetchImpl: options.naverFetchImpl,
     fetchImpl: options.fetchImpl,
     naverCurrentQuotesTimeoutMs: options.naverCurrentQuotesTimeoutMs,
@@ -830,6 +903,8 @@ export async function getCurrentQuotes(input = {}, options = {}) {
       tradeDate,
       naverQuoteFetcher: options.naverQuoteFetcher,
       naverPriceFetcher: options.naverPriceFetcher,
+      naverIntegrationFetcher: options.naverIntegrationFetcher,
+      includeNaverQuoteContext: options.includeNaverQuoteContext,
       naverFetchImpl: options.naverFetchImpl,
       fetchImpl: options.fetchImpl,
       naverCurrentQuotesTimeoutMs: options.naverCurrentQuotesTimeoutMs,

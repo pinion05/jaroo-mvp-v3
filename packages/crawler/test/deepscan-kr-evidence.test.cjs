@@ -177,6 +177,9 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
     recommendation: 'BUY',
     recommendationScore: null,
     recommendationCounts: null,
+    analystCount: null,
+    highestTargetPrice: null,
+    lowestTargetPrice: null,
     revisionDirection: 'unknown',
     revisionPct: null,
   });

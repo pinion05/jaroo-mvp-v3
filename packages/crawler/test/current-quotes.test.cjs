@@ -25,6 +25,7 @@ test('quotes-current endpoint definition is registered', async () => {
   assert.deepEqual(definition.dataSources, ['naver-finance', 'krx-js-client', 'polygon', 'fmp']);
   assert.ok(definition.query.includes('codes(optional, csv)'));
   assert.ok(definition.query.includes('tickers(optional, csv)'));
+  assert.ok(definition.query.includes('includeContext(optional, boolean)'));
 });
 
 test('GET explicit-source quotes path returns standard success envelope with item-based count', async () => {
@@ -174,6 +175,42 @@ test('getNaverCurrentQuotes fills volume from the Naver price endpoint when basi
   assert.equal(result.items[0].volume, 1234567);
   assert.equal(result.items[0].source, 'naver-finance');
   assert.deepEqual(result.missing, []);
+});
+
+test('getNaverCurrentQuotes can include 52-week high and low from Naver integration context', async () => {
+  const { getNaverCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+  const requestedUrls = [];
+
+  const result = await getNaverCurrentQuotes(['005930'], {
+    includeNaverQuoteContext: true,
+    naverCurrentQuotesTimeoutMs: null,
+    naverFetchImpl: async (url) => {
+      requestedUrls.push(String(url));
+      if (String(url).endsWith('/basic')) {
+        return new Response(JSON.stringify({
+          itemCode: '005930',
+          closePrice: '85,200',
+          accumulatedTradingVolume: '1,234,567',
+          localTradedAt: '2026-04-30T15:30:00+09:00',
+        }));
+      }
+
+      return new Response(JSON.stringify({
+        totalInfos: [
+          { code: 'highPriceOf52Weeks', key: '52주 최고', value: '107,200' },
+          { code: 'lowPriceOf52Weeks', key: '52주 최저', value: '79,400' },
+        ],
+      }));
+    },
+  });
+
+  assert.deepEqual(requestedUrls, [
+    'https://m.stock.naver.com/api/stock/005930/basic',
+    'https://m.stock.naver.com/api/stock/005930/integration',
+  ]);
+  assert.equal(result.items.length, 1);
+  assert.equal(result.items[0].week52High, 107200);
+  assert.equal(result.items[0].week52Low, 79400);
 });
 
 test('getNaverCurrentQuotes default timeout tolerates OCI-class Naver latency', async () => {

@@ -257,6 +257,17 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
       body: '2025년 기준, 매출은 10.9% 늘었어요.\n본업 이익은 33.2% 늘었어요.\nAI 인프라 경쟁으로 서버용 메모리 수요가 물건이 모자랄 만큼 많아져 실적이 좋아졌어요.',
     },
   );
+  assert.deepEqual(
+    payload.insights.items.find((item) => item.sourceLabel === '증권사 의견'),
+    {
+      sourceType: 'report',
+      sourceLabel: '증권사 의견',
+      date: '2026-04-14',
+      label: '컨센서스',
+      title: '삼성전자 증권사 컨센서스',
+      body: '평균 목표가 100000 KRW · 현재가 대비 +17.37% · 매수 의견이 우세해요 · 투자의견 BUY',
+    },
+  );
   assert.equal(payload.strategy.weekSignal, '관찰 지속');
   assert.equal(payload.strategy.currentPriceText, '85200 KRW');
   assert.equal(payload.strategy.targetPriceText, '컨센서스/패키지 보조 근거 확인');

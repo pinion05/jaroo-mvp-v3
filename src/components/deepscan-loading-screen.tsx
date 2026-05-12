@@ -34,6 +34,7 @@ type DeepScanLoadingScreenProps = {
   currentProfitRate?: string | number
   evaluationAmount?: string | number
   findingProgress?: Partial<Record<FindingKey, FindingProgress>>
+  quickFacts?: LoadingQuickFact[]
   performanceComment?: LoadingPerformanceComment
   evidenceCollected?: boolean
   resultsReady?: boolean
@@ -57,6 +58,34 @@ export type LoadingPerformanceComment = {
   asOf?: string
   body: string
   lines?: string[]
+}
+
+export type LoadingQuickFact = {
+  key: string
+  category: string
+  badge: string
+  tone: 'info' | 'positive' | 'warning'
+  body: string
+  detail?: string
+  indicator?: {
+    positionPct: number
+    markerLabel?: string
+    deltaLabels?: string[]
+    leftLabel: string
+    rightLabel: string
+  }
+  consensus?: {
+    targetPriceLabel: string
+    currentPriceLabel?: string
+    analystCountLabel?: string
+    highTargetLabel?: string
+    lowTargetLabel?: string
+    summary?: string
+    upsideLabel?: string
+    upsidePct?: number
+    opinionLabel?: string
+    opinionScore?: number
+  }
 }
 
 type FindingDefinition = {
@@ -242,6 +271,48 @@ function formatTradingVolume(value: string | number | undefined) {
   return `${formatCompactNumber(numericValue)}주`
 }
 
+function hashSparklineSeed(value: string) {
+  return value.split('').reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 2166136261)
+}
+
+function seededSparklineUnit(seed: number, index: number) {
+  let state = (seed + index * 1013904223) >>> 0
+  state = (state * 1664525 + 1013904223) >>> 0
+  state = (state * 1664525 + 1013904223) >>> 0
+  return state / 4294967295
+}
+
+function clampSparklineY(value: number) {
+  return Math.min(48, Math.max(10, value))
+}
+
+function buildConsensusSparkline(seedSource: string, upsidePct: number | undefined) {
+  const seed = hashSparklineSeed(seedSource)
+  const uplift = typeof upsidePct === 'number' && Number.isFinite(upsidePct)
+    ? Math.min(20, Math.max(-14, upsidePct / 40 * 20))
+    : 8
+  const count = 7
+  const currentPoints: string[] = []
+  const targetPoints: string[] = []
+
+  for (let index = 0; index < count; index += 1) {
+    const x = 6 + index * (88 / (count - 1))
+    const wave = Math.sin((index + (seed % 7)) * 0.92) * 4.5
+    const currentJitter = (seededSparklineUnit(seed, index) - 0.5) * 7
+    const targetJitter = (seededSparklineUnit(seed, index + 31) - 0.5) * 5
+    const currentY = clampSparklineY(34 + wave + currentJitter)
+    const targetY = clampSparklineY(currentY - 8 - uplift + targetJitter)
+
+    currentPoints.push(`${x.toFixed(1)},${currentY.toFixed(1)}`)
+    targetPoints.push(`${x.toFixed(1)},${targetY.toFixed(1)}`)
+  }
+
+  return {
+    current: currentPoints.join(' '),
+    target: targetPoints.join(' '),
+  }
+}
+
 function memberStateClass(state: CommitteeMemberState) {
   if (state === 'done') {
     return styles.memberDone
@@ -311,6 +382,18 @@ function findingBadgeClass(tone: FindingProgressTone) {
   return styles.badgeActive
 }
 
+function quickFactBadgeClass(tone: LoadingQuickFact['tone']) {
+  if (tone === 'positive') {
+    return styles.badgeDone
+  }
+
+  if (tone === 'warning') {
+    return styles.badgeWarning
+  }
+
+  return styles.badgeActive
+}
+
 export function DeepScanLoadingScreen({
   name = '선택 종목',
   identifier,
@@ -324,6 +407,7 @@ export function DeepScanLoadingScreen({
   currentProfitRate,
   evaluationAmount,
   findingProgress,
+  quickFacts = [],
   performanceComment,
   evidenceCollected = false,
   resultsReady = false,
@@ -430,6 +514,109 @@ export function DeepScanLoadingScreen({
               ))}
             </ul>
           </section>
+        ) : null}
+
+        {quickFacts.length > 0 ? (
+          <>
+            <div className={styles.sectionLabel}>빠른 시장 체크</div>
+            <section className={styles.quickFactsCard} aria-label='빠른 시장 체크'>
+              {quickFacts.map((fact) => {
+                const indicator = fact.indicator
+                const consensus = fact.consensus
+                const segmentLabel = indicator && fact.detail ? fact.detail.replace(/이에요$|예요$/u, '') : fact.badge
+                const markerTopPct = indicator ? 100 - indicator.positionPct : 0
+                const calloutTopPct = Math.min(84, Math.max(16, markerTopPct))
+                const upsidePct = consensus?.upsidePct
+                const opinionScore = consensus?.opinionScore
+                const opinionPct = typeof opinionScore === 'number' ? Math.min(100, Math.max(0, opinionScore / 5 * 100)) : 0
+                const sparkline = consensus ? buildConsensusSparkline(`${fact.body}:${consensus.targetPriceLabel}`, upsidePct) : undefined
+
+                return (
+                  <article key={fact.key} className={cn(styles.quickFact, indicator ? styles.positionQuickFact : undefined, consensus ? styles.consensusQuickFact : undefined)}>
+                    <div className={styles.findingTop}>
+                      <span className={styles.findingCat}>{fact.category}</span>
+                      <span className={cn(styles.findingBadge, indicator || consensus ? styles.positionSegmentBadge : quickFactBadgeClass(fact.tone))}>
+                        {consensus?.upsideLabel ?? segmentLabel}
+                      </span>
+                    </div>
+                    {indicator ? (
+                      <div
+                        className={styles.positionIndicator}
+                        aria-label={`${fact.category}: ${indicator.leftLabel}부터 ${indicator.rightLabel} 사이 ${indicator.markerLabel ?? '현재 위치'}`}
+                      >
+                        <div className={styles.positionScale}>
+                          <span className={styles.positionTrack} aria-hidden='true' />
+                          <span
+                            className={styles.positionMarker}
+                            style={{ top: `${markerTopPct}%` }}
+                            aria-hidden='true'
+                          >
+                            <span className={styles.positionMarkerDot} />
+                            <span className={styles.positionLeader} />
+                          </span>
+                        </div>
+                        <div className={styles.positionReadout}>
+                          <span className={styles.positionHighLabel}>{indicator.rightLabel}</span>
+                          <div className={styles.positionCurrentCallout} style={{ top: `${calloutTopPct}%` }}>
+                            {indicator.markerLabel ? <strong>{indicator.markerLabel}</strong> : null}
+                            {indicator.deltaLabels?.length ? (
+                              <span className={styles.positionDeltaLine}>{indicator.deltaLabels.join(' · ')}</span>
+                            ) : (
+                              <span className={styles.positionDeltaLine}>{fact.body}</span>
+                            )}
+                          </div>
+                          <span className={styles.positionLowLabel}>{indicator.leftLabel}</span>
+                        </div>
+                      </div>
+                    ) : consensus ? (
+                      <div className={styles.consensusInsight} aria-label={`${fact.category}: ${fact.body}`}>
+                        <div className={styles.consensusChartTop}>
+                          <div>
+                            <span className={styles.consensusEyebrow}>{consensus.analystCountLabel ?? '증권사 평균'}</span>
+                            <strong>{consensus.targetPriceLabel}</strong>
+                          </div>
+                          <span>{consensus.upsideLabel ? `현재가 대비 ${consensus.upsideLabel}` : '목표가 비교'}</span>
+                        </div>
+                        <div className={styles.consensusLineChart} aria-hidden='true'>
+                          <svg viewBox='0 0 100 56' role='img' focusable='false' preserveAspectRatio='none'>
+                            <line className={styles.consensusGridLine} x1='4' y1='14' x2='96' y2='14' />
+                            <line className={styles.consensusGridLine} x1='4' y1='34' x2='96' y2='34' />
+                            <polyline className={styles.consensusCurrentLine} points={sparkline?.current} />
+                            <polyline className={styles.consensusTargetLine} points={sparkline?.target} />
+                          </svg>
+                          <div className={styles.consensusChartLegend}>
+                            <span><i className={styles.consensusCurrentSwatch} />현재가{consensus.currentPriceLabel ? ` ${consensus.currentPriceLabel}` : ''}</span>
+                            <span><i className={styles.consensusTargetSwatch} />증권사 목표</span>
+                          </div>
+                        </div>
+                        {consensus.summary ? <p className={styles.consensusSummary}>{consensus.summary}</p> : null}
+                        {consensus.highTargetLabel || consensus.lowTargetLabel || consensus.opinionLabel ? (
+                          <div className={styles.consensusRangeRow}>
+                            {consensus.highTargetLabel ? <span>최고 {consensus.highTargetLabel}</span> : null}
+                            {consensus.lowTargetLabel ? <span>최저 {consensus.lowTargetLabel}</span> : null}
+                            {consensus.opinionLabel ? <span>투자의견 {consensus.opinionLabel}</span> : null}
+                          </div>
+                        ) : null}
+                        {consensus.opinionLabel ? (
+                          <div className={styles.consensusOpinionBlock}>
+                            <span>신뢰도</span>
+                            <div className={styles.consensusOpinionMeter} aria-hidden='true'>
+                              <span style={{ width: `${opinionPct}%` }} />
+                            </div>
+                          </div>
+                        ) : null}
+                      </div>
+                    ) : (
+                      <>
+                        <p className={styles.findingText}>{fact.body}</p>
+                        {fact.detail ? <p className={styles.quickFactDetail}>{fact.detail}</p> : null}
+                      </>
+                    )}
+                  </article>
+                )
+              })}
+            </section>
+          </>
         ) : null}
 
         <div className={styles.metaInfo} role='status' aria-live='polite'>
