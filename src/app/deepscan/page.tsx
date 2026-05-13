@@ -553,6 +553,233 @@ function resolveInsightTone(item: JarooDeepScanInsightItem): keyof typeof newsTo
   return 'neutral'
 }
 
+function normalizeInsightDate(date: string | undefined) {
+  const normalized = date?.trim()
+  if (!normalized || normalized.startsWith('1970-01-01')) {
+    return '수집 완료'
+  }
+
+  return normalized.replace(/T/u, ' ').replace(/\+09:00$/u, '')
+}
+
+function splitInsightBodyParts(body: string) {
+  return body
+    .split(/\s*·\s*/u)
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
+function formatInsightMetricValue(value: string) {
+  const metric = value.trim()
+  const match = metric.match(/^([0-9,]+(?:\.\d+)?)\s*(KRW|USD|원|달러|주)$/iu)
+  if (!match) {
+    return metric
+  }
+
+  const numericValue = Number(match[1].replace(/,/gu, ''))
+  if (!Number.isFinite(numericValue)) {
+    return metric
+  }
+
+  const unit = match[2].toUpperCase()
+  if (unit === '주') {
+    return `${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(numericValue)}주`
+  }
+
+  return formatLoadingMoney(numericValue, unit === 'USD' || match[2] === '달러' ? 'USD' : 'KRW')
+}
+
+function extractInsightMetric(item: JarooDeepScanInsightItem) {
+  const sourceLabel = item.sourceLabel
+  const body = item.body.trim()
+
+  if (sourceLabel === '현재가') {
+    return formatInsightMetricValue(body.replace(/^현재가\s*/u, '').replace(/\s*확인$/u, '').trim())
+  }
+
+  if (sourceLabel === '거래량') {
+    return formatInsightMetricValue(body.replace(/^거래량\s*/u, '').replace(/\s*확인$/u, '').trim())
+  }
+
+  if (sourceLabel === '증권사 의견') {
+    const target = body.match(/평균\s*목표가\s*([^·]+)/u)?.[1]?.trim()
+    return target ? `목표가 ${formatInsightMetricValue(target)}` : '목표가 확인'
+  }
+
+  if (sourceLabel === '국내 리포트') {
+    return body.match(/(\d+\s*\/\s*\d+)/u)?.[1]?.replace(/\s+/gu, '') ?? '리포트 확보'
+  }
+
+  if (sourceLabel === '기업실적코멘트') {
+    const salesGrowth = body.match(/매출(?:은|액은)?\s*([+-]?\d+(?:\.\d+)?)%/u)?.[1]
+    const profitGrowth = body.match(/(?:영업이익|본업 이익)(?:은)?\s*([+-]?\d+(?:\.\d+)?)%/u)?.[1]
+    if (salesGrowth && profitGrowth) {
+      return `매출 +${salesGrowth}% · 이익 +${profitGrowth}%`
+    }
+    return '실적 요약'
+  }
+
+  if (sourceLabel === '보유 맥락') {
+    const shares = body.match(/보유\s*([^/\s]+주)/u)?.[1]
+    return shares ? `보유 ${shares}` : '포지션 확인'
+  }
+
+  return item.label
+}
+
+function buildInsightPills(item: JarooDeepScanInsightItem) {
+  const body = item.body.trim()
+  const sourceLabel = item.sourceLabel
+
+  if (sourceLabel === '현재가') {
+    return ['실시간 가격', '근거 확인']
+  }
+
+  if (sourceLabel === '거래량') {
+    return ['체결 관심도', '당일 거래량']
+  }
+
+  if (sourceLabel === '기업실적코멘트') {
+    return body
+      .split(/\n+/u)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+  }
+
+  if (sourceLabel === '보유 맥락') {
+    return body
+      .split(/\s*\/\s*/u)
+      .map((part) => part.replace(/\s*확인$/u, '').trim())
+      .filter(Boolean)
+  }
+
+  return splitInsightBodyParts(body)
+    .map((part) => part.replace(/\s*확보$/u, '').trim())
+    .filter(Boolean)
+    .slice(0, 4)
+}
+
+function getInsightPresentation(item: JarooDeepScanInsightItem): {
+  Icon: LucideIcon
+  eyebrow: string
+  cardClass: string
+  iconClass: string
+  metricClass: string
+} {
+  switch (item.sourceLabel) {
+    case '현재가':
+      return {
+        Icon: CircleDollarSign,
+        eyebrow: 'PRICE TICK',
+        cardClass: 'border-[#b9daf8] bg-[linear-gradient(135deg,#f3f9ff,#ffffff)]',
+        iconClass: 'bg-[#185fa5] text-white',
+        metricClass: 'text-[#185fa5]',
+      }
+    case '거래량':
+      return {
+        Icon: Activity,
+        eyebrow: 'VOLUME PULSE',
+        cardClass: 'border-[#c6e7d5] bg-[linear-gradient(135deg,#f2fbf6,#ffffff)]',
+        iconClass: 'bg-[#26794f] text-white',
+        metricClass: 'text-[#26794f]',
+      }
+    case '증권사 의견':
+      return {
+        Icon: LineChart,
+        eyebrow: 'TARGET VIEW',
+        cardClass: 'border-[#b9daf8] bg-[linear-gradient(135deg,#eef7ff,#ffffff)]',
+        iconClass: 'bg-[#102f4e] text-white',
+        metricClass: 'text-[#102f4e]',
+      }
+    case '국내 리포트':
+      return {
+        Icon: ClipboardCheck,
+        eyebrow: 'REPORT COVERAGE',
+        cardClass: 'border-[#d7ddea] bg-[linear-gradient(135deg,#f7f9fc,#ffffff)]',
+        iconClass: 'bg-[#64748b] text-white',
+        metricClass: 'text-[#334155]',
+      }
+    case '기업실적코멘트':
+      return {
+        Icon: Landmark,
+        eyebrow: 'EARNINGS MEMO',
+        cardClass: 'border-[#f1d7a5] bg-[linear-gradient(135deg,#fff8ec,#ffffff)]',
+        iconClass: 'bg-[#a16207] text-white',
+        metricClass: 'text-[#854f0b]',
+      }
+    case '보유 맥락':
+      return {
+        Icon: ShieldCheck,
+        eyebrow: 'POSITION',
+        cardClass: 'border-[#d8d4fb] bg-[linear-gradient(135deg,#f6f4ff,#ffffff)]',
+        iconClass: 'bg-[#534ab7] text-white',
+        metricClass: 'text-[#534ab7]',
+      }
+    default:
+      return {
+        Icon: BadgeCheck,
+        eyebrow: 'EVIDENCE',
+        cardClass: 'border-white bg-white',
+        iconClass: 'bg-[color:var(--jaroo-primary)] text-white',
+        metricClass: 'text-[color:var(--jaroo-primary)]',
+      }
+  }
+}
+
+function InsightEvidenceCard({ item }: { item: JarooDeepScanInsightItem }) {
+  const presentation = getInsightPresentation(item)
+  const metric = extractInsightMetric(item)
+  const pills = buildInsightPills(item)
+  const InsightIcon = presentation.Icon
+
+  return (
+    <article className={cn('relative overflow-hidden rounded-[24px] border p-4 shadow-[0_14px_30px_rgba(15,47,78,0.07)]', presentation.cardClass)}>
+      <div className='pointer-events-none absolute -right-10 -top-12 size-28 rounded-full bg-white/70 blur-xl' />
+      <div className='relative flex items-start gap-3'>
+        <div className={cn('grid size-11 shrink-0 place-items-center rounded-2xl shadow-[0_10px_20px_rgba(15,47,78,0.14)]', presentation.iconClass)}>
+          <InsightIcon className='size-5' aria-hidden />
+        </div>
+        <div className='min-w-0 flex-1'>
+          <div className='flex items-center gap-2'>
+            <span className='text-[10px] font-black tracking-[0.12em] text-[color:var(--jaroo-muted)]'>
+              {presentation.eyebrow}
+            </span>
+            <span className='rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[color:var(--jaroo-muted)] shadow-[inset_0_0_0_1px_rgba(17,24,39,0.05)]'>
+              {normalizeInsightDate(item.date)}
+            </span>
+          </div>
+          <h3 className='mt-1 text-sm font-black leading-5 tracking-[-0.03em] text-[color:var(--jaroo-ink)]'>
+            {item.sourceLabel}
+          </h3>
+          <p className='mt-0.5 text-[11px] leading-4 text-[color:var(--jaroo-muted)]'>{item.title}</p>
+        </div>
+        <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-bold', newsToneStyles[resolveInsightTone(item)])}>
+          {item.label}
+        </span>
+      </div>
+
+      <div className='relative mt-4 rounded-[18px] bg-white/78 p-3 shadow-[inset_0_0_0_1px_rgba(17,24,39,0.05)]'>
+        <p className={cn('text-xl font-black leading-none tracking-[-0.05em]', presentation.metricClass)}>
+          {metric}
+        </p>
+        {pills.length > 0 ? (
+          <div className='mt-3 flex flex-wrap gap-1.5'>
+            {pills.map((pill) => (
+              <span
+                key={pill}
+                className='rounded-full bg-[#f7f9fb] px-2.5 py-1 text-[11px] font-bold leading-4 text-[#4b647c] shadow-[inset_0_0_0_1px_rgba(15,47,78,0.06)]'
+              >
+                {pill}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </div>
+    </article>
+  )
+}
+
 function resolveScenarioTone(index: number, total: number): keyof typeof scenarioToneStyles {
   if (index === 0) {
     return 'primary'
@@ -1405,24 +1632,21 @@ export default function DeepScanPage() {
                 body: '크롤러가 인사이트 항목을 비어 있는 상태로 반환했습니다.',
               }} />
             ) : (
-              <Card className='rounded-[26px] border border-white/90 bg-white/95 px-4 py-2 shadow-[0_14px_34px_rgba(24,95,165,0.08)]'>
-                {payload.insights.items.map((item) => (
-                  <div
-                    key={`${item.sourceLabel}-${item.title}`}
-                    className='border-b border-[color:var(--jaroo-border)] py-4 last:border-b-0'
-                  >
-                    <div className='flex items-start justify-between gap-3'>
-                      <p className='text-[11px] text-[color:var(--jaroo-muted)]'>
-                        {item.sourceLabel} · {item.date}
-                      </p>
-                      <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-medium', newsToneStyles[resolveInsightTone(item)])}>
-                        {item.label}
-                      </span>
-                    </div>
-                    <p className='mt-2 text-sm font-semibold leading-6 text-[color:var(--jaroo-ink)]'>{item.title}</p>
-                    <p className='mt-1 whitespace-pre-line text-xs leading-5 text-[color:var(--jaroo-muted)]'>{item.body}</p>
+              <Card className='rounded-[28px] border border-white/90 bg-white/80 p-3 shadow-[0_14px_34px_rgba(24,95,165,0.08)] backdrop-blur'>
+                <div className='mb-3 flex items-center justify-between px-1'>
+                  <div>
+                    <p className='text-[11px] font-black tracking-[0.1em] text-[color:var(--jaroo-primary)]'>EVIDENCE BOARD</p>
+                    <p className='mt-0.5 text-xs text-[color:var(--jaroo-muted)]'>가격·거래·리포트·보유 맥락을 역할별 카드로 정리했어요.</p>
                   </div>
-                ))}
+                  <span className='rounded-full bg-[#e6f1fb] px-2.5 py-1 text-[11px] font-bold text-[color:var(--jaroo-primary)]'>
+                    {payload.insights.items.length}개
+                  </span>
+                </div>
+                <div className='grid gap-3'>
+                  {payload.insights.items.map((item) => (
+                    <InsightEvidenceCard key={`${item.sourceLabel}-${item.title}`} item={item} />
+                  ))}
+                </div>
               </Card>
             )}
           </SectionToggle>
