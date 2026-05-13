@@ -658,8 +658,13 @@ export function DeepScanLoadingScreen({
           <span>{metaMessage.text}</span>
         </div>
 
-        <div className={styles.elapsedTimer} aria-live='polite' aria-label={`딥스캔 분석 경과 시간 ${formatElapsedTime(elapsedSeconds)}`}>
-          <span className={styles.elapsedLabel}>분석 경과</span>
+        <div
+          className={cn(styles.elapsedTimer, resultsReady ? styles.elapsedTimerDone : undefined)}
+          aria-live='polite'
+          aria-label={resultsReady ? `딥스캔 분석 완료, 소요시간 ${formatElapsedTime(elapsedSeconds)}` : `딥스캔 분석 경과 시간 ${formatElapsedTime(elapsedSeconds)}`}
+        >
+          <span className={styles.elapsedLabel}>{resultsReady ? '분석 완료' : '분석 경과'}</span>
+          {resultsReady ? <span className={styles.elapsedSubLabel}>소요시간</span> : null}
           <span className={styles.elapsedValue}>{formatElapsedTime(elapsedSeconds)}</span>
         </div>
 
