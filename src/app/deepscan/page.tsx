@@ -239,7 +239,7 @@ function buildAxisFindingProgress(axis: JarooDeepScanCommitteeAxis | undefined):
   const memberSuffix = extraCount > 0 ? ` 외 ${extraCount}명` : ''
 
   return {
-    badge: pendingCount > 0 ? `${completedMembers.length}/${members.length} 응답` : '요약 도착',
+    badge: pendingCount > 0 ? `${completedMembers.length}/${members.length} 분석중` : '분석 완료',
     tone: pendingCount > 0 ? 'active' : 'done',
     body: `${leadMember.title}${memberSuffix}: ${compactFindingText(leadMember.reason)}`,
   }
@@ -261,7 +261,7 @@ function buildLoadingFindingProgress(payload: JarooDeepScanPayload | null): Load
 
   if (payload.metadata.llmCommittee?.status !== 'partial' && payload.sellNow.blockState === 'ok') {
     progress.decision = {
-      badge: '요약 도착',
+      badge: '분석 완료',
       tone: 'done',
       body: compactFindingText(payload.sellNow.realizedText) || compactFindingText(payload.portfolioSimulation.caption) || '즉시 매도 판단이 도착했어요.',
     }
