@@ -57,6 +57,7 @@ export type FindingProgress = {
 export type LoadingPerformanceComment = {
   asOf?: string
   body: string
+  fullBody?: string
   lines?: string[]
 }
 
@@ -247,6 +248,29 @@ function getCommentLines(comment: LoadingPerformanceComment) {
   return [compactCommentLine(comment.body, COMMENT_BODY_MAX_LENGTH)].filter(Boolean)
 }
 
+function splitReadableCommentText(value: string) {
+  return value
+    .split(/\n+/)
+    .flatMap((block) => block
+      .replace(/\s+/g, ' ')
+      .trim()
+      .split(/(?<=[.!?。])\s+/u))
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+function getExpandedCommentLines(comment: LoadingPerformanceComment) {
+  const expandedBody = comment.fullBody?.trim() || comment.body
+  const bodyLines = splitReadableCommentText(expandedBody)
+
+  if (hasDisplayValue(bodyLines)) {
+    return bodyLines
+  }
+
+  const explicitLines = Array.isArray(comment.lines) ? comment.lines : []
+  return explicitLines.flatMap(splitReadableCommentText)
+}
+
 function formatShares(value: string | number | undefined) {
   if (typeof value === 'string' && value.trim()) {
     const trimmed = value.trim()
@@ -431,7 +455,12 @@ export function DeepScanLoadingScreen({
   const findings = buildFindingDefinitions()
   const hasConsensusFact = quickFacts.some((fact) => fact.key === 'analyst-consensus' || Boolean(fact.consensus))
   const showConsensusSkeleton = !resultsReady && !hasConsensusFact
-  const showQuickFactsSection = quickFacts.length > 0 || showConsensusSkeleton
+  const showQuickFactsSection = quickFacts.length > 0 || showConsensusSkeleton || Boolean(performanceComment)
+  const performanceCommentPreviewLines = performanceComment ? getCommentLines(performanceComment) : []
+  const performanceCommentFullLines = performanceComment ? getExpandedCommentLines(performanceComment) : []
+  const showPerformanceCommentDetails = performanceComment
+    ? Boolean(performanceComment.fullBody?.trim()) || performanceCommentFullLines.join('\n') !== performanceCommentPreviewLines.join('\n')
+    : false
 
   useEffect(() => {
     if (resultsReady) {
@@ -490,6 +519,24 @@ export function DeepScanLoadingScreen({
           </div>
         </section>
 
+        <section className={styles.loadingStatusCard} aria-label='딥스캔 진행 상태'>
+          <div
+            className={cn(styles.elapsedTimer, resultsReady ? styles.elapsedTimerDone : undefined)}
+            aria-label={resultsReady ? `딥스캔 분석 완료, 소요시간 ${formatElapsedTime(elapsedSeconds)}` : `딥스캔 분석 경과 시간 ${formatElapsedTime(elapsedSeconds)}`}
+          >
+            <span className={styles.elapsedLabel}>{resultsReady ? '분석 완료' : '분석 경과'}</span>
+            {resultsReady ? <span className={styles.elapsedSubLabel}>소요시간</span> : null}
+            <span className={styles.elapsedValue}>{formatElapsedTime(elapsedSeconds)}</span>
+          </div>
+          <div className={styles.metaInfo}>
+            <span className={styles.metaIcon} aria-hidden='true'>{metaMessage.icon}</span>
+            <span>{metaMessage.text}</span>
+          </div>
+          <span className={styles.statusAnnouncer} role='status' aria-live='polite' aria-atomic='true'>
+            {resultsReady ? '딥스캔 분석 완료. 상세 결과 보기가 준비됐어요.' : ''}
+          </span>
+        </section>
+
         {!resultsReady ? (
           <section className={styles.contextCard} aria-label='현재 상황'>
             <div className={styles.contextTop}>
@@ -501,21 +548,6 @@ export function DeepScanLoadingScreen({
                 .filter(Boolean)
                 .join(' · ') || '보유 포지션'} 기준으로 회복 가능성, 리스크, 즉시 매도 판단을 순서대로 분석하고 있어요.
             </p>
-          </section>
-        ) : null}
-
-        {performanceComment ? (
-          <section className={styles.commentaryCard} aria-label='기업실적코멘트'>
-            <div className={styles.commentaryTop}>
-              <Factory className={styles.commentaryIcon} aria-hidden />
-              <span>기업실적코멘트</span>
-              {performanceComment.asOf ? <span className={styles.commentaryDate}>기준 {performanceComment.asOf}</span> : null}
-            </div>
-            <ul className={styles.commentaryLines}>
-              {getCommentLines(performanceComment).map((line, index) => (
-                <li key={`${index}-${line}`}>{line}</li>
-              ))}
-            </ul>
           </section>
         ) : null}
 
@@ -649,24 +681,42 @@ export function DeepScanLoadingScreen({
                   </div>
                 </article>
               ) : null}
+              {performanceComment ? (
+                <article className={cn(styles.quickFact, styles.commentaryQuickFact)} aria-label='기업실적코멘트'>
+                  <div className={styles.commentaryTop}>
+                    <Factory className={styles.commentaryIcon} aria-hidden />
+                    <span>기업실적코멘트</span>
+                    {performanceComment.asOf ? <span className={styles.commentaryDate}>기준 {performanceComment.asOf}</span> : null}
+                  </div>
+                  <ul className={styles.commentaryLines}>
+                    {performanceCommentPreviewLines.map((line, index) => (
+                      <li key={`${index}-${line}`}>{line}</li>
+                    ))}
+                  </ul>
+                  {showPerformanceCommentDetails ? (
+                    <details className={styles.commentaryDetails}>
+                      <summary className={styles.commentaryDetailsSummary}>
+                        <span>원문 자세히 보기</span>
+                        <small>{performanceCommentFullLines.length}개 문장</small>
+                      </summary>
+                      <div className={styles.commentaryFullText}>
+                        <ol className={styles.commentaryFullList}>
+                          {performanceCommentFullLines.map((line, index) => (
+                            <li key={`${index}-${line}`}>
+                              <span className={styles.commentaryFullIndex}>{String(index + 1).padStart(2, '0')}</span>
+                              <p>{line}</p>
+                            </li>
+                          ))}
+                        </ol>
+                      </div>
+                    </details>
+                  ) : null}
+                </article>
+              ) : null}
             </section>
           </>
         ) : null}
 
-        <div className={styles.metaInfo} role='status' aria-live='polite'>
-          <span className={styles.metaIcon} aria-hidden='true'>{metaMessage.icon}</span>
-          <span>{metaMessage.text}</span>
-        </div>
-
-        <div
-          className={cn(styles.elapsedTimer, resultsReady ? styles.elapsedTimerDone : undefined)}
-          aria-live='polite'
-          aria-label={resultsReady ? `딥스캔 분석 완료, 소요시간 ${formatElapsedTime(elapsedSeconds)}` : `딥스캔 분석 경과 시간 ${formatElapsedTime(elapsedSeconds)}`}
-        >
-          <span className={styles.elapsedLabel}>{resultsReady ? '분석 완료' : '분석 경과'}</span>
-          {resultsReady ? <span className={styles.elapsedSubLabel}>소요시간</span> : null}
-          <span className={styles.elapsedValue}>{formatElapsedTime(elapsedSeconds)}</span>
-        </div>
 
         <div className={styles.sectionLabel}>진행 요약</div>
         <section className={styles.findingCard} aria-label='딥스캔 진행 요약'>
@@ -702,7 +752,7 @@ export function DeepScanLoadingScreen({
           })}
         </section>
 
-        <section className={styles.scoreCard} aria-label='최종 점수 준비 상태'>
+        <section className={cn(styles.scoreCard, !resultsReady ? styles.scoreCardWaiting : undefined)} aria-label='최종 점수 준비 상태'>
           <div className={styles.scoreLabel}>자루의 확신도</div>
           <div className={styles.scoreValue}>{resultsReady ? '준비 완료' : '계산 중'}</div>
           <div className={styles.scoreBar} aria-hidden='true'>
@@ -713,50 +763,53 @@ export function DeepScanLoadingScreen({
           </p>
         </section>
 
-        <div className={styles.stepsWrap} aria-label='분석 단계'>
-          {[
-            { label: '대상 종목 확인', state: 'done' },
-            { label: '근거 데이터 수집', state: evidenceCollected ? 'done' : 'active' },
-            { label: 'AI 9인 위원회 응답 대기', state: resultsReady ? 'done' : evidenceCollected ? 'active' : 'wait' },
-            { label: '최종 리포트 생성', state: resultsReady ? 'done' : 'wait' },
-          ].map((step, index) => {
-            const isDone = step.state === 'done'
-            const isActive = step.state === 'active'
+        <details className={styles.progressDetails}>
+          <summary className={styles.progressDetailsSummary}>세부 진행 단계·위원회 상태</summary>
+          <div className={styles.stepsWrap} aria-label='분석 단계'>
+            {[
+              { label: '대상 종목 확인', state: 'done' },
+              { label: '근거 데이터 수집', state: evidenceCollected ? 'done' : 'active' },
+              { label: 'AI 9인 위원회 응답 대기', state: resultsReady ? 'done' : evidenceCollected ? 'active' : 'wait' },
+              { label: '최종 리포트 생성', state: resultsReady ? 'done' : 'wait' },
+            ].map((step, index) => {
+              const isDone = step.state === 'done'
+              const isActive = step.state === 'active'
 
-            return (
-              <div key={step.label} className={styles.stepRow}>
-                <div className={cn(styles.stepIcon, isDone && styles.stepDone, isActive && styles.stepActive, !isDone && !isActive && styles.stepWait)}>
-                  {isDone ? <CheckCircle2 className={styles.stepSvg} aria-hidden /> : isActive ? <Loader2 className={styles.stepSvg} aria-hidden /> : index + 1}
+              return (
+                <div key={step.label} className={styles.stepRow}>
+                  <div className={cn(styles.stepIcon, isDone && styles.stepDone, isActive && styles.stepActive, !isDone && !isActive && styles.stepWait)}>
+                    {isDone ? <CheckCircle2 className={styles.stepSvg} aria-hidden /> : isActive ? <Loader2 className={styles.stepSvg} aria-hidden /> : index + 1}
+                  </div>
+                  <div className={cn(styles.stepLabel, isDone && styles.stepLabelDone, isActive && styles.stepLabelActive, !isDone && !isActive && styles.stepLabelWait)}>
+                    {step.label}
+                  </div>
+                  {index === 2 ? <div className={styles.stepCount}>{resultsReady ? '완료' : `${pendingCommitteeMemberCount}명 대기`}</div> : null}
                 </div>
-                <div className={cn(styles.stepLabel, isDone && styles.stepLabelDone, isActive && styles.stepLabelActive, !isDone && !isActive && styles.stepLabelWait)}>
-                  {step.label}
-                </div>
-                {index === 2 ? <div className={styles.stepCount}>{resultsReady ? '완료' : `${pendingCommitteeMemberCount}명 대기`}</div> : null}
-              </div>
-            )
-          })}
-        </div>
-
-        <section className={styles.committeeWrap} aria-label='AI 위원회 진행 상태'>
-          <div className={styles.committeeTitle}>{resultsReady ? 'AI 9인 위원회 응답 완료' : 'AI 9인 위원회 응답 대기 중'}</div>
-          <div className={styles.membersGrid}>
-            {committeeMembers.map((member) => (
-              <div key={member.key} className={styles.member}>
-                <div className={cn(styles.memberIcon, memberStateClass(resultsReady ? 'done' : member.state))}>
-                  <member.Icon className={styles.memberSvgIcon} aria-hidden />
-                </div>
-                <div className={styles.memberName}>
-                  {member.label.split('\n').map((line) => (
-                    <span key={line}>
-                      {line}
-                      <br />
-                    </span>
-                  ))}
-                </div>
-              </div>
-            ))}
+              )
+            })}
           </div>
-        </section>
+
+          <section className={styles.committeeWrap} aria-label='AI 위원회 진행 상태'>
+            <div className={styles.committeeTitle}>{resultsReady ? 'AI 9인 위원회 응답 완료' : 'AI 9인 위원회 응답 대기 중'}</div>
+            <div className={styles.membersGrid}>
+              {committeeMembers.map((member) => (
+                <div key={member.key} className={styles.member}>
+                  <div className={cn(styles.memberIcon, memberStateClass(resultsReady ? 'done' : member.state))}>
+                    <member.Icon className={styles.memberSvgIcon} aria-hidden />
+                  </div>
+                  <div className={styles.memberName}>
+                    {member.label.split('\n').map((line) => (
+                      <span key={line}>
+                        {line}
+                        <br />
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </section>
+        </details>
 
         <button type='button' className={styles.primaryButton} disabled={!resultsReady} onClick={onViewResults}>
           {resultsReady ? '상세 결과 보기' : '상세 결과 준비 중'}

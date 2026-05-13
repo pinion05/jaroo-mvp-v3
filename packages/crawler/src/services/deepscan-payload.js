@@ -1590,6 +1590,7 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
           label: '실적',
           title: '기업실적코멘트 쉽게 보기',
           body: performanceCommentBody,
+          sourceBody: performanceComment.text,
         }]
       : []),
     {

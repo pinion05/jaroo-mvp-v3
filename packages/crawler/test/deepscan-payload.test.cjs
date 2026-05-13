@@ -255,6 +255,7 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
       label: '실적',
       title: '기업실적코멘트 쉽게 보기',
       body: '2025년 기준, 매출은 10.9% 늘었어요.\n본업 이익은 33.2% 늘었어요.\nAI 인프라 경쟁으로 서버용 메모리 수요가 물건이 모자랄 만큼 많아져 실적이 좋아졌어요.',
+      sourceBody: '2025년 결산 전년동기 대비 연결기준 매출액은 10.9% 증가, 영업이익은 33.2% 증가. AI 인프라 경쟁으로 서버향 메모리 수요가 공급량을 초과하여 실적이 개선됨.',
     },
   );
   assert.deepEqual(
@@ -337,10 +338,12 @@ test('buildJarooDeepScanPayload uses LLM to simplify WiseReport performance comm
       sources: createStrongKrSources(),
     });
 
+    const commentInsight = payload.insights.items.find((item) => item.sourceLabel === '기업실적코멘트');
     assert.equal(
-      payload.insights.items.find((item) => item.sourceLabel === '기업실적코멘트')?.body,
+      commentInsight?.body,
       '2025년 매출은 10.9% 늘었어요.\n본업 이익은 33.2% 늘었어요.\n서버 메모리가 부족할 만큼 수요가 많았어요.',
     );
+    assert.match(commentInsight?.sourceBody ?? '', /매출액은 10\.9% 증가/);
   } finally {
     global.fetch = originalFetch;
     if (originalKey) {

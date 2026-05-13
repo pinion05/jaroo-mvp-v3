@@ -120,6 +120,7 @@ export type JarooDeepScanInsightItem = {
   label: string
   title: string
   body: string
+  sourceBody?: string
 }
 
 export type JarooDeepScanStrategyScenario = {
