@@ -472,7 +472,7 @@ function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null): L
   const isPositive = /매수|buy|상향|positive/i.test(consensus.body) || (parsedConsensus.upsidePct ?? 0) > 0 || (parsedConsensus.opinionScore ?? 0) >= 3.5
   return {
     key: 'analyst-consensus',
-    category: '증권사 의견',
+    category: '목표가',
     badge: isPositive ? '긍정' : '정보',
     tone: isPositive ? 'positive' : 'info',
     body: consensus.body,
