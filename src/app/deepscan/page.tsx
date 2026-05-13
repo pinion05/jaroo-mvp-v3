@@ -96,6 +96,12 @@ const committeeMemberIcons: Record<string, LucideIcon> = {
   FIT: ClipboardCheck,
 }
 
+const emptyDeepScanSteps: ReadonlyArray<{ icon: LucideIcon; label: string; body: string }> = [
+  { icon: BadgeCheck, label: '보유 종목 선택', body: '홈에서 분석할 주식 카드를 고릅니다.' },
+  { icon: LineChart, label: '시장 데이터 확인', body: '현재가·목표가·52주 위치를 먼저 보여줘요.' },
+  { icon: ShieldCheck, label: 'AI 위원회 분석', body: '회복 가능성과 리스크를 순서대로 정리합니다.' },
+]
+
 const newsToneStyles = {
   positive: 'bg-[color:var(--jaroo-success-soft)] text-[color:var(--jaroo-success)]',
   danger: 'bg-[color:var(--jaroo-danger-soft)] text-[color:var(--jaroo-danger)]',
@@ -553,6 +559,277 @@ function resolveInsightTone(item: JarooDeepScanInsightItem): keyof typeof newsTo
   return 'neutral'
 }
 
+function normalizeInsightDate(date: string | undefined) {
+  const normalized = date?.trim()
+  if (!normalized || normalized.startsWith('1970-01-01')) {
+    return '수집 완료'
+  }
+
+  return normalized.replace(/T/u, ' ').replace(/\+09:00$/u, '')
+}
+
+function splitInsightBodyParts(body: string) {
+  return body
+    .split(/\s*·\s*/u)
+    .map((part) => part.trim())
+    .filter(Boolean)
+}
+
+function formatInsightMetricValue(value: string) {
+  const metric = value.trim()
+  const match = metric.match(/^([0-9,]+(?:\.\d+)?)\s*(KRW|USD|원|달러|주)$/iu)
+  if (!match) {
+    return metric
+  }
+
+  const numericValue = Number(match[1].replace(/,/gu, ''))
+  if (!Number.isFinite(numericValue)) {
+    return metric
+  }
+
+  const unit = match[2].toUpperCase()
+  if (unit === '주') {
+    return `${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(numericValue)}주`
+  }
+
+  return formatLoadingMoney(numericValue, unit === 'USD' || match[2] === '달러' ? 'USD' : 'KRW')
+}
+
+function extractInsightMetric(item: JarooDeepScanInsightItem) {
+  const sourceLabel = item.sourceLabel
+  const body = item.body.trim()
+
+  if (sourceLabel === '현재가') {
+    return formatInsightMetricValue(body.replace(/^현재가\s*/u, '').replace(/\s*확인$/u, '').trim())
+  }
+
+  if (sourceLabel === '거래량') {
+    return formatInsightMetricValue(body.replace(/^거래량\s*/u, '').replace(/\s*확인$/u, '').trim())
+  }
+
+  if (sourceLabel === '증권사 의견') {
+    const target = body.match(/평균\s*목표가\s*([^·]+)/u)?.[1]?.trim()
+    return target ? `목표가 ${formatInsightMetricValue(target)}` : '목표가 확인'
+  }
+
+  if (sourceLabel === '국내 리포트') {
+    return body.match(/(\d+\s*\/\s*\d+)/u)?.[1]?.replace(/\s+/gu, '') ?? '리포트 확보'
+  }
+
+  if (sourceLabel === '기업실적코멘트') {
+    const salesGrowth = body.match(/매출(?:은|액은)?\s*([+-]?\d+(?:\.\d+)?)%/u)?.[1]
+    const profitGrowth = body.match(/(?:영업이익|본업 이익)(?:은)?\s*([+-]?\d+(?:\.\d+)?)%/u)?.[1]
+    if (salesGrowth && profitGrowth) {
+      return `매출 +${salesGrowth}% · 이익 +${profitGrowth}%`
+    }
+    return '실적 요약'
+  }
+
+  if (sourceLabel === '보유 맥락') {
+    const shares = body.match(/보유\s*([^/\s]+주)/u)?.[1]
+    return shares ? `보유 ${shares}` : '포지션 확인'
+  }
+
+  return item.label
+}
+
+function buildInsightPills(item: JarooDeepScanInsightItem) {
+  const body = item.body.trim()
+  const sourceLabel = item.sourceLabel
+
+  if (sourceLabel === '현재가') {
+    return ['실시간 가격', '근거 확인']
+  }
+
+  if (sourceLabel === '거래량') {
+    return ['체결 관심도', '당일 거래량']
+  }
+
+  if (sourceLabel === '기업실적코멘트') {
+    return body
+      .split(/\n+/u)
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .slice(0, 3)
+  }
+
+  if (sourceLabel === '보유 맥락') {
+    return body
+      .split(/\s*\/\s*/u)
+      .map((part) => part.replace(/\s*확인$/u, '').trim())
+      .filter(Boolean)
+  }
+
+  return splitInsightBodyParts(body)
+    .map((part) => part.replace(/\s*확보$/u, '').trim())
+    .filter(Boolean)
+    .slice(0, 4)
+}
+
+function splitInsightDetailLines(value: string) {
+  return value
+    .split(/\n+/u)
+    .flatMap((block) => block
+      .replace(/\s+/gu, ' ')
+      .trim()
+      .split(/(?<=[.!?。])\s+/u))
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+function getInsightDetailLines(item: JarooDeepScanInsightItem) {
+  if (item.sourceLabel !== '기업실적코멘트') {
+    return []
+  }
+
+  const detailBody = item.sourceBody?.trim() || item.body.trim()
+  const lines = splitInsightDetailLines(detailBody)
+
+  return lines.length > 0 ? lines : [detailBody].filter(Boolean)
+}
+
+function getInsightPresentation(item: JarooDeepScanInsightItem): {
+  Icon: LucideIcon
+  eyebrow: string
+  cardClass: string
+  iconClass: string
+  metricClass: string
+} {
+  switch (item.sourceLabel) {
+    case '현재가':
+      return {
+        Icon: CircleDollarSign,
+        eyebrow: 'PRICE TICK',
+        cardClass: 'border-[#b9daf8] bg-[linear-gradient(135deg,#f3f9ff,#ffffff)]',
+        iconClass: 'bg-[#185fa5] text-white',
+        metricClass: 'text-[#185fa5]',
+      }
+    case '거래량':
+      return {
+        Icon: Activity,
+        eyebrow: 'VOLUME PULSE',
+        cardClass: 'border-[#c6e7d5] bg-[linear-gradient(135deg,#f2fbf6,#ffffff)]',
+        iconClass: 'bg-[#26794f] text-white',
+        metricClass: 'text-[#26794f]',
+      }
+    case '증권사 의견':
+      return {
+        Icon: LineChart,
+        eyebrow: 'TARGET VIEW',
+        cardClass: 'border-[#b9daf8] bg-[linear-gradient(135deg,#eef7ff,#ffffff)]',
+        iconClass: 'bg-[#102f4e] text-white',
+        metricClass: 'text-[#102f4e]',
+      }
+    case '국내 리포트':
+      return {
+        Icon: ClipboardCheck,
+        eyebrow: 'REPORT COVERAGE',
+        cardClass: 'border-[#d7ddea] bg-[linear-gradient(135deg,#f7f9fc,#ffffff)]',
+        iconClass: 'bg-[#64748b] text-white',
+        metricClass: 'text-[#334155]',
+      }
+    case '기업실적코멘트':
+      return {
+        Icon: Landmark,
+        eyebrow: 'EARNINGS MEMO',
+        cardClass: 'border-[#f1d7a5] bg-[linear-gradient(135deg,#fff8ec,#ffffff)]',
+        iconClass: 'bg-[#a16207] text-white',
+        metricClass: 'text-[#854f0b]',
+      }
+    case '보유 맥락':
+      return {
+        Icon: ShieldCheck,
+        eyebrow: 'POSITION',
+        cardClass: 'border-[#d8d4fb] bg-[linear-gradient(135deg,#f6f4ff,#ffffff)]',
+        iconClass: 'bg-[#534ab7] text-white',
+        metricClass: 'text-[#534ab7]',
+      }
+    default:
+      return {
+        Icon: BadgeCheck,
+        eyebrow: 'EVIDENCE',
+        cardClass: 'border-white bg-white',
+        iconClass: 'bg-[color:var(--jaroo-primary)] text-white',
+        metricClass: 'text-[color:var(--jaroo-primary)]',
+      }
+  }
+}
+
+function InsightEvidenceCard({ item }: { item: JarooDeepScanInsightItem }) {
+  const presentation = getInsightPresentation(item)
+  const metric = extractInsightMetric(item)
+  const pills = buildInsightPills(item)
+  const detailLines = getInsightDetailLines(item)
+  const showDetails = detailLines.length > 0
+  const InsightIcon = presentation.Icon
+
+  return (
+    <article className={cn('relative overflow-hidden rounded-[24px] border p-4 shadow-[0_14px_30px_rgba(15,47,78,0.07)]', presentation.cardClass)}>
+      <div className='pointer-events-none absolute -right-10 -top-12 size-28 rounded-full bg-white/70 blur-xl' />
+      <div className='relative flex items-start gap-3'>
+        <div className={cn('grid size-11 shrink-0 place-items-center rounded-2xl shadow-[0_10px_20px_rgba(15,47,78,0.14)]', presentation.iconClass)}>
+          <InsightIcon className='size-5' aria-hidden />
+        </div>
+        <div className='min-w-0 flex-1'>
+          <div className='flex items-center gap-2'>
+            <span className='text-[10px] font-black tracking-[0.12em] text-[color:var(--jaroo-muted)]'>
+              {presentation.eyebrow}
+            </span>
+            <span className='rounded-full bg-white/80 px-2 py-0.5 text-[10px] font-bold text-[color:var(--jaroo-muted)] shadow-[inset_0_0_0_1px_rgba(17,24,39,0.05)]'>
+              {normalizeInsightDate(item.date)}
+            </span>
+          </div>
+          <h3 className='mt-1 text-sm font-black leading-5 tracking-[-0.03em] text-[color:var(--jaroo-ink)]'>
+            {item.sourceLabel}
+          </h3>
+          <p className='mt-0.5 text-[11px] leading-4 text-[color:var(--jaroo-muted)]'>{item.title}</p>
+        </div>
+        <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-bold', newsToneStyles[resolveInsightTone(item)])}>
+          {item.label}
+        </span>
+      </div>
+
+      <div className='relative mt-4 rounded-[18px] bg-white/78 p-3 shadow-[inset_0_0_0_1px_rgba(17,24,39,0.05)]'>
+        <p className={cn('text-xl font-black leading-none tracking-[-0.05em]', presentation.metricClass)}>
+          {metric}
+        </p>
+        {pills.length > 0 ? (
+          <div className='mt-3 flex flex-wrap gap-1.5'>
+            {pills.map((pill) => (
+              <span
+                key={pill}
+                className='rounded-full bg-[#f7f9fb] px-2.5 py-1 text-[11px] font-bold leading-4 text-[#4b647c] shadow-[inset_0_0_0_1px_rgba(15,47,78,0.06)]'
+              >
+                {pill}
+              </span>
+            ))}
+          </div>
+        ) : null}
+      </div>
+      {showDetails ? (
+        <details className='relative mt-3 overflow-hidden rounded-[18px] bg-white/82 shadow-[inset_0_0_0_1px_rgba(133,79,11,0.12)]'>
+          <summary className='flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-[12px] font-black text-[#854f0b] [&::-webkit-details-marker]:hidden'>
+            <span>자세히 보기</span>
+            <span className='rounded-full bg-[#fff4dc] px-2.5 py-1 text-[10px] font-black text-[#a16207]'>
+              원문 {detailLines.length}문장
+            </span>
+          </summary>
+          <ol className='grid gap-2 border-t border-[#f1d7a5]/60 p-3'>
+            {detailLines.map((line, index) => (
+              <li key={`${index}-${line}`} className='grid grid-cols-[30px_minmax(0,1fr)] gap-2 rounded-[14px] bg-[#fffaf0] p-2.5'>
+                <span className='grid size-7 place-items-center rounded-[10px] bg-[#a16207] text-[10px] font-black text-white'>
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <p className='m-0 text-xs leading-5 text-[#5f4218]'>{line}</p>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
+    </article>
+  )
+}
+
 function resolveScenarioTone(index: number, total: number): keyof typeof scenarioToneStyles {
   if (index === 0) {
     return 'primary'
@@ -607,11 +884,11 @@ function resolveWeekToneClasses(tone: string) {
 
 function SectionStatusCard({ notice }: { notice: { badge: string; title: string; body: string } }) {
   return (
-    <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
-      <span className='inline-flex rounded-full bg-[color:var(--jaroo-secondary)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-muted)]'>
+    <Card className='rounded-[26px] border border-white/90 bg-white/90 p-4 shadow-[0_14px_34px_rgba(24,95,165,0.09)] backdrop-blur'>
+      <span className='inline-flex rounded-full bg-[#e6f1fb] px-2.5 py-1 text-[11px] font-bold text-[color:var(--jaroo-primary)]'>
         {notice.badge}
       </span>
-      <p className='mt-3 text-sm font-semibold text-[color:var(--jaroo-ink)]'>{notice.title}</p>
+      <p className='mt-3 text-sm font-black tracking-[-0.02em] text-[color:var(--jaroo-ink)]'>{notice.title}</p>
       <p className='mt-2 text-xs leading-5 text-[color:var(--jaroo-muted)]'>{notice.body}</p>
     </Card>
   )
@@ -631,14 +908,14 @@ function SectionToggle({
   children: ReactNode
 }) {
   return (
-    <div className='space-y-2'>
+    <div className='space-y-3'>
       <button
         type='button'
         onClick={onToggle}
-        className='flex w-full items-center justify-between rounded-[24px] border border-[color:var(--jaroo-border)] bg-white px-4 py-4 text-left transition active:scale-[0.99]'
+        className='flex w-full items-center justify-between rounded-[26px] border border-white/90 bg-white/95 px-4 py-4 text-left shadow-[0_12px_30px_rgba(24,95,165,0.08)] transition active:scale-[0.99]'
       >
         <div className='min-w-0'>
-          <p className='text-sm font-semibold text-[color:var(--jaroo-ink)]'>{label}</p>
+          <p className='text-sm font-black tracking-[-0.02em] text-[color:var(--jaroo-ink)]'>{label}</p>
           {tags ? <div className='mt-2 flex flex-wrap gap-1.5'>{tags}</div> : null}
         </div>
         <ChevronDown
@@ -921,29 +1198,86 @@ export default function DeepScanPage() {
     return (
       <JarooShell
         title='DeepScan'
+        subtitle='종목을 선택하면 9인 위원회가 바로 시작돼요'
         backHref='/home'
         showBottomNav={false}
-        mainClassName='px-4 pt-4 pb-6'
+        mainClassName='relative overflow-x-hidden bg-[#f4f8fb] px-4 pt-4 pb-6 before:pointer-events-none before:absolute before:inset-x-[-80px] before:top-[-160px] before:h-[320px] before:rounded-full before:bg-[radial-gradient(circle_at_50%_50%,rgba(24,95,165,0.18),rgba(24,95,165,0)_68%)]'
       >
-        <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-5 shadow-none'>
-          <span className='inline-flex rounded-full bg-[color:var(--jaroo-warning-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-warning)]'>
-            비어 있음
-          </span>
-          <h1 className='mt-3 text-xl font-semibold text-[color:var(--jaroo-ink)]'>{missingTargetTitle}</h1>
-          <p className='mt-2 text-sm leading-6 text-[color:var(--jaroo-muted)]'>
-            홈에서 분석할 종목을 선택한 뒤 다시 들어와 주세요.
+        <section className='relative overflow-hidden rounded-[30px] border border-white/80 bg-[#102f4e] p-5 text-white shadow-[0_22px_48px_rgba(16,47,78,0.24)]'>
+          <div className='pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-[#5fb0ff]/20 blur-2xl' />
+          <div className='pointer-events-none absolute bottom-0 right-0 h-28 w-36 rounded-tl-[80px] bg-[linear-gradient(135deg,rgba(255,255,255,0.12),rgba(255,255,255,0))]' />
+
+          <div className='relative flex items-start justify-between gap-4'>
+            <div>
+              <span className='inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold text-[#d6ecff] backdrop-blur'>
+                <span className='size-1.5 rounded-full bg-[#8ee6b8]' />
+                대기 화면
+              </span>
+              <h1 className='mt-4 text-[26px] font-black leading-[1.12] tracking-[-0.04em]'>
+                {missingTargetTitle}
+              </h1>
+            </div>
+            <div className='grid size-14 shrink-0 place-items-center rounded-2xl bg-white text-[#185fa5] shadow-[0_14px_28px_rgba(0,0,0,0.18)]'>
+              <LineChart className='size-7' aria-hidden />
+            </div>
+          </div>
+
+          <p className='relative mt-4 max-w-[260px] text-sm leading-6 text-[#c8d8e8]'>
+            홈에서 분석할 종목을 선택하면 가격 위치, 목표가, 실적 코멘트, AI 위원회 판단을 한 흐름으로 보여드려요.
           </p>
-          <div className='mt-5'>
-            <Link
-              href='/home'
-              className={buttonVariants({
-                className: 'h-12 w-full rounded-[22px] bg-[color:var(--jaroo-primary)] text-white hover:bg-[color:var(--jaroo-primary-strong)]',
-              })}
-            >
-              /home 으로 가기
-            </Link>
+
+          <div className='relative mt-5 grid grid-cols-3 gap-2'>
+            {[
+              ['52주', '위치'],
+              ['목표가', '비교'],
+              ['AI', '판단'],
+            ].map(([top, bottom]) => (
+              <div key={top} className='rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-3 backdrop-blur'>
+                <p className='text-[15px] font-black leading-none text-white'>{top}</p>
+                <p className='mt-1 text-[10px] font-semibold text-[#a9c9e8]'>{bottom}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <Card className='relative mt-4 overflow-hidden rounded-[28px] border border-white bg-white/90 p-4 shadow-[0_16px_40px_rgba(24,95,165,0.12)] backdrop-blur'>
+          <div className='absolute right-4 top-4 rounded-full bg-[#e6f1fb] px-2.5 py-1 text-[10px] font-black text-[color:var(--jaroo-primary)]'>
+            3 STEP
+          </div>
+          <p className='text-[11px] font-black tracking-[0.14em] text-[color:var(--jaroo-primary)]'>START GUIDE</p>
+          <h2 className='mt-2 text-lg font-black tracking-[-0.03em] text-[color:var(--jaroo-ink)]'>
+            이렇게 시작하면 됩니다
+          </h2>
+          <div className='mt-4 space-y-3'>
+            {emptyDeepScanSteps.map((step, index) => {
+              const Icon = step.icon
+
+              return (
+                <div key={step.label} className='grid grid-cols-[42px_1fr] gap-3 rounded-2xl border border-[#e8eef5] bg-[#fbfdff] p-3'>
+                  <div className='relative grid size-10 place-items-center rounded-2xl bg-[#e6f1fb] text-[color:var(--jaroo-primary)]'>
+                    <Icon className='size-5' aria-hidden />
+                    <span className='absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-[#102f4e] text-[9px] font-black text-white'>
+                      {index + 1}
+                    </span>
+                  </div>
+                  <div className='min-w-0'>
+                    <p className='text-sm font-black text-[color:var(--jaroo-ink)]'>{step.label}</p>
+                    <p className='mt-1 text-xs leading-5 text-[color:var(--jaroo-muted)]'>{step.body}</p>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </Card>
+
+        <Link
+          href='/home'
+          className={buttonVariants({
+            className: 'mt-4 h-[52px] w-full rounded-[22px] bg-[#185fa5] text-[15px] font-black text-white shadow-[0_16px_28px_rgba(24,95,165,0.24)] hover:bg-[#0f4f8d]',
+          })}
+        >
+          홈에서 종목 선택하기
+        </Link>
       </JarooShell>
     )
   }
@@ -1033,7 +1367,7 @@ export default function DeepScanPage() {
       }
       backHref='/home'
       showBottomNav={false}
-      mainClassName='px-4 pt-0 pb-0'
+      mainClassName='bg-[#f4f8fb] px-4 pt-0 pb-0'
       action={
         <Link
           href='/sharecard'
@@ -1048,8 +1382,8 @@ export default function DeepScanPage() {
       }
     >
       <Tabs value={tab} onValueChange={(value) => handleTabChange(value as TabValue)} className='gap-0'>
-        <div className='sticky top-0 z-10 -mx-4 border-b border-[color:var(--jaroo-border)] bg-white px-4 py-2'>
-          <TabsList className='grid h-11 w-full grid-cols-2 gap-1 rounded-[20px] bg-[color:var(--jaroo-secondary)] p-1'>
+        <div className='sticky top-0 z-10 -mx-4 border-b border-white/80 bg-[#f4f8fb]/95 px-4 py-2 backdrop-blur'>
+          <TabsList className='grid h-11 w-full grid-cols-2 gap-1 rounded-[20px] bg-white/80 p-1 shadow-[inset_0_0_0_1px_rgba(181,212,244,0.55)]'>
             <TabsTrigger
               value='analysis'
               className='h-full rounded-[16px] border-0 px-0 py-0 text-sm font-semibold text-[color:var(--jaroo-muted)] after:hidden data-active:bg-[color:var(--jaroo-primary)] data-active:text-white data-active:shadow-[0_8px_18px_rgba(24,95,165,0.22)]'
@@ -1066,37 +1400,39 @@ export default function DeepScanPage() {
         </div>
 
         <TabsContent value='analysis' className='mt-0 space-y-4 py-4'>
-          <Card className='rounded-[24px] border-0 bg-[color:var(--jaroo-accent)] p-5 shadow-none'>
-            <div className='flex items-center justify-between gap-3'>
-              <p className='text-[11px] font-medium tracking-[0.05em] text-[color:var(--jaroo-primary)]'>
+          <Card className='relative overflow-hidden rounded-[30px] border border-white/80 bg-[#102f4e] p-5 text-white shadow-[0_22px_48px_rgba(16,47,78,0.22)]'>
+            <div className='pointer-events-none absolute -right-12 -top-14 size-44 rounded-full bg-[#5fb0ff]/20 blur-2xl' />
+            <div className='pointer-events-none absolute bottom-0 right-0 h-32 w-40 rounded-tl-[90px] bg-[linear-gradient(135deg,rgba(255,255,255,0.13),rgba(255,255,255,0))]' />
+            <div className='relative flex items-center justify-between gap-3'>
+              <p className='rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-black tracking-[0.08em] text-[#d6ecff]'>
                 AI 9인 위원회 종합 분석
               </p>
               <div className='flex items-center gap-2'>
-                <span className={cn('text-xs font-medium', heroCard.statusToneClass)}>{heroCard.statusText}</span>
+                <span className={cn('rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold', heroCard.statusToneClass)}>{heroCard.statusText}</span>
                 <button
                   type='button'
                   onClick={handleRetry}
                   className={buttonVariants({
                     variant: 'outline',
                     className:
-                      'h-8 rounded-[10px] border-[color:var(--jaroo-primary)]/20 bg-white/80 px-3 text-[11px] font-medium text-[color:var(--jaroo-primary)] hover:bg-white disabled:pointer-events-none disabled:opacity-60',
+                      'h-8 rounded-[10px] border-white/20 bg-white px-3 text-[11px] font-bold text-[#185fa5] hover:bg-white disabled:pointer-events-none disabled:opacity-60',
                   })}
                 >
                   {fetchState === 'error' ? '다시 시도' : '재분석'}
                 </button>
               </div>
             </div>
-            <h1 className='mt-3 text-[28px] font-semibold leading-tight text-[color:var(--jaroo-primary-strong)]'>
+            <h1 className='relative mt-4 text-[30px] font-black leading-[1.08] tracking-[-0.05em] text-white'>
               {heroCard.headline}
             </h1>
-            <p className='mt-3 text-sm leading-7 text-[color:var(--jaroo-ink)]/80'>{heroCard.body}</p>
-            <div className='my-4 h-px bg-[color:var(--jaroo-primary)]/15' />
-            <div className='flex items-center gap-3'>
-              <p className='text-base font-semibold text-[color:var(--jaroo-primary-strong)]'>{heroCard.scoreLabel === 'N/A' ? 'N/A' : heroCard.score}</p>
-              <Badge className='rounded-[8px] bg-[#b5d4f4] px-3 py-1 text-[11px] text-[color:var(--jaroo-primary-strong)]'>
+            <p className='relative mt-3 text-sm leading-7 text-[#c8d8e8]'>{heroCard.body}</p>
+            <div className='relative my-4 h-px bg-white/15' />
+            <div className='relative flex items-center gap-3'>
+              <p className='text-3xl font-black leading-none tracking-[-0.04em] text-white'>{heroCard.scoreLabel === 'N/A' ? 'N/A' : heroCard.score}</p>
+              <Badge className='rounded-[10px] bg-white/12 px-3 py-1 text-[11px] font-bold text-[#d6ecff]'>
                 {heroCard.scoreLabel}
               </Badge>
-              <span className='ml-auto text-xs text-[color:var(--jaroo-primary)]'>{heroCard.scoreDelta}</span>
+              <span className='ml-auto rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-[#d6ecff]'>{heroCard.scoreDelta}</span>
             </div>
           </Card>
 
@@ -1187,7 +1523,7 @@ export default function DeepScanPage() {
                 body: '크롤러가 위원회 축 데이터를 비어 있는 상태로 반환했습니다.',
               }} />
             ) : (
-              <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
+              <Card className='rounded-[26px] border border-white/90 bg-white/95 p-4 shadow-[0_14px_34px_rgba(24,95,165,0.08)]'>
                 <div className='grid grid-cols-3 gap-2'>
                   {payload.committee.axes.map((axis, index) => {
                     const tone = resolveAxisTone(axis.score)
@@ -1340,24 +1676,21 @@ export default function DeepScanPage() {
                 body: '크롤러가 인사이트 항목을 비어 있는 상태로 반환했습니다.',
               }} />
             ) : (
-              <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] px-4 py-2 shadow-none'>
-                {payload.insights.items.map((item) => (
-                  <div
-                    key={`${item.sourceLabel}-${item.title}`}
-                    className='border-b border-[color:var(--jaroo-border)] py-4 last:border-b-0'
-                  >
-                    <div className='flex items-start justify-between gap-3'>
-                      <p className='text-[11px] text-[color:var(--jaroo-muted)]'>
-                        {item.sourceLabel} · {item.date}
-                      </p>
-                      <span className={cn('rounded-full px-2.5 py-1 text-[11px] font-medium', newsToneStyles[resolveInsightTone(item)])}>
-                        {item.label}
-                      </span>
-                    </div>
-                    <p className='mt-2 text-sm font-semibold leading-6 text-[color:var(--jaroo-ink)]'>{item.title}</p>
-                    <p className='mt-1 whitespace-pre-line text-xs leading-5 text-[color:var(--jaroo-muted)]'>{item.body}</p>
+              <Card className='rounded-[28px] border border-white/90 bg-white/80 p-3 shadow-[0_14px_34px_rgba(24,95,165,0.08)] backdrop-blur'>
+                <div className='mb-3 flex items-center justify-between px-1'>
+                  <div>
+                    <p className='text-[11px] font-black tracking-[0.1em] text-[color:var(--jaroo-primary)]'>EVIDENCE BOARD</p>
+                    <p className='mt-0.5 text-xs text-[color:var(--jaroo-muted)]'>가격·거래·리포트·보유 맥락을 역할별 카드로 정리했어요.</p>
                   </div>
-                ))}
+                  <span className='rounded-full bg-[#e6f1fb] px-2.5 py-1 text-[11px] font-bold text-[color:var(--jaroo-primary)]'>
+                    {payload.insights.items.length}개
+                  </span>
+                </div>
+                <div className='grid gap-3'>
+                  {payload.insights.items.map((item) => (
+                    <InsightEvidenceCard key={`${item.sourceLabel}-${item.title}`} item={item} />
+                  ))}
+                </div>
               </Card>
             )}
           </SectionToggle>
@@ -1525,7 +1858,7 @@ export default function DeepScanPage() {
                 body: '크롤러가 비교 시나리오를 비어 있는 상태로 반환했습니다.',
               }} />
             ) : (
-              <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] px-4 py-2 shadow-none'>
+              <Card className='rounded-[26px] border border-white/90 bg-white/95 px-4 py-2 shadow-[0_14px_34px_rgba(24,95,165,0.08)]'>
                 {payload.strategy.otherScenarios.map((scenario, index) => {
                   const tone = resolveScenarioTone(index, payload.strategy.otherScenarios.length)
 
@@ -1583,7 +1916,7 @@ export default function DeepScanPage() {
                 body: '즉시 매도 판단 블록이 아직 준비되지 않았어요.',
               })} />
             ) : (
-              <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] px-4 py-2 shadow-none'>
+              <Card className='rounded-[26px] border border-white/90 bg-white/95 px-4 py-2 shadow-[0_14px_34px_rgba(24,95,165,0.08)]'>
                 {payload.sellNow.rows.map((row) => {
                   const isTagRow = row.tag && row.tagTone
                   const valueClass = row.valueTone === 'danger'
