@@ -96,6 +96,12 @@ const committeeMemberIcons: Record<string, LucideIcon> = {
   FIT: ClipboardCheck,
 }
 
+const emptyDeepScanSteps: ReadonlyArray<{ icon: LucideIcon; label: string; body: string }> = [
+  { icon: BadgeCheck, label: '보유 종목 선택', body: '홈에서 분석할 주식 카드를 고릅니다.' },
+  { icon: LineChart, label: '시장 데이터 확인', body: '현재가·목표가·52주 위치를 먼저 보여줘요.' },
+  { icon: ShieldCheck, label: 'AI 위원회 분석', body: '회복 가능성과 리스크를 순서대로 정리합니다.' },
+]
+
 const newsToneStyles = {
   positive: 'bg-[color:var(--jaroo-success-soft)] text-[color:var(--jaroo-success)]',
   danger: 'bg-[color:var(--jaroo-danger-soft)] text-[color:var(--jaroo-danger)]',
@@ -1189,19 +1195,13 @@ export default function DeepScanPage() {
   const missingTargetTitle = '분석할 종목이 없습니다'
 
   if (!requestSeed) {
-    const emptySteps = [
-      { icon: BadgeCheck, label: '보유 종목 선택', body: '홈에서 분석할 주식 카드를 고릅니다.' },
-      { icon: LineChart, label: '시장 데이터 확인', body: '현재가·목표가·52주 위치를 먼저 보여줘요.' },
-      { icon: ShieldCheck, label: 'AI 위원회 분석', body: '회복 가능성과 리스크를 순서대로 정리합니다.' },
-    ]
-
     return (
       <JarooShell
         title='DeepScan'
         subtitle='종목을 선택하면 9인 위원회가 바로 시작돼요'
         backHref='/home'
         showBottomNav={false}
-        mainClassName='relative overflow-hidden bg-[#f4f8fb] px-4 pt-4 pb-6 before:pointer-events-none before:absolute before:inset-x-[-80px] before:top-[-160px] before:h-[320px] before:rounded-full before:bg-[radial-gradient(circle_at_50%_50%,rgba(24,95,165,0.18),rgba(24,95,165,0)_68%)]'
+        mainClassName='relative overflow-x-hidden bg-[#f4f8fb] px-4 pt-4 pb-6 before:pointer-events-none before:absolute before:inset-x-[-80px] before:top-[-160px] before:h-[320px] before:rounded-full before:bg-[radial-gradient(circle_at_50%_50%,rgba(24,95,165,0.18),rgba(24,95,165,0)_68%)]'
       >
         <section className='relative overflow-hidden rounded-[30px] border border-white/80 bg-[#102f4e] p-5 text-white shadow-[0_22px_48px_rgba(16,47,78,0.24)]'>
           <div className='pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-[#5fb0ff]/20 blur-2xl' />
@@ -1249,7 +1249,7 @@ export default function DeepScanPage() {
             이렇게 시작하면 됩니다
           </h2>
           <div className='mt-4 space-y-3'>
-            {emptySteps.map((step, index) => {
+            {emptyDeepScanSteps.map((step, index) => {
               const Icon = step.icon
 
               return (
