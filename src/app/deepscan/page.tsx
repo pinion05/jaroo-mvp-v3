@@ -660,6 +660,28 @@ function buildInsightPills(item: JarooDeepScanInsightItem) {
     .slice(0, 4)
 }
 
+function splitInsightDetailLines(value: string) {
+  return value
+    .split(/\n+/u)
+    .flatMap((block) => block
+      .replace(/\s+/gu, ' ')
+      .trim()
+      .split(/(?<=[.!?。])\s+/u))
+    .map((line) => line.trim())
+    .filter(Boolean)
+}
+
+function getInsightDetailLines(item: JarooDeepScanInsightItem) {
+  if (item.sourceLabel !== '기업실적코멘트') {
+    return []
+  }
+
+  const detailBody = item.sourceBody?.trim() || item.body.trim()
+  const lines = splitInsightDetailLines(detailBody)
+
+  return lines.length > 0 ? lines : [detailBody].filter(Boolean)
+}
+
 function getInsightPresentation(item: JarooDeepScanInsightItem): {
   Icon: LucideIcon
   eyebrow: string
@@ -731,6 +753,8 @@ function InsightEvidenceCard({ item }: { item: JarooDeepScanInsightItem }) {
   const presentation = getInsightPresentation(item)
   const metric = extractInsightMetric(item)
   const pills = buildInsightPills(item)
+  const detailLines = getInsightDetailLines(item)
+  const showDetails = detailLines.length > 0
   const InsightIcon = presentation.Icon
 
   return (
@@ -776,6 +800,26 @@ function InsightEvidenceCard({ item }: { item: JarooDeepScanInsightItem }) {
           </div>
         ) : null}
       </div>
+      {showDetails ? (
+        <details className='relative mt-3 overflow-hidden rounded-[18px] bg-white/82 shadow-[inset_0_0_0_1px_rgba(133,79,11,0.12)]'>
+          <summary className='flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 px-3 py-2 text-[12px] font-black text-[#854f0b] [&::-webkit-details-marker]:hidden'>
+            <span>자세히 보기</span>
+            <span className='rounded-full bg-[#fff4dc] px-2.5 py-1 text-[10px] font-black text-[#a16207]'>
+              원문 {detailLines.length}문장
+            </span>
+          </summary>
+          <ol className='grid gap-2 border-t border-[#f1d7a5]/60 p-3'>
+            {detailLines.map((line, index) => (
+              <li key={`${index}-${line}`} className='grid grid-cols-[30px_minmax(0,1fr)] gap-2 rounded-[14px] bg-[#fffaf0] p-2.5'>
+                <span className='grid size-7 place-items-center rounded-[10px] bg-[#a16207] text-[10px] font-black text-white'>
+                  {String(index + 1).padStart(2, '0')}
+                </span>
+                <p className='m-0 text-xs leading-5 text-[#5f4218]'>{line}</p>
+              </li>
+            ))}
+          </ol>
+        </details>
+      ) : null}
     </article>
   )
 }
