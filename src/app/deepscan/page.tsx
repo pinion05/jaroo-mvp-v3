@@ -281,6 +281,7 @@ function buildLoadingPerformanceComment(payload: JarooDeepScanPayload | null): L
   return {
     asOf: comment.date,
     body: comment.body,
+    ...(comment.sourceBody?.trim() ? { fullBody: comment.sourceBody } : {}),
     ...(lines.length > 1 ? { lines } : {}),
   }
 }
