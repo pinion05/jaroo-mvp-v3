@@ -607,11 +607,11 @@ function resolveWeekToneClasses(tone: string) {
 
 function SectionStatusCard({ notice }: { notice: { badge: string; title: string; body: string } }) {
   return (
-    <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
-      <span className='inline-flex rounded-full bg-[color:var(--jaroo-secondary)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-muted)]'>
+    <Card className='rounded-[26px] border border-white/90 bg-white/90 p-4 shadow-[0_14px_34px_rgba(24,95,165,0.09)] backdrop-blur'>
+      <span className='inline-flex rounded-full bg-[#e6f1fb] px-2.5 py-1 text-[11px] font-bold text-[color:var(--jaroo-primary)]'>
         {notice.badge}
       </span>
-      <p className='mt-3 text-sm font-semibold text-[color:var(--jaroo-ink)]'>{notice.title}</p>
+      <p className='mt-3 text-sm font-black tracking-[-0.02em] text-[color:var(--jaroo-ink)]'>{notice.title}</p>
       <p className='mt-2 text-xs leading-5 text-[color:var(--jaroo-muted)]'>{notice.body}</p>
     </Card>
   )
@@ -631,14 +631,14 @@ function SectionToggle({
   children: ReactNode
 }) {
   return (
-    <div className='space-y-2'>
+    <div className='space-y-3'>
       <button
         type='button'
         onClick={onToggle}
-        className='flex w-full items-center justify-between rounded-[24px] border border-[color:var(--jaroo-border)] bg-white px-4 py-4 text-left transition active:scale-[0.99]'
+        className='flex w-full items-center justify-between rounded-[26px] border border-white/90 bg-white/95 px-4 py-4 text-left shadow-[0_12px_30px_rgba(24,95,165,0.08)] transition active:scale-[0.99]'
       >
         <div className='min-w-0'>
-          <p className='text-sm font-semibold text-[color:var(--jaroo-ink)]'>{label}</p>
+          <p className='text-sm font-black tracking-[-0.02em] text-[color:var(--jaroo-ink)]'>{label}</p>
           {tags ? <div className='mt-2 flex flex-wrap gap-1.5'>{tags}</div> : null}
         </div>
         <ChevronDown
@@ -918,32 +918,95 @@ export default function DeepScanPage() {
   const missingTargetTitle = '분석할 종목이 없습니다'
 
   if (!requestSeed) {
+    const emptySteps = [
+      { icon: BadgeCheck, label: '보유 종목 선택', body: '홈에서 분석할 주식 카드를 고릅니다.' },
+      { icon: LineChart, label: '시장 데이터 확인', body: '현재가·목표가·52주 위치를 먼저 보여줘요.' },
+      { icon: ShieldCheck, label: 'AI 위원회 분석', body: '회복 가능성과 리스크를 순서대로 정리합니다.' },
+    ]
+
     return (
       <JarooShell
         title='DeepScan'
+        subtitle='종목을 선택하면 9인 위원회가 바로 시작돼요'
         backHref='/home'
         showBottomNav={false}
-        mainClassName='px-4 pt-4 pb-6'
+        mainClassName='relative overflow-hidden bg-[#f4f8fb] px-4 pt-4 pb-6 before:pointer-events-none before:absolute before:inset-x-[-80px] before:top-[-160px] before:h-[320px] before:rounded-full before:bg-[radial-gradient(circle_at_50%_50%,rgba(24,95,165,0.18),rgba(24,95,165,0)_68%)]'
       >
-        <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-5 shadow-none'>
-          <span className='inline-flex rounded-full bg-[color:var(--jaroo-warning-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-warning)]'>
-            비어 있음
-          </span>
-          <h1 className='mt-3 text-xl font-semibold text-[color:var(--jaroo-ink)]'>{missingTargetTitle}</h1>
-          <p className='mt-2 text-sm leading-6 text-[color:var(--jaroo-muted)]'>
-            홈에서 분석할 종목을 선택한 뒤 다시 들어와 주세요.
+        <section className='relative overflow-hidden rounded-[30px] border border-white/80 bg-[#102f4e] p-5 text-white shadow-[0_22px_48px_rgba(16,47,78,0.24)]'>
+          <div className='pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-[#5fb0ff]/20 blur-2xl' />
+          <div className='pointer-events-none absolute bottom-0 right-0 h-28 w-36 rounded-tl-[80px] bg-[linear-gradient(135deg,rgba(255,255,255,0.12),rgba(255,255,255,0))]' />
+
+          <div className='relative flex items-start justify-between gap-4'>
+            <div>
+              <span className='inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold text-[#d6ecff] backdrop-blur'>
+                <span className='size-1.5 rounded-full bg-[#8ee6b8]' />
+                대기 화면
+              </span>
+              <h1 className='mt-4 text-[26px] font-black leading-[1.12] tracking-[-0.04em]'>
+                {missingTargetTitle}
+              </h1>
+            </div>
+            <div className='grid size-14 shrink-0 place-items-center rounded-2xl bg-white text-[#185fa5] shadow-[0_14px_28px_rgba(0,0,0,0.18)]'>
+              <LineChart className='size-7' aria-hidden />
+            </div>
+          </div>
+
+          <p className='relative mt-4 max-w-[260px] text-sm leading-6 text-[#c8d8e8]'>
+            홈에서 분석할 종목을 선택하면 가격 위치, 목표가, 실적 코멘트, AI 위원회 판단을 한 흐름으로 보여드려요.
           </p>
-          <div className='mt-5'>
-            <Link
-              href='/home'
-              className={buttonVariants({
-                className: 'h-12 w-full rounded-[22px] bg-[color:var(--jaroo-primary)] text-white hover:bg-[color:var(--jaroo-primary-strong)]',
-              })}
-            >
-              /home 으로 가기
-            </Link>
+
+          <div className='relative mt-5 grid grid-cols-3 gap-2'>
+            {[
+              ['52주', '위치'],
+              ['목표가', '비교'],
+              ['AI', '판단'],
+            ].map(([top, bottom]) => (
+              <div key={top} className='rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-3 backdrop-blur'>
+                <p className='text-[15px] font-black leading-none text-white'>{top}</p>
+                <p className='mt-1 text-[10px] font-semibold text-[#a9c9e8]'>{bottom}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        <Card className='relative mt-4 overflow-hidden rounded-[28px] border border-white bg-white/90 p-4 shadow-[0_16px_40px_rgba(24,95,165,0.12)] backdrop-blur'>
+          <div className='absolute right-4 top-4 rounded-full bg-[#e6f1fb] px-2.5 py-1 text-[10px] font-black text-[color:var(--jaroo-primary)]'>
+            3 STEP
+          </div>
+          <p className='text-[11px] font-black tracking-[0.14em] text-[color:var(--jaroo-primary)]'>START GUIDE</p>
+          <h2 className='mt-2 text-lg font-black tracking-[-0.03em] text-[color:var(--jaroo-ink)]'>
+            이렇게 시작하면 됩니다
+          </h2>
+          <div className='mt-4 space-y-3'>
+            {emptySteps.map((step, index) => {
+              const Icon = step.icon
+
+              return (
+                <div key={step.label} className='grid grid-cols-[42px_1fr] gap-3 rounded-2xl border border-[#e8eef5] bg-[#fbfdff] p-3'>
+                  <div className='relative grid size-10 place-items-center rounded-2xl bg-[#e6f1fb] text-[color:var(--jaroo-primary)]'>
+                    <Icon className='size-5' aria-hidden />
+                    <span className='absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-[#102f4e] text-[9px] font-black text-white'>
+                      {index + 1}
+                    </span>
+                  </div>
+                  <div className='min-w-0'>
+                    <p className='text-sm font-black text-[color:var(--jaroo-ink)]'>{step.label}</p>
+                    <p className='mt-1 text-xs leading-5 text-[color:var(--jaroo-muted)]'>{step.body}</p>
+                  </div>
+                </div>
+              )
+            })}
           </div>
         </Card>
+
+        <Link
+          href='/home'
+          className={buttonVariants({
+            className: 'mt-4 h-[52px] w-full rounded-[22px] bg-[#185fa5] text-[15px] font-black text-white shadow-[0_16px_28px_rgba(24,95,165,0.24)] hover:bg-[#0f4f8d]',
+          })}
+        >
+          홈에서 종목 선택하기
+        </Link>
       </JarooShell>
     )
   }
@@ -1033,7 +1096,7 @@ export default function DeepScanPage() {
       }
       backHref='/home'
       showBottomNav={false}
-      mainClassName='px-4 pt-0 pb-0'
+      mainClassName='bg-[#f4f8fb] px-4 pt-0 pb-0'
       action={
         <Link
           href='/sharecard'
@@ -1048,8 +1111,8 @@ export default function DeepScanPage() {
       }
     >
       <Tabs value={tab} onValueChange={(value) => handleTabChange(value as TabValue)} className='gap-0'>
-        <div className='sticky top-0 z-10 -mx-4 border-b border-[color:var(--jaroo-border)] bg-white px-4 py-2'>
-          <TabsList className='grid h-11 w-full grid-cols-2 gap-1 rounded-[20px] bg-[color:var(--jaroo-secondary)] p-1'>
+        <div className='sticky top-0 z-10 -mx-4 border-b border-white/80 bg-[#f4f8fb]/95 px-4 py-2 backdrop-blur'>
+          <TabsList className='grid h-11 w-full grid-cols-2 gap-1 rounded-[20px] bg-white/80 p-1 shadow-[inset_0_0_0_1px_rgba(181,212,244,0.55)]'>
             <TabsTrigger
               value='analysis'
               className='h-full rounded-[16px] border-0 px-0 py-0 text-sm font-semibold text-[color:var(--jaroo-muted)] after:hidden data-active:bg-[color:var(--jaroo-primary)] data-active:text-white data-active:shadow-[0_8px_18px_rgba(24,95,165,0.22)]'
@@ -1066,37 +1129,39 @@ export default function DeepScanPage() {
         </div>
 
         <TabsContent value='analysis' className='mt-0 space-y-4 py-4'>
-          <Card className='rounded-[24px] border-0 bg-[color:var(--jaroo-accent)] p-5 shadow-none'>
-            <div className='flex items-center justify-between gap-3'>
-              <p className='text-[11px] font-medium tracking-[0.05em] text-[color:var(--jaroo-primary)]'>
+          <Card className='relative overflow-hidden rounded-[30px] border border-white/80 bg-[#102f4e] p-5 text-white shadow-[0_22px_48px_rgba(16,47,78,0.22)]'>
+            <div className='pointer-events-none absolute -right-12 -top-14 size-44 rounded-full bg-[#5fb0ff]/20 blur-2xl' />
+            <div className='pointer-events-none absolute bottom-0 right-0 h-32 w-40 rounded-tl-[90px] bg-[linear-gradient(135deg,rgba(255,255,255,0.13),rgba(255,255,255,0))]' />
+            <div className='relative flex items-center justify-between gap-3'>
+              <p className='rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-black tracking-[0.08em] text-[#d6ecff]'>
                 AI 9인 위원회 종합 분석
               </p>
               <div className='flex items-center gap-2'>
-                <span className={cn('text-xs font-medium', heroCard.statusToneClass)}>{heroCard.statusText}</span>
+                <span className={cn('rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold', heroCard.statusToneClass)}>{heroCard.statusText}</span>
                 <button
                   type='button'
                   onClick={handleRetry}
                   className={buttonVariants({
                     variant: 'outline',
                     className:
-                      'h-8 rounded-[10px] border-[color:var(--jaroo-primary)]/20 bg-white/80 px-3 text-[11px] font-medium text-[color:var(--jaroo-primary)] hover:bg-white disabled:pointer-events-none disabled:opacity-60',
+                      'h-8 rounded-[10px] border-white/20 bg-white px-3 text-[11px] font-bold text-[#185fa5] hover:bg-white disabled:pointer-events-none disabled:opacity-60',
                   })}
                 >
                   {fetchState === 'error' ? '다시 시도' : '재분석'}
                 </button>
               </div>
             </div>
-            <h1 className='mt-3 text-[28px] font-semibold leading-tight text-[color:var(--jaroo-primary-strong)]'>
+            <h1 className='relative mt-4 text-[30px] font-black leading-[1.08] tracking-[-0.05em] text-white'>
               {heroCard.headline}
             </h1>
-            <p className='mt-3 text-sm leading-7 text-[color:var(--jaroo-ink)]/80'>{heroCard.body}</p>
-            <div className='my-4 h-px bg-[color:var(--jaroo-primary)]/15' />
-            <div className='flex items-center gap-3'>
-              <p className='text-base font-semibold text-[color:var(--jaroo-primary-strong)]'>{heroCard.scoreLabel === 'N/A' ? 'N/A' : heroCard.score}</p>
-              <Badge className='rounded-[8px] bg-[#b5d4f4] px-3 py-1 text-[11px] text-[color:var(--jaroo-primary-strong)]'>
+            <p className='relative mt-3 text-sm leading-7 text-[#c8d8e8]'>{heroCard.body}</p>
+            <div className='relative my-4 h-px bg-white/15' />
+            <div className='relative flex items-center gap-3'>
+              <p className='text-3xl font-black leading-none tracking-[-0.04em] text-white'>{heroCard.scoreLabel === 'N/A' ? 'N/A' : heroCard.score}</p>
+              <Badge className='rounded-[10px] bg-white/12 px-3 py-1 text-[11px] font-bold text-[#d6ecff]'>
                 {heroCard.scoreLabel}
               </Badge>
-              <span className='ml-auto text-xs text-[color:var(--jaroo-primary)]'>{heroCard.scoreDelta}</span>
+              <span className='ml-auto rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-[#d6ecff]'>{heroCard.scoreDelta}</span>
             </div>
           </Card>
 
@@ -1187,7 +1252,7 @@ export default function DeepScanPage() {
                 body: '크롤러가 위원회 축 데이터를 비어 있는 상태로 반환했습니다.',
               }} />
             ) : (
-              <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
+              <Card className='rounded-[26px] border border-white/90 bg-white/95 p-4 shadow-[0_14px_34px_rgba(24,95,165,0.08)]'>
                 <div className='grid grid-cols-3 gap-2'>
                   {payload.committee.axes.map((axis, index) => {
                     const tone = resolveAxisTone(axis.score)
@@ -1340,7 +1405,7 @@ export default function DeepScanPage() {
                 body: '크롤러가 인사이트 항목을 비어 있는 상태로 반환했습니다.',
               }} />
             ) : (
-              <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] px-4 py-2 shadow-none'>
+              <Card className='rounded-[26px] border border-white/90 bg-white/95 px-4 py-2 shadow-[0_14px_34px_rgba(24,95,165,0.08)]'>
                 {payload.insights.items.map((item) => (
                   <div
                     key={`${item.sourceLabel}-${item.title}`}
@@ -1525,7 +1590,7 @@ export default function DeepScanPage() {
                 body: '크롤러가 비교 시나리오를 비어 있는 상태로 반환했습니다.',
               }} />
             ) : (
-              <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] px-4 py-2 shadow-none'>
+              <Card className='rounded-[26px] border border-white/90 bg-white/95 px-4 py-2 shadow-[0_14px_34px_rgba(24,95,165,0.08)]'>
                 {payload.strategy.otherScenarios.map((scenario, index) => {
                   const tone = resolveScenarioTone(index, payload.strategy.otherScenarios.length)
 
@@ -1583,7 +1648,7 @@ export default function DeepScanPage() {
                 body: '즉시 매도 판단 블록이 아직 준비되지 않았어요.',
               })} />
             ) : (
-              <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] px-4 py-2 shadow-none'>
+              <Card className='rounded-[26px] border border-white/90 bg-white/95 px-4 py-2 shadow-[0_14px_34px_rgba(24,95,165,0.08)]'>
                 {payload.sellNow.rows.map((row) => {
                   const isTagRow = row.tag && row.tagTone
                   const valueClass = row.valueTone === 'danger'
