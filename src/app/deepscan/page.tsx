@@ -239,7 +239,7 @@ function buildAxisFindingProgress(axis: JarooDeepScanCommitteeAxis | undefined):
   const memberSuffix = extraCount > 0 ? ` 외 ${extraCount}명` : ''
 
   return {
-    badge: pendingCount > 0 ? `${completedMembers.length}/${members.length} 응답` : '요약 도착',
+    badge: pendingCount > 0 ? `${completedMembers.length}/${members.length} 분석중` : '분석 완료',
     tone: pendingCount > 0 ? 'active' : 'done',
     body: `${leadMember.title}${memberSuffix}: ${compactFindingText(leadMember.reason)}`,
   }
@@ -261,7 +261,7 @@ function buildLoadingFindingProgress(payload: JarooDeepScanPayload | null): Load
 
   if (payload.metadata.llmCommittee?.status !== 'partial' && payload.sellNow.blockState === 'ok') {
     progress.decision = {
-      badge: '요약 도착',
+      badge: '분석 완료',
       tone: 'done',
       body: compactFindingText(payload.sellNow.realizedText) || compactFindingText(payload.portfolioSimulation.caption) || '즉시 매도 판단이 도착했어요.',
     }
@@ -472,7 +472,7 @@ function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null): L
   const isPositive = /매수|buy|상향|positive/i.test(consensus.body) || (parsedConsensus.upsidePct ?? 0) > 0 || (parsedConsensus.opinionScore ?? 0) >= 3.5
   return {
     key: 'analyst-consensus',
-    category: '증권사 의견',
+    category: '목표가',
     badge: isPositive ? '긍정' : '정보',
     tone: isPositive ? 'positive' : 'info',
     body: consensus.body,

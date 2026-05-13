@@ -619,9 +619,9 @@ export function DeepScanLoadingScreen({
                 )
               })}
               {showConsensusSkeleton ? (
-                <article className={cn(styles.quickFact, styles.consensusQuickFact, styles.consensusSkeletonFact)} aria-label='증권사 의견 조회 중'>
+                <article className={cn(styles.quickFact, styles.consensusQuickFact, styles.consensusSkeletonFact)} aria-label='목표가 조회 중'>
                   <div className={styles.findingTop}>
-                    <span className={styles.findingCat}>증권사 의견</span>
+                    <span className={styles.findingCat}>목표가</span>
                     <span className={cn(styles.findingBadge, styles.positionSegmentBadge)}>조회 중</span>
                   </div>
                   <div className={styles.consensusInsight} aria-hidden='true'>
