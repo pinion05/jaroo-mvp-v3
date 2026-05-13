@@ -578,7 +578,7 @@ export function DeepScanLoadingScreen({
                             <span className={styles.consensusEyebrow}>{consensus.analystCountLabel ?? '증권사 평균'}</span>
                             <strong>{consensus.targetPriceLabel}</strong>
                           </div>
-                          <span>{consensus.upsideLabel ? `현재가 대비 ${consensus.upsideLabel}` : '목표가 비교'}</span>
+                          <span>목표가 비교</span>
                         </div>
                         <div className={styles.consensusLineChart} aria-hidden='true'>
                           <svg viewBox='0 0 100 56' role='img' focusable='false' preserveAspectRatio='none'>
