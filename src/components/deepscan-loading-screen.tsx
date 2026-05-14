@@ -455,7 +455,8 @@ export function DeepScanLoadingScreen({
   const findings = buildFindingDefinitions()
   const hasConsensusFact = quickFacts.some((fact) => fact.key === 'analyst-consensus' || Boolean(fact.consensus))
   const showConsensusSkeleton = !resultsReady && !hasConsensusFact
-  const showQuickFactsSection = quickFacts.length > 0 || showConsensusSkeleton || Boolean(performanceComment)
+  const showPerformanceCommentSkeleton = !resultsReady && !performanceComment
+  const showQuickFactsSection = quickFacts.length > 0 || showConsensusSkeleton || showPerformanceCommentSkeleton || Boolean(performanceComment)
   const performanceCommentPreviewLines = performanceComment ? getCommentLines(performanceComment) : []
   const performanceCommentFullLines = performanceComment ? getExpandedCommentLines(performanceComment) : []
   const showPerformanceCommentDetails = performanceComment
@@ -677,6 +678,27 @@ export function DeepScanLoadingScreen({
                       <span className={styles.consensusSkeletonPill}>최고 목표가</span>
                       <span className={styles.consensusSkeletonPill}>최저 목표가</span>
                       <span className={styles.consensusSkeletonPill}>투자의견</span>
+                    </div>
+                  </div>
+                </article>
+              ) : null}
+              {showPerformanceCommentSkeleton ? (
+                <article className={cn(styles.quickFact, styles.commentaryQuickFact, styles.commentarySkeletonFact)} aria-label='기업실적코멘트 조회 중'>
+                  <div className={styles.commentaryTop}>
+                    <Factory className={styles.commentaryIcon} aria-hidden />
+                    <span>기업실적코멘트</span>
+                    <span className={styles.commentaryDate}>수집 중</span>
+                  </div>
+                  <div className={styles.commentarySkeletonBody} aria-hidden='true'>
+                    <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonHeadline)} />
+                    <div className={styles.commentarySkeletonRows}>
+                      <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRow)} />
+                      <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRowShort)} />
+                      <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRowLong)} />
+                    </div>
+                    <div className={styles.commentarySkeletonDetail}>
+                      <span>자세히 보기 준비 중</span>
+                      <i className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonDetailPill)} />
                     </div>
                   </div>
                 </article>
