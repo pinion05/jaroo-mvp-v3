@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 
-import { resetTickerMapResolverCacheForTests, searchTickerMapCandidates } from './ticker-map-resolver'
+import { enrichOcrRowsViaTickerMap, resetTickerMapResolverCacheForTests, searchTickerMapCandidates } from './ticker-map-resolver'
 
 const fixtureRepoRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../tests/fixtures/ticker-map')
 const mutableProcessEnv = process.env as Record<string, string | undefined>
@@ -50,6 +50,34 @@ test('production에서는 명시적 repo root 없이 fallback discovery를 사�
     const candidates = await searchTickerMapCandidates('마이크로소프트', 5)
 
     assert.deepEqual(candidates, [])
+  } finally {
+    restoreEnvValue('TICKER_MAP_REPO_ROOT', previousRepoRoot)
+    restoreEnvValue('NODE_ENV', previousNodeEnv)
+    resetTickerMapResolverCacheForTests()
+  }
+})
+
+test('ticker-map enrich는 로컬 KR 종목으로 해석되는 행을 외부 fuzzy resolver에 넘기지 않는다', async () => {
+  const previousRepoRoot = process.env.TICKER_MAP_REPO_ROOT
+  const previousNodeEnv = process.env.NODE_ENV
+
+  mutableProcessEnv.TICKER_MAP_REPO_ROOT = fixtureRepoRoot
+  mutableProcessEnv.NODE_ENV = 'production'
+  resetTickerMapResolverCacheForTests()
+
+  try {
+    const [row] = await enrichOcrRowsViaTickerMap([
+      {
+        name: 'SNT에너지',
+        quantity: '32',
+        profitRate: '',
+        evaluationAmount: '',
+        averagePrice: '49256.73',
+      },
+    ])
+
+    assert.equal(row?.name, 'SNT에너지')
+    assert.equal(row?.resolvedTicker, undefined)
   } finally {
     restoreEnvValue('TICKER_MAP_REPO_ROOT', previousRepoRoot)
     restoreEnvValue('NODE_ENV', previousNodeEnv)
