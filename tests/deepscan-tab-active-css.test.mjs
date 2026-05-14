@@ -22,7 +22,7 @@ function assertToken(className, token) {
 test('DeepScan top tabs fill the active tab instead of drawing an underline', () => {
   assert.match(
     source,
-    /TabsList className='grid h-11 w-full grid-cols-2 gap-1 rounded-\[20px\] bg-\[color:var\(--jaroo-secondary\)\] p-1'/,
+    /TabsList className='grid h-11 w-full grid-cols-2 gap-1 rounded-\[20px\] bg-white\/80 p-1 shadow-\[inset_0_0_0_1px_rgba\(181,212,244,0\.55\)\]'/,
   )
   assert.doesNotMatch(source, /variant='line'/)
   assert.doesNotMatch(source, /data-active:border(?:-b)?-\[color:var\(--jaroo-primary\)\]/)
