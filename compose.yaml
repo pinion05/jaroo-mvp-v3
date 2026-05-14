@@ -10,6 +10,7 @@ x-jaroo-app: &jaroo-app
   environment: &jaroo-env
     NODE_ENV: production
     WITH_LOCAL_ENV_PROCESS_PRECEDENCE: "1"
+    TICKER_MAP_REPO_ROOT: /app/packages/instrument-core
   volumes:
     - ./.env.local:/app/.env.local:ro
     - ./.env.cookie:/app/.env.cookie:ro
@@ -48,7 +49,7 @@ services:
       crawler:
         condition: service_healthy
     healthcheck:
-      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/home').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/api/health',{signal:AbortSignal.timeout(4000)}).then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
       interval: 10s
       timeout: 5s
       retries: 12
