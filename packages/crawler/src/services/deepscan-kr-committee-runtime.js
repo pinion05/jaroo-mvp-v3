@@ -16,14 +16,14 @@ export const KR_MEMBER_SPECS = Object.freeze({
     shortLabel: '수익성',
     title: '수익성/기본체력',
     role: 'KR profitability analyst',
-    focus: 'Judge Korean equity profitability and core business quality from company overview, financial analysis, FnGuide finance evidence, and missing-data warnings.',
+    focus: 'Judge Korean equity profitability and core business quality from company overview, financial analysis, and FnGuide finance evidence that is actually present.',
   },
   valuation: {
     axis: '사업 품질',
     shortLabel: '밸류',
     title: '밸류에이션',
     role: 'KR valuation analyst',
-    focus: 'Judge Korean equity valuation attractiveness from consensus, opinion, investment indicators, current price context, and missing-data warnings.',
+    focus: 'Judge Korean equity valuation attractiveness from consensus, opinion, investment indicators, and current price context that is actually present.',
   },
   ownershipStability: {
     axis: '사업 품질',
@@ -185,7 +185,6 @@ function optionalFact(value, reasonCode, missingMessage) {
 }
 
 function buildKrFactBank(evidence) {
-  const sourceLimitations = Array.isArray(evidence.sourceLimitations) ? evidence.sourceLimitations : [];
   return {
     schemaVersion: 'jaroo.deepscan.kr-fact-bank.v2',
     locale: 'KR',
@@ -237,16 +236,33 @@ function buildKrFactBank(evidence) {
       performanceCommentAsOf: evidence.reportSignals?.performanceCommentAsOf ?? null,
     }, ['kr_reports']),
     businessCommentary: snapshotValue(evidence.businessCommentary ?? {}, ['kr_business_commentary']),
-    limitations: presentValue(sourceLimitations, ['source_limitations'], ['Source-specific missing facts must be stated as unavailable from WiseReport, not as analysis failure.']),
   };
 }
 
+function sanitizeOwnershipSnapshotForLlm(snapshot) {
+  if (!snapshot || typeof snapshot !== 'object') {
+    return snapshot ?? {};
+  }
+
+  const sanitized = { ...snapshot };
+  delete sanitized.sourceLimitations;
+
+  if (sanitized.institutionalOwnershipPct === null || sanitized.institutionalOwnershipPct === undefined) {
+    delete sanitized.institutionalOwnershipPct;
+  }
+  if (sanitized.foreignOwnershipPct === null || sanitized.foreignOwnershipPct === undefined) {
+    delete sanitized.foreignOwnershipPct;
+  }
+
+  return sanitized;
+}
+
 function buildMemberKrFacts(memberKey, evidence) {
+  const ownershipSnapshotForLlm = sanitizeOwnershipSnapshotForLlm(evidence.ownershipSnapshot);
   const base = {
     schemaVersion: 'jaroo.deepscan.kr-member-slice.v2',
     locale: 'KR',
     sourceFlavor: 'wisereport-fnguide-krx',
-    sourceLimitations: Array.isArray(evidence.sourceLimitations) ? evidence.sourceLimitations : [],
   };
 
   switch (memberKey) {
@@ -275,7 +291,7 @@ function buildMemberKrFacts(memberKey, evidence) {
     case 'ownershipStability':
       return {
         ...base,
-        ownership: evidence.ownershipSnapshot ?? {},
+        ownership: ownershipSnapshotForLlm,
         styleFactors: evidence.styleAnalysisSnapshot ?? {},
         pageCoverage: evidence.pageCoverage ?? {},
       };
@@ -356,10 +372,9 @@ function buildSharedDump(input, evidence, sources) {
     valuationSnapshot: presentValue(evidence.valuationSnapshot ?? {}, ['valuation_snapshot']),
     relativeReturnSnapshot: presentValue(evidence.relativeReturnSnapshot ?? {}, ['relative_return_snapshot']),
     styleAnalysisSnapshot: presentValue(evidence.styleAnalysisSnapshot ?? {}, ['style_analysis_snapshot']),
-    ownershipSnapshot: presentValue(evidence.ownershipSnapshot ?? {}, ['ownership_snapshot']),
+    ownershipSnapshot: presentValue(sanitizeOwnershipSnapshotForLlm(evidence.ownershipSnapshot), ['ownership_snapshot']),
     financialSnapshot: presentValue(evidence.financialSnapshot ?? {}, ['financial_snapshot']),
     businessCommentary: presentValue(evidence.businessCommentary ?? {}, ['business_commentary']),
-    sourceLimitations: presentValue(Array.isArray(evidence.sourceLimitations) ? evidence.sourceLimitations : [], ['source_limitations']),
     topFacts: presentValue(Array.isArray(evidence.topFacts) ? evidence.topFacts : [], ['top_facts']),
     topRisks: presentValue(Array.isArray(evidence.topRisks) ? evidence.topRisks : [], ['top_risks']),
     packageContext: presentValue(evidence.packageContext ?? { available: false, summaryFacts: [], marketView: null, boardHighlights: [] }, ['package_context'], ['Supplemental only; not numeric truth.']),
@@ -440,7 +455,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
         facts: {
           krFacts,
           instrument: common.instrument,
-          ownershipSnapshot: presentValue(evidence.ownershipSnapshot ?? {}, ['ownership_inputs']),
+          ownershipSnapshot: presentValue(sanitizeOwnershipSnapshotForLlm(evidence.ownershipSnapshot), ['ownership_inputs']),
           styleAnalysisSnapshot: presentValue(evidence.styleAnalysisSnapshot ?? {}, ['style_analysis_snapshot']),
           holding: common.holding,
           packageSummaryFacts: presentValue(evidence.packageContext?.summaryFacts ?? [], ['package_summary_facts']),
@@ -536,11 +551,8 @@ function systemPrompt(memberKey) {
     'Use only the provided sharedContext/memberContext JSON generated from KR WiseReport/FnGuide/KRX evidence and dump inputs.',
     'Prefer memberContext.facts.krFacts when present; it is the source-specific normalized KR slice and should override generic global-shaped assumptions.',
     'Treat package-derived context as supplemental only, never as silent numeric truth.',
-    'If a fact is listed in sourceLimitations, describe it as unavailable from the WiseReport source dump rather than claiming analysis context was generally insufficient.',
-    'Missing or unavailable facts must lower confidence and can lower the score, but do not say a fact is missing when a numeric value is present in krFacts or snapshots.',
+    'Treat absent fields as out-of-scope rather than negative evidence; do not request, infer, or mention data that is not present in sharedContext/memberContext.',
     'Lead with the strongest numeric or concrete evidence that is actually present.',
-    'Mention missing context at most once, briefly, in the final clause only if it materially limits the verdict.',
-    'Avoid repeating phrases like 부재, 누락, 판단 불가, or 컨텍스트 부족 across multiple sentences.',
     'Return only valid JSON matching the schema. Write the reason in concise Korean.',
     'Score semantics: 0 extremely negative, 50 mixed/unclear, 100 extremely positive.',
   ].join(' ');

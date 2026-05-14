@@ -124,3 +124,111 @@ test('KR committee axes render pending members and score completed members only'
   assert.equal(marketAxis.score, null);
   assert.match(marketAxis.axisStatusText, /LLM 위원 응답 대기 중/);
 });
+
+test('KR committee LLM prompt omits unavailable source-limitations data from model context', async () => {
+  const { scoreDeepScanKrCommitteeFromDump } = await import('../src/services/deepscan-kr-committee-runtime.js');
+  const originalFetch = global.fetch;
+  const originalKey = process.env.OPENROUTER_API_KEY;
+  const originalEnabled = process.env.DEEPSCAN_KR_LLM_ENABLE;
+  const capturedBodies = [];
+
+  process.env.OPENROUTER_API_KEY = 'test-key';
+  process.env.DEEPSCAN_KR_LLM_ENABLE = '1';
+
+  global.fetch = (async (_url, init) => {
+    const body = JSON.parse(String(init?.body ?? '{}'));
+    capturedBodies.push(body);
+    const userMessage = Array.isArray(body?.messages)
+      ? body.messages.find((message) => message.role === 'user')
+      : null;
+    const content = typeof userMessage?.content === 'string' ? userMessage.content : '';
+    const memberKey = content.match(/"member":"([^"]+)"/)?.[1] ?? 'unknown';
+
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            score: 70,
+            reason: `${memberKey} reason`,
+            confidence: 'medium',
+          }),
+        },
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  try {
+    await scoreDeepScanKrCommitteeFromDump({}, {
+      instrument: {
+        code: '100840',
+        name: 'SNT에너지',
+        market: 'KR',
+      },
+      sourceContext: {},
+    }, {
+      instrument: {
+        code: '100840',
+        name: 'SNT에너지',
+        market: 'KR',
+      },
+      ownershipSnapshot: {
+        majorHolderPct: 52.32,
+        foreignOwnershipPct: 2.53,
+        institutionalOwnershipPct: null,
+        sourceLimitations: [{
+          fact: 'institutionalOwnershipPct',
+          message: 'WiseReport/FnGuide KR 원본 덤프에는 기관 전체 보유율 aggregate가 없고 운용사별 보유/5% 이상 보유자/변동 내역만 있습니다.',
+        }],
+      },
+      pageCoverage: {
+        totalKnownPages: 0,
+        availablePageIds: [],
+        missingPageIds: [],
+        availableCount: 0,
+      },
+      sourceCoverage: {
+        hasCurrentQuote: false,
+        hasHolding: false,
+        hasPackageResult: false,
+        availableReportPages: [],
+      },
+      reportSignals: {},
+      missingSources: [],
+      sourceLimitations: [{
+        fact: 'institutionalOwnershipPct',
+        message: 'WiseReport/FnGuide KR 원본 덤프에는 기관 전체 보유율 aggregate가 없습니다.',
+      }],
+      topFacts: [],
+      topRisks: [],
+    }, {});
+
+    assert.equal(capturedBodies.length, 9);
+
+    const serializedBodies = JSON.stringify(capturedBodies);
+    const serializedSystemPrompts = JSON.stringify(
+      capturedBodies.flatMap((body) => body.messages ?? [])
+        .filter((message) => message.role === 'system')
+        .map((message) => message.content),
+    );
+
+    assert.doesNotMatch(serializedSystemPrompts, /sourceLimitations|missing-data warnings|WiseReport source dump/);
+    assert.doesNotMatch(serializedBodies, /institutionalOwnershipPct|기관 전체 보유율|sourceLimitations/);
+    assert.match(serializedBodies, /majorHolderPct/);
+    assert.match(serializedBodies, /foreignOwnershipPct/);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = originalKey;
+    }
+    if (originalEnabled === undefined) {
+      delete process.env.DEEPSCAN_KR_LLM_ENABLE;
+    } else {
+      process.env.DEEPSCAN_KR_LLM_ENABLE = originalEnabled;
+    }
+  }
+});
