@@ -1,8 +1,15 @@
 name: jaroo-mvp-v3
 
+x-jaroo-build: &jaroo-build
+  context: .
+  dockerfile: Dockerfile
+  target: runner
+
 x-jaroo-app: &jaroo-app
-  image: jaroo-mvp-v3:local
   restart: unless-stopped
+  environment: &jaroo-env
+    NODE_ENV: production
+    WITH_LOCAL_ENV_PROCESS_PRECEDENCE: "1"
   volumes:
     - ./.env.local:/app/.env.local:ro
     - ./.env.cookie:/app/.env.cookie:ro
@@ -10,9 +17,11 @@ x-jaroo-app: &jaroo-app
 services:
   crawler:
     <<: *jaroo-app
-    command: ["npm", "run", "start:crawler"]
+    image: jaroo-mvp-v3-crawler:local
+    build: *jaroo-build
+    command: ["node", "scripts/with-local-env.cjs", "node", "packages/crawler/src/server.js"]
     environment:
-      NODE_ENV: production
+      <<: *jaroo-env
       PORT: "3040"
     ports:
       - "3040:3040"
@@ -25,13 +34,11 @@ services:
 
   web:
     <<: *jaroo-app
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: runner
-    command: ["npm", "run", "start:web"]
+    image: jaroo-mvp-v3-web:local
+    build: *jaroo-build
+    command: ["node", "scripts/with-local-env.cjs", "node_modules/.bin/next", "start"]
     environment:
-      NODE_ENV: production
+      <<: *jaroo-env
       HOSTNAME: 0.0.0.0
       PORT: "3000"
       JAROO_CRAWLER_BASE_URL: http://crawler:3040

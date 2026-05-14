@@ -60,12 +60,21 @@ function parseEnvFile(filePath) {
   return values
 }
 
-function buildEnv(cwd) {
-  const merged = { ...process.env }
+function isEnabledEnvFlag(value) {
+  return ['1', 'true', 'yes', 'on'].includes(String(value ?? '').trim().toLowerCase())
+}
+
+function buildEnv(cwd, options = {}) {
+  const processEnv = options.processEnv ?? process.env
+  const preserveProcessEnv = options.preserveProcessEnv ?? isEnabledEnvFlag(processEnv.WITH_LOCAL_ENV_PROCESS_PRECEDENCE)
+  const merged = { ...processEnv }
   for (const name of ['.env.local', '.env.cookie']) {
     const filePath = path.join(cwd, name)
     const values = parseEnvFile(filePath)
     for (const [key, value] of Object.entries(values)) {
+      if (preserveProcessEnv && Object.prototype.hasOwnProperty.call(merged, key)) {
+        continue
+      }
       merged[key] = value
     }
   }
@@ -106,6 +115,7 @@ if (require.main === module) {
 
 module.exports = {
   buildEnv,
+  isEnabledEnvFlag,
   parseEnvFile,
   runCli,
 }
