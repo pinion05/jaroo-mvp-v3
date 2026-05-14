@@ -39,3 +39,18 @@ test('buildEnv overlays .env.local keys and raw .env.cookie aliases over existin
     }
   }
 })
+
+test('buildEnv can preserve explicit process env over mounted env files', () => {
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'jaroo-build-env-preserve-'))
+  fs.writeFileSync(path.join(tempDir, '.env.local'), 'JAROO_CRAWLER_BASE_URL=http://127.0.0.1:3040\nOPENROUTER_API_KEY=file-key\n')
+
+  const env = buildEnv(tempDir, {
+    processEnv: {
+      WITH_LOCAL_ENV_PROCESS_PRECEDENCE: '1',
+      JAROO_CRAWLER_BASE_URL: 'http://crawler:3040',
+    },
+  })
+
+  assert.equal(env.JAROO_CRAWLER_BASE_URL, 'http://crawler:3040')
+  assert.equal(env.OPENROUTER_API_KEY, 'file-key')
+})

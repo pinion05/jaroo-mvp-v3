@@ -1,0 +1,17 @@
+.git
+.gitignore
+**/.next
+**/node_modules
+**/coverage
+**/.omx
+.env*
+!.env.example
+packages/*/.env
+packages/*/.env.*
+*.tsbuildinfo
+.DS_Store
+npm-debug.log*
+Dockerfile
+compose.yaml
+docker-compose*.yml
+docker-compose*.yaml
