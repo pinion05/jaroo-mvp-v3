@@ -7,6 +7,7 @@ import {
   MAX_RESOLVE_NAME_LENGTH,
   MAX_RESOLVE_ROWS,
   MIN_VISIBLE_CANDIDATE_SCORE,
+  POST,
   enrichResolveRowsWithVisibleInstrumentInfo,
   filterVisibleInstrumentCandidates,
   getResolveRowsValidationError,
@@ -111,4 +112,23 @@ test('resolve API는 명시적 ticker가 있으면 가시성 임계값과 무관
 
   assert.equal(row?.resolvedTicker, resolved.ticker)
   assert.equal(row?.resolvedName, resolved.name)
+})
+
+test('resolve API는 로컬 KR 종목을 ticker-map 조회 없이 빠르게 확정한다', async () => {
+  const startedAt = Date.now()
+  const response = await POST(
+    new Request('http://localhost/api/instruments/resolve', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        rows: [createRow('SNT에너지', { averagePrice: '49256.73' })],
+      }),
+    }),
+  )
+  const body = await response.json()
+
+  assert.equal(response.status, 200)
+  assert.equal(body.rows[0]?.resolvedName, 'SNT에너지')
+  assert.equal(body.rows[0]?.resolvedCode, '100840')
+  assert.ok(Date.now() - startedAt < 1000)
 })

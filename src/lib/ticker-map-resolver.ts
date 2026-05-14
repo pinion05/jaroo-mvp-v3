@@ -3,6 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { pathToFileURL } from 'node:url'
 
+import { resolveHoldingInstrument } from '@/lib/holding-instrument-lookup'
 import type { OcrRow } from '@/lib/screenshot-ocr'
 
 export type TickerMapSearchCandidate = {
@@ -230,6 +231,15 @@ export function resetTickerMapResolverCacheForTests() {
 }
 
 export async function resolveTickerMapRow(row: OcrRow): Promise<Partial<OcrRow> | null> {
+  const locallyResolvedInstrument =
+    resolveHoldingInstrument(row.resolvedCode ?? '') ??
+    resolveHoldingInstrument(row.resolvedTicker ?? '') ??
+    resolveHoldingInstrument(row.name)
+
+  if (locallyResolvedInstrument?.locale === 'KR') {
+    return null
+  }
+
   const bestCandidate = (await searchTickerMapCandidates(row.name, 1))[0]
 
   if (!bestCandidate) {
