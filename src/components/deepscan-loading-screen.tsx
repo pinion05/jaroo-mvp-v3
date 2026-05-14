@@ -115,6 +115,7 @@ const metaMessages = [
   { icon: '🧮', text: '손익 부담과 시나리오 영향을 계산하고 있어요.' },
   { icon: '🎯', text: '즉시 매도 판단과 최종 요약을 준비하고 있어요.' },
 ] as const
+const completedMetaMessage = { icon: '✅', text: '분석이 완료됐어요. 상세 결과 보기 버튼을 눌러 최종 판단을 확인하세요.' } as const
 
 const pendingCommitteeMemberCount = committeeMembers.length
 const COMMENT_LINE_MAX_LENGTH = 74
@@ -451,7 +452,9 @@ export function DeepScanLoadingScreen({
     currentPriceCurrency,
   )
   const profitRateText = formatSignedPercent(currentProfitRate)
-  const metaMessage = metaMessages[Math.min(metaMessages.length - 1, Math.floor(elapsedSeconds / 5))]
+  const metaMessage = resultsReady
+    ? completedMetaMessage
+    : metaMessages[Math.min(metaMessages.length - 1, Math.floor(elapsedSeconds / 5))]
   const findings = buildFindingDefinitions()
   const hasConsensusFact = quickFacts.some((fact) => fact.key === 'analyst-consensus' || Boolean(fact.consensus))
   const showConsensusSkeleton = !resultsReady && !hasConsensusFact
