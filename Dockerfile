@@ -8,6 +8,7 @@ WORKDIR /app
 
 ENV CI=1 \
     NEXT_TELEMETRY_DISABLED=1 \
+    NODE_OPTIONS=--max-old-space-size=768 \
     PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 COPY package.json package-lock.json ./
