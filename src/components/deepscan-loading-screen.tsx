@@ -486,7 +486,7 @@ export function DeepScanLoadingScreen({
     <div className={cn(styles.loadingCard, className)}>
       <div className={styles.topBar}>
         <BackControl onBack={onBack} backHref={backHref} />
-        <div className={styles.topTitle}>딥스캔 결과</div>
+        <div className={styles.topTitle}>{resultsReady ? '딥스캔 준비 완료' : '딥스캔 분석 중'}</div>
         <div className={styles.liveTag} aria-live='polite'>
           <span className={styles.liveDot} aria-hidden='true' />
           {resultsReady ? '분석 완료' : '분석 중'}
