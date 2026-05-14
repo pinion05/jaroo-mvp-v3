@@ -456,13 +456,15 @@ export function DeepScanLoadingScreen({
     ? completedMetaMessage
     : metaMessages[Math.min(metaMessages.length - 1, Math.floor(elapsedSeconds / 5))]
   const findings = buildFindingDefinitions()
-  const hasConsensusFact = quickFacts.some((fact) => fact.key === 'analyst-consensus' || Boolean(fact.consensus))
+  const displayQuickFacts = quickFacts.filter(hasDisplayValue)
+  const hasPerformanceComment = hasDisplayValue(performanceComment)
+  const hasConsensusFact = displayQuickFacts.some((fact) => fact.key === 'analyst-consensus' || Boolean(fact.consensus))
   const showConsensusSkeleton = !resultsReady && !hasConsensusFact
-  const showPerformanceCommentSkeleton = !resultsReady && !performanceComment
-  const showQuickFactsSection = quickFacts.length > 0 || showConsensusSkeleton || showPerformanceCommentSkeleton || Boolean(performanceComment)
-  const performanceCommentPreviewLines = performanceComment ? getCommentLines(performanceComment) : []
-  const performanceCommentFullLines = performanceComment ? getExpandedCommentLines(performanceComment) : []
-  const showPerformanceCommentDetails = performanceComment
+  const showPerformanceCommentSkeleton = !resultsReady && !hasPerformanceComment
+  const showQuickFactsSection = hasDisplayValue(displayQuickFacts) || showConsensusSkeleton || showPerformanceCommentSkeleton || hasPerformanceComment
+  const performanceCommentPreviewLines = performanceComment && hasPerformanceComment ? getCommentLines(performanceComment) : []
+  const performanceCommentFullLines = performanceComment && hasPerformanceComment ? getExpandedCommentLines(performanceComment) : []
+  const showPerformanceCommentDetails = performanceComment && hasPerformanceComment
     ? Boolean(performanceComment.fullBody?.trim()) || performanceCommentFullLines.join('\n') !== performanceCommentPreviewLines.join('\n')
     : false
 
@@ -559,7 +561,7 @@ export function DeepScanLoadingScreen({
           <>
             <div className={styles.sectionLabel}>빠른 시장 체크</div>
             <section className={styles.quickFactsCard} aria-label='빠른 시장 체크'>
-              {quickFacts.map((fact) => {
+              {displayQuickFacts.map((fact) => {
                 const indicator = fact.indicator
                 const consensus = fact.consensus
                 const segmentLabel = indicator && fact.detail ? fact.detail.replace(/이에요$|예요$/u, '') : fact.badge
@@ -706,7 +708,7 @@ export function DeepScanLoadingScreen({
                   </div>
                 </article>
               ) : null}
-              {performanceComment ? (
+              {performanceComment && hasPerformanceComment ? (
                 <article className={cn(styles.quickFact, styles.commentaryQuickFact)} aria-label='기업실적코멘트'>
                   <div className={styles.commentaryTop}>
                     <Factory className={styles.commentaryIcon} aria-hidden />
