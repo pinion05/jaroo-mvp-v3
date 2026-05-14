@@ -408,6 +408,17 @@ function badgeToneClass(tone: HomeBadgeTone) {
   }
 }
 
+function marketScoreBadgeToneClass(tone: HomeBadgeTone) {
+  switch (tone) {
+    case 'red':
+      return styles.marketScoreBadgeRed
+    case 'green':
+      return styles.marketScoreBadgeGreen
+    default:
+      return styles.marketScoreBadgeAmber
+  }
+}
+
 function marketToneClass(tone: HomeHolding['marketTone']) {
   switch (tone) {
     case 'kospi':
@@ -473,7 +484,7 @@ function MarketScoreCard({ marketScore }: { marketScore: HomeMarketScore }) {
         </div>
         <div className={styles.marketScoreValueBlock}>
           <span className={styles.marketScoreValue}>{marketScore.score}</span>
-          <span className={cn(styles.marketScoreBadge, badgeToneClass(marketScore.tone))}>{marketScore.label}</span>
+          <span className={cn(styles.marketScoreBadge, marketScoreBadgeToneClass(marketScore.tone))}>{marketScore.label}</span>
         </div>
       </div>
       <p className={styles.marketScoreDescription}>{marketScore.description}</p>

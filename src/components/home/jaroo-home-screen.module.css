@@ -461,10 +461,27 @@
 
 .marketScoreBadge {
   font-size: 10px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 7px;
+  font-weight: 800;
+  padding: 3px 9px;
+  border-radius: 999px;
   white-space: nowrap;
+  border: 0.5px solid currentColor;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
+}
+
+.marketScoreBadgeAmber {
+  background: #fff4dc;
+  color: #7a4208;
+}
+
+.marketScoreBadgeRed {
+  background: #fff0f0;
+  color: #b42318;
+}
+
+.marketScoreBadgeGreen {
+  background: #e9f8ef;
+  color: #166534;
 }
 
 .marketScoreDescription {
