@@ -11,6 +11,7 @@ x-jaroo-app: &jaroo-app
     NODE_ENV: production
     WITH_LOCAL_ENV_PROCESS_PRECEDENCE: "1"
     TICKER_MAP_REPO_ROOT: /app/packages/instrument-core
+    QUOTES_CURRENT_PROXY_TIMEOUT_MS: "15000"
   volumes:
     - ./.env.local:/app/.env.local:ro
     - ./.env.cookie:/app/.env.cookie:ro
