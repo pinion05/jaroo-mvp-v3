@@ -1,0 +1,48 @@
+name: jaroo-mvp-v3
+
+x-jaroo-app: &jaroo-app
+  image: jaroo-mvp-v3:local
+  restart: unless-stopped
+  volumes:
+    - ./.env.local:/app/.env.local:ro
+    - ./.env.cookie:/app/.env.cookie:ro
+
+services:
+  crawler:
+    <<: *jaroo-app
+    command: ["npm", "run", "start:crawler"]
+    environment:
+      NODE_ENV: production
+      PORT: "3040"
+    ports:
+      - "3040:3040"
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3040/api/source/system/catalog').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+  web:
+    <<: *jaroo-app
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: runner
+    command: ["npm", "run", "start:web"]
+    environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: "3000"
+      JAROO_CRAWLER_BASE_URL: http://crawler:3040
+    ports:
+      - "3000:3000"
+    depends_on:
+      crawler:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000/home').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))\""]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
