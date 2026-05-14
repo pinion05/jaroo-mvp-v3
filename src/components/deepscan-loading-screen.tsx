@@ -115,6 +115,7 @@ const metaMessages = [
   { icon: '🧮', text: '손익 부담과 시나리오 영향을 계산하고 있어요.' },
   { icon: '🎯', text: '즉시 매도 판단과 최종 요약을 준비하고 있어요.' },
 ] as const
+const completedMetaMessage = { icon: '✅', text: '분석이 완료됐어요. 상세 결과 보기 버튼을 눌러 최종 판단을 확인하세요.' } as const
 
 const pendingCommitteeMemberCount = committeeMembers.length
 const COMMENT_LINE_MAX_LENGTH = 74
@@ -451,14 +452,19 @@ export function DeepScanLoadingScreen({
     currentPriceCurrency,
   )
   const profitRateText = formatSignedPercent(currentProfitRate)
-  const metaMessage = metaMessages[Math.min(metaMessages.length - 1, Math.floor(elapsedSeconds / 5))]
+  const metaMessage = resultsReady
+    ? completedMetaMessage
+    : metaMessages[Math.min(metaMessages.length - 1, Math.floor(elapsedSeconds / 5))]
   const findings = buildFindingDefinitions()
-  const hasConsensusFact = quickFacts.some((fact) => fact.key === 'analyst-consensus' || Boolean(fact.consensus))
+  const displayQuickFacts = quickFacts.filter(hasDisplayValue)
+  const hasPerformanceComment = hasDisplayValue(performanceComment)
+  const hasConsensusFact = displayQuickFacts.some((fact) => fact.key === 'analyst-consensus' || Boolean(fact.consensus))
   const showConsensusSkeleton = !resultsReady && !hasConsensusFact
-  const showQuickFactsSection = quickFacts.length > 0 || showConsensusSkeleton || Boolean(performanceComment)
-  const performanceCommentPreviewLines = performanceComment ? getCommentLines(performanceComment) : []
-  const performanceCommentFullLines = performanceComment ? getExpandedCommentLines(performanceComment) : []
-  const showPerformanceCommentDetails = performanceComment
+  const showPerformanceCommentSkeleton = !resultsReady && !hasPerformanceComment
+  const showQuickFactsSection = hasDisplayValue(displayQuickFacts) || showConsensusSkeleton || showPerformanceCommentSkeleton || hasPerformanceComment
+  const performanceCommentPreviewLines = performanceComment && hasPerformanceComment ? getCommentLines(performanceComment) : []
+  const performanceCommentFullLines = performanceComment && hasPerformanceComment ? getExpandedCommentLines(performanceComment) : []
+  const showPerformanceCommentDetails = performanceComment && hasPerformanceComment
     ? Boolean(performanceComment.fullBody?.trim()) || performanceCommentFullLines.join('\n') !== performanceCommentPreviewLines.join('\n')
     : false
 
@@ -555,7 +561,7 @@ export function DeepScanLoadingScreen({
           <>
             <div className={styles.sectionLabel}>빠른 시장 체크</div>
             <section className={styles.quickFactsCard} aria-label='빠른 시장 체크'>
-              {quickFacts.map((fact) => {
+              {displayQuickFacts.map((fact) => {
                 const indicator = fact.indicator
                 const consensus = fact.consensus
                 const segmentLabel = indicator && fact.detail ? fact.detail.replace(/이에요$|예요$/u, '') : fact.badge
@@ -681,7 +687,28 @@ export function DeepScanLoadingScreen({
                   </div>
                 </article>
               ) : null}
-              {performanceComment ? (
+              {showPerformanceCommentSkeleton ? (
+                <article className={cn(styles.quickFact, styles.commentaryQuickFact, styles.commentarySkeletonFact)} aria-label='기업실적코멘트 조회 중'>
+                  <div className={styles.commentaryTop}>
+                    <Factory className={styles.commentaryIcon} aria-hidden />
+                    <span>기업실적코멘트</span>
+                    <span className={styles.commentaryDate}>수집 중</span>
+                  </div>
+                  <div className={styles.commentarySkeletonBody} aria-hidden='true'>
+                    <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonHeadline)} />
+                    <div className={styles.commentarySkeletonRows}>
+                      <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRow)} />
+                      <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRowShort)} />
+                      <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRowLong)} />
+                    </div>
+                    <div className={styles.commentarySkeletonDetail}>
+                      <span>자세히 보기 준비 중</span>
+                      <i className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonDetailPill)} />
+                    </div>
+                  </div>
+                </article>
+              ) : null}
+              {performanceComment && hasPerformanceComment ? (
                 <article className={cn(styles.quickFact, styles.commentaryQuickFact)} aria-label='기업실적코멘트'>
                   <div className={styles.commentaryTop}>
                     <Factory className={styles.commentaryIcon} aria-hidden />
