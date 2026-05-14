@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import { buildDeepScanPayloadFromSearchParams, buildRawInputFromSearchParams } from '@/lib/deepscan-runtime/build-payload'
+import {
+  buildDeepScanPayloadFromSearchParams,
+  buildRawInputFromSearchParams,
+  CrawlerDeepScanRequestError,
+} from '@/lib/deepscan-runtime/build-payload'
 
 export const runtime = 'nodejs'
 
@@ -16,6 +20,7 @@ export async function createDeepScanCanonicalResponse(
     const payload = await builder(searchParams)
     return NextResponse.json(payload)
   } catch (error) {
+    const status = error instanceof CrawlerDeepScanRequestError ? error.status : 400
     return NextResponse.json(
       {
         ok: false,
@@ -25,7 +30,7 @@ export async function createDeepScanCanonicalResponse(
           message: error instanceof Error ? error.message : 'deepscan builder failed',
         },
       },
-      { status: 400 },
+      { status },
     )
   }
 }

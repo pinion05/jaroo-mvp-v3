@@ -115,18 +115,20 @@ async function writeUsdKrwRateToRedis({ client, cacheKey, data, ttlSeconds }) {
  */
 async function fetchUsdKrwRateFromSource() {
   let browser;
+  let context;
+  let page;
   try {
     const chromium = getPlaywrightChromium();
     browser = await chromium.launch({
       headless: true
     });
 
-    const context = await browser.newContext({
+    context = await browser.newContext({
       userAgent: 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
       viewport: { width: 1920, height: 1080 }
     });
 
-    const page = await context.newPage();
+    page = await context.newPage();
 
     await page.goto(USD_KRW_URL, {
       waitUntil: 'domcontentloaded',
@@ -167,8 +169,14 @@ async function fetchUsdKrwRateFromSource() {
     console.error('환율 데이터 추출 실패:', error.message);
     throw error;
   } finally {
+    if (page) {
+      await page.close().catch(() => {});
+    }
+    if (context) {
+      await context.close().catch(() => {});
+    }
     if (browser) {
-      await browser.close();
+      await browser.close().catch(() => {});
     }
   }
 }

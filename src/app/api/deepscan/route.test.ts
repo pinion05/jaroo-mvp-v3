@@ -104,10 +104,73 @@ test('createDeepScanCanonicalResponse는 internal builder 예외를 local JSON e
 })
 
 test('GET은 internal DeepScan builder response를 노출한다', async () => {
-  const response = await GET(new NextRequest('http://localhost/api/deepscan?market=KR&code=005930&name=%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90'))
-  const body = await response.json()
+  const originalFetch = global.fetch
+  const originalCrawlerBaseUrl = process.env.JAROO_CRAWLER_BASE_URL
 
-  assert.equal(response.status, 200)
-  assert.equal(typeof body.metadata?.debugId, 'string')
-  assert.ok(body.hero?.headline)
+  process.env.JAROO_CRAWLER_BASE_URL = 'http://crawler.test'
+  global.fetch = (async (input) => {
+    assert.equal(
+      String(input),
+      'http://crawler.test/api/source/wisereport-fnguide-krx-polygon-fmp-deepscan-package/deepscan/canonical?market=KR&code=005930&name=%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90&from=system',
+    )
+
+    return new Response(JSON.stringify({
+      metadata: {
+        debugId: 'deepscan:KR:005930',
+      },
+      hero: {
+        headline: '삼성전자 국내 DeepScan 70점',
+      },
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    })
+  }) as typeof fetch
+
+  try {
+    const response = await GET(new NextRequest('http://localhost/api/deepscan?market=KR&code=005930&name=%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90'))
+    const body = await response.json()
+
+    assert.equal(response.status, 200)
+    assert.equal(typeof body.metadata?.debugId, 'string')
+    assert.ok(body.hero?.headline)
+  } finally {
+    global.fetch = originalFetch
+    if (originalCrawlerBaseUrl === undefined) {
+      delete process.env.JAROO_CRAWLER_BASE_URL
+    } else {
+      process.env.JAROO_CRAWLER_BASE_URL = originalCrawlerBaseUrl
+    }
+  }
+})
+
+test('GET은 KR crawler admission failure status를 보존한다', async () => {
+  const originalFetch = global.fetch
+  const originalCrawlerBaseUrl = process.env.JAROO_CRAWLER_BASE_URL
+
+  process.env.JAROO_CRAWLER_BASE_URL = 'http://crawler.test'
+  global.fetch = (async () => new Response(JSON.stringify({
+    ok: false,
+    error: {
+      message: 'KR DeepScan crawler is busy',
+    },
+  }), {
+    status: 429,
+    headers: { 'Content-Type': 'application/json' },
+  })) as typeof fetch
+
+  try {
+    const response = await GET(new NextRequest('http://localhost/api/deepscan?market=KR&code=005930&name=%EC%82%BC%EC%84%B1%EC%A0%84%EC%9E%90'))
+    const body = await response.json()
+
+    assert.equal(response.status, 429)
+    assert.equal(body.error.message, 'KR DeepScan crawler is busy')
+  } finally {
+    global.fetch = originalFetch
+    if (originalCrawlerBaseUrl === undefined) {
+      delete process.env.JAROO_CRAWLER_BASE_URL
+    } else {
+      process.env.JAROO_CRAWLER_BASE_URL = originalCrawlerBaseUrl
+    }
+  }
 })

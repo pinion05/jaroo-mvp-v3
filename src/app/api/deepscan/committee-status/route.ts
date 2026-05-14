@@ -1,15 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import {
-  buildKrCommitteeAxesFromLlmResults,
-  getDeepScanKrCommitteeProgress,
-} from '../../../../../packages/crawler/src/services/deepscan-kr-committee-runtime.js'
+import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 
 export const runtime = 'nodejs'
 
+type DeepScanCommitteeProgress = {
+  requestId: string
+  status: string
+  results?: Record<string, unknown>
+  errors?: unknown[]
+  pending?: string[]
+  completed?: number
+  updatedAt?: string
+  softDeadlineMs?: number
+}
+
 export function createDeepScanCommitteeStatusResponse(
   searchParams: URLSearchParams,
-  reader: typeof getDeepScanKrCommitteeProgress = getDeepScanKrCommitteeProgress,
+  reader: (requestId: string) => DeepScanCommitteeProgress | null,
 ) {
   const requestId = searchParams.get('requestId')?.trim()
 
@@ -33,10 +41,41 @@ export function createDeepScanCommitteeStatusResponse(
     completed: progress.completed,
     updatedAt: progress.updatedAt,
     softDeadlineMs: progress.softDeadlineMs,
-    committeeAxes: buildKrCommitteeAxesFromLlmResults(null, progress.results, progress.errors, progress.pending).axes,
   })
 }
 
 export async function GET(request: NextRequest) {
-  return createDeepScanCommitteeStatusResponse(request.nextUrl.searchParams)
+  const requestId = request.nextUrl.searchParams.get('requestId')?.trim()
+
+  if (!requestId) {
+    return NextResponse.json({ ok: false, status: 'error', error: { message: 'requestId is required' } }, { status: 400 })
+  }
+
+  try {
+    const upstreamUrl = buildCrawlerUrl(
+      getCrawlerBaseUrl(),
+      `/api/source/deepscan/kr/committee-status?requestId=${encodeURIComponent(requestId)}`,
+    )
+    const response = await fetch(upstreamUrl, { cache: 'no-store' })
+    const body = await response.text()
+
+    return new NextResponse(body, {
+      status: response.status,
+      headers: {
+        'content-type': response.headers.get('content-type') ?? 'application/json; charset=utf-8',
+      },
+    })
+  } catch (error) {
+    return NextResponse.json(
+      {
+        ok: false,
+        requestId,
+        status: 'error',
+        error: {
+          message: error instanceof Error ? error.message : 'crawler committee status proxy failed',
+        },
+      },
+      { status: 502 },
+    )
+  }
 }

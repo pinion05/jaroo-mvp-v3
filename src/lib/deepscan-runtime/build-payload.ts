@@ -14,7 +14,6 @@ import type {
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 import { scoreUsCommitteeFromGeneratedDump, type UsMemberKey } from './llm-committee'
 import { decodeUsConsensusObservation } from './us-consensus'
-import { buildJarooDeepScanPayload as buildCrawlerDeepScanPayload } from '../../../packages/crawler/src/services/deepscan-payload.js'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -422,6 +421,60 @@ export function prepareDeepScanRawInputForBuilder(rawInput: DeepScanRawInput): D
       code: inferredKrCode,
     },
   }
+}
+
+function setCrawlerDeepScanQueryValue(searchParams: URLSearchParams, key: string, value: string | undefined) {
+  const normalized = normalizeText(value)
+  if (normalized) {
+    searchParams.set(key, normalized)
+  }
+}
+
+export function buildKrDeepScanCrawlerCanonicalUrl(rawInput: DeepScanRawInput) {
+  const input = prepareDeepScanRawInputForBuilder(rawInput)
+  const searchParams = new URLSearchParams()
+
+  setCrawlerDeepScanQueryValue(searchParams, 'market', input.instrument.market ?? 'KR')
+  setCrawlerDeepScanQueryValue(searchParams, 'code', input.instrument.code)
+  setCrawlerDeepScanQueryValue(searchParams, 'ticker', input.instrument.ticker)
+  setCrawlerDeepScanQueryValue(searchParams, 'name', input.instrument.name)
+  setCrawlerDeepScanQueryValue(searchParams, 'shares', input.holding?.shares)
+  setCrawlerDeepScanQueryValue(searchParams, 'averagePrice', input.holding?.averagePrice)
+  setCrawlerDeepScanQueryValue(searchParams, 'evaluationAmount', input.holding?.evaluationAmount)
+  setCrawlerDeepScanQueryValue(searchParams, 'selectedAt', input.selectedAt)
+  setCrawlerDeepScanQueryValue(searchParams, 'from', normalizeSourceFrom(input.sourceContext.from))
+
+  return buildCrawlerUrl(
+    getCrawlerBaseUrl(),
+    `/api/source/wisereport-fnguide-krx-polygon-fmp-deepscan-package/deepscan/canonical?${searchParams.toString()}`,
+  )
+}
+
+export class CrawlerDeepScanRequestError extends Error {
+  status: number
+
+  constructor(message: string, status: number) {
+    super(message)
+    this.name = 'CrawlerDeepScanRequestError'
+    this.status = status
+  }
+}
+
+export async function buildKrDeepScanPayloadViaCrawler(rawInput: DeepScanRawInput, fetcher: typeof fetch = fetch) {
+  const upstreamUrl = buildKrDeepScanCrawlerCanonicalUrl(rawInput)
+  const response = await fetcher(upstreamUrl, { cache: 'no-store' })
+  const payload = await response.json()
+
+  if (!response.ok) {
+    throw new CrawlerDeepScanRequestError(
+      typeof payload?.error?.message === 'string'
+        ? payload.error.message
+        : `crawler deepscan request failed with HTTP ${response.status}`,
+      response.status,
+    )
+  }
+
+  return payload as JarooDeepScanPayload
 }
 
 function buildInputValidityRaw(rawInput: DeepScanRawInput) {
@@ -1201,7 +1254,7 @@ export async function buildDeepScanPayloadFromSearchParams(searchParams: URLSear
     return createInvalidInputPayload(rawInput)
   }
 
-  return buildCrawlerDeepScanPayload(prepareDeepScanRawInputForBuilder(rawInput))
+  return buildKrDeepScanPayloadViaCrawler(rawInput)
 }
 
 export { buildRawInputFromSearchParams }

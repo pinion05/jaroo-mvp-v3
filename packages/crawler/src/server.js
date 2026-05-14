@@ -37,6 +37,8 @@ import {
   DEFAULT_US_OHLC_LIMIT,
   getUSOwnershipFlow,
   getUSStockReportData,
+  buildKrCommitteeAxesFromLlmResults,
+  getDeepScanKrCommitteeProgress,
   runTriggerBatch,
 } from './index.js';
 
@@ -119,6 +121,92 @@ function parseSingleQueryValue(value) {
 function parseBooleanQuery(value) {
   const normalizedValue = parseSingleQueryValue(value)?.toLowerCase();
   return normalizedValue === '1' || normalizedValue === 'true' || normalizedValue === 'yes' || normalizedValue === 'on';
+}
+
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function stableStringify(value) {
+  if (Array.isArray(value)) {
+    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
+  }
+  if (value && typeof value === 'object') {
+    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
+  }
+  return JSON.stringify(value ?? null);
+}
+
+const deepscanKrJobs = new Map();
+const activeDeepscanKrCodes = new Map();
+
+function buildDeepscanKrJobKey(input) {
+  return stableStringify({
+    schema: 'jaroo.deepscan.kr.canonical.v1',
+    instrument: {
+      code: input.instrument?.code ?? null,
+      ticker: input.instrument?.ticker ?? null,
+      market: input.instrument?.market ?? null,
+      kind: input.instrument?.kind ?? null,
+    },
+    holding: input.holding ?? null,
+    selectedAt: input.selectedAt ?? null,
+    sourceContext: input.sourceContext ?? null,
+  });
+}
+
+async function runDeepscanKrWithAdmission(input, load) {
+  if (process.env.DEEPSCAN_KR_EXECUTION_DISABLED === '1') {
+    throw new HttpError(503, 'KR DeepScan execution disabled', {
+      status: 'unavailable',
+      retryable: true,
+    });
+  }
+
+  const jobKey = buildDeepscanKrJobKey(input);
+  const existing = deepscanKrJobs.get(jobKey);
+  if (existing) {
+    return existing.promise;
+  }
+
+  const code = String(input.instrument?.code ?? input.instrument?.ticker ?? 'unknown');
+  const globalLimit = parsePositiveInteger(process.env.DEEPSCAN_KR_GLOBAL_JOBS, 1);
+  const perCodeLimit = parsePositiveInteger(process.env.DEEPSCAN_KR_PER_CODE_JOBS, 1);
+  const activeForCode = activeDeepscanKrCodes.get(code) ?? 0;
+
+  if (deepscanKrJobs.size >= globalLimit || activeForCode >= perCodeLimit) {
+    throw new HttpError(429, 'KR DeepScan crawler is busy', {
+      status: 'busy',
+      reason: deepscanKrJobs.size >= globalLimit ? 'global_limit' : 'per_code_limit',
+      retryAfterMs: parsePositiveInteger(process.env.DEEPSCAN_KR_BUSY_RETRY_AFTER_MS, 5000),
+    });
+  }
+
+  activeDeepscanKrCodes.set(code, activeForCode + 1);
+  const startedAt = Date.now();
+  const promise = (async () => {
+    try {
+      return await load();
+    } finally {
+      const nextActiveForCode = Math.max(0, (activeDeepscanKrCodes.get(code) ?? 1) - 1);
+      if (nextActiveForCode === 0) {
+        activeDeepscanKrCodes.delete(code);
+      } else {
+        activeDeepscanKrCodes.set(code, nextActiveForCode);
+      }
+      deepscanKrJobs.delete(jobKey);
+      console.log(`[${SERVICE_NAME}] deepscan-kr job complete code=${code} durationMs=${Date.now() - startedAt}`);
+    }
+  })();
+
+  deepscanKrJobs.set(jobKey, {
+    code,
+    startedAt: new Date().toISOString(),
+    promise,
+  });
+
+  return promise;
 }
 
 const DEEPSCAN_MAJOR_BLOCK_KEYS = Object.freeze([
@@ -2816,12 +2904,62 @@ const endpointDefinitions = [
 
       return 200;
     },
-    failureHandler: async (req) => ({
-      raw: true,
-      status: 500,
-      body: await buildJarooDeepScanRawFailurePayload(req),
-    }),
-    handler: async (req) => buildJarooDeepScanPayload(buildJarooDeepScanInputFromQuery(req)),
+    failureHandler: async (req, error) => {
+      if (error instanceof HttpError) {
+        return undefined;
+      }
+
+      return {
+        raw: true,
+        status: 500,
+        body: await buildJarooDeepScanRawFailurePayload(req),
+      };
+    },
+    handler: async (req) => {
+      const input = buildJarooDeepScanInputFromQuery(req);
+      const market = String(input.instrument.market ?? '').trim().toUpperCase();
+      const isKrInput = market !== 'US' && (input.instrument.code || /^\d{6}(?:\.(?:KS|KQ))?$/i.test(String(input.instrument.ticker ?? '')));
+
+      if (!isKrInput) {
+        return buildJarooDeepScanPayload(input);
+      }
+
+      return runDeepscanKrWithAdmission(input, () => buildJarooDeepScanPayload(input));
+    },
+  },
+  {
+    id: 'deepscan-kr-committee-status',
+    resource: 'jaroo.deepscan.kr.committee-status',
+    description: 'KR DeepScan crawler-owned committee progress state를 반환합니다.',
+    primaryPath: buildDataSourcePath('deepscan', '/kr/committee-status'),
+    dataSources: ['openrouter', 'wisereport', 'fnguide'],
+    params: [],
+    query: ['requestId(required)'],
+    rawSuccess: true,
+    handler: async (req) => {
+      const requestId = parseSingleQueryValue(req.query.requestId);
+      if (!requestId) {
+        throw new HttpError(400, 'requestId is required');
+      }
+
+      const progress = getDeepScanKrCommitteeProgress(requestId);
+      if (!progress) {
+        return { ok: true, requestId, status: 'not_found', results: {}, errors: [], pending: [] };
+      }
+
+      return {
+        ok: true,
+        requestId: progress.requestId,
+        status: progress.status,
+        results: progress.results,
+        errors: progress.errors,
+        pending: progress.pending,
+        completed: progress.completed,
+        updatedAt: progress.updatedAt,
+        softDeadlineMs: progress.softDeadlineMs,
+        committeeAxes: buildKrCommitteeAxesFromLlmResults(null, progress.results, progress.errors, progress.pending).axes,
+      };
+    },
   },
   {
     id: 'quotes-current',
