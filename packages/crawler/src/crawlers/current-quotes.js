@@ -20,7 +20,7 @@ const WISE_ETF_NAV_DATA_URL = 'https://comp.wisereport.co.kr/ETF/GetNAVData.aspx
 const NAVER_STOCK_BASIC_URL_PREFIX = 'https://m.stock.naver.com/api/stock/';
 const NAVER_STOCK_PRICE_PATH_SUFFIX = '/price?page=1&pageSize=1';
 const NAVER_STOCK_INTEGRATION_PATH_SUFFIX = '/integration';
-const DEFAULT_NAVER_CURRENT_QUOTES_TIMEOUT_MS = 3_000;
+const DEFAULT_NAVER_CURRENT_QUOTES_TIMEOUT_MS = 10_000;
 const DEFAULT_NAVER_CURRENT_QUOTES_CONCURRENCY = 4;
 const CURRENT_QUOTES_DIR = path.dirname(fileURLToPath(import.meta.url));
 const KR_EXCHANGE_PRODUCT_UNIVERSE_PATH = path.resolve(
@@ -93,7 +93,10 @@ function getNaverCurrentQuotesTimeoutMs(options = {}) {
     return parsePositiveInteger(options.naverCurrentQuotesTimeoutMs, DEFAULT_NAVER_CURRENT_QUOTES_TIMEOUT_MS);
   }
 
-  return parsePositiveInteger(process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS, DEFAULT_NAVER_CURRENT_QUOTES_TIMEOUT_MS);
+  return parsePositiveInteger(
+    process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS ?? process.env.QUOTES_CURRENT_PROXY_TIMEOUT_MS,
+    DEFAULT_NAVER_CURRENT_QUOTES_TIMEOUT_MS,
+  );
 }
 
 function getNaverCurrentQuotesConcurrency(options = {}) {

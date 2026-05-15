@@ -2,6 +2,7 @@ import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
+export const DEFAULT_COMMITTEE_LLM_MODEL = 'x-ai/grok-4.1-fast'
 const DEFAULT_LOG_DIR = join(process.cwd(), '.omx', 'context', 'committee-debug-logs')
 const EMPTY_RESPONSE_RETRY_DELAY_MS = 2000
 const DEFAULT_COMMITTEE_PROGRESS_TTL_MS = 300_000
@@ -165,6 +166,15 @@ function extractOpenRouterErrorStatus(result) {
   return typeof result?.error?.code === 'number' && Number.isInteger(result.error.code) ? result.error.code : 502
 }
 
+function isNonRetryableOpenRouterError(message, status) {
+  const text = String(message || '')
+  if (/DataInspectionFailed|inappropriate content|content policy|safety|moderation/i.test(text)) {
+    return true
+  }
+
+  return status === 400 || status === 401 || status === 403
+}
+
 class CommitteeLlmError extends Error {
   constructor(kind, message, details = {}) {
     super(message)
@@ -320,10 +330,13 @@ async function requestCommitteeAttempt(memberKey, dumps, runtimeOptions, attempt
   const upstreamErrorMessage = extractOpenRouterErrorMessage(result)
   if (!upstreamResponse.ok || upstreamErrorMessage) {
     const message = upstreamErrorMessage || `OpenRouter committee request failed (${!upstreamResponse.ok ? upstreamResponse.status : extractOpenRouterErrorStatus(result)})`
+    const errorStatus = !upstreamResponse.ok ? upstreamResponse.status : extractOpenRouterErrorStatus(result)
+    const retryable = !isNonRetryableOpenRouterError(message, errorStatus)
     writeAttemptFailureLog(runtimeOptions, memberKey, attempt, {
       errorKind: 'llm-upstream-error',
       error: message,
       status: upstreamResponse.status,
+      retryable,
       elapsed_ms: Date.now() - startedAt,
       choice: summarizeChoice(result),
       usage: extractUsage(result),
@@ -332,6 +345,7 @@ async function requestCommitteeAttempt(memberKey, dumps, runtimeOptions, attempt
     throw new CommitteeLlmError('llm-upstream-error', message, {
       attempt,
       status: upstreamResponse.status,
+      retryable,
     })
   }
 
@@ -370,7 +384,7 @@ async function requestCommitteeAttempt(memberKey, dumps, runtimeOptions, attempt
 export async function scoreCommitteeMember(memberKey, dumps, options = {}) {
   const runtimeOptions = {
     apiKey: options.apiKey ?? process.env.OPENROUTER_API_KEY,
-    model: options.model ?? process.env.DEEPSCAN_LLM_MODEL ?? process.env.OCR_MODEL ?? 'qwen/qwen3.5-flash-02-23',
+    model: options.model ?? process.env.DEEPSCAN_LLM_MODEL ?? DEFAULT_COMMITTEE_LLM_MODEL,
     schemaName: options.schemaName ?? 'jaroo_committee_member',
     referer: options.referer ?? 'http://localhost:3312',
     title: options.title ?? 'jaroo-mvp-v3 DeepScan Committee',
@@ -467,8 +481,9 @@ export async function scoreCommitteeMember(memberKey, dumps, options = {}) {
         attempt: attemptNumber,
       })
       committeeError.attempts = attemptNumber
-      committeeError.retryable = attemptNumber < maxAttempts
-      if (attemptNumber < maxAttempts) {
+      const canRetry = committeeError.retryable !== false && attemptNumber < maxAttempts
+      committeeError.retryable = canRetry
+      if (canRetry) {
         await delay(runtimeOptions.emptyResponseRetryDelayMs)
         continue
       }
@@ -517,14 +532,14 @@ export async function scoreCommitteeMembers({ memberKeys, shared, members, optio
       finalStatus: 'error',
       retryable: false,
       llmResultPresent: false,
-      model: runtimeOptions.model ?? process.env.DEEPSCAN_LLM_MODEL ?? process.env.OCR_MODEL ?? 'qwen/qwen3.5-flash-02-23',
+      model: runtimeOptions.model ?? process.env.DEEPSCAN_LLM_MODEL ?? DEFAULT_COMMITTEE_LLM_MODEL,
     })
   })
 
   const logDir = runtimeOptions.logDir ?? DEFAULT_LOG_DIR
   writeLog(logDir, `_summary-${runtimeOptions.summaryKey ?? 'committee'}.json`, {
     summaryKey: runtimeOptions.summaryKey ?? 'committee',
-    model: runtimeOptions.model ?? process.env.DEEPSCAN_LLM_MODEL ?? process.env.OCR_MODEL ?? 'qwen/qwen3.5-flash-02-23',
+    model: runtimeOptions.model ?? process.env.DEEPSCAN_LLM_MODEL ?? DEFAULT_COMMITTEE_LLM_MODEL,
     concurrency: Math.max(1, Math.min(memberKeys.length || 1, concurrency)),
     members: Object.fromEntries(Object.entries(results).map(([key, value]) => [key, {
       score: value?.score,
@@ -556,7 +571,7 @@ function createMemberError(memberKey, reason, runtimeOptions) {
     finalStatus: 'error',
     retryable: false,
     llmResultPresent: false,
-    model: runtimeOptions.model ?? process.env.DEEPSCAN_LLM_MODEL ?? process.env.OCR_MODEL ?? 'qwen/qwen3.5-flash-02-23',
+    model: runtimeOptions.model ?? process.env.DEEPSCAN_LLM_MODEL ?? DEFAULT_COMMITTEE_LLM_MODEL,
   }
 }
 
@@ -586,7 +601,7 @@ function writeCommitteeSummary(runtimeOptions, memberKeys, concurrency, snapshot
     summaryKey: runtimeOptions.summaryKey ?? 'committee',
     requestId: snapshot.requestId,
     status: snapshot.status,
-    model: runtimeOptions.model ?? process.env.DEEPSCAN_LLM_MODEL ?? process.env.OCR_MODEL ?? 'qwen/qwen3.5-flash-02-23',
+    model: runtimeOptions.model ?? process.env.DEEPSCAN_LLM_MODEL ?? DEFAULT_COMMITTEE_LLM_MODEL,
     concurrency: Math.max(1, Math.min(memberKeys.length || 1, concurrency)),
     completed: snapshot.completed,
     pending: snapshot.pending,

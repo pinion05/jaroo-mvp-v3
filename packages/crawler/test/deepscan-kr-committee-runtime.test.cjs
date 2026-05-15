@@ -104,6 +104,109 @@ test('KR committee LLM uses an extended default timeout for first attempts', asy
   }
 });
 
+test('KR committee LLM default model is isolated from OCR_MODEL', async () => {
+  const {
+    DEFAULT_KR_LLM_MODEL,
+    scoreDeepScanKrCommitteeFromDump,
+  } = await import('../src/services/deepscan-kr-committee-runtime.js');
+  const originalFetch = global.fetch;
+  const originalKey = process.env.OPENROUTER_API_KEY;
+  const originalKrModel = process.env.DEEPSCAN_KR_LLM_MODEL;
+  const originalSharedModel = process.env.DEEPSCAN_LLM_MODEL;
+  const originalOcrModel = process.env.OCR_MODEL;
+  const capturedModels = [];
+
+  process.env.OPENROUTER_API_KEY = 'test-key';
+  delete process.env.DEEPSCAN_KR_LLM_MODEL;
+  delete process.env.DEEPSCAN_LLM_MODEL;
+  process.env.OCR_MODEL = 'qwen/qwen3.5-flash-02-23';
+
+  global.fetch = (async (_url, init) => {
+    const body = JSON.parse(String(init?.body ?? '{}'));
+    capturedModels.push(body.model);
+    const userMessage = Array.isArray(body?.messages)
+      ? body.messages.find((message) => message.role === 'user')
+      : null;
+    const content = typeof userMessage?.content === 'string' ? userMessage.content : '';
+    const memberKey = content.match(/"member":"([^"]+)"/)?.[1] ?? 'unknown';
+
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            score: 70,
+            reason: `${memberKey} reason`,
+            confidence: 'medium',
+          }),
+        },
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  try {
+    await scoreDeepScanKrCommitteeFromDump({}, {
+      instrument: {
+        code: '005930',
+        name: '삼성전자',
+        market: 'KR',
+      },
+      sourceContext: {},
+    }, {
+      instrument: {
+        code: '005930',
+        name: '삼성전자',
+        market: 'KR',
+      },
+      pageCoverage: {
+        totalKnownPages: 0,
+        availablePageIds: [],
+        missingPageIds: [],
+        availableCount: 0,
+      },
+      sourceCoverage: {
+        hasCurrentQuote: false,
+        hasHolding: false,
+        hasPackageResult: false,
+        availableReportPages: [],
+      },
+      reportSignals: {},
+      missingSources: [],
+      sourceLimitations: [],
+      topFacts: [],
+      topRisks: [],
+    }, {});
+
+    assert.equal(DEFAULT_KR_LLM_MODEL, 'x-ai/grok-4.1-fast');
+    assert.equal(capturedModels.length, 9);
+    assert.deepEqual([...new Set(capturedModels)], [DEFAULT_KR_LLM_MODEL]);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = originalKey;
+    }
+    if (originalKrModel === undefined) {
+      delete process.env.DEEPSCAN_KR_LLM_MODEL;
+    } else {
+      process.env.DEEPSCAN_KR_LLM_MODEL = originalKrModel;
+    }
+    if (originalSharedModel === undefined) {
+      delete process.env.DEEPSCAN_LLM_MODEL;
+    } else {
+      process.env.DEEPSCAN_LLM_MODEL = originalSharedModel;
+    }
+    if (originalOcrModel === undefined) {
+      delete process.env.OCR_MODEL;
+    } else {
+      process.env.OCR_MODEL = originalOcrModel;
+    }
+  }
+});
+
 test('KR committee axes render pending members and score completed members only', async () => {
   const { buildKrCommitteeAxesFromLlmResults } = await import('../src/services/deepscan-kr-committee-runtime.js');
 

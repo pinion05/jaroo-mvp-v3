@@ -257,6 +257,50 @@ test('getNaverCurrentQuotes default timeout tolerates OCI-class Naver latency', 
   }
 });
 
+test('getNaverCurrentQuotes honors quote proxy timeout env as a crawler fallback', async () => {
+  const { getNaverCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+  const originalTimeout = process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS;
+  const originalProxyTimeout = process.env.QUOTES_CURRENT_PROXY_TIMEOUT_MS;
+  delete process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS;
+  process.env.QUOTES_CURRENT_PROXY_TIMEOUT_MS = '50';
+
+  try {
+    const result = await getNaverCurrentQuotes(['003720'], {
+      naverFetchImpl: async (_url, init = {}) => {
+        await new Promise((resolve, reject) => {
+          const timeout = setTimeout(resolve, 500);
+          init.signal?.addEventListener('abort', () => {
+            clearTimeout(timeout);
+            reject(Object.assign(new Error('synthetic proxy timeout abort'), { name: 'AbortError' }));
+          }, { once: true });
+        });
+
+        return new Response(JSON.stringify({
+          itemCode: '003720',
+          closePrice: '12,500',
+          localTradedAt: '2026-05-04T16:10:17+09:00',
+        }));
+      },
+    });
+
+    assert.deepEqual(result.items, []);
+    assert.equal(result.missing.length, 1);
+    assert.equal(result.missing[0].reason, 'provider-timeout');
+    assert.match(result.missing[0].message, /proxy timeout abort/);
+  } finally {
+    if (originalTimeout === undefined) {
+      delete process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS;
+    } else {
+      process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS = originalTimeout;
+    }
+    if (originalProxyTimeout === undefined) {
+      delete process.env.QUOTES_CURRENT_PROXY_TIMEOUT_MS;
+    } else {
+      process.env.QUOTES_CURRENT_PROXY_TIMEOUT_MS = originalProxyTimeout;
+    }
+  }
+});
+
 test('getNaverCurrentQuotes limits concurrent Naver mobile quote fetches', async () => {
   const { getNaverCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
   let inFlight = 0;
