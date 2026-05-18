@@ -36,6 +36,8 @@ const WISEREPORT_KR_CACHE_ROUTE_VERSION = 'v12';
 const WISEREPORT_KR_CACHE_SCHEMA_VERSION = 'wisereport-kr-v12-slim-v1';
 const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/completions';
 const DEFAULT_COMMENTARY_SUMMARY_TIMEOUT_MS = 8_000;
+const DEFAULT_DEEPSCAN_KR_LLM_MODEL = 'deepseek/deepseek-v4-flash';
+const DEFAULT_DEEPSCAN_KR_CURRENT_QUOTES_TIMEOUT_MS = 15_000;
 
 function normalizeText(value) {
   if (typeof value !== 'string') {
@@ -849,7 +851,15 @@ async function resolveKrSourceBundle(rawInput, input) {
       codes: input.instrument.code ? [input.instrument.code] : [],
       tickers: input.instrument.ticker ? [input.instrument.ticker] : [],
       ...(tradeDate ? { tradeDate } : {}),
-    }, { enrichKrVolumeFromKrx: true })),
+    }, {
+      enrichKrVolumeFromKrx: false,
+      naverCurrentQuotesTimeoutMs: parsePositiveInteger(
+        process.env.DEEPSCAN_KR_CURRENT_QUOTES_TIMEOUT_MS
+          ?? process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS
+          ?? process.env.QUOTES_CURRENT_PROXY_TIMEOUT_MS,
+        DEFAULT_DEEPSCAN_KR_CURRENT_QUOTES_TIMEOUT_MS,
+      ),
+    })),
     maybeResolveKrPackageResult(rawInput, input),
   ]);
 
@@ -1430,7 +1440,8 @@ async function summarizePerformanceCommentForLoading(input, performanceComment) 
 
   const model = process.env.DEEPSCAN_COMMENTARY_SUMMARY_MODEL
     ?? process.env.DEEPSCAN_KR_LLM_MODEL
-    ?? 'qwen/qwen3.5-flash-02-23';
+    ?? process.env.DEEPSCAN_LLM_MODEL
+    ?? DEFAULT_DEEPSCAN_KR_LLM_MODEL;
   const timeoutMs = parsePositiveInteger(
     process.env.DEEPSCAN_COMMENTARY_SUMMARY_TIMEOUT_MS ?? process.env.DEEPSCAN_LLM_TIMEOUT_MS,
     DEFAULT_COMMENTARY_SUMMARY_TIMEOUT_MS,

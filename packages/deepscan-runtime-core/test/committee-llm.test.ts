@@ -122,6 +122,52 @@ test('scoreCommitteeMember surfaces upstream OpenRouter errors', async () => {
   }
 })
 
+test('scoreCommitteeMember does not retry deterministic provider content inspection rejections', async () => {
+  const originalFetch = global.fetch
+  const originalKey = process.env.OPENROUTER_API_KEY
+  const logDir = mkdtempSync(join(tmpdir(), 'committee-llm-'))
+  process.env.OPENROUTER_API_KEY = 'test-key'
+
+  let fetchCount = 0
+  global.fetch = (async () => {
+    fetchCount += 1
+    return new Response(
+      JSON.stringify({
+        error: {
+          message: 'Upstream error from Alibaba: <400> InternalError.Algo.DataInspectionFailed: Input text data may contain inappropriate content.',
+          code: 502,
+        },
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json' } },
+    )
+  }) as typeof fetch
+
+  try {
+    await assert.rejects(
+      () => scoreCommitteeMember('trend', { shared: {}, memberDump: {} }, {
+        systemPrompt: () => 'prompt',
+        logDir,
+        retryCount: 3,
+        emptyResponseRetryDelayMs: 1,
+      }),
+      /DataInspectionFailed/,
+    )
+
+    assert.equal(fetchCount, 1)
+    const failureLog = JSON.parse(readFileSync(join(logDir, 'trend-failure.json'), 'utf8')) as { retryable?: boolean; attempt?: number }
+    assert.equal(failureLog.retryable, false)
+    assert.equal(failureLog.attempt, 1)
+  } finally {
+    rmSync(logDir, { recursive: true, force: true })
+    global.fetch = originalFetch
+    if (originalKey) {
+      process.env.OPENROUTER_API_KEY = originalKey
+    } else {
+      delete process.env.OPENROUTER_API_KEY
+    }
+  }
+})
+
 test('scoreCommitteeMember retries invalid JSON before returning a valid verdict', async () => {
   const originalFetch = global.fetch
   const originalKey = process.env.OPENROUTER_API_KEY

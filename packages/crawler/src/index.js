@@ -122,6 +122,7 @@ export {
 } from './services/deepscan-payload.js';
 
 export {
+  buildKrCommitteeAxesFromLlmResults,
   getDeepScanKrCommitteeProgress,
 } from './services/deepscan-kr-committee-runtime.js';
 

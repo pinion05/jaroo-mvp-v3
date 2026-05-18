@@ -14,7 +14,12 @@ const { runCrawlerV1Stage } = require('./wisereport-kr/crawler_v1.cjs');
 const { runCrawlerV2Stage } = require('./wisereport-kr/crawler_v2.cjs');
 const { finalizePageResult, buildAggregateResult } = require('./wisereport-kr/crawler_v3.cjs');
 
-const DEFAULT_CONCURRENCY = 3;
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const DEFAULT_CONCURRENCY = parsePositiveInteger(process.env.WISEREPORT_KR_CONCURRENCY, 3);
 
 async function mapWithConcurrency(items, limit, iteratee) {
   const results = new Array(items.length);
@@ -135,29 +140,36 @@ async function crawlMarketData() {
   });
 
   async function getNaverIndex(code) {
+    let page;
     try {
-      const page = await context.newPage();
+      page = await context.newPage();
       await page.goto(`https://finance.naver.com/sise/sise_index.naver?code=${code}`, { waitUntil: 'domcontentloaded' });
       const text = await page.evaluate(() => document.body.innerText.substring(0, 5000));
-      await page.close();
       return text;
     } catch (error) {
       logger.error('Crawler', `시장 데이터 실패 (${code}) | ${error.message}`);
       return '데이터 없음';
+    } finally {
+      if (page) {
+        await page.close().catch(() => {});
+      }
     }
   }
 
-  const [kospi, kosdaq] = await Promise.all([
-    getNaverIndex('KOSPI'),
-    getNaverIndex('KOSDAQ'),
-  ]);
+  try {
+    const [kospi, kosdaq] = await Promise.all([
+      getNaverIndex('KOSPI'),
+      getNaverIndex('KOSDAQ'),
+    ]);
 
-  await browser.close();
-
-  return {
-    KOSPI: kospi,
-    KOSDAQ: kosdaq,
-  };
+    return {
+      KOSPI: kospi,
+      KOSDAQ: kosdaq,
+    };
+  } finally {
+    await context.close().catch(() => {});
+    await browser.close().catch(() => {});
+  }
 }
 
 module.exports = {

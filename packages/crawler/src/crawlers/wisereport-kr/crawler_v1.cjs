@@ -1,8 +1,13 @@
 const logger = require('../../utils/logger.cjs');
 const { normalizeText, limitText } = require('./helpers.cjs');
 
-const DEFAULT_NAVIGATION_TIMEOUT_MS = 30000;
-const DEFAULT_WAIT_AFTER_LOAD_MS = 1200;
+function parsePositiveInteger(value, fallback) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+const DEFAULT_NAVIGATION_TIMEOUT_MS = parsePositiveInteger(process.env.WISEREPORT_KR_NAVIGATION_TIMEOUT_MS, 30000);
+const DEFAULT_WAIT_AFTER_LOAD_MS = parsePositiveInteger(process.env.WISEREPORT_KR_WAIT_AFTER_LOAD_MS, 1200);
 const MAX_CAPTURED_TABLES = 32;
 const BLOCKED_RESOURCE_TYPES = Object.freeze(['image', 'stylesheet', 'font', 'media']);
 const ONE_PIXEL_GIF = Buffer.from('R0lGODlhAQABAPAAAP///wAAACH5BAAAAAAALAAAAAABAAEAAAICRAEAOw==', 'base64');
