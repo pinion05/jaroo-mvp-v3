@@ -240,3 +240,63 @@ test('fetchUsdKrwRate fails open when Redis read or write fails', async () => {
   assert.equal(first.rate, 1349.8);
   assert.strictEqual(second, first);
 });
+
+test('parseYahooUsdKrwChart maps Yahoo chart closes to a USD/KRW snapshot', () => {
+  const { parseYahooUsdKrwChart } = require('../src/crawlers/usd-krw-rate.cjs');
+  const result = parseYahooUsdKrwChart({
+    chart: {
+      result: [{
+        meta: {
+          regularMarketPrice: 1476.45,
+          previousClose: 1472.5,
+          regularMarketTime: 1779062400,
+        },
+        timestamp: [1778976000, 1779062400],
+        indicators: { quote: [{ close: [1472.5, 1476.45] }] },
+      }],
+    },
+  }, 'https://query1.finance.yahoo.com/v8/finance/chart/USDKRW=X?range=5d&interval=1d');
+
+  assert.deepEqual(result, {
+    rate: 1476.45,
+    change: 3.95,
+    changePercent: 0.2683,
+    timestamp: '2026-05-18T00:00:00.000Z',
+    source: 'yahoo-chart',
+    sourceUrl: 'https://query1.finance.yahoo.com/v8/finance/chart/USDKRW=X?range=5d&interval=1d',
+  });
+});
+
+test('fetchUsdKrwRateFromSource falls back to open.er-api.com when Yahoo chart is unavailable', async () => {
+  const {
+    fetchUsdKrwRateFromSource,
+    USD_KRW_OPEN_ER_API_URL,
+    USD_KRW_YAHOO_CHART_URLS,
+  } = require('../src/crawlers/usd-krw-rate.cjs');
+  const requestedUrls = [];
+  const fetcher = async (url) => {
+    requestedUrls.push(url);
+    if (url !== USD_KRW_OPEN_ER_API_URL) {
+      return { ok: false, status: 403, async json() { return {}; } };
+    }
+
+    return {
+      ok: true,
+      status: 200,
+      async json() {
+        return {
+          time_last_update_unix: 1779062400,
+          rates: { KRW: 1478.12345 },
+        };
+      },
+    };
+  };
+
+  const result = await fetchUsdKrwRateFromSource({ fetcher, timeoutMs: 100 });
+
+  assert.deepEqual(requestedUrls, [...USD_KRW_YAHOO_CHART_URLS, USD_KRW_OPEN_ER_API_URL]);
+  assert.equal(result.rate, 1478.1235);
+  assert.equal(result.change, null);
+  assert.equal(result.changePercent, null);
+  assert.equal(result.source, 'open-er-api');
+});

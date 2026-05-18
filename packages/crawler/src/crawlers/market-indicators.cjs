@@ -7,8 +7,16 @@ function getPlaywrightChromium() {
 const SOURCES = {
     vkospi: 'https://stockplus.com/m/stocks/KOREA-O2901P',
     adr: 'http://adrinfo.kr/',
-    usVix: 'https://kr.investing.com/indices/volatility-s-p-500'
+    usVix: 'https://query1.finance.yahoo.com/v8/finance/chart/%5EVIX?range=5d&interval=1d',
+    usVixInvesting: 'https://kr.investing.com/indices/volatility-s-p-500'
 };
+
+const MARKET_JSON_HEADERS = {
+    accept: 'application/json,text/plain,*/*',
+    'user-agent': 'Mozilla/5.0 (compatible; JarooCrawler/1.0; +https://jaroo.local)'
+};
+
+const MARKET_JSON_TIMEOUT_MS = 3000;
 
 const USER_AGENT =
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36';
@@ -68,6 +76,107 @@ function inferSignedDelta(value, previousValue) {
     const delta = roundTo(value - previousValue, 2);
     const deltaPercent = previousValue === 0 ? 0 : roundTo((delta / previousValue) * 100, 2);
     return { delta, deltaPercent };
+}
+
+function toIsoTimestamp(value) {
+    if (Number.isFinite(value)) {
+        return new Date(value * 1000).toISOString();
+    }
+
+    if (typeof value === 'string' && value.trim()) {
+        const parsed = Date.parse(value);
+        if (Number.isFinite(parsed)) {
+            return new Date(parsed).toISOString();
+        }
+    }
+
+    return new Date().toISOString();
+}
+
+async function fetchJsonWithTimeout(url, { fetcher = fetch, timeoutMs = MARKET_JSON_TIMEOUT_MS } = {}) {
+    const abortController = new AbortController();
+    const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+
+    try {
+        const response = await fetcher(url, {
+            headers: MARKET_JSON_HEADERS,
+            cache: 'no-store',
+            signal: abortController.signal
+        });
+
+        if (!response || !response.ok) {
+            const status = response?.status ? `HTTP ${response.status}` : 'no response';
+            throw new Error(`market indicator upstream failed: ${status}`);
+        }
+
+        return await response.json();
+    } finally {
+        clearTimeout(timeoutId);
+    }
+}
+
+function findLatestFiniteClose(closes) {
+    if (!Array.isArray(closes)) {
+        return { value: null, index: -1 };
+    }
+
+    for (let index = closes.length - 1; index >= 0; index -= 1) {
+        const value = toNumber(closes[index]);
+        if (Number.isFinite(value)) {
+            return { value, index };
+        }
+    }
+
+    return { value: null, index: -1 };
+}
+
+function findPreviousFiniteClose(closes, beforeIndex) {
+    if (!Array.isArray(closes)) {
+        return null;
+    }
+
+    for (let index = beforeIndex - 1; index >= 0; index -= 1) {
+        const value = toNumber(closes[index]);
+        if (Number.isFinite(value)) {
+            return value;
+        }
+    }
+
+    return null;
+}
+
+function parseYahooVixChart(payload, sourceUrl = SOURCES.usVix) {
+    const result = payload?.chart?.result?.[0];
+    if (!result) {
+        throw new Error('Yahoo VIX chart result not found');
+    }
+
+    const meta = result.meta || {};
+    const timestamps = Array.isArray(result.timestamp) ? result.timestamp : [];
+    const closes = result.indicators?.quote?.[0]?.close || [];
+    const latestClose = findLatestFiniteClose(closes);
+    const value = toNumber(meta.regularMarketPrice) ?? latestClose.value;
+
+    if (!Number.isFinite(value)) {
+        throw new Error('Yahoo VIX value not found');
+    }
+
+    const previousClose = toNumber(meta.previousClose) ?? findPreviousFiniteClose(closes, latestClose.index);
+    const { delta, deltaPercent } = Number.isFinite(previousClose)
+        ? inferSignedDelta(value, previousClose)
+        : { delta: null, deltaPercent: null };
+
+    return {
+        name: 'CBOE Volatility Index (VIX)',
+        symbol: 'VIX',
+        value: roundTo(value, 2),
+        change: delta,
+        changePercent: deltaPercent,
+        status: 'yahoo-chart',
+        asOf: toIsoTimestamp(meta.regularMarketTime ?? timestamps[latestClose.index]),
+        source: 'yahoo-chart',
+        sourceUrl
+    };
 }
 
 function parseVkospiText(text) {
@@ -234,7 +343,7 @@ function parseUsVixText(text) {
         changePercent: toNumber(changePercentLine.replace(/[()%]/g, '')),
         status: statusLine === '실시간 데이터' ? '실시간' : statusLine,
         asOf: asOfLine,
-        sourceUrl: SOURCES.usVix
+        sourceUrl: SOURCES.usVixInvesting
     };
 }
 
@@ -403,37 +512,53 @@ async function fetchAdr() {
     );
 }
 
-async function fetchUsVix() {
-    return withBrowser((context) =>
-        fetchIndicator(context, SOURCES.usVix, parseUsVixText, {
-            attempts: 2,
-            readyMarkers: ['CBOE Volatility Index (VIX)', 'USD']
-        })
-    );
+async function fetchUsVix({ fetcher = fetch, timeoutMs = MARKET_JSON_TIMEOUT_MS } = {}) {
+    const payload = await fetchJsonWithTimeout(SOURCES.usVix, { fetcher, timeoutMs });
+    return parseYahooVixChart(payload, SOURCES.usVix);
+}
+
+function buildSourceStatus(label, sourceUrl, value, error = null) {
+    if (value) {
+        return { status: 'ok', sourceUrl };
+    }
+
+    return {
+        status: label === 'vkospi' ? 'blocked' : 'error',
+        sourceUrl,
+        reason: error instanceof Error ? error.message : error || (label === 'vkospi' ? 'source-blocked-on-oci' : 'source-unavailable')
+    };
 }
 
 async function fetchAllMarketIndicators() {
-    return withBrowser(async (context) => {
-        const vkospi = await fetchIndicatorSafe(context, 'VKOSPI', SOURCES.vkospi, parseVkospiText, {
-            attempts: 2,
-            readyMarkers: ['코스피200 변동성지수'],
-            readyPatterns: [
-                '코스피200 변동성지수',
-                '(?:\\d{2}:\\d{2}|\\d{2}\\.\\d{2})\\s*(?:장중|마감|장마감|장종료)',
-                '전일(?:지수|종가)'
-            ]
-        });
-        const adr = await fetchIndicatorSafe(context, 'ADR', SOURCES.adr, parseAdrText, {
-            attempts: 2,
-            readyMarkers: ['KOSPI', 'KOSDAQ']
-        });
-        const usVix = await fetchIndicatorSafe(context, 'US VIX', SOURCES.usVix, parseUsVixText, {
-            attempts: 2,
-            readyMarkers: ['CBOE Volatility Index (VIX)', 'USD']
-        });
+    const vkospi = null;
+    const vkospiStatus = buildSourceStatus('vkospi', SOURCES.vkospi, vkospi, 'stockplus-cloudfront-blocked-on-oci');
 
-        return { vkospi, adr, usVix };
-    });
+    const [adrResult, usVixResult] = await Promise.allSettled([
+        fetchAdr(),
+        fetchUsVix()
+    ]);
+
+    const adr = adrResult.status === 'fulfilled' ? adrResult.value : null;
+    const usVix = usVixResult.status === 'fulfilled' ? usVixResult.value : null;
+
+    if (adrResult.status === 'rejected') {
+        console.warn(`⚠️ [marketIndicators] ADR 조회 실패: ${adrResult.reason?.message || adrResult.reason}`);
+    }
+    if (usVixResult.status === 'rejected') {
+        console.warn(`⚠️ [marketIndicators] US VIX 조회 실패: ${usVixResult.reason?.message || usVixResult.reason}`);
+    }
+
+    return {
+        vkospi,
+        adr,
+        usVix,
+        partial: !vkospi || !adr || !usVix,
+        sourceStatus: {
+            vkospi: vkospiStatus,
+            adr: buildSourceStatus('adr', SOURCES.adr, adr, adrResult.status === 'rejected' ? adrResult.reason : null),
+            usVix: buildSourceStatus('usVix', SOURCES.usVix, usVix, usVixResult.status === 'rejected' ? usVixResult.reason : null)
+        }
+    };
 }
 
 module.exports = {
@@ -441,6 +566,7 @@ module.exports = {
     parseVkospiText,
     parseAdrText,
     parseUsVixText,
+    parseYahooVixChart,
     fetchVkospi,
     fetchAdr,
     fetchUsVix,

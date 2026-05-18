@@ -642,12 +642,17 @@ export function buildHomeMarketScore(_holdings: HomeHolding[], options: BuildHom
     kosdaqAdrValue !== null ? `KOSDAQ ADR ${formatMarketNumber(kosdaqAdrValue, 0)}` : null,
   ].filter((part): part is string => Boolean(part))
 
+  const isPartialWithoutVkospi = vkospiValue === null
+  const description = isPartialWithoutVkospi
+    ? `${detailParts.join(' · ')} 기준 일부 시장지표 점수예요. VKOSPI는 원천 차단으로 제외했어요.`
+    : `${detailParts.join(' · ')} 기준 시장 리스크 점수예요.`
+
   return {
     score: String(scoreNumber),
     status: 'ready',
     label,
     tone,
-    description: `${detailParts.join(' · ')} 기준 시장 리스크 점수예요.`,
+    description,
     details,
     sourceLabel: `출처: ${sourceParts.join(' + ')}`,
     updatedLabel,

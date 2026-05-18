@@ -506,6 +506,31 @@ test('home market score uses market indicators instead of portfolio PnL heuristi
   ])
 })
 
+
+
+test('home market score renders partial OCI indicators when VKOSPI source is blocked', () => {
+  const marketScore = buildHomeMarketScore(homeHoldings, {
+    marketSignalStatus: 'success',
+    marketSignals: {
+      usdKrw: { rate: 1476.45, changePercent: 0.26, timestamp: '2026-04-29T04:50:00.000Z' },
+      indicators: {
+        usVix: { value: 18.5, changePercent: -1.2, asOf: '04/29' },
+        vkospi: null,
+        adr: {
+          kospi: { value: 102, change: 1.2, asOf: '2026-04-29' },
+          kosdaq: { value: 88, change: -0.8, asOf: '2026-04-29' },
+        },
+      },
+    },
+  })
+
+  assert.equal(marketScore.status, 'ready')
+  assert.equal(marketScore.sourceLabel, '출처: US VIX + ADR + USD/KRW')
+  assert.match(marketScore.description, /일부 시장지표/)
+  assert.match(marketScore.description, /VKOSPI는 원천 차단으로 제외/)
+  assert.equal(marketScore.details.some((detail) => detail.label === 'VKOSPI'), false)
+})
+
 test('home market score has loading, missing, and error fallback states', () => {
   const loadingScore = buildHomeMarketScore(homeHoldings, { marketSignalStatus: 'loading' })
   const missingScore = buildHomeMarketScore([], { marketSignalStatus: 'idle' })
