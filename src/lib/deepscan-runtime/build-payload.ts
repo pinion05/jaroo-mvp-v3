@@ -460,12 +460,87 @@ export class CrawlerDeepScanRequestError extends Error {
   }
 }
 
-export async function buildKrDeepScanPayloadViaCrawler(rawInput: DeepScanRawInput, fetcher: typeof fetch = fetch) {
-  const upstreamUrl = buildKrDeepScanCrawlerCanonicalUrl(rawInput)
-  const response = await fetcher(upstreamUrl, { cache: 'no-store' })
-  const payload = await response.json()
+const DEFAULT_KR_DEEPSCAN_BUSY_MAX_WAIT_MS = 120_000
+const DEFAULT_KR_DEEPSCAN_BUSY_RETRY_AFTER_MS = 5_000
 
-  if (!response.ok) {
+function parsePositiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : fallback
+}
+
+function clampRetryAfterMs(value: unknown) {
+  const parsed = Number(value)
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return DEFAULT_KR_DEEPSCAN_BUSY_RETRY_AFTER_MS
+  }
+
+  return Math.min(Math.floor(parsed), 15_000)
+}
+
+function resolveCrawlerBusyRetryAfterMs(response: Response, payload: unknown) {
+  const retryAfterHeader = response.headers.get('retry-after')
+  const retryAfterSeconds = Number(retryAfterHeader)
+  if (Number.isFinite(retryAfterSeconds) && retryAfterSeconds > 0) {
+    return clampRetryAfterMs(retryAfterSeconds * 1000)
+  }
+
+  const record = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {}
+  const error = record.error && typeof record.error === 'object' ? record.error as Record<string, unknown> : {}
+  const details = error.details && typeof error.details === 'object' ? error.details as Record<string, unknown> : {}
+
+  return clampRetryAfterMs(details.retryAfterMs)
+}
+
+function isCrawlerBusyResponse(response: Response, payload: unknown) {
+  if (response.status !== 429) {
+    return false
+  }
+
+  const record = payload && typeof payload === 'object' ? payload as Record<string, unknown> : {}
+  const error = record.error && typeof record.error === 'object' ? record.error as Record<string, unknown> : {}
+  const details = error.details && typeof error.details === 'object' ? error.details as Record<string, unknown> : {}
+
+  return details.status === 'busy'
+    || (typeof error.message === 'string' && /busy/i.test(error.message))
+}
+
+type KrDeepScanCrawlerFetchOptions = {
+  maxBusyWaitMs?: number
+  sleep?: (durationMs: number) => Promise<void>
+}
+
+function sleep(durationMs: number) {
+  return new Promise<void>((resolve) => {
+    setTimeout(resolve, durationMs)
+  })
+}
+
+export async function buildKrDeepScanPayloadViaCrawler(
+  rawInput: DeepScanRawInput,
+  fetcher: typeof fetch = fetch,
+  options: KrDeepScanCrawlerFetchOptions = {},
+) {
+  const upstreamUrl = buildKrDeepScanCrawlerCanonicalUrl(rawInput)
+  const maxBusyWaitMs = options.maxBusyWaitMs
+    ?? parsePositiveInteger(process.env.DEEPSCAN_KR_BUSY_MAX_WAIT_MS, DEFAULT_KR_DEEPSCAN_BUSY_MAX_WAIT_MS)
+  const wait = options.sleep ?? sleep
+  let waitedMs = 0
+
+  while (true) {
+    const response = await fetcher(upstreamUrl, { cache: 'no-store' })
+    const payload = await response.json()
+
+    if (response.ok) {
+      return payload as JarooDeepScanPayload
+    }
+
+    if (isCrawlerBusyResponse(response, payload) && waitedMs < maxBusyWaitMs) {
+      const retryAfterMs = Math.min(resolveCrawlerBusyRetryAfterMs(response, payload), maxBusyWaitMs - waitedMs)
+      waitedMs += retryAfterMs
+      await wait(retryAfterMs)
+      continue
+    }
+
     throw new CrawlerDeepScanRequestError(
       typeof payload?.error?.message === 'string'
         ? payload.error.message
@@ -473,8 +548,6 @@ export async function buildKrDeepScanPayloadViaCrawler(rawInput: DeepScanRawInpu
       response.status,
     )
   }
-
-  return payload as JarooDeepScanPayload
 }
 
 function buildInputValidityRaw(rawInput: DeepScanRawInput) {

@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  buildKrDeepScanPayloadViaCrawler,
   describeMomentumProvenance,
   extractKrCodeFromTicker,
   prepareDeepScanRawInputForBuilder,
@@ -172,4 +173,64 @@ test('DeepScan runtime infers KR builder input from KR-like ticker without expli
 
   assert.equal(resolveDeepScanPayloadBuilderRoute(rawInput), 'kr')
   assert.equal(prepareDeepScanRawInputForBuilder(rawInput).instrument.code, '035720')
+})
+
+test('KR DeepScan crawler proxy waits and retries busy admission responses', async () => {
+  const rawInput: DeepScanRawInput = {
+    instrument: {
+      name: '삼영화학공업',
+      code: '003720',
+      market: 'KR',
+      kind: 'stock',
+    },
+    sourceContext: {
+      from: 'holding',
+    },
+  }
+  const requestedUrls: string[] = []
+  const waits: number[] = []
+  let callCount = 0
+
+  const payload = await buildKrDeepScanPayloadViaCrawler(
+    rawInput,
+    (async (input) => {
+      requestedUrls.push(String(input))
+      callCount += 1
+
+      if (callCount === 1) {
+        return new Response(JSON.stringify({
+          ok: false,
+          error: {
+            message: 'KR DeepScan crawler is busy',
+            details: {
+              status: 'busy',
+              retryAfterMs: 25,
+            },
+          },
+        }), {
+          status: 429,
+          headers: { 'Content-Type': 'application/json' },
+        })
+      }
+
+      return new Response(JSON.stringify({
+        metadata: { debugId: 'deepscan:KR:003720' },
+        hero: { headline: '삼영화학공업 국내 DeepScan 76점' },
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json' },
+      })
+    }) as typeof fetch,
+    {
+      maxBusyWaitMs: 100,
+      sleep: async (durationMs) => {
+        waits.push(durationMs)
+      },
+    },
+  )
+
+  assert.equal(callCount, 2)
+  assert.equal(requestedUrls[0], requestedUrls[1])
+  assert.deepEqual(waits, [25])
+  assert.equal(payload.metadata.debugId, 'deepscan:KR:003720')
 })

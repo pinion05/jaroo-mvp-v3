@@ -147,12 +147,18 @@ test('GET은 internal DeepScan builder response를 노출한다', async () => {
 test('GET은 KR crawler admission failure status를 보존한다', async () => {
   const originalFetch = global.fetch
   const originalCrawlerBaseUrl = process.env.JAROO_CRAWLER_BASE_URL
+  const originalBusyMaxWaitMs = process.env.DEEPSCAN_KR_BUSY_MAX_WAIT_MS
 
   process.env.JAROO_CRAWLER_BASE_URL = 'http://crawler.test'
+  process.env.DEEPSCAN_KR_BUSY_MAX_WAIT_MS = '1'
   global.fetch = (async () => new Response(JSON.stringify({
     ok: false,
     error: {
       message: 'KR DeepScan crawler is busy',
+      details: {
+        status: 'busy',
+        retryAfterMs: 1,
+      },
     },
   }), {
     status: 429,
@@ -171,6 +177,11 @@ test('GET은 KR crawler admission failure status를 보존한다', async () => {
       delete process.env.JAROO_CRAWLER_BASE_URL
     } else {
       process.env.JAROO_CRAWLER_BASE_URL = originalCrawlerBaseUrl
+    }
+    if (originalBusyMaxWaitMs === undefined) {
+      delete process.env.DEEPSCAN_KR_BUSY_MAX_WAIT_MS
+    } else {
+      process.env.DEEPSCAN_KR_BUSY_MAX_WAIT_MS = originalBusyMaxWaitMs
     }
   }
 })
