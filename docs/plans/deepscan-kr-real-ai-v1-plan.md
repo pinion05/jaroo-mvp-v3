@@ -13,7 +13,7 @@
 - app route는 proxy/cache only, page는 canonical payload render only.
 - `hero / committee / insights / strategy / sellNow / portfolioSimulation` 6블록 모두 real output을 목표로 구현한다.
 - 맥북 패키지 입력 경계는 `stockCode`, `holdingQty`, `avgPrice` 3개다.
-- OpenRouter key 재사용, 모델은 `x-ai/grok-4.1-fast` 계열을 사용한다.
+- OpenRouter key 재사용, 모델은 `deepseek/deepseek-v4-flash` 계열을 사용한다.
 - 점수/상태/blocked 판정은 crawler 코드가 결정하고, LLM은 텍스트 생성만 담당한다.
 
 ## 2. 추천 경계
@@ -356,7 +356,7 @@ package의 `boardOpinions.score`는 canonical numeric truth로 직접 쓰지 않
 
 ### Task D. text generator 추가
 - 새 service: `deepscan-kr-copy.js`
-- OpenRouter `x-ai/grok-4.1-fast` 호출
+- OpenRouter `deepseek/deepseek-v4-flash` 호출
 - strict JSON output
 - 입력은 raw source가 아니라 evidence packet + precomputed score만 사용
 

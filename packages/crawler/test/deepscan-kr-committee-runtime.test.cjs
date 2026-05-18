@@ -179,7 +179,7 @@ test('KR committee LLM default model is isolated from OCR_MODEL', async () => {
       topRisks: [],
     }, {});
 
-    assert.equal(DEFAULT_KR_LLM_MODEL, 'x-ai/grok-4.1-fast');
+    assert.equal(DEFAULT_KR_LLM_MODEL, 'deepseek/deepseek-v4-flash');
     assert.equal(capturedModels.length, 9);
     assert.deepEqual([...new Set(capturedModels)], [DEFAULT_KR_LLM_MODEL]);
   } finally {
