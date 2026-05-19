@@ -855,6 +855,12 @@ function buildWiseReportKrSlimPayloadV11(rawAggregate, code, pageDefinitions = W
   };
 }
 
+const NO_DATA_TEXT_PATTERN = /^(?:[-—–]|n\/a|na|null|none|데[이]?타가\s*존재하지\s*않습니다\.?|데[이]?터가\s*존재하지\s*않습니다\.?|자료가\s*없습니다\.?|데[이]?터\s*없음|최근\s*3개월\s*이내에\s*제시된\s*의견이\s*없습니다\.?)$/i;
+
+function isNoDataText(value) {
+  return typeof value === 'string' && NO_DATA_TEXT_PATTERN.test(value.trim().replace(/\s+/g, ' '));
+}
+
 function hasSlimV12Value(value) {
   if (value === null || value === undefined) {
     return false;
@@ -863,7 +869,7 @@ function hasSlimV12Value(value) {
     return Number.isFinite(value);
   }
   if (typeof value === 'string') {
-    return value.trim().length > 0;
+    return value.trim().length > 0 && !isNoDataText(value);
   }
   if (Array.isArray(value)) {
     return value.some((item) => hasSlimV12Value(item));

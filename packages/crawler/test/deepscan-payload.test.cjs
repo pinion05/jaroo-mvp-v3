@@ -271,7 +271,7 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
   );
   assert.equal(payload.strategy.weekSignal, '관찰 지속');
   assert.equal(payload.strategy.currentPriceText, '85200 KRW');
-  assert.equal(payload.strategy.targetPriceText, '컨센서스/패키지 보조 근거 확인');
+  assert.equal(payload.strategy.targetPriceText, '100000 KRW');
   assert.equal(payload.sellNow.realizedText, '현재가 기준 평가손익 +170400 KRW (+20%). 즉시 매도 판단은 보유 유지입니다.');
   assert.equal(payload.sellNow.rows.length, 4);
   assert.equal(payload.portfolioSimulation.beforeScore, 82);
@@ -285,6 +285,92 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
     assertBlockMeta(payload[key], 'ok');
     assert.equal(payload.metadata.blockStatus[key], 'ok');
   }
+});
+
+test('buildJarooDeepScanPayload separates source-provided missing target price from source lookup failure', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+
+  const noDataPayload = await buildJarooDeepScanPayload({
+    instrument: {
+      name: '한미반도체',
+      code: '042700',
+      market: 'KR',
+    },
+    selectedAt: '2026-05-18T00:00:00.000Z',
+    sources: {
+      slim: {
+        code: '042700',
+        pages: {
+          consensus: {
+            consensusTrend: {
+              rows: [{ 구분: '투자의견(점수)', '2026/05/18': '', '3개월전': '4.00' }],
+            },
+          },
+          opinion: {
+            analystOpinions: {
+              rows: [{
+                추정기관: '데이타가 존재하지 않습니다.',
+                적정주가: '데이타가 존재하지 않습니다.',
+                투자의견: '데이타가 존재하지 않습니다.',
+              }],
+            },
+            reportSummaries: {
+              rows: [{ 투자의견: '데이타가 존재하지 않습니다.', 목표주가: '데이타가 존재하지 않습니다.' }],
+            },
+          },
+          'recent-reports': {
+            recentReports: {
+              rows: [{ 일자: '26/01/27', 투자의견: 'BUY', 목표주가: '230,000' }],
+            },
+          },
+        },
+      },
+      quotes: {
+        items: [{
+          market: 'KR',
+          code: '042700',
+          price: 286500,
+          currency: 'KRW',
+          asOf: '2026-05-18',
+          source: 'fixture',
+          status: 'ok',
+        }],
+      },
+    },
+  });
+
+  assert.equal(noDataPayload.strategy.targetPriceText, '목표가 미제공');
+  assert.equal(noDataPayload.insights.items.some((item) => item.sourceLabel === '증권사 의견'), false);
+  assert.doesNotMatch(collectStrings({
+    insights: noDataPayload.insights,
+    strategy: noDataPayload.strategy,
+    committee: noDataPayload.committee,
+  }).join('\n'), /데이타가 존재하지 않습니다/);
+
+  const failurePayload = await buildJarooDeepScanPayload({
+    instrument: {
+      name: '한미반도체',
+      code: '042700',
+      market: 'KR',
+    },
+    selectedAt: '2026-05-18T00:00:00.000Z',
+    sources: {
+      quotes: {
+        items: [{
+          market: 'KR',
+          code: '042700',
+          price: 286500,
+          currency: 'KRW',
+          asOf: '2026-05-18',
+          source: 'fixture',
+          status: 'ok',
+        }],
+      },
+    },
+  });
+
+  assert.equal(failurePayload.strategy.targetPriceText, '목표가 조회 실패');
+  assert.match(collectStrings(failurePayload).join('\n'), /missing-source:slim|slim/);
 });
 
 

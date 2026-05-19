@@ -11,6 +11,7 @@ const KNOWN_V12_PAGE_IDS = Object.freeze(WISEREPORT_KR_V12_PAGES.map((page) => p
 const V12_EXTRA_PAGE_IDS = Object.freeze(KNOWN_V12_PAGE_IDS.filter((pageId) => !KNOWN_PAGE_IDS.includes(pageId)));
 const OCRISH_NUMBER_TEXT_PATTERN = /(shares?|share|stocks?|stock|주|원|krw|usd|eur|jpy|cny|aud|cad|hkd)/gi;
 const LABEL_PREFIX_PATTERN = /^(?:펼치기|접기)\s*/;
+const NO_DATA_TEXT_PATTERN = /^(?:[-—–]|n\/a|na|null|none|데[이]?타가\s*존재하지\s*않습니다\.?|데[이]?터가\s*존재하지\s*않습니다\.?|자료가\s*없습니다\.?|데[이]?터\s*없음|최근\s*3개월\s*이내에\s*제시된\s*의견이\s*없습니다\.?)$/i;
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -23,6 +24,16 @@ function normalizeText(value) {
 
   const normalized = value.trim();
   return normalized || null;
+}
+
+function isNoDataText(value) {
+  const normalized = normalizeText(value);
+  return Boolean(normalized && NO_DATA_TEXT_PATTERN.test(normalized.replace(/\s+/g, ' ')));
+}
+
+function normalizeEvidenceText(value) {
+  const normalized = normalizeText(value);
+  return normalized && !isNoDataText(normalized) ? normalized : null;
 }
 
 function normalizeCode(value) {
@@ -122,6 +133,11 @@ function normalizeShareCount(value) {
   return normalizeNumber(normalizedValue);
 }
 
+function normalizePositiveTargetPrice(value) {
+  const numeric = normalizeNumber(value);
+  return numeric !== null && numeric > 0 ? numeric : null;
+}
+
 function pickFirst(...values) {
   for (const value of values) {
     if (value !== null && value !== undefined) {
@@ -142,7 +158,7 @@ function hasEvidence(value) {
   }
 
   if (typeof value === 'string') {
-    return value.trim().length > 0;
+    return Boolean(normalizeEvidenceText(value));
   }
 
   if (Array.isArray(value)) {
@@ -409,7 +425,7 @@ function findNamedValue(rows, labelPatterns) {
         continue;
       }
 
-      const text = normalizeText(value);
+      const text = normalizeEvidenceText(value);
       if (text && textFallback === null) {
         textFallback = text;
       }
@@ -439,7 +455,7 @@ function findFirstKeyValue(rows, keyPatterns) {
 function extractRecommendation(opinionPage, consensusPage) {
   const opinionRows = collectRows(opinionPage);
   for (const row of opinionRows) {
-    const recommendation = normalizeText(row.의견 ?? row.투자의견 ?? row.recommendation);
+    const recommendation = normalizeEvidenceText(row.의견 ?? row.투자의견 ?? row.recommendation);
     if (recommendation) {
       return recommendation;
     }
@@ -452,8 +468,8 @@ function extractRecommendation(opinionPage, consensusPage) {
 
 function pickOpinionConsensusRow(opinionPage) {
   const opinionRows = collectRows(opinionPage);
-  return opinionRows.find((row) => normalizeText(row.추정기관)?.toLowerCase() === 'consensus' && normalizeNumber(row.적정주가) !== null)
-    ?? opinionRows.find((row) => normalizeNumber(row.적정주가 ?? row.목표주가 ?? row.목표가) !== null)
+  return opinionRows.find((row) => normalizeEvidenceText(row.추정기관)?.toLowerCase() === 'consensus' && readTargetPriceFromRow(row) !== null)
+    ?? opinionRows.find((row) => readTargetPriceFromRow(row) !== null)
     ?? null;
 }
 
@@ -500,7 +516,7 @@ function readTargetPriceFromRow(row) {
       && !/(직전|증감|변동|전일|previous|revision)/i.test(normalizedKey)
     ) {
       const numeric = normalizeNumber(value);
-      if (numeric !== null) {
+      if (numeric !== null && numeric > 0) {
         return numeric;
       }
     }
@@ -518,7 +534,7 @@ function readPreviousTargetPriceFromRow(row) {
     const normalizedKey = normalizeLabel(key) ?? key;
     if (/(직전|previous).*(적정주가|목표주가|목표가|targetprice)|(적정주가|목표주가|목표가|targetprice).*(직전|previous)/i.test(normalizedKey)) {
       const numeric = normalizeNumber(value);
-      if (numeric !== null) {
+      if (numeric !== null && numeric > 0) {
         return numeric;
       }
     }
@@ -561,15 +577,24 @@ function resolveRevisionDirection(revisionPct) {
   return 'flat';
 }
 
-function extractConsensusSnapshot(consensusPage, opinionPage, currentPrice) {
+function resolveConsensusFieldStatus(value, hasSourcePage) {
+  if (value !== null && value !== undefined) {
+    return 'present';
+  }
+
+  return hasSourcePage ? 'not_provided' : 'source_unavailable';
+}
+
+function extractConsensusSnapshot(consensusPage, opinionPage, currentPrice, options = {}) {
+  const hasSourcePage = options.hasConsensusPage === true || options.hasOpinionPage === true;
   const consensusRows = collectRows(consensusPage);
   const opinionConsensusRow = pickOpinionConsensusRow(opinionPage);
   const opinionRows = opinionConsensusRow ? [opinionConsensusRow] : [];
   const analystTargetStats = extractAnalystTargetStats(opinionPage);
   const targetPrice = pickFirst(
     readTargetPriceFromRow(opinionConsensusRow),
-    normalizeNumber(findFirstKeyValue(consensusRows, [/목표주가/i, /목표가/i, /targetprice/i])),
-    normalizeNumber(findNamedValue(consensusRows, [/목표주가/i, /목표가/i, /targetprice/i])),
+    normalizePositiveTargetPrice(findFirstKeyValue(consensusRows, [/목표주가/i, /목표가/i, /targetprice/i])),
+    normalizePositiveTargetPrice(findNamedValue(consensusRows, [/목표주가/i, /목표가/i, /targetprice/i])),
   );
   const previousTargetPrice = pickFirst(
     readPreviousTargetPriceFromRow(opinionConsensusRow),
@@ -582,14 +607,17 @@ function extractConsensusSnapshot(consensusPage, opinionPage, currentPrice) {
       : null,
   );
   const recommendation = extractRecommendation(opinionPage, consensusPage);
+  const recommendationScore = normalizeNumber(findFirstKeyValue(opinionRows, [/투자의견/i]));
   return {
     targetPrice,
+    targetPriceStatus: resolveConsensusFieldStatus(targetPrice, hasSourcePage),
     previousTargetPrice,
     targetGapPct: currentPrice !== null && targetPrice !== null && currentPrice !== 0
       ? ((targetPrice - currentPrice) / currentPrice) * 100
       : null,
     recommendation,
-    recommendationScore: normalizeNumber(findFirstKeyValue(opinionRows, [/투자의견/i])),
+    recommendationStatus: resolveConsensusFieldStatus(recommendationScore ?? recommendation, hasSourcePage),
+    recommendationScore,
     recommendationCounts: null,
     analystCount: analystTargetStats.analystCount,
     highestTargetPrice: analystTargetStats.highestTargetPrice,
@@ -1243,6 +1271,8 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
   const knownPageIds = resolveKnownPageIds(safeSources.slim, slimPages);
   const availablePageIds = knownPageIds.filter((pageId) => hasEvidence(slimPages[pageId]));
   const missingPageIds = knownPageIds.filter((pageId) => !hasEvidence(slimPages[pageId]));
+  const hasConsensusPage = Object.prototype.hasOwnProperty.call(slimPages, 'consensus');
+  const hasOpinionPage = Object.prototype.hasOwnProperty.call(slimPages, 'opinion');
   const pageCoverage = {
     totalKnownPages: knownPageIds.length,
     availablePageIds,
@@ -1251,8 +1281,9 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
   };
 
   const reportSignals = {
-    consensusAvailable: hasEvidence(slimPages.consensus),
-    opinionAvailable: hasEvidence(slimPages.opinion),
+    consensusAvailable: false,
+    opinionAvailable: false,
+    consensusSourceStatus: hasConsensusPage || hasOpinionPage ? 'loaded' : 'unavailable',
     recentReportsAvailable: hasEvidence(slimPages['recent-reports']),
     relativeReturnAvailable: hasEvidence(slimPages['relative-return']),
     styleAnalysisAvailable: hasEvidence(slimPages['style-analysis']),
@@ -1305,7 +1336,15 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
       : null,
   };
 
-  const consensusSnapshot = extractConsensusSnapshot(slimPages.consensus, slimPages.opinion, marketSnapshot.currentPrice);
+  const consensusSnapshot = extractConsensusSnapshot(slimPages.consensus, slimPages.opinion, marketSnapshot.currentPrice, {
+    hasConsensusPage,
+    hasOpinionPage,
+  });
+  reportSignals.consensusAvailable = consensusSnapshot.targetPrice !== null || consensusSnapshot.recommendationScore !== null || consensusSnapshot.recommendation !== null;
+  reportSignals.opinionAvailable = consensusSnapshot.recommendationScore !== null || consensusSnapshot.recommendation !== null;
+  reportSignals.consensusSourceStatus = consensusSnapshot.targetPriceStatus === 'source_unavailable' && consensusSnapshot.recommendationStatus === 'source_unavailable'
+    ? 'unavailable'
+    : 'loaded';
   const valuationSnapshot = extractValuationSnapshot(slimPages['investment-indicators'], slimPages['fnguide-finance']);
   const relativeReturnSnapshot = extractRelativeReturnSnapshot(slimPages['relative-return']);
   const styleAnalysisSnapshot = extractStyleAnalysisSnapshot(slimPages['style-analysis']);

@@ -162,6 +162,7 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
   assert.deepEqual(packet.reportSignals, {
     consensusAvailable: true,
     opinionAvailable: true,
+    consensusSourceStatus: 'loaded',
     recentReportsAvailable: true,
     relativeReturnAvailable: true,
     styleAnalysisAvailable: true,
@@ -172,9 +173,11 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
   });
   assert.deepEqual(packet.consensusSnapshot, {
     targetPrice: 100000,
+    targetPriceStatus: 'present',
     previousTargetPrice: null,
     targetGapPct: ((100000 - 85200) / 85200) * 100,
     recommendation: 'BUY',
+    recommendationStatus: 'present',
     recommendationScore: null,
     recommendationCounts: null,
     analystCount: null,
@@ -270,6 +273,7 @@ test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a dire
   assert.deepEqual(packet.reportSignals, {
     consensusAvailable: false,
     opinionAvailable: false,
+    consensusSourceStatus: 'unavailable',
     recentReportsAvailable: false,
     relativeReturnAvailable: false,
     styleAnalysisAvailable: false,
@@ -502,6 +506,63 @@ test('buildDeepScanKrEvidencePacket promotes KR WiseReport raw facts into struct
   assert.equal(packet.sourceLimitations.some((limitation) => limitation.fact === 'institutionalOwnershipPct'), true);
 });
 
+test('buildDeepScanKrEvidencePacket treats WiseReport/FnGuide no-data target rows as source-provided missing values, not present recommendations', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  const packet = buildDeepScanKrEvidencePacket(
+    {
+      instrument: {
+        code: '042700',
+        name: '한미반도체',
+        market: 'KR',
+      },
+    },
+    {
+      slim: {
+        code: '042700',
+        pages: {
+          consensus: {
+            consensusTrend: {
+              rows: [{ 구분: '투자의견(점수)', '2026/05/18': '', '3개월전': '4.00' }],
+            },
+          },
+          opinion: {
+            analystOpinions: {
+              rows: [{
+                추정기관: '데이타가 존재하지 않습니다.',
+                적정주가: '데이타가 존재하지 않습니다.',
+                투자의견: '데이타가 존재하지 않습니다.',
+              }],
+            },
+            reportSummaries: {
+              rows: [{
+                일자: '데이타가 존재하지 않습니다.',
+                목표주가: '데이타가 존재하지 않습니다.',
+                투자의견: '데이타가 존재하지 않습니다.',
+              }],
+            },
+          },
+          'recent-reports': {
+            recentReports: {
+              rows: [{ 일자: '26/01/27', 투자의견: 'BUY', 목표주가: '230,000' }],
+            },
+          },
+        },
+      },
+    },
+  );
+
+  assert.equal(packet.reportSignals.consensusSourceStatus, 'loaded');
+  assert.equal(packet.reportSignals.consensusAvailable, false);
+  assert.equal(packet.reportSignals.opinionAvailable, false);
+  assert.equal(packet.consensusSnapshot.targetPrice, null);
+  assert.equal(packet.consensusSnapshot.targetPriceStatus, 'not_provided');
+  assert.equal(packet.consensusSnapshot.recommendation, null);
+  assert.equal(packet.consensusSnapshot.recommendationScore, null);
+  assert.equal(packet.consensusSnapshot.recommendationStatus, 'not_provided');
+  assert.equal(packet.reportSignals.recentReportCount, 1);
+});
+
 test('buildDeepScanKrEvidencePacket uses v1.2 FnGuide ownership pages when present', async () => {
   const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
 
@@ -629,6 +690,7 @@ test('buildDeepScanKrEvidencePacket ignores unknown slim page keys, counts recen
   assert.deepEqual(packet.reportSignals, {
     consensusAvailable: false,
     opinionAvailable: false,
+    consensusSourceStatus: 'loaded',
     recentReportsAvailable: true,
     relativeReturnAvailable: false,
     styleAnalysisAvailable: false,

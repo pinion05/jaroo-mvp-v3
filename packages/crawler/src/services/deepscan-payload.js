@@ -941,6 +941,23 @@ function resolveConsensusOpinionSummary(consensusSnapshot) {
   return null;
 }
 
+function resolveTargetPriceText(evidence) {
+  const consensusSnapshot = evidence?.consensusSnapshot ?? {};
+  const targetPrice = typeof consensusSnapshot.targetPrice === 'number' && Number.isFinite(consensusSnapshot.targetPrice) && consensusSnapshot.targetPrice > 0
+    ? consensusSnapshot.targetPrice
+    : null;
+
+  if (targetPrice !== null) {
+    return formatCurrencyValue(targetPrice, evidence.currentQuote?.currency ?? evidence.marketSnapshot?.currency ?? 'KRW');
+  }
+
+  if (consensusSnapshot.targetPriceStatus === 'source_unavailable' || evidence.missingSources?.includes('slim')) {
+    return '목표가 조회 실패';
+  }
+
+  return '목표가 미제공';
+}
+
 function getScoreTone(score) {
   if (score >= 70) {
     return 'positive';
@@ -1516,7 +1533,7 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
     ? evidence.currentQuote.volume
     : null;
   const consensusSnapshot = evidence.consensusSnapshot ?? {};
-  const consensusTargetPrice = typeof consensusSnapshot.targetPrice === 'number' && Number.isFinite(consensusSnapshot.targetPrice)
+  const consensusTargetPrice = typeof consensusSnapshot.targetPrice === 'number' && Number.isFinite(consensusSnapshot.targetPrice) && consensusSnapshot.targetPrice > 0
     ? consensusSnapshot.targetPrice
     : null;
   const consensusTargetGapPct = typeof consensusSnapshot.targetGapPct === 'number' && Number.isFinite(consensusSnapshot.targetGapPct)
@@ -1663,9 +1680,7 @@ function buildStrategy(input, evidence, scored) {
     scenarioPeriod: evidence.currentQuote?.asOf ? `${evidence.currentQuote.asOf} 기준 1-2주` : '1~2주',
     scenarioCondition: evidence.topRisks[0] ?? '추가 리스크 없음',
     currentPriceText,
-    targetPriceText: evidence.reportSignals.consensusAvailable || evidence.sourceCoverage.hasPackageResult
-      ? '컨센서스/패키지 보조 근거 확인'
-      : '목표가 근거 없음',
+    targetPriceText: resolveTargetPriceText(evidence),
     scenarioDetails: scenarioDetails.length > 0 ? scenarioDetails : ['확보된 근거가 부족합니다.'],
     otherScenarios: [
       {

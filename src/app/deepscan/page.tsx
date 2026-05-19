@@ -469,13 +469,21 @@ function parseLoadingConsensusBody(body: string) {
   }
 }
 
+function isNoDataConsensusBody(body: string) {
+  return /데[이]?타가\s*존재하지\s*않습니다|데[이]?터가\s*존재하지\s*않습니다|최근\s*3개월\s*이내에\s*제시된\s*의견이\s*없습니다|목표가\s*미제공|목표가\s*조회\s*실패/u.test(body)
+}
+
 function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null): LoadingQuickFact | null {
   const consensus = payload?.insights.items.find((item) => item.sourceLabel === '증권사 의견' || item.label === '컨센서스')
-  if (!consensus?.body?.trim()) {
+  if (!consensus?.body?.trim() || isNoDataConsensusBody(consensus.body)) {
     return null
   }
 
   const parsedConsensus = parseLoadingConsensusBody(consensus.body)
+  if (!parsedConsensus.targetPriceLabel) {
+    return null
+  }
+
   const isPositive = /매수|buy|상향|positive/i.test(consensus.body) || (parsedConsensus.upsidePct ?? 0) > 0 || (parsedConsensus.opinionScore ?? 0) >= 3.5
   return {
     key: 'analyst-consensus',
