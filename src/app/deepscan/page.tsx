@@ -1327,9 +1327,9 @@ export default function DeepScanPage() {
       .join(' · ')
 
     return (
-      <div className='flex min-h-screen justify-center bg-[color:var(--jaroo-canvas)] px-3 py-4 sm:px-6'>
+      <div className='flex min-h-screen min-h-dvh justify-center bg-white sm:bg-[color:var(--jaroo-canvas)] sm:px-6 sm:py-4'>
         <DeepScanLoadingScreen
-          className='max-w-[390px] overflow-hidden rounded-[32px] border border-white/70 shadow-[0_20px_60px_rgba(12,68,124,0.18)]'
+          className='w-full overflow-hidden sm:max-w-[390px] sm:rounded-[32px] sm:border sm:border-white/70 sm:shadow-[0_20px_60px_rgba(12,68,124,0.18)]'
           name={requestSeed.holding.name}
           identifier={identifier}
           market={requestSeed.holding.market}

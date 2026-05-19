@@ -38,8 +38,8 @@ export function JarooShell({
   const pathname = usePathname()
 
   return (
-    <div className='min-h-screen bg-[color:var(--jaroo-canvas)] px-3 py-4 text-foreground sm:px-6'>
-      <div className='relative mx-auto flex min-h-[calc(100vh-2rem)] w-full max-w-[390px] flex-col overflow-hidden rounded-[32px] border border-white/70 bg-white shadow-[0_20px_60px_rgba(12,68,124,0.18)]'>
+    <div className='min-h-screen min-h-dvh bg-white text-foreground sm:bg-[color:var(--jaroo-canvas)] sm:px-6 sm:py-4'>
+      <div className='relative mx-auto flex min-h-screen min-h-dvh w-full flex-col overflow-hidden bg-white sm:min-h-[calc(100vh-2rem)] sm:max-w-[390px] sm:rounded-[32px] sm:border sm:border-white/70 sm:shadow-[0_20px_60px_rgba(12,68,124,0.18)]'>
         <header className='sticky top-0 z-20 border-b border-[color:var(--jaroo-border)] bg-white/95 px-4 py-3 backdrop-blur'>
           <div className='flex items-center gap-3'>
             {leading !== undefined ? (
