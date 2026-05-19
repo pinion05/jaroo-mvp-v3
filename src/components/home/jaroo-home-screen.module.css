@@ -3,13 +3,16 @@
   display: flex;
   justify-content: center;
   min-height: 100vh;
+  min-height: 100dvh;
+  width: 100%;
 }
 
 .frame {
   position: relative;
   background: #fff;
-  width: 340px;
+  width: 100%;
   min-height: 100vh;
+  min-height: 100dvh;
   overflow-y: auto;
   overflow-x: hidden;
   scroll-behavior: smooth;
@@ -905,17 +908,12 @@
   pointer-events: none;
 }
 
-@media (min-width: 768px) {
-  .modalMount {
-    left: 7rem;
-  }
-}
-
 .modalInner {
   position: relative;
   width: 100%;
-  max-width: 340px;
+  max-width: none;
   height: 100vh;
+  height: 100dvh;
 }
 
 .deepScanLoadingMount {
@@ -924,19 +922,47 @@
   z-index: 60;
   display: flex;
   justify-content: center;
-  padding: 1rem 0.75rem;
-  background: var(--jaroo-canvas);
+  padding: 0;
+  background: #fff;
 }
 
 .deepScanLoadingInner {
   width: 100%;
-  max-width: 390px;
-  min-height: calc(100vh - 2rem);
+  min-height: 100vh;
+  min-height: 100dvh;
   overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.7);
-  border-radius: 32px;
   background: #fff;
-  box-shadow: 0 20px 60px rgba(12, 68, 124, 0.18);
+}
+
+@media (min-width: 768px) {
+  .viewport {
+    background: var(--jaroo-canvas);
+  }
+
+  .frame {
+    width: 340px;
+  }
+
+  .modalMount {
+    left: 7rem;
+  }
+
+  .modalInner {
+    max-width: 340px;
+  }
+
+  .deepScanLoadingMount {
+    padding: 1rem 0.75rem;
+    background: var(--jaroo-canvas);
+  }
+
+  .deepScanLoadingInner {
+    max-width: 390px;
+    min-height: calc(100vh - 2rem);
+    border: 1px solid rgba(255, 255, 255, 0.7);
+    border-radius: 32px;
+    box-shadow: 0 20px 60px rgba(12, 68, 124, 0.18);
+  }
 }
 
 .sheetOverlay {
