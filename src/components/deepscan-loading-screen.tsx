@@ -457,11 +457,13 @@ export function DeepScanLoadingScreen({
     : metaMessages[Math.min(metaMessages.length - 1, Math.floor(elapsedSeconds / 5))]
   const findings = buildFindingDefinitions()
   const displayQuickFacts = quickFacts.filter(hasDisplayValue)
+  const hasWeek52Fact = displayQuickFacts.some((fact) => fact.key === 'week52-position' || Boolean(fact.indicator))
   const hasPerformanceComment = hasDisplayValue(performanceComment)
   const hasConsensusFact = displayQuickFacts.some((fact) => fact.key === 'analyst-consensus' || Boolean(fact.consensus))
-  const showConsensusSkeleton = !resultsReady && !hasConsensusFact
-  const showPerformanceCommentSkeleton = !resultsReady && !hasPerformanceComment
-  const showQuickFactsSection = hasDisplayValue(displayQuickFacts) || showConsensusSkeleton || showPerformanceCommentSkeleton || hasPerformanceComment
+  const showPositionSkeleton = !resultsReady && !hasWeek52Fact
+  const showConsensusSkeleton = !resultsReady && hasWeek52Fact && !hasConsensusFact
+  const showPerformanceCommentSkeleton = !resultsReady && hasWeek52Fact && hasConsensusFact && !hasPerformanceComment
+  const showQuickFactsSection = hasDisplayValue(displayQuickFacts) || showPositionSkeleton || showConsensusSkeleton || showPerformanceCommentSkeleton || hasPerformanceComment
   const performanceCommentPreviewLines = performanceComment && hasPerformanceComment ? getCommentLines(performanceComment) : []
   const performanceCommentFullLines = performanceComment && hasPerformanceComment ? getExpandedCommentLines(performanceComment) : []
   const showPerformanceCommentDetails = performanceComment && hasPerformanceComment
@@ -656,6 +658,31 @@ export function DeepScanLoadingScreen({
                   </article>
                 )
               })}
+              {showPositionSkeleton ? (
+                <article className={cn(styles.quickFact, styles.positionQuickFact, styles.consensusSkeletonFact)} aria-label='가격 위치 조회 중'>
+                  <div className={styles.findingTop}>
+                    <span className={styles.findingCat}>가격 위치</span>
+                    <span className={cn(styles.findingBadge, styles.positionSegmentBadge)}>조회 중</span>
+                  </div>
+                  <div className={styles.positionIndicator} aria-hidden='true'>
+                    <div className={styles.positionScale}>
+                      <span className={styles.positionTrack} />
+                      <span className={styles.positionMarker} style={{ top: '50%' }}>
+                        <span className={styles.positionMarkerDot} />
+                        <span className={styles.positionLeader} />
+                      </span>
+                    </div>
+                    <div className={styles.positionReadout}>
+                      <span className={cn(styles.consensusSkeletonBlock, styles.consensusSkeletonSummary)} />
+                      <div className={styles.positionCurrentCallout} style={{ top: '50%' }}>
+                        <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRowShort)} />
+                        <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRow)} />
+                      </div>
+                      <span className={cn(styles.consensusSkeletonBlock, styles.consensusSkeletonSummary)} />
+                    </div>
+                  </div>
+                </article>
+              ) : null}
               {showConsensusSkeleton ? (
                 <article className={cn(styles.quickFact, styles.consensusQuickFact, styles.consensusSkeletonFact)} aria-label='목표가 조회 중'>
                   <div className={styles.findingTop}>

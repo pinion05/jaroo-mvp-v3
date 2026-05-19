@@ -23,7 +23,7 @@ export default function RootLayout({
     <html lang='ko' className={`${notoSansKr.variable} h-full antialiased`}>
       <body className='min-h-full bg-background font-sans text-foreground'>
         <DebugPageNav />
-        <div className='md:pl-28'>{children}</div>
+        <div className='lg:pl-28'>{children}</div>
       </body>
     </html>
   )

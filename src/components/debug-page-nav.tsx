@@ -1,6 +1,7 @@
 'use client'
 
 import type { ComponentType } from 'react'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import {
@@ -35,9 +36,28 @@ const navItems: NavItem[] = [
 
 export function DebugPageNav() {
   const pathname = usePathname()
+  const [canShowDebugNav, setCanShowDebugNav] = useState(false)
+
+  useEffect(() => {
+    const query = window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)')
+    const updateVisibility = () => {
+      setCanShowDebugNav(query.matches)
+    }
+
+    updateVisibility()
+    query.addEventListener('change', updateVisibility)
+
+    return () => {
+      query.removeEventListener('change', updateVisibility)
+    }
+  }, [])
+
+  if (!canShowDebugNav) {
+    return null
+  }
 
   return (
-    <aside className='fixed top-1/2 left-4 z-50 hidden -translate-y-1/2 md:block'>
+    <aside className='fixed top-1/2 left-4 z-50 hidden -translate-y-1/2 lg:block'>
       <div className='flex w-22 flex-col gap-2 rounded-3xl border border-white/70 bg-white/92 p-3 shadow-[0_18px_48px_rgba(15,23,40,0.16)] backdrop-blur'>
         <div className='px-1 pb-1 text-[11px] font-semibold tracking-[-0.01em] text-[color:var(--jaroo-muted)]'>
           DEBUG NAV
