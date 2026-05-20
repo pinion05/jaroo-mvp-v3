@@ -88,24 +88,40 @@ export async function GET(request: NextRequest) {
   }
 }
 
-function parseCommitteeProgressBody(body: string): DeepScanCommitteeProgress | null {
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function toStringArray(value: unknown) {
+  if (!Array.isArray(value)) {
+    return undefined
+  }
+
+  return value.filter((item): item is string => typeof item === 'string')
+}
+
+function toNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+export function parseCommitteeProgressBody(body: string): DeepScanCommitteeProgress | null {
   try {
-    const parsed = JSON.parse(body) as Partial<DeepScanCommitteeProgress>
-    if (typeof parsed.requestId === 'string' && parsed.requestId.trim()) {
-      return {
-        requestId: parsed.requestId,
-        status: typeof parsed.status === 'string' ? parsed.status : 'unknown',
-        results: parsed.results,
-        errors: parsed.errors,
-        pending: parsed.pending,
-        completed: parsed.completed,
-        updatedAt: parsed.updatedAt,
-        softDeadlineMs: parsed.softDeadlineMs,
-      }
+    const parsed = JSON.parse(body) as unknown
+    if (!isRecord(parsed) || typeof parsed.requestId !== 'string' || !parsed.requestId.trim()) {
+      return null
+    }
+
+    return {
+      requestId: parsed.requestId,
+      status: typeof parsed.status === 'string' ? parsed.status : 'unknown',
+      results: isRecord(parsed.results) ? parsed.results : undefined,
+      errors: Array.isArray(parsed.errors) ? parsed.errors : undefined,
+      pending: toStringArray(parsed.pending),
+      completed: toNumber(parsed.completed),
+      updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : undefined,
+      softDeadlineMs: toNumber(parsed.softDeadlineMs),
     }
   } catch {
     return null
   }
-
-  return null
 }

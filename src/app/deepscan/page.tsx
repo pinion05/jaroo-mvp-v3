@@ -519,13 +519,10 @@ function buildTargetPriceStatusQuickFact(payload: JarooDeepScanPayload | null, s
   const reasonSource = sourceBody?.trim() || targetPriceText
   const isFailure = isTargetPriceFailureText(reasonSource)
   const isMissing = !isFailure && isTargetPriceMissingText(reasonSource)
-  const body = isFailure
-    ? summarizeTargetPriceReason(reasonSource, payload, fallbackName)
-    : isMissing
-      ? summarizeTargetPriceReason(reasonSource, payload, fallbackName)
-      : targetPriceText && targetPriceText !== 'N/A'
-        ? `목표가 ${targetPriceText}`
-        : summarizeTargetPriceReason(reasonSource, payload, fallbackName)
+  const hasTargetPriceValue = Boolean(targetPriceText && targetPriceText !== 'N/A' && !isFailure && !isMissing)
+  const body = hasTargetPriceValue
+    ? `목표가 ${targetPriceText}`
+    : summarizeTargetPriceReason(reasonSource, payload, fallbackName)
 
   return {
     key: 'analyst-consensus',
