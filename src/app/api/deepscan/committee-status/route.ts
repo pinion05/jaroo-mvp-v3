@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
+import { recordDeepScanCommitteeProgressPerf } from '@/lib/deepscan-runtime/perf-trace'
 
 export const runtime = 'nodejs'
 
@@ -31,6 +32,8 @@ export function createDeepScanCommitteeStatusResponse(
     return NextResponse.json({ ok: true, requestId, status: 'not_found', results: {}, errors: [], pending: [] })
   }
 
+  void recordDeepScanCommitteeProgressPerf(progress, { route: 'api/deepscan/committee-status' }).catch(() => undefined)
+
   return NextResponse.json({
     ok: true,
     requestId: progress.requestId,
@@ -58,6 +61,11 @@ export async function GET(request: NextRequest) {
     )
     const response = await fetch(upstreamUrl, { cache: 'no-store' })
     const body = await response.text()
+    const progress = parseCommitteeProgressBody(body)
+
+    if (progress) {
+      void recordDeepScanCommitteeProgressPerf(progress, { route: 'api/deepscan/committee-status' }).catch(() => undefined)
+    }
 
     return new NextResponse(body, {
       status: response.status,
@@ -78,4 +86,26 @@ export async function GET(request: NextRequest) {
       { status: 502 },
     )
   }
+}
+
+function parseCommitteeProgressBody(body: string): DeepScanCommitteeProgress | null {
+  try {
+    const parsed = JSON.parse(body) as Partial<DeepScanCommitteeProgress>
+    if (typeof parsed.requestId === 'string' && parsed.requestId.trim()) {
+      return {
+        requestId: parsed.requestId,
+        status: typeof parsed.status === 'string' ? parsed.status : 'unknown',
+        results: parsed.results,
+        errors: parsed.errors,
+        pending: parsed.pending,
+        completed: parsed.completed,
+        updatedAt: parsed.updatedAt,
+        softDeadlineMs: parsed.softDeadlineMs,
+      }
+    }
+  } catch {
+    return null
+  }
+
+  return null
 }
