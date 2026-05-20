@@ -473,15 +473,87 @@ function isNoDataConsensusBody(body: string) {
   return /데[이]?타가\s*존재하지\s*않습니다|데[이]?터가\s*존재하지\s*않습니다|최근\s*3개월\s*이내에\s*제시된\s*의견이\s*없습니다|목표가\s*미제공|목표가\s*조회\s*실패/u.test(body)
 }
 
-function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null): LoadingQuickFact | null {
+function isTargetPriceFailureText(value: string) {
+  return /목표가\s*조회\s*실패|조회\s*실패|수집\s*실패|원천\s*(?:차단|실패|불가)|source[_-]?unavailable/i.test(value)
+}
+
+function isTargetPriceMissingText(value: string) {
+  return /목표가\s*미제공|데[이]?타가\s*존재하지\s*않습니다|데[이]?터가\s*존재하지\s*않습니다|최근\s*3개월\s*이내에\s*제시된\s*의견이\s*없습니다/u.test(value)
+}
+
+function hasHangulBatchim(value: string) {
+  const lastChar = Array.from(value.trim()).at(-1)
+  if (!lastChar) {
+    return false
+  }
+
+  const code = lastChar.charCodeAt(0)
+  return code >= 0xac00 && code <= 0xd7a3 && (code - 0xac00) % 28 !== 0
+}
+
+function getTargetPriceSubject(payload: JarooDeepScanPayload | null, fallbackName?: string) {
+  const name = payload?.input.instrument.name?.trim() || fallbackName?.trim()
+  return name ? `${name}${hasHangulBatchim(name) ? '은' : '는'}` : '이 종목은'
+}
+
+function summarizeTargetPriceReason(value: string, payload: JarooDeepScanPayload | null, fallbackName?: string) {
+  const normalized = value.replace(/\s+/gu, ' ').trim()
+  const subject = getTargetPriceSubject(payload, fallbackName)
+  if (!normalized) {
+    return `${subject} 증권사 목표가를 확인하는 중입니다.`
+  }
+
+  if (isTargetPriceFailureText(normalized)) {
+    return `${subject} 증권사 목표가를 지금 불러오지 못했습니다.`
+  }
+
+  if (isTargetPriceMissingText(normalized)) {
+    return `${subject} 아직 증권사 목표가가 제시되지 않은 종목입니다.`
+  }
+
+  return normalized
+}
+
+function buildTargetPriceStatusQuickFact(payload: JarooDeepScanPayload | null, sourceBody?: string, fallbackName?: string): LoadingQuickFact {
+  const targetPriceText = payload?.strategy.targetPriceText?.trim() ?? ''
+  const reasonSource = sourceBody?.trim() || targetPriceText
+  const isFailure = isTargetPriceFailureText(reasonSource)
+  const isMissing = !isFailure && isTargetPriceMissingText(reasonSource)
+  const body = isFailure
+    ? summarizeTargetPriceReason(reasonSource, payload, fallbackName)
+    : isMissing
+      ? summarizeTargetPriceReason(reasonSource, payload, fallbackName)
+      : targetPriceText && targetPriceText !== 'N/A'
+        ? `목표가 ${targetPriceText}`
+        : summarizeTargetPriceReason(reasonSource, payload, fallbackName)
+
+  return {
+    key: 'analyst-consensus',
+    category: '목표가',
+    badge: isFailure ? '조회 실패' : isMissing ? '미제공' : '확인 중',
+    tone: isFailure ? 'warning' : 'info',
+    body,
+    detail: isFailure ? '목표가 없음으로 확정하지 않고, 원천 조회 실패로 분리해 표시합니다.' : undefined,
+  }
+}
+
+function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null, fallbackName?: string): LoadingQuickFact | null {
   const consensus = payload?.insights.items.find((item) => item.sourceLabel === '증권사 의견' || item.label === '컨센서스')
-  if (!consensus?.body?.trim() || isNoDataConsensusBody(consensus.body)) {
-    return null
+  if (!payload) {
+    return buildTargetPriceStatusQuickFact(null, undefined, fallbackName)
+  }
+
+  if (!consensus?.body?.trim()) {
+    return buildTargetPriceStatusQuickFact(payload, undefined, fallbackName)
+  }
+
+  if (isNoDataConsensusBody(consensus.body)) {
+    return buildTargetPriceStatusQuickFact(payload, consensus.body, fallbackName)
   }
 
   const parsedConsensus = parseLoadingConsensusBody(consensus.body)
   if (!parsedConsensus.targetPriceLabel) {
-    return null
+    return buildTargetPriceStatusQuickFact(payload, consensus.body, fallbackName)
   }
 
   const isPositive = /매수|buy|상향|positive/i.test(consensus.body) || (parsedConsensus.upsidePct ?? 0) > 0 || (parsedConsensus.opinionScore ?? 0) >= 3.5
@@ -510,10 +582,10 @@ function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null): L
   }
 }
 
-function buildLoadingQuickFacts(payload: JarooDeepScanPayload | null, quickQuote: LoadingQuickQuote | null): LoadingQuickFact[] {
+function buildLoadingQuickFacts(payload: JarooDeepScanPayload | null, quickQuote: LoadingQuickQuote | null, fallbackName?: string): LoadingQuickFact[] {
   return [
     buildWeek52LoadingQuickFact(quickQuote),
-    buildConsensusLoadingQuickFact(payload),
+    buildConsensusLoadingQuickFact(payload, fallbackName),
   ].filter((fact): fact is LoadingQuickFact => Boolean(fact))
 }
 
@@ -1303,7 +1375,7 @@ export default function DeepScanPage() {
   const loadingTradingVolume = activeLoadingQuickQuote?.tradingVolume ?? buildLoadingTradingVolume(payload)
   const loadingCurrentPrice = target?.currentPrice ?? activeLoadingQuickQuote?.currentPrice
   const loadingCurrentPriceCurrency = target?.currentPriceCurrency ?? activeLoadingQuickQuote?.currentPriceCurrency
-  const loadingQuickFacts = buildLoadingQuickFacts(payload, activeLoadingQuickQuote)
+  const loadingQuickFacts = buildLoadingQuickFacts(payload, activeLoadingQuickQuote, requestSeed.holding.name)
   const evidenceCollected = hasCollectedDeepScanEvidence(payload)
   const analysisLoadingNotice = {
     badge: '로딩 중',
