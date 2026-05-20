@@ -21,7 +21,7 @@ export async function createDeepScanCanonicalResponse(
 
   try {
     const payload = await builder(searchParams)
-    await recordDeepScanPayloadPerf(payload, { route: 'api/deepscan', startedAt }).catch(() => undefined)
+    void recordDeepScanPayloadPerf(payload, { route: 'api/deepscan', startedAt }).catch(() => undefined)
     return NextResponse.json(payload)
   } catch (error) {
     const status = error instanceof CrawlerDeepScanRequestError ? error.status : 400

@@ -71,6 +71,7 @@ type RecordOptions = {
   now?: Date
   startedAt?: Date
   route?: string
+  requestId?: string
 }
 
 const MAX_TRACKED_REQUESTS = 200
@@ -470,8 +471,15 @@ function buildTarget(payload: JarooDeepScanPayload): DeepScanPerfEvent['target']
   }
 }
 
-function getPayloadRequestId(payload: JarooDeepScanPayload) {
-  return payload.metadata.llmCommittee?.requestId || payload.metadata.debugId
+function getPayloadRequestId(payload: JarooDeepScanPayload, observedAt: Date, options: RecordOptions = {}) {
+  const explicitRequestId = normalizeText(options.requestId)
+  const committeeRequestId = normalizeText(payload.metadata.llmCommittee?.requestId)
+  if (explicitRequestId || committeeRequestId) {
+    return explicitRequestId ?? committeeRequestId ?? 'unknown'
+  }
+
+  const debugId = normalizeText(payload.metadata.debugId) ?? 'unknown'
+  return `payload:${debugId}:${observedAt.getTime()}`
 }
 
 function getLogDir() {
@@ -545,7 +553,7 @@ function buildEvents(params: {
 export async function recordDeepScanPayloadPerf(payload: JarooDeepScanPayload, options: RecordOptions = {}) {
   const observedAt = options.now ?? new Date()
   const events = buildEvents({
-    requestId: getPayloadRequestId(payload),
+    requestId: getPayloadRequestId(payload, observedAt, options),
     states: collectDeepScanPayloadFieldStates(payload),
     observedAt,
     startedAt: options.startedAt,

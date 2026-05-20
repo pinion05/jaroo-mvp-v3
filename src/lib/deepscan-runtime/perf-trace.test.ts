@@ -155,6 +155,33 @@ test('recordDeepScanPayloadPerf는 필드 상태 전이를 JSONL로 중복 없�
   })
 })
 
+test('recordDeepScanPayloadPerf는 위원회 requestId가 없으면 관측별 payload requestId로 분리 기록한다', async () => {
+  await withPerfDir(async (dir) => {
+    const payload = createPayload()
+    payload.metadata.llmCommittee = undefined
+    const firstEvents = await recordDeepScanPayloadPerf(payload, {
+      now: new Date('2026-05-20T00:00:02.000Z'),
+      startedAt: new Date('2026-05-20T00:00:00.000Z'),
+      route: 'test',
+    })
+    const secondEvents = await recordDeepScanPayloadPerf(payload, {
+      now: new Date('2026-05-20T00:00:05.000Z'),
+      startedAt: new Date('2026-05-20T00:00:00.000Z'),
+      route: 'test',
+    })
+
+    assert.ok(firstEvents.length > 0)
+    assert.ok(secondEvents.length > 0)
+    assert.notEqual(firstEvents[0]?.requestId, secondEvents[0]?.requestId)
+    assert.equal(firstEvents[0]?.requestId, 'payload:deepscan:KR:042700:1779235202000')
+    assert.equal(secondEvents[0]?.requestId, 'payload:deepscan:KR:042700:1779235205000')
+
+    const log = await readFile(join(dir, '2026-05-20.jsonl'), 'utf8')
+    assert.match(log, /"requestId":"payload:deepscan:KR:042700:1779235202000"/)
+    assert.match(log, /"requestId":"payload:deepscan:KR:042700:1779235205000"/)
+  })
+})
+
 test('recordDeepScanCommitteeProgressPerf는 polling마다 완료된 위원 member 시간을 분리 기록한다', async () => {
   await withPerfDir(async () => {
     await recordDeepScanCommitteeProgressPerf({
