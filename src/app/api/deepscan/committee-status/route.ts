@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
+import { recordDeepScanCommitteeProgressPerf } from '@/lib/deepscan-runtime/perf-trace'
 
 export const runtime = 'nodejs'
 
@@ -31,6 +32,8 @@ export function createDeepScanCommitteeStatusResponse(
     return NextResponse.json({ ok: true, requestId, status: 'not_found', results: {}, errors: [], pending: [] })
   }
 
+  void recordDeepScanCommitteeProgressPerf(progress, { route: 'api/deepscan/committee-status' }).catch(() => undefined)
+
   return NextResponse.json({
     ok: true,
     requestId: progress.requestId,
@@ -58,6 +61,11 @@ export async function GET(request: NextRequest) {
     )
     const response = await fetch(upstreamUrl, { cache: 'no-store' })
     const body = await response.text()
+    const progress = parseCommitteeProgressBody(body)
+
+    if (progress) {
+      void recordDeepScanCommitteeProgressPerf(progress, { route: 'api/deepscan/committee-status' }).catch(() => undefined)
+    }
 
     return new NextResponse(body, {
       status: response.status,
@@ -77,5 +85,43 @@ export async function GET(request: NextRequest) {
       },
       { status: 502 },
     )
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function toStringArray(value: unknown) {
+  if (!Array.isArray(value)) {
+    return undefined
+  }
+
+  return value.filter((item): item is string => typeof item === 'string')
+}
+
+function toNumber(value: unknown) {
+  return typeof value === 'number' && Number.isFinite(value) ? value : undefined
+}
+
+export function parseCommitteeProgressBody(body: string): DeepScanCommitteeProgress | null {
+  try {
+    const parsed = JSON.parse(body) as unknown
+    if (!isRecord(parsed) || typeof parsed.requestId !== 'string' || !parsed.requestId.trim()) {
+      return null
+    }
+
+    return {
+      requestId: parsed.requestId,
+      status: typeof parsed.status === 'string' ? parsed.status : 'unknown',
+      results: isRecord(parsed.results) ? parsed.results : undefined,
+      errors: Array.isArray(parsed.errors) ? parsed.errors : undefined,
+      pending: toStringArray(parsed.pending),
+      completed: toNumber(parsed.completed),
+      updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : undefined,
+      softDeadlineMs: toNumber(parsed.softDeadlineMs),
+    }
+  } catch {
+    return null
   }
 }

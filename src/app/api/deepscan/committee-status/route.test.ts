@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { createDeepScanCommitteeStatusResponse } from './route'
+import { createDeepScanCommitteeStatusResponse, parseCommitteeProgressBody } from './route'
 
 test('committee status route requires requestId', async () => {
   const response = createDeepScanCommitteeStatusResponse(new URLSearchParams(), () => null)
@@ -33,4 +33,34 @@ test('committee status route returns progressive state', async () => {
   assert.equal(body.status, 'partial')
   assert.deepEqual(body.pending, ['valuation'])
   assert.equal(body.completed, 1)
+})
+
+
+test('parseCommitteeProgressBody sanitizes malformed upstream fields', () => {
+  const parsed = parseCommitteeProgressBody(JSON.stringify({
+    requestId: 'job-2',
+    status: 42,
+    results: ['not-a-record'],
+    errors: 'not-an-array',
+    pending: ['valuation', 1, 'quality'],
+    completed: '1',
+    updatedAt: 123,
+    softDeadlineMs: Number.NaN,
+  }))
+
+  assert.deepEqual(parsed, {
+    requestId: 'job-2',
+    status: 'unknown',
+    results: undefined,
+    errors: undefined,
+    pending: ['valuation', 'quality'],
+    completed: undefined,
+    updatedAt: undefined,
+    softDeadlineMs: undefined,
+  })
+})
+
+test('parseCommitteeProgressBody returns null for invalid JSON or missing requestId', () => {
+  assert.equal(parseCommitteeProgressBody('{'), null)
+  assert.equal(parseCommitteeProgressBody(JSON.stringify({ status: 'partial' })), null)
 })
