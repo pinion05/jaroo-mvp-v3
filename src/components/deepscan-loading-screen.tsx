@@ -459,11 +459,8 @@ export function DeepScanLoadingScreen({
   const displayQuickFacts = quickFacts.filter(hasDisplayValue)
   const hasWeek52Fact = displayQuickFacts.some((fact) => fact.key === 'week52-position' || Boolean(fact.indicator))
   const hasPerformanceComment = hasDisplayValue(performanceComment)
-  const hasConsensusFact = displayQuickFacts.some((fact) => fact.key === 'analyst-consensus' || Boolean(fact.consensus))
   const showPositionSkeleton = !resultsReady && !hasWeek52Fact
-  const showConsensusSkeleton = !resultsReady && hasWeek52Fact && !hasConsensusFact
-  const showPerformanceCommentSkeleton = !resultsReady && hasWeek52Fact && hasConsensusFact && !hasPerformanceComment
-  const showQuickFactsSection = hasDisplayValue(displayQuickFacts) || showPositionSkeleton || showConsensusSkeleton || showPerformanceCommentSkeleton || hasPerformanceComment
+  const showQuickFactsSection = hasDisplayValue(displayQuickFacts) || showPositionSkeleton || hasPerformanceComment
   const performanceCommentPreviewLines = performanceComment && hasPerformanceComment ? getCommentLines(performanceComment) : []
   const performanceCommentFullLines = performanceComment && hasPerformanceComment ? getExpandedCommentLines(performanceComment) : []
   const showPerformanceCommentDetails = performanceComment && hasPerformanceComment
@@ -679,58 +676,6 @@ export function DeepScanLoadingScreen({
                         <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRow)} />
                       </div>
                       <span className={cn(styles.consensusSkeletonBlock, styles.consensusSkeletonSummary)} />
-                    </div>
-                  </div>
-                </article>
-              ) : null}
-              {showConsensusSkeleton ? (
-                <article className={cn(styles.quickFact, styles.consensusQuickFact, styles.consensusSkeletonFact)} aria-label='목표가 조회 중'>
-                  <div className={styles.findingTop}>
-                    <span className={styles.findingCat}>목표가</span>
-                    <span className={cn(styles.findingBadge, styles.positionSegmentBadge)}>조회 중</span>
-                  </div>
-                  <div className={styles.consensusInsight} aria-hidden='true'>
-                    <div className={styles.consensusChartTop}>
-                      <div className={styles.consensusSkeletonHeader}>
-                        <span className={cn(styles.consensusSkeletonBlock, styles.consensusSkeletonEyebrow)} />
-                        <span className={cn(styles.consensusSkeletonBlock, styles.consensusSkeletonValue)} />
-                      </div>
-                      <span className={cn(styles.consensusSkeletonBlock, styles.consensusSkeletonBadge)} />
-                    </div>
-                    <div className={cn(styles.consensusLineChart, styles.consensusSkeletonChart)}>
-                      <span className={cn(styles.consensusSkeletonLine, styles.consensusSkeletonCurrentLine)} />
-                      <span className={cn(styles.consensusSkeletonLine, styles.consensusSkeletonTargetLine)} />
-                      <div className={styles.consensusChartLegend}>
-                        <span><i className={styles.consensusCurrentSwatch} />현재가 확인 중</span>
-                        <span><i className={styles.consensusTargetSwatch} />목표가 수집 중</span>
-                      </div>
-                    </div>
-                    <span className={cn(styles.consensusSkeletonBlock, styles.consensusSkeletonSummary)} />
-                    <div className={styles.consensusRangeRow}>
-                      <span className={styles.consensusSkeletonPill}>최고 목표가</span>
-                      <span className={styles.consensusSkeletonPill}>최저 목표가</span>
-                      <span className={styles.consensusSkeletonPill}>투자의견</span>
-                    </div>
-                  </div>
-                </article>
-              ) : null}
-              {showPerformanceCommentSkeleton ? (
-                <article className={cn(styles.quickFact, styles.commentaryQuickFact, styles.commentarySkeletonFact)} aria-label='기업실적코멘트 조회 중'>
-                  <div className={styles.commentaryTop}>
-                    <Factory className={styles.commentaryIcon} aria-hidden />
-                    <span>기업실적코멘트</span>
-                    <span className={styles.commentaryDate}>수집 중</span>
-                  </div>
-                  <div className={styles.commentarySkeletonBody} aria-hidden='true'>
-                    <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonHeadline)} />
-                    <div className={styles.commentarySkeletonRows}>
-                      <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRow)} />
-                      <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRowShort)} />
-                      <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRowLong)} />
-                    </div>
-                    <div className={styles.commentarySkeletonDetail}>
-                      <span>자세히 보기 준비 중</span>
-                      <i className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonDetailPill)} />
                     </div>
                   </div>
                 </article>
