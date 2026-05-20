@@ -7,8 +7,10 @@ import { join } from 'node:path'
 import type { JarooDeepScanPayload } from '../../../packages/contracts/src/deepscan'
 import {
   collectDeepScanPayloadFieldStates,
+  collectDeepScanQuickQuoteFieldStates,
   recordDeepScanCommitteeProgressPerf,
   recordDeepScanPayloadPerf,
+  recordDeepScanQuickQuotePerf,
   resetDeepScanPerfTraceForTests,
   summarizeDeepScanPerfEvents,
 } from './perf-trace'
@@ -103,6 +105,30 @@ test('collectDeepScanPayloadFieldStates는 목표가 제공 없음과 대기/성
   })
   assert.equal(states.find((state) => state.field === 'member.valuation')?.status, 'ready')
   assert.equal(states.find((state) => state.field === 'member.quality')?.status, 'pending')
+  assert.equal(states.find((state) => state.component === 'loadingQuickFacts' && state.field === 'analystConsensus')?.status, 'confirmed_missing')
+  assert.equal(states.find((state) => state.component === 'loadingQuickFacts' && state.field === 'performanceComment')?.status, 'confirmed_missing')
+})
+
+test('collectDeepScanQuickQuoteFieldStates는 빠른 시장 체크 가격 위치 입력을 판정한다', () => {
+  const states = collectDeepScanQuickQuoteFieldStates({
+    ok: true,
+    data: {
+      items: [{
+        code: '005930',
+        name: '삼성전자',
+        source: 'naver-finance',
+        price: 264500,
+        volume: 30970457,
+        week52High: 299500,
+        week52Low: 53500,
+        currency: 'KRW',
+      }],
+    },
+  })
+
+  assert.equal(states.find((state) => state.field === 'quote.currentPrice')?.status, 'ready')
+  assert.equal(states.find((state) => state.field === 'quote.tradingVolume')?.status, 'ready')
+  assert.equal(states.find((state) => state.field === 'week52Position')?.status, 'ready')
 })
 
 test('recordDeepScanPayloadPerf는 필드 상태 전이를 JSONL로 중복 없이 기록하고 요약한다', async () => {
@@ -145,5 +171,35 @@ test('recordDeepScanCommitteeProgressPerf는 polling마다 완료된 위원 memb
     const summary = await summarizeDeepScanPerfEvents({ status: 'ready' })
     const memberSummary = summary.fields.find((field) => field.component === 'committee' && field.field === 'member.valuation')
     assert.equal(memberSummary?.p50Ms, 3000)
+  })
+})
+
+test('recordDeepScanQuickQuotePerf는 빠른 시장 체크 quote readiness를 기록한다', async () => {
+  await withPerfDir(async () => {
+    const events = await recordDeepScanQuickQuotePerf({
+      ok: true,
+      data: {
+        items: [{
+          code: '005930',
+          name: '삼성전자',
+          source: 'naver-finance',
+          price: 264500,
+          volume: 30970457,
+          week52High: 299500,
+          week52Low: 53500,
+          currency: 'KRW',
+        }],
+      },
+    }, {
+      now: new Date('2026-05-20T00:00:00.120Z'),
+      startedAt: new Date('2026-05-20T00:00:00.000Z'),
+      route: 'test-quote',
+    })
+
+    assert.equal(events.find((event) => event.field === 'week52Position')?.elapsedMs, 120)
+
+    const summary = await summarizeDeepScanPerfEvents({ status: 'ready' })
+    const week52Summary = summary.fields.find((field) => field.component === 'loadingQuickFacts' && field.field === 'week52Position')
+    assert.equal(week52Summary?.p50Ms, 120)
   })
 })

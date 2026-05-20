@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
+import { recordDeepScanQuickQuotePerf } from '@/lib/deepscan-runtime/perf-trace'
 
 export const QUOTES_CURRENT_PROXY_TIMEOUT_MS = 4500
 
@@ -78,6 +79,7 @@ type QuotesCurrentRequestOptions = {
 
 export async function handleQuotesCurrentRequest(request: NextRequest, options: QuotesCurrentRequestOptions = {}) {
   const upstreamUrl = buildQuotesCurrentUpstreamUrl(getCrawlerBaseUrl(), request.nextUrl.searchParams)
+  const startedAt = new Date()
 
   try {
     const response = await fetchQuotesCurrentUpstream(
@@ -87,6 +89,11 @@ export async function handleQuotesCurrentRequest(request: NextRequest, options: 
       request.signal,
     )
     const body = await response.text()
+    const parsedBody = parseQuotesCurrentBody(body)
+
+    if (parsedBody) {
+      void recordDeepScanQuickQuotePerf(parsedBody, { route: 'api/quotes/current', startedAt }).catch(() => undefined)
+    }
 
     return new NextResponse(body, {
       status: response.status,
@@ -122,6 +129,15 @@ export async function handleQuotesCurrentRequest(request: NextRequest, options: 
       },
       { status: error instanceof QuotesCurrentProxyTimeoutError ? 504 : 502 },
     )
+  }
+}
+
+function parseQuotesCurrentBody(body: string) {
+  try {
+    const parsed = JSON.parse(body) as unknown
+    return parsed && typeof parsed === 'object' ? parsed : null
+  } catch {
+    return null
   }
 }
 

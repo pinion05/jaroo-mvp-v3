@@ -50,6 +50,14 @@ export type DeepScanCommitteeProgressLike = {
   softDeadlineMs?: number
 }
 
+export type DeepScanQuickQuoteLike = {
+  ok?: boolean
+  data?: {
+    items?: unknown[]
+  }
+  items?: unknown[]
+}
+
 type PerfRequestState = {
   firstObservedAtMs: number
   seenKeys: Set<string>
@@ -211,6 +219,10 @@ function arrayState(component: string, field: string, value: unknown): DeepScanP
   return status ? { component, field, status, detail: { count: Array.isArray(value) ? value.length : 0 } } : null
 }
 
+function hasNumericField(record: UnknownRecord | null, field: string) {
+  return typeof record?.[field] === 'number' && Number.isFinite(record[field])
+}
+
 function memberIdentity(member: JarooDeepScanCommitteeMember, index: number) {
   return normalizeText(member.shortLabel) ?? normalizeText(member.title) ?? `member-${index + 1}`
 }
@@ -270,6 +282,7 @@ export function collectDeepScanPayloadFieldStates(payload: JarooDeepScanPayload)
   pushState(states, textState('strategy', 'scenarioProbability', payload.strategy.scenarioProbability))
   pushState(states, textState('strategy', 'currentPriceText', payload.strategy.currentPriceText))
   pushState(states, textState('strategy', 'targetPriceText', payload.strategy.targetPriceText, { zeroMeansMissing: true }))
+  pushState(states, buildLoadingConsensusState(payload))
   pushState(states, arrayState('strategy', 'scenarioDetails', payload.strategy.scenarioDetails))
   pushState(states, arrayState('strategy', 'otherScenarios', payload.strategy.otherScenarios))
 
@@ -281,6 +294,7 @@ export function collectDeepScanPayloadFieldStates(payload: JarooDeepScanPayload)
   pushState(states, numberState('portfolioSimulation', 'beforeScore', payload.portfolioSimulation.beforeScore))
   pushState(states, numberState('portfolioSimulation', 'afterScore', payload.portfolioSimulation.afterScore))
   pushState(states, textState('portfolioSimulation', 'deltaLabel', payload.portfolioSimulation.deltaLabel))
+  pushState(states, buildLoadingPerformanceCommentState(payload))
 
   const llmCommittee = payload.metadata.llmCommittee
   if (llmCommittee) {
@@ -298,6 +312,51 @@ export function collectDeepScanPayloadFieldStates(payload: JarooDeepScanPayload)
   }
 
   return states
+}
+
+function isNoDataConsensusBody(body: string) {
+  return /데[이]?타가\s*존재하지\s*않습니다|데[이]?터가\s*존재하지\s*않습니다|최근\s*3개월\s*이내에\s*제시된\s*의견이\s*없습니다|목표가\s*미제공|목표가\s*조회\s*실패/u.test(body)
+}
+
+function buildLoadingConsensusState(payload: JarooDeepScanPayload): DeepScanPerfFieldState {
+  const consensus = payload.insights.items.find((item) => item.sourceLabel === '증권사 의견' || item.label === '컨센서스')
+  const body = normalizeText(consensus?.body)
+
+  if (!body) {
+    return { component: 'loadingQuickFacts', field: 'analystConsensus', status: 'confirmed_missing' }
+  }
+
+  if (hasFailedMeaning(body)) {
+    return { component: 'loadingQuickFacts', field: 'analystConsensus', status: 'failed' }
+  }
+
+  if (isNoDataConsensusBody(body)) {
+    return { component: 'loadingQuickFacts', field: 'analystConsensus', status: 'confirmed_missing' }
+  }
+
+  const hasTargetPrice = /평균\s*목표가\s*[0-9,]+(?:\.\d+)?\s*(KRW|USD|원|달러)?/iu.test(body)
+  return {
+    component: 'loadingQuickFacts',
+    field: 'analystConsensus',
+    status: hasTargetPrice ? 'ready' : 'confirmed_missing',
+    detail: {
+      sourceLabel: consensus?.sourceLabel,
+      label: consensus?.label,
+      date: consensus?.date,
+    },
+  }
+}
+
+function buildLoadingPerformanceCommentState(payload: JarooDeepScanPayload): DeepScanPerfFieldState {
+  const comment = payload.insights.items.find((item) => item.sourceLabel === '기업실적코멘트' || item.title === '기업실적코멘트')
+  const body = normalizeText(comment?.body)
+
+  return {
+    component: 'loadingQuickFacts',
+    field: 'performanceComment',
+    status: body ? 'ready' : 'confirmed_missing',
+    detail: body ? { date: comment?.date } : undefined,
+  }
 }
 
 export function collectDeepScanCommitteeProgressFieldStates(progress: DeepScanCommitteeProgressLike): DeepScanPerfFieldState[] {
@@ -346,6 +405,58 @@ export function collectDeepScanCommitteeProgressFieldStates(progress: DeepScanCo
       },
     })
   })
+
+  return states
+}
+
+export function collectDeepScanQuickQuoteFieldStates(body: DeepScanQuickQuoteLike): DeepScanPerfFieldState[] {
+  const items = Array.isArray(body.data?.items) ? body.data.items : Array.isArray(body.items) ? body.items : []
+  const states: DeepScanPerfFieldState[] = []
+
+  for (const item of items) {
+    const record = asRecord(item)
+    if (!record) {
+      continue
+    }
+
+    const codeOrTicker = normalizeText(record.code) ?? normalizeText(record.ticker) ?? 'unknown'
+    const fieldPrefix = items.length > 1 ? `${codeOrTicker}.` : ''
+    const hasCurrentPrice = hasNumericField(record, 'price')
+    const hasTradingVolume = hasNumericField(record, 'volume')
+    const hasWeek52High = hasNumericField(record, 'week52High')
+    const hasWeek52Low = hasNumericField(record, 'week52Low')
+
+    states.push({
+      component: 'loadingQuickFacts',
+      field: `${fieldPrefix}quote.currentPrice`,
+      status: hasCurrentPrice ? 'ready' : 'confirmed_missing',
+      detail: { source: record.source, code: record.code, ticker: record.ticker },
+    })
+    states.push({
+      component: 'loadingQuickFacts',
+      field: `${fieldPrefix}quote.tradingVolume`,
+      status: hasTradingVolume ? 'ready' : 'confirmed_missing',
+      detail: { source: record.source, code: record.code, ticker: record.ticker },
+    })
+    states.push({
+      component: 'loadingQuickFacts',
+      field: `${fieldPrefix}week52Position`,
+      status: hasCurrentPrice && hasWeek52High && hasWeek52Low ? 'ready' : 'confirmed_missing',
+      detail: {
+        source: record.source,
+        code: record.code,
+        ticker: record.ticker,
+        hasCurrentPrice,
+        hasWeek52High,
+        hasWeek52Low,
+      },
+    })
+  }
+
+  if (states.length === 0) {
+    states.push({ component: 'loadingQuickFacts', field: 'quote.currentPrice', status: body.ok === false ? 'failed' : 'confirmed_missing' })
+    states.push({ component: 'loadingQuickFacts', field: 'week52Position', status: body.ok === false ? 'failed' : 'confirmed_missing' })
+  }
 
   return states
 }
@@ -456,6 +567,40 @@ export async function recordDeepScanCommitteeProgressPerf(progress: DeepScanComm
     startedAt: options.startedAt,
     route: options.route,
     generatedAt: progress.updatedAt,
+  })
+
+  await appendEvents(events, observedAt)
+  return events
+}
+
+function buildQuickQuoteRequestId(body: DeepScanQuickQuoteLike, observedAt: Date) {
+  const items = Array.isArray(body.data?.items) ? body.data.items : Array.isArray(body.items) ? body.items : []
+  const firstItem = asRecord(items[0])
+  const targetKey = normalizeText(firstItem?.code) ?? normalizeText(firstItem?.ticker) ?? 'unknown'
+  return `quick-quote:${targetKey}:${observedAt.getTime()}`
+}
+
+function buildQuickQuoteTarget(body: DeepScanQuickQuoteLike): DeepScanPerfEvent['target'] {
+  const items = Array.isArray(body.data?.items) ? body.data.items : Array.isArray(body.items) ? body.items : []
+  const firstItem = asRecord(items[0])
+
+  return {
+    name: normalizeText(firstItem?.name),
+    code: normalizeText(firstItem?.code),
+    ticker: normalizeText(firstItem?.ticker),
+    market: normalizeText(firstItem?.market),
+  }
+}
+
+export async function recordDeepScanQuickQuotePerf(body: DeepScanQuickQuoteLike, options: RecordOptions = {}) {
+  const observedAt = options.now ?? new Date()
+  const events = buildEvents({
+    requestId: buildQuickQuoteRequestId(body, observedAt),
+    states: collectDeepScanQuickQuoteFieldStates(body),
+    observedAt,
+    startedAt: options.startedAt,
+    route: options.route,
+    target: buildQuickQuoteTarget(body),
   })
 
   await appendEvents(events, observedAt)
