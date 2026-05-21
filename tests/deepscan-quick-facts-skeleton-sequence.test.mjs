@@ -81,10 +81,12 @@ test('DeepScan loading v13 sequencing is reveal-only and resultsReady bypasses d
   assert.doesNotMatch(source, /setTimeout\(/)
 })
 
-test('DeepScan loading screen does not introduce fetches, pre-ready recommendations, or result CTA', () => {
+test('DeepScan loading screen only fetches internal team summaries and avoids result CTA', () => {
   const source = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
 
-  assert.doesNotMatch(source, /fetch\(/)
+  assert.match(source, /fetch\('\/api\/deepscan\/team-summary'/)
+  assert.match(source, /card\.summarizable/)
+  assert.match(source, /teamName: card\.analystName/)
   assert.doesNotMatch(source, /강세|손절|보유 유지|즉시 매도|최종 판단|최종 요약/u)
   assert.doesNotMatch(source, /상세 결과 보기|상세보기|아래 버튼/u)
   assert.match(source, /inlineResults/)
@@ -101,15 +103,17 @@ test('/deepscan renders inline results without confirmed-result CTA gate', () =>
   assert.doesNotMatch(source, /resultsReady && !/)
 })
 
-test('DeepScan team bubbles preserve raw member reasons without hidden summary layer', () => {
+test('DeepScan team bubbles preserve raw member reasons with explicit team-summary fallback', () => {
   const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
   const pageSource = readRepoFile('src', 'app', 'deepscan', 'page.tsx')
   const routeSource = readRepoFile('src', 'app', 'api', 'deepscan', 'committee-status', 'route.ts')
+  const summaryRouteSource = readRepoFile('src', 'app', 'api', 'deepscan', 'team-summary', 'route.ts')
 
   assert.match(loadingSource, /member\.reason/)
   assert.match(loadingSource, /`\$\{definition\.alias\}: \$\{member\.reason\}`/)
   assert.match(loadingSource, /`\$\{definition\.alias\}: 응답 대기 중`/)
-  assert.match(loadingSource, /<p className=\{styles\.narrativeText\}>\{card\.body\}<\/p>/)
+  assert.match(loadingSource, /const displayBody = summaryReady \? summaryState\.summary! : card\.body/)
+  assert.match(loadingSource, /<p className=\{cn\(styles\.narrativeText/)
   assert.match(loadingSource, /white-space: pre-line|styles\.narrativeText/)
   assert.doesNotMatch(loadingSource, literalPattern(obsoleteUnavailableBody))
   assert.doesNotMatch(loadingSource, literalPattern(`${obsoleteCompactHelper}(member.reason`))
@@ -119,6 +123,7 @@ test('DeepScan team bubbles preserve raw member reasons without hidden summary l
   assert.doesNotMatch(loadingSource, literalPattern(obsoleteSummaryField))
   assert.doesNotMatch(pageSource, literalPattern(obsoleteSummaryField))
   assert.doesNotMatch(routeSource, literalPattern(obsoleteSummaryField))
+  assert.doesNotMatch(summaryRouteSource, literalPattern(obsoleteSummaryField))
   assert.doesNotMatch(loadingSource, literalPattern(obsoleteServiceName))
   assert.doesNotMatch(loadingSource, literalPattern(obsoleteKoreanLens))
 })

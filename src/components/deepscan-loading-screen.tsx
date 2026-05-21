@@ -3,7 +3,7 @@
 import type { JarooDeepScanCommitteeAxis } from '../../packages/contracts/src/deepscan'
 
 import Link from 'next/link'
-import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
+import { useEffect, useMemo, useRef, useState, type ComponentType, type ReactNode } from 'react'
 import {
   Activity,
   BadgeDollarSign,
@@ -117,6 +117,13 @@ type NarrativeCard = {
   statusLabel: string
   statusTone: NarrativeTone
   complete: boolean
+  summarizable: boolean
+}
+
+type TeamSummaryState = {
+  inputKey: string
+  status: 'loading' | 'success' | 'error'
+  summary?: string
 }
 
 type CompletionState = {
@@ -286,6 +293,21 @@ function hasDisplayValue(value: unknown): boolean {
   }
 
   return typeof value === 'string' ? value.trim().length > 0 : Boolean(value)
+}
+
+function hashSummaryInput(value: string) {
+  let hash = 0
+  for (let index = 0; index < value.length; index += 1) {
+    hash = ((hash << 5) - hash + value.charCodeAt(index)) | 0
+  }
+
+  return `${value.length}:${Math.abs(hash)}`
+}
+
+function normalizeSummaryText(value: unknown) {
+  return typeof value === 'string' && value.trim()
+    ? value.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim()
+    : null
 }
 
 function compactCommentLine(value: string, maxLength = COMMENT_LINE_MAX_LENGTH) {
@@ -495,6 +517,7 @@ function buildLoadingStages({
       statusLabel: teamBody.readyCount === team.members.length ? '위원 응답 완료' : teamBody.errorCount > 0 ? '일부 응답 실패' : `${teamBody.readyCount}/${team.members.length} 응답`,
       statusTone: teamBody.errorCount > 0 ? 'warning' : teamBody.readyCount > 0 ? 'positive' : 'neutral',
       complete: teamBody.readyCount + teamBody.errorCount === team.members.length,
+      summarizable: teamBody.readyCount === team.members.length,
     }
   })
 }
@@ -531,6 +554,8 @@ export function DeepScanLoadingScreen({
   inlineResults,
 }: DeepScanLoadingScreenProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [teamSummaries, setTeamSummaries] = useState<Partial<Record<LoadingStageKey, TeamSummaryState>>>({})
+  const requestedTeamSummariesRef = useRef<Set<string>>(new Set())
   const targetLine = [identifier, market].filter(Boolean).join(' · ')
   const sharesText = formatShares(shares)
   const averagePriceText = formatMoney(averagePrice, averagePriceCurrency)
@@ -541,17 +566,23 @@ export function DeepScanLoadingScreen({
     currentPriceCurrency,
   )
   const profitRateText = formatSignedPercent(currentProfitRate)
-  const displayQuickFacts = quickFacts.filter(hasDisplayValue)
+  const displayQuickFacts = useMemo(() => quickFacts.filter(hasDisplayValue), [quickFacts])
   const positionQuickFact = displayQuickFacts.find((fact) => fact.key === 'week52-position' || Boolean(fact.indicator))
-  const loadingStages = buildLoadingStages({
-    displayQuickFacts,
-    findingProgress,
-    performanceComment,
-    committeeAxes,
-    currentPriceText,
-    tradingVolumeText,
-  })
-  const visibleNarrativeCards = buildVisibleNarrativeCards(loadingStages, elapsedSeconds, resultsReady)
+  const loadingStages = useMemo(
+    () => buildLoadingStages({
+      displayQuickFacts,
+      findingProgress,
+      performanceComment,
+      committeeAxes,
+      currentPriceText,
+      tradingVolumeText,
+    }),
+    [committeeAxes, currentPriceText, displayQuickFacts, findingProgress, performanceComment, tradingVolumeText],
+  )
+  const visibleNarrativeCards = useMemo(
+    () => buildVisibleNarrativeCards(loadingStages, elapsedSeconds, resultsReady),
+    [elapsedSeconds, loadingStages, resultsReady],
+  )
   const completionState = buildCompletionState(resultsReady, elapsedSeconds)
   const progressPct = resultsReady ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
   const activeNarrativeCard = visibleNarrativeCards.at(-1) ?? loadingStages[0]
@@ -570,6 +601,54 @@ export function DeepScanLoadingScreen({
       window.clearInterval(intervalId)
     }
   }, [resultsReady])
+
+  useEffect(() => {
+    loadingStages.forEach((card) => {
+      if (!card.summarizable || !card.body.trim()) {
+        return
+      }
+
+      const inputKey = hashSummaryInput(card.body)
+      const requestKey = `${card.key}:${inputKey}`
+      if (requestedTeamSummariesRef.current.has(requestKey)) {
+        return
+      }
+
+      requestedTeamSummariesRef.current.add(requestKey)
+      setTeamSummaries((previous) => ({
+        ...previous,
+        [card.key]: { inputKey, status: 'loading' },
+      }))
+
+      fetch('/api/deepscan/team-summary', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          teamKey: card.key,
+          teamName: card.analystName,
+          body: card.body,
+        }),
+      })
+        .then(async (response) => {
+          const body = await response.json().catch(() => null) as { ok?: boolean; summary?: unknown } | null
+          const summary = body?.ok === true ? normalizeSummaryText(body.summary) : null
+          if (!response.ok || !summary) {
+            throw new Error('team summary unavailable')
+          }
+
+          setTeamSummaries((previous) => ({
+            ...previous,
+            [card.key]: { inputKey, status: 'success', summary },
+          }))
+        })
+        .catch(() => {
+          setTeamSummaries((previous) => ({
+            ...previous,
+            [card.key]: { inputKey, status: 'error' },
+          }))
+        })
+    })
+  }, [loadingStages])
 
   return (
     <div className={cn(styles.loadingCard, className)}>
@@ -620,8 +699,20 @@ export function DeepScanLoadingScreen({
 
         <section className={styles.narrativeStream} aria-label='분석가 진행 메시지'>
           {visibleNarrativeCards.map((card) => {
+            const summaryInputKey = hashSummaryInput(card.body)
+            const summaryState = teamSummaries[card.key]
+            const summaryReady = summaryState?.inputKey === summaryInputKey && summaryState.status === 'success' && summaryState.summary
+            const summaryLoading = summaryState?.inputKey === summaryInputKey && summaryState.status === 'loading'
+            const displayBody = summaryReady ? summaryState.summary! : card.body
             const cardSettled = resultsReady || card.complete
-            const statusLabel = cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
+            const statusLabel = summaryReady ? '팀 요약 완료' : summaryLoading ? '팀 요약 중' : cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
+            const statusTone = summaryReady ? 'positive' : summaryLoading ? 'info' : cardSettled && !card.complete ? 'info' : card.statusTone
+            const tags = [
+              ...card.tags,
+              card.summarizable
+                ? { text: summaryReady ? '한줄 요약 완료' : summaryLoading ? '한줄 요약 중' : '원문 표시', tone: summaryReady ? 'positive' as const : summaryLoading ? 'info' as const : 'neutral' as const }
+                : null,
+            ].filter((tag): tag is { text: string; tone: NarrativeTone } => Boolean(tag))
 
             return (
               <article key={card.key} className={cn(styles.narrativeCard, cardSettled ? styles.narrativeCardComplete : styles.narrativeCardPending)}>
@@ -631,10 +722,10 @@ export function DeepScanLoadingScreen({
                     <strong>{card.analystName}</strong>
                     <span>{card.description}</span>
                   </div>
-                  <span className={cn(styles.narrativeStatus, narrativeToneClass(cardSettled && !card.complete ? 'info' : card.statusTone))}>{statusLabel}</span>
+                  <span className={cn(styles.narrativeStatus, narrativeToneClass(statusTone))}>{statusLabel}</span>
                 </div>
                 <div className={styles.narrativeBubble}>
-                  <p className={styles.narrativeText}>{card.body}</p>
+                  <p className={cn(styles.narrativeText, summaryReady ? styles.narrativeTextSummarized : undefined)}>{displayBody}</p>
                   {card.key === 'marketTeam' && positionQuickFact?.indicator ? (
                     <div
                       className={styles.narrativePricebar}
@@ -657,7 +748,7 @@ export function DeepScanLoadingScreen({
                     </div>
                   ) : null}
                   <div className={styles.narrativeTags}>
-                    {card.tags.map((tag) => (
+                    {tags.map((tag) => (
                       <span key={`${card.key}-${tag.text}`} className={cn(styles.narrativeTag, narrativeToneClass(tag.tone))}>{tag.text}</span>
                     ))}
                   </div>
