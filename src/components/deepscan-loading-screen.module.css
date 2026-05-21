@@ -2012,6 +2012,13 @@
   white-space: pre-line;
 }
 
+.narrativeTextSummarized {
+  font-size: 13.5px;
+  font-weight: 650;
+  line-height: 1.68;
+  white-space: normal;
+}
+
 .narrativeCardPending .narrativeText {
   color: var(--ds-muted);
 }
