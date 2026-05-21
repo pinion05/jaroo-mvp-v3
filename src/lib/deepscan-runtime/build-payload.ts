@@ -560,7 +560,7 @@ function createInvalidInputPayload(rawInput: DeepScanRawInput): JarooDeepScanPay
   const fallback = createFallback('input-invalid', '입력 확인 필요')
   const error = createError('input-invalid', 'instrument code or ticker is required')
 
-  const payload = {
+  const payload: JarooDeepScanPayload = {
     input: {
       instrument: {
         name: rawInput.instrument.name?.trim() || '알 수 없는 종목',
@@ -1259,7 +1259,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
       : null,
   ].filter((part): part is string => Boolean(part))
 
-  const payload = {
+  const payload: JarooDeepScanPayload = {
     input: {
       instrument: {
         name,

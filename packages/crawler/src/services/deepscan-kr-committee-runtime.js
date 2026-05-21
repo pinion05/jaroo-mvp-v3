@@ -555,7 +555,9 @@ function systemPrompt(memberKey) {
     'Treat package-derived context as supplemental only, never as silent numeric truth.',
     'Treat absent fields as out-of-scope rather than negative evidence; do not request, infer, or mention data that is not present in sharedContext/memberContext.',
     'Lead with the strongest numeric or concrete evidence that is actually present.',
-    'Return only valid JSON matching the schema. Write the reason in concise Korean.',
+    'Return only valid JSON matching the schema.',
+    'Write reason as exactly one readable Korean sentence for a mobile chat bubble: no bullet, no newline, no colon label, no member name prefix, and no multi-sentence paragraph.',
+    'Keep reason focused on one strongest evidence-to-judgment flow; prefer about 70-140 Korean characters and avoid cramming every metric into a long comma chain.',
     'Score semantics: 0 extremely negative, 50 mixed/unclear, 100 extremely positive.',
   ].join(' ');
 }

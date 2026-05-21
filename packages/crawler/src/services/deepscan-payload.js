@@ -3,7 +3,10 @@ import { getCurrentQuotes } from '../crawlers/current-quotes.js';
 import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
 import { scoreDeepScanKrEvidence, scoreDeepScanKrFromCommittee } from './deepscan-kr-score.js';
 import { invokeDeepScanKrPackage } from './deepscan-kr-package-adapter.js';
-import { buildKrCommitteeAxesFromLlmResults, scoreDeepScanKrCommitteeFromDump } from './deepscan-kr-committee-runtime.js';
+import {
+  buildKrCommitteeAxesFromLlmResults,
+  scoreDeepScanKrCommitteeFromDump,
+} from './deepscan-kr-committee-runtime.js';
 import {
   getDefaultCrawlerCacheFreshTtlMs,
   getDefaultCrawlerCacheStaleTtlMs,
@@ -1981,7 +1984,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
       },
     };
 
-    return {
+    const payload = {
       input,
       ...blocks,
       metadata: {
@@ -1998,6 +2001,8 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
         ...(llmCommitteeMetadata ? { llmCommittee: llmCommitteeMetadata } : {}),
       },
     };
+
+    return payload;
   } catch {
     return createInternalErrorPayload(rawInput);
   }

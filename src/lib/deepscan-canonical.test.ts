@@ -329,3 +329,5 @@ test('isDeepScanPayloadReady는 blocked canonical payload도 render 가능한 pa
   assert.equal(readBlockedReason(blockedPayload), 'input-invalid')
   assert.equal(isDeepScanPayloadReady({ ok: false, error: { message: 'network down' } }), false)
 })
+
+

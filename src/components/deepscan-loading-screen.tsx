@@ -1,7 +1,9 @@
 'use client'
 
+import type { JarooDeepScanCommitteeAxis } from '../../packages/contracts/src/deepscan'
+
 import Link from 'next/link'
-import { useEffect, useState, type ComponentType } from 'react'
+import { useEffect, useState, type ComponentType, type ReactNode } from 'react'
 import {
   Activity,
   BadgeDollarSign,
@@ -34,6 +36,7 @@ type DeepScanLoadingScreenProps = {
   currentProfitRate?: string | number
   evaluationAmount?: string | number
   findingProgress?: Partial<Record<FindingKey, FindingProgress>>
+  committeeAxes?: JarooDeepScanCommitteeAxis[]
   quickFacts?: LoadingQuickFact[]
   performanceComment?: LoadingPerformanceComment
   evidenceCollected?: boolean
@@ -41,7 +44,7 @@ type DeepScanLoadingScreenProps = {
   className?: string
   onBack?: () => void
   backHref?: string
-  onViewResults?: () => void
+  inlineResults?: ReactNode
 }
 
 type CommitteeMemberState = 'done' | 'active' | 'wait'
@@ -89,11 +92,38 @@ export type LoadingQuickFact = {
   }
 }
 
-type FindingDefinition = {
-  key: FindingKey
-  number: string
+type LoadingStageKey = 'fundamentalTeam' | 'marketTeam' | 'contextTeam'
+type NarrativeTone = 'positive' | 'warning' | 'neutral' | 'info'
+type CommitteeTeamMemberDefinition = {
+  sourceTitle: string
+  alias: string
+}
+type CommitteeTeamDefinition = {
+  key: LoadingStageKey
+  revealAt: number
+  analystName: string
+  description: string
+  avatar: string
+  members: CommitteeTeamMemberDefinition[]
+}
+type NarrativeCard = {
+  key: LoadingStageKey
+  revealAt: number
+  analystName: string
+  description: string
+  avatar: string
+  body: string
+  tags: Array<{ text: string; tone: NarrativeTone }>
+  statusLabel: string
+  statusTone: NarrativeTone
+  complete: boolean
+}
+
+type CompletionState = {
+  ready: boolean
+  eyebrow: string
   title: string
-  loadingLabel: string
+  body: string
 }
 
 const committeeMembers: ReadonlyArray<{ key: string; Icon: CommitteeMemberIcon; label: string; state: CommitteeMemberState }> = [
@@ -108,14 +138,44 @@ const committeeMembers: ReadonlyArray<{ key: string; Icon: CommitteeMemberIcon; 
   { key: 'event', Icon: BadgeDollarSign, label: '이벤트\n스캐너', state: 'active' },
 ] as const
 
-const metaMessages = [
-  { icon: '📊', text: '보유 포지션과 현재가 근거를 맞춰보고 있어요.' },
-  { icon: '🔍', text: '국내 리포트와 최근 신호를 확인하는 중이에요.' },
-  { icon: '🧠', text: 'AI 9인 위원회가 각자 판단을 정리하고 있어요.' },
-  { icon: '🧮', text: '손익 부담과 시나리오 영향을 계산하고 있어요.' },
-  { icon: '🎯', text: '즉시 매도 판단과 최종 요약을 준비하고 있어요.' },
+const committeeTeams: readonly CommitteeTeamDefinition[] = [
+  {
+    key: 'fundamentalTeam',
+    revealAt: 0,
+    analystName: '가치/기본 팀',
+    description: '가치 분석가 · 성장 전략가 · 재무 감사관',
+    avatar: '🏛️',
+    members: [
+      { sourceTitle: '밸류에이션', alias: '가치 분석가' },
+      { sourceTitle: '수익성/기본체력', alias: '성장 전략가' },
+      { sourceTitle: '지분/안정성', alias: '재무 감사관' },
+    ],
+  },
+  {
+    key: 'marketTeam',
+    revealAt: 4,
+    analystName: '시장/차트 팀',
+    description: '차트 마스터 · 수급 추적기 · 모멘텀 스카우터',
+    avatar: '📈',
+    members: [
+      { sourceTitle: '가격 위치', alias: '차트 마스터' },
+      { sourceTitle: '평단 격차', alias: '수급 추적기' },
+      { sourceTitle: '트렌드', alias: '모멘텀 스카우터' },
+    ],
+  },
+  {
+    key: 'contextTeam',
+    revealAt: 8,
+    analystName: '심리/환경 팀',
+    description: '심리 분석AI · 산업 전문가 · 이벤트 스캐너',
+    avatar: '🧠',
+    members: [
+      { sourceTitle: '입력 완성도', alias: '심리 분석AI' },
+      { sourceTitle: '상방 버퍼', alias: '산업 전문가' },
+      { sourceTitle: '컨센서스 모멘텀', alias: '이벤트 스캐너' },
+    ],
+  },
 ] as const
-const completedMetaMessage = { icon: '✅', text: '분석이 완료됐어요. 상세 결과 보기 버튼을 눌러 최종 판단을 확인하세요.' } as const
 
 const pendingCommitteeMemberCount = committeeMembers.length
 const COMMENT_LINE_MAX_LENGTH = 74
@@ -249,28 +309,6 @@ function getCommentLines(comment: LoadingPerformanceComment) {
   return [compactCommentLine(comment.body, COMMENT_BODY_MAX_LENGTH)].filter(Boolean)
 }
 
-function splitReadableCommentText(value: string) {
-  return value
-    .split(/\n+/)
-    .flatMap((block) => block
-      .replace(/\s+/g, ' ')
-      .trim()
-      .split(/(?<=[.!?。])\s+/u))
-    .map((line) => line.trim())
-    .filter(Boolean)
-}
-
-function getExpandedCommentLines(comment: LoadingPerformanceComment) {
-  const expandedBody = comment.fullBody?.trim() || comment.body
-  const bodyLines = splitReadableCommentText(expandedBody)
-
-  if (hasDisplayValue(bodyLines)) {
-    return bodyLines
-  }
-
-  const explicitLines = Array.isArray(comment.lines) ? comment.lines : []
-  return explicitLines.flatMap(splitReadableCommentText)
-}
 
 function formatShares(value: string | number | undefined) {
   if (typeof value === 'string' && value.trim()) {
@@ -296,47 +334,6 @@ function formatTradingVolume(value: string | number | undefined) {
   return `${formatCompactNumber(numericValue)}주`
 }
 
-function hashSparklineSeed(value: string) {
-  return value.split('').reduce((hash, char) => ((hash * 31) + char.charCodeAt(0)) >>> 0, 2166136261)
-}
-
-function seededSparklineUnit(seed: number, index: number) {
-  let state = (seed + index * 1013904223) >>> 0
-  state = (state * 1664525 + 1013904223) >>> 0
-  state = (state * 1664525 + 1013904223) >>> 0
-  return state / 4294967295
-}
-
-function clampSparklineY(value: number) {
-  return Math.min(48, Math.max(10, value))
-}
-
-function buildConsensusSparkline(seedSource: string, upsidePct: number | undefined) {
-  const seed = hashSparklineSeed(seedSource)
-  const uplift = typeof upsidePct === 'number' && Number.isFinite(upsidePct)
-    ? Math.min(20, Math.max(-14, upsidePct / 40 * 20))
-    : 8
-  const count = 7
-  const currentPoints: string[] = []
-  const targetPoints: string[] = []
-
-  for (let index = 0; index < count; index += 1) {
-    const x = 6 + index * (88 / (count - 1))
-    const wave = Math.sin((index + (seed % 7)) * 0.92) * 4.5
-    const currentJitter = (seededSparklineUnit(seed, index) - 0.5) * 7
-    const targetJitter = (seededSparklineUnit(seed, index + 31) - 0.5) * 5
-    const currentY = clampSparklineY(34 + wave + currentJitter)
-    const targetY = clampSparklineY(currentY - 8 - uplift + targetJitter)
-
-    currentPoints.push(`${x.toFixed(1)},${currentY.toFixed(1)}`)
-    targetPoints.push(`${x.toFixed(1)},${targetY.toFixed(1)}`)
-  }
-
-  return {
-    current: currentPoints.join(' '),
-    target: targetPoints.join(' '),
-  }
-}
 
 function memberStateClass(state: CommitteeMemberState) {
   if (state === 'done') {
@@ -366,57 +363,148 @@ function BackControl({ onBack, backHref }: Pick<DeepScanLoadingScreenProps, 'onB
   )
 }
 
-function buildFindingDefinitions(): FindingDefinition[] {
-  return [
-    {
-      key: 'quality',
-      number: '01',
-      title: '사업 품질',
-      loadingLabel: '사업 품질 위원 응답 대기 중',
-    },
-    {
-      key: 'timing',
-      number: '02',
-      title: '시장 타이밍',
-      loadingLabel: '시장 타이밍 위원 응답 대기 중',
-    },
-    {
-      key: 'position',
-      number: '03',
-      title: '포지션 적합도',
-      loadingLabel: '포지션 적합도 위원 응답 대기 중',
-    },
-    {
-      key: 'decision',
-      number: '04',
-      title: '즉시 매도·시뮬레이션',
-      loadingLabel: '최종 판단 블록 응답 대기 중',
-    },
-  ]
-}
 
-function findingBadgeClass(tone: FindingProgressTone) {
-  if (tone === 'done') {
-    return styles.badgeDone
-  }
-
-  if (tone === 'warning') {
-    return styles.badgeWarning
-  }
-
-  return styles.badgeActive
-}
-
-function quickFactBadgeClass(tone: LoadingQuickFact['tone']) {
+function narrativeToneClass(tone: NarrativeTone) {
   if (tone === 'positive') {
-    return styles.badgeDone
+    return styles.narrativeTonePositive
   }
 
   if (tone === 'warning') {
-    return styles.badgeWarning
+    return styles.narrativeToneWarning
   }
 
-  return styles.badgeActive
+  if (tone === 'neutral') {
+    return styles.narrativeToneNeutral
+  }
+
+  return styles.narrativeToneInfo
+}
+
+function quickFactToneToNarrativeTone(tone: LoadingQuickFact['tone']): NarrativeTone {
+  if (tone === 'positive') {
+    return 'positive'
+  }
+
+  if (tone === 'warning') {
+    return 'warning'
+  }
+
+  return 'info'
+}
+
+function getQuickFactByKey(facts: LoadingQuickFact[], key: string) {
+  return facts.find((fact) => fact.key === key)
+}
+
+function flattenCommitteeMembers(committeeAxes: JarooDeepScanCommitteeAxis[] | undefined) {
+  return (committeeAxes ?? []).flatMap((axis) => axis.members)
+}
+
+function buildCommitteeTeamBody(
+  team: CommitteeTeamDefinition,
+  committeeAxes: JarooDeepScanCommitteeAxis[] | undefined,
+) {
+  const members = flattenCommitteeMembers(committeeAxes)
+  const lines = team.members.map((definition) => {
+    const member = members.find((candidate) => candidate.title === definition.sourceTitle)
+    if (member?.status === 'success' && typeof member.reason === 'string' && member.reason.trim()) {
+      return `${definition.alias}: ${member.reason}`
+    }
+    if (member?.status === 'error') {
+      return `${definition.alias}: 응답 실패`
+    }
+    return `${definition.alias}: 응답 대기 중`
+  })
+
+  return {
+    body: lines.join('\n'),
+    readyCount: team.members.filter((definition) => {
+      const member = members.find((candidate) => candidate.title === definition.sourceTitle)
+      return member?.status === 'success' && typeof member.reason === 'string' && member.reason.trim().length > 0
+    }).length,
+    errorCount: team.members.filter((definition) => {
+      const member = members.find((candidate) => candidate.title === definition.sourceTitle)
+      return member?.status === 'error'
+    }).length,
+  }
+}
+
+function buildCompletionState(resultsReady: boolean, elapsedSeconds: number): CompletionState {
+  if (resultsReady) {
+    return {
+      ready: true,
+      eyebrow: '분석 완료',
+      title: '실제 분석 결과가 도착했어요',
+      body: `실제 응답이 도착했습니다. ${formatElapsedTime(elapsedSeconds)} 동안 모은 근거를 바로 아래 결과 카드에서 이어서 확인하세요.`,
+    }
+  }
+
+  return {
+    ready: false,
+    eyebrow: '분석 진행 중',
+    title: '분석가 의견을 차례로 모으는 중이에요',
+    body: '완료 신호가 오면 기다리지 않고 바로 상세 결과로 넘어갈 수 있게 바뀝니다.',
+  }
+}
+
+function buildLoadingStages({
+  displayQuickFacts,
+  findingProgress,
+  performanceComment,
+  committeeAxes,
+  currentPriceText,
+  tradingVolumeText,
+}: {
+  displayQuickFacts: LoadingQuickFact[]
+  findingProgress?: Partial<Record<FindingKey, FindingProgress>>
+  performanceComment?: LoadingPerformanceComment
+  committeeAxes?: JarooDeepScanCommitteeAxis[]
+  currentPriceText: string | null
+  tradingVolumeText: string | null
+}): NarrativeCard[] {
+  const positionFact = displayQuickFacts.find((fact) => fact.key === 'week52-position' || Boolean(fact.indicator))
+  const consensusFact = getQuickFactByKey(displayQuickFacts, 'analyst-consensus')
+  const completedFindings = findingProgress ? Object.values(findingProgress).filter(Boolean) : []
+  const performanceLines = performanceComment && hasDisplayValue(performanceComment) ? getCommentLines(performanceComment) : []
+
+  return committeeTeams.map((team) => {
+    const teamBody = buildCommitteeTeamBody(team, committeeAxes)
+    const tags = team.key === 'fundamentalTeam'
+      ? [
+          { text: performanceLines.length ? '실적 코멘트 확인' : '실적 대기', tone: performanceLines.length ? 'positive' as const : 'neutral' as const },
+          { text: completedFindings.length ? `위원회 ${completedFindings.length}개 응답` : '위원회 대기', tone: completedFindings.length ? 'info' as const : 'neutral' as const },
+        ]
+      : team.key === 'marketTeam'
+        ? [
+            { text: currentPriceText ? '현재가 확인' : '현재가 대기', tone: currentPriceText ? 'positive' as const : 'neutral' as const },
+            { text: tradingVolumeText ? `거래량 ${tradingVolumeText}` : '가격 위치 대기', tone: positionFact ? 'info' as const : 'neutral' as const },
+          ]
+        : [
+            { text: consensusFact?.badge ?? '확인 중', tone: consensusFact ? quickFactToneToNarrativeTone(consensusFact.tone) : 'neutral' as const },
+            { text: consensusFact?.detail ? '조회 실패 분리' : '원천 상태 표시', tone: consensusFact?.tone === 'warning' ? 'warning' as const : 'info' as const },
+          ]
+
+    return {
+      key: team.key,
+      revealAt: team.revealAt,
+      analystName: team.analystName,
+      description: team.description,
+      avatar: team.avatar,
+      body: teamBody.body,
+      tags,
+      statusLabel: teamBody.readyCount === team.members.length ? '위원 응답 완료' : teamBody.errorCount > 0 ? '일부 응답 실패' : `${teamBody.readyCount}/${team.members.length} 응답`,
+      statusTone: teamBody.errorCount > 0 ? 'warning' : teamBody.readyCount > 0 ? 'positive' : 'neutral',
+      complete: teamBody.readyCount + teamBody.errorCount === team.members.length,
+    }
+  })
+}
+
+function buildVisibleNarrativeCards(cards: NarrativeCard[], elapsedSeconds: number, resultsReady: boolean): NarrativeCard[] {
+  if (resultsReady) {
+    return cards
+  }
+
+  return cards.filter((card) => elapsedSeconds >= card.revealAt)
 }
 
 export function DeepScanLoadingScreen({
@@ -432,6 +520,7 @@ export function DeepScanLoadingScreen({
   currentProfitRate,
   evaluationAmount,
   findingProgress,
+  committeeAxes,
   quickFacts = [],
   performanceComment,
   evidenceCollected = false,
@@ -439,7 +528,7 @@ export function DeepScanLoadingScreen({
   className,
   onBack,
   backHref = '/home',
-  onViewResults,
+  inlineResults,
 }: DeepScanLoadingScreenProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const targetLine = [identifier, market].filter(Boolean).join(' · ')
@@ -452,20 +541,21 @@ export function DeepScanLoadingScreen({
     currentPriceCurrency,
   )
   const profitRateText = formatSignedPercent(currentProfitRate)
-  const metaMessage = resultsReady
-    ? completedMetaMessage
-    : metaMessages[Math.min(metaMessages.length - 1, Math.floor(elapsedSeconds / 5))]
-  const findings = buildFindingDefinitions()
   const displayQuickFacts = quickFacts.filter(hasDisplayValue)
-  const hasWeek52Fact = displayQuickFacts.some((fact) => fact.key === 'week52-position' || Boolean(fact.indicator))
-  const hasPerformanceComment = hasDisplayValue(performanceComment)
-  const showPositionSkeleton = !resultsReady && !hasWeek52Fact
-  const showQuickFactsSection = hasDisplayValue(displayQuickFacts) || showPositionSkeleton || hasPerformanceComment
-  const performanceCommentPreviewLines = performanceComment && hasPerformanceComment ? getCommentLines(performanceComment) : []
-  const performanceCommentFullLines = performanceComment && hasPerformanceComment ? getExpandedCommentLines(performanceComment) : []
-  const showPerformanceCommentDetails = performanceComment && hasPerformanceComment
-    ? Boolean(performanceComment.fullBody?.trim()) || performanceCommentFullLines.join('\n') !== performanceCommentPreviewLines.join('\n')
-    : false
+  const positionQuickFact = displayQuickFacts.find((fact) => fact.key === 'week52-position' || Boolean(fact.indicator))
+  const loadingStages = buildLoadingStages({
+    displayQuickFacts,
+    findingProgress,
+    performanceComment,
+    committeeAxes,
+    currentPriceText,
+    tradingVolumeText,
+  })
+  const visibleNarrativeCards = buildVisibleNarrativeCards(loadingStages, elapsedSeconds, resultsReady)
+  const completionState = buildCompletionState(resultsReady, elapsedSeconds)
+  const progressPct = resultsReady ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
+  const activeNarrativeCard = visibleNarrativeCards.at(-1) ?? loadingStages[0]
+  const progressLabel = resultsReady ? '상세 결과 준비 완료' : `${activeNarrativeCard.analystName}가 살펴보는 중…`
 
   useEffect(() => {
     if (resultsReady) {
@@ -483,283 +573,112 @@ export function DeepScanLoadingScreen({
 
   return (
     <div className={cn(styles.loadingCard, className)}>
-      <div className={styles.topBar}>
-        <BackControl onBack={onBack} backHref={backHref} />
-        <div className={styles.topTitle}>{resultsReady ? '딥스캔 준비 완료' : '딥스캔 분석 중'}</div>
-        <div className={styles.liveTag} aria-live='polite'>
-          <span className={styles.liveDot} aria-hidden='true' />
-          {resultsReady ? '분석 완료' : '분석 중'}
+      <header className={styles.topBar}>
+        <div className={styles.topBarRow}>
+          <BackControl onBack={onBack} backHref={backHref} />
+          <div className={styles.stockIdentity}>
+            <h1 className={styles.stockName}>{name}</h1>
+            <p className={styles.stockCode}>{[targetLine, sharesText ? `보유 ${sharesText}` : null].filter(Boolean).join(' · ') || '분석 대상 확인 중'}</p>
+          </div>
+          <div className={styles.stockPriceBox}>
+            <p className={styles.stockPrice}>{currentPriceText ?? '현재가 확인 중'}</p>
+            <p className={cn(styles.stockChange, profitRateText && parseNumericValue(profitRateText) !== null && parseNumericValue(profitRateText)! < 0 ? styles.loss : styles.gain)}>
+              {profitRateText ? profitRateText : '계산 중'}
+            </p>
+          </div>
         </div>
-      </div>
+        <div className={cn(styles.headerProgress, resultsReady ? styles.headerProgressDone : undefined)} aria-label={resultsReady ? '딥스캔 완료' : '딥스캔 진행 중'}>
+          <span className={styles.headerProgressText}>{progressLabel}</span>
+          <span className={styles.headerProgressTrack} aria-hidden='true'>
+            <span className={styles.headerProgressFill} style={{ width: `${progressPct}%` }} />
+          </span>
+          <span className={styles.headerProgressTime}>{resultsReady ? '완료' : formatElapsedTime(elapsedSeconds)}</span>
+        </div>
+      </header>
 
       <div className={styles.body}>
-        <section className={styles.stockHeader} aria-label='분석 대상 종목'>
-          <div className={styles.stockHeaderTop}>
-            <div className={styles.stockIdentity}>
-              <h1 className={styles.stockName}>{name}</h1>
-              <p className={styles.stockCode}>{[targetLine, sharesText ? `보유 ${sharesText}` : null].filter(Boolean).join(' · ') || '분석 대상 확인 중'}</p>
-            </div>
-            <div className={styles.stockPriceBox}>
-              <p className={styles.stockPrice}>{currentPriceText ?? '현재가 확인 중'}</p>
-              <p className={cn(styles.stockChange, profitRateText && parseNumericValue(profitRateText) !== null && parseNumericValue(profitRateText)! < 0 ? styles.loss : styles.gain)}>
-                {profitRateText ? `손익률 ${profitRateText}` : '손익률 계산 중'}
-              </p>
-            </div>
+        <section className={styles.intro} aria-label='딥스캔 안내'>
+          <p className={styles.introGreet}>{new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date())}</p>
+          <h2 className={styles.introTitle}>세 분석가가 종목을<br />차례로 살펴보고 있어요</h2>
+          <p className={styles.introBody}>{resultsReady ? '실제 응답이 도착했어요. 아래 결과 카드가 바로 이어집니다.' : '완료 신호가 오면 기다림 없이 이 화면 아래에 결과가 이어집니다.'}</p>
+        </section>
+
+        <section className={styles.positionSummaryCard} aria-label='보유 포지션 요약'>
+          <div>
+            <span className={styles.metaLabel}>평단가</span>
+            <span className={styles.metaValue}>{averagePriceText ?? '확인 중'}</span>
           </div>
-          <div className={cn(styles.stockMetaGrid, tradingVolumeText && styles.stockMetaGridThree)}>
-            <div>
-              <span className={styles.metaLabel}>평단가</span>
-              <span className={styles.metaValue}>{averagePriceText ?? '확인 중'}</span>
-            </div>
-            <div>
-              <span className={styles.metaLabel}>평가금액</span>
-              <span className={styles.metaValue}>{evaluationAmountText ?? '계산 중'}</span>
-            </div>
-            {tradingVolumeText ? (
-              <div>
-                <span className={styles.metaLabel}>거래량</span>
-                <span className={styles.metaValue}>{tradingVolumeText}</span>
-              </div>
-            ) : null}
+          <div>
+            <span className={styles.metaLabel}>평가금액</span>
+            <span className={styles.metaValue}>{evaluationAmountText ?? '계산 중'}</span>
+          </div>
+          <div>
+            <span className={styles.metaLabel}>거래량</span>
+            <span className={styles.metaValue}>{tradingVolumeText ?? '확인 중'}</span>
           </div>
         </section>
 
-        <section className={styles.loadingStatusCard} aria-label='딥스캔 진행 상태'>
-          <div
-            className={cn(styles.elapsedTimer, resultsReady ? styles.elapsedTimerDone : undefined)}
-            aria-label={resultsReady ? `딥스캔 분석 완료, 소요시간 ${formatElapsedTime(elapsedSeconds)}` : `딥스캔 분석 경과 시간 ${formatElapsedTime(elapsedSeconds)}`}
-          >
-            <span className={styles.elapsedLabel}>{resultsReady ? '분석 완료' : '분석 경과'}</span>
-            {resultsReady ? <span className={styles.elapsedSubLabel}>소요시간</span> : null}
-            <span className={styles.elapsedValue}>{formatElapsedTime(elapsedSeconds)}</span>
-          </div>
-          <div className={styles.metaInfo}>
-            <span className={styles.metaIcon} aria-hidden='true'>{metaMessage.icon}</span>
-            <span>{metaMessage.text}</span>
-          </div>
-          <span className={styles.statusAnnouncer} role='status' aria-live='polite' aria-atomic='true'>
-            {resultsReady ? '딥스캔 분석 완료. 상세 결과 보기가 준비됐어요.' : ''}
-          </span>
-        </section>
-
-        {!resultsReady ? (
-          <section className={styles.contextCard} aria-label='현재 상황'>
-            <div className={styles.contextTop}>
-              <Sparkles className={styles.contextIcon} aria-hidden />
-              <span>현재 상황</span>
-            </div>
-            <p>
-              {[profitRateText ? `손익률 ${profitRateText}` : null, averagePriceText ? `평단 ${averagePriceText}` : null]
-                .filter(Boolean)
-                .join(' · ') || '보유 포지션'} 기준으로 회복 가능성, 리스크, 즉시 매도 판단을 순서대로 분석하고 있어요.
-            </p>
-          </section>
-        ) : null}
-
-        {showQuickFactsSection ? (
-          <>
-            <div className={styles.sectionLabel}>빠른 시장 체크</div>
-            <section className={styles.quickFactsCard} aria-label='빠른 시장 체크'>
-              {displayQuickFacts.map((fact) => {
-                const indicator = fact.indicator
-                const consensus = fact.consensus
-                const segmentLabel = indicator && fact.detail ? fact.detail.replace(/이에요$|예요$/u, '') : fact.badge
-                const markerTopPct = indicator ? 100 - indicator.positionPct : 0
-                const calloutTopPct = Math.min(84, Math.max(16, markerTopPct))
-                const upsidePct = consensus?.upsidePct
-                const opinionScore = consensus?.opinionScore
-                const opinionPct = typeof opinionScore === 'number' ? Math.min(100, Math.max(0, opinionScore / 5 * 100)) : 0
-                const sparkline = consensus ? buildConsensusSparkline(`${fact.body}:${consensus.targetPriceLabel}`, upsidePct) : undefined
-
-                return (
-                  <article key={fact.key} className={cn(styles.quickFact, indicator ? styles.positionQuickFact : undefined, consensus ? styles.consensusQuickFact : undefined)}>
-                    <div className={styles.findingTop}>
-                      <span className={styles.findingCat}>{fact.category}</span>
-                      <span className={cn(styles.findingBadge, indicator || consensus ? styles.positionSegmentBadge : quickFactBadgeClass(fact.tone))}>
-                        {consensus?.upsideLabel ?? segmentLabel}
-                      </span>
-                    </div>
-                    {indicator ? (
-                      <div
-                        className={styles.positionIndicator}
-                        aria-label={`${fact.category}: ${indicator.leftLabel}부터 ${indicator.rightLabel} 사이 ${indicator.markerLabel ?? '현재 위치'}`}
-                      >
-                        <div className={styles.positionScale}>
-                          <span className={styles.positionTrack} aria-hidden='true' />
-                          <span
-                            className={styles.positionMarker}
-                            style={{ top: `${markerTopPct}%` }}
-                            aria-hidden='true'
-                          >
-                            <span className={styles.positionMarkerDot} />
-                            <span className={styles.positionLeader} />
-                          </span>
-                        </div>
-                        <div className={styles.positionReadout}>
-                          <span className={styles.positionHighLabel}>{indicator.rightLabel}</span>
-                          <div className={styles.positionCurrentCallout} style={{ top: `${calloutTopPct}%` }}>
-                            {indicator.markerLabel ? <strong>{indicator.markerLabel}</strong> : null}
-                            {indicator.deltaLabels?.length ? (
-                              <span className={styles.positionDeltaLine}>{indicator.deltaLabels.join(' · ')}</span>
-                            ) : (
-                              <span className={styles.positionDeltaLine}>{fact.body}</span>
-                            )}
-                          </div>
-                          <span className={styles.positionLowLabel}>{indicator.leftLabel}</span>
-                        </div>
-                      </div>
-                    ) : consensus ? (
-                      <div className={styles.consensusInsight} aria-label={`${fact.category}: ${fact.body}`}>
-                        <div className={styles.consensusChartTop}>
-                          <div>
-                            <span className={styles.consensusEyebrow}>{consensus.analystCountLabel ?? '증권사 평균'}</span>
-                            <strong>{consensus.targetPriceLabel}</strong>
-                          </div>
-                          <span>목표가 비교</span>
-                        </div>
-                        <div className={styles.consensusLineChart} aria-hidden='true'>
-                          <svg viewBox='0 0 100 56' role='img' focusable='false' preserveAspectRatio='none'>
-                            <line className={styles.consensusGridLine} x1='4' y1='14' x2='96' y2='14' />
-                            <line className={styles.consensusGridLine} x1='4' y1='34' x2='96' y2='34' />
-                            <polyline className={styles.consensusCurrentLine} points={sparkline?.current} />
-                            <polyline className={styles.consensusTargetLine} points={sparkline?.target} />
-                          </svg>
-                          <div className={styles.consensusChartLegend}>
-                            <span><i className={styles.consensusCurrentSwatch} />현재가{consensus.currentPriceLabel ? ` ${consensus.currentPriceLabel}` : ''}</span>
-                            <span><i className={styles.consensusTargetSwatch} />증권사 목표</span>
-                          </div>
-                        </div>
-                        {consensus.summary ? <p className={styles.consensusSummary}>{consensus.summary}</p> : null}
-                        {consensus.highTargetLabel || consensus.lowTargetLabel || consensus.opinionLabel ? (
-                          <div className={styles.consensusRangeRow}>
-                            {consensus.highTargetLabel ? <span>최고 {consensus.highTargetLabel}</span> : null}
-                            {consensus.lowTargetLabel ? <span>최저 {consensus.lowTargetLabel}</span> : null}
-                            {consensus.opinionLabel ? <span>투자의견 {consensus.opinionLabel}</span> : null}
-                          </div>
-                        ) : null}
-                        {consensus.opinionLabel ? (
-                          <div className={styles.consensusOpinionBlock}>
-                            <span>신뢰도</span>
-                            <div className={styles.consensusOpinionMeter} aria-hidden='true'>
-                              <span style={{ width: `${opinionPct}%` }} />
-                            </div>
-                          </div>
-                        ) : null}
-                      </div>
-                    ) : (
-                      <>
-                        <p className={styles.findingText}>{fact.body}</p>
-                        {fact.detail ? <p className={styles.quickFactDetail}>{fact.detail}</p> : null}
-                      </>
-                    )}
-                  </article>
-                )
-              })}
-              {showPositionSkeleton ? (
-                <article className={cn(styles.quickFact, styles.positionQuickFact, styles.consensusSkeletonFact)} aria-label='가격 위치 조회 중'>
-                  <div className={styles.findingTop}>
-                    <span className={styles.findingCat}>가격 위치</span>
-                    <span className={cn(styles.findingBadge, styles.positionSegmentBadge)}>조회 중</span>
-                  </div>
-                  <div className={styles.positionIndicator} aria-hidden='true'>
-                    <div className={styles.positionScale}>
-                      <span className={styles.positionTrack} />
-                      <span className={styles.positionMarker} style={{ top: '50%' }}>
-                        <span className={styles.positionMarkerDot} />
-                        <span className={styles.positionLeader} />
-                      </span>
-                    </div>
-                    <div className={styles.positionReadout}>
-                      <span className={cn(styles.consensusSkeletonBlock, styles.consensusSkeletonSummary)} />
-                      <div className={styles.positionCurrentCallout} style={{ top: '50%' }}>
-                        <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRowShort)} />
-                        <span className={cn(styles.consensusSkeletonBlock, styles.commentarySkeletonRow)} />
-                      </div>
-                      <span className={cn(styles.consensusSkeletonBlock, styles.consensusSkeletonSummary)} />
-                    </div>
-                  </div>
-                </article>
-              ) : null}
-              {performanceComment && hasPerformanceComment ? (
-                <article className={cn(styles.quickFact, styles.commentaryQuickFact)} aria-label='기업실적코멘트'>
-                  <div className={styles.commentaryTop}>
-                    <Factory className={styles.commentaryIcon} aria-hidden />
-                    <span>기업실적코멘트</span>
-                    {performanceComment.asOf ? <span className={styles.commentaryDate}>기준 {performanceComment.asOf}</span> : null}
-                  </div>
-                  <ul className={styles.commentaryLines}>
-                    {performanceCommentPreviewLines.map((line, index) => (
-                      <li key={`${index}-${line}`}>{line}</li>
-                    ))}
-                  </ul>
-                  {showPerformanceCommentDetails ? (
-                    <details className={styles.commentaryDetails}>
-                      <summary className={styles.commentaryDetailsSummary}>
-                        <span>원문 자세히 보기</span>
-                        <small>{performanceCommentFullLines.length}개 문장</small>
-                      </summary>
-                      <div className={styles.commentaryFullText}>
-                        <ol className={styles.commentaryFullList}>
-                          {performanceCommentFullLines.map((line, index) => (
-                            <li key={`${index}-${line}`}>
-                              <span className={styles.commentaryFullIndex}>{String(index + 1).padStart(2, '0')}</span>
-                              <p>{line}</p>
-                            </li>
-                          ))}
-                        </ol>
-                      </div>
-                    </details>
-                  ) : null}
-                </article>
-              ) : null}
-            </section>
-          </>
-        ) : null}
-
-
-        <div className={styles.sectionLabel}>진행 요약</div>
-        <section className={styles.findingCard} aria-label='딥스캔 진행 요약'>
-          {findings.map((finding) => {
-            const progress = findingProgress?.[finding.key]
+        <section className={styles.narrativeStream} aria-label='분석가 진행 메시지'>
+          {visibleNarrativeCards.map((card) => {
+            const cardSettled = resultsReady || card.complete
+            const statusLabel = cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
 
             return (
-              <article key={finding.key} className={cn(styles.finding, progress ? styles.findingAnswered : styles.findingLoading)}>
-                {progress ? (
-                  <div className={styles.findingContent}>
-                    <div className={styles.findingTop}>
-                      <span className={styles.findingNum}>{finding.number}</span>
-                      <span className={styles.findingCat}>{finding.title}</span>
-                      <span className={cn(styles.findingBadge, findingBadgeClass(progress.tone))}>{progress.badge}</span>
-                    </div>
-                    <p className={styles.findingText}>{progress.body}</p>
+              <article key={card.key} className={cn(styles.narrativeCard, cardSettled ? styles.narrativeCardComplete : styles.narrativeCardPending)}>
+                <div className={styles.narrativeHead}>
+                  <span className={cn(styles.narrativeAvatar, cardSettled ? undefined : styles.narrativeAvatarPending)} aria-hidden='true'>{cardSettled ? card.avatar : <Loader2 className={styles.narrativeSpinner} aria-hidden />}</span>
+                  <div className={styles.narrativeNameWrap}>
+                    <strong>{card.analystName}</strong>
+                    <span>{card.description}</span>
                   </div>
-                ) : (
-                  <div className={styles.skeleton} aria-label={finding.loadingLabel}>
-                    <div className={styles.skeletonLabel}>
-                      <Loader2 className={styles.skeletonSpinner} aria-hidden />
-                      <span className={styles.findingNum}>{finding.number}</span>
-                      <span className={styles.findingCat}>{finding.title}</span>
-                      <span className={styles.pendingBadge}>응답 대기</span>
+                  <span className={cn(styles.narrativeStatus, narrativeToneClass(cardSettled && !card.complete ? 'info' : card.statusTone))}>{statusLabel}</span>
+                </div>
+                <div className={styles.narrativeBubble}>
+                  <p className={styles.narrativeText}>{card.body}</p>
+                  {card.key === 'marketTeam' && positionQuickFact?.indicator ? (
+                    <div
+                      className={styles.narrativePricebar}
+                      aria-label={`시장/차트 팀 가격 위치: ${positionQuickFact.indicator.leftLabel}부터 ${positionQuickFact.indicator.rightLabel} 사이 ${positionQuickFact.indicator.markerLabel ?? '현재 위치'}`}
+                    >
+                      <div className={styles.narrativePricebarRow}>
+                        <span>{positionQuickFact.indicator.leftLabel}</span>
+                        <span>{positionQuickFact.indicator.rightLabel}</span>
+                      </div>
+                      <div className={styles.narrativePricebarTrack} aria-hidden='true'>
+                        <span
+                          className={styles.narrativePricebarMarker}
+                          style={{ left: `${positionQuickFact.indicator.positionPct}%` }}
+                        />
+                      </div>
+                      <div className={styles.narrativePricebarNow}>
+                        <strong>{positionQuickFact.indicator.markerLabel ?? '현재 위치'}</strong>
+                        {positionQuickFact.indicator.deltaLabels?.length ? <span>{positionQuickFact.indicator.deltaLabels.join(' · ')}</span> : null}
+                      </div>
                     </div>
-                    <div className={cn(styles.skeletonRow, styles.skeletonMid)} />
-                    <div className={cn(styles.skeletonRow, styles.skeletonBottom)} />
-                    <p className={styles.pendingText}>실제 위원회 응답이 도착하면 이 카드의 한 줄 요약을 채워요.</p>
+                  ) : null}
+                  <div className={styles.narrativeTags}>
+                    {card.tags.map((tag) => (
+                      <span key={`${card.key}-${tag.text}`} className={cn(styles.narrativeTag, narrativeToneClass(tag.tone))}>{tag.text}</span>
+                    ))}
                   </div>
-                )}
+                </div>
               </article>
             )
           })}
         </section>
 
-        <section className={cn(styles.scoreCard, !resultsReady ? styles.scoreCardWaiting : undefined)} aria-label='최종 점수 준비 상태'>
-          <div className={styles.scoreLabel}>자루의 확신도</div>
-          <div className={styles.scoreValue}>{resultsReady ? '준비 완료' : '계산 중'}</div>
-          <div className={styles.scoreBar} aria-hidden='true'>
-            <div className={styles.scoreBarFill} />
+
+
+
+        <section className={cn(styles.completionCard, completionState.ready ? styles.completionCardReady : styles.completionCardWaiting)} aria-label='완료 전환 상태'>
+          <div className={styles.completionHead}>
+            <span className={styles.completionIcon} aria-hidden='true'>{completionState.ready ? '✓' : '…'}</span>
+            <div>
+              <span className={styles.completionEyebrow}>{completionState.eyebrow}</span>
+              <h2 className={styles.completionTitle}>{completionState.title}</h2>
+            </div>
           </div>
-          <p className={styles.scoreDesc}>
-            {resultsReady ? '아래 버튼을 누르면 상세 결과 화면으로 이동해요.' : '위원회 의견이 도착하면 점수와 판단을 바로 보여드릴게요.'}
-          </p>
+          <p className={styles.completionBody}>{completionState.body}</p>
         </section>
 
         <details className={styles.progressDetails}>
@@ -769,7 +688,7 @@ export function DeepScanLoadingScreen({
               { label: '대상 종목 확인', state: 'done' },
               { label: '근거 데이터 수집', state: evidenceCollected ? 'done' : 'active' },
               { label: 'AI 9인 위원회 응답 대기', state: resultsReady ? 'done' : evidenceCollected ? 'active' : 'wait' },
-              { label: '최종 리포트 생성', state: resultsReady ? 'done' : 'wait' },
+              { label: '상세 리포트 연결', state: resultsReady ? 'done' : 'wait' },
             ].map((step, index) => {
               const isDone = step.state === 'done'
               const isActive = step.state === 'active'
@@ -810,9 +729,7 @@ export function DeepScanLoadingScreen({
           </section>
         </details>
 
-        <button type='button' className={styles.primaryButton} disabled={!resultsReady} onClick={onViewResults}>
-          {resultsReady ? '상세 결과 보기' : '상세 결과 준비 중'}
-        </button>
+        {inlineResults ? <div className={styles.inlineResultsSlot}>{inlineResults}</div> : null}
         <p className={styles.privacy}>분석 결과는 투자 권유가 아닌 참고 자료입니다.</p>
       </div>
     </div>
