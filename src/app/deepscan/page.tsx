@@ -24,6 +24,7 @@ import { Badge } from '@/components/ui/badge'
 import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { DeepScanInlineResults } from '@/components/deepscan-inline-results'
 import { DeepScanLoadingScreen, type FindingProgress, type LoadingPerformanceComment, type LoadingQuickFact } from '@/components/deepscan-loading-screen'
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
@@ -1018,7 +1019,6 @@ export default function DeepScanPage() {
     sellNow: false,
     pfSim: false,
   })
-  const [confirmedResultsTargetKey, setConfirmedResultsTargetKey] = useState<string | null>(null)
   const target = useDeepScanStore((state) => state.target)
   const requestStatus = useDeepScanStore((state) => state.requestStatus)
   const errorMessage = useDeepScanStore((state) => state.errorMessage)
@@ -1259,15 +1259,10 @@ export default function DeepScanPage() {
   }
 
   const handleRetry = useCallback(() => {
-    setConfirmedResultsTargetKey(null)
     startRequest()
     scrollContentToTop()
   }, [startRequest])
 
-  const handleViewResults = useCallback(() => {
-    setConfirmedResultsTargetKey(targetKey)
-    scrollContentToTop()
-  }, [targetKey])
 
   const missingTargetTitle = '분석할 종목이 없습니다'
 
@@ -1365,7 +1360,6 @@ export default function DeepScanPage() {
   const weekTone = resolveWeekToneClasses(payload?.strategy.weekSignalTone ?? 'neutral')
   const isCommitteeHydrating = fetchState === 'success' && payload?.metadata.llmCommittee?.status === 'partial'
   const resultsReady = fetchState === 'success' && Boolean(payload) && !isCommitteeHydrating
-  const hasConfirmedResultsView = targetKey !== null && confirmedResultsTargetKey === targetKey
   const loadingFindingProgress = buildLoadingFindingProgress(payload)
   const loadingPerformanceComment = buildLoadingPerformanceComment(payload)
   const activeLoadingQuickQuote = loadingQuickQuote?.targetKey === targetKey ? loadingQuickQuote : null
@@ -1390,7 +1384,7 @@ export default function DeepScanPage() {
     body: errorMessage ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
   }
 
-  if (fetchState === 'loading' || isCommitteeHydrating || (resultsReady && !hasConfirmedResultsView)) {
+  if (fetchState === 'loading' || isCommitteeHydrating || resultsReady) {
     const identifier = [requestSeed.holding.ticker, requestSeed.holding.code]
       .filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index)
       .join(' · ')
@@ -1411,11 +1405,12 @@ export default function DeepScanPage() {
           currentProfitRate={target?.currentProfitRate}
           evaluationAmount={target?.evaluationAmount}
           findingProgress={loadingFindingProgress}
+          committeeAxes={payload?.committee.axes}
           quickFacts={loadingQuickFacts}
           performanceComment={loadingPerformanceComment}
           evidenceCollected={evidenceCollected}
           resultsReady={resultsReady}
-          onViewResults={handleViewResults}
+          inlineResults={resultsReady && payload ? <DeepScanInlineResults payload={payload} requestSeed={requestSeed} target={target} /> : null}
           backHref='/home'
         />
       </div>

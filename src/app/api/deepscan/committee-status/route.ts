@@ -14,6 +14,7 @@ type DeepScanCommitteeProgress = {
   completed?: number
   updatedAt?: string
   softDeadlineMs?: number
+  committeeAxes?: unknown[]
 }
 
 export function createDeepScanCommitteeStatusResponse(
@@ -44,6 +45,7 @@ export function createDeepScanCommitteeStatusResponse(
     completed: progress.completed,
     updatedAt: progress.updatedAt,
     softDeadlineMs: progress.softDeadlineMs,
+    committeeAxes: progress.committeeAxes,
   })
 }
 
@@ -120,6 +122,7 @@ export function parseCommitteeProgressBody(body: string): DeepScanCommitteeProgr
       completed: toNumber(parsed.completed),
       updatedAt: typeof parsed.updatedAt === 'string' ? parsed.updatedAt : undefined,
       softDeadlineMs: toNumber(parsed.softDeadlineMs),
+      committeeAxes: Array.isArray(parsed.committeeAxes) ? parsed.committeeAxes : undefined,
     }
   } catch {
     return null

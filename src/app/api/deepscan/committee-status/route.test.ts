@@ -36,6 +36,43 @@ test('committee status route returns progressive state', async () => {
 })
 
 
+test('committee status route preserves member reasons without lens summary', async () => {
+  const response = createDeepScanCommitteeStatusResponse(new URLSearchParams('requestId=job-2'), () => ({
+    requestId: 'job-2',
+    status: 'complete',
+    results: {},
+    errors: [],
+    pending: [],
+    completed: 9,
+    committeeAxes: [{
+      label: '사업 품질',
+      score: 70,
+      scoreText: '70 / 100',
+      axisStatusText: 'LLM 위원 3/3명 반영',
+      subtitle: '테스트',
+      avgLabel: '위원 평균 70',
+      members: [{
+        shortLabel: '밸류',
+        title: '밸류에이션',
+        status: 'success',
+        reason: 'RAW_REASON_VALUE_ANALYST_SENTINEL',
+        score: 70,
+        scoreLabel: '70',
+        tone: 'positive',
+        iconTone: 'green',
+        confidence: 'medium',
+        error: null,
+      }],
+    }],
+  }))
+  const body = await response.json()
+
+  assert.equal(body.status, 'complete')
+  assert.equal(body.committeeAxes[0].members[0].reason, 'RAW_REASON_VALUE_ANALYST_SENTINEL')
+  assert.equal(Object.hasOwn(body, ['three', 'Lens', 'Summary'].join('')), false)
+})
+
+
 test('parseCommitteeProgressBody sanitizes malformed upstream fields', () => {
   const parsed = parseCommitteeProgressBody(JSON.stringify({
     requestId: 'job-2',
@@ -57,6 +94,7 @@ test('parseCommitteeProgressBody sanitizes malformed upstream fields', () => {
     completed: undefined,
     updatedAt: undefined,
     softDeadlineMs: undefined,
+    committeeAxes: undefined,
   })
 })
 

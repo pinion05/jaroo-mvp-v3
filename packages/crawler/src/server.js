@@ -2953,6 +2953,8 @@ const endpointDefinitions = [
         return { ok: true, requestId, status: 'not_found', results: {}, errors: [], pending: [] };
       }
 
+      const committeeAxes = buildKrCommitteeAxesFromLlmResults(null, progress.results, progress.errors, progress.pending).axes;
+
       return {
         ok: true,
         requestId: progress.requestId,
@@ -2963,7 +2965,7 @@ const endpointDefinitions = [
         completed: progress.completed,
         updatedAt: progress.updatedAt,
         softDeadlineMs: progress.softDeadlineMs,
-        committeeAxes: buildKrCommitteeAxesFromLlmResults(null, progress.results, progress.errors, progress.pending).axes,
+        committeeAxes,
       };
     },
   },
