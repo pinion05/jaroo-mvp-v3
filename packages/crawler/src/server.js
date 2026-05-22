@@ -179,7 +179,7 @@ async function runDeepscanKrWithAdmission(input, load) {
     throw new HttpError(429, 'KR DeepScan crawler is busy', {
       status: 'busy',
       reason: deepscanKrJobs.size >= globalLimit ? 'global_limit' : 'per_code_limit',
-      retryAfterMs: parsePositiveInteger(process.env.DEEPSCAN_KR_BUSY_RETRY_AFTER_MS, 5000),
+      retryAfterMs: parsePositiveInteger(process.env.DEEPSCAN_KR_BUSY_RETRY_AFTER_MS, 2000),
     });
   }
 

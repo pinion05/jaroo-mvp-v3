@@ -9,7 +9,7 @@ import {
 import { buildKrCommitteeFromMemberScores } from './deepscan-kr-score.js';
 
 export const DEFAULT_KR_LLM_TIMEOUT_MS = 180_000;
-export const DEFAULT_KR_LLM_SOFT_DEADLINE_MS = 25_000;
+export const DEFAULT_KR_LLM_SOFT_DEADLINE_MS = 5_000;
 export const DEFAULT_KR_LLM_MODEL = DEFAULT_COMMITTEE_LLM_MODEL;
 
 export const KR_MEMBER_SPECS = Object.freeze({
