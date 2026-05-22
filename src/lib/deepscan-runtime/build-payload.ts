@@ -460,8 +460,8 @@ export class CrawlerDeepScanRequestError extends Error {
   }
 }
 
-const DEFAULT_KR_DEEPSCAN_BUSY_MAX_WAIT_MS = 120_000
-const DEFAULT_KR_DEEPSCAN_BUSY_RETRY_AFTER_MS = 5_000
+const DEFAULT_KR_DEEPSCAN_BUSY_MAX_WAIT_MS = 30_000
+const DEFAULT_KR_DEEPSCAN_BUSY_RETRY_AFTER_MS = 2_000
 
 function parsePositiveInteger(value: string | undefined, fallback: number) {
   const parsed = Number(value)

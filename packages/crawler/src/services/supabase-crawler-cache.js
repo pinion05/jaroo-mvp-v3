@@ -403,6 +403,10 @@ async function recordEventBestEffort(cacheClient, event) {
   }
 }
 
+function recordEventEventually(cacheClient, event) {
+  void recordEventBestEffort(cacheClient, event);
+}
+
 function buildEventBase(identity) {
   return {
     cacheKey: identity.cacheKey,
@@ -456,7 +460,7 @@ export async function readThroughCrawlerCache({
 
   try {
     if (forceRefresh) {
-      await recordEventBestEffort(cacheClient, {
+      recordEventEventually(cacheClient, {
         ...eventBase,
         eventType: 'refresh',
         latencyMs: Date.now() - startedAt,
@@ -465,7 +469,7 @@ export async function readThroughCrawlerCache({
     } else {
       cachedRow = await cacheClient.readPayload(identity.cacheKey);
       if (cachedRow && isCacheRowFresh(cachedRow, effectiveNow)) {
-        await recordEventBestEffort(cacheClient, {
+        recordEventEventually(cacheClient, {
           ...eventBase,
           payloadId: cachedRow.id,
           eventType: 'hit',
@@ -494,7 +498,7 @@ export async function readThroughCrawlerCache({
   }
 
   if (!forceRefresh) {
-    await recordEventBestEffort(cacheClient, {
+    recordEventEventually(cacheClient, {
       ...eventBase,
       payloadId: cachedRow?.id ?? null,
       eventType: 'miss',
@@ -523,7 +527,7 @@ export async function readThroughCrawlerCache({
       writeError = error;
     }
 
-    await recordEventBestEffort(cacheClient, {
+    recordEventEventually(cacheClient, {
       ...eventBase,
       payloadId,
       eventType: 'write',
@@ -549,7 +553,7 @@ export async function readThroughCrawlerCache({
       },
     };
   } catch (error) {
-    await recordEventBestEffort(cacheClient, {
+    recordEventEventually(cacheClient, {
       ...eventBase,
       payloadId: staleCandidate?.id ?? null,
       eventType: 'error',
@@ -584,7 +588,7 @@ export async function readThroughCrawlerCache({
         // Persisting the error snapshot is best-effort; stale fallback should still work.
       }
 
-      await recordEventBestEffort(cacheClient, {
+      recordEventEventually(cacheClient, {
         ...eventBase,
         payloadId: fallbackPayloadId,
         eventType: 'stale_hit',

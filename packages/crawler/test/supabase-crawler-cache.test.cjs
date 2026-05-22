@@ -84,6 +84,34 @@ test('readThroughCrawlerCache returns fresh Supabase hits before calling the cra
   assert.deepEqual(events.map((event) => event.eventType), ['hit']);
 });
 
+test('readThroughCrawlerCache does not wait for slow best-effort cache event logging', async () => {
+  const { readThroughCrawlerCache } = await import('../src/services/supabase-crawler-cache.js');
+  const startedAt = Date.now();
+  const cacheClient = {
+    readPayload: async () => createFreshRow({ from: 'supabase' }),
+    upsertPayload: async () => assert.fail('fresh hit must not write'),
+    recordEvent: async () => new Promise(() => {}),
+  };
+
+  const result = await readThroughCrawlerCache({
+    cacheClient,
+    descriptor: {
+      source: 'wisereport',
+      market: 'KR',
+      targetIdentifier: '005930',
+      route: 'wisereport-kr-v12-slim',
+      routeVersion: 'v12',
+      schemaVersion: 'test-v1',
+      request: { code: '005930' },
+    },
+    load: async () => assert.fail('fresh hit must not call loader'),
+    now: new Date('2026-05-07T00:00:00.000Z'),
+  });
+
+  assert.equal(result.cache.hit, true);
+  assert.ok(Date.now() - startedAt < 50);
+});
+
 test('readThroughCrawlerCache loads and upserts on miss or stale entry', async () => {
   const { readThroughCrawlerCache } = await import('../src/services/supabase-crawler-cache.js');
   const events = [];
