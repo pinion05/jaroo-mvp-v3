@@ -1962,6 +1962,27 @@
   font-size: 10px;
 }
 
+.narrativeTitleSkeleton,
+.narrativeDescriptionSkeleton,
+.narrativeTextSkeleton span {
+  display: block;
+  overflow: hidden;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #e7ebf0 0%, #f5f7fa 48%, #e7ebf0 100%);
+  background-size: 180% 100%;
+  animation: shimmer 1.15s ease-in-out infinite;
+}
+
+.narrativeTitleSkeleton {
+  width: 86px;
+  height: 13px;
+}
+
+.narrativeDescriptionSkeleton {
+  width: 142px;
+  height: 10px;
+}
+
 .narrativeStatus {
   align-self: flex-start;
   margin-top: 2px;
@@ -2010,6 +2031,31 @@
   line-height: 1.65;
   letter-spacing: -0.01em;
   white-space: pre-line;
+}
+
+.narrativeTextSkeleton {
+  display: block;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.narrativeTextSkeleton span {
+  position: relative;
+  height: 11px;
+}
+
+.narrativeTextSkeleton span:nth-child(1) {
+  width: calc(100% - 28px);
+}
+
+.narrativeTextSkeleton span:nth-child(1)::after {
+  content: '....';
+  position: absolute;
+  right: -26px;
+  top: -4px;
+  color: #9aa3af;
+  font-size: 13px;
+  letter-spacing: 0.02em;
 }
 
 .narrativeTextSummarized {

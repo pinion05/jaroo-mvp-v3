@@ -15,7 +15,6 @@ import {
   Loader2,
   Radar,
   Scale,
-  Sparkles,
   TrendingUp,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
@@ -40,6 +39,8 @@ type DeepScanLoadingScreenProps = {
   quickFacts?: LoadingQuickFact[]
   performanceComment?: LoadingPerformanceComment
   evidenceCollected?: boolean
+  visibleStageCount?: number
+  arrivedStageKeys?: LoadingStageKey[]
   resultsReady?: boolean
   className?: string
   onBack?: () => void
@@ -92,7 +93,9 @@ export type LoadingQuickFact = {
   }
 }
 
-type LoadingStageKey = 'fundamentalTeam' | 'marketTeam' | 'contextTeam'
+export type LoadingStageKey = 'fundamentalTeam' | 'marketTeam' | 'contextTeam'
+type PlaceholderStageKey = `pendingStage${number}`
+type NarrativeCardKey = LoadingStageKey | PlaceholderStageKey
 type NarrativeTone = 'positive' | 'warning' | 'neutral' | 'info'
 type CommitteeTeamMemberDefinition = {
   sourceTitle: string
@@ -100,15 +103,14 @@ type CommitteeTeamMemberDefinition = {
 }
 type CommitteeTeamDefinition = {
   key: LoadingStageKey
-  revealAt: number
   analystName: string
   description: string
   avatar: string
   members: CommitteeTeamMemberDefinition[]
 }
 type NarrativeCard = {
-  key: LoadingStageKey
-  revealAt: number
+  key: NarrativeCardKey
+  teamKey?: LoadingStageKey
   analystName: string
   description: string
   avatar: string
@@ -118,6 +120,7 @@ type NarrativeCard = {
   statusTone: NarrativeTone
   complete: boolean
   summarizable: boolean
+  placeholder: boolean
 }
 
 type TeamSummaryState = {
@@ -148,7 +151,6 @@ const committeeMembers: ReadonlyArray<{ key: string; Icon: CommitteeMemberIcon; 
 const committeeTeams: readonly CommitteeTeamDefinition[] = [
   {
     key: 'fundamentalTeam',
-    revealAt: 0,
     analystName: '가치/기본 팀',
     description: '가치 분석가 · 성장 전략가 · 재무 감사관',
     avatar: '🏛️',
@@ -160,7 +162,6 @@ const committeeTeams: readonly CommitteeTeamDefinition[] = [
   },
   {
     key: 'marketTeam',
-    revealAt: 4,
     analystName: '시장/차트 팀',
     description: '차트 마스터 · 수급 추적기 · 모멘텀 스카우터',
     avatar: '📈',
@@ -172,7 +173,6 @@ const committeeTeams: readonly CommitteeTeamDefinition[] = [
   },
   {
     key: 'contextTeam',
-    revealAt: 8,
     analystName: '심리/환경 팀',
     description: '심리 분석AI · 산업 전문가 · 이벤트 스캐너',
     avatar: '🧠',
@@ -508,7 +508,7 @@ function buildLoadingStages({
 
     return {
       key: team.key,
-      revealAt: team.revealAt,
+      teamKey: team.key,
       analystName: team.analystName,
       description: team.description,
       avatar: team.avatar,
@@ -517,17 +517,45 @@ function buildLoadingStages({
       statusLabel: teamBody.readyCount === team.members.length ? '위원 응답 완료' : teamBody.errorCount > 0 ? '일부 응답 실패' : `${teamBody.readyCount}/${team.members.length} 응답`,
       statusTone: teamBody.errorCount > 0 ? 'warning' : teamBody.readyCount > 0 ? 'positive' : 'neutral',
       complete: teamBody.readyCount + teamBody.errorCount === team.members.length,
-      summarizable: teamBody.readyCount === team.members.length,
+      summarizable: teamBody.readyCount > 0 && teamBody.readyCount + teamBody.errorCount === team.members.length,
+      placeholder: false,
     }
   })
 }
 
-function buildVisibleNarrativeCards(cards: NarrativeCard[], elapsedSeconds: number, resultsReady: boolean): NarrativeCard[] {
-  if (resultsReady) {
-    return cards
+function buildPlaceholderNarrativeCard(index: number): NarrativeCard {
+  return {
+    key: `pendingStage${index + 1}`,
+    analystName: '',
+    description: '',
+    avatar: '',
+    body: '',
+    tags: [],
+    statusLabel: '응답 대기',
+    statusTone: 'neutral',
+    complete: false,
+    summarizable: false,
+    placeholder: true,
   }
+}
 
-  return cards.filter((card) => elapsedSeconds >= card.revealAt)
+function buildOrderedNarrativeCards(cards: NarrativeCard[], arrivedStageKeys: LoadingStageKey[]): NarrativeCard[] {
+  const cardsByKey = new Map<LoadingStageKey, NarrativeCard>(
+    cards.flatMap((card) => (card.teamKey ? [[card.teamKey, card] as const] : [])),
+  )
+  const arrivedCards = arrivedStageKeys
+    .map((stageKey) => cardsByKey.get(stageKey))
+    .filter((card): card is NarrativeCard => typeof card !== 'undefined')
+  const remainingSlotCount = Math.max(0, cards.length - arrivedCards.length)
+
+  return [
+    ...arrivedCards,
+    ...Array.from({ length: remainingSlotCount }, (_, index) => buildPlaceholderNarrativeCard(arrivedCards.length + index)),
+  ]
+}
+
+function buildVisibleNarrativeCards(cards: NarrativeCard[], visibleStageCount: number): NarrativeCard[] {
+  return cards.slice(0, Math.min(Math.max(visibleStageCount, 1), cards.length))
 }
 
 export function DeepScanLoadingScreen({
@@ -547,6 +575,8 @@ export function DeepScanLoadingScreen({
   quickFacts = [],
   performanceComment,
   evidenceCollected = false,
+  visibleStageCount = 1,
+  arrivedStageKeys = [],
   resultsReady = false,
   className,
   onBack,
@@ -579,14 +609,22 @@ export function DeepScanLoadingScreen({
     }),
     [committeeAxes, currentPriceText, displayQuickFacts, findingProgress, performanceComment, tradingVolumeText],
   )
+  const orderedNarrativeCards = useMemo(
+    () => buildOrderedNarrativeCards(loadingStages, arrivedStageKeys),
+    [arrivedStageKeys, loadingStages],
+  )
   const visibleNarrativeCards = useMemo(
-    () => buildVisibleNarrativeCards(loadingStages, elapsedSeconds, resultsReady),
-    [elapsedSeconds, loadingStages, resultsReady],
+    () => buildVisibleNarrativeCards(orderedNarrativeCards, visibleStageCount),
+    [orderedNarrativeCards, visibleStageCount],
   )
   const completionState = buildCompletionState(resultsReady, elapsedSeconds)
   const progressPct = resultsReady ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
-  const activeNarrativeCard = visibleNarrativeCards.at(-1) ?? loadingStages[0]
-  const progressLabel = resultsReady ? '상세 결과 준비 완료' : `${activeNarrativeCard.analystName}가 살펴보는 중…`
+  const activeNarrativeCard = visibleNarrativeCards.findLast((card) => !card.placeholder) ?? visibleNarrativeCards.at(-1) ?? orderedNarrativeCards[0]
+  const progressLabel = resultsReady
+    ? '상세 결과 준비 완료'
+    : activeNarrativeCard.placeholder
+      ? '분석가 응답을 기다리는 중…'
+      : `${activeNarrativeCard.analystName}가 살펴보는 중…`
 
   useEffect(() => {
     if (resultsReady) {
@@ -604,12 +642,13 @@ export function DeepScanLoadingScreen({
 
   useEffect(() => {
     loadingStages.forEach((card) => {
-      if (!card.summarizable || !card.body.trim()) {
+      const teamKey = card.teamKey
+      if (!teamKey || !card.summarizable || !card.body.trim()) {
         return
       }
 
       const inputKey = hashSummaryInput(card.body)
-      const requestKey = `${card.key}:${inputKey}`
+      const requestKey = `${teamKey}:${inputKey}`
       if (requestedTeamSummariesRef.current.has(requestKey)) {
         return
       }
@@ -617,7 +656,7 @@ export function DeepScanLoadingScreen({
       requestedTeamSummariesRef.current.add(requestKey)
       setTeamSummaries((previous) => ({
         ...previous,
-        [card.key]: { inputKey, status: 'loading' },
+        [teamKey]: { inputKey, status: 'loading' },
       }))
 
       fetch('/api/deepscan/team-summary', {
@@ -638,13 +677,13 @@ export function DeepScanLoadingScreen({
 
           setTeamSummaries((previous) => ({
             ...previous,
-            [card.key]: { inputKey, status: 'success', summary },
+            [teamKey]: { inputKey, status: 'success', summary },
           }))
         })
         .catch(() => {
           setTeamSummaries((previous) => ({
             ...previous,
-            [card.key]: { inputKey, status: 'error' },
+            [teamKey]: { inputKey, status: 'error' },
           }))
         })
     })
@@ -700,7 +739,7 @@ export function DeepScanLoadingScreen({
         <section className={styles.narrativeStream} aria-label='분석가 진행 메시지'>
           {visibleNarrativeCards.map((card) => {
             const summaryInputKey = hashSummaryInput(card.body)
-            const summaryState = teamSummaries[card.key]
+            const summaryState = card.teamKey ? teamSummaries[card.teamKey] : undefined
             const summaryReady = summaryState?.inputKey === summaryInputKey && summaryState.status === 'success' && summaryState.summary
             const summaryLoading = summaryState?.inputKey === summaryInputKey && summaryState.status === 'loading'
             const displayBody = summaryReady ? summaryState.summary! : card.body
@@ -717,16 +756,22 @@ export function DeepScanLoadingScreen({
             return (
               <article key={card.key} className={cn(styles.narrativeCard, cardSettled ? styles.narrativeCardComplete : styles.narrativeCardPending)}>
                 <div className={styles.narrativeHead}>
-                  <span className={cn(styles.narrativeAvatar, cardSettled ? undefined : styles.narrativeAvatarPending)} aria-hidden='true'>{cardSettled ? card.avatar : <Loader2 className={styles.narrativeSpinner} aria-hidden />}</span>
+                  <span className={cn(styles.narrativeAvatar, cardSettled && !card.placeholder ? undefined : styles.narrativeAvatarPending)} aria-hidden='true'>{cardSettled && !card.placeholder ? card.avatar : <Loader2 className={styles.narrativeSpinner} aria-hidden />}</span>
                   <div className={styles.narrativeNameWrap}>
-                    <strong>{card.analystName}</strong>
-                    <span>{card.description}</span>
+                    <strong>{card.placeholder ? <span className={styles.narrativeTitleSkeleton} aria-hidden='true' /> : card.analystName}</strong>
+                    <span>{card.placeholder ? <span className={styles.narrativeDescriptionSkeleton} aria-hidden='true' /> : card.description}</span>
                   </div>
                   <span className={cn(styles.narrativeStatus, narrativeToneClass(statusTone))}>{statusLabel}</span>
                 </div>
                 <div className={styles.narrativeBubble}>
-                  <p className={cn(styles.narrativeText, summaryReady ? styles.narrativeTextSummarized : undefined)}>{displayBody}</p>
-                  {card.key === 'marketTeam' && positionQuickFact?.indicator ? (
+                  {card.placeholder ? (
+                    <div className={styles.narrativeTextSkeleton} aria-hidden='true'>
+                      <span />
+                    </div>
+                  ) : (
+                    <p className={cn(styles.narrativeText, summaryReady ? styles.narrativeTextSummarized : undefined)}>{displayBody}</p>
+                  )}
+                  {card.teamKey === 'marketTeam' && positionQuickFact?.indicator ? (
                     <div
                       className={styles.narrativePricebar}
                       aria-label={`시장/차트 팀 가격 위치: ${positionQuickFact.indicator.leftLabel}부터 ${positionQuickFact.indicator.rightLabel} 사이 ${positionQuickFact.indicator.markerLabel ?? '현재 위치'}`}

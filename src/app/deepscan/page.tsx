@@ -3,7 +3,7 @@
 import type { JarooDeepScanCommitteeAxis, JarooDeepScanInsightItem, JarooDeepScanPayload } from '../../../packages/contracts/src/deepscan'
 
 import Link from 'next/link'
-import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import {
   Activity,
   BadgeCheck,
@@ -25,7 +25,7 @@ import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DeepScanInlineResults } from '@/components/deepscan-inline-results'
-import { DeepScanLoadingScreen, type FindingProgress, type LoadingPerformanceComment, type LoadingQuickFact } from '@/components/deepscan-loading-screen'
+import { DeepScanLoadingScreen, type FindingProgress, type LoadingPerformanceComment, type LoadingQuickFact, type LoadingStageKey } from '@/components/deepscan-loading-screen'
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import {
@@ -42,6 +42,87 @@ import { cn } from '@/lib/utils'
 type TabValue = 'analysis' | 'strategy'
 type SectionKey = 'why' | 'news' | 'scenarioDetail' | 'otherScenarios' | 'sellNow' | 'pfSim'
 type HomeMarketTone = DeepScanCanonicalTargetSession['holding']['marketTone']
+type DeepScanLoadingSequenceState = {
+  targetKey: string | null
+  firstSuccessObserved: boolean
+  visibleStageCount: number
+  sequenceComplete: boolean
+}
+type DeepScanLoadingStageArrivalState = {
+  targetKey: string | null
+  stageKeys: LoadingStageKey[]
+}
+
+const DEEPSCAN_STAGE_WAIT_MS = 10_000
+const DEEPSCAN_STAGE_FILL_DELAY_MS = 3_000
+const DEEPSCAN_MEMBER_STAGE_BY_KEY: Record<string, LoadingStageKey> = {
+  profitability: 'fundamentalTeam',
+  valuation: 'fundamentalTeam',
+  ownershipStability: 'fundamentalTeam',
+  trend: 'marketTeam',
+  consensusMomentum: 'marketTeam',
+  priceLocation: 'marketTeam',
+  avgPriceGap: 'contextTeam',
+  upsideBuffer: 'contextTeam',
+  holdingCompleteness: 'contextTeam',
+}
+const DEEPSCAN_MEMBER_STAGE_BY_TITLE: Record<string, LoadingStageKey> = {
+  '수익성/기본체력': 'fundamentalTeam',
+  밸류에이션: 'fundamentalTeam',
+  '지분/안정성': 'fundamentalTeam',
+  트렌드: 'marketTeam',
+  '컨센서스 모멘텀': 'marketTeam',
+  '가격 위치': 'marketTeam',
+  '평단 격차': 'contextTeam',
+  '상방 버퍼': 'contextTeam',
+  '입력 완성도': 'contextTeam',
+}
+
+function createDeepScanLoadingSequence(targetKey: string | null): DeepScanLoadingSequenceState {
+  return {
+    targetKey,
+    firstSuccessObserved: false,
+    visibleStageCount: 1,
+    sequenceComplete: false,
+  }
+}
+
+function createDeepScanLoadingStageArrival(targetKey: string | null): DeepScanLoadingStageArrivalState {
+  return {
+    targetKey,
+    stageKeys: [],
+  }
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function uniqueLoadingStageKeys(stageKeys: LoadingStageKey[]): LoadingStageKey[] {
+  return stageKeys.filter((stageKey, index, values) => values.indexOf(stageKey) === index)
+}
+
+function extractLoadingStageKeysFromCommitteeResults(results: unknown): LoadingStageKey[] {
+  if (!isRecord(results)) {
+    return []
+  }
+
+  return uniqueLoadingStageKeys(
+    Object.keys(results)
+      .map((memberKey) => DEEPSCAN_MEMBER_STAGE_BY_KEY[memberKey])
+      .filter((stageKey): stageKey is LoadingStageKey => Boolean(stageKey)),
+  )
+}
+
+function extractLoadingStageKeysFromCommitteeAxes(committeeAxes: JarooDeepScanCommitteeAxis[] | undefined): LoadingStageKey[] {
+  return uniqueLoadingStageKeys(
+    (committeeAxes ?? [])
+      .flatMap((axis) => axis.members)
+      .filter((member) => member.status === 'success' || member.status === 'error')
+      .map((member) => DEEPSCAN_MEMBER_STAGE_BY_TITLE[member.title])
+      .filter((stageKey): stageKey is LoadingStageKey => Boolean(stageKey)),
+  )
+}
 
 const axisToneStyles = {
   positive: {
@@ -619,6 +700,7 @@ type DeepScanCommitteeStatusResponse = {
   requestId?: string
   status?: 'partial' | 'complete' | 'error' | 'not_found'
   completed?: number
+  results?: Record<string, unknown>
   pending?: string[]
   errors?: unknown[]
   softDeadlineMs?: number
@@ -1031,8 +1113,12 @@ export default function DeepScanPage() {
   const finishError = useDeepScanStore((state) => state.finishError)
   const abandonInFlight = useDeepScanStore((state) => state.abandonInFlight)
   const [loadingQuickQuote, setLoadingQuickQuote] = useState<LoadingQuickQuote | null>(null)
+  const [loadingSequence, setLoadingSequence] = useState<DeepScanLoadingSequenceState>(() => createDeepScanLoadingSequence(null))
+  const [arrivedLoadingStages, setArrivedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
+  const [displayedLoadingStages, setDisplayedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
 
   const targetKey = useMemo(() => (target ? getDeepScanTargetKey(target) : null), [target])
+  const targetKeyRef = useRef(targetKey)
   const requestSeed = useMemo<DeepScanCanonicalTargetSession | null>(
     () =>
       target
@@ -1062,6 +1148,143 @@ export default function DeepScanPage() {
     activeTargetKey,
     lastSuccessful,
   })
+  useEffect(() => {
+    targetKeyRef.current = targetKey
+  }, [targetKey])
+  const markDeepScanLoadingSuccess = useCallback((successTargetKey: string | null) => {
+    if (!successTargetKey) {
+      return
+    }
+
+    setLoadingSequence((previous) => {
+      if (previous.targetKey !== successTargetKey) {
+        return {
+          ...createDeepScanLoadingSequence(successTargetKey),
+          firstSuccessObserved: true,
+        }
+      }
+
+      if (previous.firstSuccessObserved) {
+        return previous
+      }
+
+      return {
+        ...previous,
+        firstSuccessObserved: true,
+      }
+    })
+  }, [])
+  const appendArrivedLoadingStageKeys = useCallback((successTargetKey: string | null, stageKeys: LoadingStageKey[]) => {
+    if (!successTargetKey || stageKeys.length === 0) {
+      return
+    }
+
+    setArrivedLoadingStages((previous) => {
+      const previousKeys = previous.targetKey === successTargetKey ? previous.stageKeys : []
+      const nextStageKeys = uniqueLoadingStageKeys([...previousKeys, ...stageKeys])
+      if (previous.targetKey === successTargetKey && nextStageKeys.length === previous.stageKeys.length) {
+        return previous
+      }
+
+      return {
+        targetKey: successTargetKey,
+        stageKeys: nextStageKeys,
+      }
+    })
+  }, [])
+
+  useEffect(() => {
+    if (!loadingSequence.targetKey || !loadingSequence.firstSuccessObserved || loadingSequence.sequenceComplete) {
+      return undefined
+    }
+
+    const sequenceTargetKey = loadingSequence.targetKey
+    if (loadingSequence.visibleStageCount === 1) {
+      const timeoutId = window.setTimeout(() => {
+        setLoadingSequence((previous) => (
+          previous.targetKey === sequenceTargetKey && previous.visibleStageCount === 1
+            ? { ...previous, visibleStageCount: 2 }
+            : previous
+        ))
+      }, DEEPSCAN_STAGE_WAIT_MS)
+
+      return () => {
+        window.clearTimeout(timeoutId)
+      }
+    }
+
+    if (loadingSequence.visibleStageCount === 2) {
+      const timeoutId = window.setTimeout(() => {
+        setLoadingSequence((previous) => (
+          previous.targetKey === sequenceTargetKey && previous.visibleStageCount === 2
+            ? { ...previous, visibleStageCount: 3 }
+            : previous
+        ))
+      }, DEEPSCAN_STAGE_WAIT_MS)
+
+      return () => {
+        window.clearTimeout(timeoutId)
+      }
+    }
+
+    if (loadingSequence.visibleStageCount === 3) {
+      const timeoutId = window.setTimeout(() => {
+        setLoadingSequence((previous) => (
+          previous.targetKey === sequenceTargetKey && previous.visibleStageCount === 3
+            ? { ...previous, sequenceComplete: true }
+            : previous
+        ))
+      }, DEEPSCAN_STAGE_WAIT_MS)
+
+      return () => {
+        window.clearTimeout(timeoutId)
+      }
+    }
+
+    return undefined
+  }, [loadingSequence.firstSuccessObserved, loadingSequence.sequenceComplete, loadingSequence.targetKey, loadingSequence.visibleStageCount])
+
+  useEffect(() => {
+    if (!targetKey || arrivedLoadingStages.targetKey !== targetKey) {
+      return undefined
+    }
+
+    const displayedStageKeys = displayedLoadingStages.targetKey === targetKey ? displayedLoadingStages.stageKeys : []
+    if (
+      displayedStageKeys.length >= arrivedLoadingStages.stageKeys.length
+      || displayedStageKeys.length >= loadingSequence.visibleStageCount
+    ) {
+      return undefined
+    }
+
+    const nextStageKey = arrivedLoadingStages.stageKeys[displayedStageKeys.length]
+    if (!nextStageKey) {
+      return undefined
+    }
+
+    const releaseTargetKey = targetKey
+    const timeoutId = window.setTimeout(() => {
+      if (targetKeyRef.current !== releaseTargetKey) {
+        return
+      }
+
+      setDisplayedLoadingStages((previous) => {
+        const previousKeys = previous.targetKey === releaseTargetKey ? previous.stageKeys : []
+        if (previousKeys.includes(nextStageKey)) {
+          return previous
+        }
+
+        return {
+          targetKey: releaseTargetKey,
+          stageKeys: uniqueLoadingStageKeys([...previousKeys, nextStageKey]),
+        }
+      })
+    }, DEEPSCAN_STAGE_FILL_DELAY_MS)
+
+    return () => {
+      window.clearTimeout(timeoutId)
+    }
+  }, [arrivedLoadingStages.stageKeys, arrivedLoadingStages.targetKey, displayedLoadingStages.stageKeys, displayedLoadingStages.targetKey, loadingSequence.visibleStageCount, targetKey])
 
   useEffect(() => {
     if (!shouldStartRequest) {
@@ -1125,13 +1348,14 @@ export default function DeepScanPage() {
     return () => {
       controller.abort()
     }
-  }, [target, targetKey])
+  }, [markDeepScanLoadingSuccess, target, targetKey])
 
   useEffect(() => {
-    if (!requestSeed || requestStatus !== 'loading') {
+    if (!requestSeed || !targetKey || requestStatus !== 'loading') {
       return
     }
 
+    const requestedTargetKey = targetKey
     const controller = new AbortController()
     let settled = false
 
@@ -1153,6 +1377,10 @@ export default function DeepScanPage() {
           return
         }
 
+        markDeepScanLoadingSuccess(requestedTargetKey)
+        if (!nextPayload.metadata.llmCommittee?.requestId) {
+          appendArrivedLoadingStageKeys(requestedTargetKey, extractLoadingStageKeysFromCommitteeAxes(nextPayload.committee.axes))
+        }
         finishSuccess(nextPayload)
       } catch (error) {
         if (controller.signal.aborted) {
@@ -1173,14 +1401,17 @@ export default function DeepScanPage() {
         abandonInFlight()
       }
     }
-  }, [abandonInFlight, finishError, finishSuccess, requestSeed, requestStatus])
+  }, [abandonInFlight, appendArrivedLoadingStageKeys, finishError, finishSuccess, markDeepScanLoadingSuccess, requestSeed, requestStatus, targetKey])
 
   useEffect(() => {
     const llmCommittee = payload?.metadata.llmCommittee
-    if (fetchState !== 'success' || !payload || llmCommittee?.status !== 'partial' || !llmCommittee.requestId) {
+    const needsPartialPolling = llmCommittee?.status === 'partial'
+    const needsCompleteArrivalLookup = llmCommittee?.status === 'complete' && arrivedLoadingStages.targetKey !== targetKey
+    if (fetchState !== 'success' || !payload || !targetKey || !llmCommittee?.requestId || (!needsPartialPolling && !needsCompleteArrivalLookup)) {
       return
     }
 
+    const requestedTargetKey = targetKey
     let stopped = false
     let timeoutId: ReturnType<typeof setTimeout> | null = null
 
@@ -1191,6 +1422,16 @@ export default function DeepScanPage() {
 
         if (stopped || !body.ok || body.requestId !== llmCommittee.requestId) {
           return
+        }
+
+        if (body.status === 'partial' || body.status === 'complete') {
+          markDeepScanLoadingSuccess(requestedTargetKey)
+          appendArrivedLoadingStageKeys(
+            requestedTargetKey,
+            extractLoadingStageKeysFromCommitteeResults(body.results).length > 0
+              ? extractLoadingStageKeysFromCommitteeResults(body.results)
+              : extractLoadingStageKeysFromCommitteeAxes(body.committeeAxes),
+          )
         }
 
         updateActivePayload((currentPayload: JarooDeepScanPayload) => {
@@ -1251,7 +1492,7 @@ export default function DeepScanPage() {
         clearTimeout(timeoutId)
       }
     }
-  }, [fetchState, payload, updateActivePayload])
+  }, [appendArrivedLoadingStageKeys, arrivedLoadingStages.targetKey, fetchState, markDeepScanLoadingSuccess, payload, targetKey, updateActivePayload])
 
   const scrollContentToTop = () => {
     const container = document.querySelector<HTMLElement>("[data-slot='jaroo-shell-main']")
@@ -1259,9 +1500,12 @@ export default function DeepScanPage() {
   }
 
   const handleRetry = useCallback(() => {
+    setLoadingSequence(createDeepScanLoadingSequence(targetKey))
+    setArrivedLoadingStages(createDeepScanLoadingStageArrival(targetKey))
+    setDisplayedLoadingStages(createDeepScanLoadingStageArrival(targetKey))
     startRequest()
     scrollContentToTop()
-  }, [startRequest])
+  }, [startRequest, targetKey])
 
 
   const missingTargetTitle = '분석할 종목이 없습니다'
@@ -1359,7 +1603,12 @@ export default function DeepScanPage() {
   const partialSuccessNotice = buildDeepScanPartialSuccessNotice(payload)
   const weekTone = resolveWeekToneClasses(payload?.strategy.weekSignalTone ?? 'neutral')
   const isCommitteeHydrating = fetchState === 'success' && payload?.metadata.llmCommittee?.status === 'partial'
-  const resultsReady = fetchState === 'success' && Boolean(payload) && !isCommitteeHydrating
+  const rawResultsReady = fetchState === 'success' && Boolean(payload) && !isCommitteeHydrating
+  const loadingSequenceComplete = loadingSequence.targetKey === targetKey && loadingSequence.sequenceComplete
+  const canReuseReadyPayloadWithoutSequence = rawResultsReady && loadingSequence.targetKey !== targetKey
+  const resultsReady = rawResultsReady && (loadingSequenceComplete || canReuseReadyPayloadWithoutSequence)
+  const visibleStageCount = loadingSequence.targetKey === targetKey ? loadingSequence.visibleStageCount : 1
+  const arrivedStageKeys = displayedLoadingStages.targetKey === targetKey ? displayedLoadingStages.stageKeys : []
   const loadingFindingProgress = buildLoadingFindingProgress(payload)
   const loadingPerformanceComment = buildLoadingPerformanceComment(payload)
   const activeLoadingQuickQuote = loadingQuickQuote?.targetKey === targetKey ? loadingQuickQuote : null
@@ -1384,7 +1633,7 @@ export default function DeepScanPage() {
     body: errorMessage ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
   }
 
-  if (fetchState === 'loading' || isCommitteeHydrating || resultsReady) {
+  if (fetchState === 'loading' || isCommitteeHydrating || rawResultsReady) {
     const identifier = [requestSeed.holding.ticker, requestSeed.holding.code]
       .filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index)
       .join(' · ')
@@ -1409,6 +1658,8 @@ export default function DeepScanPage() {
           quickFacts={loadingQuickFacts}
           performanceComment={loadingPerformanceComment}
           evidenceCollected={evidenceCollected}
+          visibleStageCount={visibleStageCount}
+          arrivedStageKeys={arrivedStageKeys}
           resultsReady={resultsReady}
           inlineResults={resultsReady && payload ? <DeepScanInlineResults payload={payload} requestSeed={requestSeed} target={target} /> : null}
           backHref='/home'
