@@ -742,14 +742,15 @@ export function DeepScanLoadingScreen({
             const summaryState = card.teamKey ? teamSummaries[card.teamKey] : undefined
             const summaryReady = summaryState?.inputKey === summaryInputKey && summaryState.status === 'success' && summaryState.summary
             const summaryLoading = summaryState?.inputKey === summaryInputKey && summaryState.status === 'loading'
-            const displayBody = summaryReady ? summaryState.summary! : card.body
+            const summaryText = summaryReady ? summaryState.summary! : null
+            const showSummarySkeleton = !card.placeholder && !summaryText
             const cardSettled = resultsReady || card.complete
             const statusLabel = summaryReady ? '팀 요약 완료' : summaryLoading ? '팀 요약 중' : cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
             const statusTone = summaryReady ? 'positive' : summaryLoading ? 'info' : cardSettled && !card.complete ? 'info' : card.statusTone
             const tags = [
               ...card.tags,
               card.summarizable
-                ? { text: summaryReady ? '한줄 요약 완료' : summaryLoading ? '한줄 요약 중' : '원문 표시', tone: summaryReady ? 'positive' as const : summaryLoading ? 'info' as const : 'neutral' as const }
+                ? { text: summaryReady ? '한줄 요약 완료' : '한줄 요약 중', tone: summaryReady ? 'positive' as const : 'info' as const }
                 : null,
             ].filter((tag): tag is { text: string; tone: NarrativeTone } => Boolean(tag))
 
@@ -764,12 +765,12 @@ export function DeepScanLoadingScreen({
                   <span className={cn(styles.narrativeStatus, narrativeToneClass(statusTone))}>{statusLabel}</span>
                 </div>
                 <div className={styles.narrativeBubble}>
-                  {card.placeholder ? (
+                  {card.placeholder || showSummarySkeleton ? (
                     <div className={styles.narrativeTextSkeleton} aria-hidden='true'>
                       <span />
                     </div>
                   ) : (
-                    <p className={cn(styles.narrativeText, summaryReady ? styles.narrativeTextSummarized : undefined)}>{displayBody}</p>
+                    <p className={cn(styles.narrativeText, styles.narrativeTextSummarized)}>{summaryText}</p>
                   )}
                   {card.teamKey === 'marketTeam' && positionQuickFact?.indicator ? (
                     <div

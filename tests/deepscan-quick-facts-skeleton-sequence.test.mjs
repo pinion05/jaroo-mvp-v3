@@ -123,7 +123,7 @@ test('/deepscan renders inline results without confirmed-result CTA gate', () =>
   assert.doesNotMatch(source, /resultsReady && !/)
 })
 
-test('DeepScan team bubbles preserve raw member reasons with explicit team-summary fallback', () => {
+test('DeepScan team bubbles send raw member reasons for summaries but hide raw gray copy in the UI', () => {
   const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
   const pageSource = readRepoFile('src', 'app', 'deepscan', 'page.tsx')
   const routeSource = readRepoFile('src', 'app', 'api', 'deepscan', 'committee-status', 'route.ts')
@@ -132,7 +132,12 @@ test('DeepScan team bubbles preserve raw member reasons with explicit team-summa
   assert.match(loadingSource, /member\.reason/)
   assert.match(loadingSource, /`\$\{definition\.alias\}: \$\{member\.reason\}`/)
   assert.match(loadingSource, /`\$\{definition\.alias\}: 응답 대기 중`/)
-  assert.match(loadingSource, /const displayBody = summaryReady \? summaryState\.summary! : card\.body/)
+  assert.match(loadingSource, /const summaryText = summaryReady \? summaryState\.summary! : null/)
+  assert.match(loadingSource, /const showSummarySkeleton = !card\.placeholder && !summaryText/)
+  assert.match(loadingSource, /card\.placeholder \|\| showSummarySkeleton/)
+  assert.doesNotMatch(loadingSource, /const displayBody = summaryReady \? summaryState\.summary! : card\.body/)
+  assert.doesNotMatch(loadingSource, /\{displayBody\}/)
+  assert.doesNotMatch(loadingSource, /원문 표시/)
   assert.match(loadingSource, /<p className=\{cn\(styles\.narrativeText/)
   assert.match(loadingSource, /white-space: pre-line|styles\.narrativeText/)
   assert.doesNotMatch(loadingSource, literalPattern(obsoleteUnavailableBody))
