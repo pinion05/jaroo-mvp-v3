@@ -2138,3 +2138,336 @@
 .inlineResultsSlot {
   margin-top: 14px;
 }
+
+/* v7 quote briefing insert: price snapshot + chart + six market readouts */
+.todayBriefingCard {
+  overflow: hidden;
+  margin-bottom: 14px;
+  border: 0.5px solid var(--ds-line);
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 4px 20px rgba(15, 20, 25, 0.035);
+}
+
+.todayBriefingHead {
+  padding: 13px 16px 12px;
+  border-bottom: 0.5px solid #eff1f4;
+}
+
+.todayLiveLabel {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-bottom: 9px;
+  color: var(--ds-green);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.todayLiveDot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--ds-green);
+  animation: pulse 1.6s ease-in-out infinite;
+}
+
+.todayPriceRow {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.todayPrice {
+  color: var(--ds-ink);
+  font-size: 24px;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: -0.03em;
+  font-variant-numeric: tabular-nums;
+}
+
+.todayPriceSub {
+  margin-top: 4px;
+  color: var(--ds-muted);
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.todayProfitBox {
+  flex: 0 0 auto;
+  text-align: right;
+}
+
+.todayProfitRate {
+  color: var(--ds-red);
+  font-size: 17px;
+  font-weight: 800;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+
+.todayProfitAmount {
+  margin-top: 4px;
+  color: var(--ds-red);
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.todayChartWrap {
+  padding: 14px 16px 12px;
+  border-bottom: 0.5px solid #eff1f4;
+}
+
+.todayChartLabel {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 10px;
+  color: var(--ds-muted);
+  font-size: 10px;
+  font-weight: 650;
+}
+
+.todayChartLabel span:last-child {
+  padding: 2px 7px;
+  border-radius: 5px;
+  background: #f5f6f8;
+  font-size: 9.5px;
+}
+
+.todayChartSvg {
+  display: block;
+  width: 100%;
+  height: 120px;
+  overflow: visible;
+}
+
+.todayChartArea {
+  fill: rgba(229, 72, 77, 0.08);
+}
+
+.todayChartLine {
+  fill: none;
+  stroke: var(--ds-red);
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+  stroke-dasharray: 420;
+  stroke-dashoffset: 420;
+  animation: today-chart-draw 1.6s 0.1s ease-out forwards;
+}
+
+.todayAvgLine {
+  stroke: var(--ds-muted);
+  stroke-dasharray: 3 3;
+  stroke-width: 1;
+}
+
+.todayAvgText {
+  fill: var(--ds-mid);
+  font-size: 8.5px;
+  font-weight: 750;
+}
+
+.todayChartDot {
+  fill: var(--ds-red);
+}
+
+.todayChartRing {
+  fill: none;
+  stroke: var(--ds-red);
+  stroke-width: 1.5;
+  opacity: 0.35;
+  animation: today-ring-pulse 1.8s ease-in-out infinite;
+}
+
+.todayBriefList {
+  padding: 6px 16px 14px;
+}
+
+.todayBriefItem {
+  padding: 13px 0;
+  border-top: 0.5px solid #eff1f4;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    max-height 0.56s cubic-bezier(0.16, 1, 0.3, 1),
+    padding 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.todayBriefItem:first-child {
+  border-top: 0;
+}
+
+.todayBriefItemIn {
+  max-height: 190px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.todayBriefQuestionRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.todayBriefIcon {
+  width: 30px;
+  height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: 0 0 auto;
+  border-radius: 8px;
+  background: #f5f6f8;
+  font-size: 14px;
+}
+
+.todayBriefQuestion {
+  color: var(--ds-mid);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.todayBriefBody {
+  margin-top: 9px;
+  margin-left: 40px;
+  max-height: 0;
+  overflow: hidden;
+  opacity: 0;
+  transform: translateY(4px);
+  transition:
+    opacity 0.34s ease,
+    transform 0.34s ease,
+    max-height 0.42s ease;
+}
+
+.todayBriefBodyIn {
+  max-height: 130px;
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.todayBriefData {
+  color: var(--ds-ink);
+  font-size: 14px;
+  font-weight: 800;
+  line-height: 1.35;
+  font-variant-numeric: tabular-nums;
+}
+
+.todayBriefMeaning {
+  margin: 6px 0 0;
+  color: var(--ds-mid);
+  font-size: 11.5px;
+  line-height: 1.45;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: opacity 0.34s ease, transform 0.34s ease;
+}
+
+.todayBriefMeaningIn {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.todayBriefMeaning b {
+  color: var(--ds-ink);
+  font-weight: 750;
+}
+
+.todayMarketGrid {
+  display: flex;
+  gap: 7px;
+  margin-top: 2px;
+}
+
+.todayMarketCell {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 4px;
+  border-radius: 7px;
+  background: #f5f6f8;
+  text-align: center;
+}
+
+.todayMarketCellMe {
+  background: var(--ds-blue-soft);
+}
+
+.todayMarketCell span {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--ds-muted);
+  font-size: 8.5px;
+  font-weight: 700;
+}
+
+.todayMarketCellMe span {
+  color: var(--ds-blue);
+}
+
+.todayMarketCell b {
+  display: block;
+  font-size: 12px;
+  font-weight: 850;
+  font-variant-numeric: tabular-nums;
+}
+
+.todayUp {
+  color: var(--ds-green);
+}
+
+.todayDown {
+  color: var(--ds-red);
+}
+
+.todayBlue {
+  color: var(--ds-blue);
+}
+
+@keyframes today-chart-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes today-ring-pulse {
+  0%, 100% {
+    r: 5;
+    opacity: 0.42;
+  }
+
+  50% {
+    r: 9;
+    opacity: 0.08;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .todayLiveDot,
+  .todayChartLine,
+  .todayChartRing,
+  .todayBriefItem {
+    animation: none;
+    transition: none;
+  }
+
+  .todayChartLine {
+    stroke-dashoffset: 0;
+  }
+
+  .todayBriefItem,
+  .todayBriefBody,
+  .todayBriefMeaning {
+    transform: none;
+  }
+}
