@@ -863,7 +863,7 @@ function TodayBriefingCard({
         {chart.hasData ? (
           <svg className={styles.todayChartSvg} viewBox='0 0 300 120' aria-label='최근 3개월 일봉 차트'>
             <path className={styles.todayChartArea} d={chart.areaPath} />
-            <path className={styles.todayChartLine} d={chart.linePath} />
+            <path className={styles.todayChartLine} d={chart.linePath} pathLength={1} />
             <line className={styles.todayAvgLine} x1='4' y1={chart.averageY} x2='296' y2={chart.averageY} />
             <text className={styles.todayAvgText} x='296' y={Math.max(12, chart.averageY - 6)} textAnchor='end'>내 평단 {displayAveragePrice.replace(/원$/u, '')}</text>
             <circle className={styles.todayChartDot} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='3' />
