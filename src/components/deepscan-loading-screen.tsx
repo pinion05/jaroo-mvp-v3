@@ -22,6 +22,47 @@ import styles from './deepscan-loading-screen.module.css'
 
 type MoneyCurrency = 'KRW' | 'USD'
 
+export type LoadingBriefingDailyRow = {
+  date: string
+  open?: number | null
+  high?: number | null
+  low?: number | null
+  close: number
+  volume?: number | null
+  changePct?: number | null
+}
+
+export type LoadingBriefingMarketIndex = {
+  value?: number | null
+  changePct?: number | null
+  asOf?: string | null
+}
+
+export type LoadingBriefingSnapshot = {
+  code?: string
+  asOf?: string | null
+  quote?: {
+    currentPrice?: number | null
+    openPrice?: number | null
+    highPrice?: number | null
+    lowPrice?: number | null
+    volume?: number | null
+    previousClose?: number | null
+    previousVolume?: number | null
+    changePct?: number | null
+    currency?: MoneyCurrency | string | null
+    asOf?: string | null
+    exchange?: string | null
+    source?: string | null
+  }
+  daily?: LoadingBriefingDailyRow[]
+  market?: {
+    kospi?: LoadingBriefingMarketIndex | null
+    kosdaq?: LoadingBriefingMarketIndex | null
+  }
+  sources?: string[]
+}
+
 type DeepScanLoadingScreenProps = {
   name?: string
   identifier?: string
@@ -34,6 +75,7 @@ type DeepScanLoadingScreenProps = {
   tradingVolume?: string | number
   currentProfitRate?: string | number
   evaluationAmount?: string | number
+  briefingSnapshot?: LoadingBriefingSnapshot | null
   findingProgress?: Partial<Record<FindingKey, FindingProgress>>
   committeeAxes?: JarooDeepScanCommitteeAxis[]
   quickFacts?: LoadingQuickFact[]
@@ -296,6 +338,20 @@ function calculateFallbackEvaluationAmount({
   }
 
   return undefined
+}
+
+function calculateProfitRate({
+  currentPrice,
+  averagePrice,
+}: Pick<DeepScanLoadingScreenProps, 'currentPrice' | 'averagePrice'>) {
+  const currentPriceValue = parseNumericValue(currentPrice)
+  const averagePriceValue = parseNumericValue(averagePrice)
+
+  if (currentPriceValue === null || averagePriceValue === null || averagePriceValue === 0) {
+    return null
+  }
+
+  return ((currentPriceValue / averagePriceValue) - 1) * 100
 }
 
 function calculateProfitAmount({
@@ -589,6 +645,186 @@ function buildVisibleNarrativeCards(cards: NarrativeCard[], visibleStageCount: n
   return cards.slice(0, Math.min(Math.max(visibleStageCount, 1), cards.length))
 }
 
+
+function isFiniteNumber(value: unknown): value is number {
+  return typeof value === 'number' && Number.isFinite(value)
+}
+
+function clamp(value: number, min: number, max: number) {
+  return Math.min(max, Math.max(min, value))
+}
+
+function formatAsOfTime(value: string | null | undefined) {
+  if (!value) {
+    return '방금 조회'
+  }
+
+  const parsed = new Date(value)
+  if (Number.isNaN(parsed.getTime())) {
+    return '방금 조회'
+  }
+
+  return `${new Intl.DateTimeFormat('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false, timeZone: 'Asia/Seoul' }).format(parsed)} 조회`
+}
+
+function formatPercentValue(value: number | null | undefined) {
+  if (!isFiniteNumber(value)) {
+    return null
+  }
+
+  const sign = value > 0 ? '+' : value < 0 ? '−' : ''
+  return `${sign}${formatNumber(Math.abs(value))}%`
+}
+
+function pctToneClass(value: number | null | undefined) {
+  if (!isFiniteNumber(value) || value === 0) {
+    return styles.todayBlue
+  }
+
+  return value > 0 ? styles.todayUp : styles.todayDown
+}
+
+function getLatestDailyRow(rows: LoadingBriefingDailyRow[]) {
+  return rows.length > 0 ? rows[rows.length - 1] : null
+}
+
+function getPreviousDailyRow(rows: LoadingBriefingDailyRow[]) {
+  return rows.length > 1 ? rows[rows.length - 2] : null
+}
+
+function calculateOneMonthChangePct(rows: LoadingBriefingDailyRow[]) {
+  const latest = getLatestDailyRow(rows)
+  if (!latest || rows.length < 2) {
+    return null
+  }
+
+  const baseIndex = Math.max(0, rows.length - 22)
+  const base = rows[baseIndex]
+  if (!base || !isFiniteNumber(base.close) || base.close === 0) {
+    return null
+  }
+
+  return ((latest.close / base.close) - 1) * 100
+}
+
+function calculateShortStreak(rows: LoadingBriefingDailyRow[]) {
+  if (rows.length < 2) {
+    return { direction: 'flat' as const, count: 0 }
+  }
+
+  const latest = rows[rows.length - 1]
+  const previous = rows[rows.length - 2]
+  if (latest.close === previous.close) {
+    return { direction: 'flat' as const, count: 1 }
+  }
+
+  const direction = latest.close > previous.close ? 'up' as const : 'down' as const
+  let count = 1
+  for (let index = rows.length - 1; index > 0; index -= 1) {
+    const current = rows[index]
+    const before = rows[index - 1]
+    if (direction === 'up' && current.close > before.close) {
+      count += 1
+      continue
+    }
+    if (direction === 'down' && current.close < before.close) {
+      count += 1
+      continue
+    }
+    break
+  }
+
+  return { direction, count }
+}
+
+function buildChartGeometry(rows: LoadingBriefingDailyRow[], averagePriceValue: number | null) {
+  const values = rows.map((row) => row.close).filter(isFiniteNumber)
+  if (values.length === 0) {
+    return {
+      linePath: 'M4 16 L26 26 L48 38 L70 52 L92 68 L114 84 L136 92 L158 82 L180 72 L202 60 L224 48 L246 38 L268 34 L296 36',
+      areaPath: 'M4 16 L26 26 L48 38 L70 52 L92 68 L114 84 L136 92 L158 82 L180 72 L202 60 L224 48 L246 38 L268 34 L296 36 L296 116 L4 116 Z',
+      lastPoint: { x: 296, y: 36 },
+      averageY: 35,
+    }
+  }
+
+  const chartValues = isFiniteNumber(averagePriceValue) ? [...values, averagePriceValue] : values
+  const minValue = Math.min(...chartValues)
+  const maxValue = Math.max(...chartValues)
+  const range = maxValue - minValue || Math.max(1, maxValue * 0.02)
+  const left = 4
+  const right = 296
+  const top = 14
+  const bottom = 108
+  const width = right - left
+
+  const points = values.map((value, index) => {
+    const x = values.length === 1 ? right : left + (width * index) / (values.length - 1)
+    const y = bottom - ((value - minValue) / range) * (bottom - top)
+    return { x: Math.round(x * 10) / 10, y: Math.round(clamp(y, top, bottom) * 10) / 10 }
+  })
+  const linePath = points.map((point, index) => `${index === 0 ? 'M' : 'L'}${point.x} ${point.y}`).join(' ')
+  const firstPoint = points[0]
+  const lastPoint = points[points.length - 1]
+  const areaPath = `${linePath} L${lastPoint.x} 116 L${firstPoint.x} 116 Z`
+  const averageY = isFiniteNumber(averagePriceValue)
+    ? Math.round(clamp(bottom - ((averagePriceValue - minValue) / range) * (bottom - top), top, bottom) * 10) / 10
+    : 35
+
+  return { linePath, areaPath, lastPoint, averageY }
+}
+
+function buildOneMonthMeaning(value: number | null) {
+  if (!isFiniteNumber(value)) {
+    return '가격 흐름을 불러오는 중이에요.'
+  }
+
+  if (value >= 5) {
+    return '한 달 기준으로 상승 흐름이 이어지고 있어요.'
+  }
+
+  if (value <= -5) {
+    return '한 달 기준으론 아직 눌림이 남아 있어요.'
+  }
+
+  return '큰 방향성보다는 박스권 흐름에 가까워요.'
+}
+
+function buildTodayFlow({ current, open, high, low }: { current: number | null; open: number | null; high: number | null; low: number | null }) {
+  if (!isFiniteNumber(current) || !isFiniteNumber(open)) {
+    return { label: '장중 흐름 확인 중', meaning: '시초가·고저가 데이터를 불러오는 중이에요.', tone: 'neutral' as const }
+  }
+
+  const openChangePct = ((current / open) - 1) * 100
+  const nearHigh = isFiniteNumber(high) && isFiniteNumber(low) && high > low
+    ? current >= high - (high - low) * 0.25
+    : current >= open
+  const lowText = isFiniteNumber(low) ? `저가 ${formatNumber(low)}에서 ` : ''
+  const highText = nearHigh ? '고가 부근, ' : ''
+
+  if (openChangePct >= 0.3) {
+    return {
+      label: nearHigh ? '반등 흐름' : '상승 흐름',
+      meaning: `${lowText}올라 ${highText}시초가보다 ${formatPercentValue(openChangePct)}.`,
+      tone: 'positive' as const,
+    }
+  }
+
+  if (openChangePct <= -0.3) {
+    return {
+      label: '장중 약세',
+      meaning: `시초가보다 ${formatPercentValue(openChangePct)}라 장중 탄력이 약해요.`,
+      tone: 'negative' as const,
+    }
+  }
+
+  return {
+    label: '보합권 등락',
+    meaning: `시초가와 비교하면 ${formatPercentValue(openChangePct)} 수준이에요.`,
+    tone: 'neutral' as const,
+  }
+}
+
 function TodayBriefingCard({
   currentPriceText,
   averagePriceText,
@@ -596,6 +832,7 @@ function TodayBriefingCard({
   profitRateText,
   profitAmountText,
   elapsedSeconds,
+  briefingSnapshot,
 }: {
   currentPriceText: string | null
   averagePriceText: string | null
@@ -603,26 +840,83 @@ function TodayBriefingCard({
   profitRateText: string | null
   profitAmountText: string | null
   elapsedSeconds: number
+  briefingSnapshot?: LoadingBriefingSnapshot | null
 }) {
-  const displayCurrentPrice = currentPriceText ?? '14,185원'
-  const displayAveragePrice = averagePriceText ?? '14,240원'
-  const displayShares = sharesText ?? '16주'
-  const displayProfitRate = profitRateText ?? '−0.4%'
-  const displayProfitAmount = profitAmountText ?? '−877원'
-
+  const dailyRows = (briefingSnapshot?.daily ?? []).filter((row) => isFiniteNumber(row.close))
+  const latestRow = getLatestDailyRow(dailyRows)
+  const previousRow = getPreviousDailyRow(dailyRows)
+  const quote = briefingSnapshot?.quote
+  const currentPriceValue = quote?.currentPrice ?? latestRow?.close ?? parseNumericValue(currentPriceText ?? undefined)
+  const averagePriceValue = parseNumericValue(averagePriceText ?? undefined)
+  const sharesValue = parseNumericValue(sharesText ?? undefined)
+  const displayCurrentPrice = formatMoney(currentPriceValue ?? undefined, 'KRW') ?? currentPriceText ?? '현재가 확인 중'
+  const displayAveragePrice = averagePriceText ?? '평단 확인 중'
+  const displayShares = sharesText ?? '수량 확인 중'
+  const calculatedProfitRate = isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue) && averagePriceValue !== 0
+    ? ((currentPriceValue / averagePriceValue) - 1) * 100
+    : null
+  const calculatedProfitAmount = isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue) && isFiniteNumber(sharesValue)
+    ? (currentPriceValue - averagePriceValue) * sharesValue
+    : null
+  const displayProfitRate = formatSignedPercent(calculatedProfitRate ?? undefined) ?? profitRateText ?? '계산 중'
+  const displayProfitAmount = formatSignedMoney(calculatedProfitAmount, 'KRW') ?? profitAmountText ?? '계산 중'
+  const oneMonthPct = calculateOneMonthChangePct(dailyRows)
+  const oneMonthLabel = formatPercentValue(oneMonthPct)
+  const shortStreak = calculateShortStreak(dailyRows)
+  const streakLabel = shortStreak.direction === 'up'
+    ? `${shortStreak.count}일 연속 상승`
+    : shortStreak.direction === 'down'
+      ? `${shortStreak.count}일 연속 하락`
+      : '전일과 비슷한 흐름'
+  const positionPct = calculatedProfitRate
+  const needToBreakeven = isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue) && currentPriceValue < averagePriceValue
+    ? ((averagePriceValue / currentPriceValue) - 1) * 100
+    : null
+  const breakevenGap = isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue)
+    ? Math.round(Math.abs(averagePriceValue - currentPriceValue))
+    : null
+  const positionLabel = isFiniteNumber(positionPct)
+    ? positionPct >= 0
+      ? `평단보다 ${formatPercentValue(positionPct)}`
+      : `본전까지 ${formatPercentValue(needToBreakeven)}`
+    : '평단 위치 계산 중'
+  const positionMeaning = isFiniteNumber(positionPct)
+    ? positionPct >= 0
+      ? '지금 가격은 평단 위라 수익 구간이에요.'
+      : `${formatNumber(breakevenGap ?? 0)}원만 오르면 원금 회복이에요.`
+    : '현재가와 평단을 맞춰 보는 중이에요.'
+  const todayFlow = buildTodayFlow({
+    current: currentPriceValue,
+    open: quote?.openPrice ?? latestRow?.open ?? null,
+    high: quote?.highPrice ?? latestRow?.high ?? null,
+    low: quote?.lowPrice ?? latestRow?.low ?? null,
+  })
+  const volume = quote?.volume ?? latestRow?.volume ?? null
+  const previousVolume = quote?.previousVolume ?? previousRow?.volume ?? null
+  const volumeRatio = isFiniteNumber(volume) && isFiniteNumber(previousVolume) && previousVolume > 0 ? volume / previousVolume : null
+  const volumeRatioLabel = isFiniteNumber(volumeRatio) ? `어제의 ${formatNumber(volumeRatio)}배` : '거래량 확인 중'
+  const volumeMeaning = isFiniteNumber(volumeRatio)
+    ? volumeRatio >= 1.3
+      ? '평소보다 관심이 붙은 하루예요.'
+      : volumeRatio >= 0.8
+        ? '어제와 비슷한 수준으로 거래되고 있어요.'
+        : '어제보다는 거래가 차분한 편이에요.'
+    : '거래량 비교 데이터를 불러오는 중이에요.'
+  const chartRows = dailyRows.slice(-60)
+  const chart = buildChartGeometry(chartRows, averagePriceValue)
   const briefStartSeconds = [4, 6, 8, 10, 12, 14]
 
   return (
     <section className={styles.todayBriefingCard} aria-label='오늘 장 기준 시세 브리핑'>
       <div className={styles.todayBriefingHead}>
-        <div className={styles.todayLiveLabel}><span className={styles.todayLiveDot} />오늘 장 기준 · 14:32 조회</div>
+        <div className={styles.todayLiveLabel}><span className={styles.todayLiveDot} />오늘 장 기준 · {formatAsOfTime(quote?.asOf ?? briefingSnapshot?.asOf)}</div>
         <div className={styles.todayPriceRow}>
           <div>
             <div className={styles.todayPrice}>{displayCurrentPrice}</div>
             <div className={styles.todayPriceSub}>평단 {displayAveragePrice} · {displayShares}</div>
           </div>
           <div className={styles.todayProfitBox}>
-            <div className={styles.todayProfitRate}>{displayProfitRate}</div>
+            <div className={cn(styles.todayProfitRate, isFiniteNumber(calculatedProfitRate) && calculatedProfitRate < 0 ? styles.todayDown : styles.todayUp)}>{displayProfitRate}</div>
             <div className={styles.todayProfitAmount}>{displayProfitAmount}</div>
           </div>
         </div>
@@ -634,22 +928,22 @@ function TodayBriefingCard({
           <span>일봉</span>
         </div>
         <svg className={styles.todayChartSvg} viewBox='0 0 300 120' aria-label='최근 3개월 일봉 차트'>
-          <path className={styles.todayChartArea} d='M4 16 L26 26 L48 38 L70 52 L92 68 L114 84 L136 92 L158 82 L180 72 L202 60 L224 48 L246 38 L268 34 L296 36 L296 116 L4 116 Z' />
-          <path className={styles.todayChartLine} d='M4 16 L26 26 L48 38 L70 52 L92 68 L114 84 L136 92 L158 82 L180 72 L202 60 L224 48 L246 38 L268 34 L296 36' />
-          <line className={styles.todayAvgLine} x1='4' y1='35' x2='296' y2='35' />
-          <text className={styles.todayAvgText} x='296' y='29' textAnchor='end'>내 평단 {displayAveragePrice.replace(/원$/u, '')}</text>
-          <circle className={styles.todayChartDot} cx='296' cy='36' r='3' />
-          <circle className={styles.todayChartRing} cx='296' cy='36' r='7' />
+          <path className={styles.todayChartArea} d={chart.areaPath} />
+          <path className={styles.todayChartLine} d={chart.linePath} />
+          <line className={styles.todayAvgLine} x1='4' y1={chart.averageY} x2='296' y2={chart.averageY} />
+          <text className={styles.todayAvgText} x='296' y={Math.max(12, chart.averageY - 6)} textAnchor='end'>내 평단 {displayAveragePrice.replace(/원$/u, '')}</text>
+          <circle className={styles.todayChartDot} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='3' />
+          <circle className={styles.todayChartRing} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='7' />
         </svg>
       </div>
 
       <div className={styles.todayBriefList}>
-        <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} icon='🗓️' question='최근 한 달, 어떻게 흘러왔나요?' data={<><span className={styles.todayUp}>한 달 전보다 +12.3%</span></>} meaning={<><b>고점에서 빠졌다가 바닥을 다지고 회복하는 중</b>이에요.</>} />
-        <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} icon='📈' question='단기 흐름은요?' data={<span className={styles.todayUp}>3일 연속 상승</span>} meaning='짧게 봐도 흐름이 살아나고 있어요.' />
-        <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} icon='🎯' question='내 자리는 어디쯤일까요?' data={<><span className={styles.todayUp}>본전까지 +0.4%</span></>} meaning={<><b>고점 부근에서 사셨지만, 55원만 오르면 원금 회복</b>이에요.</>} />
-        <TodayMarketBriefing at={briefStartSeconds[3]} elapsedSeconds={elapsedSeconds} />
-        <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} icon='📊' question='오늘 하루는 어땠나요?' data={<span className={styles.todayUp}>반등 흐름</span>} meaning='저가 14,050에서 올라 고가 부근, 시초가보다 +0.6%.' />
-        <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} icon='🔥' question='거래는 활발했나요?' data={<><span className={styles.todayBlue}>어제의 1.4배</span></>} meaning='평소보다 관심이 붙은 하루예요.' />
+        <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} icon='🗓️' question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
+        <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} icon='📈' question='단기 흐름은요?' data={<span className={shortStreak.direction === 'up' ? styles.todayUp : shortStreak.direction === 'down' ? styles.todayDown : styles.todayBlue}>{streakLabel}</span>} meaning={shortStreak.direction === 'up' ? '짧게 봐도 흐름이 살아나고 있어요.' : shortStreak.direction === 'down' ? '단기적으로는 숨 고르기가 이어지고 있어요.' : '아직 한쪽 방향으로 강하게 기울지는 않았어요.'} />
+        <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} icon='🎯' question='내 자리는 어디쯤일까요?' data={<span className={isFiniteNumber(positionPct) && positionPct < 0 ? styles.todayDown : styles.todayUp}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
+        <TodayMarketBriefing at={briefStartSeconds[3]} elapsedSeconds={elapsedSeconds} kospiPct={briefingSnapshot?.market?.kospi?.changePct ?? null} kosdaqPct={briefingSnapshot?.market?.kosdaq?.changePct ?? null} stockPct={quote?.changePct ?? latestRow?.changePct ?? null} />
+        <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} icon='📊' question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
+        <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} icon='🔥' question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
       </div>
     </section>
   )
@@ -688,10 +982,48 @@ function TodayBriefingItem({
   )
 }
 
-function TodayMarketBriefing({ at, elapsedSeconds }: { at: number; elapsedSeconds: number }) {
+
+function buildMarketMeaning(kospiPct: number | null, kosdaqPct: number | null, stockPct: number | null) {
+  if (!isFiniteNumber(stockPct)) {
+    return '내 종목의 장중 등락률을 확인하는 중이에요.'
+  }
+
+  const marketValues = [kospiPct, kosdaqPct].filter(isFiniteNumber)
+  if (marketValues.length === 0) {
+    return '시장 지수와 내 종목 흐름을 맞춰 보는 중이에요.'
+  }
+
+  const marketAverage = marketValues.reduce((sum, value) => sum + value, 0) / marketValues.length
+  if (stockPct >= marketAverage + 0.5) {
+    return '시장보다 더 강하게 움직이고 있어요.'
+  }
+
+  if (stockPct <= marketAverage - 0.5) {
+    return '시장 흐름 대비 아직 덜 따라온 상태예요.'
+  }
+
+  return '시장 흐름과 비슷한 속도로 움직이고 있어요.'
+}
+
+function TodayMarketBriefing({
+  at,
+  elapsedSeconds,
+  kospiPct,
+  kosdaqPct,
+  stockPct,
+}: {
+  at: number
+  elapsedSeconds: number
+  kospiPct: number | null
+  kosdaqPct: number | null
+  stockPct: number | null
+}) {
   const isVisible = elapsedSeconds >= at
   const isDataVisible = elapsedSeconds >= at + 0.75
   const isMeaningVisible = elapsedSeconds >= at + 1.45
+  const kospiLabel = formatPercentValue(kospiPct) ?? '확인 중'
+  const kosdaqLabel = formatPercentValue(kosdaqPct) ?? '확인 중'
+  const stockLabel = formatPercentValue(stockPct) ?? '확인 중'
 
   return (
     <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)}>
@@ -701,15 +1033,16 @@ function TodayMarketBriefing({ at, elapsedSeconds }: { at: number; elapsedSecond
       </div>
       <div className={cn(styles.todayBriefBody, isDataVisible ? styles.todayBriefBodyIn : undefined)}>
         <div className={styles.todayMarketGrid}>
-          <div className={styles.todayMarketCell}><span>코스피</span><b className={styles.todayUp}>+0.8%</b></div>
-          <div className={styles.todayMarketCell}><span>코스닥</span><b className={styles.todayDown}>−0.3%</b></div>
-          <div className={`${styles.todayMarketCell} ${styles.todayMarketCellMe}`}><span>내 종목</span><b className={styles.todayUp}>+0.2%</b></div>
+          <div className={styles.todayMarketCell}><span>코스피</span><b className={pctToneClass(kospiPct)}>{kospiLabel}</b></div>
+          <div className={styles.todayMarketCell}><span>코스닥</span><b className={pctToneClass(kosdaqPct)}>{kosdaqLabel}</b></div>
+          <div className={`${styles.todayMarketCell} ${styles.todayMarketCellMe}`}><span>내 종목</span><b className={pctToneClass(stockPct)}>{stockLabel}</b></div>
         </div>
-        <p className={cn(styles.todayBriefMeaning, isMeaningVisible ? styles.todayBriefMeaningIn : undefined)}><b>시장 흐름은 좋은데 아직 덜 따라온 상태</b>예요.</p>
+        <p className={cn(styles.todayBriefMeaning, isMeaningVisible ? styles.todayBriefMeaningIn : undefined)}><b>{buildMarketMeaning(kospiPct, kosdaqPct, stockPct)}</b></p>
       </div>
     </article>
   )
 }
+
 
 export function DeepScanLoadingScreen({
   name = '선택 종목',
@@ -723,6 +1056,7 @@ export function DeepScanLoadingScreen({
   tradingVolume,
   currentProfitRate,
   evaluationAmount,
+  briefingSnapshot,
   findingProgress,
   committeeAxes,
   quickFacts = [],
@@ -748,9 +1082,11 @@ export function DeepScanLoadingScreen({
     calculateFallbackEvaluationAmount({ evaluationAmount, currentPrice, shares, averagePrice, currentProfitRate }),
     currentPriceCurrency,
   )
-  const profitRateText = formatSignedPercent(currentProfitRate)
+  const snapshotCurrentPrice = briefingSnapshot?.quote?.currentPrice ?? undefined
+  const effectiveCurrentPrice = snapshotCurrentPrice ?? currentPrice
+  const profitRateText = formatSignedPercent(calculateProfitRate({ currentPrice: effectiveCurrentPrice, averagePrice }) ?? currentProfitRate)
   const profitAmountText = formatSignedMoney(
-    calculateProfitAmount({ currentPrice, averagePrice, shares }),
+    calculateProfitAmount({ currentPrice: effectiveCurrentPrice, averagePrice, shares }),
     currentPriceCurrency,
   )
   const displayQuickFacts = useMemo(() => quickFacts.filter(hasDisplayValue), [quickFacts])
@@ -885,6 +1221,7 @@ export function DeepScanLoadingScreen({
           profitRateText={profitRateText}
           profitAmountText={profitAmountText}
           elapsedSeconds={elapsedSeconds}
+          briefingSnapshot={briefingSnapshot}
         />
 
         <section className={styles.positionSummaryCard} aria-label='보유 포지션 요약'>
