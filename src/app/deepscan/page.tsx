@@ -25,9 +25,10 @@ import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { DeepScanInlineResults } from '@/components/deepscan-inline-results'
-import { DeepScanLoadingScreen, type FindingProgress, type LoadingBriefingSnapshot, type LoadingPerformanceComment, type LoadingQuickFact, type LoadingStageKey } from '@/components/deepscan-loading-screen'
+import { DeepScanLoadingScreen, type FindingProgress, type LoadingPerformanceComment, type LoadingQuickFact, type LoadingStageKey } from '@/components/deepscan-loading-screen'
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
+import type { LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
 import {
   buildDeepScanHeroCard,
   buildDeepScanPageHeader,
@@ -1370,12 +1371,13 @@ export default function DeepScanPage() {
 
   useEffect(() => {
     const snapshotUrl = buildLoadingBriefingSnapshotUrl(target)
-    if (!snapshotUrl || !targetKey) {
+    if (!snapshotUrl || !targetKey || requestStatus !== 'loading') {
       return
     }
 
     const requestedTargetKey = targetKey
     const controller = new AbortController()
+    setLoadingBriefingSnapshot((previous) => (previous?.targetKey === requestedTargetKey ? null : previous))
 
     const run = async () => {
       try {
@@ -1403,7 +1405,7 @@ export default function DeepScanPage() {
     return () => {
       controller.abort()
     }
-  }, [target, targetKey])
+  }, [requestStatus, target, targetKey])
 
   useEffect(() => {
     if (!requestSeed || !targetKey || requestStatus !== 'loading') {

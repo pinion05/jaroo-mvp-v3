@@ -17,51 +17,18 @@ import {
   Scale,
   TrendingUp,
 } from 'lucide-react'
+import {
+  calculateBriefingOneMonthChangePct,
+  calculateBriefingShortStreak,
+  getLatestBriefingDailyRow,
+  getPreviousBriefingDailyRow,
+  isFiniteNumber,
+  type LoadingBriefingDailyRow,
+  type LoadingBriefingSnapshot,
+  type MoneyCurrency,
+} from '@/lib/deepscan-briefing-snapshot'
 import { cn } from '@/lib/utils'
 import styles from './deepscan-loading-screen.module.css'
-
-type MoneyCurrency = 'KRW' | 'USD'
-
-export type LoadingBriefingDailyRow = {
-  date: string
-  open?: number | null
-  high?: number | null
-  low?: number | null
-  close: number
-  volume?: number | null
-  changePct?: number | null
-}
-
-export type LoadingBriefingMarketIndex = {
-  value?: number | null
-  changePct?: number | null
-  asOf?: string | null
-}
-
-export type LoadingBriefingSnapshot = {
-  code?: string
-  asOf?: string | null
-  quote?: {
-    currentPrice?: number | null
-    openPrice?: number | null
-    highPrice?: number | null
-    lowPrice?: number | null
-    volume?: number | null
-    previousClose?: number | null
-    previousVolume?: number | null
-    changePct?: number | null
-    currency?: MoneyCurrency | string | null
-    asOf?: string | null
-    exchange?: string | null
-    source?: string | null
-  }
-  daily?: LoadingBriefingDailyRow[]
-  market?: {
-    kospi?: LoadingBriefingMarketIndex | null
-    kosdaq?: LoadingBriefingMarketIndex | null
-  }
-  sources?: string[]
-}
 
 type DeepScanLoadingScreenProps = {
   name?: string
@@ -646,10 +613,6 @@ function buildVisibleNarrativeCards(cards: NarrativeCard[], visibleStageCount: n
 }
 
 
-function isFiniteNumber(value: unknown): value is number {
-  return typeof value === 'number' && Number.isFinite(value)
-}
-
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
 }
@@ -657,6 +620,11 @@ function clamp(value: number, min: number, max: number) {
 function formatAsOfTime(value: string | null | undefined) {
   if (!value) {
     return '방금 조회'
+  }
+
+  if (/^\d{4}-\d{2}-\d{2}$/u.test(value)) {
+    const [, month, day] = value.split('-')
+    return `${Number(month)}월 ${Number(day)}일 종가 기준`
   }
 
   const parsed = new Date(value)
@@ -684,65 +652,13 @@ function pctToneClass(value: number | null | undefined) {
   return value > 0 ? styles.todayUp : styles.todayDown
 }
 
-function getLatestDailyRow(rows: LoadingBriefingDailyRow[]) {
-  return rows.length > 0 ? rows[rows.length - 1] : null
-}
-
-function getPreviousDailyRow(rows: LoadingBriefingDailyRow[]) {
-  return rows.length > 1 ? rows[rows.length - 2] : null
-}
-
-function calculateOneMonthChangePct(rows: LoadingBriefingDailyRow[]) {
-  const latest = getLatestDailyRow(rows)
-  if (!latest || rows.length < 2) {
-    return null
-  }
-
-  const baseIndex = Math.max(0, rows.length - 22)
-  const base = rows[baseIndex]
-  if (!base || !isFiniteNumber(base.close) || base.close === 0) {
-    return null
-  }
-
-  return ((latest.close / base.close) - 1) * 100
-}
-
-function calculateShortStreak(rows: LoadingBriefingDailyRow[]) {
-  if (rows.length < 2) {
-    return { direction: 'flat' as const, count: 0 }
-  }
-
-  const latest = rows[rows.length - 1]
-  const previous = rows[rows.length - 2]
-  if (latest.close === previous.close) {
-    return { direction: 'flat' as const, count: 1 }
-  }
-
-  const direction = latest.close > previous.close ? 'up' as const : 'down' as const
-  let count = 1
-  for (let index = rows.length - 1; index > 0; index -= 1) {
-    const current = rows[index]
-    const before = rows[index - 1]
-    if (direction === 'up' && current.close > before.close) {
-      count += 1
-      continue
-    }
-    if (direction === 'down' && current.close < before.close) {
-      count += 1
-      continue
-    }
-    break
-  }
-
-  return { direction, count }
-}
-
 function buildChartGeometry(rows: LoadingBriefingDailyRow[], averagePriceValue: number | null) {
   const values = rows.map((row) => row.close).filter(isFiniteNumber)
   if (values.length === 0) {
     return {
-      linePath: 'M4 16 L26 26 L48 38 L70 52 L92 68 L114 84 L136 92 L158 82 L180 72 L202 60 L224 48 L246 38 L268 34 L296 36',
-      areaPath: 'M4 16 L26 26 L48 38 L70 52 L92 68 L114 84 L136 92 L158 82 L180 72 L202 60 L224 48 L246 38 L268 34 L296 36 L296 116 L4 116 Z',
+      hasData: false,
+      linePath: '',
+      areaPath: '',
       lastPoint: { x: 296, y: 36 },
       averageY: 35,
     }
@@ -771,7 +687,7 @@ function buildChartGeometry(rows: LoadingBriefingDailyRow[], averagePriceValue: 
     ? Math.round(clamp(bottom - ((averagePriceValue - minValue) / range) * (bottom - top), top, bottom) * 10) / 10
     : 35
 
-  return { linePath, areaPath, lastPoint, averageY }
+  return { hasData: true, linePath, areaPath, lastPoint, averageY }
 }
 
 function buildOneMonthMeaning(value: number | null) {
@@ -842,13 +758,38 @@ function TodayBriefingCard({
   elapsedSeconds: number
   briefingSnapshot?: LoadingBriefingSnapshot | null
 }) {
-  const dailyRows = (briefingSnapshot?.daily ?? []).filter((row) => isFiniteNumber(row.close))
-  const latestRow = getLatestDailyRow(dailyRows)
-  const previousRow = getPreviousDailyRow(dailyRows)
   const quote = briefingSnapshot?.quote
-  const currentPriceValue = quote?.currentPrice ?? latestRow?.close ?? parseNumericValue(currentPriceText ?? undefined)
   const averagePriceValue = parseNumericValue(averagePriceText ?? undefined)
   const sharesValue = parseNumericValue(sharesText ?? undefined)
+  const briefingModel = useMemo(() => {
+    const dailyRows = (briefingSnapshot?.daily ?? []).filter((row) => isFiniteNumber(row.close))
+    const latestRow = getLatestBriefingDailyRow(dailyRows)
+    const previousRow = getPreviousBriefingDailyRow(dailyRows)
+    const currentPriceValue = quote?.currentPrice ?? latestRow?.close ?? parseNumericValue(currentPriceText ?? undefined)
+    const oneMonthPct = calculateBriefingOneMonthChangePct(dailyRows)
+    const shortStreak = calculateBriefingShortStreak(dailyRows)
+    const todayFlow = buildTodayFlow({
+      current: currentPriceValue,
+      open: quote?.openPrice ?? latestRow?.open ?? null,
+      high: quote?.highPrice ?? latestRow?.high ?? null,
+      low: quote?.lowPrice ?? latestRow?.low ?? null,
+    })
+    const volume = quote?.volume ?? latestRow?.volume ?? null
+    const previousVolume = quote?.previousVolume ?? previousRow?.volume ?? null
+    const volumeRatio = isFiniteNumber(volume) && isFiniteNumber(previousVolume) && previousVolume > 0 ? volume / previousVolume : null
+    const chart = buildChartGeometry(dailyRows.slice(-60), averagePriceValue)
+
+    return {
+      currentPriceValue,
+      latestRow,
+      oneMonthPct,
+      shortStreak,
+      todayFlow,
+      volumeRatio,
+      chart,
+    }
+  }, [averagePriceValue, briefingSnapshot?.daily, currentPriceText, quote])
+  const currentPriceValue = briefingModel.currentPriceValue
   const displayCurrentPrice = formatMoney(currentPriceValue ?? undefined, 'KRW') ?? currentPriceText ?? '현재가 확인 중'
   const displayAveragePrice = averagePriceText ?? '평단 확인 중'
   const displayShares = sharesText ?? '수량 확인 중'
@@ -860,9 +801,9 @@ function TodayBriefingCard({
     : null
   const displayProfitRate = formatSignedPercent(calculatedProfitRate ?? undefined) ?? profitRateText ?? '계산 중'
   const displayProfitAmount = formatSignedMoney(calculatedProfitAmount, 'KRW') ?? profitAmountText ?? '계산 중'
-  const oneMonthPct = calculateOneMonthChangePct(dailyRows)
+  const oneMonthPct = briefingModel.oneMonthPct
   const oneMonthLabel = formatPercentValue(oneMonthPct)
-  const shortStreak = calculateShortStreak(dailyRows)
+  const shortStreak = briefingModel.shortStreak
   const streakLabel = shortStreak.direction === 'up'
     ? `${shortStreak.count}일 연속 상승`
     : shortStreak.direction === 'down'
@@ -885,15 +826,8 @@ function TodayBriefingCard({
       ? '지금 가격은 평단 위라 수익 구간이에요.'
       : `${formatNumber(breakevenGap ?? 0)}원만 오르면 원금 회복이에요.`
     : '현재가와 평단을 맞춰 보는 중이에요.'
-  const todayFlow = buildTodayFlow({
-    current: currentPriceValue,
-    open: quote?.openPrice ?? latestRow?.open ?? null,
-    high: quote?.highPrice ?? latestRow?.high ?? null,
-    low: quote?.lowPrice ?? latestRow?.low ?? null,
-  })
-  const volume = quote?.volume ?? latestRow?.volume ?? null
-  const previousVolume = quote?.previousVolume ?? previousRow?.volume ?? null
-  const volumeRatio = isFiniteNumber(volume) && isFiniteNumber(previousVolume) && previousVolume > 0 ? volume / previousVolume : null
+  const todayFlow = briefingModel.todayFlow
+  const volumeRatio = briefingModel.volumeRatio
   const volumeRatioLabel = isFiniteNumber(volumeRatio) ? `어제의 ${formatNumber(volumeRatio)}배` : '거래량 확인 중'
   const volumeMeaning = isFiniteNumber(volumeRatio)
     ? volumeRatio >= 1.3
@@ -902,8 +836,7 @@ function TodayBriefingCard({
         ? '어제와 비슷한 수준으로 거래되고 있어요.'
         : '어제보다는 거래가 차분한 편이에요.'
     : '거래량 비교 데이터를 불러오는 중이에요.'
-  const chartRows = dailyRows.slice(-60)
-  const chart = buildChartGeometry(chartRows, averagePriceValue)
+  const chart = briefingModel.chart
   const briefStartSeconds = [4, 6, 8, 10, 12, 14]
 
   return (
@@ -927,21 +860,25 @@ function TodayBriefingCard({
           <span>최근 3개월 · 점선은 내 평단</span>
           <span>일봉</span>
         </div>
-        <svg className={styles.todayChartSvg} viewBox='0 0 300 120' aria-label='최근 3개월 일봉 차트'>
-          <path className={styles.todayChartArea} d={chart.areaPath} />
-          <path className={styles.todayChartLine} d={chart.linePath} />
-          <line className={styles.todayAvgLine} x1='4' y1={chart.averageY} x2='296' y2={chart.averageY} />
-          <text className={styles.todayAvgText} x='296' y={Math.max(12, chart.averageY - 6)} textAnchor='end'>내 평단 {displayAveragePrice.replace(/원$/u, '')}</text>
-          <circle className={styles.todayChartDot} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='3' />
-          <circle className={styles.todayChartRing} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='7' />
-        </svg>
+        {chart.hasData ? (
+          <svg className={styles.todayChartSvg} viewBox='0 0 300 120' aria-label='최근 3개월 일봉 차트'>
+            <path className={styles.todayChartArea} d={chart.areaPath} />
+            <path className={styles.todayChartLine} d={chart.linePath} />
+            <line className={styles.todayAvgLine} x1='4' y1={chart.averageY} x2='296' y2={chart.averageY} />
+            <text className={styles.todayAvgText} x='296' y={Math.max(12, chart.averageY - 6)} textAnchor='end'>내 평단 {displayAveragePrice.replace(/원$/u, '')}</text>
+            <circle className={styles.todayChartDot} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='3' />
+            <circle className={styles.todayChartRing} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='7' />
+          </svg>
+        ) : (
+          <div className={styles.todayChartEmpty} role='status'>차트 데이터를 확인하는 중이에요</div>
+        )}
       </div>
 
       <div className={styles.todayBriefList}>
         <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} icon='🗓️' question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
         <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} icon='📈' question='단기 흐름은요?' data={<span className={shortStreak.direction === 'up' ? styles.todayUp : shortStreak.direction === 'down' ? styles.todayDown : styles.todayBlue}>{streakLabel}</span>} meaning={shortStreak.direction === 'up' ? '짧게 봐도 흐름이 살아나고 있어요.' : shortStreak.direction === 'down' ? '단기적으로는 숨 고르기가 이어지고 있어요.' : '아직 한쪽 방향으로 강하게 기울지는 않았어요.'} />
         <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} icon='🎯' question='내 자리는 어디쯤일까요?' data={<span className={isFiniteNumber(positionPct) && positionPct < 0 ? styles.todayDown : styles.todayUp}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
-        <TodayMarketBriefing at={briefStartSeconds[3]} elapsedSeconds={elapsedSeconds} kospiPct={briefingSnapshot?.market?.kospi?.changePct ?? null} kosdaqPct={briefingSnapshot?.market?.kosdaq?.changePct ?? null} stockPct={quote?.changePct ?? latestRow?.changePct ?? null} />
+        <TodayMarketBriefing at={briefStartSeconds[3]} elapsedSeconds={elapsedSeconds} kospiPct={briefingSnapshot?.market?.kospi?.changePct ?? null} kosdaqPct={briefingSnapshot?.market?.kosdaq?.changePct ?? null} stockPct={quote?.changePct ?? briefingModel.latestRow?.changePct ?? null} />
         <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} icon='📊' question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
         <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} icon='🔥' question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
       </div>
