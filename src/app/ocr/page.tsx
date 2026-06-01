@@ -254,6 +254,7 @@ function OcrResultDesignStyles() {
       .jaroo-ocr-warn-ico{width:22px;height:22px;border-radius:50%;background:#FCEFD2;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
       .jaroo-ocr-warn-title{flex:1;font-size:13px;font-weight:600;color:#0F1419}
       .jaroo-ocr-warn-body{padding:0 16px 14px}
+      .jaroo-ocr-attention-row + .jaroo-ocr-attention-row{margin-top:14px;padding-top:14px;border-top:.5px solid #F2E4C8}
       .jaroo-ocr-warn-read{font-size:11.5px;color:#5A6473;margin-bottom:11px;line-height:1.5}
       .jaroo-ocr-warn-read b{color:#0F1419;font-weight:600}
       .jaroo-ocr-cand-label{font-size:10.5px;color:#97A0AE;margin-bottom:7px}
@@ -321,8 +322,14 @@ function getRowIdentifierMeta(row: OcrReviewRow | AggregatedOcrReviewRow) {
     .join(' · ')
 }
 
-function isProfitRateUp(value: string) {
-  return !value.trim().startsWith('-') && !value.trim().startsWith('−')
+function getProfitRateClass(value: string) {
+  const trimmed = value.trim()
+
+  if (!trimmed || trimmed === '-') {
+    return ''
+  }
+
+  return !trimmed.startsWith('-') && !trimmed.startsWith('−') ? 'up' : 'down'
 }
 
 export default function OcrPage() {
@@ -733,6 +740,12 @@ export default function OcrPage() {
     patchReviewRow(rowId, nextRow)
   }, [patchReviewRow, reviewRows])
 
+  const handleRemoveReviewRow = useCallback((rowId: string) => {
+    setRemovedRowIds((current) => ({ ...current, [rowId]: true }))
+    removeReviewRow(rowId)
+    setExpandedRowId((current) => (current === rowId ? null : current))
+  }, [removeReviewRow])
+
   const handleContinue = () => {
     if (!canContinue || !session) {
       return
@@ -852,7 +865,7 @@ export default function OcrPage() {
                           </div>
                           <div className='jaroo-ocr-okr-right'>
                             <div className='jaroo-ocr-okr-amt'>{row.evaluationAmount || '-'}</div>
-                            <div className={`jaroo-ocr-okr-rate ${isProfitRateUp(row.profitRate) ? 'up' : 'down'}`}>{row.profitRate || '-'}</div>
+                            <div className={`jaroo-ocr-okr-rate ${getProfitRateClass(row.profitRate)}`}>{row.profitRate || '-'}</div>
                             <button
                               type='button'
                               className='jaroo-ocr-okr-edit'
@@ -938,11 +951,7 @@ export default function OcrPage() {
                               <button
                                 type='button'
                                 className='jaroo-ocr-edit-remove'
-                                onClick={() => {
-                                  setRemovedRowIds((current) => ({ ...current, [editableRowId]: true }))
-                                  removeReviewRow(editableRowId)
-                                  setExpandedRowId(null)
-                                }}
+                                onClick={() => handleRemoveReviewRow(editableRowId)}
                               >
                                 제외
                               </button>
@@ -1001,8 +1010,9 @@ export default function OcrPage() {
                   {rowsNeedingAttention.slice(0, 3).map((row) => {
                     const candidates = instrumentCandidatesByRowId[row.id] ?? []
                     const selectedId = row.selectedCandidateId ?? candidates[0]?.id
+                    const isEditing = expandedRowId === row.id
                     return (
-                      <div key={row.id}>
+                      <div key={row.id} className='jaroo-ocr-attention-row'>
                         <div className='jaroo-ocr-warn-read'>읽은 종목: <b>{row.name || '-'}</b> · {row.quantity || '-'} · {row.averagePrice ? `평단 ${row.averagePrice}` : row.evaluationAmount}</div>
                         {candidates.length > 0 ? <div className='jaroo-ocr-cand-label'>이 종목인가요?</div> : null}
                         {candidates.slice(0, 2).map((candidate) => {
@@ -1019,13 +1029,72 @@ export default function OcrPage() {
                             </button>
                           )
                         })}
+                        <div className='jaroo-ocr-warn-actions'>
+                          <button
+                            type='button'
+                            className='jaroo-ocr-warn-search'
+                            onClick={() => setExpandedRowId((current) => (current === row.id ? null : row.id))}
+                          >
+                            {isEditing ? '직접 확인 닫기' : '직접 확인'}
+                          </button>
+                          <button type='button' className='jaroo-ocr-warn-skip' onClick={() => handleRemoveReviewRow(row.id)}>나중에 추가</button>
+                        </div>
+                        {isEditing ? (
+                          <div className='jaroo-ocr-edit-panel'>
+                            <div className='jaroo-ocr-edit-title'>{row.name || '종목'} 직접 확인</div>
+                            <div className='jaroo-ocr-edit-grid'>
+                              <label className='jaroo-ocr-edit-field full'>
+                                <span>종목명</span>
+                                <input value={row.name} onChange={(event) => handleManualFieldChange(row.id, 'name', event.target.value)} />
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>Code</span>
+                                <input value={row.resolvedCode ?? ''} onChange={(event) => handleManualFieldChange(row.id, 'resolvedCode', event.target.value)} />
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>Ticker</span>
+                                <input value={row.resolvedTicker ?? ''} onChange={(event) => handleManualFieldChange(row.id, 'resolvedTicker', event.target.value)} />
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>시장</span>
+                                <select value={row.resolvedMarket ?? ''} onChange={(event) => handleManualFieldChange(row.id, 'resolvedMarket', event.target.value)}>
+                                  <option value=''>선택</option>
+                                  <option value='KR'>KR</option>
+                                  <option value='KOSPI'>KOSPI</option>
+                                  <option value='KOSDAQ'>KOSDAQ</option>
+                                  <option value='US'>US</option>
+                                </select>
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>유형</span>
+                                <select value={row.resolvedKind ?? ''} onChange={(event) => handleManualFieldChange(row.id, 'resolvedKind', event.target.value)}>
+                                  <option value=''>선택</option>
+                                  <option value='stock'>주식</option>
+                                  <option value='etf'>ETF/ETN</option>
+                                </select>
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>수량</span>
+                                <input value={row.quantity} onChange={(event) => handleManualFieldChange(row.id, 'quantity', event.target.value)} />
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>수익률</span>
+                                <input value={row.profitRate} onChange={(event) => handleManualFieldChange(row.id, 'profitRate', event.target.value)} />
+                              </label>
+                              <label className='jaroo-ocr-edit-field full'>
+                                <span>평가 금액</span>
+                                <input value={row.evaluationAmount} onChange={(event) => handleManualFieldChange(row.id, 'evaluationAmount', event.target.value)} />
+                              </label>
+                            </div>
+                            <div className='jaroo-ocr-edit-actions'>
+                              <button type='button' className='jaroo-ocr-edit-done' onClick={() => setExpandedRowId(null)}>수정 완료</button>
+                              <button type='button' className='jaroo-ocr-edit-remove' onClick={() => handleRemoveReviewRow(row.id)}>제외</button>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     )
                   })}
-                  <div className='jaroo-ocr-warn-actions'>
-                    <button type='button' className='jaroo-ocr-warn-search' onClick={() => setExpandedRowId(rowsNeedingAttention[0]?.id ?? null)}>직접 확인</button>
-                    <button type='button' className='jaroo-ocr-warn-skip'>나중에 추가</button>
-                  </div>
                 </div>
               </div>
             ) : null}
