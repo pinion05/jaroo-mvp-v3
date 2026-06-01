@@ -703,7 +703,7 @@
   height: 100%;
 }
 
-@media (max-width: 360px) {
+@media (max-width: 640px) {
   .viewport {
     padding: 0;
   }
@@ -713,6 +713,7 @@
     height: 100dvh;
     min-height: 100dvh;
     border-radius: 0;
+    box-shadow: none;
   }
 
   .caption {
