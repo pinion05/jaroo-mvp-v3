@@ -2262,6 +2262,8 @@
 
 .todayChartArea {
   fill: rgba(229, 72, 77, 0.08);
+  opacity: 0;
+  animation: today-chart-area-reveal 5s 0.1s ease-out forwards;
 }
 
 .todayChartLine {
@@ -2272,7 +2274,7 @@
   stroke-width: 1.8;
   stroke-dasharray: 1;
   stroke-dashoffset: 1;
-  animation: today-chart-draw 1.6s 0.1s ease-out forwards;
+  animation: today-chart-draw 5s 0.1s ease-out forwards;
 }
 
 .todayAvgLine {
@@ -2289,14 +2291,16 @@
 
 .todayChartDot {
   fill: var(--ds-red);
+  opacity: 0;
+  animation: today-chart-point-reveal 0.45s 5.1s ease-out forwards;
 }
 
 .todayChartRing {
   fill: none;
   stroke: var(--ds-red);
   stroke-width: 1.5;
-  opacity: 0.35;
-  animation: today-ring-pulse 1.8s ease-in-out infinite;
+  opacity: 0;
+  animation: today-chart-point-reveal 0.45s 5.1s ease-out forwards, today-ring-pulse 1.8s 5.55s ease-in-out infinite;
 }
 
 .todayBriefList {
@@ -2448,9 +2452,25 @@
   color: var(--ds-blue);
 }
 
+@keyframes today-chart-area-reveal {
+  0%, 35% {
+    opacity: 0;
+  }
+
+  100% {
+    opacity: 1;
+  }
+}
+
 @keyframes today-chart-draw {
   to {
     stroke-dashoffset: 0;
+  }
+}
+
+@keyframes today-chart-point-reveal {
+  to {
+    opacity: 1;
   }
 }
 
@@ -2468,11 +2488,19 @@
 
 @media (prefers-reduced-motion: reduce) {
   .todayLiveDot,
+  .todayChartArea,
   .todayChartLine,
+  .todayChartDot,
   .todayChartRing,
   .todayBriefItem {
     animation: none;
     transition: none;
+  }
+
+  .todayChartArea,
+  .todayChartDot,
+  .todayChartRing {
+    opacity: 1;
   }
 
   .todayChartLine {
