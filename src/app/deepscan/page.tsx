@@ -1377,7 +1377,6 @@ export default function DeepScanPage() {
 
     const requestedTargetKey = targetKey
     const controller = new AbortController()
-    setLoadingBriefingSnapshot((previous) => (previous?.targetKey === requestedTargetKey ? null : previous))
 
     const run = async () => {
       try {
