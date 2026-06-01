@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   clearPersistedScreenshotUploadSession,
   normalizeStockName,
+  parseOcrNumber,
   persistScreenshotUploadSession,
   readPersistedScreenshotUploadSession,
   SCREENSHOT_OCR_STORAGE_KEY,
@@ -13,6 +14,12 @@ test('normalizeStockName removes #, whitespace, and decorative edge symbols', ()
   assert.equal(normalizeStockName('  # 삼성 전자  '), '삼성전자')
   assert.equal(normalizeStockName('★ Tesla Inc. ★'), 'teslainc')
   assert.equal(normalizeStockName('▶  TIGER 미국 S&P500  ◀'), 'tiger미국s&p500')
+})
+
+test('parseOcrNumber prefers embedded percent values for OCR profit text', () => {
+  assert.equal(parseOcrNumber('+20,347 (1.4%)'), 1.4)
+  assert.equal(parseOcrNumber('-11,167 (5.7%)'), -5.7)
+  assert.equal(parseOcrNumber('−19,964 (15.1%)'), -15.1)
 })
 
 test('screenshot upload session survives a hard navigation fallback', () => {

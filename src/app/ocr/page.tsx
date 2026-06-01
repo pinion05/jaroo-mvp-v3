@@ -5,6 +5,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   buildOcrSourceRows,
   clearPersistedScreenshotUploadSession,
+  computeAveragePrice,
   readPersistedScreenshotUploadSession,
   sanitizeOcrInstrumentCandidateLists,
   sanitizeOcrRows,
@@ -41,6 +42,16 @@ type ResolveInstrumentsResponse = {
   candidates?: unknown
   error?: string
 }
+
+type ManualEditableField =
+  | 'name'
+  | 'resolvedTicker'
+  | 'resolvedCode'
+  | 'resolvedMarket'
+  | 'resolvedKind'
+  | 'quantity'
+  | 'profitRate'
+  | 'evaluationAmount'
 
 type UploadStatus = {
   state: UploadRequestState
@@ -115,6 +126,40 @@ function isManualRowComplete(row: OcrReviewRow) {
     && row.profitRate.trim()
     && row.evaluationAmount.trim(),
   )
+}
+
+function inferMarketTone(market?: string) {
+  const normalized = market?.trim().toUpperCase()
+
+  if (!normalized) {
+    return undefined
+  }
+
+  if (normalized === 'KR') {
+    return 'kospi'
+  }
+
+  if (normalized === 'US') {
+    return 'nasdaq'
+  }
+
+  if (normalized.includes('KOSDAQ')) {
+    return 'kosdaq'
+  }
+
+  if (normalized.includes('KOSPI') || normalized.includes('KRX')) {
+    return 'kospi'
+  }
+
+  if (normalized.includes('NASDAQ') || normalized.includes('NYSE') || normalized.includes('AMEX')) {
+    return 'nasdaq'
+  }
+
+  if (normalized.includes('ETF')) {
+    return 'etf'
+  }
+
+  return undefined
 }
 
 function filterConflictSelections(
@@ -193,6 +238,17 @@ function OcrResultDesignStyles() {
       .jaroo-ocr-okr-rate{font-size:11px;margin-top:1px;font-variant-numeric:tabular-nums}
       .jaroo-ocr-okr-rate.up{color:#1A9D55}.jaroo-ocr-okr-rate.down{color:#E5484D}
       .jaroo-ocr-okr-edit{font-size:10.5px;color:#2B6BE6;margin-top:3px;cursor:pointer;border:0;background:transparent}
+      .jaroo-ocr-edit-panel{border-top:.5px solid #EFF1F4;background:#F8FAFD;padding:12px 14px}
+      .jaroo-ocr-edit-title{font-size:11.5px;font-weight:700;color:#0F1419;margin-bottom:9px}
+      .jaroo-ocr-edit-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+      .jaroo-ocr-edit-field{display:flex;flex-direction:column;gap:4px;min-width:0}
+      .jaroo-ocr-edit-field.full{grid-column:1 / -1}
+      .jaroo-ocr-edit-field span{font-size:9.5px;font-weight:600;color:#97A0AE}
+      .jaroo-ocr-edit-field input,.jaroo-ocr-edit-field select{width:100%;border:.5px solid #DDE3EA;border-radius:9px;background:#fff;padding:8px 9px;font-size:11.5px;color:#0F1419;outline:none}
+      .jaroo-ocr-edit-field input:focus,.jaroo-ocr-edit-field select:focus{border-color:#2B6BE6;box-shadow:0 0 0 2px rgba(43,107,230,.10)}
+      .jaroo-ocr-edit-actions{display:flex;gap:8px;margin-top:10px}
+      .jaroo-ocr-edit-done{flex:1;border:0;border-radius:10px;background:#2B6BE6;color:#fff;font-size:11.5px;font-weight:700;padding:9px;cursor:pointer}
+      .jaroo-ocr-edit-remove{border:0;background:transparent;color:#E5484D;font-size:11px;font-weight:600;padding:9px;cursor:pointer}
       .jaroo-ocr-warn-card{background:#fff;border-radius:14px;border:.5px solid #F3D9A0;box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;margin-bottom:12px}
       .jaroo-ocr-warn-head{display:flex;align-items:center;gap:10px;padding:13px 16px 11px}
       .jaroo-ocr-warn-ico{width:22px;height:22px;border-radius:50%;background:#FCEFD2;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
@@ -281,6 +337,8 @@ export default function OcrPage() {
   const errorMessage = useOcrReviewStore((state) => state.errorMessage ?? '')
   const instrumentResolveError = useOcrReviewStore((state) => state.resolveErrorMessage ?? '')
   const setReviewRows = useOcrReviewStore((state) => state.setRows)
+  const patchReviewRow = useOcrReviewStore((state) => state.patchRow)
+  const removeReviewRow = useOcrReviewStore((state) => state.removeRow)
   const replaceCandidates = useOcrReviewStore((state) => state.replaceCandidates)
   const selectCandidate = useOcrReviewStore((state) => state.selectCandidate)
   const setRequestStatus = useOcrReviewStore((state) => state.setRequestStatus)
@@ -297,6 +355,7 @@ export default function OcrPage() {
   const [uploadStatuses, setUploadStatuses] = useState<Record<string, UploadStatus>>({})
   const [baseMergedRows, setBaseMergedRows] = useState<OcrSourceRow[]>([])
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
+  const [isOkCardOpen, setIsOkCardOpen] = useState(false)
   const [conflicts, setConflicts] = useState<OcrConflict[]>([])
   const [conflictSelections, setConflictSelections] = useState<Record<string, string>>({})
   const [removedRowIds, setRemovedRowIds] = useState<Record<string, true>>({})
@@ -356,6 +415,7 @@ export default function OcrPage() {
     setResolveStatus('idle')
     setBaseMergedRows([])
     setExpandedRowId(null)
+    setIsOkCardOpen(false)
     setConflicts([])
     setConflictSelections({})
     setRemovedRowIds({})
@@ -509,6 +569,7 @@ export default function OcrPage() {
       setReviewRows([])
       replaceCandidates({})
       setExpandedRowId(null)
+      setIsOkCardOpen(false)
       setResolveStatus('idle')
       return
     }
@@ -640,6 +701,38 @@ export default function OcrPage() {
     && invalidManualRowIds.length === 0
     && applyStatus !== 'loading'
 
+  const handleManualFieldChange = useCallback((rowId: string, field: ManualEditableField, value: string) => {
+    const currentRow = reviewRows.find((row) => row.id === rowId)
+
+    if (!currentRow) {
+      return
+    }
+
+    const normalizedValue = value.trim()
+    const nextRow: OcrReviewRow = {
+      ...currentRow,
+      name: field === 'name' ? value : currentRow.name,
+      resolvedName: field === 'name' ? value.trim() || currentRow.resolvedName : currentRow.resolvedName,
+      resolvedTicker: field === 'resolvedTicker' ? normalizedValue || undefined : currentRow.resolvedTicker,
+      resolvedCode: field === 'resolvedCode' ? normalizedValue || undefined : currentRow.resolvedCode,
+      resolvedMarket: field === 'resolvedMarket' ? normalizedValue || undefined : currentRow.resolvedMarket,
+      resolvedKind:
+        field === 'resolvedKind'
+          ? normalizedValue === 'stock' || normalizedValue === 'etf'
+            ? normalizedValue
+            : undefined
+          : currentRow.resolvedKind,
+      quantity: field === 'quantity' ? value : currentRow.quantity,
+      profitRate: field === 'profitRate' ? value : currentRow.profitRate,
+      evaluationAmount: field === 'evaluationAmount' ? value : currentRow.evaluationAmount,
+    }
+
+    nextRow.resolvedMarketTone = inferMarketTone(nextRow.resolvedMarket)
+    nextRow.averagePrice = computeAveragePrice(nextRow.quantity, nextRow.profitRate, nextRow.evaluationAmount) || nextRow.averagePrice
+    nextRow.resolutionState = isManualRowComplete(nextRow) ? 'resolved' : 'manual-required'
+    patchReviewRow(rowId, nextRow)
+  }, [patchReviewRow, reviewRows])
+
   const handleContinue = () => {
     if (!canContinue || !session) {
       return
@@ -686,7 +779,7 @@ export default function OcrPage() {
   const recognizedNames = aggregatedRows.map((row) => row.resolvedName || row.name).filter(Boolean).join(' · ')
   const attentionCount = rowsNeedingAttention.length + unresolvedConflictCount
   const canRetry = requestState !== 'loading' && Boolean(session)
-  const isOkCardOpen = expandedRowId === '__ok__' || aggregatedRows.length === 0
+  const shouldShowOkList = isOkCardOpen || aggregatedRows.length === 0
 
   return (
     <div className='jaroo-ocr-page'>
@@ -710,12 +803,15 @@ export default function OcrPage() {
             )}
 
             {!hasOcrError ? (
-              <div className={`jaroo-ocr-ok-card ${isOkCardOpen ? 'open' : ''}`}>
+              <div className={`jaroo-ocr-ok-card ${shouldShowOkList ? 'open' : ''}`}>
                 <button
                   type='button'
                   className='jaroo-ocr-ok-head'
-                  aria-expanded={isOkCardOpen}
-                  onClick={() => setExpandedRowId((current) => (current === '__ok__' ? null : '__ok__'))}
+                  aria-expanded={shouldShowOkList}
+                  onClick={() => {
+                    setIsOkCardOpen((current) => !current)
+                    setExpandedRowId(null)
+                  }}
                 >
                   <div className='jaroo-ocr-ok-check'>✓</div>
                   <div style={{ flex: 1, minWidth: 0 }}>
@@ -725,38 +821,138 @@ export default function OcrPage() {
                   <div className='jaroo-ocr-ok-arrow'>▼</div>
                 </button>
                 <div className='jaroo-ocr-ok-list'>
-                  {isOkCardOpen && aggregatedRows.length > 0 ? aggregatedRows.map((row, index) => {
+                  {shouldShowOkList && aggregatedRows.length > 0 ? aggregatedRows.map((row, index) => {
                     const accountDetails = row.accountDetails ?? []
                     const isMerged = row.isAccountMerged
+                    const editableRowId = row.sourceRowIds[0] ?? row.id
+                    const editableRow = previewRows.find((item) => item.id === editableRowId) ?? row
+                    const candidates = instrumentCandidatesByRowId[editableRowId] ?? []
+                    const selectedId = editableRow.selectedCandidateId ?? candidates[0]?.id
+                    const isEditing = expandedRowId === editableRowId
 
                     return (
-                      <div key={`${row.id}-${index}`} className='jaroo-ocr-ok-row'>
-                        <div className='jaroo-ocr-okr-info'>
-                          <div className='jaroo-ocr-okr-name'>
-                            {row.resolvedName || row.name || '-'}
-                            {isMerged ? <span className='jaroo-ocr-merge-badge'>{accountDetails.length}개 계좌 합산</span> : null}
-                          </div>
-                          <div className='jaroo-ocr-okr-meta'>{getRowIdentifierMeta(row)}</div>
-                          {isMerged ? (
-                            <div className='jaroo-ocr-acct-detail'>
-                              {accountDetails.map((detail, detailIndex) => (
-                                <div key={detail.rowId} className='jaroo-ocr-acct-row'>
-                                  <span>{detail.sourceFileName || `계좌 ${detailIndex + 1}`}</span>
-                                  <span>{detail.quantity} · {detail.evaluationAmount}</span>
-                                </div>
-                              ))}
+                      <div key={`${row.id}-${index}`}>
+                        <div className='jaroo-ocr-ok-row'>
+                          <div className='jaroo-ocr-okr-info'>
+                            <div className='jaroo-ocr-okr-name'>
+                              {row.resolvedName || row.name || '-'}
+                              {isMerged ? <span className='jaroo-ocr-merge-badge'>{accountDetails.length}개 계좌 합산</span> : null}
                             </div>
-                          ) : null}
+                            <div className='jaroo-ocr-okr-meta'>{getRowIdentifierMeta(row)}</div>
+                            {isMerged ? (
+                              <div className='jaroo-ocr-acct-detail'>
+                                {accountDetails.map((detail, detailIndex) => (
+                                  <div key={detail.rowId} className='jaroo-ocr-acct-row'>
+                                    <span>{detail.sourceFileName || `계좌 ${detailIndex + 1}`}</span>
+                                    <span>{detail.quantity} · {detail.evaluationAmount}</span>
+                                  </div>
+                                ))}
+                              </div>
+                            ) : null}
+                          </div>
+                          <div className='jaroo-ocr-okr-right'>
+                            <div className='jaroo-ocr-okr-amt'>{row.evaluationAmount || '-'}</div>
+                            <div className={`jaroo-ocr-okr-rate ${isProfitRateUp(row.profitRate) ? 'up' : 'down'}`}>{row.profitRate || '-'}</div>
+                            <button
+                              type='button'
+                              className='jaroo-ocr-okr-edit'
+                              aria-expanded={isEditing}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                setIsOkCardOpen(true)
+                                setExpandedRowId((current) => (current === editableRowId ? null : editableRowId))
+                              }}
+                            >
+                              {isEditing ? '닫기' : '수정'}
+                            </button>
+                          </div>
                         </div>
-                        <div className='jaroo-ocr-okr-right'>
-                          <div className='jaroo-ocr-okr-amt'>{row.evaluationAmount || '-'}</div>
-                          <div className={`jaroo-ocr-okr-rate ${isProfitRateUp(row.profitRate) ? 'up' : 'down'}`}>{row.profitRate || '-'}</div>
-                          <button type='button' className='jaroo-ocr-okr-edit' onClick={() => setExpandedRowId(row.id)}>수정</button>
-                        </div>
+                        {isEditing ? (
+                          <div className='jaroo-ocr-edit-panel'>
+                            <div className='jaroo-ocr-edit-title'>{editableRow.resolvedName || editableRow.name || '종목'} 수정</div>
+                            {candidates.length > 0 ? (
+                              <>
+                                <div className='jaroo-ocr-cand-label'>추천 종목</div>
+                                {candidates.slice(0, 2).map((candidate) => {
+                                  const active = selectedId === candidate.id
+                                  const candidateMeta = [candidate.resolvedMarket, candidate.resolvedCode || candidate.resolvedTicker].filter(Boolean).join(' · ')
+                                  return (
+                                    <button key={candidate.id} type='button' className={`jaroo-ocr-cand ${active ? 'sel' : ''}`} onClick={() => selectCandidate(editableRowId, candidate.id)}>
+                                      <div className='jaroo-ocr-cand-radio' />
+                                      <div className='jaroo-ocr-cand-info'>
+                                        <div className='jaroo-ocr-cand-name'>{candidate.resolvedName}</div>
+                                        <div className='jaroo-ocr-cand-code'>{candidateMeta || '정보 확인 중'}</div>
+                                      </div>
+                                      <div className='jaroo-ocr-cand-meta'>{formatCandidateScore(candidate.score) || '후보'}</div>
+                                    </button>
+                                  )
+                                })}
+                              </>
+                            ) : null}
+                            <div className='jaroo-ocr-edit-grid'>
+                              <label className='jaroo-ocr-edit-field full'>
+                                <span>종목명</span>
+                                <input value={editableRow.name} onChange={(event) => handleManualFieldChange(editableRowId, 'name', event.target.value)} />
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>Code</span>
+                                <input value={editableRow.resolvedCode ?? ''} onChange={(event) => handleManualFieldChange(editableRowId, 'resolvedCode', event.target.value)} />
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>Ticker</span>
+                                <input value={editableRow.resolvedTicker ?? ''} onChange={(event) => handleManualFieldChange(editableRowId, 'resolvedTicker', event.target.value)} />
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>시장</span>
+                                <select value={editableRow.resolvedMarket ?? ''} onChange={(event) => handleManualFieldChange(editableRowId, 'resolvedMarket', event.target.value)}>
+                                  <option value=''>선택</option>
+                                  <option value='KR'>KR</option>
+                                  <option value='KOSPI'>KOSPI</option>
+                                  <option value='KOSDAQ'>KOSDAQ</option>
+                                  <option value='US'>US</option>
+                                </select>
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>유형</span>
+                                <select value={editableRow.resolvedKind ?? ''} onChange={(event) => handleManualFieldChange(editableRowId, 'resolvedKind', event.target.value)}>
+                                  <option value=''>선택</option>
+                                  <option value='stock'>주식</option>
+                                  <option value='etf'>ETF/ETN</option>
+                                </select>
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>수량</span>
+                                <input value={editableRow.quantity} onChange={(event) => handleManualFieldChange(editableRowId, 'quantity', event.target.value)} />
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>수익률</span>
+                                <input value={editableRow.profitRate} onChange={(event) => handleManualFieldChange(editableRowId, 'profitRate', event.target.value)} />
+                              </label>
+                              <label className='jaroo-ocr-edit-field full'>
+                                <span>평가 금액</span>
+                                <input value={editableRow.evaluationAmount} onChange={(event) => handleManualFieldChange(editableRowId, 'evaluationAmount', event.target.value)} />
+                              </label>
+                            </div>
+                            <div className='jaroo-ocr-edit-actions'>
+                              <button type='button' className='jaroo-ocr-edit-done' onClick={() => setExpandedRowId(null)}>수정 완료</button>
+                              <button
+                                type='button'
+                                className='jaroo-ocr-edit-remove'
+                                onClick={() => {
+                                  setRemovedRowIds((current) => ({ ...current, [editableRowId]: true }))
+                                  removeReviewRow(editableRowId)
+                                  setExpandedRowId(null)
+                                }}
+                              >
+                                제외
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
                       </div>
                     )
                   }) : null}
-                  {isOkCardOpen && aggregatedRows.length === 0 ? (
+                  {shouldShowOkList && aggregatedRows.length === 0 ? (
                     <div className='jaroo-ocr-ok-row'>
                       <div className='jaroo-ocr-okr-info'>
                         <div className='jaroo-ocr-okr-name'>인식된 종목이 없어요</div>

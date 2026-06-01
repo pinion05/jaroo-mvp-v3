@@ -149,6 +149,18 @@ export function parseOcrNumber(value: string) {
     return null
   }
 
+  const percentMatch = normalizedValue.match(/([+-]?(?:\d+(?:[,.]\d+)*\.?\d*|\.\d+))\s*%/)
+  if (percentMatch?.[1]) {
+    const parsedPercent = Number(percentMatch[1].replaceAll(',', ''))
+    if (!Number.isFinite(parsedPercent)) {
+      return null
+    }
+
+    const hasExplicitPercentSign = /^[+-]/.test(percentMatch[1])
+    const inheritsNegativeSign = !hasExplicitPercentSign && normalizedValue.startsWith('-')
+    return inheritsNegativeSign ? -Math.abs(parsedPercent) : parsedPercent
+  }
+
   const wrappedNegativeMatch = normalizedValue.match(/^\((.*)\)$/)
   const isWrappedNegative = Boolean(wrappedNegativeMatch)
   const unwrappedValue = wrappedNegativeMatch?.[1] ?? normalizedValue
