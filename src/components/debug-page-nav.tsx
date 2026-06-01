@@ -56,6 +56,10 @@ export function DebugPageNav() {
     return null
   }
 
+  if (pathname === '/screenshot' || pathname === '/ocr') {
+    return null
+  }
+
   return (
     <aside className='fixed top-1/2 left-4 z-50 hidden -translate-y-1/2 lg:block'>
       <div className='flex w-22 flex-col gap-2 rounded-3xl border border-white/70 bg-white/92 p-3 shadow-[0_18px_48px_rgba(15,23,40,0.16)] backdrop-blur'>

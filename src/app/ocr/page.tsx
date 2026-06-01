@@ -1,28 +1,27 @@
 'use client'
 
-import Image from 'next/image'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, ArrowRight, Check, ChevronDown, LoaderCircle, RefreshCcw, ScanSearch } from 'lucide-react'
-import { OcrConflictMergeCard } from '@/components/ocr-conflict-merge-card'
-import { Button } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { JarooShell } from '@/components/jaroo-shell'
 import {
-  buildMergedOcrResult,
   buildOcrSourceRows,
-  computeAveragePrice,
-  resolveMergedOcrRows,
+  clearPersistedScreenshotUploadSession,
+  readPersistedScreenshotUploadSession,
   sanitizeOcrInstrumentCandidateLists,
   sanitizeOcrRows,
+  type OcrConflict,
   type OcrRow,
   type OcrSourceRow,
   type ScreenshotUploadSession,
 } from '@/lib/screenshot-ocr'
 import { resolveIdentifierRowsWithRetry, type OcrIdentifierResolutionResult } from '@/lib/ocr-identifier-resolution'
+import { buildHomeCurrentQuoteQuery } from '@/lib/home-current-quotes'
+import { hydratePortfolioItemsWithCurrentQuotes } from '@/lib/home-quote-bootstrap'
+import { aggregateResolvedOcrReviewRows, type AggregatedOcrReviewRow } from '@/lib/ocr-review-aggregation'
+import { buildMergeRowsFromReviewRows, persistAppliedPortfolioFromMergeRows } from '@/lib/ocr-portfolio-apply'
 import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
 import { useOcrUploadStore } from '@/lib/stores/use-ocr-upload-store'
+import { usePortfolioStore } from '@/lib/stores/use-portfolio-store'
 import {
   applyInstrumentResolutionFailure,
   applyInstrumentResolutionResult,
@@ -31,8 +30,7 @@ import {
   mergeResolvedRowsWithExistingReviewRows,
   toReviewRow,
 } from '@/lib/ocr-review-resolution'
-import type { OcrReviewRow, ResolveCandidate } from '@/lib/workflow-types'
-import { cn } from '@/lib/utils'
+import type { OcrReviewRow } from '@/lib/workflow-types'
 
 type OcrRequestState = 'idle' | 'loading' | 'success' | 'error'
 type UploadRequestState = 'idle' | 'loading' | 'success' | 'error'
@@ -44,34 +42,10 @@ type ResolveInstrumentsResponse = {
   error?: string
 }
 
-type ManualEditableField =
-  | 'name'
-  | 'resolvedTicker'
-  | 'resolvedCode'
-  | 'resolvedMarket'
-  | 'resolvedKind'
-  | 'quantity'
-  | 'profitRate'
-  | 'evaluationAmount'
-
 type UploadStatus = {
   state: UploadRequestState
   rowCount: number
   errorMessage: string
-}
-
-const statusLabel: Record<OcrRequestState, string> = {
-  idle: '대기 중',
-  loading: '분석 중',
-  success: '인식 완료',
-  error: '재시도 필요',
-}
-
-const uploadStateLabel: Record<UploadRequestState, string> = {
-  idle: '대기',
-  loading: '분석 중',
-  success: '완료',
-  error: '실패',
 }
 
 const MIN_IDENTIFIER_SEARCH_RING_MS = 900
@@ -88,34 +62,19 @@ function waitForMinimumIdentifierSearchRing(startedAt: number) {
   })
 }
 
+function toUserFacingOcrErrorMessage(message: string) {
+  if (/key limit exceeded|rate limit|quota|insufficient credits|credit limit|openrouter\\.ai/i.test(message)) {
+    return 'OCR 사용량 한도를 초과했어요. 잠시 후 다시 시도하거나 관리자에게 문의해주세요.'
+  }
+
+  return message || '스크린샷 확인 중 문제가 발생했어요.'
+}
+
 function buildOcrSessionRunKey(session: ScreenshotUploadSession) {
   return [
     session.broker,
     ...session.uploads.map((upload) => `${upload.id}:${upload.fileName}:${upload.imageDataUrl.length}`),
   ].join('|')
-}
-
-function OcrMetricChip({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
-  return (
-    <div className='min-w-0 rounded-[14px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
-      <p className='text-[10px] text-[color:var(--jaroo-muted)]'>{label}</p>
-      <p className={cn('mt-1 truncate text-[12px] font-semibold text-[color:var(--jaroo-ink)]', valueClassName)}>{value || '-'}</p>
-    </div>
-  )
-}
-
-function OcrRemoveChip({ label, onRemove }: { label: string; onRemove: () => void }) {
-  return (
-    <button
-      type='button'
-      onClick={onRemove}
-      aria-label={label}
-      className='group col-span-2 min-w-0 rounded-[14px] bg-[#FFF7F7] px-3 py-2 text-left transition hover:bg-[#FFF0F0] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#F5B8B8]/60'
-    >
-      <p className='text-[10px] text-[#B78585]'>항목 관리</p>
-      <p className='mt-1 truncate text-[12px] font-semibold text-[#A96A6A] transition group-hover:text-[#C13030]'>이 항목 제거</p>
-    </button>
-  )
 }
 
 async function resolveInstrumentRows(rows: OcrSourceRow[]): Promise<OcrIdentifierResolutionResult> {
@@ -132,7 +91,7 @@ async function resolveInstrumentRows(rows: OcrSourceRow[]): Promise<OcrIdentifie
   const sanitizedCandidates = sanitizeOcrInstrumentCandidateLists(payload?.candidates)
 
   if (!response.ok || !Array.isArray(payload?.rows) || sanitizedRows.length !== rows.length || sanitizedCandidates.length !== rows.length) {
-    throw new Error(payload?.error || '종목 식별자 확인에 실패했어요.')
+    throw new Error(payload?.error || '종목 확인에 실패했어요.')
   }
 
   const mergedRows = rows.map((row, index) => ({
@@ -144,40 +103,6 @@ async function resolveInstrumentRows(rows: OcrSourceRow[]): Promise<OcrIdentifie
     rows: mergedRows,
     candidatesByRowId: Object.fromEntries(mergedRows.map((row, index) => [row.id, sanitizedCandidates[index]])),
   }
-}
-
-function inferMarketTone(market?: string) {
-  const normalized = market?.trim().toUpperCase()
-
-  if (!normalized) {
-    return undefined
-  }
-
-  if (normalized === 'KR') {
-    return 'kospi'
-  }
-
-  if (normalized === 'US') {
-    return 'nasdaq'
-  }
-
-  if (normalized.includes('KOSDAQ')) {
-    return 'kosdaq'
-  }
-
-  if (normalized.includes('KOSPI') || normalized.includes('KRX')) {
-    return 'kospi'
-  }
-
-  if (normalized.includes('NASDAQ') || normalized.includes('NYSE') || normalized.includes('AMEX')) {
-    return 'nasdaq'
-  }
-
-  if (normalized.includes('ETF')) {
-    return 'etf'
-  }
-
-  return undefined
 }
 
 function isManualRowComplete(row: OcrReviewRow) {
@@ -230,231 +155,124 @@ function formatCandidateScore(score?: number) {
   return `${Math.round(score * 100)}%`
 }
 
-type OcrResolvedRowCardProps = {
-  row: OcrReviewRow
-  isLast: boolean
-  identifierStatus: InstrumentResolveState
-  candidates: ResolveCandidate[]
-  isExpanded: boolean
-  selectedCandidateId?: string
-  onToggleExpand: () => void
-  onSelectCandidate: (candidateId: string) => void
-  onClearCandidateSelection: () => void
-  onManualFieldChange: (field: ManualEditableField, value: string) => void
-  onRemoveRow: () => void
+function OcrResultDesignStyles() {
+  return (
+    <style>{`
+      .jaroo-ocr-page *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Pretendard',sans-serif;-webkit-font-smoothing:antialiased}
+      .jaroo-ocr-page{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;min-height:100vh;min-height:100dvh;align-items:flex-start;color:#0F1419}
+      @media (min-width:1024px){.jaroo-ocr-page{margin-left:-7rem}}
+      .jaroo-ocr-frame{background:#F5F6F8;border-radius:16px;width:340px;height:720px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative;display:flex;flex-direction:column}
+      .jaroo-ocr-frame::-webkit-scrollbar{display:none}
+      .jaroo-ocr-head{position:relative;z-index:10;flex:0 0 auto;background:rgba(245,246,248,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;border-bottom:.5px solid #E8EAEE;display:flex;align-items:center;gap:11px}
+      .jaroo-ocr-head-back{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;color:#0F1419;box-shadow:0 1px 2px rgba(0,0,0,.04);border:0;cursor:pointer}
+      .jaroo-ocr-head-title{font-size:15px;font-weight:600;color:#0F1419}
+      .jaroo-ocr-body{flex:1 1 auto;min-height:0;overflow-y:auto;overflow-x:hidden;padding:18px 16px 24px}
+      .jaroo-ocr-body::-webkit-scrollbar{display:none}
+      .jaroo-ocr-lead{font-size:13px;color:#5A6473;line-height:1.5;margin-bottom:16px}
+      .jaroo-ocr-lead b{color:#0F1419;font-weight:600}
+      .jaroo-ocr-ok-card{background:#fff;border-radius:14px;border:.5px solid #E8EAEE;box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;margin-bottom:12px}
+      .jaroo-ocr-ok-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border:0;background:transparent;width:100%;text-align:left;cursor:pointer}
+      .jaroo-ocr-ok-check{width:22px;height:22px;border-radius:50%;background:#E5F3EB;display:flex;align-items:center;justify-content:center;font-size:12px;color:#1A7340;flex-shrink:0}
+      .jaroo-ocr-ok-title{flex:1;font-size:13.5px;font-weight:600;color:#0F1419}
+      .jaroo-ocr-ok-names{font-size:11px;color:#97A0AE;margin-top:2px;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:225px}
+      .jaroo-ocr-ok-arrow{font-size:11px;color:#97A0AE;transition:transform .25s}
+      .jaroo-ocr-ok-card.open .jaroo-ocr-ok-arrow{transform:rotate(180deg)}
+      .jaroo-ocr-ok-list{max-height:0;overflow:hidden;transition:max-height .35s ease}
+      .jaroo-ocr-ok-card.open .jaroo-ocr-ok-list{max-height:9999px;border-top:.5px solid #EFF1F4}
+      .jaroo-ocr-ok-row{display:flex;align-items:flex-start;padding:12px 16px;border-bottom:.5px solid #EFF1F4;gap:10px}
+      .jaroo-ocr-ok-row:last-child{border-bottom:none}
+      .jaroo-ocr-okr-info{flex:1;min-width:0}
+      .jaroo-ocr-okr-name{font-size:13px;font-weight:600;color:#0F1419;line-height:1.25}
+      .jaroo-ocr-merge-badge{font-size:9px;font-weight:600;color:#2B6BE6;background:#E6F0FE;padding:2px 6px;border-radius:5px;margin-left:5px;vertical-align:middle}
+      .jaroo-ocr-acct-detail{margin-top:6px;padding-top:6px;border-top:.5px dashed #E8EAEE}
+      .jaroo-ocr-acct-row{display:flex;justify-content:space-between;gap:8px;font-size:10px;color:#97A0AE;padding:2px 0}
+      .jaroo-ocr-acct-row span:last-child{color:#5A6473;font-variant-numeric:tabular-nums;white-space:nowrap}
+      .jaroo-ocr-okr-meta{font-size:10.5px;color:#97A0AE;margin-top:2px;line-height:1.35}
+      .jaroo-ocr-okr-right{text-align:right;flex-shrink:0}
+      .jaroo-ocr-okr-amt{font-size:12.5px;font-weight:600;color:#0F1419;font-variant-numeric:tabular-nums;white-space:nowrap}
+      .jaroo-ocr-okr-rate{font-size:11px;margin-top:1px;font-variant-numeric:tabular-nums}
+      .jaroo-ocr-okr-rate.up{color:#1A9D55}.jaroo-ocr-okr-rate.down{color:#E5484D}
+      .jaroo-ocr-okr-edit{font-size:10.5px;color:#2B6BE6;margin-top:3px;cursor:pointer;border:0;background:transparent}
+      .jaroo-ocr-warn-card{background:#fff;border-radius:14px;border:.5px solid #F3D9A0;box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;margin-bottom:12px}
+      .jaroo-ocr-warn-head{display:flex;align-items:center;gap:10px;padding:13px 16px 11px}
+      .jaroo-ocr-warn-ico{width:22px;height:22px;border-radius:50%;background:#FCEFD2;display:flex;align-items:center;justify-content:center;font-size:12px;flex-shrink:0}
+      .jaroo-ocr-warn-title{flex:1;font-size:13px;font-weight:600;color:#0F1419}
+      .jaroo-ocr-warn-body{padding:0 16px 14px}
+      .jaroo-ocr-warn-read{font-size:11.5px;color:#5A6473;margin-bottom:11px;line-height:1.5}
+      .jaroo-ocr-warn-read b{color:#0F1419;font-weight:600}
+      .jaroo-ocr-cand-label{font-size:10.5px;color:#97A0AE;margin-bottom:7px}
+      .jaroo-ocr-cand{display:flex;align-items:center;gap:10px;padding:11px 12px;border:.5px solid #E8EAEE;border-radius:10px;margin-bottom:7px;cursor:pointer;transition:all .15s;background:#fff;width:100%;text-align:left}
+      .jaroo-ocr-cand.sel{border-color:#2B6BE6;background:#F0F6FF}
+      .jaroo-ocr-cand-radio{width:16px;height:16px;border-radius:50%;border:1.5px solid #C2C8D0;flex-shrink:0;position:relative}
+      .jaroo-ocr-cand.sel .jaroo-ocr-cand-radio{border-color:#2B6BE6}
+      .jaroo-ocr-cand.sel .jaroo-ocr-cand-radio::after{content:'';position:absolute;inset:3px;border-radius:50%;background:#2B6BE6}
+      .jaroo-ocr-cand-info{flex:1;min-width:0}
+      .jaroo-ocr-cand-name{font-size:12.5px;font-weight:600;color:#0F1419}
+      .jaroo-ocr-cand-code{font-size:10.5px;color:#97A0AE;margin-top:1px}
+      .jaroo-ocr-cand-meta{font-size:10.5px;color:#5A6473;text-align:right;font-variant-numeric:tabular-nums}
+      .jaroo-ocr-warn-actions{display:flex;gap:8px;margin-top:4px}
+      .jaroo-ocr-warn-search,.jaroo-ocr-warn-skip{flex:1;text-align:center;padding:10px;border-radius:10px;font-size:11.5px;cursor:pointer;background:#fff}
+      .jaroo-ocr-warn-search{border:.5px solid #E8EAEE;color:#2B6BE6;font-weight:600}
+      .jaroo-ocr-warn-skip{border:0;color:#97A0AE}
+      .jaroo-ocr-add-more{display:flex;align-items:center;justify-content:center;gap:7px;padding:12px;border-radius:12px;border:1px dashed #B8C4D4;background:#fff;margin-bottom:12px;cursor:pointer;width:100%}
+      .jaroo-ocr-add-more-lbl{font-size:12px;color:#5A6473;font-weight:500}
+      .jaroo-ocr-privacy{font-size:10px;color:#97A0AE;text-align:center;margin-top:14px;line-height:1.5}
+      .jaroo-ocr-footer{position:relative;z-index:20;flex:0 0 auto;padding:12px 16px 16px;background:#F5F6F8;border-top:.5px solid #E8EAEE;box-shadow:0 -8px 18px rgba(15,20,25,.04)}
+      .jaroo-ocr-apply-btn{width:100%;padding:15px;border-radius:13px;border:none;background:#2B6BE6;color:#fff;font-size:14.5px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 4px 14px rgba(43,107,230,.3)}
+      .jaroo-ocr-apply-btn:disabled{opacity:.45;cursor:default;box-shadow:none}
+      .jaroo-ocr-apply-sub{text-align:center;font-size:10.5px;color:#97A0AE;margin-top:8px}
+      .jaroo-ocr-load-wrap{flex:1 1 auto;min-height:0;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 16px}
+      .jaroo-ocr-load-thumb{width:120px;height:150px;border-radius:12px;background:#fff;border:.5px solid #E8EAEE;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:24px;position:relative;overflow:hidden}
+      .jaroo-ocr-load-thumb-line{height:9px;background:#EEF0F3;border-radius:3px;margin:11px 12px}
+      .jaroo-ocr-scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#2B6BE6,transparent);animation:jarooOcrScan 1.8s ease-in-out infinite;box-shadow:0 0 8px rgba(43,107,230,.6)}
+      @keyframes jarooOcrScan{0%{top:8%}50%{top:88%}100%{top:8%}}
+      .jaroo-ocr-spinner{width:34px;height:34px;border:3px solid #E8EAEE;border-top-color:#2B6BE6;border-radius:50%;animation:jarooOcrSpin .8s linear infinite;margin-bottom:16px}
+      @keyframes jarooOcrSpin{to{transform:rotate(360deg)}}
+      .jaroo-ocr-load-txt{font-size:14px;font-weight:600;color:#0F1419;margin-bottom:5px}
+      .jaroo-ocr-load-sub{font-size:11.5px;color:#97A0AE}
+      .jaroo-ocr-progress{width:180px;height:4px;background:#E8EAEE;border-radius:99px;overflow:hidden;margin-top:14px}
+      .jaroo-ocr-progress-fill{height:100%;background:#2B6BE6;border-radius:99px;transition:width .3s ease}
+    `}</style>
+  )
 }
 
-function OcrResolvedRowCard({
-  row,
-  isLast,
-  identifierStatus,
-  candidates,
-  isExpanded,
-  selectedCandidateId,
-  onToggleExpand,
-  onSelectCandidate,
-  onClearCandidateSelection,
-  onManualFieldChange,
-  onRemoveRow,
-}: OcrResolvedRowCardProps) {
-  const identifierName = row.resolvedName?.trim()
-  const identifierMeta = [row.resolvedMarket?.trim(), row.resolvedTicker?.trim(), row.resolvedCode?.trim()].filter(Boolean).join(' · ')
-  const identifierStatusText =
-    identifierStatus === 'loading'
-      ? '식별자 확인 중'
-      : identifierStatus === 'error'
-        ? '식별자 확인 실패'
-        : '식별자 미확인'
-  const isIdentifierSearching = identifierStatus === 'loading' && !identifierName && !identifierMeta
-  const hasCandidatePicker = candidates.length > 1
-  const selectedCandidate = candidates.find((candidate) => candidate.id === selectedCandidateId)
-  const needsManualConfirmation = row.resolutionState === 'manual-required'
-
+function OcrLoadingPanel({ progressPercent }: { progressPercent: number }) {
   return (
-    <div className={cn('min-w-0', !isLast && 'border-b border-[color:var(--jaroo-border)]')}>
-      <div className='min-w-0 px-4 py-3'>
-        <button
-          type='button'
-          onClick={hasCandidatePicker ? onToggleExpand : undefined}
-          className={cn(
-            'min-w-0 w-full text-left',
-            hasCandidatePicker ? 'transition hover:bg-[color:var(--jaroo-secondary)]' : 'cursor-default'
-          )}
-        >
-          <div className='min-w-0'>
-            <div className='min-w-0'>
-              <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{row.name || '-'}</p>
-            </div>
-          </div>
-
-          <div className='mt-3 min-w-0 rounded-[14px] border border-[#DCE8F5] bg-[#F7FBFF] px-3 py-2'>
-            <div className='flex min-w-0 items-start justify-between gap-3'>
-              <div className='min-w-0'>
-                <p className='text-[10px] text-[color:var(--jaroo-muted)]'>식별된 종목</p>
-                {identifierName || identifierMeta ? (
-                  <>
-                    <p className='mt-1 truncate text-[12px] font-semibold text-[color:var(--jaroo-ink)]'>{identifierName || row.name || '-'}</p>
-                    <p className='mt-1 truncate text-[10px] text-[color:var(--jaroo-primary)]'>{identifierMeta || '이름만 확인됨'}</p>
-                  </>
-                ) : (
-                  <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>{identifierStatusText}</p>
-                )}
-              </div>
-              {isIdentifierSearching ? (
-                <div
-                  role='status'
-                  aria-label='식별자 검색 중'
-                  className='flex shrink-0 items-center gap-1.5 rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[color:var(--jaroo-primary)] shadow-[0_4px_12px_rgba(75,157,245,0.12)]'
-                >
-                  <LoaderCircle className='size-3 animate-spin' strokeWidth={2.5} />
-                  <span>검색 중</span>
-                </div>
-              ) : hasCandidatePicker ? (
-                <div className='flex shrink-0 items-center gap-2 pl-2'>
-                  <span className='rounded-full bg-white px-2 py-1 text-[10px] font-semibold text-[color:var(--jaroo-primary)]'>
-                    {selectedCandidate ? '후보 적용됨' : `후보 ${candidates.length}개`}
-                  </span>
-                  <ChevronDown className={cn('size-4 text-[color:var(--jaroo-primary)] transition', isExpanded && 'rotate-180')} />
-                </div>
-              ) : null}
-            </div>
-          </div>
-        </button>
-
-        <div className='mt-3 grid min-w-0 grid-cols-2 gap-2'>
-          <OcrMetricChip label='보유 수량' value={row.quantity} />
-          <OcrMetricChip label='평가 금액' value={row.evaluationAmount} />
-          <OcrMetricChip label='평균 단가' value={row.averagePrice} />
-          <OcrMetricChip label='수익률' value={row.profitRate} valueClassName='text-[color:var(--jaroo-primary)]' />
-          <OcrRemoveChip label={`${row.name || '항목'} 제거`} onRemove={onRemoveRow} />
-        </div>
+    <div className='jaroo-ocr-load-wrap'>
+      <div className='jaroo-ocr-load-thumb'>
+        <div className='jaroo-ocr-load-thumb-line' style={{ width: '60%' }} />
+        <div className='jaroo-ocr-load-thumb-line' style={{ width: '80%' }} />
+        <div className='jaroo-ocr-load-thumb-line' style={{ width: '50%' }} />
+        <div className='jaroo-ocr-load-thumb-line' style={{ width: '75%' }} />
+        <div className='jaroo-ocr-load-thumb-line' style={{ width: '55%' }} />
+        <div className='jaroo-ocr-load-thumb-line' style={{ width: '70%' }} />
+        <div className='jaroo-ocr-scan-line' />
       </div>
-
-      {hasCandidatePicker && isExpanded ? (
-        <div className='border-t border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)] px-4 py-3'>
-          <div className='flex items-center justify-between gap-3'>
-            <div>
-              <p className='text-[11px] font-semibold text-[color:var(--jaroo-ink)]'>추천 식별 후보</p>
-              <p className='mt-1 text-[10px] text-[color:var(--jaroo-muted)]'>ticker-map 후보를 우선 노출하고, 부족한 경우 로컬 유니버스 후보를 함께 보여줘요.</p>
-            </div>
-            {selectedCandidate ? (
-              <button
-                type='button'
-                onClick={onClearCandidateSelection}
-                className='shrink-0 rounded-full border border-[color:var(--jaroo-primary)] bg-white px-2.5 py-1 text-[10px] font-semibold text-[color:var(--jaroo-primary)]'
-              >
-                기본 식별 유지
-              </button>
-            ) : null}
-          </div>
-
-          <div className='mt-3 space-y-2'>
-            {candidates.map((candidate, index) => {
-              const active = selectedCandidateId === candidate.id
-              const candidateMeta = [candidate.resolvedMarket?.trim(), candidate.resolvedTicker?.trim(), candidate.resolvedCode?.trim()].filter(Boolean).join(' · ')
-              const scoreLabel = formatCandidateScore(candidate.score)
-              const evidenceText = [candidate.source === 'ticker-map' ? 'ticker-map' : '로컬', scoreLabel, candidate.via].filter(Boolean).join(' · ')
-
-              return (
-                <button
-                  key={candidate.id}
-                  type='button'
-                  onClick={() => onSelectCandidate(candidate.id)}
-                  className={cn(
-                    'w-full rounded-[18px] border px-3 py-3 text-left transition',
-                    active
-                      ? 'border-[color:var(--jaroo-primary)] bg-white shadow-[0_6px_20px_rgba(75,157,245,0.12)]'
-                      : 'border-[color:var(--jaroo-border)] bg-white hover:bg-[#F9FCFF]',
-                  )}
-                >
-                  <div className='flex items-start justify-between gap-3'>
-                    <div className='min-w-0'>
-                      <div className='flex flex-wrap items-center gap-1.5'>
-                        <span className={cn('text-[10px] font-semibold', active ? 'text-[color:var(--jaroo-primary)]' : 'text-[color:var(--jaroo-muted)]')}>
-                          후보 {index + 1}
-                        </span>
-                        <span className='rounded-full bg-[color:var(--jaroo-secondary)] px-2 py-0.5 text-[10px] font-medium text-[color:var(--jaroo-muted)]'>
-                          {candidate.source === 'ticker-map' ? 'ticker-map' : '로컬'}
-                        </span>
-                      </div>
-                      <p className='mt-1 truncate text-[12px] font-semibold text-[color:var(--jaroo-ink)]'>{candidate.resolvedName}</p>
-                      <p className='mt-1 truncate text-[10px] text-[color:var(--jaroo-primary)]'>{candidateMeta || '식별자 일부만 확인됨'}</p>
-                      {evidenceText ? <p className='mt-1 truncate text-[10px] text-[color:var(--jaroo-muted)]'>{evidenceText}</p> : null}
-                    </div>
-                    <span
-                      className={cn(
-                        'shrink-0 rounded-full px-2 py-1 text-[10px] font-semibold',
-                        active ? 'bg-[color:var(--jaroo-primary)] text-white' : 'bg-[color:var(--jaroo-secondary)] text-[color:var(--jaroo-muted)]',
-                      )}
-                    >
-                      {active ? '적용됨' : '선택'}
-                    </span>
-                  </div>
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {needsManualConfirmation ? (
-        <div className='border-t border-[color:var(--jaroo-border)] bg-[#FFF8E8] px-4 py-3'>
-          <div className='mb-3 rounded-[16px] border border-[#F5D185] bg-white px-3 py-2'>
-            <p className='text-[11px] font-semibold text-[#854F0B]'>자동 후보가 없어요</p>
-            <p className='mt-1 text-[10px] leading-5 text-[#8A6520]'>종목명, ticker/code, market/kind, 보유 수량, 수익률, 평가 금액을 직접 확인해 주세요.</p>
-          </div>
-
-          <div className='grid grid-cols-1 gap-2 sm:grid-cols-2'>
-            <label className='space-y-1'>
-              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>종목명</span>
-              <input value={row.name} onChange={(event) => onManualFieldChange('name', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]' />
-            </label>
-            <label className='space-y-1'>
-              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>Ticker</span>
-              <input value={row.resolvedTicker ?? ''} onChange={(event) => onManualFieldChange('resolvedTicker', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]' />
-            </label>
-            <label className='space-y-1'>
-              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>Code</span>
-              <input value={row.resolvedCode ?? ''} onChange={(event) => onManualFieldChange('resolvedCode', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]' />
-            </label>
-            <label className='space-y-1'>
-              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>시장</span>
-              <select value={row.resolvedMarket ?? ''} onChange={(event) => onManualFieldChange('resolvedMarket', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]'>
-                <option value=''>선택</option>
-                <option value='KR'>KR</option>
-                <option value='US'>US</option>
-              </select>
-            </label>
-            <label className='space-y-1'>
-              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>종목 유형</span>
-              <select value={row.resolvedKind ?? ''} onChange={(event) => onManualFieldChange('resolvedKind', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]'>
-                <option value=''>선택</option>
-                <option value='stock'>stock</option>
-                <option value='etf'>etf</option>
-              </select>
-            </label>
-            <label className='space-y-1'>
-              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>보유 수량</span>
-              <input value={row.quantity} onChange={(event) => onManualFieldChange('quantity', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]' />
-            </label>
-            <label className='space-y-1'>
-              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>수익률</span>
-              <input value={row.profitRate} onChange={(event) => onManualFieldChange('profitRate', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]' />
-            </label>
-            <label className='space-y-1'>
-              <span className='text-[10px] font-medium text-[color:var(--jaroo-muted)]'>평가 금액</span>
-              <input value={row.evaluationAmount} onChange={(event) => onManualFieldChange('evaluationAmount', event.target.value)} className='w-full rounded-[14px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)]' />
-            </label>
-          </div>
-        </div>
-      ) : null}
+      <div className='jaroo-ocr-spinner' />
+      <div className='jaroo-ocr-load-txt'>종목을 읽고 있어요…</div>
+      <div className='jaroo-ocr-load-sub'>보통 5초 정도 걸려요</div>
+      <div className='jaroo-ocr-progress'>
+        <div className='jaroo-ocr-progress-fill' style={{ width: `${progressPercent}%` }} />
+      </div>
     </div>
   )
 }
 
+function getRowIdentifierMeta(row: OcrReviewRow | AggregatedOcrReviewRow) {
+  const identifier = row.resolvedCode?.trim() || row.resolvedTicker?.trim()
+  return [row.resolvedMarket?.trim(), identifier, row.quantity ? `${row.quantity}` : '', row.averagePrice ? `평단 ${row.averagePrice}` : '']
+    .filter(Boolean)
+    .join(' · ')
+}
+
+function isProfitRateUp(value: string) {
+  return !value.trim().startsWith('-') && !value.trim().startsWith('−')
+}
+
 export default function OcrPage() {
   const router = useRouter()
-  const session = useOcrUploadStore((state) => state.input)
+  const uploadStoreSession = useOcrUploadStore((state) => state.input)
+  const setUploadInput = useOcrUploadStore((state) => state.setInput)
   const clearUploadInput = useOcrUploadStore((state) => state.clear)
   const reviewRows = useOcrReviewStore((state) => state.rows)
   const instrumentCandidatesByRowId = useOcrReviewStore((state) => state.candidatesByRowId)
@@ -463,27 +281,34 @@ export default function OcrPage() {
   const errorMessage = useOcrReviewStore((state) => state.errorMessage ?? '')
   const instrumentResolveError = useOcrReviewStore((state) => state.resolveErrorMessage ?? '')
   const setReviewRows = useOcrReviewStore((state) => state.setRows)
-  const patchReviewRow = useOcrReviewStore((state) => state.patchRow)
-  const removeReviewRow = useOcrReviewStore((state) => state.removeRow)
   const replaceCandidates = useOcrReviewStore((state) => state.replaceCandidates)
   const selectCandidate = useOcrReviewStore((state) => state.selectCandidate)
   const setRequestStatus = useOcrReviewStore((state) => state.setRequestStatus)
   const setResolveStatus = useOcrReviewStore((state) => state.setResolveStatus)
   const resetReviewState = useOcrReviewStore((state) => state.resetForRestart)
   const resetMergeState = useMergeStore((state) => state.resetForBackNav)
+  const setMergeRows = useMergeStore((state) => state.setRows)
+  const applyStatus = useMergeStore((state) => state.applyStatus)
+  const applyError = useMergeStore((state) => state.errorMessage ?? '')
+  const setApplyStatus = useMergeStore((state) => state.setApplyStatus)
+  const markApplied = useMergeStore((state) => state.markApplied)
+  const replacePortfolioItems = usePortfolioStore((state) => state.replaceItems)
+  const setQuoteStatus = usePortfolioStore((state) => state.setQuoteStatus)
   const [uploadStatuses, setUploadStatuses] = useState<Record<string, UploadStatus>>({})
   const [baseMergedRows, setBaseMergedRows] = useState<OcrSourceRow[]>([])
   const [expandedRowId, setExpandedRowId] = useState<string | null>(null)
-  const [conflicts, setConflicts] = useState<ReturnType<typeof buildMergedOcrResult>['conflicts']>([])
+  const [conflicts, setConflicts] = useState<OcrConflict[]>([])
   const [conflictSelections, setConflictSelections] = useState<Record<string, string>>({})
   const [removedRowIds, setRemovedRowIds] = useState<Record<string, true>>({})
+  const [persistedUploadSession, setPersistedUploadSession] = useState<ScreenshotUploadSession | null>(null)
   const ocrRunIdRef = useRef(0)
   const autoOcrSessionKeyRef = useRef<string | null>(null)
+  const session = uploadStoreSession ?? persistedUploadSession
 
   useEffect(() => {
     if (!session) {
       autoOcrSessionKeyRef.current = null
-      setRequestStatus('error', '먼저 /screenshot 에서 분석할 스크린샷을 선택해주세요.')
+      setRequestStatus('error', '먼저 스크린샷 추가 화면에서 분석할 이미지를 선택해주세요.')
       setResolveStatus('idle')
       setUploadStatuses({})
       return
@@ -503,12 +328,30 @@ export default function OcrPage() {
     )
   }, [session, setRequestStatus, setResolveStatus])
 
+  useEffect(() => {
+    if (uploadStoreSession) {
+      setPersistedUploadSession(uploadStoreSession)
+      return
+    }
+
+    const restoredSession = readPersistedScreenshotUploadSession()
+
+    if (!restoredSession) {
+      setPersistedUploadSession(null)
+      return
+    }
+
+    setPersistedUploadSession(restoredSession)
+    setUploadInput(restoredSession)
+  }, [setUploadInput, uploadStoreSession])
+
   const runOcrBatch = useCallback(async (currentSession: ScreenshotUploadSession) => {
     const runId = ocrRunIdRef.current + 1
     ocrRunIdRef.current = runId
     const isCurrentRun = () => ocrRunIdRef.current === runId
 
     resetReviewState()
+    resetMergeState()
     setRequestStatus('loading')
     setResolveStatus('idle')
     setBaseMergedRows([])
@@ -564,7 +407,7 @@ export default function OcrPage() {
           | null
 
         if (!response.ok) {
-          throw new Error(payload?.error || 'OCR 요청에 실패했어요.')
+          throw new Error(payload?.error || '스크린샷 확인에 실패했어요.')
         }
 
         if (!isCurrentRun()) {
@@ -595,7 +438,7 @@ export default function OcrPage() {
           [upload.id]: {
             state: 'error',
             rowCount: 0,
-            errorMessage: error instanceof Error ? error.message : 'OCR 분석 중 문제가 발생했어요.',
+            errorMessage: toUserFacingOcrErrorMessage(error instanceof Error ? error.message : ''),
           },
         }))
       }
@@ -606,24 +449,11 @@ export default function OcrPage() {
     }
 
     const sourceRows = buildOcrSourceRows(currentSession.uploads, nextRowsByUpload)
-    const mergedResult = buildMergedOcrResult(sourceRows)
-    setBaseMergedRows(mergedResult.mergedRows)
-    setConflicts(mergedResult.conflicts)
-    setReviewRows(resolveMergedOcrRows(mergedResult.mergedRows, mergedResult.conflicts, {}).map(toReviewRow))
-
-    setConflictSelections((currentSelections) => {
-      const nextSelections = Object.fromEntries(
-        mergedResult.conflicts
-          .map((conflict) => {
-            const currentSelectedId = currentSelections[conflict.key]
-            const stillValid = conflict.candidates.some((candidate) => candidate.id === currentSelectedId)
-            return stillValid ? [conflict.key, currentSelectedId] : null
-          })
-          .filter((entry): entry is [string, string] => entry !== null),
-      )
-
-      return nextSelections
-    })
+    const rowsPreservingAccountVariants = sourceRows.sort((left, right) => left.uploadIndex - right.uploadIndex || left.rowIndex - right.rowIndex)
+    setBaseMergedRows(rowsPreservingAccountVariants)
+    setConflicts([])
+    setReviewRows(rowsPreservingAccountVariants.map(toReviewRow))
+    setConflictSelections({})
 
     if (hasErrors) {
       setRequestStatus('error', '일부 스크린샷 분석에 실패했어요. 실패한 항목을 확인하고 다시 시도해주세요.')
@@ -631,7 +461,7 @@ export default function OcrPage() {
     }
 
     setRequestStatus('success')
-  }, [resetReviewState, setRequestStatus, setResolveStatus, setReviewRows])
+  }, [resetMergeState, resetReviewState, setRequestStatus, setResolveStatus, setReviewRows])
 
   useEffect(() => {
     if (!session) {
@@ -657,22 +487,10 @@ export default function OcrPage() {
   )
 
   const resolvedRows = useMemo(() => {
-    const filteredBaseRows = baseMergedRows.filter((row) => !removedRowIds[row.id])
-    const autoResolvedRows = conflictsWithRemainingCandidates.flatMap((conflict) => {
-      if (conflict.candidates.length === 1) {
-        return conflict.candidates
-      }
-
-      return []
-    })
-
-    const filteredConflicts = conflictsWithRemainingCandidates.filter((conflict) => conflict.candidates.length > 1)
-    const chosenRows = resolveMergedOcrRows([], filteredConflicts, conflictSelections)
-
-    return [...filteredBaseRows, ...autoResolvedRows, ...chosenRows].sort(
+    return baseMergedRows.filter((row) => !removedRowIds[row.id]).sort(
       (left, right) => left.uploadIndex - right.uploadIndex || left.rowIndex - right.rowIndex,
     )
-  }, [baseMergedRows, conflictSelections, conflictsWithRemainingCandidates, removedRowIds])
+  }, [baseMergedRows, removedRowIds])
 
   const visibleConflicts = useMemo(
     () => conflictsWithRemainingCandidates.filter((conflict) => conflict.candidates.length > 1),
@@ -751,7 +569,7 @@ export default function OcrPage() {
         setReviewRows(applyInstrumentResolutionFailure(mergedState.rows))
         replaceCandidates(mergedState.candidatesByRowId)
         setExpandedRowId((current) => (current && mergedState.candidatesByRowId[current]?.length > 1 ? current : null))
-        setResolveStatus('error', error instanceof Error ? error.message : '종목 식별자 확인에 실패했어요.')
+        setResolveStatus('error', error instanceof Error ? error.message : '종목 확인에 실패했어요.')
       })
 
     return () => {
@@ -770,10 +588,27 @@ export default function OcrPage() {
     )
   }, [instrumentCandidatesByRowId, requestState, resolvedRows, reviewRows])
 
-  const completedUploadCount = useMemo(
-    () => session?.uploads.filter((upload) => uploadStatuses[upload.id]?.state === 'success').length ?? 0,
-    [session?.uploads, uploadStatuses],
+  const rowsReadyForApply = useMemo(
+    () => previewRows.filter((row) => row.resolutionState === 'resolved'),
+    [previewRows],
   )
+  const aggregatedRows = useMemo(
+    () => aggregateResolvedOcrReviewRows(rowsReadyForApply),
+    [rowsReadyForApply],
+  )
+  const rowsNeedingAttention = useMemo(
+    () => previewRows.filter((row) => row.resolutionState !== 'resolved'),
+    [previewRows],
+  )
+  const mergeRowsForApply = useMemo(
+    () => buildMergeRowsFromReviewRows(aggregatedRows),
+    [aggregatedRows],
+  )
+  const applicableApplyCount = useMemo(
+    () => mergeRowsForApply.filter((row) => row.status !== 'error').length,
+    [mergeRowsForApply],
+  )
+
   const processedUploadCount = useMemo(
     () => session?.uploads.filter((upload) => {
       const uploadState = uploadStatuses[upload.id]?.state
@@ -797,376 +632,236 @@ export default function OcrPage() {
     [previewRows],
   )
 
-  const summaryText = useMemo(() => {
-    if (requestState === 'loading') {
-      return `${completedUploadCount}/${session?.uploads.length ?? 0}장 분석 완료`
-    }
-
-    if (requestState === 'success') {
-      if (visibleConflicts.length > 0 && unresolvedConflictCount > 0) {
-        return `${previewRows.length}행 정리됨 · 충돌 ${unresolvedConflictCount}건 선택 필요`
-      }
-
-      if (instrumentResolveState === 'loading') {
-        return `${previewRows.length}개 종목 정리 완료 · 식별자 확인 중`
-      }
-
-      if (instrumentResolveState === 'error') {
-        return `${previewRows.length}개 종목 정리 완료 · 식별자 확인 재시도 필요`
-      }
-
-      return `${previewRows.length}개 종목 정리 완료`
-    }
-
-    if (requestState === 'error') {
-      return '일부 결과를 다시 확인해야 해요'
-    }
-
-    return '업로드된 스크린샷을 준비 중이에요'
-  }, [completedUploadCount, instrumentResolveState, previewRows.length, requestState, session?.uploads.length, unresolvedConflictCount, visibleConflicts.length])
-
   const canContinue =
     requestState === 'success'
     && (instrumentResolveState === 'success' || instrumentResolveState === 'error')
     && unresolvedConflictCount === 0
-    && previewRows.length > 0
+    && applicableApplyCount > 0
     && invalidManualRowIds.length === 0
-
-  const handleManualFieldChange = useCallback((rowId: string, field: ManualEditableField, value: string) => {
-    const currentRow = reviewRows.find((row) => row.id === rowId)
-
-    if (!currentRow) {
-      return
-    }
-
-    const normalizedValue = value.trim()
-    const nextRow: OcrReviewRow = {
-      ...currentRow,
-      name: field === 'name' ? value : currentRow.name,
-      resolvedName: field === 'name' ? value.trim() || currentRow.resolvedName : currentRow.resolvedName,
-      resolvedTicker: field === 'resolvedTicker' ? normalizedValue || undefined : currentRow.resolvedTicker,
-      resolvedCode: field === 'resolvedCode' ? normalizedValue || undefined : currentRow.resolvedCode,
-      resolvedMarket: field === 'resolvedMarket' ? normalizedValue || undefined : currentRow.resolvedMarket,
-      resolvedKind:
-        field === 'resolvedKind'
-          ? normalizedValue === 'stock' || normalizedValue === 'etf'
-            ? normalizedValue
-            : undefined
-          : currentRow.resolvedKind,
-      quantity: field === 'quantity' ? value : currentRow.quantity,
-      profitRate: field === 'profitRate' ? value : currentRow.profitRate,
-      evaluationAmount: field === 'evaluationAmount' ? value : currentRow.evaluationAmount,
-    }
-
-    nextRow.resolvedMarketTone = inferMarketTone(nextRow.resolvedMarket)
-    nextRow.averagePrice = computeAveragePrice(nextRow.quantity, nextRow.profitRate, nextRow.evaluationAmount)
-    nextRow.resolutionState = isManualRowComplete(nextRow) ? 'resolved' : 'manual-required'
-    patchReviewRow(rowId, nextRow)
-  }, [patchReviewRow, reviewRows])
+    && applyStatus !== 'loading'
 
   const handleContinue = () => {
     if (!canContinue || !session) {
       return
     }
 
-    setReviewRows(previewRows)
-    resetMergeState()
-    router.push('/merge')
+    setReviewRows(aggregatedRows)
+    setMergeRows(mergeRowsForApply)
+    setApplyStatus('loading')
+
+    try {
+      const appliedAt = new Date().toISOString()
+      const applyResult = persistAppliedPortfolioFromMergeRows(mergeRowsForApply, appliedAt)
+
+      if (!applyResult.persisted || applyResult.normalizedItems.length === 0) {
+        throw new Error('포트폴리오에 적용할 종목을 찾지 못했어요.')
+      }
+
+      const nextQuoteQuery = buildHomeCurrentQuoteQuery(applyResult.nextQuoteHoldings)
+      replacePortfolioItems(applyResult.normalizedItems)
+      setQuoteStatus('loading', null, nextQuoteQuery)
+      void hydratePortfolioItemsWithCurrentQuotes(applyResult.normalizedItems)
+        .then((result) => {
+          replacePortfolioItems(result.items)
+          setQuoteStatus(result.quoteStatus, result.quoteErrorMessage, result.quoteQuery)
+        })
+        .catch(() => {
+          setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', null)
+        })
+      markApplied(appliedAt)
+      clearPersistedScreenshotUploadSession()
+      clearUploadInput()
+      router.push('/home')
+    } catch (error) {
+      setApplyStatus('error', error instanceof Error ? error.message : '포트폴리오 저장에 실패했어요.')
+    }
   }
 
   const isIdentifierResolving = requestState === 'success' && instrumentResolveState === 'loading'
-  const progressState = isIdentifierResolving ? 'loading' : requestState
-  const progressStatusLabel = isIdentifierResolving ? '식별 중' : statusLabel[requestState]
+  const hasOcrError = requestState === 'error'
+  const uploadErrorMessage = session?.uploads
+    .map((upload) => uploadStatuses[upload.id]?.errorMessage)
+    .find((message): message is string => Boolean(message))
+  const displayErrorMessage = toUserFacingOcrErrorMessage(uploadErrorMessage || errorMessage)
+  const recognizedNames = aggregatedRows.map((row) => row.resolvedName || row.name).filter(Boolean).join(' · ')
+  const attentionCount = rowsNeedingAttention.length + unresolvedConflictCount
+  const canRetry = requestState !== 'loading' && Boolean(session)
+  const isOkCardOpen = expandedRowId === '__ok__' || aggregatedRows.length === 0
 
   return (
-    <JarooShell title='종목 확인' backHref='/screenshot' showBottomNav={false} mainClassName='space-y-3'>
-      <p className='text-[11px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>인식된 종목을 확인한 뒤 다음 단계로 진행하세요</p>
+    <div className='jaroo-ocr-page'>
+      <OcrResultDesignStyles />
+      <div className='jaroo-ocr-frame'>
+        <div className='jaroo-ocr-head'>
+          <button type='button' className='jaroo-ocr-head-back' onClick={() => router.push('/screenshot')} aria-label='뒤로 가기'>←</button>
+          <div className='jaroo-ocr-head-title'>종목 확인</div>
+        </div>
 
-      {session ? (
-        <Card className='overflow-hidden rounded-[24px] border border-[color:var(--jaroo-border)] bg-white shadow-none'>
-          <div className='flex items-center gap-3 border-b border-[color:var(--jaroo-border)] px-4 py-3'>
-            <div className='relative size-14 overflow-hidden rounded-2xl border border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)]'>
-              <Image src={session.uploads[0]?.imageDataUrl || ''} alt={session.uploads[0]?.fileName || '스크린샷'} fill unoptimized className='object-cover' />
-              {session.uploads.length > 1 ? (
-                <div className='absolute inset-x-0 bottom-0 bg-black/65 px-1.5 py-1 text-center text-[9px] font-semibold text-white'>
-                  +{session.uploads.length - 1}장
-                </div>
-              ) : null}
-            </div>
-            <div className='min-w-0 flex-1'>
-              <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{session.uploads.length}장 스크린샷</p>
-              <p className='mt-0.5 text-[11px] text-[color:var(--jaroo-muted)]'>{session.broker} 화면 분석</p>
-            </div>
-            <ScanSearch className='size-4 text-[color:var(--jaroo-primary)]' />
-          </div>
-
-          <div className='flex items-center justify-between gap-3 bg-[color:var(--jaroo-secondary)] px-4 py-3'>
-            <div className='flex min-w-0 items-center gap-2'>
-              <div
-                className={cn(
-                  'flex size-[18px] items-center justify-center rounded-full',
-                  progressState === 'success' && 'bg-[color:var(--jaroo-success-soft)] text-[color:var(--jaroo-success)]',
-                  progressState === 'loading' && 'bg-[color:var(--jaroo-accent)] text-[color:var(--jaroo-primary)]',
-                  progressState === 'error' && 'bg-[color:var(--jaroo-warning-soft)] text-[#854F0B]',
-                  progressState === 'idle' && 'bg-[color:var(--jaroo-secondary)] text-[color:var(--jaroo-muted)]',
-                )}
-              >
-                {progressState === 'loading' ? (
-                  <LoaderCircle className='size-3 animate-spin' strokeWidth={2.5} />
-                ) : progressState === 'error' ? (
-                  <AlertTriangle className='size-3' strokeWidth={2.5} />
-                ) : (
-                  <Check className='size-3' strokeWidth={2.5} />
-                )}
+        {requestState === 'loading' || isIdentifierResolving ? (
+          <OcrLoadingPanel progressPercent={visibleUploadProgressPercent} />
+        ) : (
+          <div className='jaroo-ocr-body'>
+            {hasOcrError ? (
+              <div className='jaroo-ocr-lead'><b>스크린샷 분석에 실패했어요.</b><br />다시 시도하거나 다른 이미지를 올려주세요.</div>
+            ) : (
+              <div className='jaroo-ocr-lead'>
+                <b>{session?.uploads.length ?? 0}장</b>에서 종목을 읽어 합쳤어요.<br />대부분 맞으면 바로 적용하면 돼요.
               </div>
-              <p className='truncate text-[12px] font-medium text-[color:var(--jaroo-ink)]'>{summaryText}</p>
-            </div>
-            <p
-              className={cn(
-                'shrink-0 text-[11px] font-medium',
-                progressState === 'success' && 'text-[color:var(--jaroo-success)]',
-                progressState === 'loading' && 'text-[color:var(--jaroo-primary)]',
-                progressState === 'error' && 'text-[#854F0B]',
-                progressState === 'idle' && 'text-[color:var(--jaroo-muted)]',
-              )}
-            >
-              {progressStatusLabel}
-            </p>
-          </div>
+            )}
 
-          {requestState === 'loading' ? (
-            <div className='border-t border-[color:var(--jaroo-border)] bg-white px-4 py-3'>
-              <div className='mb-2 flex items-center justify-between gap-3'>
-                <p className='text-[11px] font-medium text-[color:var(--jaroo-primary)]'>OCR 진행률</p>
-                <p className='text-[10px] font-semibold text-[color:var(--jaroo-muted)]'>
-                  {processedUploadCount}/{session.uploads.length}장
-                </p>
-              </div>
-              <div
-                role='progressbar'
-                aria-label='OCR 분석 진행률'
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={uploadProgressPercent}
-                className='h-2 overflow-hidden rounded-full bg-[color:var(--jaroo-accent)]'
-              >
-                <div
-                  className='h-full rounded-full bg-[color:var(--jaroo-primary)] transition-[width] duration-300 ease-out'
-                  style={{ width: `${visibleUploadProgressPercent}%` }}
-                />
-              </div>
-            </div>
-          ) : null}
-        </Card>
-      ) : null}
-
-      {session ? (
-        <Card className='overflow-hidden rounded-[24px] border border-[color:var(--jaroo-border)] bg-white shadow-none'>
-          <div className='border-b border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)] px-4 py-3'>
-            <p className='text-[12px] font-medium text-[color:var(--jaroo-muted)]'>이미지별 분석 상태</p>
-          </div>
-          <div>
-            {session.uploads.map((upload, index) => {
-              const status = uploadStatuses[upload.id] ?? { state: 'idle', rowCount: 0, errorMessage: '' }
-
-              return (
-                <div
-                  key={upload.id}
-                  className={cn(
-                    'grid grid-cols-[auto_1fr_auto] items-center gap-3 px-4 py-3',
-                    index < session.uploads.length - 1 && 'border-b border-[color:var(--jaroo-border)]',
-                  )}
+            {!hasOcrError ? (
+              <div className={`jaroo-ocr-ok-card ${isOkCardOpen ? 'open' : ''}`}>
+                <button
+                  type='button'
+                  className='jaroo-ocr-ok-head'
+                  aria-expanded={isOkCardOpen}
+                  onClick={() => setExpandedRowId((current) => (current === '__ok__' ? null : '__ok__'))}
                 >
-                  <div className='relative size-11 overflow-hidden rounded-[14px] border border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)]'>
-                    <Image src={upload.imageDataUrl} alt={upload.fileName} fill unoptimized className='object-cover' />
+                  <div className='jaroo-ocr-ok-check'>✓</div>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div className='jaroo-ocr-ok-title'>{aggregatedRows.length}개 종목 인식됐어요</div>
+                    <div className='jaroo-ocr-ok-names'>{recognizedNames || '인식된 종목이 없어요'}</div>
                   </div>
-                  <div className='min-w-0'>
-                    <p className='truncate text-[12px] font-medium text-[color:var(--jaroo-ink)]'>{index + 1}. {upload.fileName}</p>
-                    <p className='mt-0.5 truncate text-[10px] text-[color:var(--jaroo-muted)]'>
-                      {status.state === 'success'
-                        ? `${status.rowCount}개 종목 인식`
-                        : status.state === 'error'
-                          ? status.errorMessage
-                          : '대기 중'}
-                    </p>
-                  </div>
-                  <span
-                    className={cn(
-                      'rounded-full px-2 py-1 text-[10px] font-semibold',
-                      status.state === 'success' && 'bg-[color:var(--jaroo-success-soft)] text-[color:var(--jaroo-success)]',
-                      status.state === 'loading' && 'bg-[color:var(--jaroo-accent)] text-[color:var(--jaroo-primary)]',
-                      status.state === 'error' && 'bg-[color:var(--jaroo-warning-soft)] text-[#854F0B]',
-                      status.state === 'idle' && 'bg-[color:var(--jaroo-secondary)] text-[color:var(--jaroo-muted)]',
-                    )}
-                  >
-                    {status.state === 'loading' ? '진행중' : uploadStateLabel[status.state]}
-                  </span>
+                  <div className='jaroo-ocr-ok-arrow'>▼</div>
+                </button>
+                <div className='jaroo-ocr-ok-list'>
+                  {isOkCardOpen && aggregatedRows.length > 0 ? aggregatedRows.map((row, index) => {
+                    const accountDetails = row.accountDetails ?? []
+                    const isMerged = row.isAccountMerged
+
+                    return (
+                      <div key={`${row.id}-${index}`} className='jaroo-ocr-ok-row'>
+                        <div className='jaroo-ocr-okr-info'>
+                          <div className='jaroo-ocr-okr-name'>
+                            {row.resolvedName || row.name || '-'}
+                            {isMerged ? <span className='jaroo-ocr-merge-badge'>{accountDetails.length}개 계좌 합산</span> : null}
+                          </div>
+                          <div className='jaroo-ocr-okr-meta'>{getRowIdentifierMeta(row)}</div>
+                          {isMerged ? (
+                            <div className='jaroo-ocr-acct-detail'>
+                              {accountDetails.map((detail, detailIndex) => (
+                                <div key={detail.rowId} className='jaroo-ocr-acct-row'>
+                                  <span>{detail.sourceFileName || `계좌 ${detailIndex + 1}`}</span>
+                                  <span>{detail.quantity} · {detail.evaluationAmount}</span>
+                                </div>
+                              ))}
+                            </div>
+                          ) : null}
+                        </div>
+                        <div className='jaroo-ocr-okr-right'>
+                          <div className='jaroo-ocr-okr-amt'>{row.evaluationAmount || '-'}</div>
+                          <div className={`jaroo-ocr-okr-rate ${isProfitRateUp(row.profitRate) ? 'up' : 'down'}`}>{row.profitRate || '-'}</div>
+                          <button type='button' className='jaroo-ocr-okr-edit' onClick={() => setExpandedRowId(row.id)}>수정</button>
+                        </div>
+                      </div>
+                    )
+                  }) : null}
+                  {isOkCardOpen && aggregatedRows.length === 0 ? (
+                    <div className='jaroo-ocr-ok-row'>
+                      <div className='jaroo-ocr-okr-info'>
+                        <div className='jaroo-ocr-okr-name'>인식된 종목이 없어요</div>
+                        <div className='jaroo-ocr-okr-meta'>종목 목록이 보이도록 스크린샷을 다시 선택해보세요.</div>
+                      </div>
+                    </div>
+                  ) : null}
                 </div>
-              )
-            })}
-          </div>
-        </Card>
-      ) : null}
-
-      {visibleConflicts.length > 0 ? (
-        <section className='space-y-3'>
-          <div className='rounded-[20px] border border-[#FAC775] bg-[color:var(--jaroo-warning-soft)] px-4 py-3'>
-            <p className='text-[12px] font-semibold text-[#854F0B]'>충돌 머지 확인</p>
-            <p className='mt-1 text-[11px] leading-5 text-[#8A6520]'>중복 종목 {visibleConflicts.length}건 중 {unresolvedConflictCount}건이 아직 선택되지 않았어요.</p>
-          </div>
-
-          {visibleConflicts.map((conflict) => (
-            <OcrConflictMergeCard
-              key={conflict.key}
-              conflict={conflict}
-              selectedCandidateId={conflictSelections[conflict.key]}
-              onSelect={(candidateId) =>
-                setConflictSelections((current) => ({
-                  ...current,
-                  [conflict.key]: candidateId,
-                }))
-              }
-            />
-          ))}
-        </section>
-      ) : null}
-
-      <Card className='overflow-hidden rounded-[24px] border border-[color:var(--jaroo-border)] bg-white shadow-none'>
-        <div className='border-b border-[color:var(--jaroo-border)] bg-[color:var(--jaroo-secondary)] px-4 py-3'>
-          <p className='text-[11px] font-medium text-[color:var(--jaroo-muted)]'>종목명과 식별자(name/ticker/code/market), 보유 수량, 수익률, 평가 금액, 평균 단가를 함께 확인하세요. 후보가 여러 개인 카드만 추천 후보를 펼칠 수 있어요.</p>
-        </div>
-
-        {isIdentifierResolving ? (
-          <div
-            role='status'
-            aria-label='식별자 검색 중'
-            className='flex items-center gap-2 border-b border-[#DCE8F5] bg-[#F7FBFF] px-4 py-3 text-[12px] font-medium text-[color:var(--jaroo-primary)]'
-          >
-            <LoaderCircle className='size-4 shrink-0 animate-spin' strokeWidth={2.5} />
-            <span className='min-w-0 truncate'>종목 식별자를 검색하고 있어요</span>
-          </div>
-        ) : null}
-
-        {requestState === 'loading' ? (
-          <div className='flex flex-col items-center justify-center gap-3 px-4 py-10 text-center'>
-            <LoaderCircle className='size-5 animate-spin text-[color:var(--jaroo-primary)]' />
-            <div>
-              <p className='text-[13px] font-medium text-[color:var(--jaroo-ink)]'>OCR 분석 중</p>
-              <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>여러 스크린샷에서 종목명, 보유 수량, 수익률, 평가 금액을 순서대로 추출하고 있어요.</p>
-            </div>
-            <div className='w-full max-w-[220px]'>
-              <div
-                role='progressbar'
-                aria-label='OCR 분석 진행률'
-                aria-valuemin={0}
-                aria-valuemax={100}
-                aria-valuenow={uploadProgressPercent}
-                className='h-2 overflow-hidden rounded-full bg-[color:var(--jaroo-accent)]'
-              >
-                <div
-                  className='h-full rounded-full bg-[color:var(--jaroo-primary)] transition-[width] duration-300 ease-out'
-                  style={{ width: `${visibleUploadProgressPercent}%` }}
-                />
               </div>
-            </div>
+            ) : null}
+
+            {hasOcrError ? (
+              <div className='jaroo-ocr-warn-card'>
+                <div className='jaroo-ocr-warn-head'>
+                  <div className='jaroo-ocr-warn-ico'>⚠️</div>
+                  <div className='jaroo-ocr-warn-title'>분석을 완료하지 못했어요</div>
+                </div>
+                <div className='jaroo-ocr-warn-body'>
+                  <div className='jaroo-ocr-warn-read'>{displayErrorMessage}</div>
+                  <div className='jaroo-ocr-warn-actions'>
+                    {canRetry ? <button type='button' className='jaroo-ocr-warn-search' onClick={() => session && void runOcrBatch(session)}>다시 확인하기</button> : null}
+                    <button
+                      type='button'
+                      className='jaroo-ocr-warn-skip'
+                      onClick={() => {
+                        clearPersistedScreenshotUploadSession()
+                        clearUploadInput()
+                        resetReviewState()
+                        router.push('/screenshot')
+                      }}
+                    >
+                      다시 선택
+                    </button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {!hasOcrError && attentionCount > 0 ? (
+              <div className='jaroo-ocr-warn-card'>
+                <div className='jaroo-ocr-warn-head'>
+                  <div className='jaroo-ocr-warn-ico'>⚠️</div>
+                  <div className='jaroo-ocr-warn-title'>{attentionCount}개는 확인이 필요해요</div>
+                </div>
+                <div className='jaroo-ocr-warn-body'>
+                  {rowsNeedingAttention.slice(0, 3).map((row) => {
+                    const candidates = instrumentCandidatesByRowId[row.id] ?? []
+                    const selectedId = row.selectedCandidateId ?? candidates[0]?.id
+                    return (
+                      <div key={row.id}>
+                        <div className='jaroo-ocr-warn-read'>읽은 종목: <b>{row.name || '-'}</b> · {row.quantity || '-'} · {row.averagePrice ? `평단 ${row.averagePrice}` : row.evaluationAmount}</div>
+                        {candidates.length > 0 ? <div className='jaroo-ocr-cand-label'>이 종목인가요?</div> : null}
+                        {candidates.slice(0, 2).map((candidate) => {
+                          const active = selectedId === candidate.id
+                          const candidateMeta = [candidate.resolvedMarket, candidate.resolvedCode || candidate.resolvedTicker].filter(Boolean).join(' · ')
+                          return (
+                            <button key={candidate.id} type='button' className={`jaroo-ocr-cand ${active ? 'sel' : ''}`} onClick={() => selectCandidate(row.id, candidate.id)}>
+                              <div className='jaroo-ocr-cand-radio' />
+                              <div className='jaroo-ocr-cand-info'>
+                                <div className='jaroo-ocr-cand-name'>{candidate.resolvedName}</div>
+                                <div className='jaroo-ocr-cand-code'>{candidateMeta || '정보 확인 중'}</div>
+                              </div>
+                              <div className='jaroo-ocr-cand-meta'>{formatCandidateScore(candidate.score) || '후보'}</div>
+                            </button>
+                          )
+                        })}
+                      </div>
+                    )
+                  })}
+                  <div className='jaroo-ocr-warn-actions'>
+                    <button type='button' className='jaroo-ocr-warn-search' onClick={() => setExpandedRowId(rowsNeedingAttention[0]?.id ?? null)}>직접 확인</button>
+                    <button type='button' className='jaroo-ocr-warn-skip'>나중에 추가</button>
+                  </div>
+                </div>
+              </div>
+            ) : null}
+
+            {requestState === 'success' && instrumentResolveState === 'error' ? (
+              <div className='jaroo-ocr-warn-card'>
+                <div className='jaroo-ocr-warn-head'>
+                  <div className='jaroo-ocr-warn-ico'>⚠️</div>
+                  <div className='jaroo-ocr-warn-title'>종목 확인에 실패했어요</div>
+                </div>
+                <div className='jaroo-ocr-warn-body'>
+                  <div className='jaroo-ocr-warn-read'>{instrumentResolveError || '일부 종목은 직접 확인해주세요.'}</div>
+                </div>
+              </div>
+            ) : null}
+
+            <button type='button' className='jaroo-ocr-add-more' onClick={() => router.push('/screenshot')}>
+              <span style={{ fontSize: 14, color: '#5A6473' }}>＋</span>
+              <div className='jaroo-ocr-add-more-lbl'>다른 계좌 있으면 스크린샷 추가</div>
+            </button>
+
+            <div className='jaroo-ocr-privacy'>개인정보는 분석 후 즉시 안전하게 파기됩니다</div>
           </div>
-        ) : null}
+        )}
 
-        {requestState !== 'loading' && previewRows.length > 0 ? (
-          <div>
-            {previewRows.map((item, index) => {
-              const isLast = index === previewRows.length - 1
-
-              return (
-                <OcrResolvedRowCard
-                  key={`${item.id}-${index}`}
-                  row={item}
-                  isLast={isLast}
-                  identifierStatus={instrumentResolveState}
-                  candidates={instrumentCandidatesByRowId[item.id] ?? []}
-                  isExpanded={expandedRowId === item.id}
-                  selectedCandidateId={item.selectedCandidateId ?? undefined}
-                  onToggleExpand={() => setExpandedRowId((current) => (current === item.id ? null : item.id))}
-                  onSelectCandidate={(candidateId) => selectCandidate(item.id, candidateId)}
-                  onClearCandidateSelection={() =>
-                    selectCandidate(item.id, null)
-                  }
-                  onManualFieldChange={(field, value) => handleManualFieldChange(item.id, field, value)}
-                  onRemoveRow={() => {
-                    setRemovedRowIds((current) => ({ ...current, [item.id]: true }))
-                    removeReviewRow(item.id)
-                    if (expandedRowId === item.id) {
-                      setExpandedRowId(null)
-                    }
-                  }}
-                />
-              )
-            })}
-          </div>
-        ) : null}
-
-        {requestState !== 'loading' && previewRows.length === 0 ? (
-          <div className='px-4 py-8 text-center'>
-            <p className='text-[13px] font-medium text-[color:var(--jaroo-ink)]'>인식된 종목이 없어요</p>
-            <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>종목 목록이 보이도록 스크린샷을 다시 선택해보세요.</p>
-          </div>
-        ) : null}
-      </Card>
-
-      {requestState === 'success' && instrumentResolveState === 'error' ? (
-        <div className='flex items-start gap-2 rounded-[20px] border border-[#FAC775] bg-[color:var(--jaroo-warning-soft)] px-4 py-3 text-[#854F0B]'>
-          <AlertTriangle className='mt-0.5 size-4 shrink-0' />
-          <p className='text-[12px] leading-6'>{instrumentResolveError || '종목 식별자 확인에 실패했어요. OCR 다시 시도하기로 새로 분석해주세요.'}</p>
+        <div className='jaroo-ocr-footer'>
+          <button type='button' className='jaroo-ocr-apply-btn' onClick={handleContinue} disabled={!canContinue}>
+            → {applyStatus === 'loading' ? '적용 중...' : `${applicableApplyCount}개 종목 적용하기`}
+          </button>
+          <div className='jaroo-ocr-apply-sub'>{applyError || '적용하면 홈에서 분석을 시작할 수 있어요'}</div>
         </div>
-      ) : null}
-
-      {requestState === 'error' ? (
-        <div className='flex items-start gap-2 rounded-[20px] border border-[#FAC775] bg-[color:var(--jaroo-warning-soft)] px-4 py-3 text-[#854F0B]'>
-          <AlertTriangle className='mt-0.5 size-4 shrink-0' />
-          <p className='text-[12px] leading-6'>{errorMessage || '세션 정보가 없거나 OCR 응답이 유효하지 않았어요. 다시 업로드한 뒤 재시도해주세요.'}</p>
-        </div>
-      ) : null}
-
-      {requestState !== 'loading' && session ? (
-        <Button
-          type='button'
-          variant='outline'
-          onClick={() => void runOcrBatch(session)}
-          className='h-12 w-full rounded-[20px] border-[color:#B5D4F4] bg-[color:var(--jaroo-accent)] text-[13px] font-medium text-[color:var(--jaroo-primary)] shadow-none hover:bg-[#d9eafb]'
-        >
-          <span className='flex items-center gap-2'>
-            <RefreshCcw className='size-4' />
-            OCR 다시 시도하기
-          </span>
-        </Button>
-      ) : null}
-
-      <button
-        type='button'
-        onClick={() => {
-          clearUploadInput()
-          resetReviewState()
-          router.push('/screenshot')
-        }}
-        className='flex items-center justify-center gap-2 rounded-[20px] border border-[#B5D4F4] bg-[color:var(--jaroo-accent)] px-4 py-3 text-center text-[12px] font-medium text-[color:var(--jaroo-primary)] transition hover:bg-[#d9eafb]'
-      >
-        <ScanSearch className='size-4' />
-        <span>스크린샷 다시 선택하기</span>
-      </button>
-
-      <Button
-        type='button'
-        onClick={handleContinue}
-        disabled={!canContinue}
-        className='h-12 w-full rounded-[20px] bg-[color:var(--jaroo-primary)] text-[14px] font-medium text-white hover:bg-[color:var(--jaroo-primary-strong)] disabled:opacity-45'
-      >
-        <span className='flex items-center gap-2'>
-          <ArrowRight className='size-4' />
-          분석 시작하기
-        </span>
-      </Button>
-
-      <p className='text-center text-[10px] text-[#b8c0cb]'>개인정보는 분석 후 즉시 안전하게 파기됩니다</p>
-    </JarooShell>
+      </div>
+    </div>
   )
 }

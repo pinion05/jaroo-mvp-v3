@@ -43,6 +43,21 @@ const OCR_SCHEMA = {
   },
 } as const
 
+type OpenRouterRequestBody = {
+  model: string
+  temperature: number
+  max_tokens: number
+  response_format?: {
+    type: 'json_schema'
+    json_schema: typeof OCR_SCHEMA
+  }
+  messages: Array<{
+    role: 'system' | 'user'
+    content: string | Array<{ type: 'text'; text: string } | { type: 'image_url'; image_url: { url: string } }>
+  }>
+}
+
+
 const SYSTEM_PROMPT = `You are an OCR extraction engine for Korean and English brokerage screenshots.
 Return ONLY valid JSON matching the provided schema.
 Never output markdown, prose, explanations, code fences, or extra keys.
@@ -72,12 +87,38 @@ OCR guidance:
 - evaluationAmount must map to the row-level valuation/market value amount, not profit/loss amount, principal, or a totals summary.
 - If the same row appears twice due to sticky headers or repeated sections, keep one row only.`
 
+const DEFAULT_OCR_MODEL = 'google/gemini-2.0-flash-lite-001'
+const DEFAULT_OCR_FALLBACK_MODELS = [
+  'qwen/qwen3-vl-8b-instruct',
+  'google/gemma-4-26b-a4b-it',
+  'qwen/qwen3.5-9b',
+] as const
+
+
 export function extractOpenRouterErrorMessage(result: OpenRouterResponse | null | undefined) {
   return typeof result?.error?.message === 'string' ? result.error.message.trim() : ''
 }
 
 export function extractOpenRouterErrorStatus(result: OpenRouterResponse | null | undefined) {
   return typeof result?.error?.code === 'number' && Number.isInteger(result.error.code) ? result.error.code : 502
+}
+
+export function toPublicOcrErrorMessage(message: string) {
+  const normalizedMessage = message.trim()
+
+  if (!normalizedMessage) {
+    return '스크린샷 분석에 실패했어요. 잠시 후 다시 시도해주세요.'
+  }
+
+  if (/key limit exceeded|rate limit|quota|insufficient credits|credit limit/i.test(normalizedMessage)) {
+    return 'OCR 사용량 한도를 초과했어요. 잠시 후 다시 시도하거나 관리자에게 문의해주세요.'
+  }
+
+  if (/invalid image|image size|unsupported image/i.test(normalizedMessage)) {
+    return '이미지 형식을 확인할 수 없어요. 더 선명한 스크린샷으로 다시 시도해주세요.'
+  }
+
+  return '스크린샷 분석에 실패했어요. 잠시 후 다시 시도해주세요.'
 }
 
 function extractTextContent(content: string | Array<{ type?: string; text?: string }> | undefined) {
@@ -95,9 +136,141 @@ function extractTextContent(content: string | Array<{ type?: string; text?: stri
   return ''
 }
 
+
+export function extractJsonObjectText(rawContent: string) {
+  const trimmedContent = rawContent.trim()
+  const fencedJsonMatch = trimmedContent.match(/^```(?:json)?\s*([\s\S]*?)\s*```$/i)
+  const unfencedContent = (fencedJsonMatch?.[1] ?? trimmedContent).trim()
+
+  if (unfencedContent.startsWith('{') && unfencedContent.endsWith('}')) {
+    return unfencedContent
+  }
+
+  const jsonStart = unfencedContent.indexOf('{')
+  const jsonEnd = unfencedContent.lastIndexOf('}')
+
+  if (jsonStart >= 0 && jsonEnd > jsonStart) {
+    return unfencedContent.slice(jsonStart, jsonEnd + 1)
+  }
+
+  return unfencedContent
+}
+
+function getFallbackModels(primaryModel: string) {
+  const configuredFallbacks = (process.env.OCR_FALLBACK_MODELS ?? '')
+    .split(',')
+    .map((fallbackModel) => fallbackModel.trim())
+    .filter(Boolean)
+  const fallbackModels = configuredFallbacks.length > 0 ? configuredFallbacks : [...DEFAULT_OCR_FALLBACK_MODELS]
+
+  return fallbackModels.filter((fallbackModel, index, models) => fallbackModel !== primaryModel && models.indexOf(fallbackModel) === index)
+}
+
+function buildOpenRouterOcrBody(options: {
+  model: string
+  broker: string
+  fileName: string
+  imageDataUrl: string
+  useJsonSchema: boolean
+}): OpenRouterRequestBody {
+  return {
+    model: options.model,
+    temperature: 0,
+    max_tokens: 1024,
+    ...(options.useJsonSchema
+      ? {
+          response_format: {
+            type: 'json_schema' as const,
+            json_schema: OCR_SCHEMA,
+          },
+        }
+      : {}),
+    messages: [
+      {
+        role: 'system',
+        content: SYSTEM_PROMPT,
+      },
+      {
+        role: 'user',
+        content: [
+          {
+            type: 'text',
+            text: `Extract holdings rows from this brokerage screenshot. Broker hint: ${options.broker || 'unknown'}. Filename: ${options.fileName}. Return JSON matching the schema exactly.`,
+          },
+          {
+            type: 'image_url',
+            image_url: {
+              url: options.imageDataUrl,
+            },
+          },
+        ],
+      },
+    ],
+  }
+}
+
+async function requestOpenRouterOcr(options: {
+  apiKey: string
+  model: string
+  broker: string
+  fileName: string
+  imageDataUrl: string
+  useJsonSchema: boolean
+}) {
+  const upstreamResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      Authorization: `Bearer ${options.apiKey}`,
+      'Content-Type': 'application/json',
+      'HTTP-Referer': 'http://localhost:3200',
+      'X-Title': 'jaroo-mvp-v3 OCR',
+    },
+    body: JSON.stringify(buildOpenRouterOcrBody(options)),
+  })
+
+  const result = (await upstreamResponse.json().catch(() => null)) as OpenRouterResponse | null
+  const upstreamErrorMessage = extractOpenRouterErrorMessage(result)
+
+  if (!upstreamResponse.ok || upstreamErrorMessage) {
+    return {
+      ok: false as const,
+      status: !upstreamResponse.ok ? upstreamResponse.status || 502 : extractOpenRouterErrorStatus(result),
+      errorMessage: upstreamErrorMessage || 'OpenRouter OCR request failed.',
+    }
+  }
+
+  const rawContent = extractTextContent(result?.choices?.[0]?.message?.content)
+
+  if (!rawContent) {
+    return {
+      ok: false as const,
+      status: 502,
+      errorMessage: 'OpenRouter returned an empty OCR response.',
+    }
+  }
+
+  let parsed: unknown
+
+  try {
+    parsed = JSON.parse(extractJsonObjectText(rawContent))
+  } catch {
+    return {
+      ok: false as const,
+      status: 502,
+      errorMessage: 'OpenRouter returned invalid JSON.',
+    }
+  }
+
+  return {
+    ok: true as const,
+    rows: sanitizeOcrRows((parsed as { rows?: unknown })?.rows),
+  }
+}
+
 export async function POST(request: Request) {
   const apiKey = process.env.OPENROUTER_API_KEY
-  const model = process.env.OCR_MODEL || 'qwen/qwen3.5-flash-02-23'
+  const model = process.env.OCR_MODEL || DEFAULT_OCR_MODEL
+  const useJsonSchema = process.env.OCR_RESPONSE_FORMAT === 'json_schema'
 
   if (!apiKey) {
     return NextResponse.json({ error: 'OPENROUTER_API_KEY is not configured.' }, { status: 500 })
@@ -119,70 +292,36 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'A valid imageDataUrl is required.' }, { status: 400 })
   }
 
-  const upstreamResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'http://localhost:3000',
-      'X-Title': 'jaroo-mvp-v3 OCR',
-    },
-    body: JSON.stringify({
-      model,
-      temperature: 0,
-      response_format: {
-        type: 'json_schema',
-        json_schema: OCR_SCHEMA,
-      },
-      messages: [
-        {
-          role: 'system',
-          content: SYSTEM_PROMPT,
-        },
-        {
-          role: 'user',
-          content: [
-            {
-              type: 'text',
-              text: `Extract holdings rows from this brokerage screenshot. Broker hint: ${broker || 'unknown'}. Filename: ${fileName}. Return JSON matching the schema exactly.`,
-            },
-            {
-              type: 'image_url',
-              image_url: {
-                url: imageDataUrl,
-              },
-            },
-          ],
-        },
-      ],
-    }),
-  })
+  const attempts = [
+    { model, useJsonSchema },
+    ...getFallbackModels(model).map((fallbackModel) => ({ model: fallbackModel, useJsonSchema: false })),
+  ]
+  const errors: Array<{ status: number; errorMessage: string }> = []
 
-  const result = (await upstreamResponse.json().catch(() => null)) as OpenRouterResponse | null
-  const upstreamErrorMessage = extractOpenRouterErrorMessage(result)
+  for (const attempt of attempts) {
+    const result = await requestOpenRouterOcr({
+      apiKey,
+      model: attempt.model,
+      broker,
+      fileName,
+      imageDataUrl,
+      useJsonSchema: attempt.useJsonSchema,
+    })
 
-  if (!upstreamResponse.ok || upstreamErrorMessage) {
-    return NextResponse.json(
-      { error: upstreamErrorMessage || 'OpenRouter OCR request failed.' },
-      { status: !upstreamResponse.ok ? upstreamResponse.status || 502 : extractOpenRouterErrorStatus(result) },
-    )
+    if (result.ok) {
+      return NextResponse.json({ rows: result.rows })
+    }
+
+    errors.push({
+      status: result.status,
+      errorMessage: result.errorMessage,
+    })
   }
 
-  const rawContent = extractTextContent(result?.choices?.[0]?.message?.content)
+  const firstError = errors[0]
 
-  if (!rawContent) {
-    return NextResponse.json({ error: 'OpenRouter returned an empty OCR response.' }, { status: 502 })
-  }
-
-  let parsed: unknown
-
-  try {
-    parsed = JSON.parse(rawContent)
-  } catch {
-    return NextResponse.json({ error: 'OpenRouter returned invalid JSON.' }, { status: 502 })
-  }
-
-  const rows = sanitizeOcrRows((parsed as { rows?: unknown })?.rows)
-
-  return NextResponse.json({ rows })
+  return NextResponse.json(
+    { error: toPublicOcrErrorMessage(firstError?.errorMessage || 'OpenRouter OCR request failed.') },
+    { status: firstError?.status || 502 },
+  )
 }
