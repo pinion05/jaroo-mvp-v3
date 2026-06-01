@@ -1,20 +1,15 @@
 'use client'
 
-import Image from 'next/image'
-import { useMemo, useState, type ChangeEvent } from 'react'
+import { useRef, useState, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
-import { ArrowLeft, Camera, ImagePlus, ImageUp, Sparkles } from 'lucide-react'
-import { JarooShell } from '@/components/jaroo-shell'
-import { Button } from '@/components/ui/button'
 import {
   MAX_SCREENSHOT_UPLOADS,
-  type ScreenshotUploadImage,
+  persistScreenshotUploadSession,
 } from '@/lib/screenshot-ocr'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
 import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
 import { useOcrUploadStore } from '@/lib/stores/use-ocr-upload-store'
-import { cn } from '@/lib/utils'
 
 const MAX_TOTAL_IMAGE_DATA_URL_LENGTH = 4_000_000
 const PERSISTED_SCREENSHOT_BROKER = '기타'
@@ -37,23 +32,131 @@ function readFileAsDataUrl(file: File) {
   })
 }
 
+function UploadDesignStyles() {
+  return (
+    <style>{`
+      .jaroo-upload-page *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Pretendard',sans-serif;-webkit-font-smoothing:antialiased}
+      .jaroo-upload-page{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;min-height:100vh;min-height:100dvh;align-items:flex-start;color:#0F1419}
+      @media (min-width:1024px){.jaroo-upload-page{margin-left:-7rem}}
+      .jaroo-upload-frame{background:#F5F6F8;border-radius:16px;width:340px;height:720px;overflow-y:auto;overflow-x:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative}
+      .jaroo-upload-frame::-webkit-scrollbar{display:none}
+      .jaroo-upload-head{position:sticky;top:0;z-index:10;background:rgba(245,246,248,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;border-bottom:.5px solid #E8EAEE;display:flex;align-items:center;gap:11px}
+      .jaroo-upload-head-back{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;color:#0F1419;box-shadow:0 1px 2px rgba(0,0,0,.04);border:0;cursor:pointer;line-height:1}
+      .jaroo-upload-head-title{font-size:15px;font-weight:600;color:#0F1419}
+      .jaroo-upload-body{padding:18px 16px 24px}
+      .jaroo-upload-body.first{padding-top:24px}
+      .jaroo-upload-body.sheet-open{filter:blur(1px);opacity:.5}
+      .jaroo-upload-logo{font-size:22px;font-weight:700;color:#0F1419;letter-spacing:-.5px;margin-bottom:6px}
+      .jaroo-upload-intro{font-size:14px;color:#5A6473;line-height:1.5;margin-bottom:20px}
+      .jaroo-upload-intro b{color:#0F1419;font-weight:600}
+      .jaroo-upload-lead{font-size:13px;color:#5A6473;line-height:1.5;margin-bottom:16px}
+      .jaroo-upload-lead b{color:#0F1419;font-weight:600}
+      .jaroo-upload-ex-card{background:#fff;border-radius:14px;border:.5px solid #E8EAEE;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:14px 16px;margin-bottom:14px}
+      .jaroo-upload-ex-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
+      .jaroo-upload-ex-check{width:20px;height:20px;border-radius:50%;background:#E5F3EB;display:flex;align-items:center;justify-content:center;font-size:11px;color:#1A7340;flex-shrink:0}
+      .jaroo-upload-ex-label{font-size:12px;font-weight:600;color:#0F1419}
+      .jaroo-upload-ex-mock{background:#F5F6F8;border-radius:10px;padding:4px 12px;margin-bottom:11px}
+      .jaroo-upload-ex-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:.5px solid #E8EAEE}
+      .jaroo-upload-ex-row:last-child{border-bottom:none}
+      .jaroo-upload-exr-name{font-size:12px;font-weight:600;color:#0F1419}
+      .jaroo-upload-exr-cnt{font-size:10px;color:#97A0AE;margin-top:1px}
+      .jaroo-upload-exr-amt{font-size:12px;font-weight:600;color:#0F1419;font-variant-numeric:tabular-nums;text-align:right}
+      .jaroo-upload-exr-rate{font-size:10px;margin-top:1px;font-variant-numeric:tabular-nums;text-align:right}
+      .jaroo-upload-exr-rate.up{color:#1A9D55}.jaroo-upload-exr-rate.down{color:#E5484D}
+      .jaroo-upload-ex-hint{font-size:11.5px;color:#5A6473;line-height:1.55;text-align:center}
+      .jaroo-upload-ex-hint b{color:#2B6BE6;font-weight:600}
+      .jaroo-upload-upzone{display:block;width:100%;background:#fff;border-radius:14px;border:1.5px dashed #B8C4D4;padding:26px 16px;text-align:center;cursor:pointer;margin-bottom:12px;appearance:none}
+      .jaroo-upload-upzone:disabled{cursor:default;opacity:1}
+      .jaroo-upload-up-icon{width:50px;height:50px;border-radius:50%;background:#2B6BE6;display:flex;align-items:center;justify-content:center;margin:0 auto 11px;font-size:22px}
+      .jaroo-upload-up-label{font-size:14.5px;font-weight:600;color:#0F1419;margin-bottom:4px}
+      .jaroo-upload-up-hint{font-size:11.5px;color:#97A0AE}
+      .jaroo-upload-up-note{font-size:10.5px;color:#97A0AE;text-align:center;margin-bottom:14px}
+      .jaroo-upload-error{font-size:11px;color:#E5484D;text-align:center;margin:-5px 0 12px;line-height:1.45}
+      .jaroo-upload-privacy{font-size:10px;color:#97A0AE;text-align:center;margin-top:8px;line-height:1.5}
+      .jaroo-upload-dim{position:absolute;inset:0;background:rgba(15,20,25,.45);display:flex;flex-direction:column;justify-content:flex-end;z-index:20}
+      .jaroo-upload-sheet{background:#fff;border-radius:18px 18px 0 0;padding:12px 0 24px}
+      .jaroo-upload-sh-handle{width:34px;height:4px;border-radius:2px;background:#D8DCE2;margin:0 auto 16px}
+      .jaroo-upload-sh-title{font-size:13px;font-weight:600;color:#0F1419;padding:0 20px;margin-bottom:16px}
+      .jaroo-upload-sh-opts{display:flex;justify-content:space-around;padding:0 16px}
+      .jaroo-upload-sh-opt{display:flex;flex-direction:column;align-items:center;gap:8px;border:0;background:transparent;cursor:pointer}
+      .jaroo-upload-sh-icon{width:54px;height:54px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:23px}
+      .jaroo-upload-sh-lbl{font-size:11px;color:#5A6473;text-align:center;line-height:1.3}
+      .jaroo-upload-load-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 16px}
+      .jaroo-upload-load-thumb{width:120px;height:150px;border-radius:12px;background:#fff;border:.5px solid #E8EAEE;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:24px;position:relative;overflow:hidden}
+      .jaroo-upload-load-thumb-line{height:9px;background:#EEF0F3;border-radius:3px;margin:11px 12px}
+      .jaroo-upload-scan-line{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,#2B6BE6,transparent);animation:jarooUploadScan 1.8s ease-in-out infinite;box-shadow:0 0 8px rgba(43,107,230,.6)}
+      @keyframes jarooUploadScan{0%{top:8%}50%{top:88%}100%{top:8%}}
+      .jaroo-upload-spinner{width:34px;height:34px;border:3px solid #E8EAEE;border-top-color:#2B6BE6;border-radius:50%;animation:jarooUploadSpin .8s linear infinite;margin-bottom:16px}
+      @keyframes jarooUploadSpin{to{transform:rotate(360deg)}}
+      .jaroo-upload-load-txt{font-size:14px;font-weight:600;color:#0F1419;margin-bottom:5px}
+      .jaroo-upload-load-sub{font-size:11.5px;color:#97A0AE}
+      .jaroo-upload-file-input{display:none}
+    `}</style>
+  )
+}
+
+function ExampleCard({ firstUser }: { firstUser: boolean }) {
+  return (
+    <div className='jaroo-upload-ex-card'>
+      <div className='jaroo-upload-ex-head'>
+        <div className='jaroo-upload-ex-check'>✓</div>
+        <div className='jaroo-upload-ex-label'>{firstUser ? '이렇게 보이는 화면을 올려주세요' : '이렇게 보이는 화면이 좋아요'}</div>
+      </div>
+      <div className='jaroo-upload-ex-mock'>
+        {[
+          ['삼성전자', '1주', '321,000원', '+40.9%', 'up'],
+          ['LG디스플레이', '16주', '227,040원', '−0.4%', 'down'],
+          ['SFA반도체', '23주', '224,710원', '−14.3%', 'down'],
+        ].map(([name, count, amount, rate, tone]) => (
+          <div key={name} className='jaroo-upload-ex-row'>
+            <div>
+              <div className='jaroo-upload-exr-name'>{name}</div>
+              <div className='jaroo-upload-exr-cnt'>{count}</div>
+            </div>
+            <div>
+              <div className='jaroo-upload-exr-amt'>{amount}</div>
+              <div className={`jaroo-upload-exr-rate ${tone}`}>{rate}</div>
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className='jaroo-upload-ex-hint'><b>종목명 · 수량 · 평가금액</b>이<br />또렷하게 보이면 잘 읽혀요.</div>
+    </div>
+  )
+}
+
+function LoadingPanel() {
+  return (
+    <div className='jaroo-upload-load-wrap'>
+      <div className='jaroo-upload-load-thumb'>
+        <div className='jaroo-upload-load-thumb-line' style={{ width: '60%' }} />
+        <div className='jaroo-upload-load-thumb-line' style={{ width: '80%' }} />
+        <div className='jaroo-upload-load-thumb-line' style={{ width: '50%' }} />
+        <div className='jaroo-upload-load-thumb-line' style={{ width: '75%' }} />
+        <div className='jaroo-upload-load-thumb-line' style={{ width: '55%' }} />
+        <div className='jaroo-upload-load-thumb-line' style={{ width: '70%' }} />
+        <div className='jaroo-upload-scan-line' />
+      </div>
+      <div className='jaroo-upload-spinner' />
+      <div className='jaroo-upload-load-txt'>종목을 읽고 있어요…</div>
+      <div className='jaroo-upload-load-sub'>보통 5초 정도 걸려요</div>
+    </div>
+  )
+}
+
 export default function ScreenshotPage() {
   const router = useRouter()
   const setUploadInput = useOcrUploadStore((state) => state.setInput)
   const clearReviewState = useOcrReviewStore((state) => state.resetForRestart)
   const clearMergeState = useMergeStore((state) => state.resetForBackNav)
   const clearDeepScanState = useDeepScanStore((state) => state.clear)
-  const [uploads, setUploads] = useState<ScreenshotUploadImage[]>([])
   const [isPreparing, setIsPreparing] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
-
-  const uploadSummaryText = useMemo(() => {
-    if (uploads.length === 0) {
-      return '아래 파일 선택 버튼으로 실제 이미지를 고르세요'
-    }
-
-    return `${uploads.length}장 선택됨 · /ocr에서 순서대로 분석돼요`
-  }, [uploads.length])
+  const [isSheetOpen, setIsSheetOpen] = useState(false)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const photoInputRef = useRef<HTMLInputElement>(null)
+  const isFirstPortfolio = false
 
   const handleBack = () => {
     if (window.history.length > 1) {
@@ -67,18 +170,23 @@ export default function ScreenshotPage() {
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
     event.target.value = ''
+    setIsSheetOpen(false)
+    setIsPreparing(true)
 
     if (files.length === 0) {
+      setIsPreparing(false)
       return
     }
 
     if (files.length > MAX_SCREENSHOT_UPLOADS) {
       setErrorMessage(`한 번에 최대 ${MAX_SCREENSHOT_UPLOADS}장까지 업로드할 수 있어요.`)
+      setIsPreparing(false)
       return
     }
 
     if (files.some((file) => !file.type.startsWith('image/'))) {
       setErrorMessage('이미지 파일만 업로드할 수 있어요.')
+      setIsPreparing(false)
       return
     }
 
@@ -94,7 +202,7 @@ export default function ScreenshotPage() {
 
     if (!nextUploads) {
       setErrorMessage('이미지를 읽는 중 문제가 생겼어요. 다시 시도해주세요.')
-      setUploads([])
+      setIsPreparing(false)
       return
     }
 
@@ -102,32 +210,28 @@ export default function ScreenshotPage() {
 
     if (totalImagePayloadLength > MAX_TOTAL_IMAGE_DATA_URL_LENGTH) {
       setErrorMessage('선택한 이미지 용량이 너무 커요. 장수를 줄이거나 더 작은 스크린샷으로 다시 시도해주세요.')
-      setUploads([])
+      setIsPreparing(false)
       return
-    }
-
-    setUploads(nextUploads)
-  }
-
-  const handleContinue = () => {
-    if (uploads.length === 0) {
-      setErrorMessage('먼저 스크린샷 이미지를 선택해주세요.')
-      return
-    }
-
-    setIsPreparing(true)
-
-    const payload = {
-      broker: PERSISTED_SCREENSHOT_BROKER,
-      uploads,
     }
 
     try {
+      const nextSession = {
+        broker: PERSISTED_SCREENSHOT_BROKER,
+        uploads: nextUploads,
+      }
+
       clearReviewState()
       clearMergeState()
       clearDeepScanState()
-      setUploadInput(payload)
+      persistScreenshotUploadSession(nextSession)
+      setUploadInput(nextSession)
       router.push('/ocr')
+
+      window.setTimeout(() => {
+        if (window.location.pathname !== '/ocr') {
+          window.location.assign('/ocr')
+        }
+      }, 800)
     } catch {
       setIsPreparing(false)
       setErrorMessage('이미지 임시 저장에 실패했어요. 장수를 줄이거나 더 작은 스크린샷으로 다시 시도해주세요.')
@@ -135,98 +239,69 @@ export default function ScreenshotPage() {
   }
 
   return (
-    <JarooShell
-      title='스크린샷 추가'
-      leading={
-        <Button
-          type='button'
-          variant='ghost'
-          size='icon-lg'
-          onClick={handleBack}
-          className='size-9 rounded-full bg-[color:var(--jaroo-secondary)] text-[color:var(--jaroo-ink)] hover:bg-[color:var(--jaroo-accent)]'
-        >
-          <ArrowLeft className='size-4' />
-          <span className='sr-only'>뒤로 가기</span>
-        </Button>
-      }
-      showBottomNav={false}
-      mainClassName='px-4 py-4'
-    >
-      <div className='space-y-4'>
-        <section className='space-y-2'>
-          <p className='text-[11px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>추가할 MTS 보유 종목 화면을 올려주세요</p>
-
-          <div
-            className={cn(
-              'w-full rounded-[24px] border border-dashed px-4 py-5 text-center transition',
-              uploads.length > 0
-                ? 'border-[color:var(--jaroo-success)]/55 bg-[color:var(--jaroo-success-ghost)]'
-                : 'border-[color:var(--jaroo-primary)]/30 bg-[color:var(--jaroo-accent)]/40',
-            )}
-          >
-            <div className='mx-auto flex size-12 items-center justify-center rounded-full bg-[color:var(--jaroo-primary)] text-white'>
-              {uploads.length > 0 ? <ImagePlus className='size-5' /> : <Camera className='size-5' />}
-            </div>
-            <p className='mt-3 text-[14px] font-medium text-[color:var(--jaroo-ink)]'>스크린샷 업로드</p>
-            <p className='mt-1 text-[11px] text-[color:var(--jaroo-muted)]'>{uploadSummaryText}</p>
-
-            {uploads.length > 0 ? (
-              <div className='mt-4 grid grid-cols-3 gap-2'>
-                {uploads.map((upload, index) => (
-                  <div key={upload.id} className='overflow-hidden rounded-[18px] border border-white/90 bg-white shadow-sm'>
-                    <div className='relative aspect-[3/4]'>
-                      <Image src={upload.imageDataUrl} alt={upload.fileName} fill unoptimized className='object-cover' />
-                    </div>
-                    <div className='border-t border-[color:var(--jaroo-border)] px-2 py-2 text-left'>
-                      <p className='truncate text-[10px] font-medium text-[color:var(--jaroo-ink)]'>{index + 1}. {upload.fileName}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            ) : null}
+    <div className='jaroo-upload-page'>
+      <UploadDesignStyles />
+      <div className='jaroo-upload-frame'>
+        {!isFirstPortfolio || isPreparing ? (
+          <div className='jaroo-upload-head'>
+            <button type='button' className='jaroo-upload-head-back' onClick={handleBack} aria-label='뒤로 가기'>←</button>
+            <div className='jaroo-upload-head-title'>스크린샷 추가</div>
           </div>
+        ) : null}
 
-          <input
-            id='screenshot-upload'
-            type='file'
-            accept='image/*'
-            multiple
-            onChange={handleFileChange}
-            className='block w-full cursor-pointer rounded-[18px] border border-[color:var(--jaroo-border)] bg-white px-3 py-2 text-[12px] text-[color:var(--jaroo-ink)] file:mr-3 file:rounded-[12px] file:border-0 file:bg-[color:var(--jaroo-primary)] file:px-3 file:py-2 file:text-[12px] file:font-medium file:text-white'
-          />
+        {isPreparing ? (
+          <LoadingPanel />
+        ) : (
+          <div className={`jaroo-upload-body ${isFirstPortfolio ? 'first' : ''} ${isSheetOpen ? 'sheet-open' : ''}`}>
+            {isFirstPortfolio ? (
+              <>
+                <div className='jaroo-upload-logo'>Jaroo</div>
+                <div className='jaroo-upload-intro'>MTS 스크린샷 한 장으로<br /><b>내 주식을 AI가 진단</b>해드려요.</div>
+              </>
+            ) : (
+              <div className='jaroo-upload-lead'><b>MTS 보유 종목 화면</b>을 올려주세요.<br />종목을 자동으로 읽어드려요.</div>
+            )}
 
-          {errorMessage ? <p className='text-[11px] text-[#D54841]'>{errorMessage}</p> : null}
-          <p className='text-[10px] text-[color:var(--jaroo-muted)]'>최대 {MAX_SCREENSHOT_UPLOADS}장까지 선택 가능 · 다시 선택하면 새 목록으로 바뀌어요</p>
-        </section>
+            <ExampleCard firstUser={isFirstPortfolio} />
 
-        <div className='space-y-2 pt-1'>
-          <Button
-            type='button'
-            onClick={handleContinue}
-            disabled={uploads.length === 0 || isPreparing}
-            className='h-12 w-full rounded-[20px] bg-[color:var(--jaroo-primary)] text-[14px] font-medium text-white hover:bg-[color:var(--jaroo-primary-strong)] disabled:bg-[color:var(--jaroo-primary)] disabled:opacity-45'
-          >
-            <span className='flex items-center gap-2'>
-              <Sparkles className='size-4' />
-              {isPreparing ? '분석 화면으로 이동 중...' : '종목 자동 추출하기'}
-            </span>
-          </Button>
+            <button type='button' className='jaroo-upload-upzone' onClick={() => setIsSheetOpen(true)}>
+              <div className='jaroo-upload-up-icon'>📷</div>
+              <div className='jaroo-upload-up-label'>스크린샷 올리기</div>
+              <div className='jaroo-upload-up-hint'>탭해서 갤러리에서 선택</div>
+            </button>
+            <div className='jaroo-upload-up-note'>최대 5장까지 · 여러 계좌면 나눠 올려도 돼요</div>
+            {errorMessage ? <div className='jaroo-upload-error'>{errorMessage}</div> : null}
+            <div className='jaroo-upload-privacy'>개인정보는 분석 후 즉시 안전하게 파기됩니다</div>
+          </div>
+        )}
 
-          <Button
-            type='button'
-            variant='outline'
-            onClick={() => router.push('/home')}
-            className='h-12 w-full rounded-[20px] border-[color:var(--jaroo-border)] bg-white text-[13px] text-[color:var(--jaroo-muted)] shadow-none hover:bg-[color:var(--jaroo-secondary)]'
-          >
-            <span className='flex items-center gap-2'>
-              <ImageUp className='size-4' />
-              취소
-            </span>
-          </Button>
-        </div>
+        {isSheetOpen && !isPreparing ? (
+          <div className='jaroo-upload-dim' onClick={() => setIsSheetOpen(false)}>
+            <div className='jaroo-upload-sheet' onClick={(event) => event.stopPropagation()}>
+              <div className='jaroo-upload-sh-handle' />
+              <div className='jaroo-upload-sh-title'>어떻게 올릴까요?</div>
+              <div className='jaroo-upload-sh-opts'>
+                <button type='button' className='jaroo-upload-sh-opt' onClick={() => cameraInputRef.current?.click()}>
+                  <div className='jaroo-upload-sh-icon' style={{ background: '#F2F3F6' }}>📷</div>
+                  <div className='jaroo-upload-sh-lbl'>카메라</div>
+                </button>
+                <button type='button' className='jaroo-upload-sh-opt' onClick={() => fileInputRef.current?.click()}>
+                  <div className='jaroo-upload-sh-icon' style={{ background: '#FCEFD2' }}>📁</div>
+                  <div className='jaroo-upload-sh-lbl'>내 파일</div>
+                </button>
+                <button type='button' className='jaroo-upload-sh-opt' onClick={() => photoInputRef.current?.click()}>
+                  <div className='jaroo-upload-sh-icon' style={{ background: '#E6F0FE' }}>🖼️</div>
+                  <div className='jaroo-upload-sh-lbl'>사진</div>
+                </button>
+              </div>
+            </div>
+          </div>
+        ) : null}
 
-        <p className='pt-0.5 text-center text-[10px] text-[#b8c0cb]'>개인정보는 분석 후 즉시 안전하게 파기됩니다</p>
+        <input ref={cameraInputRef} type='file' accept='image/*' capture='environment' multiple className='jaroo-upload-file-input' onChange={handleFileChange} />
+        <input ref={fileInputRef} type='file' accept='image/*' multiple className='jaroo-upload-file-input' onChange={handleFileChange} />
+        <input ref={photoInputRef} type='file' accept='image/*' multiple className='jaroo-upload-file-input' onChange={handleFileChange} />
       </div>
-    </JarooShell>
+    </div>
   )
 }

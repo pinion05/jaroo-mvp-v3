@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { extractOpenRouterErrorMessage, extractOpenRouterErrorStatus } from './route'
+import { extractJsonObjectText, extractOpenRouterErrorMessage, extractOpenRouterErrorStatus, toPublicOcrErrorMessage } from './route'
 
 test('OpenRouter가 HTTP 200으로 error payload를 내려도 메시지를 추출한다', () => {
   const message = extractOpenRouterErrorMessage({
@@ -36,4 +36,16 @@ test('정상 payload 에서는 error message가 없다', () => {
   })
 
   assert.equal(message, '')
+})
+
+test('OCR upstream key limit errors are not exposed verbatim', () => {
+  const message = toPublicOcrErrorMessage('Key limit exceeded (total limit). Manage it using https://openrouter.ai/workspaces/default/keys/key-id')
+
+  assert.equal(message, 'OCR 사용량 한도를 초과했어요. 잠시 후 다시 시도하거나 관리자에게 문의해주세요.')
+  assert.doesNotMatch(message, /openrouter|key-id/i)
+})
+
+test('extractJsonObjectText accepts fenced JSON from schema-free OCR models', () => {
+  assert.equal(extractJsonObjectText('```json\n{"rows":[]}\n```'), '{"rows":[]}')
+  assert.equal(extractJsonObjectText('prefix {"rows":[]} suffix'), '{"rows":[]}')
 })

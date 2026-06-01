@@ -29,6 +29,84 @@ export type ScreenshotUploadSession = {
   uploads: ScreenshotUploadImage[]
 }
 
+function sanitizeScreenshotUploadSession(value: unknown): ScreenshotUploadSession | null {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const candidate = value as Partial<ScreenshotUploadSession>
+
+  if (typeof candidate.broker !== 'string' || !Array.isArray(candidate.uploads)) {
+    return null
+  }
+
+  const uploads = candidate.uploads.flatMap((upload) => {
+    if (!upload || typeof upload !== 'object') {
+      return []
+    }
+
+    const candidateUpload = upload as Partial<ScreenshotUploadImage>
+
+    if (
+      typeof candidateUpload.id !== 'string'
+      || typeof candidateUpload.fileName !== 'string'
+      || typeof candidateUpload.imageDataUrl !== 'string'
+      || !candidateUpload.imageDataUrl.startsWith('data:image/')
+    ) {
+      return []
+    }
+
+    return [{
+      id: candidateUpload.id,
+      fileName: candidateUpload.fileName,
+      imageDataUrl: candidateUpload.imageDataUrl,
+    }]
+  })
+
+  if (uploads.length === 0 || uploads.length !== candidate.uploads.length || uploads.length > MAX_SCREENSHOT_UPLOADS) {
+    return null
+  }
+
+  return {
+    broker: candidate.broker,
+    uploads,
+  }
+}
+
+export function persistScreenshotUploadSession(session: ScreenshotUploadSession) {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.sessionStorage.setItem(SCREENSHOT_OCR_STORAGE_KEY, JSON.stringify(session))
+}
+
+export function readPersistedScreenshotUploadSession() {
+  if (typeof window === 'undefined') {
+    return null
+  }
+
+  const rawSession = window.sessionStorage.getItem(SCREENSHOT_OCR_STORAGE_KEY)
+
+  if (!rawSession) {
+    return null
+  }
+
+  try {
+    return sanitizeScreenshotUploadSession(JSON.parse(rawSession))
+  } catch {
+    return null
+  }
+}
+
+export function clearPersistedScreenshotUploadSession() {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.sessionStorage.removeItem(SCREENSHOT_OCR_STORAGE_KEY)
+}
+
 export type OcrSourceRow = OcrRow & {
   id: string
   uploadId: string
@@ -93,6 +171,28 @@ export function parseOcrNumber(value: string) {
   return isWrappedNegative ? -Math.abs(parsedValue) : parsedValue
 }
 
+export function parseOcrProfitRate(value: string) {
+  const normalizedValue = value.trim().replace(/[−–—]/g, '-')
+
+  if (!normalizedValue) {
+    return null
+  }
+
+  const percentMatch = normalizedValue.match(/([+-]?(?:\d+(?:[,.]\d+)*\.?\d*|\.\d+))\s*%/)
+  if (percentMatch?.[1]) {
+    const parsedPercent = Number(percentMatch[1].replaceAll(',', ''))
+    if (!Number.isFinite(parsedPercent)) {
+      return null
+    }
+
+    const hasExplicitPercentSign = /^[+-]/.test(percentMatch[1])
+    const inheritsNegativeSign = !hasExplicitPercentSign && normalizedValue.startsWith('-')
+    return inheritsNegativeSign ? -Math.abs(parsedPercent) : parsedPercent
+  }
+
+  return parseOcrNumber(value)
+}
+
 export function formatComputedNumber(value: number) {
   const roundedValue = Number(value.toFixed(4))
 
@@ -108,7 +208,7 @@ export function formatComputedNumber(value: number) {
 
 export function computeAveragePrice(quantity: string, profitRate: string, evaluationAmount: string) {
   const parsedQuantity = parseOcrNumber(quantity)
-  const parsedProfitRate = parseOcrNumber(profitRate)
+  const parsedProfitRate = parseOcrProfitRate(profitRate)
   const parsedEvaluationAmount = parseOcrNumber(evaluationAmount)
 
   if (parsedQuantity === null || parsedProfitRate === null || parsedEvaluationAmount === null || parsedQuantity === 0) {
@@ -238,7 +338,12 @@ export function sanitizeOcrInstrumentCandidateLists(input: unknown): OcrInstrume
 }
 
 export function normalizeStockName(name: string) {
-  return name.trim().replace(/\s+/g, ' ').toLowerCase()
+  return name
+    .trim()
+    .replace(/^[\s#★☆▶▷◀◁▸•·*_\-=+[\\\](){}<>~!|"'“”‘’.,;:]+|[\s#★☆▶▷◀◁▸•·*_\-=+[\\\](){}<>~!|"'“”‘’.,;:]+$/g, '')
+    .replace(/#/g, '')
+    .replace(/\s+/g, '')
+    .toLowerCase()
 }
 
 export function normalizeComparableValue(value: string) {

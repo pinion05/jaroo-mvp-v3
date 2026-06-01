@@ -3,7 +3,8 @@ import assert from 'node:assert/strict'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import { buildAppliedHomePortfolioRowsFromConfirmedHoldings, buildMergeRowsFromReviewRows, MergeResultRowCard, prepareMergeRowsForApply } from './jaroo-merge-screen'
+import { MergeResultRowCard } from './jaroo-merge-screen'
+import { buildAppliedHomePortfolioRowsFromConfirmedHoldings, buildMergeRowsFromReviewRows, prepareMergeRowsForApply } from '@/lib/ocr-portfolio-apply'
 import type { OcrReviewRow } from '@/lib/workflow-types'
 
 function createReviewRow(overrides: Partial<OcrReviewRow> = {}): OcrReviewRow {

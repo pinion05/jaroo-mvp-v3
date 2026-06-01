@@ -8,103 +8,19 @@ import { Card } from '@/components/ui/card'
 import { JarooShell } from '@/components/jaroo-shell'
 import { buildHomeCurrentQuoteQuery } from '@/lib/home-current-quotes'
 import { hydratePortfolioItemsWithCurrentQuotes } from '@/lib/home-quote-bootstrap'
-import { buildHomeHoldingsFromPortfolioItems, persistAppliedHomePortfolio, type AppliedHomePortfolioRow } from '@/lib/jaroo-home-data'
-import { computeAveragePrice } from '@/lib/screenshot-ocr'
+import {
+  buildMergeRowsFromReviewRows,
+  persistAppliedPortfolioFromMergeRows,
+} from '@/lib/ocr-portfolio-apply'
 import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
 import { usePortfolioStore } from '@/lib/stores/use-portfolio-store'
 import {
-  createMergeRowId,
   getApplicableConfirmedHoldings,
-  toConfirmedHolding,
   toPortfolioNormalizedItem,
-  type ConfirmedHolding,
   type MergeRow,
-  type OcrReviewRow,
 } from '@/lib/workflow-types'
 import { cn } from '@/lib/utils'
-
-function isMissingAveragePrice(value: string) {
-  const normalizedValue = value.replace(/[−–—]/g, '-').trim()
-
-  if (!normalizedValue) {
-    return true
-  }
-
-  if (/^-+$/.test(normalizedValue)) {
-    return true
-  }
-
-  return normalizedValue.toLowerCase().replace(/[./\s]/g, '') === 'na'
-}
-
-export function prepareMergeRowsForApply<T extends { averagePrice: string; quantity: string; profitRate: string; evaluationAmount: string }>(rows: T[]) {
-  return rows.map((row) => {
-    if (!isMissingAveragePrice(row.averagePrice)) {
-      return { ...row }
-    }
-
-    return {
-      ...row,
-      averagePrice: computeAveragePrice(row.quantity, row.profitRate, row.evaluationAmount),
-    }
-  })
-}
-
-export function buildMergeRowsFromReviewRows(rows: OcrReviewRow[]): MergeRow[] {
-  return rows.map((row) => {
-    const preparedReviewRow = {
-      ...row,
-      averagePrice: isMissingAveragePrice(row.averagePrice)
-        ? computeAveragePrice(row.quantity, row.profitRate, row.evaluationAmount)
-        : row.averagePrice,
-    }
-    const confirmedHolding = toConfirmedHolding(preparedReviewRow)
-    const mergeRow: MergeRow = {
-      id: createMergeRowId(row.id, confirmedHolding.displayName),
-      sourceRowId: row.id,
-      status: 'ready',
-      ...confirmedHolding,
-    }
-
-    if (row.resolutionState !== 'resolved') {
-      return {
-        ...mergeRow,
-        status: 'error',
-        errorCode: 'merge-upstream-review-incomplete',
-        errorMessage: '이 행은 OCR 검수에서 아직 확정되지 않았어요. /ocr 로 돌아가 다시 확인해주세요.',
-      }
-    }
-
-    if (!toPortfolioNormalizedItem(confirmedHolding)) {
-      return {
-        ...mergeRow,
-        status: 'error',
-        errorCode: 'merge-normalization-failed',
-        errorMessage: '이 행은 홈 포트폴리오 형식으로 변환할 수 없어요. /ocr 로 돌아가 값을 다시 확인해주세요.',
-      }
-    }
-
-    return mergeRow
-  })
-}
-
-export function buildAppliedHomePortfolioRowsFromConfirmedHoldings(holdings: ConfirmedHolding[]): AppliedHomePortfolioRow[] {
-  return holdings.map((holding) => ({
-    name: holding.displayName,
-    quantity: holding.quantityText,
-    averagePrice: holding.averagePriceText,
-    averagePriceCurrency: holding.averagePriceCurrency ?? (holding.marketTone === 'nasdaq' ? 'USD' : 'KRW'),
-    code: holding.code,
-    ticker: holding.ticker,
-    resolvedName: holding.displayName,
-    resolvedCode: holding.code,
-    resolvedTicker: holding.ticker,
-    resolvedMarket: holding.market,
-    resolvedMarketTone: holding.marketTone,
-    resolvedKind: holding.kind,
-  }))
-}
 
 function MergeMetricChip({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
   return (
@@ -213,20 +129,16 @@ export default function JarooMergeScreen() {
 
     try {
       const appliedAt = new Date().toISOString()
-      const persisted = persistAppliedHomePortfolio({
-        broker: 'OCR 적용 포트폴리오',
-        rows: buildAppliedHomePortfolioRowsFromConfirmedHoldings(applicableHoldings),
-        appliedAt,
-      })
+      const applyResult = persistAppliedPortfolioFromMergeRows(mergeRows, appliedAt)
 
-      if (!persisted) {
+      if (!applyResult.persisted) {
         throw new Error('홈 포트폴리오 저장에 실패했어요.')
       }
 
-      const nextQuoteQuery = buildHomeCurrentQuoteQuery(buildHomeHoldingsFromPortfolioItems(normalizedItems))
-      replacePortfolioItems(normalizedItems)
+      const nextQuoteQuery = buildHomeCurrentQuoteQuery(applyResult.nextQuoteHoldings)
+      replacePortfolioItems(applyResult.normalizedItems)
       setQuoteStatus('loading', null, nextQuoteQuery)
-      void hydratePortfolioItemsWithCurrentQuotes(normalizedItems)
+      void hydratePortfolioItemsWithCurrentQuotes(applyResult.normalizedItems)
         .then((result) => {
           replacePortfolioItems(result.items)
           setQuoteStatus(result.quoteStatus, result.quoteErrorMessage, result.quoteQuery)
