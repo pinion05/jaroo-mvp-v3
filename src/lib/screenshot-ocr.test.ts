@@ -5,6 +5,7 @@ import {
   clearPersistedScreenshotUploadSession,
   normalizeStockName,
   parseOcrNumber,
+  parseOcrProfitRate,
   persistScreenshotUploadSession,
   readPersistedScreenshotUploadSession,
   SCREENSHOT_OCR_STORAGE_KEY,
@@ -16,10 +17,15 @@ test('normalizeStockName removes #, whitespace, and decorative edge symbols', ()
   assert.equal(normalizeStockName('▶  TIGER 미국 S&P500  ◀'), 'tiger미국s&p500')
 })
 
-test('parseOcrNumber prefers embedded percent values for OCR profit text', () => {
-  assert.equal(parseOcrNumber('+20,347 (1.4%)'), 1.4)
-  assert.equal(parseOcrNumber('-11,167 (5.7%)'), -5.7)
-  assert.equal(parseOcrNumber('−19,964 (15.1%)'), -15.1)
+test('parseOcrProfitRate prefers embedded percent values for OCR profit text', () => {
+  assert.equal(parseOcrProfitRate('+20,347 (1.4%)'), 1.4)
+  assert.equal(parseOcrProfitRate('-11,167 (5.7%)'), -5.7)
+  assert.equal(parseOcrProfitRate('−19,964 (15.1%)'), -15.1)
+})
+
+test('parseOcrNumber does not mistake adjacent percent text for an amount', () => {
+  assert.equal(parseOcrNumber('1,423,947원 (+1.4%)'), null)
+  assert.equal(parseOcrNumber('1,423,947원'), 1423947)
 })
 
 test('screenshot upload session survives a hard navigation fallback', () => {

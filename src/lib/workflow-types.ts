@@ -1,5 +1,5 @@
 import type { JarooDeepScanPayload } from '../../packages/contracts/src/deepscan'
-import { parseOcrNumber } from './screenshot-ocr'
+import { parseOcrNumber, parseOcrProfitRate } from './screenshot-ocr'
 
 export type WorkflowMarketTone = 'kospi' | 'kosdaq' | 'nasdaq' | 'etf'
 export type WorkflowInstrumentKind = 'stock' | 'etf'
@@ -184,7 +184,7 @@ export function toConfirmedHolding(row: OcrReviewRow): ConfirmedHolding {
     quantityText: row.quantity,
     quantityValue: parseOcrNumber(row.quantity) ?? undefined,
     profitRateText: row.profitRate,
-    profitRateValue: parseOcrNumber(row.profitRate) ?? undefined,
+    profitRateValue: parseOcrProfitRate(row.profitRate) ?? undefined,
     evaluationAmountText: row.evaluationAmount,
     evaluationAmountValue: parseOcrNumber(row.evaluationAmount) ?? undefined,
     averagePriceText: row.averagePrice,

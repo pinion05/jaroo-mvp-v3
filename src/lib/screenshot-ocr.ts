@@ -149,18 +149,6 @@ export function parseOcrNumber(value: string) {
     return null
   }
 
-  const percentMatch = normalizedValue.match(/([+-]?(?:\d+(?:[,.]\d+)*\.?\d*|\.\d+))\s*%/)
-  if (percentMatch?.[1]) {
-    const parsedPercent = Number(percentMatch[1].replaceAll(',', ''))
-    if (!Number.isFinite(parsedPercent)) {
-      return null
-    }
-
-    const hasExplicitPercentSign = /^[+-]/.test(percentMatch[1])
-    const inheritsNegativeSign = !hasExplicitPercentSign && normalizedValue.startsWith('-')
-    return inheritsNegativeSign ? -Math.abs(parsedPercent) : parsedPercent
-  }
-
   const wrappedNegativeMatch = normalizedValue.match(/^\((.*)\)$/)
   const isWrappedNegative = Boolean(wrappedNegativeMatch)
   const unwrappedValue = wrappedNegativeMatch?.[1] ?? normalizedValue
@@ -183,6 +171,28 @@ export function parseOcrNumber(value: string) {
   return isWrappedNegative ? -Math.abs(parsedValue) : parsedValue
 }
 
+export function parseOcrProfitRate(value: string) {
+  const normalizedValue = value.trim().replace(/[−–—]/g, '-')
+
+  if (!normalizedValue) {
+    return null
+  }
+
+  const percentMatch = normalizedValue.match(/([+-]?(?:\d+(?:[,.]\d+)*\.?\d*|\.\d+))\s*%/)
+  if (percentMatch?.[1]) {
+    const parsedPercent = Number(percentMatch[1].replaceAll(',', ''))
+    if (!Number.isFinite(parsedPercent)) {
+      return null
+    }
+
+    const hasExplicitPercentSign = /^[+-]/.test(percentMatch[1])
+    const inheritsNegativeSign = !hasExplicitPercentSign && normalizedValue.startsWith('-')
+    return inheritsNegativeSign ? -Math.abs(parsedPercent) : parsedPercent
+  }
+
+  return parseOcrNumber(value)
+}
+
 export function formatComputedNumber(value: number) {
   const roundedValue = Number(value.toFixed(4))
 
@@ -198,7 +208,7 @@ export function formatComputedNumber(value: number) {
 
 export function computeAveragePrice(quantity: string, profitRate: string, evaluationAmount: string) {
   const parsedQuantity = parseOcrNumber(quantity)
-  const parsedProfitRate = parseOcrNumber(profitRate)
+  const parsedProfitRate = parseOcrProfitRate(profitRate)
   const parsedEvaluationAmount = parseOcrNumber(evaluationAmount)
 
   if (parsedQuantity === null || parsedProfitRate === null || parsedEvaluationAmount === null || parsedQuantity === 0) {

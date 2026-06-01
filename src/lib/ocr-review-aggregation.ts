@@ -3,6 +3,7 @@ import {
   formatComputedNumber,
   normalizeStockName,
   parseOcrNumber,
+  parseOcrProfitRate,
 } from '@/lib/screenshot-ocr'
 import type { OcrReviewRow } from '@/lib/workflow-types'
 
@@ -46,7 +47,7 @@ function sumParsed(rows: OcrReviewRow[], field: 'quantity' | 'evaluationAmount')
 function computeMergedProfitRate(rows: OcrReviewRow[], evaluationAmount: number) {
   const principalValues = rows.map((row) => {
     const rowEvaluationAmount = parseOcrNumber(row.evaluationAmount)
-    const rowProfitRate = parseOcrNumber(row.profitRate)
+    const rowProfitRate = parseOcrProfitRate(row.profitRate)
 
     if (rowEvaluationAmount === null || rowProfitRate === null) {
       return null
