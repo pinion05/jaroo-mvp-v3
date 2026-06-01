@@ -28,6 +28,7 @@ import { DeepScanInlineResults } from '@/components/deepscan-inline-results'
 import { DeepScanLoadingScreen, type FindingProgress, type LoadingPerformanceComment, type LoadingQuickFact, type LoadingStageKey } from '@/components/deepscan-loading-screen'
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
+import type { LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
 import {
   buildDeepScanHeroCard,
   buildDeepScanPageHeader,
@@ -271,6 +272,9 @@ type LoadingQuickQuote = {
   week52High?: number
   week52Low?: number
 }
+type TargetLoadingBriefingSnapshot = LoadingBriefingSnapshot & {
+  targetKey: string
+}
 type QuotesCurrentProxyResponse = {
   ok?: boolean
   data?: {
@@ -284,6 +288,10 @@ type QuotesCurrentProxyResponse = {
       week52Low?: number
     }>
   }
+}
+type BriefingSnapshotProxyResponse = {
+  ok?: boolean
+  data?: LoadingBriefingSnapshot
 }
 
 const loadingFindingAxisKeys = ['quality', 'timing', 'position'] as const
@@ -419,6 +427,16 @@ function buildLoadingQuickQuoteUrl(target: { code?: string; ticker?: string } | 
   }
 
   return `/api/quotes/current?${searchParams.toString()}`
+}
+
+function buildLoadingBriefingSnapshotUrl(target: { code?: string } | null) {
+  const code = normalizeDeepScanCode(target?.code)
+  if (!code) {
+    return undefined
+  }
+
+  const searchParams = new URLSearchParams({ code })
+  return `/api/deepscan/briefing-snapshot?${searchParams.toString()}`
 }
 
 function formatLoadingPercent(value: number | undefined) {
@@ -1113,6 +1131,7 @@ export default function DeepScanPage() {
   const finishError = useDeepScanStore((state) => state.finishError)
   const abandonInFlight = useDeepScanStore((state) => state.abandonInFlight)
   const [loadingQuickQuote, setLoadingQuickQuote] = useState<LoadingQuickQuote | null>(null)
+  const [loadingBriefingSnapshot, setLoadingBriefingSnapshot] = useState<TargetLoadingBriefingSnapshot | null>(null)
   const [loadingSequence, setLoadingSequence] = useState<DeepScanLoadingSequenceState>(() => createDeepScanLoadingSequence(null))
   const [arrivedLoadingStages, setArrivedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
   const [displayedLoadingStages, setDisplayedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
@@ -1349,6 +1368,43 @@ export default function DeepScanPage() {
       controller.abort()
     }
   }, [markDeepScanLoadingSuccess, target, targetKey])
+
+  useEffect(() => {
+    const snapshotUrl = buildLoadingBriefingSnapshotUrl(target)
+    if (!snapshotUrl || !targetKey || requestStatus !== 'loading') {
+      return
+    }
+
+    const requestedTargetKey = targetKey
+    const controller = new AbortController()
+
+    const run = async () => {
+      try {
+        const response = await fetch(snapshotUrl, { cache: 'no-store', signal: controller.signal })
+        if (!response.ok) {
+          return
+        }
+
+        const body = (await response.json()) as BriefingSnapshotProxyResponse
+        if (!body.ok || !body.data || controller.signal.aborted) {
+          return
+        }
+
+        setLoadingBriefingSnapshot({
+          ...body.data,
+          targetKey: requestedTargetKey,
+        })
+      } catch {
+        // The loading page should keep working even if the v7 briefing snapshot is unavailable.
+      }
+    }
+
+    void run()
+
+    return () => {
+      controller.abort()
+    }
+  }, [requestStatus, target, targetKey])
 
   useEffect(() => {
     if (!requestSeed || !targetKey || requestStatus !== 'loading') {
@@ -1612,9 +1668,10 @@ export default function DeepScanPage() {
   const loadingFindingProgress = buildLoadingFindingProgress(payload)
   const loadingPerformanceComment = buildLoadingPerformanceComment(payload)
   const activeLoadingQuickQuote = loadingQuickQuote?.targetKey === targetKey ? loadingQuickQuote : null
-  const loadingTradingVolume = activeLoadingQuickQuote?.tradingVolume ?? buildLoadingTradingVolume(payload)
-  const loadingCurrentPrice = target?.currentPrice ?? activeLoadingQuickQuote?.currentPrice
-  const loadingCurrentPriceCurrency = target?.currentPriceCurrency ?? activeLoadingQuickQuote?.currentPriceCurrency
+  const activeLoadingBriefingSnapshot = loadingBriefingSnapshot?.targetKey === targetKey ? loadingBriefingSnapshot : null
+  const loadingTradingVolume = activeLoadingBriefingSnapshot?.quote?.volume ?? activeLoadingQuickQuote?.tradingVolume ?? buildLoadingTradingVolume(payload)
+  const loadingCurrentPrice = activeLoadingBriefingSnapshot?.quote?.currentPrice ?? target?.currentPrice ?? activeLoadingQuickQuote?.currentPrice
+  const loadingCurrentPriceCurrency = target?.currentPriceCurrency ?? normalizeQuoteCurrency(activeLoadingBriefingSnapshot?.quote?.currency ?? undefined) ?? activeLoadingQuickQuote?.currentPriceCurrency
   const loadingQuickFacts = buildLoadingQuickFacts(payload, activeLoadingQuickQuote, requestSeed.holding.name)
   const evidenceCollected = hasCollectedDeepScanEvidence(payload)
   const analysisLoadingNotice = {
@@ -1653,6 +1710,7 @@ export default function DeepScanPage() {
           tradingVolume={loadingTradingVolume}
           currentProfitRate={target?.currentProfitRate}
           evaluationAmount={target?.evaluationAmount}
+          briefingSnapshot={activeLoadingBriefingSnapshot}
           findingProgress={loadingFindingProgress}
           committeeAxes={payload?.committee.axes}
           quickFacts={loadingQuickFacts}
