@@ -1,615 +1,340 @@
 .viewport {
-  background: #fff;
-  display: flex;
-  justify-content: center;
   min-height: 100vh;
   min-height: 100dvh;
   width: 100%;
+  background: #eceef2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 12px 0;
 }
 
 .frame {
-  position: relative;
-  background: #fff;
-  width: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
+  background: #f5f6f8;
+  border-radius: 16px;
+  width: min(100vw, 340px);
+  height: min(100dvh - 48px, 760px);
+  min-height: 620px;
   overflow-y: auto;
   overflow-x: hidden;
-  scroll-behavior: smooth;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
+  position: relative;
+  color: #0f1419;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
 
 .frame::-webkit-scrollbar {
   display: none;
 }
 
-.topBar {
-  padding: 14px 16px 8px;
+.top {
+  padding: 14px 16px 10px;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  background: #0c447c;
+  background: #f5f6f8;
   position: sticky;
   top: 0;
-  z-index: 10;
+  z-index: 8;
 }
 
-.appName {
-  font-size: 16px;
-  font-weight: 500;
-  color: white;
+.brand {
+  font-size: 22px;
+  font-weight: 750;
+  letter-spacing: -0.03em;
 }
 
-.topIcons {
+.topActions {
   display: flex;
-  gap: 10px;
+  gap: 8px;
 }
 
-.iconButton {
-  width: 28px;
-  height: 28px;
+.tbtn {
+  width: 30px;
+  height: 30px;
   border-radius: 999px;
-  background: rgba(255, 255, 255, 0.15);
+  background: #fff;
+  border: 0.5px solid #e8eaee;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: white;
+  color: #1f2937;
+  text-decoration: none;
+  font-size: 17px;
+  line-height: 1;
   position: relative;
   cursor: pointer;
-  border: none;
 }
 
-.bellDot {
+.dot {
+  position: absolute;
+  right: 5px;
+  top: 5px;
   width: 6px;
   height: 6px;
-  border-radius: 999px;
+  border-radius: 50%;
   background: #e24b4a;
-  position: absolute;
-  top: 1px;
-  right: 1px;
-}
-
-.hero {
-  background: #0c447c;
-  padding: 12px 18px 20px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-}
-
-.viewToggle {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 14px;
-}
-
-.viewToggleButton {
-  display: flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 14px;
-  border-radius: 10px;
-  font-size: 11px;
-  cursor: pointer;
-  border: 0.5px solid rgba(255, 255, 255, 0.2);
-  color: rgba(255, 255, 255, 0.5);
-  background: transparent;
-}
-
-.viewToggleButtonOn {
-  background: rgba(255, 255, 255, 0.15);
-  color: white;
-  border-color: rgba(255, 255, 255, 0.4);
-}
-
-.view {
-  width: 100%;
-}
-
-.hidden {
-  display: none;
-}
-
-.donutOuter {
-  position: relative;
-  width: 210px;
-  height: 210px;
-  margin: 0 auto;
-}
-
-.donutSvg {
-  width: 210px;
-  height: 210px;
-  overflow: visible;
-}
-
-.donutSvg :global(svg) {
-  overflow: visible;
-}
-
-.donutCenter {
-  position: absolute;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  text-align: center;
-  width: 96px;
-  cursor: pointer;
-  background: transparent;
-  border: none;
-}
-
-.dcScore {
-  font-weight: 500;
-  line-height: 1;
-}
-
-.dcBadge {
-  font-size: 10px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 7px;
-  margin: 4px auto;
-  display: inline-block;
-}
-
-.dcBadgeAmber {
-  background: #faeeda;
-  color: #854f0b;
-}
-
-.dcBadgeRed {
-  background: rgba(226, 75, 74, 0.35);
-  color: #f7c1c1;
-}
-
-.dcBadgeGreen {
-  background: rgba(29, 158, 117, 0.3);
-  color: #9fe1cb;
-}
-
-.dcTxt {
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.5);
-  line-height: 1.5;
-}
-
-.arcSeg {
-  cursor: pointer;
-  transition: opacity 0.2s, filter 0.2s;
-}
-
-.dimmed {
-  opacity: 0.28;
-}
-
-.selected {
-  filter: brightness(1.2);
-}
-
-.scrollHint {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 5px;
-  margin-top: 10px;
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.4);
-  transition: opacity 0.3s;
-}
-
-.scrollArrow {
-  animation: bounce 0.9s infinite;
-}
-
-.momentumBanner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 10px;
-  padding: 9px 12px;
-  margin-top: 10px;
-  cursor: pointer;
-  border: 0.5px solid rgba(255, 255, 255, 0.15);
-  width: 100%;
-}
-
-.momentumDot {
-  width: 7px;
-  height: 7px;
-  border-radius: 999px;
-  background: #9fe1cb;
-  flex-shrink: 0;
-}
-
-.momentumText {
-  font-size: 12px;
-  color: rgba(255, 255, 255, 0.85);
-  flex: 1;
-  text-align: left;
-}
-
-.momentumValue {
-  font-size: 11px;
-  font-weight: 500;
-  color: #9fe1cb;
-}
-
-.momentumArrow {
-  font-size: 11px;
-  color: rgba(255, 255, 255, 0.4);
-  margin-left: 2px;
-}
-
-.heatmapHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  width: 100%;
-  margin-bottom: 12px;
-}
-
-.heatmapScore {
-  font-size: 32px;
-  font-weight: 500;
-  color: white;
-  line-height: 1;
-}
-
-.heatmapScoreLabel {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
-  margin-top: 3px;
-}
-
-.heatmapSummary {
-  text-align: right;
-}
-
-.heatmapSummaryBadge {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 3px 10px;
-  border-radius: 7px;
-  background: #faeeda;
-  color: #854f0b;
-  display: inline-block;
-  margin-bottom: 4px;
-}
-
-.heatmapSummaryText {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.5);
-  line-height: 1.4;
-}
-
-.heatmapGrid {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  width: 100%;
-}
-
-.heatmapTreemap {
-  width: 100%;
-  border-radius: 12px;
-  overflow: hidden;
-}
-
-.heatmapTreemap :global(svg) {
-  overflow: visible;
-}
-
-.heatmapTreemapTile {
-  width: 100%;
-  height: 100%;
-  min-height: 0;
-  overflow: hidden;
-  box-sizing: border-box;
-}
-
-.heatmapRow {
-  display: flex;
-  gap: 5px;
-}
-
-.heatmapColumn {
-  flex: 2;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-}
-
-.heatmapTile {
-  border-radius: 10px;
-  padding: 9px 10px;
-  display: flex;
-  flex-direction: column;
-  justify-content: flex-end;
-  position: relative;
-  cursor: pointer;
-  border: none;
-  text-align: left;
-  appearance: none;
-}
-
-.heatmapTileActive {
-  box-shadow: inset 0 0 0 1.5px rgba(255, 255, 255, 0.95), 0 0 0 1px rgba(255, 255, 255, 0.2);
-}
-
-.heatmapSamsung {
-  flex: 5;
-  height: 108px;
-}
-
-.heatmapSmall {
-  height: 51px;
-  padding: 7px 9px;
-}
-
-.heatmapWide {
-  width: 100%;
-  height: 64px;
-}
-
-.heatmapFooter {
-  width: 100%;
-  height: 52px;
-  padding: 8px 10px;
-}
-
-.heatmapWeight {
-  position: absolute;
-  top: 8px;
-  right: 9px;
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.55);
-}
-
-.heatmapWeightSmall {
-  top: 6px;
-  right: 8px;
-  font-size: 9px;
-  color: rgba(255, 255, 255, 0.5);
-}
-
-.heatmapName {
-  font-size: 12px;
-  font-weight: 500;
-  color: white;
-}
-
-.heatmapNameSmall {
-  font-size: 11px;
-}
-
-.heatmapNameTiny {
-  font-size: 10px;
-}
-
-.heatmapChange {
-  font-size: 10px;
-  color: rgba(255, 255, 255, 0.8);
-  margin-top: 2px;
-}
-
-.heatmapChangeSmall {
-  font-size: 9px;
-  margin-top: 1px;
-}
-
-.heatmapChip {
-  display: inline-block;
-  font-size: 9px;
-  padding: 1px 6px;
-  border-radius: 5px;
-  margin-top: 3px;
-  font-weight: 500;
-}
-
-.heatmapChipTiny {
-  font-size: 8px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  margin-top: 2px;
+  border: 1px solid #fff;
 }
 
 .body {
-  padding: 12px 14px;
+  padding: 0 12px 14px;
+}
+
+.mainCard {
   background: #fff;
+  border-radius: 18px;
+  border: 0.5px solid #e8eaee;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  padding: 18px 18px 20px;
+  margin: 4px 0 14px;
 }
 
-.marketScoreCard {
-  background: linear-gradient(135deg, #f7fbff 0%, #f8f8f6 100%);
-  border: 0.5px solid #dce8f4;
-  border-radius: 14px;
-  padding: 13px 14px;
-  margin-bottom: 10px;
-}
-
-.marketScoreHeader {
+.mcTop {
   display: flex;
-  align-items: flex-start;
   justify-content: space-between;
+  align-items: flex-start;
   gap: 12px;
 }
 
-.marketScoreEyebrow {
-  font-size: 9px;
-  color: #185fa5;
-  letter-spacing: 0.08em;
-  font-weight: 600;
-  margin-bottom: 2px;
+.mcLabel {
+  color: #8a95a6;
+  font-size: 12px;
+  margin-bottom: 6px;
 }
 
-.marketScoreTitle {
-  font-size: 14px;
-  font-weight: 600;
-  color: #111;
+.mcTotal {
+  font-size: 25px;
+  font-weight: 750;
+  color: #0f1419;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+  line-height: 1;
 }
 
-.marketScoreValueBlock {
+.mcPl {
+  margin-top: 6px;
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+
+.up {
+  color: #169b4f;
+}
+
+.down {
+  color: #ef4444;
+}
+
+.mcBadge,
+.stockTag,
+.dCenterBadge {
+  border-radius: 999px;
+  background: #fff4dc;
+  color: #854f0b;
+  font-weight: 800;
+  border: 0.5px solid rgba(133, 79, 11, 0.18);
+}
+
+.mcBadge {
+  padding: 5px 10px;
+  font-size: 11px;
+}
+
+.profit,
+.dCenterBadgeGreen {
+  background: #eaf3de;
+  color: #3b6d11;
+  border-color: rgba(59, 109, 17, 0.18);
+}
+
+.loss,
+.dCenterBadgeRed {
+  background: #fcebeb;
+  color: #a32d2d;
+  border-color: rgba(163, 45, 45, 0.18);
+}
+
+.watch {
+  background: #fff4dc;
+  color: #854f0b;
+}
+
+.donutWrap {
+  display: flex;
+  justify-content: center;
+  margin: 20px 0 8px;
+}
+
+.donut {
+  position: relative;
+  width: 220px;
+  height: 220px;
+  border-radius: 50%;
+  filter: drop-shadow(0 6px 16px rgba(15, 20, 25, 0.08));
+}
+
+.donut::before {
+  content: "";
+  position: absolute;
+  inset: 54px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: inset 0 0 0 0.5px #e8eaee;
+}
+
+.dLbl {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  max-width: 92px;
+  padding: 3px 7px;
+  border-radius: 999px;
+  background: rgba(17, 24, 39, 0.74);
+  color: #fff;
+  border: 0;
+  font-size: 10px;
+  font-weight: 700;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+  z-index: 2;
+}
+
+.dLblOn {
+  outline: 2px solid rgba(255, 255, 255, 0.9);
+  background: #111827;
+}
+
+.donutHole {
+  position: absolute;
+  inset: 62px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 1;
+}
+
+.dCenterPl {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.dCenterLbl {
+  margin-top: 5px;
+  color: #8a95a6;
+  font-size: 11px;
+}
+
+.dCenterBadge {
+  margin-top: 7px;
+  font-size: 10px;
+  padding: 3px 8px;
+}
+
+.mcHint {
+  margin-top: 8px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.trend {
+  width: 100%;
+  border: 0;
+  background: #fff;
+  border-radius: 14px;
+  border: 0.5px solid #e8eaee;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+  padding: 12px 13px;
+  margin-bottom: 14px;
   display: flex;
   align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
+  justify-content: space-between;
+  cursor: pointer;
 }
 
-.marketScoreValue {
-  font-size: 30px;
-  line-height: 1;
-  font-weight: 600;
-  color: #185fa5;
-}
-
-.marketScoreBadge {
-  font-size: 10px;
-  font-weight: 800;
-  padding: 3px 9px;
-  border-radius: 999px;
-  white-space: nowrap;
-  border: 0.5px solid currentColor;
-  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.55);
-}
-
-.marketScoreBadgeAmber {
-  background: #fff4dc;
-  color: #7a4208;
-}
-
-.marketScoreBadgeRed {
-  background: #fff0f0;
-  color: #b42318;
-}
-
-.marketScoreBadgeGreen {
-  background: #e9f8ef;
-  color: #166534;
-}
-
-.marketScoreDescription {
-  margin: 8px 0 9px;
-  font-size: 11px;
-  line-height: 1.55;
-  color: #555;
-}
-
-.marketScoreDetails {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 6px;
-  margin: 0 0 9px;
-}
-
-.marketScoreDetail {
-  background: rgba(255, 255, 255, 0.78);
-  border: 0.5px solid #e2ebf4;
-  border-radius: 10px;
-  padding: 6px 8px;
-  min-width: 0;
-}
-
-.marketScoreDetail dt {
-  font-size: 8px;
-  line-height: 1.2;
-  color: #6f8dac;
-  font-weight: 600;
-  letter-spacing: 0.04em;
-}
-
-.marketScoreDetail dd {
-  margin: 2px 0 0;
+.trendLeft {
+  display: inline-flex;
+  align-items: center;
+  color: #0f1419;
   font-size: 13px;
-  line-height: 1.1;
-  color: #173e65;
   font-weight: 700;
 }
 
-.marketScoreDetail span {
-  display: block;
-  margin-top: 2px;
-  font-size: 9px;
-  line-height: 1.2;
-  color: #777;
+.trendDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #64c27b;
+  margin-right: 8px;
 }
 
-.marketScoreMeta {
+.trendRight {
+  color: #169b4f;
+  font-weight: 800;
+  font-size: 12px;
+}
+
+.sectionHeader {
   display: flex;
+  align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  font-size: 9px;
-  color: #999;
-  line-height: 1.4;
+  margin: 4px 0 8px;
 }
 
 .sectionLabel {
+  color: #5b6573;
+  font-size: 13px;
+  font-weight: 800;
+}
+
+.refreshTextBtn {
+  border: 0;
+  background: transparent;
+  color: #2563eb;
   font-size: 11px;
-  color: #888;
-  letter-spacing: 0.04em;
-  margin-bottom: 8px;
-}
-
-.stockCard {
-  background: #fff;
-  border-radius: 12px;
-  border: 0.5px solid #e8e8e8;
-  padding: 11px 12px;
-  margin-bottom: 8px;
+  font-weight: 700;
   cursor: pointer;
-  transition: border-color 0.2s;
 }
 
-.cardHalt {
-  border-color: #f7c1c1;
-  background: #fff8f8;
+.stock {
+  background: #fff;
+  border-radius: 14px;
+  border: 0.5px solid #e8eaee;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  margin-bottom: 10px;
+  overflow: hidden;
 }
 
-.cardProfit {
-  border-color: #c0dd97;
-}
-
-.cardEtf {
-  border-color: #b5d4f4;
-}
-
-.cardActive {
-  border-color: #185fa5;
-  border-width: 1.5px;
-}
-
-.stockCardMain {
+.stockRow {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  padding: 13px 13px;
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 10px;
+  cursor: pointer;
+  text-align: left;
 }
 
-.signal {
-  width: 7px;
-  height: 7px;
+.stockDot {
+  width: 10px;
+  height: 10px;
   border-radius: 999px;
-  flex-shrink: 0;
-  margin-top: 4px;
-}
-
-.signalDanger {
-  background: #e24b4a;
-}
-
-.signalWarning {
-  background: #ef9f27;
-}
-
-.signalPositive {
-  background: #639922;
-}
-
-.signalHalt {
-  background: #e24b4a;
-  animation: blink 1.2s infinite;
-}
-
-.signalEtf {
-  background: #185fa5;
+  flex: 0 0 auto;
 }
 
 .stockInfo {
@@ -617,628 +342,380 @@
   flex: 1;
 }
 
-.stockNameRow {
+.stockNameLine {
   display: flex;
-  min-width: 0;
   align-items: center;
-  gap: 5px;
-  margin-bottom: 2px;
+  gap: 6px;
+  min-width: 0;
 }
 
 .stockName {
-  min-width: 0;
+  color: #0f1419;
+  font-size: 15px;
+  font-weight: 800;
   overflow: hidden;
-  color: #111;
-  font-size: 13px;
-  font-weight: 500;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.stockBadge {
-  flex-shrink: 0;
-  border-radius: 7px;
-  font-size: 10px;
-  padding: 1px 6px;
-  white-space: nowrap;
+.stockTag {
+  font-size: 9px;
+  padding: 2px 6px;
+  flex: 0 0 auto;
 }
 
-.badgeRed {
-  background: #fcebeb;
-  color: #a32d2d;
-}
-
-.badgeAmber {
-  background: #faeeda;
-  color: #854f0b;
-}
-
-.badgeGreen {
-  background: #eaf3de;
-  color: #3b6d11;
-}
-
-.stockSub {
+.stockMeta {
+  display: block;
+  margin-top: 4px;
+  color: #8a95a6;
   font-size: 11px;
-  color: #999;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.stockValue {
+.stockRight {
   text-align: right;
+  flex: 0 0 auto;
+  max-width: 92px;
 }
 
-.stockValueStrong {
+.stockRate {
+  display: block;
   font-size: 14px;
-  font-weight: 500;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
-.valueDanger,
-.valueHalt {
-  color: #a32d2d;
+.stockAmt {
+  display: block;
+  margin-top: 3px;
+  color: #4b5563;
+  font-size: 11px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
 }
 
-.valuePositive {
-  color: #3b6d11;
-}
-
-.detail {
+.stockDetail {
   display: none;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 0.5px solid #eee;
+  border-top: 0.5px solid #eef0f3;
+  padding: 0 13px 13px;
 }
 
-.detailOpen {
+.open .stockDetail {
   display: block;
 }
 
-.aiBox {
-  border-radius: 6px;
-  padding: 8px 10px;
-  margin-bottom: 8px;
-  border: 0.5px solid transparent;
-}
-
-.aiLabel {
-  font-size: 10px;
-  color: #999;
-  margin-bottom: 3px;
-}
-
-.aiText {
-  font-size: 11px;
-  color: #555;
-  line-height: 1.6;
-}
-
-.metaLine {
-  font-size: 11px;
-  color: #aaa;
-  margin-bottom: 8px;
-}
-
-.metricGrid {
+.sdFacts {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
-  gap: 5px;
-  margin-bottom: 8px;
+  gap: 6px;
+  padding: 11px 0;
 }
 
-.metricCard {
+.sdFacts > div {
   background: #f8f8f6;
-  border-radius: 6px;
-  padding: 6px 7px;
+  border-radius: 10px;
+  padding: 7px 6px;
+  min-width: 0;
 }
 
-.metricLabel {
+.sdfLabel {
+  display: block;
+  color: #9aa3af;
   font-size: 9px;
-  color: #999;
-  margin-bottom: 2px;
+  font-weight: 700;
 }
 
-.metricValue {
+.sdfVal {
+  display: block;
+  margin-top: 3px;
+  color: #0f1419;
   font-size: 11px;
-  font-weight: 500;
+  font-weight: 800;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.metricDanger {
-  color: #a32d2d;
-}
-
-.metricWarning {
-  color: #854f0b;
-}
-
-.metricPositive {
-  color: #3b6d11;
-}
-
-.metricLocked {
-  color: #bbb;
-}
-
-.metricNeutral {
-  color: #555;
-}
-
-.detailButton {
+.scanBtn,
+.refreshBtn {
   width: 100%;
-  padding: 9px;
-  border-radius: 8px;
-  border: none;
-  font-size: 12px;
-  font-weight: 500;
-  cursor: pointer;
+  min-height: 40px;
+  border: 0;
+  border-radius: 12px;
+  background: #185fa5;
+  color: #fff;
   display: flex;
   align-items: center;
   justify-content: center;
   gap: 5px;
-  color: white;
   text-decoration: none;
+  font-weight: 800;
+  font-size: 13px;
+  cursor: pointer;
 }
 
-.buttonBlue {
-  background: #185fa5;
-}
-
-.buttonRed {
-  background: #a32d2d;
-}
-
-.buttonGreen {
-  background: #3b6d11;
-}
-
-.credit {
-  font-size: 9px;
-  background: rgba(255, 255, 255, 0.2);
-  padding: 2px 6px;
-  border-radius: 6px;
-}
-
-.actionSubLabel {
+.sub {
   font-size: 10px;
-  color: rgba(255, 255, 255, 0.6);
-  font-weight: 400;
-}
-
-.marketTag {
-  font-size: 9px;
-  padding: 1px 5px;
-  border-radius: 4px;
-  font-weight: 500;
-  flex-shrink: 0;
-}
-
-.marketKospi {
-  background: #eef2ff;
-  color: #4f46e5;
-}
-
-.marketKosdaq {
-  background: #f0fdf4;
-  color: #16a34a;
-}
-
-.marketEtf {
-  background: #eff6ff;
-  color: #185fa5;
-}
-
-.marketNasdaq {
-  background: #fff7ed;
-  color: #c2410c;
+  opacity: 0.82;
+  font-weight: 650;
 }
 
 .forecastCard {
-  background: #f8f8f6;
-  border-radius: 12px;
-  padding: 12px;
-  margin-bottom: 4px;
+  background: #fff;
+  border-radius: 14px;
+  border: 0.5px solid #e8eaee;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.03);
+  margin: 10px 0;
+  padding: 13px;
 }
 
 .forecastLabel {
-  font-size: 10px;
-  color: #999;
-  letter-spacing: 0.04em;
-  margin-bottom: 5px;
+  color: #185fa5;
+  font-size: 9px;
+  letter-spacing: 0.08em;
+  font-weight: 900;
 }
 
 .forecastText {
+  color: #4b5563;
   font-size: 12px;
-  color: #555;
-  line-height: 1.65;
+  line-height: 1.55;
+  margin-top: 5px;
 }
 
 .forecastMore {
-  font-size: 11px;
+  display: inline-flex;
+  margin-top: 8px;
   color: #185fa5;
-  margin-top: 6px;
+  font-size: 12px;
+  font-weight: 800;
   text-decoration: none;
-  display: inline-block;
 }
 
-.uploadCtaButton {
+.refreshBtn {
   margin-top: 10px;
-  padding: 11px 12px;
-  border-radius: 10px;
 }
 
-.bottomNav {
+.tabbar {
+  position: sticky;
+  bottom: 0;
   display: flex;
-  border-top: 0.5px solid #eee;
-  background: #fff;
+  background: rgba(255, 255, 255, 0.96);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-top: 0.5px solid #e8eaee;
+  padding: 8px 0 10px;
+  z-index: 5;
 }
 
-.navItem {
+.tab {
   flex: 1;
-  padding: 11px 0;
-  text-align: center;
-  font-size: 10px;
-  color: #aaa;
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 3px;
+  gap: 2px;
+  color: #9aa3af;
+  font-size: 10px;
+  font-weight: 750;
+  text-decoration: none;
   background: transparent;
-  border: none;
+  border: 0;
+  cursor: pointer;
 }
 
-.navItemOn {
+.tab.on,
+.on {
   color: #185fa5;
 }
 
-.navIcon {
-  width: 16px;
-  height: 16px;
-  border-radius: 3px;
-  background: #f0efe8;
+.tabIco {
+  font-size: 16px;
+  line-height: 1;
 }
 
-.navIconOn {
-  background: #e6f1fb;
+.caption {
+  margin-top: 8px;
+  color: #6b7280;
+  font-size: 11px;
+  text-align: center;
 }
 
 .modalMount {
   position: fixed;
   inset: 0;
-  display: flex;
-  justify-content: center;
-  z-index: 30;
+  z-index: 60;
   pointer-events: none;
 }
 
 .modalInner {
   position: relative;
   width: 100%;
-  max-width: none;
-  height: 100vh;
-  height: 100dvh;
-}
-
-.deepScanLoadingMount {
-  position: fixed;
-  inset: 0;
-  z-index: 60;
-  display: flex;
-  justify-content: center;
-  padding: 0;
-  background: #fff;
-}
-
-.deepScanLoadingInner {
-  width: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
-  overflow: hidden;
-  background: #fff;
-}
-
-@media (min-width: 768px) {
-  .viewport {
-    background: var(--jaroo-canvas);
-  }
-
-  .frame {
-    width: 340px;
-  }
-
-  .modalMount {
-    left: 7rem;
-  }
-
-  .modalInner {
-    max-width: 340px;
-  }
-
-  .deepScanLoadingMount {
-    padding: 1rem 0.75rem;
-    background: var(--jaroo-canvas);
-  }
-
-  .deepScanLoadingInner {
-    max-width: 390px;
-    min-height: calc(100vh - 2rem);
-    border: 1px solid rgba(255, 255, 255, 0.7);
-    border-radius: 32px;
-    box-shadow: 0 20px 60px rgba(12, 68, 124, 0.18);
-  }
+  height: 100%;
 }
 
 .sheetOverlay {
   position: absolute;
   inset: 0;
-  background: rgba(0, 0, 0, 0.4);
-  display: none;
-  pointer-events: auto;
+  background: rgba(15, 20, 25, 0);
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, background 0.2s ease;
 }
 
 .sheetOverlayOpen {
-  display: block;
+  background: rgba(15, 20, 25, 0.35);
+  opacity: 1;
+  pointer-events: auto;
 }
 
 .sheet {
   position: absolute;
+  left: 50%;
   bottom: 0;
-  left: 0;
-  right: 0;
+  width: min(100vw, 340px);
+  max-height: min(78dvh, 620px);
+  overflow-y: auto;
+  transform: translate(-50%, 102%);
   background: #fff;
-  border-radius: 16px 16px 0 0;
-  padding: 0 0 20px;
-  transform: translateY(100%);
-  transition: transform 0.3s cubic-bezier(0.32, 0.72, 0, 1);
+  border-radius: 20px 20px 0 0;
+  padding: 10px 16px 22px;
+  box-shadow: 0 -16px 40px rgba(0, 0, 0, 0.18);
+  transition: transform 0.24s ease;
   pointer-events: auto;
 }
 
 .sheetOpen {
-  transform: translateY(0);
+  transform: translate(-50%, 0);
 }
 
 .sheetHandle {
-  width: 36px;
+  width: 42px;
   height: 4px;
-  border-radius: 2px;
-  background: #ddd;
-  margin: 12px auto 16px;
+  border-radius: 999px;
+  background: #d1d5db;
+  margin: 0 auto 14px;
 }
 
 .sheetTitle {
-  font-size: 15px;
-  font-weight: 500;
-  color: #111;
-  padding: 0 16px;
-  margin-bottom: 4px;
+  font-size: 18px;
+  font-weight: 850;
+  color: #0f1419;
 }
 
 .sheetSubtitle {
-  font-size: 11px;
-  color: #aaa;
-  padding: 0 16px;
-  margin-bottom: 16px;
-}
-
-.sheetScoreRow {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 0 16px;
-  margin-bottom: 16px;
-}
-
-.sheetScoreNum {
-  font-size: 36px;
-  font-weight: 500;
-  color: #185fa5;
-  line-height: 1;
-}
-
-.sheetScoreBadge {
+  margin-top: 4px;
   font-size: 12px;
-  font-weight: 500;
-  padding: 3px 10px;
-  border-radius: 8px;
-  background: #faeeda;
-  color: #854f0b;
-}
-
-.sheetScoreText {
-  font-size: 11px;
-  color: #aaa;
-  margin-left: auto;
-  line-height: 1.5;
-  text-align: right;
-}
-
-.breakdownItem {
-  padding: 12px 16px;
-  border-bottom: 0.5px solid #f0efe8;
-}
-
-.breakdownItem:last-child {
-  border-bottom: none;
-}
-
-.breakdownHeader {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 6px;
-}
-
-.breakdownLabel {
-  font-size: 13px;
-  font-weight: 500;
-  color: #111;
-}
-
-.breakdownScore {
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.breakdownBarTrack {
-  height: 4px;
-  background: #f0efe8;
-  border-radius: 2px;
-  margin-bottom: 7px;
-}
-
-.breakdownBarFill {
-  height: 100%;
-  border-radius: 2px;
-}
-
-.breakdownDesc {
-  font-size: 11px;
-  color: #888;
-  line-height: 1.6;
-  margin-bottom: 6px;
-}
-
-.breakdownStocks {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 5px;
-}
-
-.breakdownStockTag {
-  font-size: 10px;
-  padding: 2px 8px;
-  border-radius: 6px;
-  background: #f0efe8;
-  color: #555;
-  display: flex;
-  align-items: center;
-  gap: 4px;
-}
-
-.breakdownStockDot {
-  width: 6px;
-  height: 6px;
-  border-radius: 999px;
-}
-
-.momentumStageRow {
-  padding: 0 16px;
-  margin-bottom: 16px;
+  color: #6b7280;
 }
 
 .momentumStages {
-  display: flex;
-  gap: 5px;
-  margin-bottom: 8px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  margin-top: 14px;
 }
 
-.momentumStage {
-  flex: 1;
-  text-align: center;
-  padding: 8px 4px;
-  border-radius: 8px;
+.momentumStage,
+.signalCard {
+  background: #f8f8f6;
+  border: 0.5px solid #eceef2;
+  border-radius: 12px;
+  padding: 10px;
 }
 
-.stageDanger {
-  background: #fcebeb;
-}
-
-.stageMuted {
-  background: #f0efe8;
-}
-
-.stagePositive {
-  background: #eaf3de;
-  border: 1.5px solid #639922;
+.momentumStageActive {
+  border-color: #b7d6f4;
+  background: #eef7ff;
 }
 
 .momentumStageLabel {
-  font-size: 10px;
-  font-weight: 500;
-  margin-bottom: 2px;
-}
-
-.stageDanger .momentumStageLabel,
-.stageDanger .momentumStageSub {
-  color: #a32d2d;
-}
-
-.stageMuted .momentumStageLabel {
-  color: #888;
-}
-
-.stageMuted .momentumStageSub {
-  color: #aaa;
-}
-
-.stagePositive .momentumStageLabel,
-.stagePositive .momentumStageSub {
-  color: #3b6d11;
+  font-size: 12px;
+  font-weight: 850;
+  color: #0f1419;
 }
 
 .momentumStageSub {
-  font-size: 9px;
-}
-
-.momentumStageHint {
-  font-size: 11px;
-  color: #aaa;
-  text-align: center;
+  margin-top: 3px;
+  color: #6b7280;
+  font-size: 10px;
 }
 
 .sheetSectionTitle {
-  padding: 0 16px 6px;
+  margin: 16px 0 8px;
+  color: #5b6573;
   font-size: 12px;
-  font-weight: 500;
-  color: #111;
+  font-weight: 850;
+}
+
+.signalCard {
+  margin-bottom: 8px;
 }
 
 .signalRow {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 5px;
+}
+
+.signal {
+  width: 9px;
+  height: 9px;
+  border-radius: 999px;
+  flex: 0 0 auto;
 }
 
 .signalName {
-  font-size: 12px;
-  font-weight: 500;
-  color: #111;
   flex: 1;
+  font-size: 13px;
+  font-weight: 850;
+  min-width: 0;
 }
 
 .signalBadge {
-  font-size: 11px;
-  font-weight: 500;
-  padding: 2px 8px;
-  border-radius: 6px;
+  border-radius: 999px;
+  padding: 3px 8px;
+  font-size: 10px;
+  font-weight: 850;
 }
 
 .signalDesc {
+  margin-top: 6px;
+  color: #5b6573;
   font-size: 11px;
-  color: #888;
-  line-height: 1.6;
+  line-height: 1.45;
 }
 
-.blink {
-  animation: blink 1.2s infinite;
+.deepScanLoadingMount {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: flex;
+  align-items: stretch;
+  justify-content: center;
+  background: #fff;
 }
 
-@keyframes bounce {
-  0%,
-  100% {
-    transform: translateY(0);
-  }
-
-  50% {
-    transform: translateY(3px);
-  }
+.deepScanLoadingInner {
+  width: min(100vw, 390px);
+  height: 100%;
 }
 
-@keyframes blink {
-  0%,
-  100% {
-    opacity: 1;
+@media (max-width: 360px) {
+  .viewport {
+    padding: 0;
   }
 
-  50% {
-    opacity: 0.3;
+  .frame {
+    width: 100vw;
+    height: 100dvh;
+    min-height: 100dvh;
+    border-radius: 0;
+  }
+
+  .caption {
+    display: none;
   }
 }
