@@ -55,7 +55,12 @@ type DeepScanLoadingStageArrivalState = {
 }
 
 const DEEPSCAN_STAGE_WAIT_MS = 10_000
-const DEEPSCAN_STAGE_FILL_DELAY_MS = 3_000
+const DEEPSCAN_STAGE_FILL_BASE_DELAY_MS = 2_500
+const DEEPSCAN_STAGE_FILL_DWELL_MS = 2_500
+
+function getDeepScanStageFillDelayMs(displayedStageCount: number) {
+  return DEEPSCAN_STAGE_FILL_BASE_DELAY_MS + Math.max(0, displayedStageCount) * DEEPSCAN_STAGE_FILL_DWELL_MS
+}
 const DEEPSCAN_MEMBER_STAGE_BY_KEY: Record<string, LoadingStageKey> = {
   profitability: 'fundamentalTeam',
   valuation: 'fundamentalTeam',
@@ -1298,7 +1303,7 @@ export default function DeepScanPage() {
           stageKeys: uniqueLoadingStageKeys([...previousKeys, nextStageKey]),
         }
       })
-    }, DEEPSCAN_STAGE_FILL_DELAY_MS)
+    }, getDeepScanStageFillDelayMs(displayedStageKeys.length))
 
     return () => {
       window.clearTimeout(timeoutId)

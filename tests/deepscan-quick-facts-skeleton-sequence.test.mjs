@@ -16,6 +16,12 @@ function literalPattern(value) {
   return new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
 }
 
+function parseNumericConst(source, name) {
+  const match = source.match(new RegExp(`const ${name}\\s*=\\s*([0-9_]+)`))
+  assert.ok(match, `missing ${name}`)
+  return Number(match[1].replaceAll('_', ''))
+}
+
 const obsoleteSummaryField = ['three', 'Lens', 'Summary'].join('')
 const obsoleteServiceName = ['three', '-', 'lens'].join('')
 const obsoleteKoreanLens = ['3', '렌즈'].join('')
@@ -82,12 +88,13 @@ test('DeepScan loading sequencing is success-gated and no longer bypasses on raw
   assert.doesNotMatch(loadingSource, /if \(resultsReady\) \{\s*return cards\s*\}/u)
 
   assert.match(pageSource, /DEEPSCAN_STAGE_WAIT_MS\s*=\s*10_000/)
-  assert.match(pageSource, /DEEPSCAN_STAGE_FILL_DELAY_MS\s*=\s*3_000/)
+  assert.match(pageSource, /DEEPSCAN_STAGE_FILL_BASE_DELAY_MS\s*=\s*2_500/)
+  assert.match(pageSource, /DEEPSCAN_STAGE_FILL_DWELL_MS\s*=\s*2_500/)
   assert.match(pageSource, /markDeepScanLoadingSuccess/)
   assert.match(pageSource, /previous\.visibleStageCount === 1\s*\?\s*\{ \.\.\.previous, visibleStageCount: 2 \}/)
   assert.match(pageSource, /previous\.visibleStageCount === 2\s*\?\s*\{ \.\.\.previous, visibleStageCount: 3 \}/)
   assert.match(pageSource, /window\.setTimeout\(\(\) => \{\s*if \(targetKeyRef\.current !== releaseTargetKey\)/u)
-  assert.match(pageSource, /DEEPSCAN_STAGE_FILL_DELAY_MS/)
+  assert.match(pageSource, /getDeepScanStageFillDelayMs\(displayedStageKeys\.length\)/)
   assert.match(pageSource, /extractLoadingStageKeysFromCommitteeResults/)
   assert.match(pageSource, /rawResultsReady/)
   assert.match(pageSource, /sequenceComplete/)
@@ -97,6 +104,19 @@ test('DeepScan loading sequencing is success-gated and no longer bypasses on raw
   assert.match(pageSource, /inlineResults=\{resultsReady && payload \? <DeepScanInlineResults/)
   assert.doesNotMatch(pageSource, /inlineResults=\{rawResultsReady && payload/)
   assert.doesNotMatch(pageSource, /firstSuccessObserved: true,\s*visibleStageCount: 2/u)
+})
+
+
+test('DeepScan anti-burst dwell cadence increases release delay after each displayed team', () => {
+  const pageSource = readRepoFile('src', 'app', 'deepscan', 'page.tsx')
+  const baseDelayMs = parseNumericConst(pageSource, 'DEEPSCAN_STAGE_FILL_BASE_DELAY_MS')
+  const dwellMs = parseNumericConst(pageSource, 'DEEPSCAN_STAGE_FILL_DWELL_MS')
+  const releaseDelays = [0, 1, 2].map((displayedStageCount) => baseDelayMs + displayedStageCount * dwellMs)
+
+  assert.deepEqual(releaseDelays, [2_500, 5_000, 7_500])
+  assert.match(pageSource, /function getDeepScanStageFillDelayMs\(displayedStageCount: number\)/)
+  assert.match(pageSource, /Math\.max\(0, displayedStageCount\) \* DEEPSCAN_STAGE_FILL_DWELL_MS/)
+  assert.match(pageSource, /getDeepScanStageFillDelayMs\(displayedStageKeys\.length\)/)
 })
 
 test('DeepScan loading screen only fetches internal team summaries and avoids result CTA', () => {
