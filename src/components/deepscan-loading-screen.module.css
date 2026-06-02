@@ -1903,9 +1903,6 @@
 @media (prefers-reduced-motion: reduce) {
   .narrativeCard,
   .narrativeSpinner,
-  .narrativeTitleSkeleton,
-  .narrativeDescriptionSkeleton,
-  .narrativeTextSkeleton span,
   .headerProgressFill {
     animation: none;
     transition: none;
@@ -2050,6 +2047,15 @@
 
 .narrativeTextSkeleton span:nth-child(1) {
   width: calc(100% - 28px);
+}
+
+
+@media (prefers-reduced-motion: reduce) {
+  .narrativeTitleSkeleton,
+  .narrativeDescriptionSkeleton,
+  .narrativeTextSkeleton span {
+    animation: none;
+  }
 }
 
 .narrativeTextSkeleton span:nth-child(1)::after {
