@@ -1573,6 +1573,7 @@ export default function DeepScanPage() {
         subtitle='종목을 선택하면 9인 위원회가 바로 시작돼요'
         backHref='/home'
         showBottomNav={false}
+        frameClassName='sm:max-w-[340px]'
         mainClassName='relative overflow-x-hidden bg-[#f4f8fb] px-4 pt-4 pb-6 before:pointer-events-none before:absolute before:inset-x-[-80px] before:top-[-160px] before:h-[320px] before:rounded-full before:bg-[radial-gradient(circle_at_50%_50%,rgba(24,95,165,0.18),rgba(24,95,165,0)_68%)]'
       >
         <section className='relative overflow-hidden rounded-[30px] border border-white/80 bg-[#102f4e] p-5 text-white shadow-[0_22px_48px_rgba(16,47,78,0.24)]'>
@@ -1698,7 +1699,7 @@ export default function DeepScanPage() {
     return (
       <div className='flex min-h-screen min-h-dvh justify-center bg-white sm:bg-[color:var(--jaroo-canvas)] sm:px-6 sm:py-4'>
         <DeepScanLoadingScreen
-          className='w-full overflow-hidden sm:max-w-[390px] sm:rounded-[32px] sm:border sm:border-white/70 sm:shadow-[0_20px_60px_rgba(12,68,124,0.18)]'
+          className='w-full overflow-hidden sm:max-w-[340px] sm:rounded-[32px] sm:border sm:border-white/70 sm:shadow-[0_20px_60px_rgba(12,68,124,0.18)]'
           name={requestSeed.holding.name}
           identifier={identifier}
           market={requestSeed.holding.market}
@@ -1748,6 +1749,7 @@ export default function DeepScanPage() {
       }
       backHref='/home'
       showBottomNav={false}
+      frameClassName='sm:max-w-[340px]'
       mainClassName='bg-[#f4f8fb] px-4 pt-0 pb-0'
       action={
         <Link

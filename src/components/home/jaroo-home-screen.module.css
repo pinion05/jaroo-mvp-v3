@@ -699,7 +699,7 @@
 }
 
 .deepScanLoadingInner {
-  width: min(100vw, 390px);
+  width: min(100vw, 340px);
   height: 100%;
 }
 

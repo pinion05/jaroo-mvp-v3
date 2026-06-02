@@ -24,6 +24,7 @@ export function JarooShell({
   leading,
   bottomNav,
   mainClassName,
+  frameClassName,
 }: {
   title: ReactNode
   subtitle?: ReactNode
@@ -34,12 +35,13 @@ export function JarooShell({
   leading?: ReactNode | null
   bottomNav?: ReactNode
   mainClassName?: string
+  frameClassName?: string
 }) {
   const pathname = usePathname()
 
   return (
     <div className='min-h-screen min-h-dvh bg-white text-foreground sm:bg-[color:var(--jaroo-canvas)] sm:px-6 sm:py-4'>
-      <div className='relative mx-auto flex min-h-screen min-h-dvh w-full flex-col overflow-hidden bg-white sm:min-h-[calc(100vh-2rem)] sm:max-w-[390px] sm:rounded-[32px] sm:border sm:border-white/70 sm:shadow-[0_20px_60px_rgba(12,68,124,0.18)]'>
+      <div className={cn('relative mx-auto flex min-h-screen min-h-dvh w-full flex-col overflow-hidden bg-white sm:min-h-[calc(100vh-2rem)] sm:max-w-[390px] sm:rounded-[32px] sm:border sm:border-white/70 sm:shadow-[0_20px_60px_rgba(12,68,124,0.18)]', frameClassName)}>
         <header className='sticky top-0 z-20 border-b border-[color:var(--jaroo-border)] bg-white/95 px-4 py-3 backdrop-blur'>
           <div className='flex items-center gap-3'>
             {leading !== undefined ? (
