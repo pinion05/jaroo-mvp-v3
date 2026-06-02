@@ -39,6 +39,7 @@ function UploadDesignStyles() {
       .jaroo-upload-page{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;min-height:100vh;min-height:100dvh;align-items:flex-start;color:#0F1419}
       @media (min-width:1024px){.jaroo-upload-page{margin-left:-7rem}}
       .jaroo-upload-frame{background:#F5F6F8;border-radius:16px;width:340px;height:720px;overflow-y:auto;overflow-x:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative}
+      @media (max-width:640px){.jaroo-upload-page{display:block;padding:0;background:#F5F6F8;min-height:100dvh}.jaroo-upload-frame{width:100vw;height:100dvh;min-height:100dvh;border-radius:0;box-shadow:none}}
       .jaroo-upload-frame::-webkit-scrollbar{display:none}
       .jaroo-upload-head{position:sticky;top:0;z-index:10;background:rgba(245,246,248,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;border-bottom:.5px solid #E8EAEE;display:flex;align-items:center;gap:11px}
       .jaroo-upload-head-back{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;color:#0F1419;box-shadow:0 1px 2px rgba(0,0,0,.04);border:0;cursor:pointer;line-height:1}

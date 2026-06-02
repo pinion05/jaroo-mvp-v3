@@ -3,7 +3,6 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
-import { Cell, Pie, PieChart, ResponsiveContainer, Treemap, type PieLabelRenderProps, type TreemapNode } from 'recharts'
 import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
 import { shouldUseDeepScanLoadingHandoff } from '@/lib/deepscan-navigation'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
@@ -13,8 +12,8 @@ import {
   buildHomeHoldingErrorCard,
   buildQuoteLookupKey,
   requiresFxConversion,
-  shouldTreatQuoteFailureAsErrorCard,
   resolveAveragePriceCurrency,
+  shouldTreatQuoteFailureAsErrorCard,
   type CurrentQuoteItem,
   type HomeHoldingQuoteErrorKind,
 } from '@/lib/home-current-quotes'
@@ -24,39 +23,27 @@ import {
   resolveUsdKrwRateAfterFailedQuoteResponse,
   shouldSkipHomeQuoteHydration,
 } from '@/lib/home-quote-bootstrap'
-import { parseOcrNumber } from '@/lib/screenshot-ocr'
-import { cn } from '@/lib/utils'
 import {
   buildHomeHoldingsFromPortfolioItems,
-  buildHomeMarketScore,
   buildPortfolioItemsFromAppliedHomePortfolioRows,
   homeForecast as defaultHomeForecast,
   momentumSignals as defaultMomentumSignals,
   momentumStages as defaultMomentumStages,
-  portfolioScoreBreakdown as defaultPortfolioScoreBreakdown,
   readAppliedHomePortfolio,
   type HomeBadgeTone,
   type HomeHolding,
-  type HomeMetricTone,
-  type HomeMarketScore,
-  type HomeMarketScoreSignals,
 } from '@/lib/jaroo-home-data'
+import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
 import { usePortfolioStore } from '@/lib/stores/use-portfolio-store'
-import { toDeepScanTargetInput, type WorkflowAsyncStatus } from '@/lib/workflow-types'
+import { cn } from '@/lib/utils'
+import { toDeepScanTargetInput } from '@/lib/workflow-types'
 import styles from './jaroo-home-screen.module.css'
 
-const DONUT_CHART_SIZE = 210
-const HOME_MARKET_FX_SIGNAL_FETCH_TIMEOUT_MS = 2000
-const HOME_MARKET_INDICATOR_FETCH_TIMEOUT_MS = 30000
-
-type ViewMode = 'donut' | 'heatmap'
-type SheetMode = 'score' | 'momentum' | null
-type ScoreBreakdownItem = (typeof defaultPortfolioScoreBreakdown)[number]
 type MomentumSignalItem = (typeof defaultMomentumSignals)[number]
 type ForecastCard = typeof defaultHomeForecast
-type DonutChartDatum = HomeHolding & { value: number }
-type HeatmapChartDatum = HomeHolding & { value: number; name: string }
+type PortfolioStoreItem = ReturnType<typeof usePortfolioStore.getState>['items'][number]
+
 type DeepScanLoadingTarget = {
   name: string
   identifier?: string
@@ -70,119 +57,34 @@ type DeepScanLoadingTarget = {
   evaluationAmount?: number
 }
 
-type PortfolioSummary = {
-  score: string
+type HomeV2Summary = {
+  totalEvaluation: number | null
+  totalPnl: number | null
+  totalRate: number | null
   badge: string
   badgeTone: HomeBadgeTone
-  summaryText: string
+  hint: string
   momentumValue: string
   forecast: ForecastCard
-  scoreBreakdown: ScoreBreakdownItem[]
   momentumSignals: MomentumSignalItem[]
   momentumStages: typeof defaultMomentumStages
 }
 
-type PortfolioStoreItem = ReturnType<typeof usePortfolioStore.getState>['items'][number]
-
-function asRecord(value: unknown): Record<string, unknown> | null {
-  return value && typeof value === 'object' && !Array.isArray(value) ? value as Record<string, unknown> : null
+type DonutSegment = {
+  holding: HomeHolding
+  start: number
+  end: number
+  labelTop: string
+  labelLeft: string
 }
 
-function toFiniteMarketNumber(value: unknown) {
-  const parsed = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-function readEnvelopeData(payload: unknown) {
-  const envelope = asRecord(payload)
-  return asRecord(envelope?.data) ?? envelope
-}
-
-function readUsdKrwSignal(payload: unknown): HomeMarketScoreSignals['usdKrw'] {
-  const data = readEnvelopeData(payload)
-  return data
-    ? {
-        rate: toFiniteMarketNumber(data.rate),
-        changePercent: toFiniteMarketNumber(data.changePercent),
-        timestamp: typeof data.timestamp === 'string' ? data.timestamp : null,
-      }
-    : null
-}
-
-function readVolatilitySignal(payload: unknown) {
-  const data = asRecord(payload)
-  return data
-    ? {
-        value: toFiniteMarketNumber(data.value),
-        changePercent: toFiniteMarketNumber(data.changePercent),
-        asOf: typeof data.asOf === 'string' ? data.asOf : null,
-      }
-    : null
-}
-
-function readAdrSignal(payload: unknown) {
-  const data = asRecord(payload)
-  return data
-    ? {
-        value: toFiniteMarketNumber(data.value),
-        change: toFiniteMarketNumber(data.change),
-        asOf: typeof data.asOf === 'string' ? data.asOf : null,
-      }
-    : null
-}
-
-function readMarketIndicatorSignals(payload: unknown): HomeMarketScoreSignals['indicators'] {
-  const data = readEnvelopeData(payload)
-  const adr = asRecord(data?.adr)
-
-  return data
-    ? {
-        vkospi: readVolatilitySignal(data.vkospi),
-        usVix: readVolatilitySignal(data.usVix),
-        adr: adr
-          ? {
-              kospi: readAdrSignal(adr.kospi),
-              kosdaq: readAdrSignal(adr.kosdaq),
-            }
-          : null,
-      }
-    : null
-}
-
-function hasAnyMarketSignal(signals: HomeMarketScoreSignals) {
-  return [
-    signals.usdKrw?.rate,
-    signals.usdKrw?.changePercent,
-    signals.indicators?.vkospi?.value,
-    signals.indicators?.usVix?.value,
-    signals.indicators?.adr?.kospi?.value,
-    signals.indicators?.adr?.kosdaq?.value,
-  ].some((value) => toFiniteMarketNumber(value) !== null)
-}
-
-function hasAnyMarketIndicatorSignal(indicators: HomeMarketScoreSignals['indicators']) {
-  return [
-    indicators?.vkospi?.value,
-    indicators?.usVix?.value,
-    indicators?.adr?.kospi?.value,
-    indicators?.adr?.kosdaq?.value,
-  ].some((value) => toFiniteMarketNumber(value) !== null)
-}
-
-async function fetchHomeMarketSignalJson(input: RequestInfo | URL, signal: AbortSignal, timeoutMs: number) {
-  const response = await fetchHomeQuoteResponseWithTimeout(
-    fetch,
-    input,
-    { cache: 'no-store', signal },
-    timeoutMs,
-  )
-
-  if (!response.ok) {
-    return null
-  }
-
-  return response.json()
-}
+const DONUT_LABEL_POSITIONS = [
+  { top: '78%', left: '61%' },
+  { top: '18%', left: '26%' },
+  { top: '18%', left: '74%' },
+  { top: '39%', left: '83%' },
+  { top: '64%', left: '19%' },
+]
 
 function stripPortfolioQuoteFields(item: PortfolioStoreItem) {
   const { currentPrice, currentProfitRate, currentPriceCurrency, ...baseItem } = item
@@ -200,40 +102,6 @@ function getHoldingChangeValue(item: HomeHolding) {
   return parseOcrNumber(item.change)
 }
 
-function getValueToneClass(item: HomeHolding) {
-  const changeValue = getHoldingChangeValue(item)
-
-  if (changeValue === null) {
-    return undefined
-  }
-
-  if (changeValue > 0) {
-    return styles.valuePositive
-  }
-
-  return styles.valueDanger
-}
-
-function getHeatmapChipStyle(item: HomeHolding) {
-  if (item.badgeTone === 'green') {
-    return { background: 'rgba(29,158,117,.28)', color: '#C7F0E0' }
-  }
-
-  if (item.badgeTone === 'red') {
-    return { background: 'rgba(226,75,74,.35)', color: '#F7C1C1' }
-  }
-
-  return { background: 'rgba(239,159,39,.3)', color: '#FAC775' }
-}
-
-function getHeatmapChangeText(item: HomeHolding) {
-  if (item.heatmapMeta) {
-    return item.heatmapChange ? `${item.heatmapChange} · ${item.heatmapMeta}` : item.heatmapMeta
-  }
-
-  return item.heatmapChange ?? ''
-}
-
 function getHoldingIdentifierText(item: HomeHolding) {
   const identifiers = [item.identifierTicker, item.identifierCode].filter(
     (value, index, values): value is string => Boolean(value) && values.indexOf(value) === index,
@@ -242,275 +110,283 @@ function getHoldingIdentifierText(item: HomeHolding) {
   return identifiers.length > 0 ? identifiers.join(' · ') : item.identifierLabel
 }
 
-function buildPortfolioSummary(holdings: HomeHolding[], isAppliedPortfolio: boolean): PortfolioSummary {
-  if (!isAppliedPortfolio) {
-    return {
-      score: '54',
-      badge: '주의',
-      badgeTone: 'amber',
-      summaryText: '1개 종목이\n위험해요',
-      momentumValue: '나아지는 중 ↑',
-      forecast: defaultHomeForecast,
-      scoreBreakdown: defaultPortfolioScoreBreakdown,
-      momentumSignals: defaultMomentumSignals,
-      momentumStages: defaultMomentumStages,
-    }
+function getEvaluationAmount(item: HomeHolding) {
+  const directAmount = item.evaluationAmount ? parseOcrNumber(item.evaluationAmount) : null
+  if (directAmount !== null) {
+    return directAmount
   }
 
-  const changeValues = holdings.map(getHoldingChangeValue).filter((value): value is number => value !== null)
-  const avgChange = changeValues.length > 0 ? changeValues.reduce((sum, value) => sum + value, 0) / changeValues.length : 0
-  const negativeCount = changeValues.filter((value) => value < 0).length
-  const positiveCount = changeValues.filter((value) => value >= 0).length
-  const scoreNumber = clamp(Math.round(60 + avgChange), 0, 99)
-  const worstHolding = [...holdings].sort((left, right) => (getHoldingChangeValue(left) ?? 0) - (getHoldingChangeValue(right) ?? 0))[0] ?? holdings[0]
-  const dominantHolding = [...holdings].sort((left, right) => right.donutPercent - left.donutPercent)[0] ?? holdings[0]
-  const bestHolding = [...holdings].sort((left, right) => (getHoldingChangeValue(right) ?? -999) - (getHoldingChangeValue(left) ?? -999))[0] ?? holdings[0]
-  const scoreBadgeTone: HomeBadgeTone = negativeCount > 0 ? (negativeCount >= Math.ceil(holdings.length / 2) ? 'red' : 'amber') : 'green'
-  const scoreBadge = scoreBadgeTone === 'green' ? '양호' : scoreBadgeTone === 'red' ? '주의' : '관찰'
-  const summaryText = negativeCount > 0 ? `${negativeCount}개 종목이\n손실 구간이에요` : `${positiveCount}개 종목이\n수익 중이에요`
-  const forecastBody = `${holdings.length}개 OCR 종목을 홈에 적용했어요. ${worstHolding?.name ?? holdings[0]?.name} ${worstHolding?.change ?? ''} 상태를 먼저 확인해보세요.`
+  const metaMatch = item.metaLine.match(/평가금액\s*([^·]+)/)
+  const metaAmount = metaMatch ? parseOcrNumber(metaMatch[1]) : null
+  if (metaAmount !== null) {
+    return metaAmount
+  }
 
-  const scoreBreakdown: ScoreBreakdownItem[] = [
-    {
-      label: '비중 집중도',
-      score: `${clamp(Math.round((dominantHolding?.donutPercent ?? 0) * 100), 0, 100)} / 100`,
-      scoreColor: dominantHolding?.donutColor ?? '#185FA5',
-      barWidth: `${Math.max(12, Math.round((dominantHolding?.donutPercent ?? 0) * 100))}%`,
-      barColor: dominantHolding?.donutColor ?? '#185FA5',
-      description: `${dominantHolding?.name ?? '-'} 비중이 가장 커요. 홈 도넛과 히트맵도 이 비중을 기준으로 다시 그려졌어요.`,
-      stocks: holdings.slice(0, 4).map((item) => ({ label: `${item.name} ${item.heatmapWeight}`, dot: item.donutColor })),
-    },
-    {
-      label: '손익 상태',
-      score: `${Math.max(0, 100 - negativeCount * 20)} / 100`,
-      scoreColor: negativeCount > 0 ? '#A32D2D' : '#3B6D11',
-      barWidth: `${clamp(100 - negativeCount * 20, 15, 100)}%`,
-      barColor: negativeCount > 0 ? '#E24B4A' : '#639922',
-      description: negativeCount > 0 ? `${negativeCount}개 종목이 손실 구간이에요. 가장 약한 종목은 ${worstHolding?.name ?? '-'}예요.` : '현재 인식된 종목은 모두 수익 또는 보합 구간이에요.',
-      stocks: holdings.slice(0, 4).map((item) => ({
-        label: `${item.name} ${item.change}`,
-        dot: item.donutColor,
-        background: getHoldingChangeValue(item) !== null && (getHoldingChangeValue(item) ?? 0) < 0 ? '#FCEBEB' : '#EAF3DE',
-        color: getHoldingChangeValue(item) !== null && (getHoldingChangeValue(item) ?? 0) < 0 ? '#A32D2D' : '#3B6D11',
-      })),
-    },
-    {
-      label: '회복 모멘텀',
-      score: `${clamp(Math.round(avgChange + 50), 0, 100)} / 100`,
-      scoreColor: avgChange >= 0 ? '#3B6D11' : '#854F0B',
-      barWidth: `${clamp(Math.round(avgChange + 50), 15, 100)}%`,
-      barColor: avgChange >= 0 ? '#639922' : '#EF9F27',
-      description: avgChange >= 0 ? `평균 수익률이 ${avgChange.toFixed(1)}%예요. ${bestHolding?.name ?? '-'} 흐름이 가장 좋아요.` : `평균 수익률이 ${avgChange.toFixed(1)}%예요. OCR 적용 후 약한 종목부터 우선 확인하는 게 좋아요.`,
-      stocks: holdings.slice(0, 4).map((item) => ({ label: `${item.name} · ${item.change}`, dot: item.donutColor })),
-    },
-    {
-      label: '적용 상태',
-      score: `${holdings.length * 10} / 100`,
-      scoreColor: '#185FA5',
-      barWidth: `${clamp(holdings.length * 18, 15, 100)}%`,
-      barColor: '#185FA5',
-      description: `merge에서 확정한 ${holdings.length}개 종목이 홈에 적용됐어요. 부족한 분석 필드는 placeholder로 채워 안정적으로 보여줘요.`,
-      stocks: holdings.slice(0, 4).map((item) => ({ label: `${item.name} 적용 완료`, dot: item.donutColor })),
-    },
-  ]
+  const quantity = parseOcrNumber(item.shares)
+  const averagePrice = parseOcrNumber(item.averagePrice)
+  return quantity !== null && averagePrice !== null ? quantity * averagePrice : null
+}
 
-  const momentumSignals: MomentumSignalItem[] = holdings.slice(0, 4).map((item) => {
-    const changeValue = getHoldingChangeValue(item)
-    const positive = changeValue !== null && changeValue >= 0
-    const danger = changeValue !== null && changeValue <= -20
+function getPnlAmount(item: HomeHolding) {
+  return parseOcrNumber(item.pnl)
+}
 
-    return {
-      name: item.name,
-      dot: item.donutColor,
-      badge: positive ? '순풍' : danger ? '역풍' : '미풍',
-      badgeBackground: positive ? '#EAF3DE' : danger ? '#FCEBEB' : '#f0efe8',
-      badgeColor: positive ? '#3B6D11' : danger ? '#A32D2D' : '#888',
-      description: positive
-        ? `${item.name}는 현재 ${item.change}로 인식됐어요. 수익 구간 대응 전략을 이어서 볼 수 있어요.`
-        : danger
-          ? `${item.name}는 ${item.change} 손실 구간이에요. 우선순위 종목으로 먼저 점검하는 게 좋아요.`
-          : `${item.name}는 ${item.change} 상태예요. 추가 변화가 있는지 계속 확인해보세요.`,
-      blink: danger || undefined,
-    }
-  })
+function formatKrw(value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return '-'
+  }
 
-  const activeStageIndex = avgChange >= 8 ? 4 : avgChange >= 0 ? 3 : avgChange >= -10 ? 2 : avgChange >= -20 ? 1 : 0
-  const momentumStages = defaultMomentumStages.map((stage, index) => ({
-    ...stage,
-    active: index === activeStageIndex,
-  }))
-  const momentumValue = avgChange >= 8 ? '빠르게 개선 중 ↑' : avgChange >= 0 ? '나아지는 중 ↑' : avgChange >= -10 ? '천천히 회복 중 →' : '경계 필요 ↓'
+  return `${Math.round(value).toLocaleString('ko-KR')}원`
+}
+
+function formatSignedKrw(value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return '-'
+  }
+
+  const sign = value > 0 ? '+' : value < 0 ? '-' : ''
+  return `${sign}${Math.abs(Math.round(value)).toLocaleString('ko-KR')}원`
+}
+
+function formatSignedRate(value: number | null) {
+  if (value === null || !Number.isFinite(value)) {
+    return '-'
+  }
+
+  const sign = value > 0 ? '+' : value < 0 ? '-' : ''
+  return `${sign}${Math.abs(value).toFixed(1)}%`
+}
+
+function getToneClass(value: number | null) {
+  if (value === null) {
+    return undefined
+  }
+
+  return value < 0 ? styles.down : styles.up
+}
+
+function getStockTag(item: HomeHolding) {
+  if (item.badgeTone === 'green') {
+    return '수익'
+  }
+
+  if (item.badgeTone === 'red') {
+    return item.cardTone === 'halt' ? '정지' : '점검'
+  }
+
+  return '관찰'
+}
+
+function getStockTagClass(item: HomeHolding) {
+  if (item.badgeTone === 'green') {
+    return styles.profit
+  }
+
+  if (item.badgeTone === 'red') {
+    return styles.loss
+  }
+
+  return styles.watch
+}
+
+function buildHomeV2Summary(holdings: HomeHolding[], isAppliedPortfolio: boolean): HomeV2Summary {
+  const totalEvaluationValues = holdings.map(getEvaluationAmount).filter((value): value is number => value !== null)
+  const pnlValues = holdings.map(getPnlAmount).filter((value): value is number => value !== null)
+  const totalEvaluation = totalEvaluationValues.length > 0 ? totalEvaluationValues.reduce((sum, value) => sum + value, 0) : null
+  const totalPnl = pnlValues.length > 0 ? pnlValues.reduce((sum, value) => sum + value, 0) : null
+  const principal = totalEvaluation !== null && totalPnl !== null ? totalEvaluation - totalPnl : null
+  const totalRate = principal !== null && principal > 0 && totalPnl !== null ? (totalPnl / principal) * 100 : null
+  const negativeCount = holdings.filter((item) => (getHoldingChangeValue(item) ?? 0) < 0).length
+  const badgeTone: HomeBadgeTone = negativeCount === 0 ? 'green' : negativeCount >= Math.ceil(holdings.length / 2) ? 'red' : 'amber'
+  const badge = badgeTone === 'green' ? '수익' : badgeTone === 'red' ? '점검' : '관찰'
+  const averageRate = holdings.length > 0
+    ? holdings.reduce((sum, item) => sum + (getHoldingChangeValue(item) ?? 0), 0) / holdings.length
+    : 0
+  const momentumValue = averageRate >= 8 ? '빠르게 개선 중 ↑' : averageRate >= 0 ? '나아지는 중 ↑' : averageRate >= -10 ? '천천히 회복 중 →' : '경계 필요 ↓'
+  const worstHolding = [...holdings].sort((left, right) => (getHoldingChangeValue(left) ?? 0) - (getHoldingChangeValue(right) ?? 0))[0]
+  const forecastBody = isAppliedPortfolio
+    ? `${holdings.length}개 OCR 종목을 홈에 적용했어요. ${worstHolding?.name ?? holdings[0]?.name ?? '보유 종목'} 상태를 먼저 확인해보세요.`
+    : defaultHomeForecast.body
 
   return {
-    score: String(scoreNumber),
-    badge: scoreBadge,
-    badgeTone: scoreBadgeTone,
-    summaryText,
+    totalEvaluation,
+    totalPnl,
+    totalRate,
+    badge,
+    badgeTone,
+    hint: `${holdings.length}개 중 ${negativeCount}개가 손실 구간이에요 · 조각을 탭하면 종목으로 이동`,
     momentumValue,
-    forecast: {
-      label: 'OCR APPLIED',
-      body: forecastBody,
-      cta: '딥스캔으로 상세 전략 보기 ›',
-      href: '/deepscan',
-    },
-    scoreBreakdown,
-    momentumSignals,
-    momentumStages,
+    forecast: isAppliedPortfolio
+      ? {
+          label: 'OCR APPLIED',
+          body: forecastBody,
+          cta: '딥스캔으로 상세 전략 보기 ›',
+          href: '/deepscan',
+        }
+      : defaultHomeForecast,
+    momentumSignals: holdings.slice(0, 4).map((item) => {
+      const changeValue = getHoldingChangeValue(item)
+      const positive = changeValue !== null && changeValue >= 0
+      const danger = changeValue !== null && changeValue <= -20
+
+      return {
+        name: item.name,
+        dot: item.donutColor,
+        badge: positive ? '순풍' : danger ? '역풍' : '미풍',
+        badgeBackground: positive ? '#EAF3DE' : danger ? '#FCEBEB' : '#f0efe8',
+        badgeColor: positive ? '#3B6D11' : danger ? '#A32D2D' : '#888',
+        description: positive
+          ? `${item.name}는 현재 ${item.change}로 인식됐어요. 수익 구간 대응 전략을 이어서 볼 수 있어요.`
+          : danger
+            ? `${item.name}는 ${item.change} 손실 구간이에요. 우선순위 종목으로 먼저 점검하는 게 좋아요.`
+            : `${item.name}는 ${item.change} 상태예요. 추가 변화가 있는지 계속 확인해보세요.`,
+        blink: danger || undefined,
+      }
+    }),
+    momentumStages: defaultMomentumStages.map((stage, index) => ({
+      ...stage,
+      active: index === clamp(Math.round(averageRate / 8) + 2, 0, defaultMomentumStages.length - 1),
+    })),
   }
 }
 
-function HeatmapTile({
-  item,
-  className,
-  nameClassName,
-  weightClassName,
-  changeClassName,
-  style,
-  active = false,
-  onClick,
-}: {
-  item: HomeHolding
-  className?: string
-  nameClassName?: string
-  weightClassName?: string
-  changeClassName?: string
-  style?: React.CSSProperties
-  active?: boolean
-  onClick: () => void
+function buildConicGradient(holdings: HomeHolding[]) {
+  let cursor = 0
+  const stops: string[] = []
+  const totalWeight = holdings.reduce((sum, item) => sum + Math.max(item.donutPercent, 0.01), 0) || 1
+
+  for (const item of holdings) {
+    const size = (Math.max(item.donutPercent, 0.01) / totalWeight) * 360
+    const end = cursor + size
+    stops.push(`${item.donutColor} ${cursor.toFixed(1)}deg ${end.toFixed(1)}deg`)
+    cursor = end
+  }
+
+  return `conic-gradient(${stops.join(', ')})`
+}
+
+function buildDonutSegments(holdings: HomeHolding[]): DonutSegment[] {
+  const totalWeight = holdings.reduce((sum, item) => sum + Math.max(item.donutPercent, 0.01), 0) || 1
+  let cursor = -90
+
+  return holdings.map((holding, index) => {
+    const size = (Math.max(holding.donutPercent, 0.01) / totalWeight) * 360
+    const middle = cursor + size / 2
+    const radians = (middle * Math.PI) / 180
+    const x = 50 + Math.cos(radians) * 42
+    const y = 50 + Math.sin(radians) * 42
+    const presetPosition = DONUT_LABEL_POSITIONS[index]
+    const segment = {
+      holding,
+      start: cursor,
+      end: cursor + size,
+      labelTop: presetPosition?.top ?? `${clamp(y, 10, 86).toFixed(1)}%`,
+      labelLeft: presetPosition?.left ?? `${clamp(x, 9, 91).toFixed(1)}%`,
+    }
+    cursor += size
+    return segment
+  })
+}
+
+function HomeDonut({ holdings, summary, selectedId, onSelect }: {
+  holdings: HomeHolding[]
+  summary: HomeV2Summary
+  selectedId: number | null
+  onSelect: (id: number) => void
 }) {
+  const segments = buildDonutSegments(holdings)
+  const topSegments = segments.slice(0, 5)
+
   return (
-    <button
-      type='button'
-      className={cn(styles.heatmapTile, className, active && styles.heatmapTileActive, item.blink && styles.blink)}
-      style={{ background: item.heatmapBackground, ...style }}
-      onClick={onClick}
-    >
-      <div className={cn(styles.heatmapWeight, weightClassName)}>{item.heatmapWeight}</div>
-      <div className={cn(styles.heatmapName, nameClassName)}>{item.shortName || item.name}</div>
-      <div className={cn(styles.heatmapChange, changeClassName)}>{getHeatmapChangeText(item)}</div>
-      {item.heatmapBadge ? (
-        <div className={cn(styles.heatmapChip, changeClassName && styles.heatmapChipTiny)} style={getHeatmapChipStyle(item)}>
-          {item.heatmapBadge}
-        </div>
-      ) : null}
-    </button>
+    <div className={styles.donutWrap}>
+      <div className={styles.donut} style={{ background: buildConicGradient(holdings) }}>
+        {topSegments.map((segment) => (
+          <button
+            key={segment.holding.id}
+            type='button'
+            className={cn(styles.dLbl, selectedId === segment.holding.id && styles.dLblOn)}
+            style={{ top: segment.labelTop, left: segment.labelLeft }}
+            onClick={() => onSelect(segment.holding.id)}
+          >
+            {segment.holding.donutLabel || segment.holding.shortName || segment.holding.name}
+          </button>
+        ))}
+        <button type='button' className={styles.donutHole} onClick={() => onSelect(holdings[0]?.id ?? 0)}>
+          <div className={cn(styles.dCenterPl, getToneClass(summary.totalPnl))}>{formatSignedRate(summary.totalRate)}</div>
+          <div className={styles.dCenterLbl}>전체 손익</div>
+          <div className={cn(styles.dCenterBadge, summary.badgeTone === 'green' && styles.dCenterBadgeGreen, summary.badgeTone === 'red' && styles.dCenterBadgeRed)}>
+            {summary.badge}
+          </div>
+        </button>
+      </div>
+    </div>
   )
 }
 
-function badgeToneClass(tone: HomeBadgeTone) {
-  switch (tone) {
-    case 'red':
-      return styles.dcBadgeRed
-    case 'green':
-      return styles.dcBadgeGreen
-    default:
-      return styles.dcBadgeAmber
-  }
-}
+function StockCard({
+  item,
+  open,
+  onToggle,
+  onAction,
+}: {
+  item: HomeHolding
+  open: boolean
+  onToggle: () => void
+  onAction: (item: HomeHolding, event: MouseEvent<HTMLAnchorElement>) => void
+}) {
+  const changeValue = getHoldingChangeValue(item)
+  const evaluationAmount = getEvaluationAmount(item)
+  const identifierText = getHoldingIdentifierText(item)
 
-function marketScoreBadgeToneClass(tone: HomeBadgeTone) {
-  switch (tone) {
-    case 'red':
-      return styles.marketScoreBadgeRed
-    case 'green':
-      return styles.marketScoreBadgeGreen
-    default:
-      return styles.marketScoreBadgeAmber
-  }
-}
-
-function marketToneClass(tone: HomeHolding['marketTone']) {
-  switch (tone) {
-    case 'kospi':
-      return styles.marketKospi
-    case 'kosdaq':
-      return styles.marketKosdaq
-    case 'nasdaq':
-      return styles.marketNasdaq
-    default:
-      return styles.marketEtf
-  }
-}
-
-function signalToneClass(tone: HomeHolding['signalTone']) {
-  switch (tone) {
-    case 'danger':
-      return styles.signalDanger
-    case 'warning':
-      return styles.signalWarning
-    case 'positive':
-      return styles.signalPositive
-    case 'halt':
-      return styles.signalHalt
-    default:
-      return styles.signalEtf
-  }
-}
-
-function metricToneClass(tone: HomeMetricTone) {
-  switch (tone) {
-    case 'danger':
-      return styles.metricDanger
-    case 'warning':
-      return styles.metricWarning
-    case 'positive':
-      return styles.metricPositive
-    case 'locked':
-      return styles.metricLocked
-    default:
-      return styles.metricNeutral
-  }
-}
-
-function actionToneClass(item: HomeHolding) {
-  if (item.cardTone === 'halt') {
-    return styles.buttonRed
-  }
-
-  if (item.cardTone === 'profit') {
-    return styles.buttonGreen
-  }
-
-  return styles.buttonBlue
-}
-
-function MarketScoreCard({ marketScore }: { marketScore: HomeMarketScore }) {
   return (
-    <section className={styles.marketScoreCard} aria-label='시장 점수'>
-      <div className={styles.marketScoreHeader}>
-        <div>
-          <div className={styles.marketScoreEyebrow}>MARKET SCORE</div>
-          <div className={styles.marketScoreTitle}>시장 점수</div>
+    <article className={cn(styles.stock, open && styles.open)}>
+      <button type='button' className={styles.stockRow} onClick={onToggle} aria-expanded={open}>
+        <span className={styles.stockDot} style={{ background: item.donutColor }} />
+        <span className={styles.stockInfo}>
+          <span className={styles.stockNameLine}>
+            <span className={styles.stockName}>{item.name}</span>
+            <span className={cn(styles.stockTag, getStockTagClass(item))}>{getStockTag(item)}</span>
+          </span>
+          <span className={styles.stockMeta}>{item.market}{identifierText ? ` · ${identifierText}` : ''} · {item.shares}</span>
+        </span>
+        <span className={styles.stockRight}>
+          <span className={cn(styles.stockRate, getToneClass(changeValue))}>{item.change}</span>
+          <span className={styles.stockAmt}>{formatKrw(evaluationAmount)}</span>
+        </span>
+      </button>
+      <div className={styles.stockDetail} aria-hidden={!open}>
+        <div className={styles.sdFacts}>
+          <div>
+            <span className={styles.sdfLabel}>현재가</span>
+            <span className={styles.sdfVal}>{item.change}</span>
+          </div>
+          <div>
+            <span className={styles.sdfLabel}>평단</span>
+            <span className={styles.sdfVal}>{item.averagePrice}</span>
+          </div>
+          <div>
+            <span className={styles.sdfLabel}>평가금액</span>
+            <span className={styles.sdfVal}>{formatKrw(evaluationAmount)}</span>
+          </div>
         </div>
-        <div className={styles.marketScoreValueBlock}>
-          <span className={styles.marketScoreValue}>{marketScore.score}</span>
-          <span className={cn(styles.marketScoreBadge, marketScoreBadgeToneClass(marketScore.tone))}>{marketScore.label}</span>
-        </div>
+        {item.actionHref ? (
+          <Link href={item.actionHref} className={styles.scanBtn} onClick={(event) => onAction(item, event)}>
+            🔍 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
+          </Link>
+        ) : (
+          <button type='button' className={styles.scanBtn}>
+            🔍 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
+          </button>
+        )}
       </div>
-      <p className={styles.marketScoreDescription}>{marketScore.description}</p>
-      {marketScore.details.length > 0 ? (
-        <dl className={styles.marketScoreDetails} aria-label='시장 점수 산출 지표'>
-          {marketScore.details.map((detail) => (
-            <div key={detail.label} className={styles.marketScoreDetail}>
-              <dt>{detail.label}</dt>
-              <dd>{detail.value}</dd>
-              {detail.meta ? <span>{detail.meta}</span> : null}
-            </div>
-          ))}
-        </dl>
-      ) : null}
-      <div className={styles.marketScoreMeta}>
-        <span>{marketScore.sourceLabel}</span>
-        <span>{marketScore.updatedLabel}</span>
-      </div>
-    </section>
+    </article>
   )
 }
 
 export function JarooHomeScreen() {
   const router = useRouter()
   const frameRef = useRef<HTMLDivElement>(null)
-  const cardRefs = useRef<Record<number, HTMLDivElement | null>>({})
+  const cardRefs = useRef<Record<number, HTMLElement | null>>({})
   const deepScanNavigationIdRef = useRef(0)
 
   const portfolioItems = usePortfolioStore((state) => state.items)
@@ -523,19 +399,15 @@ export function JarooHomeScreen() {
   const clearItemQuote = usePortfolioStore((state) => state.clearItemQuote)
   const setDeepScanTarget = useDeepScanStore((state) => state.setTarget)
 
-  const [view, setView] = useState<ViewMode>('donut')
   const [selectedId, setSelectedId] = useState<number | null>(null)
-  const [openStockCardId, setOpenStockCardId] = useState<number | null>(null)
-  const [openEtfCardId, setOpenEtfCardId] = useState<number | null>(null)
-  const [openSheet, setOpenSheet] = useState<SheetMode>(null)
+  const [openCardId, setOpenCardId] = useState<number | null>(null)
+  const [openSheet, setOpenSheet] = useState<'momentum' | null>(null)
   const [liveQuoteSnapshot, setLiveQuoteSnapshot] = useState<{ query: string; items: CurrentQuoteItem[] }>({ query: '', items: [] })
   const [usdKrwRate, setUsdKrwRate] = useState<number | null>(null)
   const [quoteFailureKinds, setQuoteFailureKinds] = useState<Record<string, HomeHoldingQuoteErrorKind>>({})
   const [quoteSummaryMessage, setQuoteSummaryMessage] = useState<string | null>(null)
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [deepScanLoadingTarget, setDeepScanLoadingTarget] = useState<DeepScanLoadingTarget | null>(null)
-  const [marketSignals, setMarketSignals] = useState<HomeMarketScoreSignals | null>(null)
-  const [marketSignalStatus, setMarketSignalStatus] = useState<WorkflowAsyncStatus>('idle')
   const hasCheckedPersistedPortfolioRef = useRef(false)
 
   const portfolioBaseItems = useMemo(() => portfolioItems.map((item) => stripPortfolioQuoteFields(item)), [portfolioItems])
@@ -558,8 +430,6 @@ export function JarooHomeScreen() {
     [rawHomeHoldings],
   )
 
-  const redirectReasonMessage = '홈 포트폴리오가 없어 /ocr 로 이동합니다.'
-
   useEffect(() => {
     if (hasPortfolioItems) {
       return
@@ -567,11 +437,8 @@ export function JarooHomeScreen() {
 
     if (!hasCheckedPersistedPortfolioRef.current) {
       hasCheckedPersistedPortfolioRef.current = true
-
       const persistedPortfolio = readAppliedHomePortfolio()
-      const persistedItems = persistedPortfolio
-        ? buildPortfolioItemsFromAppliedHomePortfolioRows(persistedPortfolio.rows)
-        : []
+      const persistedItems = persistedPortfolio ? buildPortfolioItemsFromAppliedHomePortfolioRows(persistedPortfolio.rows) : []
 
       if (persistedItems.length > 0) {
         replacePortfolioItems(persistedItems)
@@ -661,29 +528,26 @@ export function JarooHomeScreen() {
         ])
         const nextFxRate = fxResult.rate
         const fxFetchFailed = fxResult.failed
-        const response = quoteResponse
 
         if (abortController.signal.aborted) {
           return
         }
 
-        if (!response.ok) {
+        if (!quoteResponse.ok) {
           setUsdKrwRate((previousRate) => resolveUsdKrwRateAfterFailedQuoteResponse(previousRate, nextFxRate, fxFetchFailed))
           setQuoteStatus('error', '현재 시세 응답이 지연되어 기존 시세로 표시 중이에요. 다시 시도해주세요.', quoteQuery)
           return
         }
 
-        const payload = await response.json()
-
+        const payload = await quoteResponse.json()
         const nextItems: CurrentQuoteItem[] = Array.isArray(payload?.data?.items) ? payload.data.items : []
         const okItems = nextItems.filter((item) => item.status === 'ok' && typeof item.price === 'number')
         const nextHoldings = applyCurrentQuotesToHomeHoldings(rawHomeHoldingsRef.current, okItems, { usdKrwRate: hasUsHomeHoldings ? nextFxRate : null })
         const nextHoldingsById = new Map(nextHoldings.map((holding) => [holding.id, holding]))
         const responseByLookupKey = new Map<string, CurrentQuoteItem>()
+
         for (const item of nextItems) {
-          const lookupKey = item.market === 'US'
-            ? item.ticker?.trim().toUpperCase()
-            : item.code?.trim()
+          const lookupKey = item.market === 'US' ? item.ticker?.trim().toUpperCase() : item.code?.trim()
           if (lookupKey) {
             responseByLookupKey.set(lookupKey, item)
           }
@@ -712,8 +576,8 @@ export function JarooHomeScreen() {
 
           const quoteCurrency = quoteItem.currency === 'USD' || homeHolding.marketTone === 'nasdaq' ? 'USD' : 'KRW'
           const averagePriceCurrency = resolveAveragePriceCurrency(homeHolding, quoteCurrency, quoteItem, { usdKrwRate: nextFxRate })
-          const requiresFx = requiresFxConversion(quoteCurrency, averagePriceCurrency)
-          if (requiresFx && (fxFetchFailed || nextFxRate === null)) {
+          const needsFx = requiresFxConversion(quoteCurrency, averagePriceCurrency)
+          if (needsFx && (fxFetchFailed || nextFxRate === null)) {
             nextFailureKinds[itemKey] = 'fx-required'
             continue
           }
@@ -740,11 +604,7 @@ export function JarooHomeScreen() {
           return
         }
 
-        setQuoteSummaryMessage(
-          failureCount > 0
-            ? '일부 종목의 시세를 불러오지 못해 오류 카드로 표시했어요.'
-            : null,
-        )
+        setQuoteSummaryMessage(failureCount > 0 ? '일부 종목의 시세를 불러오지 못해 기존 OCR 값으로 표시했어요.' : null)
         setQuoteStatus('success', null, quoteQuery)
       } catch (error) {
         if (abortController.signal.aborted || (error instanceof Error && error.name === 'AbortError')) {
@@ -763,70 +623,6 @@ export function JarooHomeScreen() {
       abortController.abort()
     }
   }, [clearItemQuote, hasUsHomeHoldings, patchQuote, quoteQuery, quoteRunKey, quoteSurfaceEnabled, refreshVersion, setQuoteStatus])
-
-  useEffect(() => {
-    const abortController = new AbortController()
-
-    const hydrateMarketSignals = async () => {
-      setMarketSignalStatus('loading')
-      const nextSignals: HomeMarketScoreSignals = {}
-      let receivedAnySignal = false
-      let receivedIndicatorSignal = false
-
-      const publishSignals = (status: WorkflowAsyncStatus) => {
-        if (!hasAnyMarketSignal(nextSignals)) {
-          return
-        }
-
-        receivedAnySignal = true
-        setMarketSignals({
-          usdKrw: nextSignals.usdKrw ?? null,
-          indicators: nextSignals.indicators ?? null,
-        })
-        setMarketSignalStatus(status)
-      }
-
-      const usdKrwPromise = fetchHomeMarketSignalJson('/api/market/fx/usd-krw', abortController.signal, HOME_MARKET_FX_SIGNAL_FETCH_TIMEOUT_MS)
-        .then((payload) => {
-          if (abortController.signal.aborted) {
-            return
-          }
-          nextSignals.usdKrw = readUsdKrwSignal(payload)
-          publishSignals(receivedIndicatorSignal ? 'success' : 'loading')
-        })
-
-      const indicatorsPromise = fetchHomeMarketSignalJson('/api/market/indicators', abortController.signal, HOME_MARKET_INDICATOR_FETCH_TIMEOUT_MS)
-        .then((payload) => {
-          if (abortController.signal.aborted) {
-            return
-          }
-          nextSignals.indicators = readMarketIndicatorSignals(payload)
-          receivedIndicatorSignal = hasAnyMarketIndicatorSignal(nextSignals.indicators)
-          publishSignals(receivedIndicatorSignal ? 'success' : 'error')
-        })
-
-      await Promise.allSettled([usdKrwPromise, indicatorsPromise])
-
-      if (abortController.signal.aborted) {
-        return
-      }
-
-      if (!receivedAnySignal) {
-        setMarketSignalStatus('error')
-        return
-      }
-
-      if (!receivedIndicatorSignal) {
-        setMarketSignalStatus('error')
-      }
-    }
-
-    void hydrateMarketSignals()
-
-    return () => {
-      abortController.abort()
-    }
-  }, [refreshVersion])
 
   const homeHoldings = useMemo(() => {
     const quoteApplied = applyCurrentQuotesToHomeHoldings(
@@ -848,6 +644,14 @@ export function JarooHomeScreen() {
   }, [hasUsHomeHoldings, liveQuoteSnapshot, portfolioBaseItems, quoteFailureKinds, quoteQuery, quoteSurfaceEnabled, rawHomeHoldings, usdKrwRate])
 
   const selectedHolding = selectedId === null ? null : homeHoldings.find((item) => item.id === selectedId) ?? null
+  const summary = useMemo(() => buildHomeV2Summary(homeHoldings, isAppliedPortfolio), [homeHoldings, isAppliedPortfolio])
+  const defaultDeepScanHolding = useMemo(() => {
+    if (selectedHolding?.kind === 'stock') {
+      return selectedHolding
+    }
+
+    return pickDeepScanDefaultHolding(homeHoldings)
+  }, [homeHoldings, selectedHolding])
 
   const handleQuoteRefresh = useCallback(() => {
     if (quoteStatus === 'loading') {
@@ -856,6 +660,48 @@ export function JarooHomeScreen() {
 
     setRefreshVersion((value) => value + 1)
   }, [quoteStatus])
+
+  const scrollToCard = useCallback((id: number) => {
+    const frame = frameRef.current
+    const card = cardRefs.current[id]
+
+    if (!frame || !card) {
+      return
+    }
+
+    window.setTimeout(() => {
+      frame.scrollTo({
+        top: card.offsetTop - 76,
+        behavior: 'smooth',
+      })
+    }, 80)
+  }, [])
+
+  const selectHolding = useCallback((id: number, shouldScroll = true) => {
+    if (selectedId === id) {
+      setSelectedId(null)
+      setOpenCardId(null)
+      return
+    }
+
+    setSelectedId(id)
+    setOpenCardId(id)
+
+    if (shouldScroll) {
+      scrollToCard(id)
+    }
+  }, [scrollToCard, selectedId])
+
+  const toggleCard = useCallback((id: number) => {
+    if (openCardId === id) {
+      setSelectedId(null)
+      setOpenCardId(null)
+      return
+    }
+
+    setSelectedId(id)
+    setOpenCardId(id)
+  }, [openCardId])
 
   const navigateToDeepScanForHolding = useCallback(async (holdingId: number, actionHref: string) => {
     const item = portfolioItems[holdingId]
@@ -905,181 +751,16 @@ export function JarooHomeScreen() {
     await navigateToDeepScanForHolding(item.id, item.actionHref)
   }, [navigateToDeepScanForHolding])
 
-  const donutChartData = useMemo<DonutChartDatum[]>(
-    () => homeHoldings.map((item) => ({ ...item, value: Math.max(item.donutPercent, 0.01) })),
-    [homeHoldings],
-  )
-  const heatmapChartData = useMemo<HeatmapChartDatum[]>(
-    () => homeHoldings.map((item) => ({ ...item, name: item.shortName || item.name, value: Math.max(item.donutPercent, 0.01) })),
-    [homeHoldings],
-  )
-  const heatmapChartHeight = Math.max(234, 234 + Math.max(0, heatmapChartData.length - 5) * 34)
-  const summaryData = useMemo(() => buildPortfolioSummary(homeHoldings, isAppliedPortfolio), [homeHoldings, isAppliedPortfolio])
-  const marketScore = useMemo(
-    () => buildHomeMarketScore(homeHoldings, { marketSignalStatus, marketSignals }),
-    [homeHoldings, marketSignalStatus, marketSignals],
-  )
-  const defaultDeepScanHolding = useMemo(() => {
-    if (selectedHolding?.kind === 'stock') {
-      return selectedHolding
-    }
-
-    return pickDeepScanDefaultHolding(homeHoldings)
-  }, [homeHoldings, selectedHolding])
-  const renderDonutLabel = useCallback(({ x, y, payload }: PieLabelRenderProps) => {
-    const item = payload as DonutChartDatum | undefined
-
-    if (!item || typeof x !== 'number' || typeof y !== 'number') {
-      return null
-    }
-
-    const textWidth = item.donutLabel.length * 6.2
-    const labelX = clamp(x, textWidth / 2 + 10, DONUT_CHART_SIZE - textWidth / 2 - 10)
-    const labelY = clamp(y, 12, DONUT_CHART_SIZE - 12)
-
-    return (
-      <g pointerEvents='none'>
-        <rect x={labelX - textWidth / 2 - 5} y={labelY - 8} width={textWidth + 10} height={15} rx={6} fill='rgba(10,25,55,.8)' />
-        <text x={labelX} y={labelY} fontSize='10' fill='white' textAnchor='middle' fontWeight='500' dominantBaseline='middle'>
-          {item.donutLabel}
-        </text>
-      </g>
-    )
-  }, [])
-
-  const scrollToCard = useCallback((id: number) => {
-    const frame = frameRef.current
-    const card = cardRefs.current[id]
-
-    if (!frame || !card) {
-      return
-    }
-
-    window.setTimeout(() => {
-      frame.scrollTo({
-        top: card.offsetTop - 56,
-        behavior: 'smooth',
-      })
-    }, 80)
-  }, [])
-
-  const resetSelection = useCallback(() => {
-    setSelectedId(null)
-    setOpenStockCardId(null)
-    setOpenEtfCardId(null)
-  }, [])
-
-  const selectHolding = useCallback(
-    (id: number, shouldScroll = true) => {
-      if (selectedId === id) {
-        resetSelection()
-        return
-      }
-
-      const selectedItem = homeHoldings.find((item) => item.id === id)
-      setSelectedId(id)
-
-      if (selectedItem?.kind === 'etf') {
-        setOpenStockCardId(null)
-        setOpenEtfCardId(id)
-      } else {
-        setOpenStockCardId(id)
-        setOpenEtfCardId(null)
-      }
-
-      if (shouldScroll) {
-        scrollToCard(id)
-      }
-    },
-    [homeHoldings, resetSelection, scrollToCard, selectedId],
-  )
-
-  const toggleCard = useCallback(
-    (id: number) => {
-      if (openStockCardId === id && selectedId === id) {
-        resetSelection()
-        return
-      }
-
-      setSelectedId(id)
-      setOpenStockCardId(id)
-      setOpenEtfCardId(null)
-    },
-    [openStockCardId, resetSelection, selectedId],
-  )
-
-  const handleHeatmapClick = useCallback(
-    (id: number) => {
-      const selectedItem = homeHoldings.find((item) => item.id === id)
-      setSelectedId(id)
-
-      if (selectedItem?.kind === 'etf') {
-        setOpenStockCardId(null)
-        setOpenEtfCardId(id)
-      } else {
-        setOpenStockCardId(id)
-        setOpenEtfCardId(null)
-      }
-
-      scrollToCard(id)
-    },
-    [homeHoldings, scrollToCard],
-  )
-
-  const toggleEtfCard = useCallback(
-    (id: number) => {
-      if (openEtfCardId === id && selectedId === id) {
-        resetSelection()
-        return
-      }
-
-      setSelectedId(id)
-      setOpenStockCardId(null)
-      setOpenEtfCardId(id)
-    },
-    [openEtfCardId, resetSelection, selectedId],
-  )
-
-  const renderHeatmapContent = useCallback(
-    (node: TreemapNode) => {
-      const item = node as TreemapNode & Partial<HeatmapChartDatum>
-
-      if (item.depth !== 1 || typeof item.id !== 'number' || item.width <= 0 || item.height <= 0) {
-        return <g />
-      }
-
-      const isCompactTile = item.width < 100 || item.height < 58
-      const isTinyTile = item.width < 78 || item.height < 48
-      const isActive = item.id === selectedId || item.id === openStockCardId || item.id === openEtfCardId
-
-      return (
-        <foreignObject x={item.x} y={item.y} width={item.width} height={item.height}>
-          <HeatmapTile
-            item={item as HomeHolding}
-            className={styles.heatmapTreemapTile}
-            weightClassName={isCompactTile ? styles.heatmapWeightSmall : undefined}
-            nameClassName={isTinyTile ? styles.heatmapNameTiny : isCompactTile ? styles.heatmapNameSmall : undefined}
-            changeClassName={isCompactTile ? styles.heatmapChangeSmall : undefined}
-            style={{ width: '100%', height: '100%', padding: isCompactTile ? '7px 9px' : '9px 10px' }}
-            active={isActive}
-            onClick={() => handleHeatmapClick(item.id as number)}
-          />
-        </foreignObject>
-      )
-    },
-    [handleHeatmapClick, openEtfCardId, openStockCardId, selectedId],
-  )
-
   if (!hasPortfolioItems) {
     return (
       <div className={styles.viewport}>
         <div className={styles.frame}>
-          <div className={styles.body}>
+          <main className={styles.body}>
             <div className={styles.forecastCard}>
               <div className={styles.forecastLabel}>REDIRECTING</div>
-              <div className={styles.forecastText}>{redirectReasonMessage ?? '홈 포트폴리오를 확인하는 중이에요.'}</div>
+              <div className={styles.forecastText}>홈 포트폴리오가 없어 /ocr 로 이동합니다.</div>
             </div>
-          </div>
+          </main>
         </div>
       </div>
     )
@@ -1088,198 +769,45 @@ export function JarooHomeScreen() {
   return (
     <div className={styles.viewport}>
       <div ref={frameRef} className={styles.frame}>
-        <div className={styles.topBar}>
-          <div className={styles.appName}>Jaroo</div>
-          <div className={styles.topIcons}>
-            <button type='button' className={styles.iconButton} onClick={() => setOpenSheet('momentum')} aria-label='이번 주 회복 모멘텀 열기'>
-              <svg width='14' height='14' viewBox='0 0 14 14' fill='none'>
-                <line x1='7' y1='2' x2='7' y2='12' stroke='white' strokeWidth='1.8' strokeLinecap='round' />
-                <line x1='2' y1='7' x2='12' y2='7' stroke='white' strokeWidth='1.8' strokeLinecap='round' />
-              </svg>
-            </button>
-            <button type='button' className={styles.iconButton} aria-label='알림'>
-              <svg width='14' height='14' viewBox='0 0 14 14' fill='none'>
-                <path
-                  d='M7 1.5C4.5 1.5 2.5 3.3 2.5 5.5V9L1.5 10.5h11L11.5 9V5.5C11.5 3.3 9.5 1.5 7 1.5Z'
-                  stroke='white'
-                  strokeWidth='1.4'
-                  fill='none'
-                />
-                <path d='M5.5 10.5C5.5 11.3 6.2 12 7 12s1.5-.7 1.5-1.5' stroke='white' strokeWidth='1.4' fill='none' strokeLinecap='round' />
-              </svg>
-              <span className={styles.bellDot} />
+        <header className={styles.top}>
+          <div className={styles.brand}>Jaroo</div>
+          <div className={styles.topActions}>
+            <Link href='/ocr' className={styles.tbtn} aria-label='스크린샷 추가'>＋</Link>
+            <button type='button' className={styles.tbtn} aria-label='알림' onClick={() => setOpenSheet('momentum')}>
+              🔔<span className={styles.dot} />
             </button>
           </div>
-        </div>
+        </header>
 
-        <div className={styles.hero}>
-          <div className={styles.viewToggle}>
-            <button
-              type='button'
-              className={cn(styles.viewToggleButton, view === 'donut' && styles.viewToggleButtonOn)}
-              onClick={() => setView('donut')}
-            >
-              <svg width='14' height='14' viewBox='0 0 14 14' fill='none' style={{ opacity: 0.9 }}>
-                <circle cx='7' cy='7' r='5.5' stroke='white' strokeWidth='1.5' fill='none' />
-                <circle cx='7' cy='7' r='2.5' fill='white' />
-              </svg>
-              비중
-            </button>
-            <button
-              type='button'
-              className={cn(styles.viewToggleButton, view === 'heatmap' && styles.viewToggleButtonOn)}
-              onClick={() => setView('heatmap')}
-            >
-              <svg width='14' height='14' viewBox='0 0 14 14' fill='none' style={{ opacity: 0.7 }}>
-                <rect x='1' y='1' width='5.5' height='5.5' rx='1.5' fill='white' />
-                <rect x='7.5' y='1' width='5.5' height='2.5' rx='1' fill='white' />
-                <rect x='7.5' y='4.5' width='5.5' height='2' rx='1' fill='white' />
-                <rect x='1' y='7.5' width='12' height='5.5' rx='1.5' fill='white' />
-              </svg>
-              손익
-            </button>
-          </div>
-
-          <div className={cn(styles.view, view !== 'donut' && styles.hidden)}>
-            <div className={styles.donutOuter}>
-              <div className={styles.donutSvg}>
-                <ResponsiveContainer width='100%' height='100%'>
-                  <PieChart>
-                    <Pie
-                      data={[{ value: 1 }]}
-                      dataKey='value'
-                      cx='50%'
-                      cy='50%'
-                      innerRadius={58}
-                      outerRadius={82}
-                      fill='rgba(255,255,255,.07)'
-                      stroke='none'
-                      isAnimationActive={false}
-                    />
-                    <Pie
-                      data={donutChartData}
-                      dataKey='value'
-                      nameKey='donutLabel'
-                      cx='50%'
-                      cy='50%'
-                      innerRadius={58}
-                      outerRadius={82}
-                      startAngle={90}
-                      endAngle={-270}
-                      paddingAngle={homeHoldings.length > 1 ? 3 : 0}
-                      cornerRadius={3}
-                      stroke='none'
-                      labelLine={false}
-                      label={renderDonutLabel}
-                      isAnimationActive={false}
-                      onClick={(data) => {
-                        const item = data.payload as DonutChartDatum | undefined
-
-                        if (item) {
-                          selectHolding(item.id)
-                        }
-                      }}
-                    >
-                      {donutChartData.map((item) => (
-                        <Cell
-                          key={item.id}
-                          fill={item.donutColor}
-                          className={cn(
-                            styles.arcSeg,
-                            selectedId !== null && selectedId !== item.id && styles.dimmed,
-                            selectedId === item.id && styles.selected,
-                          )}
-                        />
-                      ))}
-                    </Pie>
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-              <button type='button' className={styles.donutCenter} onClick={() => setOpenSheet('score')}>
-                <div
-                  className={styles.dcScore}
-                  style={{
-                    fontSize: selectedHolding ? 22 : 32,
-                    color: selectedHolding ? selectedHolding.centerScoreColor : 'white',
-                  }}
-                >
-                  {selectedHolding ? selectedHolding.centerScore : summaryData.score}
-                </div>
-                <div className={cn(styles.dcBadge, badgeToneClass(selectedHolding?.centerBadgeTone ?? summaryData.badgeTone))}>
-                  {selectedHolding ? selectedHolding.centerBadge : summaryData.badge}
-                </div>
-                <div className={styles.dcTxt}>
-                  {selectedHolding ? (
-                    selectedHolding.centerName
-                  ) : (
-                    <>
-                      탭하면 해당
-                      <br />
-                      종목으로 이동해요
-                    </>
-                  )}
-                </div>
-              </button>
-            </div>
-            <div className={styles.scrollHint} style={{ opacity: selectedHolding ? 0 : 1 }}>
-              <span>탭하면 종목 카드로 이동해요</span>
-              <span className={styles.scrollArrow}>↓</span>
-            </div>
-            <button type='button' className={styles.momentumBanner} onClick={() => setOpenSheet('momentum')}>
-              <span className={styles.momentumDot} />
-              <span className={styles.momentumText}>이번 주 포트폴리오 순풍</span>
-              <span className={styles.momentumValue}>{summaryData.momentumValue}</span>
-              <span className={styles.momentumArrow}>›</span>
-            </button>
-          </div>
-
-          <div className={cn(styles.view, view !== 'heatmap' && styles.hidden)}>
-            <div className={styles.heatmapHeader}>
+        <main className={styles.body}>
+          <section className={styles.mainCard} aria-label='홈 포트폴리오 요약'>
+            <div className={styles.mcTop}>
               <div>
-                <div className={styles.heatmapScore}>{summaryData.score}</div>
-                <div className={styles.heatmapScoreLabel}>포트폴리오 점수</div>
-              </div>
-              <div className={styles.heatmapSummary}>
-                <div className={styles.heatmapSummaryBadge}>{summaryData.badge}</div>
-                <div className={styles.heatmapSummaryText}>
-                  {summaryData.summaryText.split('\n')[0]}
-                  <br />
-                  {summaryData.summaryText.split('\n')[1]}
+                <div className={styles.mcLabel}>총 평가액</div>
+                <div className={styles.mcTotal}>{formatKrw(summary.totalEvaluation)}</div>
+                <div className={cn(styles.mcPl, getToneClass(summary.totalPnl))}>
+                  {formatSignedKrw(summary.totalPnl)} · {formatSignedRate(summary.totalRate)}
                 </div>
               </div>
-            </div>
-            <div className={styles.heatmapGrid}>
-              <div className={styles.heatmapTreemap} style={{ height: heatmapChartHeight }}>
-                <ResponsiveContainer width='100%' height='100%'>
-                  <Treemap
-                    data={heatmapChartData}
-                    dataKey='value'
-                    aspectRatio={1.25}
-                    stroke='rgba(255,255,255,.08)'
-                    content={renderHeatmapContent}
-                    isAnimationActive={false}
-                  />
-                </ResponsiveContainer>
+              <div className={cn(styles.mcBadge, summary.badgeTone === 'green' && styles.profit, summary.badgeTone === 'red' && styles.loss)}>
+                {summary.badge}
               </div>
             </div>
-            <button type='button' className={styles.momentumBanner} onClick={() => setOpenSheet('momentum')}>
-              <span className={styles.momentumDot} />
-              <span className={styles.momentumText}>이번 주 포트폴리오 순풍</span>
-              <span className={styles.momentumValue}>{summaryData.momentumValue}</span>
-              <span className={styles.momentumArrow}>›</span>
-            </button>
-          </div>
-        </div>
 
-        <div className={styles.body}>
-          <MarketScoreCard marketScore={marketScore} />
+            <HomeDonut holdings={homeHoldings} summary={summary} selectedId={selectedId} onSelect={selectHolding} />
+            <div className={styles.mcHint}>{summary.hint}</div>
+          </section>
+
+          <button type='button' className={styles.trend} onClick={() => setOpenSheet('momentum')}>
+            <span className={styles.trendLeft}><span className={styles.trendDot} />이번 주 포트폴리오 순풍</span>
+            <span className={styles.trendRight}>{summary.momentumValue}</span>
+          </button>
+
           {quoteSurfaceEnabled && quoteStatus === 'error' ? (
             <div className={styles.forecastCard}>
               <div className={styles.forecastLabel}>QUOTE ERROR</div>
               <div className={styles.forecastText}>{quoteErrorMessage ?? '현재 시세를 불러오지 못했어요. 다시 시도해주세요.'}</div>
-              <button type='button' className={cn(styles.detailButton, styles.buttonBlue, styles.uploadCtaButton)} onClick={handleQuoteRefresh}>
-                시세 다시 불러오기
-              </button>
+              <button type='button' className={styles.refreshBtn} onClick={handleQuoteRefresh}>시세 다시 불러오기</button>
             </div>
           ) : null}
           {quoteSurfaceEnabled && quoteSummaryMessage ? (
@@ -1288,226 +816,56 @@ export function JarooHomeScreen() {
               <div className={styles.forecastText}>{quoteSummaryMessage}</div>
             </div>
           ) : null}
-          <div className='mb-3 flex items-center justify-between gap-3'>
+
+          <div className={styles.sectionHeader}>
             <div className={styles.sectionLabel}>종목별 현황</div>
-            <button type='button' className={cn(styles.detailButton, styles.buttonBlue)} onClick={handleQuoteRefresh}>
-              {quoteSurfaceEnabled && quoteStatus === 'loading' ? '시세 갱신 중...' : '시세 새로고침'}
+            <button type='button' className={styles.refreshTextBtn} onClick={handleQuoteRefresh}>
+              {quoteSurfaceEnabled && quoteStatus === 'loading' ? '갱신 중...' : '시세 새로고침'}
             </button>
           </div>
 
-          {homeHoldings.map((item) => {
-            const isEtf = item.kind === 'etf'
-            const open = isEtf ? openEtfCardId === item.id : openStockCardId === item.id
-            const valueToneClass = getValueToneClass(item)
-            const holdingIdentifierText = getHoldingIdentifierText(item)
-
-            return (
-              <div
-                key={item.id}
-                ref={(node) => {
-                  cardRefs.current[item.id] = node
-                }}
-                className={cn(
-                  styles.stockCard,
-                  item.cardTone === 'halt' && styles.cardHalt,
-                  item.cardTone === 'profit' && styles.cardProfit,
-                  isEtf && styles.cardEtf,
-                  open && styles.cardActive,
-                )}
-                onClick={() => {
-                  if (isEtf) {
-                    toggleEtfCard(item.id)
-                    return
-                  }
-
-                  toggleCard(item.id)
-                }}
-              >
-                <div className={styles.stockCardMain}>
-                  <div className={cn(styles.signal, signalToneClass(item.signalTone))} />
-                  <div className={styles.stockInfo}>
-                    <div className={styles.stockNameRow}>
-                      <div className={styles.stockName}>{item.name}</div>
-                      <div
-                        className={cn(
-                          styles.stockBadge,
-                          item.badgeTone === 'red' && styles.badgeRed,
-                          item.badgeTone === 'amber' && styles.badgeAmber,
-                          item.badgeTone === 'green' && styles.badgeGreen,
-                        )}
-                      >
-                        {item.badge}
-                      </div>
-                    </div>
-                    <div className={styles.stockSub}>
-                      <span className={cn(styles.marketTag, marketToneClass(item.marketTone))}>{item.market}</span>
-                      {holdingIdentifierText ? ` · ${holdingIdentifierText}` : ''} · {item.shares}
-                    </div>
-                  </div>
-                  <div className={styles.stockValue}>
-                    <div className={cn(styles.stockValueStrong, valueToneClass)}>{item.change}</div>
-                    <div className={cn(styles.stockSub, valueToneClass)} style={{ marginTop: 2 }}>
-                      {item.pnl}
-                    </div>
-                  </div>
-                </div>
-                <div className={cn(styles.detail, open && styles.detailOpen)}>
-                  <div
-                    className={styles.aiBox}
-                    style={{
-                      background: item.opinionBackground,
-                      borderColor: item.opinionBorder,
-                    }}
-                  >
-                    <div
-                      className={styles.aiLabel}
-                      style={{
-                        color:
-                          item.cardTone === 'halt'
-                            ? '#A32D2D'
-                            : item.cardTone === 'profit'
-                              ? '#3B6D11'
-                              : item.kind === 'etf'
-                                ? '#185FA5'
-                                : '#999',
-                      }}
-                    >
-                      {item.opinionLabel}
-                    </div>
-                    <div className={styles.aiText} style={{ color: item.opinionTextColor }}>
-                      {item.opinionText}
-                    </div>
-                  </div>
-                  <div className={styles.metaLine}>{item.metaLine}</div>
-                  <div className={styles.metricGrid}>
-                    {item.metrics.map((metric) => (
-                      <div key={metric.label} className={styles.metricCard}>
-                        <div className={styles.metricLabel}>{metric.label}</div>
-                        <div className={cn(styles.metricValue, metricToneClass(metric.tone))}>{metric.value}</div>
-                      </div>
-                    ))}
-                  </div>
-                  {item.actionHref ? (
-                    <Link
-                      href={item.actionHref}
-                      className={cn(styles.detailButton, actionToneClass(item))}
-                      onClick={(event) => handleHoldingActionClick(item, event)}
-                    >
-                      {item.actionLabel}
-                      {item.actionSubLabel ? <span className={styles.actionSubLabel}>{item.actionSubLabel}</span> : null}
-                      {item.actionCredits ? <span className={styles.credit}>{item.actionCredits}</span> : null}
-                    </Link>
-                  ) : (
-                    <button
-                      type='button'
-                      className={cn(styles.detailButton, actionToneClass(item))}
-                      onClick={(event) => event.stopPropagation()}
-                    >
-                      {item.actionLabel}
-                      {item.actionSubLabel ? <span className={styles.actionSubLabel}>{item.actionSubLabel}</span> : null}
-                      {item.actionCredits ? <span className={styles.credit}>{item.actionCredits}</span> : null}
-                    </button>
-                  )}
-                </div>
-              </div>
-            )
-          })}
+          {homeHoldings.map((item) => (
+            <div
+              key={item.id}
+              ref={(node) => {
+                cardRefs.current[item.id] = node
+              }}
+            >
+              <StockCard
+                item={item}
+                open={openCardId === item.id}
+                onToggle={() => toggleCard(item.id)}
+                onAction={handleHoldingActionClick}
+              />
+            </div>
+          ))}
 
           <div className={styles.forecastCard}>
-            <div className={styles.forecastLabel}>{summaryData.forecast.label}</div>
-            <div className={styles.forecastText}>{summaryData.forecast.body}</div>
+            <div className={styles.forecastLabel}>{summary.forecast.label}</div>
+            <div className={styles.forecastText}>{summary.forecast.body}</div>
             <Link
-              href={summaryData.forecast.href}
+              href={summary.forecast.href}
               className={styles.forecastMore}
               onClick={(event) => {
-                if (summaryData.forecast.href === '/deepscan' && defaultDeepScanHolding) {
+                if (summary.forecast.href === '/deepscan' && defaultDeepScanHolding) {
                   event.preventDefault()
-                  void navigateToDeepScanForHolding(defaultDeepScanHolding.id, summaryData.forecast.href)
+                  void navigateToDeepScanForHolding(defaultDeepScanHolding.id, summary.forecast.href)
                 }
               }}
             >
-              {summaryData.forecast.cta}
+              {summary.forecast.cta}
             </Link>
           </div>
-        </div>
+        </main>
 
-        <div className={styles.bottomNav}>
-          <button type='button' className={cn(styles.navItem, styles.navItemOn)}>
-            <span className={cn(styles.navIcon, styles.navIconOn)} />
-            <span>홈</span>
-          </button>
-          <button type='button' className={styles.navItem}>
-            <span className={styles.navIcon} />
-            <span>포트폴리오</span>
-          </button>
-          <button type='button' className={styles.navItem}>
-            <span className={styles.navIcon} />
-            <span>분석</span>
-          </button>
-          <Link href='/mypage' className={styles.navItem}>
-            <span className={styles.navIcon} />
-            <span>마이</span>
-          </Link>
-        </div>
+        <nav className={styles.tabbar} aria-label='하단 탭'>
+          <button type='button' className={cn(styles.tab, styles.on)}><span className={styles.tabIco}>🏠</span>홈</button>
+          <button type='button' className={styles.tab}><span className={styles.tabIco}>📁</span>포트폴리오</button>
+          <Link href='/deepscan' className={styles.tab}><span className={styles.tabIco}>📈</span>분석</Link>
+          <Link href='/mypage' className={styles.tab}><span className={styles.tabIco}>👤</span>마이</Link>
+        </nav>
       </div>
-
-      <div className={styles.modalMount}>
-        <div className={styles.modalInner}>
-          <button
-            type='button'
-            className={cn(styles.sheetOverlay, openSheet === 'score' && styles.sheetOverlayOpen)}
-            onClick={() => setOpenSheet(null)}
-            aria-label='포트폴리오 점수 닫기'
-          />
-          <div className={cn(styles.sheet, openSheet === 'score' && styles.sheetOpen)}>
-            <div className={styles.sheetHandle} />
-            <div className={styles.sheetTitle}>포트폴리오 점수</div>
-            <div className={styles.sheetSubtitle}>각 항목이 내 포트폴리오에 미치는 영향이에요</div>
-            <div className={styles.sheetScoreRow}>
-              <div className={styles.sheetScoreNum}>{summaryData.score}</div>
-              <div className={styles.sheetScoreBadge}>{summaryData.badge}</div>
-              <div className={styles.sheetScoreText}>
-                100점 만점
-                <br />
-                상위 47%
-              </div>
-            </div>
-            {summaryData.scoreBreakdown.map((item) => (
-              <div key={item.label} className={styles.breakdownItem}>
-                <div className={styles.breakdownHeader}>
-                  <div className={styles.breakdownLabel}>{item.label}</div>
-                  <div className={styles.breakdownScore} style={{ color: item.scoreColor }}>
-                    {item.score}
-                  </div>
-                </div>
-                <div className={styles.breakdownBarTrack}>
-                  <div className={styles.breakdownBarFill} style={{ width: item.barWidth, background: item.barColor }} />
-                </div>
-                <div className={styles.breakdownDesc}>{item.description}</div>
-                <div className={styles.breakdownStocks}>
-                  {item.stocks.map((stock) => (
-                    <div
-                      key={stock.label}
-                      className={styles.breakdownStockTag}
-                      style={
-                        'background' in stock
-                          ? {
-                              background: stock.background,
-                              color: stock.color,
-                            }
-                          : undefined
-                      }
-                    >
-                      <span className={styles.breakdownStockDot} style={{ background: stock.dot }} />
-                      {stock.label}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
+      <div className={styles.caption}>홈 v2 — 시장점수 제거 · 도넛 녹임 · 손익+비중 한 화면</div>
 
       <div className={styles.modalMount}>
         <div className={styles.modalInner}>
@@ -1520,35 +878,22 @@ export function JarooHomeScreen() {
           <div className={cn(styles.sheet, openSheet === 'momentum' && styles.sheetOpen)}>
             <div className={styles.sheetHandle} />
             <div className={styles.sheetTitle}>이번 주 회복 모멘텀</div>
-            <div className={styles.sheetSubtitle}>9인 위원회가 매주 종목별 회복 신호를 분석해요</div>
-            <div className={styles.momentumStageRow}>
-              <div className={styles.momentumStages}>
-                {summaryData.momentumStages.map((stage) => (
-                  <div
-                    key={stage.label}
-                    className={cn(
-                      styles.momentumStage,
-                      stage.tone === 'danger' && styles.stageDanger,
-                      stage.tone === 'muted' && styles.stageMuted,
-                      stage.tone === 'positive' && styles.stagePositive,
-                    )}
-                  >
-                    <div className={styles.momentumStageLabel}>{stage.label}</div>
-                    <div className={styles.momentumStageSub}>{stage.subtitle}</div>
-                  </div>
-                ))}
-              </div>
-              <div className={styles.momentumStageHint}>지난주 미풍 → 이번 주 순풍으로 한 단계 올라왔어요</div>
+            <div className={styles.sheetSubtitle}>세 팀이 종목별 회복 신호를 간단히 요약해요</div>
+            <div className={styles.momentumStages}>
+              {summary.momentumStages.map((stage) => (
+                <div key={stage.label} className={cn(styles.momentumStage, stage.active && styles.momentumStageActive)}>
+                  <div className={styles.momentumStageLabel}>{stage.label}</div>
+                  <div className={styles.momentumStageSub}>{stage.subtitle}</div>
+                </div>
+              ))}
             </div>
             <div className={styles.sheetSectionTitle}>종목별 회복 신호</div>
-            {summaryData.momentumSignals.map((signal) => (
-              <div key={signal.name} className={styles.breakdownItem}>
+            {summary.momentumSignals.map((signal) => (
+              <div key={signal.name} className={styles.signalCard}>
                 <div className={styles.signalRow}>
-                  <span className={cn(styles.signal, signal.blink && styles.blink)} style={{ background: signal.dot, marginTop: 0 }} />
+                  <span className={styles.signal} style={{ background: signal.dot }} />
                   <div className={styles.signalName}>{signal.name}</div>
-                  <div className={styles.signalBadge} style={{ background: signal.badgeBackground, color: signal.badgeColor }}>
-                    {signal.badge}
-                  </div>
+                  <div className={styles.signalBadge} style={{ background: signal.badgeBackground, color: signal.badgeColor }}>{signal.badge}</div>
                 </div>
                 <div className={styles.signalDesc}>{signal.description}</div>
               </div>
