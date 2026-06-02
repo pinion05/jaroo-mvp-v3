@@ -370,6 +370,7 @@ export default function OcrPage() {
   const [hasCheckedPersistedUploadSession, setHasCheckedPersistedUploadSession] = useState(false)
   const ocrRunIdRef = useRef(0)
   const autoOcrSessionKeyRef = useRef<string | null>(null)
+  const appliedPortfolioNavigationRef = useRef(false)
   const session = uploadStoreSession ?? persistedUploadSession
 
   useEffect(() => {
@@ -378,6 +379,10 @@ export default function OcrPage() {
     }
 
     if (!session) {
+      if (appliedPortfolioNavigationRef.current) {
+        return
+      }
+
       autoOcrSessionKeyRef.current = null
       setRequestStatus('idle')
       setResolveStatus('idle')
@@ -784,10 +789,12 @@ export default function OcrPage() {
           setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', null)
         })
       markApplied(appliedAt)
+      appliedPortfolioNavigationRef.current = true
       clearPersistedScreenshotUploadSession()
       clearUploadInput()
       router.push('/home')
     } catch (error) {
+      appliedPortfolioNavigationRef.current = false
       setApplyStatus('error', error instanceof Error ? error.message : '포트폴리오 저장에 실패했어요.')
     }
   }
