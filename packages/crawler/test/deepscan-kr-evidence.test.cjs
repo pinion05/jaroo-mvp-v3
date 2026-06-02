@@ -711,6 +711,41 @@ test('buildDeepScanKrEvidencePacket ignores unknown slim page keys, counts recen
   ]);
 });
 
+test('buildDeepScanKrEvidencePacket counts reached KR pages even when recent report rows are empty', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  const packet = buildDeepScanKrEvidencePacket(
+    {
+      instrument: {
+        code: '100840',
+        name: 'SNT에너지',
+      },
+    },
+    {
+      slim: {
+        schemaVersion: 'wisereport-kr-slim-v1.2',
+        code: '100840',
+        pages: {
+          'recent-reports': {
+            recentReports: {
+              rows: [],
+            },
+            ajaxEvidence: [],
+          },
+        },
+      },
+    },
+  );
+
+  assert.equal(packet.pageCoverage.totalKnownPages, 14);
+  assert.deepEqual(packet.pageCoverage.availablePageIds, ['recent-reports']);
+  assert.equal(packet.pageCoverage.availableCount, 1);
+  assert.equal(packet.pageCoverage.missingPageIds.includes('recent-reports'), false);
+  assert.equal(packet.reportSignals.recentReportsAvailable, false);
+  assert.equal(packet.reportSignals.recentReportCount, 0);
+  assert.deepEqual(packet.topFacts, ['KR 리포트 페이지 1/14 확보']);
+});
+
 test('buildDeepScanKrEvidencePacket parses display-formatted holding strings from the deepscan handoff', async () => {
   const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
 

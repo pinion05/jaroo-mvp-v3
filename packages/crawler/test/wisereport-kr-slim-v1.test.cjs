@@ -714,7 +714,7 @@ test('buildWiseReportKrSlimPayloadV12 adds DeepScan krFacts with explicit invest
   assert.equal(slim.krFacts.styleFactors.factors.value[0].name, '베타');
 });
 
-test('buildWiseReportKrSlimPayloadV12 does not count arrays of empty rows as available page evidence', async () => {
+test('buildWiseReportKrSlimPayloadV12 counts reached pages even when business rows are empty', async () => {
   const { buildWiseReportKrSlimPayloadV12 } = await import('../src/server.js');
   const aggregate = createAggregateFixtureV11();
   aggregate.pages['fnguide-snapshot'] = {
@@ -740,11 +740,12 @@ test('buildWiseReportKrSlimPayloadV12 does not count arrays of empty rows as ava
 
   const slim = buildWiseReportKrSlimPayloadV12(aggregate, '005930');
 
-  assert.equal(slim.sourceCoverage.pageCoverage.availableCount, 12);
+  assert.equal(slim.sourceCoverage.pageCoverage.availableCount, 13);
   assert.deepEqual(
     slim.sourceCoverage.pageCoverage.missingPageIds.sort(),
-    ['fnguide-finance', 'fnguide-snapshot'],
+    ['fnguide-finance'],
   );
+  assert.equal(slim.sourceCoverage.pageCoverage.availablePageIds.includes('fnguide-snapshot'), true);
 });
 
 test('buildWiseReportKrSlimPayloadV12 marks ETF corporate financial facts as not_applicable', async () => {
