@@ -2308,8 +2308,8 @@
 }
 
 .todayBriefItem {
-  padding: 13px 0;
-  border-top: 0.5px solid #eff1f4;
+  padding: 0;
+  border-top: 0 solid transparent;
   max-height: 0;
   overflow: hidden;
   opacity: 0;
@@ -2326,9 +2326,15 @@
 }
 
 .todayBriefItemIn {
+  padding: 13px 0;
+  border-top: 0.5px solid #eff1f4;
   max-height: 190px;
   opacity: 1;
   transform: translateY(0);
+}
+
+.todayBriefItemIn:first-child {
+  border-top: 0;
 }
 
 .todayBriefQuestionRow {
