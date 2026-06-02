@@ -48,3 +48,8 @@ test('parseTeamSummaryContent accepts JSON or direct sentence and normalizes whi
   assert.equal(parseTeamSummaryContent('{"summary":"강한 추세입니다.\\n단, 변동성은 봐야 합니다."}'), '강한 추세입니다. 단, 변동성은 봐야 합니다.')
   assert.equal(parseTeamSummaryContent('  직접 한 문장입니다.  '), '직접 한 문장입니다.')
 })
+
+test('parseTeamSummaryContent rejects malformed JSON-like fragments', () => {
+  assert.equal(parseTeamSummaryContent('{"summary":"현재 손실'), null)
+  assert.equal(parseTeamSummaryContent('```json\n{"summary":"현재 손실\n```'), null)
+})

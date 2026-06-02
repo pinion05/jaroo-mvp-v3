@@ -383,6 +383,19 @@ function compactCommentLine(value: string, maxLength = COMMENT_LINE_MAX_LENGTH) 
   return `${normalized.slice(0, maxLength - 1).trim()}…`
 }
 
+function buildFallbackTeamSummary(value: string) {
+  const lines = value
+    .split(/\n+/)
+    .map((line) => line.replace(/^[^:：]{1,24}[:：]\s*/u, '').trim())
+    .filter((line) => line && line !== '응답 대기 중' && line !== '응답 실패')
+
+  if (lines.length === 0) {
+    return '확보된 위원 근거를 바탕으로 핵심 흐름을 정리하고 있어요.'
+  }
+
+  return compactCommentLine(lines.join(' '), 156)
+}
+
 function getCommentLines(comment: LoadingPerformanceComment) {
   const explicitLines = Array.isArray(comment.lines) ? comment.lines : []
   const sourceLines = hasDisplayValue(explicitLines) ? explicitLines : comment.body.split(/\n+/)
@@ -1141,33 +1154,44 @@ export function DeepScanLoadingScreen({
         [teamKey]: { inputKey, status: 'loading' },
       }))
 
-      fetch('/api/deepscan/team-summary', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          teamKey: card.key,
-          teamName: card.analystName,
-          body: card.body,
-        }),
-      })
-        .then(async (response) => {
-          const body = await response.json().catch(() => null) as { ok?: boolean; summary?: unknown } | null
-          const summary = body?.ok === true ? normalizeSummaryText(body.summary) : null
-          if (!response.ok || !summary) {
-            throw new Error('team summary unavailable')
-          }
+      const requestTeamSummary = async () => {
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+          try {
+            const response = await fetch('/api/deepscan/team-summary', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                teamKey: card.key,
+                teamName: card.analystName,
+                body: card.body,
+              }),
+            })
+            const body = await response.json().catch(() => null) as { ok?: boolean; summary?: unknown } | null
+            const summary = body?.ok === true ? normalizeSummaryText(body.summary) : null
+            if (!response.ok || !summary) {
+              throw new Error('team summary unavailable')
+            }
 
-          setTeamSummaries((previous) => ({
-            ...previous,
-            [teamKey]: { inputKey, status: 'success', summary },
-          }))
-        })
-        .catch(() => {
-          setTeamSummaries((previous) => ({
-            ...previous,
-            [teamKey]: { inputKey, status: 'error' },
-          }))
-        })
+            setTeamSummaries((previous) => ({
+              ...previous,
+              [teamKey]: { inputKey, status: 'success', summary },
+            }))
+            return
+          } catch {
+            if (attempt === 0) {
+              await new Promise((resolve) => window.setTimeout(resolve, 700))
+              continue
+            }
+          }
+        }
+
+        setTeamSummaries((previous) => ({
+          ...previous,
+          [teamKey]: { inputKey, status: 'success', summary: buildFallbackTeamSummary(card.body) },
+        }))
+      }
+
+      void requestTeamSummary()
     })
   }, [visibleNarrativeCards])
 
@@ -1237,15 +1261,15 @@ export function DeepScanLoadingScreen({
             const summaryLoading = summaryState?.inputKey === summaryInputKey && summaryState.status === 'loading'
             const summaryFailed = summaryState?.inputKey === summaryInputKey && summaryState.status === 'error'
             const summaryText = summaryReady ? summaryState.summary! : null
-            const displaySummaryText = summaryText ?? (summaryFailed ? '팀 요약을 불러오지 못했어요. 확보된 근거는 아래 종합 결론에서 이어서 확인하세요.' : null)
+            const displaySummaryText = summaryText ?? (summaryFailed ? buildFallbackTeamSummary(card.body) : null)
             const showSummarySkeleton = !card.placeholder && !displaySummaryText
             const cardSettled = resultsReady || card.complete
-            const statusLabel = summaryReady ? '요약 완료' : summaryLoading ? '요약 중' : summaryFailed ? '요약 생략' : cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
-            const statusTone = summaryReady ? 'positive' : summaryLoading ? 'info' : summaryFailed ? 'warning' : cardSettled && !card.complete ? 'info' : card.statusTone
+            const statusLabel = summaryReady ? '요약 완료' : summaryLoading ? '요약 중' : summaryFailed ? '근거 요약' : cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
+            const statusTone = summaryReady ? 'positive' : summaryLoading ? 'info' : summaryFailed ? 'info' : cardSettled && !card.complete ? 'info' : card.statusTone
             const tags = [
               ...card.tags,
               card.summarizable
-                ? { text: summaryReady ? '요약 완료' : summaryFailed ? '요약 생략' : '요약 중', tone: summaryReady ? 'positive' as const : summaryFailed ? 'warning' as const : 'info' as const }
+                ? { text: summaryReady ? '요약 완료' : summaryFailed ? '근거 요약' : '요약 중', tone: summaryReady ? 'positive' as const : 'info' as const }
                 : null,
             ].filter((tag): tag is { text: string; tone: NarrativeTone } => Boolean(tag))
 

@@ -5,7 +5,7 @@ export const runtime = 'nodejs'
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 export const DEEPSCAN_TEAM_SUMMARY_MODEL = 'openai/gpt-oss-120b'
 export const DEEPSCAN_TEAM_SUMMARY_MAX_TOKENS = 1000
-const DEFAULT_TEAM_SUMMARY_TIMEOUT_MS = 2500
+const DEFAULT_TEAM_SUMMARY_TIMEOUT_MS = 5000
 const MAX_TEAM_BODY_CHARS = 2400
 
 type TeamSummaryRequestBody = {
@@ -60,7 +60,12 @@ export function parseTeamSummaryContent(content: string) {
     // Some providers may return the sentence directly despite the JSON instruction.
   }
 
-  return cleanupSummary(text.replace(/^```(?:json)?/i, '').replace(/```$/i, ''))
+  const unfencedText = text.replace(/^```(?:json)?/i, '').replace(/```$/i, '').trim()
+  if (/^[{[]/u.test(unfencedText)) {
+    return null
+  }
+
+  return cleanupSummary(unfencedText)
 }
 
 async function callOpenRouterTeamSummary(input: { teamKey: string; teamName: string; body: string }): Promise<TeamSummaryResult> {
