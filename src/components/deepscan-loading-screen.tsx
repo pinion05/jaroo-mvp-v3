@@ -150,6 +150,10 @@ const TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS = 5
 const TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS = 0.9
 const TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS = 1.8
 const TODAY_BRIEFING_ITEM_COUNT = 6
+const TODAY_BRIEFING_COMPLETE_SECONDS = TODAY_BRIEFING_FIRST_REVEAL_SECONDS
+  + (TODAY_BRIEFING_ITEM_COUNT - 1) * TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS
+  + TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS
+const NARRATIVE_CARD_REVEAL_INTERVAL_SECONDS = 5
 
 const committeeMembers: ReadonlyArray<{ key: string; Icon: CommitteeMemberIcon; label: string; state: CommitteeMemberState }> = [
   { key: 'valuation', Icon: Scale, label: '가치\n분석가', state: 'active' },
@@ -618,6 +622,16 @@ function buildVisibleNarrativeCards(cards: NarrativeCard[], visibleStageCount: n
   return cards.slice(0, Math.min(Math.max(visibleStageCount, 1), cards.length))
 }
 
+function getPostBriefingVisibleStageCount(elapsedSeconds: number, requestedVisibleStageCount: number) {
+  if (elapsedSeconds < TODAY_BRIEFING_COMPLETE_SECONDS) {
+    return 0
+  }
+
+  const postBriefingVisibleCount = Math.floor((elapsedSeconds - TODAY_BRIEFING_COMPLETE_SECONDS) / NARRATIVE_CARD_REVEAL_INTERVAL_SECONDS) + 1
+
+  return Math.min(Math.max(requestedVisibleStageCount, 0), postBriefingVisibleCount)
+}
+
 
 function clamp(value: number, min: number, max: number) {
   return Math.min(max, Math.max(min, value))
@@ -1052,9 +1066,10 @@ export function DeepScanLoadingScreen({
     () => buildOrderedNarrativeCards(loadingStages, arrivedStageKeys),
     [arrivedStageKeys, loadingStages],
   )
+  const visibleNarrativeStageCount = getPostBriefingVisibleStageCount(elapsedSeconds, visibleStageCount)
   const visibleNarrativeCards = useMemo(
-    () => buildVisibleNarrativeCards(orderedNarrativeCards, visibleStageCount),
-    [orderedNarrativeCards, visibleStageCount],
+    () => visibleNarrativeStageCount > 0 ? buildVisibleNarrativeCards(orderedNarrativeCards, visibleNarrativeStageCount) : [],
+    [orderedNarrativeCards, visibleNarrativeStageCount],
   )
   const completionState = buildCompletionState(resultsReady, elapsedSeconds)
   const progressPct = resultsReady ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
@@ -1080,7 +1095,7 @@ export function DeepScanLoadingScreen({
   }, [resultsReady])
 
   useEffect(() => {
-    loadingStages.forEach((card) => {
+    visibleNarrativeCards.forEach((card) => {
       const teamKey = card.teamKey
       if (!teamKey || !card.summarizable || !card.body.trim()) {
         return
@@ -1126,7 +1141,7 @@ export function DeepScanLoadingScreen({
           }))
         })
     })
-  }, [loadingStages])
+  }, [visibleNarrativeCards])
 
   return (
     <div className={cn(styles.loadingCard, className)}>
@@ -1185,6 +1200,7 @@ export function DeepScanLoadingScreen({
           </div>
         </section>
 
+        {visibleNarrativeCards.length ? (
         <section className={styles.narrativeStream} aria-label='분석가 진행 메시지'>
           {visibleNarrativeCards.map((card) => {
             const summaryInputKey = hashSummaryInput(card.body)
@@ -1252,6 +1268,7 @@ export function DeepScanLoadingScreen({
             )
           })}
         </section>
+        ) : null}
 
 
 
