@@ -4,9 +4,10 @@ export const runtime = 'nodejs'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 export const DEEPSCAN_TEAM_SUMMARY_MODEL = 'openai/gpt-oss-120b'
-export const DEEPSCAN_TEAM_SUMMARY_MAX_TOKENS = 1000
+export const DEEPSCAN_TEAM_SUMMARY_MAX_TOKENS = 220
 const DEFAULT_TEAM_SUMMARY_TIMEOUT_MS = 5000
 const MAX_TEAM_BODY_CHARS = 2400
+const MAX_TEAM_SUMMARY_CHARS = 88
 
 type TeamSummaryRequestBody = {
   teamKey?: unknown
@@ -44,6 +45,18 @@ function cleanupSummary(value: string) {
     .trim()
 }
 
+function constrainSummaryLength(value: string) {
+  const summary = cleanupSummary(value)
+  if (summary.length <= MAX_TEAM_SUMMARY_CHARS) {
+    return summary
+  }
+
+  const sliced = summary.slice(0, MAX_TEAM_SUMMARY_CHARS)
+  const breakIndex = Math.max(sliced.lastIndexOf('다.'), sliced.lastIndexOf('.'), sliced.lastIndexOf(','), sliced.lastIndexOf('·'), sliced.lastIndexOf(' '))
+  const candidate = breakIndex >= 42 ? sliced.slice(0, breakIndex + 1) : sliced
+  return `${candidate.replace(/[,.·\s]+$/u, '').trim()}.`
+}
+
 export function parseTeamSummaryContent(content: string) {
   const text = content.trim()
   if (!text) {
@@ -54,7 +67,7 @@ export function parseTeamSummaryContent(content: string) {
     const parsed = JSON.parse(text) as unknown
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       const summary = normalizeText((parsed as { summary?: unknown }).summary)
-      return summary ? cleanupSummary(summary) : null
+      return summary ? constrainSummaryLength(summary) : null
     }
   } catch {
     // Some providers may return the sentence directly despite the JSON instruction.
@@ -65,7 +78,7 @@ export function parseTeamSummaryContent(content: string) {
     return null
   }
 
-  return cleanupSummary(unfencedText)
+  return constrainSummaryLength(unfencedText)
 }
 
 async function callOpenRouterTeamSummary(input: { teamKey: string; teamName: string; body: string }): Promise<TeamSummaryResult> {
@@ -105,8 +118,9 @@ async function callOpenRouterTeamSummary(input: { teamKey: string; teamName: str
             '너는 모바일 주식 분석 앱의 카피 에디터다.',
             '입력은 한 팀의 3명 위원 판단이다.',
             '출력은 JSON만 허용한다: {"summary":"..."}.',
-            'summary는 한국어 한 문장, 70~130자, 줄바꿈/목록/위원 이름/콜론/투자 권유 금지.',
-            '핵심 근거와 판단을 읽기 좋게 압축하라.',
+            'summary는 한국어 한 문장, 55~85자, 절대 90자 초과 금지.',
+            '줄바꿈/목록/위원 이름/콜론/말줄임표/투자 권유 금지.',
+            '핵심 근거 1~2개와 판단만 짧게 압축하라.',
           ].join(' '),
         },
         {
@@ -154,7 +168,7 @@ export async function createDeepScanTeamSummaryResponse(
       ok: true,
       teamKey,
       teamName,
-      summary: result.summary,
+      summary: constrainSummaryLength(result.summary),
       model: result.model ?? process.env.DEEPSCAN_TEAM_SUMMARY_MODEL ?? DEEPSCAN_TEAM_SUMMARY_MODEL,
       provider: result.provider ?? 'Cerebras/fp16',
       elapsedMs: result.elapsedMs,

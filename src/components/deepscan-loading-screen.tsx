@@ -206,6 +206,7 @@ const committeeTeams: readonly CommitteeTeamDefinition[] = [
 const pendingCommitteeMemberCount = committeeMembers.length
 const COMMENT_LINE_MAX_LENGTH = 74
 const COMMENT_BODY_MAX_LENGTH = 168
+const TEAM_SUMMARY_MAX_LENGTH = 88
 
 function formatElapsedTime(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
@@ -369,9 +370,11 @@ function hashSummaryInput(value: string) {
 }
 
 function normalizeSummaryText(value: unknown) {
-  return typeof value === 'string' && value.trim()
-    ? value.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim()
-    : null
+  if (typeof value !== 'string' || !value.trim()) {
+    return null
+  }
+
+  return compactSummaryLine(value)
 }
 
 function compactCommentLine(value: string, maxLength = COMMENT_LINE_MAX_LENGTH) {
@@ -381,6 +384,18 @@ function compactCommentLine(value: string, maxLength = COMMENT_LINE_MAX_LENGTH) 
   }
 
   return `${normalized.slice(0, maxLength - 1).trim()}…`
+}
+
+function compactSummaryLine(value: string, maxLength = TEAM_SUMMARY_MAX_LENGTH) {
+  const normalized = value.replace(/[\r\n]+/g, ' ').replace(/\s+/g, ' ').trim()
+  if (normalized.length <= maxLength) {
+    return normalized
+  }
+
+  const sliced = normalized.slice(0, maxLength)
+  const breakIndex = Math.max(sliced.lastIndexOf('다.'), sliced.lastIndexOf('.'), sliced.lastIndexOf(','), sliced.lastIndexOf('·'), sliced.lastIndexOf(' '))
+  const candidate = breakIndex >= 42 ? sliced.slice(0, breakIndex + 1) : sliced
+  return `${candidate.replace(/[,.·\s]+$/u, '').trim()}.`
 }
 
 function buildFallbackTeamSummary(value: string) {
@@ -393,7 +408,7 @@ function buildFallbackTeamSummary(value: string) {
     return '확보된 위원 근거를 바탕으로 핵심 흐름을 정리하고 있어요.'
   }
 
-  return compactCommentLine(lines.join(' '), 156)
+  return compactSummaryLine(lines.join(' '))
 }
 
 function getCommentLines(comment: LoadingPerformanceComment) {
