@@ -99,6 +99,18 @@ test('DeepScan loading sequencing is success-gated and no longer bypasses on raw
   assert.doesNotMatch(pageSource, /firstSuccessObserved: true,\s*visibleStageCount: 2/u)
 })
 
+
+test('DeepScan soft-motion skeleton cadence slows narrative motion and keeps reduced-motion escape hatch', () => {
+  const cssSource = readRepoFile('src', 'components', 'deepscan-loading-screen.module.css')
+
+  assert.match(cssSource, /animation: rise-in 0\.72s cubic-bezier\(0\.2, 0\.8, 0\.2, 1\) forwards/)
+  assert.match(cssSource, /\.narrativeSpinner \{[\s\S]*?animation: spin 1\.15s linear infinite/)
+  assert.match(cssSource, /animation: shimmer 1\.8s ease-in-out infinite/)
+  assert.match(cssSource, /transition: background 0\.55s ease, border-color 0\.55s ease, box-shadow 0\.55s ease/)
+  assert.match(cssSource, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.narrativeCard,[\s\S]*?\.narrativeSpinner,[\s\S]*?animation: none;[\s\S]*?transition: none;/)
+  assert.match(cssSource, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.narrativeBubble \{[\s\S]*?transition: none;/)
+})
+
 test('DeepScan loading screen only fetches internal team summaries and avoids result CTA', () => {
   const source = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
 

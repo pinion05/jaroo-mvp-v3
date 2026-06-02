@@ -1041,7 +1041,7 @@
 
 .skeletonSpinner,
 .stepActive .stepSvg {
-  animation: spin 0.8s linear infinite;
+  animation: spin 1.15s linear infinite;
 }
 
 .skeletonRow {
@@ -1698,7 +1698,7 @@
   box-shadow: 0 4px 20px rgba(15, 20, 25, 0.04);
   opacity: 0;
   transform: translateY(8px);
-  animation: rise-in 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+  animation: rise-in 0.72s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
 }
 
 .narrativeCardPending {
@@ -1731,7 +1731,7 @@
 .narrativeSpinner {
   width: 15px;
   height: 15px;
-  animation: spin 0.8s linear infinite;
+  animation: spin 1.15s linear infinite;
 }
 
 .narrativeNameWrap {
@@ -1970,7 +1970,7 @@
   border-radius: 999px;
   background: linear-gradient(90deg, #e7ebf0 0%, #f5f7fa 48%, #e7ebf0 100%);
   background-size: 180% 100%;
-  animation: shimmer 1.15s ease-in-out infinite;
+  animation: shimmer 1.8s ease-in-out infinite;
 }
 
 .narrativeTitleSkeleton {
@@ -1999,6 +1999,7 @@
   border-radius: 14px;
   background: #fff;
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: background 0.55s ease, border-color 0.55s ease, box-shadow 0.55s ease;
 }
 
 .narrativeBubble::before {
