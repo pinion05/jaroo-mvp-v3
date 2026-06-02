@@ -554,16 +554,16 @@ function buildLoadingStages({
     const tags = team.key === 'fundamentalTeam'
       ? [
           { text: performanceLines.length ? '실적 코멘트 확인' : '실적 대기', tone: performanceLines.length ? 'positive' as const : 'neutral' as const },
-          { text: completedFindings.length ? `위원회 ${completedFindings.length}개 응답` : '위원회 대기', tone: completedFindings.length ? 'info' as const : 'neutral' as const },
+          { text: completedFindings.length ? `근거 ${completedFindings.length}개 확인` : '세 팀 대기', tone: completedFindings.length ? 'info' as const : 'neutral' as const },
         ]
       : team.key === 'marketTeam'
         ? [
-            { text: currentPriceText ? '현재가 확인' : '현재가 대기', tone: currentPriceText ? 'positive' as const : 'neutral' as const },
+            { text: currentPriceText ? '가격 확인' : '가격 대기', tone: currentPriceText ? 'positive' as const : 'neutral' as const },
             { text: tradingVolumeText ? `거래량 ${tradingVolumeText}` : '가격 위치 대기', tone: positionFact ? 'info' as const : 'neutral' as const },
           ]
         : [
             { text: consensusFact?.badge ?? '확인 중', tone: consensusFact ? quickFactToneToNarrativeTone(consensusFact.tone) : 'neutral' as const },
-            { text: consensusFact?.detail ? '조회 실패 분리' : '원천 상태 표시', tone: consensusFact?.tone === 'warning' ? 'warning' as const : 'info' as const },
+            { text: consensusFact?.detail ? '일부 데이터 대기' : '데이터 상태 확인', tone: consensusFact?.tone === 'warning' ? 'warning' as const : 'info' as const },
           ]
 
     return {
@@ -1194,12 +1194,12 @@ export function DeepScanLoadingScreen({
             const summaryText = summaryReady ? summaryState.summary! : null
             const showSummarySkeleton = !card.placeholder && !summaryText
             const cardSettled = resultsReady || card.complete
-            const statusLabel = summaryReady ? '팀 요약 완료' : summaryLoading ? '팀 요약 중' : cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
+            const statusLabel = summaryReady ? '요약 완료' : summaryLoading ? '요약 중' : cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
             const statusTone = summaryReady ? 'positive' : summaryLoading ? 'info' : cardSettled && !card.complete ? 'info' : card.statusTone
             const tags = [
               ...card.tags,
               card.summarizable
-                ? { text: summaryReady ? '한줄 요약 완료' : '한줄 요약 중', tone: summaryReady ? 'positive' as const : 'info' as const }
+                ? { text: summaryReady ? '요약 완료' : '요약 중', tone: summaryReady ? 'positive' as const : 'info' as const }
                 : null,
             ].filter((tag): tag is { text: string; tone: NarrativeTone } => Boolean(tag))
 
@@ -1268,12 +1268,12 @@ export function DeepScanLoadingScreen({
         </section>
 
         <details className={styles.progressDetails}>
-          <summary className={styles.progressDetailsSummary}>세부 진행 단계·위원회 상태</summary>
+          <summary className={styles.progressDetailsSummary}>세부 진행 단계·분석 상태</summary>
           <div className={styles.stepsWrap} aria-label='분석 단계'>
             {[
               { label: '대상 종목 확인', state: 'done' },
               { label: '근거 데이터 수집', state: evidenceCollected ? 'done' : 'active' },
-              { label: 'AI 9인 위원회 응답 대기', state: resultsReady ? 'done' : evidenceCollected ? 'active' : 'wait' },
+              { label: '세 팀 분석 대기', state: resultsReady ? 'done' : evidenceCollected ? 'active' : 'wait' },
               { label: '상세 리포트 연결', state: resultsReady ? 'done' : 'wait' },
             ].map((step, index) => {
               const isDone = step.state === 'done'
@@ -1293,8 +1293,8 @@ export function DeepScanLoadingScreen({
             })}
           </div>
 
-          <section className={styles.committeeWrap} aria-label='AI 위원회 진행 상태'>
-            <div className={styles.committeeTitle}>{resultsReady ? 'AI 9인 위원회 응답 완료' : 'AI 9인 위원회 응답 대기 중'}</div>
+          <section className={styles.committeeWrap} aria-label='세 팀 분석 진행 상태'>
+            <div className={styles.committeeTitle}>{resultsReady ? '세 팀 분석 완료' : '세 팀 분석 대기 중'}</div>
             <div className={styles.membersGrid}>
               {committeeMembers.map((member) => (
                 <div key={member.key} className={styles.member}>

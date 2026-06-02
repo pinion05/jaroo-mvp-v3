@@ -182,7 +182,7 @@ const committeeMemberIcons: Record<string, LucideIcon> = {
 const emptyDeepScanSteps: ReadonlyArray<{ icon: LucideIcon; label: string; body: string }> = [
   { icon: BadgeCheck, label: '보유 종목 선택', body: '홈에서 분석할 주식 카드를 고릅니다.' },
   { icon: LineChart, label: '시장 데이터 확인', body: '현재가·목표가·52주 위치를 먼저 보여줘요.' },
-  { icon: ShieldCheck, label: 'AI 위원회 분석', body: '회복 가능성과 리스크를 순서대로 정리합니다.' },
+  { icon: ShieldCheck, label: '세 팀 분석', body: '회복 가능성과 리스크를 순서대로 정리합니다.' },
 ]
 
 const newsToneStyles = {
@@ -1570,7 +1570,7 @@ export default function DeepScanPage() {
     return (
       <JarooShell
         title='DeepScan'
-        subtitle='종목을 선택하면 9인 위원회가 바로 시작돼요'
+        subtitle='종목을 선택하면 세 팀이 바로 분석해요'
         backHref='/home'
         showBottomNav={false}
         frameClassName='sm:max-w-[340px]'
@@ -1596,14 +1596,14 @@ export default function DeepScanPage() {
           </div>
 
           <p className='relative mt-4 max-w-[260px] text-sm leading-6 text-[#c8d8e8]'>
-            홈에서 분석할 종목을 선택하면 가격 위치, 목표가, 실적 코멘트, AI 위원회 판단을 한 흐름으로 보여드려요.
+            홈에서 분석할 종목을 선택하면 가격 위치, 목표가, 실적 코멘트, 세 팀 판단을 한 흐름으로 보여드려요.
           </p>
 
           <div className='relative mt-5 grid grid-cols-3 gap-2'>
             {[
               ['52주', '위치'],
               ['목표가', '비교'],
-              ['AI', '판단'],
+              ['세 팀', '판단'],
             ].map(([top, bottom]) => (
               <div key={top} className='rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-3 backdrop-blur'>
                 <p className='text-[15px] font-black leading-none text-white'>{top}</p>
@@ -1788,7 +1788,7 @@ export default function DeepScanPage() {
             <div className='pointer-events-none absolute bottom-0 right-0 h-32 w-40 rounded-tl-[90px] bg-[linear-gradient(135deg,rgba(255,255,255,0.13),rgba(255,255,255,0))]' />
             <div className='relative flex items-center justify-between gap-3'>
               <p className='rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-black tracking-[0.08em] text-[#d6ecff]'>
-                AI 9인 위원회 종합 분석
+                세 팀 종합 분석
               </p>
               <div className='flex items-center gap-2'>
                 <span className={cn('rounded-full bg-white/10 px-2.5 py-1 text-xs font-bold', heroCard.statusToneClass)}>{heroCard.statusText}</span>
@@ -1811,11 +1811,10 @@ export default function DeepScanPage() {
             <p className='relative mt-3 text-sm leading-7 text-[#c8d8e8]'>{heroCard.body}</p>
             <div className='relative my-4 h-px bg-white/15' />
             <div className='relative flex items-center gap-3'>
-              <p className='text-3xl font-black leading-none tracking-[-0.04em] text-white'>{heroCard.scoreLabel === 'N/A' ? 'N/A' : heroCard.score}</p>
+              <p className='text-3xl font-black leading-none tracking-[-0.04em] text-white'>{heroCard.statusText}</p>
               <Badge className='rounded-[10px] bg-white/12 px-3 py-1 text-[11px] font-bold text-[#d6ecff]'>
-                {heroCard.scoreLabel}
+                세 팀 판단
               </Badge>
-              <span className='ml-auto rounded-full bg-white/10 px-3 py-1 text-xs font-bold text-[#d6ecff]'>{heroCard.scoreDelta}</span>
             </div>
           </Card>
 
@@ -1852,7 +1851,7 @@ export default function DeepScanPage() {
           ) : null}
 
           <SectionToggle
-            label='AI 분석 결과'
+            label='세 팀 분석 결과'
             isOpen={openSections.why}
             onToggle={() => toggleSection('why')}
             tags={
@@ -1864,16 +1863,14 @@ export default function DeepScanPage() {
                 <span className='rounded-full bg-[color:var(--jaroo-warning-soft)] px-2.5 py-1 text-[11px] font-medium text-[color:var(--jaroo-warning)]'>
                   {getDeepScanBlockNotice(payload.committee, {
                     badge: '보류',
-                    title: '위원회 분석을 표시할 수 없어요',
-                    body: '위원회 분석 블록이 아직 준비되지 않았어요.',
+                    title: '세 팀 분석을 표시할 수 없어요',
+                    body: '세 팀 분석 데이터가 아직 준비되지 않았어요.',
                   }).badge}
                 </span>
               ) : (
                 <div className='grid w-full grid-cols-3 gap-1.5'>
                   {payload.committee.axes.map((axis) => {
                     const tone = resolveAxisTone(axis.score)
-                    const scoreLabel = axis.score === null ? 'N/A' : String(axis.score)
-
                     return (
                       <span
                         key={axis.label}
@@ -1881,9 +1878,9 @@ export default function DeepScanPage() {
                           'min-w-0 truncate rounded-full px-2 py-1 text-center text-[10px] font-medium leading-4',
                           axisToneStyles[tone].badge,
                         )}
-                        title={`${axis.label} ${axis.scoreText}`}
+                        title={`${axis.label} ${axis.axisStatusText}`}
                       >
-                        {axis.label} {scoreLabel}
+                        {axis.label} {axis.axisStatusText}
                       </span>
                     )
                   })}
@@ -1896,14 +1893,14 @@ export default function DeepScanPage() {
             ) : payload.committee.blockState !== 'ok' ? (
               <SectionStatusCard notice={getDeepScanBlockNotice(payload.committee, {
                 badge: '보류',
-                title: '위원회 분석을 표시할 수 없어요',
-                body: '위원회 분석 블록이 아직 준비되지 않았어요.',
+                title: '세 팀 분석을 표시할 수 없어요',
+                body: '세 팀 분석 데이터가 아직 준비되지 않았어요.',
               })} />
             ) : payload.committee.axes.length === 0 ? (
               <SectionStatusCard notice={{
                 badge: '비어 있음',
-                title: '위원회 축 데이터가 비어 있어요',
-                body: '크롤러가 위원회 축 데이터를 비어 있는 상태로 반환했습니다.',
+                title: '세 팀 분석 데이터가 비어 있어요',
+                body: '현재 표시할 세 팀 분석 데이터가 없습니다.',
               }} />
             ) : (
               <Card className='rounded-[26px] border border-white/90 bg-white/95 p-4 shadow-[0_14px_34px_rgba(24,95,165,0.08)]'>
@@ -1924,7 +1921,7 @@ export default function DeepScanPage() {
                         )}
                       >
                         <p className='text-[11px] text-[color:var(--jaroo-muted)]'>{axis.label}</p>
-                        <p className={cn('mt-2 text-2xl font-semibold', toneStyle.score)}>{axis.scoreText}</p>
+                        <p className={cn('mt-2 text-lg font-semibold', toneStyle.score)}>{axis.axisStatusText}</p>
                         <span className={cn('mt-2 inline-flex rounded-[8px] px-2.5 py-1 text-[10px] font-medium', toneStyle.badge)}>
                           {axis.axisStatusText}
                         </span>
@@ -1991,7 +1988,7 @@ export default function DeepScanPage() {
                                 ) : isPendingMember ? (
                                   <>
                                     <p className='mt-1 text-xs font-medium leading-5 text-[color:var(--jaroo-muted)]'>
-                                      {member.reason ?? '이 위원은 추가 LLM 응답을 기다리는 중입니다.'}
+                                      {member.reason ?? '이 분석은 추가 데이터를 기다리는 중입니다.'}
                                     </p>
                                     <p className='mt-0.5 text-[11px] leading-4 text-[color:var(--jaroo-muted)]/80'>
                                       완료되는 대로 자동 반영합니다.
@@ -2002,7 +1999,7 @@ export default function DeepScanPage() {
                                 )}
                               </div>
                               <span className={cn('shrink-0 rounded-full px-3 py-1 text-xs font-medium', resolveMemberScoreClass(member))}>
-                                {member.scoreLabel}
+                                {member.status === 'success' ? '확인' : member.status === 'pending' ? '대기' : '보류'}
                               </span>
                             </div>
                           )
@@ -2344,7 +2341,7 @@ export default function DeepScanPage() {
           </SectionToggle>
 
           <SectionToggle
-            label='포트폴리오 점수 변화'
+            label='포트폴리오 변화'
             isOpen={openSections.pfSim}
             onToggle={() => toggleSection('pfSim')}
             tags={

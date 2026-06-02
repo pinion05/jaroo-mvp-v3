@@ -60,7 +60,7 @@ function installWindowMock() {
   }
 }
 
-test('applied home portfolio handoff는 raw storage에서 OCR evaluationAmount/profitRate를 제거하고 홈 placeholder만 남긴다', () => {
+test('applied home portfolio handoff는 OCR evaluationAmount/profitRate를 보존해 홈 실데이터로 표시한다', () => {
   const restoreWindow = installWindowMock()
 
   try {
@@ -94,22 +94,24 @@ test('applied home portfolio handoff는 raw storage에서 OCR evaluationAmount/p
     const session = readAppliedHomePortfolio()
     const [holding] = buildHomeHoldingsFromOcrRows(session?.rows ?? [])
 
-    assert.equal(Object.hasOwn(persistedRow ?? {}, 'evaluationAmount'), false)
-    assert.equal(Object.hasOwn(persistedRow ?? {}, 'profitRate'), false)
+    assert.equal(persistedRow?.evaluationAmount, '$3,450.00')
+    assert.equal(persistedRow?.profitRate, '+18.4%')
     assert.equal(session?.rows[0]?.averagePrice, '$972.11')
+    assert.equal(session?.rows[0]?.evaluationAmount, '$3,450.00')
+    assert.equal(session?.rows[0]?.profitRate, '+18.4%')
     assert.equal(holding?.averagePrice, '$972.11')
-    assert.equal(holding?.evaluationAmount, undefined)
-    assert.equal(holding?.change, '-')
-    assert.equal(holding?.pnl, '-')
-    assert.equal(holding?.metaLine, '티커 MSFT · 종목코드 US5949181045 · 평단 $972.11')
-    assert.equal(holding?.metrics.some((metric) => metric.label === '수익률' && metric.value === '-'), true)
-    assert.equal(holding?.metrics.some((metric) => metric.label === '평가 금액' && metric.value === '-'), true)
+    assert.equal(holding?.evaluationAmount, '$3,450')
+    assert.equal(holding?.change, '+18.4%')
+    assert.equal(holding?.pnl, '+$533.67')
+    assert.equal(holding?.metaLine, '티커 MSFT · 종목코드 US5949181045 · 평단 $972.11 · 평가금액 $3,450 · 현재가 $1,150')
+    assert.equal(holding?.metrics.some((metric) => metric.label === '수익률' && metric.value === '+18.4%'), true)
+    assert.equal(holding?.metrics.some((metric) => metric.label === '평가 금액' && metric.value === '$3,450'), true)
   } finally {
     restoreWindow()
   }
 })
 
-test('persistAppliedHomePortfolio는 averagePrice가 비어 있으면 OCR profit/evaluation으로 평단을 유도하지 않는다', () => {
+test('persistAppliedHomePortfolio는 averagePrice가 비어 있어도 OCR profit/evaluation을 홈에 표시한다', () => {
   const restoreWindow = installWindowMock()
 
   try {
@@ -142,28 +144,28 @@ test('persistAppliedHomePortfolio는 averagePrice가 비어 있으면 OCR profit
     const session = readAppliedHomePortfolio()
     const [holding] = buildHomeHoldingsFromOcrRows(session?.rows ?? [])
 
-    assert.equal(Object.hasOwn(persistedRow ?? {}, 'evaluationAmount'), false)
-    assert.equal(Object.hasOwn(persistedRow ?? {}, 'profitRate'), false)
+    assert.equal(persistedRow?.evaluationAmount, '766,000원')
+    assert.equal(persistedRow?.profitRate, '-23.4%')
     assert.equal(persistedRow?.averagePrice, '')
     assert.equal(session?.rows[0]?.averagePrice, '')
     assert.equal(holding?.averagePrice, '-')
-    assert.equal(holding?.evaluationAmount, undefined)
-    assert.equal(holding?.change, '-')
+    assert.equal(holding?.evaluationAmount, '766,000원')
+    assert.equal(holding?.change, '-23.4%')
     assert.equal(holding?.pnl, '-')
-    assert.equal(holding?.centerScore, '-')
-    assert.equal(holding?.metaLine, '종목코드 005930 · 평단 -')
+    assert.equal(holding?.centerScore, '-23.4%')
+    assert.equal(holding?.metaLine, '종목코드 005930 · 평단 - · 평가금액 766,000원 · 현재가 76,600원')
     assert.deepEqual(holding?.metrics, [
       { label: '보유 수량', value: '10주', tone: 'neutral' },
-      { label: '수익률', value: '-', tone: 'neutral' },
-      { label: '평가 금액', value: '-', tone: 'neutral' },
-      { label: '현재가', value: '-', tone: 'neutral' },
+      { label: '수익률', value: '-23.4%', tone: 'danger' },
+      { label: '평가 금액', value: '766,000원', tone: 'neutral' },
+      { label: '현재가', value: '76,600원', tone: 'neutral' },
     ])
   } finally {
     restoreWindow()
   }
 })
 
-test('readAppliedHomePortfolio는 raw storage에 섞인 OCR profit/evaluation으로 평단을 재계산하지 않는다', () => {
+test('readAppliedHomePortfolio는 raw storage OCR profit/evaluation을 유지하되 평단은 재계산하지 않는다', () => {
   const restoreWindow = installWindowMock()
 
   try {
@@ -189,18 +191,18 @@ test('readAppliedHomePortfolio는 raw storage에 섞인 OCR profit/evaluation으
     const [holding] = buildHomeHoldingsFromOcrRows(session?.rows ?? [])
 
     assert.equal(session?.rows[0]?.averagePrice, '')
-    assert.equal(Object.hasOwn(session?.rows[0] ?? {}, 'evaluationAmount'), false)
-    assert.equal(Object.hasOwn(session?.rows[0] ?? {}, 'profitRate'), false)
+    assert.equal(session?.rows[0]?.evaluationAmount, '766,000원')
+    assert.equal(session?.rows[0]?.profitRate, '-23.4%')
     assert.equal(holding?.averagePrice, '-')
-    assert.equal(holding?.change, '-')
+    assert.equal(holding?.change, '-23.4%')
     assert.equal(holding?.pnl, '-')
-    assert.equal(holding?.metaLine, '종목코드 005930 · 평단 -')
+    assert.equal(holding?.metaLine, '종목코드 005930 · 평단 - · 평가금액 766,000원 · 현재가 76,600원')
   } finally {
     restoreWindow()
   }
 })
 
-test('home holdings builder는 applied row에 섞여 들어온 OCR evaluation/profit를 무시하고 live quote placeholder로 시작한다', () => {
+test('home holdings builder는 applied row의 OCR evaluation/profit를 실데이터 fallback으로 사용한다', () => {
   const leakedAppliedRow = {
     name: '삼성전자',
     quantity: '10주',
@@ -220,17 +222,17 @@ test('home holdings builder는 applied row에 섞여 들어온 OCR evaluation/pr
   const [holding] = buildHomeHoldingsFromOcrRows([leakedAppliedRow])
 
   assert.equal(holding?.averagePrice, '80,000원')
-  assert.equal(holding?.evaluationAmount, undefined)
-  assert.equal(holding?.change, '-')
-  assert.equal(holding?.pnl, '-')
-  assert.equal(holding?.centerScore, '-')
+  assert.equal(holding?.evaluationAmount, '999,999원')
+  assert.equal(holding?.change, '+24.9%')
+  assert.equal(holding?.pnl, '+199,999원')
+  assert.equal(holding?.centerScore, '+24.9%')
   assert.equal(holding?.heatmapChange, undefined)
-  assert.equal(holding?.metaLine, '종목코드 005930 · 평단 80,000원')
+  assert.equal(holding?.metaLine, '종목코드 005930 · 평단 80,000원 · 평가금액 999,999원 · 현재가 99,999.9원')
   assert.deepEqual(holding?.metrics, [
     { label: '보유 수량', value: '10주', tone: 'neutral' },
-    { label: '수익률', value: '-', tone: 'neutral' },
-    { label: '평가 금액', value: '-', tone: 'neutral' },
-    { label: '현재가', value: '-', tone: 'neutral' },
+    { label: '수익률', value: '+24.9%', tone: 'positive' },
+    { label: '평가 금액', value: '999,999원', tone: 'neutral' },
+    { label: '현재가', value: '99,999.9원', tone: 'neutral' },
   ])
 })
 
@@ -300,6 +302,7 @@ test('applied home portfolio rows can rehydrate the in-memory portfolio store sh
       currentPrice: 1150,
       currentPriceCurrency: 'USD',
       currentProfitRate: 18.3,
+      evaluationAmount: undefined,
       identifierLabel: 'MSFT · US5949181045',
     },
   ])
@@ -339,7 +342,9 @@ test('applied home portfolio handoff는 미국 종목 OCR 평단의 KRW 통화 �
     assert.equal(session?.rows[0]?.averagePriceCurrency, 'KRW')
     assert.equal(holding?.averagePriceCurrency, 'KRW')
     assert.equal(holding?.averagePrice, '79,577.3278원')
-    assert.equal(holding?.metaLine, '티커 PYPL · 종목코드 US70450Y1038 · 평단 79,577.3278원')
+    assert.equal(holding?.evaluationAmount, '3,156,013원')
+    assert.equal(holding?.change, '-15.5%')
+    assert.equal(holding?.metaLine, '티커 PYPL · 종목코드 US70450Y1038 · 평단 79,577.3278원 · 평가금액 3,156,013원 · 현재가 67,242.842원')
   } finally {
     restoreWindow()
   }
@@ -543,7 +548,7 @@ test('home market score has loading, missing, and error fallback states', () => 
       label: loadingScore.label,
       updatedLabel: loadingScore.updatedLabel,
     },
-    { score: '-', status: 'loading', label: '계산 중', updatedLabel: '갱신 중' },
+    { score: '-', status: 'loading', label: '계산 중', updatedLabel: '불러오는 중' },
   )
   assert.equal(missingScore.status, 'fallback')
   assert.equal(missingScore.sourceLabel, '출처: 시장지표 필요')

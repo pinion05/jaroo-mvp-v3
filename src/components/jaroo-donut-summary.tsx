@@ -14,7 +14,7 @@ export function JarooDonutSummary() {
     <Card className='overflow-hidden rounded-[28px] border-0 bg-[linear-gradient(180deg,var(--jaroo-primary-strong),var(--jaroo-primary))] p-5 text-white shadow-none'>
       <div className='flex items-start justify-between gap-3'>
         <div>
-          <p className='text-xs text-white/60'>포트폴리오 점수</p>
+          <p className='text-xs text-white/60'>포트폴리오 변화</p>
           <div className='mt-2 flex items-end gap-2'>
             <p className='text-4xl font-semibold leading-none'>54</p>
             <Badge className='rounded-full bg-[color:var(--jaroo-warning-soft)] px-2.5 py-1 text-[11px] text-[color:var(--jaroo-warning)]'>주의</Badge>

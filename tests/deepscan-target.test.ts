@@ -37,7 +37,7 @@ const sampleHolding = {
   heatmapChange: '-16.7%',
   heatmapBadge: '관찰 중',
   heatmapBadgeTone: 'amber' as const,
-  opinionLabel: 'AI 간략 의견',
+  opinionLabel: '간략 의견',
   opinionText: '테스트 의견',
   opinionBackground: '#f8f8f6',
   opinionBorder: 'transparent',
@@ -49,8 +49,8 @@ const sampleHolding = {
     { label: '평가 금액', value: '2,359,000원', tone: 'neutral' as const },
   ],
   actionLabel: '딥스캔',
-  actionSubLabel: 'AI 9인 위원회 분석',
-  actionCredits: '300cr',
+  actionSubLabel: '세 팀이 분석해요',
+  actionCredits: undefined,
   actionHref: '/deepscan',
 }
 

@@ -55,7 +55,7 @@ export function MergeResultRowCard({ row, isLast }: { row: MergeRow; isLast: boo
             <AlertTriangle className='mt-0.5 size-4 shrink-0 text-[#854F0B]' />
             <div className='min-w-0'>
               <p className='text-[11px] font-semibold text-[#854F0B]'>이 행은 적용에서 제외돼요</p>
-              <p className='mt-1 text-[10px] leading-5 text-[#8A6520]'>{row.errorMessage || '/ocr 로 돌아가 이 종목을 다시 확인해주세요.'}</p>
+              <p className='mt-1 text-[10px] leading-5 text-[#8A6520]'>{row.errorMessage || '종목 확인으로 돌아가 이 종목을 다시 확인해주세요.'}</p>
             </div>
           </div>
         </div>
@@ -121,7 +121,7 @@ export default function JarooMergeScreen() {
     }
 
     if (normalizedItems.length === 0) {
-      setApplyStatus('error', '적용 가능한 종목이 없어요. /ocr 로 돌아가 값을 다시 확인해주세요.')
+      setApplyStatus('error', '적용 가능한 종목이 없어요. 값을 다시 확인해주세요.')
       return
     }
 
@@ -174,7 +174,7 @@ export default function JarooMergeScreen() {
     >
       <Card className='rounded-[20px] border-0 bg-[color:var(--jaroo-accent)] px-4 py-3 shadow-none'>
         <p className='text-[13px] font-medium text-[color:var(--jaroo-primary-strong)]'>OCR 검수 결과 {mergeRows.length}개 종목을 병합 대기 중이에요</p>
-        <p className='mt-1 text-[12px] leading-6 text-[color:var(--jaroo-primary)]'>정상 행만 홈 포트폴리오에 반영돼요. 제외된 행은 카드 안 안내를 보고 /ocr 에서 다시 확인해주세요.</p>
+        <p className='mt-1 text-[12px] leading-6 text-[color:var(--jaroo-primary)]'>정상 행만 홈 포트폴리오에 반영돼요. 제외된 행은 카드 안 안내를 보고 다시 확인해주세요.</p>
       </Card>
 
       <section className='space-y-2'>
@@ -210,7 +210,7 @@ export default function JarooMergeScreen() {
               'h-12 w-full rounded-[20px] border-[color:var(--jaroo-border)] bg-white text-[13px] font-normal text-[#555] hover:bg-white',
           })}
         >
-          /ocr 로 돌아가기
+          종목 확인으로 돌아가기
         </button>
         {applyError ? <p className='text-[11px] text-[#D54841]'>{applyError}</p> : null}
       </div>

@@ -995,12 +995,12 @@ function buildUsPortfolioSimulation(heroScore: number, sellNow: JarooDeepScanSel
     return {
       ...createBlockMeta('blocked', [createSourceRef('system', 'deepscan-us-portfolio-sim', 'US portfolio simulation blocked')], {
         fallback: createFallback('sell-now-blocked', '시뮬레이션 보류'),
-        error: createError('sell-now-blocked', '즉시 매도 판단이 없어 포트폴리오 점수 변화를 계산하지 않았어요.'),
+        error: createError('sell-now-blocked', '즉시 매도 판단이 없어 포트폴리오 변화를 계산하지 않았어요.'),
       }),
       beforeScore: heroScore,
       afterScore: heroScore,
       deltaLabel: 'blocked:+0',
-      caption: '즉시 매도 판단이 준비되면 포트폴리오 점수 변화를 계산할 수 있어요.',
+      caption: '즉시 매도 판단이 준비되면 포트폴리오 변화를 계산할 수 있어요.',
     }
   }
 
@@ -1014,7 +1014,7 @@ function buildUsPortfolioSimulation(heroScore: number, sellNow: JarooDeepScanSel
     beforeScore,
     afterScore,
     deltaLabel: `${decisionBand}:+${delta}`,
-    caption: `${decisionBand} 판단 기준 포지션 제거 시 포트폴리오 점수 ${beforeScore} → ${afterScore}.`,
+    caption: `${decisionBand} 판단 기준 포지션 제거 시 포트폴리오 변화 ${beforeScore} → ${afterScore}.`,
   }
 }
 
@@ -1062,7 +1062,7 @@ function createUsRuntimeFailurePayload(rawInput: DeepScanRawInput, ticker: strin
       otherScenarioTags: [],
     },
     sellNow: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), realizedText: '데이터가 없어 즉시 매도 판단을 계산하지 않았어요.', rows: [] },
-    portfolioSimulation: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), beforeScore: 0, afterScore: 0, deltaLabel: 'blocked:+0', caption: '데이터가 없어 포트폴리오 점수 변화를 계산하지 않았어요.' },
+    portfolioSimulation: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), beforeScore: 0, afterScore: 0, deltaLabel: 'blocked:+0', caption: '데이터가 없어 포트폴리오 변화를 계산하지 않았어요.' },
     metadata: {
       generatedAt,
       version: 'deepscan-runtime-v1',
@@ -1169,7 +1169,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
         otherScenarioTags: [],
       },
       sellNow: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), realizedText: '데이터가 없어 즉시 매도 판단을 계산하지 않았어요.', rows: [] },
-      portfolioSimulation: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), beforeScore: 0, afterScore: 0, deltaLabel: 'blocked:+0', caption: '데이터가 없어 포트폴리오 점수 변화를 계산하지 않았어요.' },
+      portfolioSimulation: { ...createBlockMeta('blocked', sourceRefs, { fallback, error }), beforeScore: 0, afterScore: 0, deltaLabel: 'blocked:+0', caption: '데이터가 없어 포트폴리오 변화를 계산하지 않았어요.' },
       metadata: {
         generatedAt,
         version: 'deepscan-runtime-v1',

@@ -59,7 +59,9 @@ type DeepScanLoadingTarget = {
 
 type HomeV2Summary = {
   totalEvaluation: number | null
+  totalEvaluationText: string
   totalPnl: number | null
+  totalPnlText: string
   totalRate: number | null
   badge: string
   badgeTone: HomeBadgeTone
@@ -131,12 +133,43 @@ function getPnlAmount(item: HomeHolding) {
   return parseOcrNumber(item.pnl)
 }
 
+function getMetricValue(item: HomeHolding, label: string) {
+  return item.metrics.find((metric) => metric.label === label)?.value?.trim() || '-'
+}
+
+function getEvaluationAmountText(item: HomeHolding) {
+  const metricValue = getMetricValue(item, '평가 금액')
+  return metricValue !== '-' ? metricValue : (item.evaluationAmount?.trim() || '-')
+}
+
+function inferHomogeneousMoneyCurrency(values: string[]) {
+  const populatedValues = values.map((value) => value.trim()).filter((value) => value && value !== '-')
+
+  if (populatedValues.length > 0 && populatedValues.every((value) => /^[+-]?\$/.test(value))) {
+    return 'USD'
+  }
+
+  return 'KRW'
+}
+
 function formatKrw(value: number | null) {
   if (value === null || !Number.isFinite(value)) {
     return '-'
   }
 
   return `${Math.round(value).toLocaleString('ko-KR')}원`
+}
+
+function formatMoneyValue(value: number | null, currency: 'KRW' | 'USD') {
+  if (value === null || !Number.isFinite(value)) {
+    return '-'
+  }
+
+  if (currency === 'USD') {
+    return `$${value.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
+  return formatKrw(value)
 }
 
 function formatSignedKrw(value: number | null) {
@@ -146,6 +179,19 @@ function formatSignedKrw(value: number | null) {
 
   const sign = value > 0 ? '+' : value < 0 ? '-' : ''
   return `${sign}${Math.abs(Math.round(value)).toLocaleString('ko-KR')}원`
+}
+
+function formatSignedMoneyValue(value: number | null, currency: 'KRW' | 'USD') {
+  if (value === null || !Number.isFinite(value)) {
+    return '-'
+  }
+
+  if (currency === 'USD') {
+    const sign = value > 0 ? '+' : value < 0 ? '-' : ''
+    return `${sign}$${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+  }
+
+  return formatSignedKrw(value)
 }
 
 function formatSignedRate(value: number | null) {
@@ -192,6 +238,8 @@ function getStockTagClass(item: HomeHolding) {
 function buildHomeV2Summary(holdings: HomeHolding[], isAppliedPortfolio: boolean): HomeV2Summary {
   const totalEvaluationValues = holdings.map(getEvaluationAmount).filter((value): value is number => value !== null)
   const pnlValues = holdings.map(getPnlAmount).filter((value): value is number => value !== null)
+  const evaluationCurrency = inferHomogeneousMoneyCurrency(holdings.map(getEvaluationAmountText))
+  const pnlCurrency = inferHomogeneousMoneyCurrency(holdings.map((item) => item.pnl))
   const totalEvaluation = totalEvaluationValues.length > 0 ? totalEvaluationValues.reduce((sum, value) => sum + value, 0) : null
   const totalPnl = pnlValues.length > 0 ? pnlValues.reduce((sum, value) => sum + value, 0) : null
   const principal = totalEvaluation !== null && totalPnl !== null ? totalEvaluation - totalPnl : null
@@ -205,12 +253,14 @@ function buildHomeV2Summary(holdings: HomeHolding[], isAppliedPortfolio: boolean
   const momentumValue = averageRate >= 8 ? '빠르게 개선 중 ↑' : averageRate >= 0 ? '나아지는 중 ↑' : averageRate >= -10 ? '천천히 회복 중 →' : '경계 필요 ↓'
   const worstHolding = [...holdings].sort((left, right) => (getHoldingChangeValue(left) ?? 0) - (getHoldingChangeValue(right) ?? 0))[0]
   const forecastBody = isAppliedPortfolio
-    ? `${holdings.length}개 OCR 종목을 홈에 적용했어요. ${worstHolding?.name ?? holdings[0]?.name ?? '보유 종목'} 상태를 먼저 확인해보세요.`
+    ? `${holdings.length}개 보유 종목을 확인했어요. ${worstHolding?.name ?? holdings[0]?.name ?? '보유 종목'} 상태를 먼저 점검해보세요.`
     : defaultHomeForecast.body
 
   return {
     totalEvaluation,
+    totalEvaluationText: formatMoneyValue(totalEvaluation, evaluationCurrency),
     totalPnl,
+    totalPnlText: formatSignedMoneyValue(totalPnl, pnlCurrency),
     totalRate,
     badge,
     badgeTone,
@@ -218,9 +268,9 @@ function buildHomeV2Summary(holdings: HomeHolding[], isAppliedPortfolio: boolean
     momentumValue,
     forecast: isAppliedPortfolio
       ? {
-          label: 'OCR APPLIED',
+          label: '보유 종목 요약',
           body: forecastBody,
-          cta: '딥스캔으로 상세 전략 보기 ›',
+          cta: '종목 카드에서 딥스캔을 시작하세요',
           href: '/deepscan',
         }
       : defaultHomeForecast,
@@ -336,29 +386,31 @@ function StockCard({
 }) {
   const changeValue = getHoldingChangeValue(item)
   const evaluationAmount = getEvaluationAmount(item)
+  const evaluationAmountText = getEvaluationAmountText(item)
   const identifierText = getHoldingIdentifierText(item)
+  const currentPriceText = getMetricValue(item, '현재가')
 
   return (
     <article className={cn(styles.stock, open && styles.open)}>
       <button type='button' className={styles.stockRow} onClick={onToggle} aria-expanded={open}>
         <span className={styles.stockDot} style={{ background: item.donutColor }} />
         <span className={styles.stockInfo}>
-          <span className={styles.stockNameLine}>
+          <span className={styles.stockNameRow}>
             <span className={styles.stockName}>{item.name}</span>
-            <span className={cn(styles.stockTag, getStockTagClass(item))}>{getStockTag(item)}</span>
+            <span className={cn(styles.stockBadge, getStockTagClass(item))}>{getStockTag(item)}</span>
           </span>
           <span className={styles.stockMeta}>{item.market}{identifierText ? ` · ${identifierText}` : ''} · {item.shares}</span>
         </span>
         <span className={styles.stockRight}>
           <span className={cn(styles.stockRate, getToneClass(changeValue))}>{item.change}</span>
-          <span className={styles.stockAmt}>{formatKrw(evaluationAmount)}</span>
+          <span className={cn(styles.stockAmt, getToneClass(getPnlAmount(item)))}>{item.pnl}</span>
         </span>
       </button>
       <div className={styles.stockDetail} aria-hidden={!open}>
         <div className={styles.sdFacts}>
           <div>
             <span className={styles.sdfLabel}>현재가</span>
-            <span className={styles.sdfVal}>{item.change}</span>
+            <span className={styles.sdfVal}>{currentPriceText}</span>
           </div>
           <div>
             <span className={styles.sdfLabel}>평단</span>
@@ -366,7 +418,7 @@ function StockCard({
           </div>
           <div>
             <span className={styles.sdfLabel}>평가금액</span>
-            <span className={styles.sdfVal}>{formatKrw(evaluationAmount)}</span>
+            <span className={styles.sdfVal}>{evaluationAmountText !== '-' ? evaluationAmountText : formatKrw(evaluationAmount)}</span>
           </div>
         </div>
         {item.actionHref ? (
@@ -447,7 +499,7 @@ export function JarooHomeScreen() {
     }
 
     const timeoutId = window.setTimeout(() => {
-      router.replace('/ocr')
+      router.replace('/screenshot')
     }, 350)
 
     return () => {
@@ -757,8 +809,8 @@ export function JarooHomeScreen() {
         <div className={styles.frame}>
           <main className={styles.body}>
             <div className={styles.forecastCard}>
-              <div className={styles.forecastLabel}>REDIRECTING</div>
-              <div className={styles.forecastText}>홈 포트폴리오가 없어 /ocr 로 이동합니다.</div>
+              <div className={styles.forecastLabel}>스크린샷 준비</div>
+              <div className={styles.forecastText}>보유 종목을 만들기 위해 스크린샷 추가 화면으로 이동합니다.</div>
             </div>
           </main>
         </div>
@@ -784,9 +836,9 @@ export function JarooHomeScreen() {
             <div className={styles.mcTop}>
               <div>
                 <div className={styles.mcLabel}>총 평가액</div>
-                <div className={styles.mcTotal}>{formatKrw(summary.totalEvaluation)}</div>
+                <div className={styles.mcTotal}>{summary.totalEvaluationText}</div>
                 <div className={cn(styles.mcPl, getToneClass(summary.totalPnl))}>
-                  {formatSignedKrw(summary.totalPnl)} · {formatSignedRate(summary.totalRate)}
+                  {summary.totalPnlText} · {formatSignedRate(summary.totalRate)}
                 </div>
               </div>
               <div className={cn(styles.mcBadge, summary.badgeTone === 'green' && styles.profit, summary.badgeTone === 'red' && styles.loss)}>
@@ -805,14 +857,14 @@ export function JarooHomeScreen() {
 
           {quoteSurfaceEnabled && quoteStatus === 'error' ? (
             <div className={styles.forecastCard}>
-              <div className={styles.forecastLabel}>QUOTE ERROR</div>
+              <div className={styles.forecastLabel}>시세 지연</div>
               <div className={styles.forecastText}>{quoteErrorMessage ?? '현재 시세를 불러오지 못했어요. 다시 시도해주세요.'}</div>
               <button type='button' className={styles.refreshBtn} onClick={handleQuoteRefresh}>시세 다시 불러오기</button>
             </div>
           ) : null}
           {quoteSurfaceEnabled && quoteSummaryMessage ? (
             <div className={styles.forecastCard}>
-              <div className={styles.forecastLabel}>PARTIAL SUCCESS</div>
+              <div className={styles.forecastLabel}>일부 시세 대기</div>
               <div className={styles.forecastText}>{quoteSummaryMessage}</div>
             </div>
           ) : null}
@@ -820,7 +872,7 @@ export function JarooHomeScreen() {
           <div className={styles.sectionHeader}>
             <div className={styles.sectionLabel}>종목별 현황</div>
             <button type='button' className={styles.refreshTextBtn} onClick={handleQuoteRefresh}>
-              {quoteSurfaceEnabled && quoteStatus === 'loading' ? '갱신 중...' : '시세 새로고침'}
+              {quoteSurfaceEnabled && quoteStatus === 'loading' ? '불러오는 중' : '시세 새로고침'}
             </button>
           </div>
 
@@ -840,7 +892,7 @@ export function JarooHomeScreen() {
             </div>
           ))}
 
-          <div className={styles.forecastCard}>
+          {!isAppliedPortfolio ? <div className={styles.forecastCard}>
             <div className={styles.forecastLabel}>{summary.forecast.label}</div>
             <div className={styles.forecastText}>{summary.forecast.body}</div>
             <Link
@@ -855,7 +907,7 @@ export function JarooHomeScreen() {
             >
               {summary.forecast.cta}
             </Link>
-          </div>
+          </div> : null}
         </main>
 
         <nav className={styles.tabbar} aria-label='하단 탭'>
@@ -865,7 +917,6 @@ export function JarooHomeScreen() {
           <Link href='/mypage' className={styles.tab}><span className={styles.tabIco}>👤</span>마이</Link>
         </nav>
       </div>
-      <div className={styles.caption}>홈 v2 — 시장점수 제거 · 도넛 녹임 · 손익+비중 한 화면</div>
 
       <div className={styles.modalMount}>
         <div className={styles.modalInner}>

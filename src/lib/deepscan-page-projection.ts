@@ -76,7 +76,7 @@ const DEEP_SCAN_BLOCK_LABELS = {
   insights: '인사이트',
   strategy: '전략',
   sellNow: '지금 팔면',
-  portfolioSimulation: '포트폴리오 점수 변화',
+  portfolioSimulation: '포트폴리오 변화',
 } as const
 
 function normalizeText(value: unknown) {

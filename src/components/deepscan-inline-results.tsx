@@ -114,10 +114,9 @@ function buildTeamSummary(payload: JarooDeepScanPayload, team: TeamDefinition) {
       ? compact(errored[0]?.error?.message) || '일부 위원 응답 실패. 도착한 근거만 먼저 보여드려요.'
       : '응답 대기 중이에요. 도착한 실제 데이터부터 순서대로 붙습니다.'
   const tags = [
-    successful.length > 0 ? `${successful.length}명 확인` : null,
-    errored.length > 0 ? `${errored.length}명 실패` : null,
-    pending.length > 0 ? `${pending.length}명 대기` : null,
-    lead?.scoreLabel && lead.scoreLabel !== 'N/A' ? lead.scoreLabel : null,
+    successful.length > 0 ? `${successful.length}개 근거` : null,
+    errored.length > 0 ? `${errored.length}개 대기` : null,
+    pending.length > 0 ? `${pending.length}개 준비 중` : null,
   ].filter((tag): tag is string => Boolean(tag))
 
   return { body, tags: tags.length ? tags : ['확인 중'], status: errored.length > 0 ? '일부 실패' : pending.length > 0 ? '분석 중' : '확인', warning: errored.length > 0 }
@@ -218,7 +217,7 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
         <div className='px-4 py-5 text-center'>
           <div className={cn('text-[28px] font-black leading-none', strength.active <= 1 ? 'text-[#E5484D]' : 'text-[#1A9D55]')}>{strength.label}</div>
           <div className='mx-auto mt-3 flex w-[122px] gap-1'>{Array.from({ length: 5 }, (_, index) => <span key={index} className={cn('h-[6px] flex-1 rounded-full', index < strength.active ? 'bg-[#1A9D55]' : 'bg-[#E8EAEE]')} />)}</div>
-          <p className='mt-2 text-[11px] text-[#5A6473]'>{strength.helper} · {payload.hero.scoreLabel || `${payload.hero.score}점`}</p>
+          <p className='mt-2 text-[11px] text-[#5A6473]'>{strength.helper}</p>
         </div>
         <p className='border-t border-[#EFF1F4] px-4 py-4 text-[13px] leading-6 text-[#0F1419]'>{summary}</p>
         <div className='border-t border-[#EFF1F4] px-4 py-4'>

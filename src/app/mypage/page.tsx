@@ -457,7 +457,7 @@ export default function MyPage() {
             <p className='text-[13px] text-white/70'>월 4,900원</p>
           </div>
           <div className='mt-4 space-y-2.5'>
-            {['딥스캔 무제한', '매일 자동 스캔', '회복 알림 푸시', '포트폴리오 점수 주간 리포트'].map((feature) => (
+            {['딥스캔 무제한', '매일 자동 스캔', '회복 알림 푸시', '포트폴리오 변화 주간 리포트'].map((feature) => (
               <div key={feature} className='flex items-center gap-2 text-[12px] text-white/85'>
                 <span className='text-[#9FE1CB]'>✓</span>
                 <span>{feature}</span>
