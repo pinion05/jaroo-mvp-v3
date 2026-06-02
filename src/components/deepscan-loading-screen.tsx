@@ -145,6 +145,12 @@ type CompletionState = {
   body: string
 }
 
+const TODAY_BRIEFING_FIRST_REVEAL_SECONDS = 5
+const TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS = 5
+const TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS = 0.9
+const TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS = 1.8
+const TODAY_BRIEFING_ITEM_COUNT = 6
+
 const committeeMembers: ReadonlyArray<{ key: string; Icon: CommitteeMemberIcon; label: string; state: CommitteeMemberState }> = [
   { key: 'valuation', Icon: Scale, label: '가치\n분석가', state: 'active' },
   { key: 'growth', Icon: TrendingUp, label: '성장\n전략가', state: 'active' },
@@ -837,7 +843,10 @@ function TodayBriefingCard({
         : '어제보다는 거래가 차분한 편이에요.'
     : '거래량 비교 데이터를 불러오는 중이에요.'
   const chart = briefingModel.chart
-  const briefStartSeconds = [4, 6, 8, 10, 12, 14]
+  const briefStartSeconds = Array.from(
+    { length: TODAY_BRIEFING_ITEM_COUNT },
+    (_, index) => TODAY_BRIEFING_FIRST_REVEAL_SECONDS + index * TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS,
+  )
 
   return (
     <section className={styles.todayBriefingCard} aria-label='오늘 장 기준 시세 브리핑'>
@@ -902,8 +911,8 @@ function TodayBriefingItem({
   meaning: ReactNode
 }) {
   const isVisible = elapsedSeconds >= at
-  const isDataVisible = elapsedSeconds >= at + 0.75
-  const isMeaningVisible = elapsedSeconds >= at + 1.45
+  const isDataVisible = elapsedSeconds >= at + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS
+  const isMeaningVisible = elapsedSeconds >= at + TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS
 
   return (
     <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)}>
@@ -956,8 +965,8 @@ function TodayMarketBriefing({
   stockPct: number | null
 }) {
   const isVisible = elapsedSeconds >= at
-  const isDataVisible = elapsedSeconds >= at + 0.75
-  const isMeaningVisible = elapsedSeconds >= at + 1.45
+  const isDataVisible = elapsedSeconds >= at + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS
+  const isMeaningVisible = elapsedSeconds >= at + TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS
   const kospiLabel = formatPercentValue(kospiPct) ?? '확인 중'
   const kosdaqLabel = formatPercentValue(kosdaqPct) ?? '확인 중'
   const stockLabel = formatPercentValue(stockPct) ?? '확인 중'
