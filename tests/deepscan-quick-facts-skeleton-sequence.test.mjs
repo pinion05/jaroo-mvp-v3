@@ -115,6 +115,20 @@ test('DeepScan soft-motion skeleton cadence slows narrative motion and keeps red
   assert.match(cssSource, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.narrativeBubble \{[\s\S]*?transition: none;/)
 })
 
+
+test("DeepScan team narrative waits until today\'s briefing sequence is fully visible", () => {
+  const source = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
+
+  assert.match(source, /const TODAY_BRIEFING_COMPLETE_SECONDS = TODAY_BRIEFING_FIRST_REVEAL_SECONDS/)
+  assert.match(source, /const NARRATIVE_CARD_REVEAL_INTERVAL_SECONDS = 5/)
+  assert.match(source, /function getPostBriefingVisibleStageCount\(elapsedSeconds: number, requestedVisibleStageCount: number\)/)
+  assert.match(source, /elapsedSeconds < TODAY_BRIEFING_COMPLETE_SECONDS/)
+  assert.match(source, /visibleNarrativeStageCount > 0 \? buildVisibleNarrativeCards\(orderedNarrativeCards, visibleNarrativeStageCount\) : \[\]/)
+  assert.match(source, /visibleNarrativeCards\.length \? \(/)
+  assert.match(source, /visibleNarrativeCards\.forEach\(\(card\) => \{/)
+  assert.doesNotMatch(source, /loadingStages\.forEach\(\(card\) => \{/)
+})
+
 test('DeepScan loading screen only fetches internal team summaries and avoids result CTA', () => {
   const source = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
 
