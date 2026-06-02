@@ -26,7 +26,7 @@ type NavItem = {
 const navItems: NavItem[] = [
   { href: '/home', label: '홈', icon: House },
   { href: '/deepscan', label: '딥스캔', icon: ScanSearch },
-  { href: '/ocr', label: 'OCR', icon: FileText },
+  { href: '/ocr', label: '검수', icon: FileText },
   { href: '/screenshot', label: '스크린샷', icon: Camera },
   { href: '/merge', label: '병합', icon: GitMerge },
   { href: '/sharecard', label: '공유카드', icon: LayoutGrid },
@@ -64,7 +64,7 @@ export function DebugPageNav() {
     <aside className='fixed top-1/2 left-4 z-50 hidden -translate-y-1/2 lg:block'>
       <div className='flex w-22 flex-col gap-2 rounded-3xl border border-white/70 bg-white/92 p-3 shadow-[0_18px_48px_rgba(15,23,40,0.16)] backdrop-blur'>
         <div className='px-1 pb-1 text-[11px] font-semibold tracking-[-0.01em] text-[color:var(--jaroo-muted)]'>
-          DEBUG NAV
+          페이지
         </div>
         {navItems.map(({ href, label, icon: Icon }) => {
           const isActive = pathname === href

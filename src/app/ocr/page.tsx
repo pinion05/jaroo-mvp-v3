@@ -367,16 +367,22 @@ export default function OcrPage() {
   const [conflictSelections, setConflictSelections] = useState<Record<string, string>>({})
   const [removedRowIds, setRemovedRowIds] = useState<Record<string, true>>({})
   const [persistedUploadSession, setPersistedUploadSession] = useState<ScreenshotUploadSession | null>(null)
+  const [hasCheckedPersistedUploadSession, setHasCheckedPersistedUploadSession] = useState(false)
   const ocrRunIdRef = useRef(0)
   const autoOcrSessionKeyRef = useRef<string | null>(null)
   const session = uploadStoreSession ?? persistedUploadSession
 
   useEffect(() => {
+    if (!hasCheckedPersistedUploadSession) {
+      return
+    }
+
     if (!session) {
       autoOcrSessionKeyRef.current = null
-      setRequestStatus('error', '먼저 스크린샷 추가 화면에서 분석할 이미지를 선택해주세요.')
+      setRequestStatus('idle')
       setResolveStatus('idle')
       setUploadStatuses({})
+      router.replace('/screenshot')
       return
     }
 
@@ -392,11 +398,12 @@ export default function OcrPage() {
         ]),
       ),
     )
-  }, [session, setRequestStatus, setResolveStatus])
+  }, [hasCheckedPersistedUploadSession, router, session, setRequestStatus, setResolveStatus])
 
   useEffect(() => {
     if (uploadStoreSession) {
       setPersistedUploadSession(uploadStoreSession)
+      setHasCheckedPersistedUploadSession(true)
       return
     }
 
@@ -404,11 +411,13 @@ export default function OcrPage() {
 
     if (!restoredSession) {
       setPersistedUploadSession(null)
+      setHasCheckedPersistedUploadSession(true)
       return
     }
 
     setPersistedUploadSession(restoredSession)
     setUploadInput(restoredSession)
+    setHasCheckedPersistedUploadSession(true)
   }, [setUploadInput, uploadStoreSession])
 
   const runOcrBatch = useCallback(async (currentSession: ScreenshotUploadSession) => {

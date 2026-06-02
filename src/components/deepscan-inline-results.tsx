@@ -1,10 +1,13 @@
 'use client'
 
-import type { DeepScanBlockState, JarooDeepScanPayload } from '../../packages/contracts/src/deepscan'
+import type {
+  JarooDeepScanCommitteeMember,
+  JarooDeepScanPayload,
+  JarooDeepScanStrategyScenario,
+} from '../../packages/contracts/src/deepscan'
 import type { DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import type { DeepScanTargetInput } from '@/lib/workflow-types'
 
-import { AlertTriangle, BarChart3, CheckCircle2, FileText, Gauge, Target, type LucideIcon } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type DeepScanInlineResultsProps = {
@@ -13,232 +16,244 @@ type DeepScanInlineResultsProps = {
   target?: DeepScanTargetInput | null
 }
 
-function blockLabel(state: DeepScanBlockState) {
-  if (state === 'ok') {
-    return '확인됨'
-  }
-  if (state === 'blocked') {
-    return '원천 차단'
-  }
-  return '조회 실패'
+type TeamDefinition = {
+  key: string
+  name: string
+  description: string
+  icon: string
+  memberTitles: string[]
 }
 
-function blockNotice(state: DeepScanBlockState, fallbackLabel?: string, errorMessage?: string | null) {
-  if (state === 'ok') {
-    return null
-  }
-
-  return fallbackLabel || errorMessage || (state === 'blocked' ? '원천에서 이 영역을 제공하지 않아 제외했습니다.' : '이 영역은 응답 오류로 일부만 표시합니다.')
+type ScenarioView = {
+  label: string
+  probability: string
+  condition: string
+  tone: 'green' | 'blue' | 'red'
+  recommended?: boolean
 }
 
-function formatGeneratedAt(value: string) {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) {
-    return value
-  }
-
-  return new Intl.DateTimeFormat('ko-KR', {
-    month: 'short',
-    day: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(date)
-}
+const TEAM_DEFINITIONS: readonly TeamDefinition[] = [
+  { key: 'market', name: '시장·차트 팀', description: '차트 마스터 · 거래량 · 상승세 추적', icon: '📈', memberTitles: ['가격 위치', '평단 격차', '트렌드'] },
+  { key: 'context', name: '심리·환경 팀', description: '증권사 의견 · 산업 전문가 · 이슈 탐색', icon: '🧠', memberTitles: ['입력 완성도', '상방 버퍼', '컨센서스 모멘텀'] },
+  { key: 'fundamental', name: '가치·기본 팀', description: '가치 분석 · 성장 전략 · 재무 점검', icon: '📊', memberTitles: ['밸류에이션', '수익성/기본체력', '지분/안정성'] },
+] as const
 
 function firstNonEmpty(...values: Array<string | undefined | null>) {
   return values.find((value) => typeof value === 'string' && value.trim().length > 0)?.trim() ?? null
 }
 
+function compact(value: string | null | undefined, max = 104) {
+  const normalized = value?.replace(/\s+/g, ' ').trim()
+  if (!normalized) return ''
+  return normalized.length > max ? `${normalized.slice(0, max - 1).trim()}…` : normalized
+}
+
+function parsePercent(value: string | null | undefined) {
+  if (!value) return null
+  const cleaned = value.replace(/[^0-9.-]/g, '')
+  if (!cleaned) return null
+  const parsed = Number(cleaned)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function formatPercent(value: number | null) {
+  if (value === null || !Number.isFinite(value)) return '--'
+  const sign = value > 0 ? '+' : value < 0 ? '−' : ''
+  return `${sign}${Math.abs(value).toFixed(1).replace(/\.0$/u, '')}%`
+}
+
+function parseMoneyNumber(value: string | null | undefined) {
+  if (!value) return null
+  const cleaned = value.replace(/[^0-9.-]/g, '')
+  if (!cleaned) return null
+  const parsed = Number(cleaned)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+function deriveUpside(currentText: string | null | undefined, targetText: string | null | undefined) {
+  const current = parseMoneyNumber(currentText)
+  const target = parseMoneyNumber(targetText)
+  if (current === null || target === null || current === 0) return null
+  return ((target / current) - 1) * 100
+}
+
+function flattenMembers(payload: JarooDeepScanPayload) {
+  return payload.committee?.axes?.flatMap((axis) => axis.members ?? []) ?? []
+}
+
+function resolveTeamMembers(payload: JarooDeepScanPayload, team: TeamDefinition) {
+  const members = flattenMembers(payload)
+  const matched = team.memberTitles
+    .map((title) => members.find((member) => member.title === title))
+    .filter((member): member is JarooDeepScanCommitteeMember => Boolean(member))
+
+  if (matched.length > 0) return matched
+
+  const fallbackAxis = payload.committee?.axes?.find((axis) => team.memberTitles.some((title) => axis.label?.includes(title) || axis.subtitle?.includes(title)))
+  return fallbackAxis?.members ?? []
+}
+
+function buildTeamSummary(payload: JarooDeepScanPayload, team: TeamDefinition) {
+  if (payload.committee.blockState !== 'ok') {
+    return {
+      body: payload.committee.fallback?.label || payload.committee.error?.message || '위원회 분석 원천을 지금 불러오지 못했어요.',
+      tags: ['원천 상태 확인', '관망'],
+      status: '보류',
+      warning: true,
+    }
+  }
+
+  const members = resolveTeamMembers(payload, team)
+  if (members.length === 0) {
+    return { body: '이 팀의 실제 위원 응답이 아직 도착하지 않았어요.', tags: ['응답 대기'], status: '대기', warning: false }
+  }
+
+  const successful = members.filter((member) => member.status === 'success' && member.reason?.trim())
+  const errored = members.filter((member) => member.status === 'error')
+  const pending = members.filter((member) => member.status === 'pending')
+  const lead = successful[0]
+  const body = lead
+    ? compact(lead.reason)
+    : errored.length > 0
+      ? compact(errored[0]?.error?.message) || '일부 위원 응답 실패. 도착한 근거만 먼저 보여드려요.'
+      : '응답 대기 중이에요. 도착한 실제 데이터부터 순서대로 붙습니다.'
+  const tags = [
+    successful.length > 0 ? `${successful.length}개 근거` : null,
+    errored.length > 0 ? `${errored.length}개 대기` : null,
+    pending.length > 0 ? `${pending.length}개 준비 중` : null,
+  ].filter((tag): tag is string => Boolean(tag))
+
+  return { body, tags: tags.length ? tags : ['확인 중'], status: errored.length > 0 ? '일부 실패' : pending.length > 0 ? '분석 중' : '확인', warning: errored.length > 0 }
+}
+
+function buildStrength(payload: JarooDeepScanPayload) {
+  const score = payload.hero.score
+  if (score >= 67) return { label: '강세', helper: '긍정 우세', active: 4 }
+  if (score >= 55) return { label: '중립+', helper: '긍정·중립 혼재', active: 3 }
+  if (score >= 45) return { label: '중립', helper: '추가 확인 필요', active: 2 }
+  return { label: '주의', helper: '방어 우선', active: 1 }
+}
+
+function buildScenarioViews(payload: JarooDeepScanPayload): ScenarioView[] {
+  if (payload.strategy?.blockState !== 'ok') {
+    return [{ label: '관망', probability: '--', condition: payload.strategy?.fallback?.label || payload.strategy?.error?.message || '전략 데이터를 확인하는 중이에요.', tone: 'blue', recommended: true }]
+  }
+
+  const primary: ScenarioView = {
+    label: payload.strategy?.scenarioLabel || '보유 유지',
+    probability: payload.strategy?.scenarioProbability || '--',
+    condition: [payload.strategy?.scenarioCondition, payload.strategy?.scenarioPeriod].filter(Boolean).join(' · ') || '조건 확인 중',
+    tone: 'green',
+    recommended: true,
+  }
+  const others = (payload.strategy?.otherScenarios ?? []).slice(0, 2).map((scenario, index): ScenarioView => ({
+    label: scenario.label,
+    probability: scenario.probability,
+    condition: scenario.condition,
+    tone: index === 0 ? 'blue' : 'red',
+  }))
+  return [primary, ...others]
+}
+
+function scenarioWidth(scenario: Pick<JarooDeepScanStrategyScenario, 'probability'> | ScenarioView) {
+  const pct = parsePercent(scenario.probability)
+  return `${Math.max(0, Math.min(100, pct ?? 0))}%`
+}
+
+function toneClasses(tone: ScenarioView['tone']) {
+  if (tone === 'green') return { dot: 'bg-[#1A9D55]', bar: 'bg-[#1A9D55]', text: 'text-[#1A9D55]' }
+  if (tone === 'red') return { dot: 'bg-[#E5484D]', bar: 'bg-[#E5484D]', text: 'text-[#E5484D]' }
+  return { dot: 'bg-[#2B6BE6]', bar: 'bg-[#2B6BE6]', text: 'text-[#2B6BE6]' }
+}
+
 export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScanInlineResultsProps) {
   const name = firstNonEmpty(payload.input.instrument.name, target?.name, requestSeed?.holding.name) ?? '선택 종목'
-  const identifier = firstNonEmpty(payload.input.instrument.code, payload.input.instrument.ticker, target?.code, target?.ticker)
-  const heroNotice = blockNotice(payload.hero.blockState, payload.hero.fallback?.label, payload.hero.error?.message)
-  const strategyNotice = blockNotice(payload.strategy.blockState, payload.strategy.fallback?.label, payload.strategy.error?.message)
-  const committeeNotice = blockNotice(payload.committee.blockState, payload.committee.fallback?.label, payload.committee.error?.message)
-  const sellNotice = blockNotice(payload.sellNow.blockState, payload.sellNow.fallback?.label, payload.sellNow.error?.message)
-  const portfolioNotice = blockNotice(payload.portfolioSimulation.blockState, payload.portfolioSimulation.fallback?.label, payload.portfolioSimulation.error?.message)
-  const insightsNotice = blockNotice(payload.insights.blockState, payload.insights.fallback?.label, payload.insights.error?.message)
-  const topAxis = payload.committee.axes.find((axis) => typeof axis.score === 'number') ?? payload.committee.axes[0]
-  const topInsights = payload.insights.items.slice(0, 4)
-  const generatedAt = formatGeneratedAt(payload.metadata.generatedAt)
+  const strength = buildStrength(payload)
+  const scenarios = buildScenarioViews(payload)
+  const upside = deriveUpside(payload.strategy.currentPriceText, payload.strategy.targetPriceText)
+  const evidenceCount = payload.metadata.sourceRefs.length || payload.insights.items.length
+  const summary = payload.hero.blockState === 'ok'
+    ? payload.hero.body
+    : payload.hero.fallback?.label || payload.hero.error?.message || `${name} 분석 결과를 일부만 표시하고 있어요.`
+  const facts = [
+    ['현재가', payload.strategy.currentPriceText || '확인 중'],
+    ['목표가', payload.strategy.targetPriceText || '확인 중'],
+    ['상승 여력', upside === null ? '확인 중' : formatPercent(upside)],
+    ['근거', evidenceCount > 0 ? `${evidenceCount}개` : payload.insights.summaryTags[0] ?? '확인 중'],
+  ]
 
   return (
-    <section className='space-y-3 pb-2' aria-label='딥스캔 인라인 결과'>
-      <article className='overflow-hidden rounded-[30px] border border-[#d9e9f7] bg-white shadow-[0_18px_40px_rgba(24,95,165,0.12)]'>
-        <div className='bg-[linear-gradient(135deg,#10304f,#185fa5)] px-4 py-4 text-white'>
-          <div className='flex items-center justify-between gap-3'>
-            <span className='inline-flex items-center gap-1.5 rounded-full bg-white/12 px-3 py-1 text-[11px] font-black text-[#d7edff]'>
-              <CheckCircle2 className='size-3.5' aria-hidden />
-              실제 결과 도착
-            </span>
-            <span className='text-[10px] font-bold text-[#bdd9f4]'>{generatedAt}</span>
-          </div>
-          <h2 className='mt-4 text-[24px] font-black leading-tight tracking-[-0.05em]'>{payload.hero.headline}</h2>
-          <p className='mt-2 text-[13px] leading-6 text-[#d9e9f8]'>{payload.hero.body}</p>
-        </div>
-        <div className='grid grid-cols-[104px_1fr] gap-3 p-4'>
-          <div className='grid place-items-center rounded-[26px] bg-[#edf6ff] p-3 text-center'>
-            <span className='text-[11px] font-black text-[#185fa5]'>{payload.hero.scoreLabel}</span>
-            <strong className='mt-1 text-[34px] font-black leading-none tracking-[-0.06em] text-[#102f4e]'>{payload.hero.score}</strong>
-            <span className='mt-1 text-[10px] font-bold text-[#7b8a98]'>{payload.hero.scoreDelta}</span>
-          </div>
-          <div className='min-w-0 rounded-[24px] border border-[#edf1f5] bg-[#fbfdff] p-3'>
-            <p className='text-[11px] font-black text-[#7b8a98]'>{name}{identifier ? ` · ${identifier}` : ''}</p>
-            <p className='mt-2 text-sm font-black leading-5 text-[#17202a]'>{payload.hero.statusText}</p>
-            {heroNotice ? <p className='mt-2 text-xs leading-5 text-[#b66a00]'>{heroNotice}</p> : null}
-          </div>
-        </div>
-      </article>
-
-      <article className='rounded-[28px] border border-white bg-white/95 p-4 shadow-[0_14px_34px_rgba(24,95,165,0.10)]' aria-label='핵심 지표'>
-        <div className='flex items-center justify-between'>
-          <h3 className='text-[15px] font-black tracking-[-0.03em] text-[#17202a]'>결과 핵심 지표</h3>
-          <span className='rounded-full bg-[#eef6ff] px-2.5 py-1 text-[10px] font-black text-[#185fa5]'>{blockLabel(payload.strategy.blockState)}</span>
-        </div>
-        <div className='mt-3 grid grid-cols-2 gap-2'>
-          {[
-            ['현재가', payload.strategy.currentPriceText],
-            ['목표가', payload.strategy.targetPriceText],
-            ['주간 신호', payload.strategy.weekSignal],
-            ['시나리오 확률', payload.strategy.scenarioProbability],
-          ].map(([label, value]) => (
-            <div key={label} className='rounded-[20px] border border-[#edf1f5] bg-[#fbfdff] p-3'>
-              <p className='text-[10px] font-black text-[#8793a0]'>{label}</p>
-              <p className='mt-1 text-[14px] font-black leading-5 text-[#17202a]'>{value || '표시할 데이터 없음'}</p>
-            </div>
-          ))}
-        </div>
-        {strategyNotice ? <Notice>{strategyNotice}</Notice> : null}
-      </article>
-
-      <article className='rounded-[28px] border border-white bg-white/95 p-4 shadow-[0_14px_34px_rgba(24,95,165,0.10)]' aria-label='판단 시나리오'>
-        <SectionTitle icon={Target} label='판단 시나리오' />
-        <div className='mt-3 rounded-[24px] bg-[#f3f8fd] p-3'>
-          <div className='flex items-start justify-between gap-3'>
-            <div>
-              <p className='text-[16px] font-black tracking-[-0.03em] text-[#17202a]'>{payload.strategy.scenarioLabel}</p>
-              <p className='mt-1 text-xs leading-5 text-[#657484]'>{payload.strategy.scenarioCondition}</p>
-            </div>
-            <strong className='rounded-2xl bg-white px-3 py-2 text-[15px] font-black text-[#185fa5]'>{payload.strategy.scenarioProbability}</strong>
-          </div>
-          {payload.strategy.scenarioPeriod ? <p className='mt-2 text-[11px] font-bold text-[#7b8a98]'>관찰 기간: {payload.strategy.scenarioPeriod}</p> : null}
-        </div>
-        {payload.strategy.scenarioDetails.length ? (
-          <ul className='mt-3 space-y-2'>
-            {payload.strategy.scenarioDetails.map((detail) => <li key={detail} className='rounded-2xl border border-[#edf1f5] bg-white px-3 py-2 text-xs leading-5 text-[#344150]'>{detail}</li>)}
-          </ul>
-        ) : null}
-        {payload.strategy.otherScenarios.length ? (
-          <div className='mt-3 grid gap-2'>
-            {payload.strategy.otherScenarios.map((scenario) => (
-              <div key={`${scenario.label}-${scenario.probability}`} className='flex items-start justify-between gap-3 rounded-2xl bg-[#fbfdff] px-3 py-2 text-xs'>
-                <div>
-                  <p className='font-black text-[#17202a]'>{scenario.label}</p>
-                  <p className='mt-1 leading-5 text-[#657484]'>{scenario.condition}</p>
+    <section className='space-y-3 pb-2' aria-label='딥스캔 v7 실제 결과'>
+      <div className='px-2 pt-1 text-[11px] font-semibold tracking-[0.08em] text-[#97A0AE]'>AI 팀 브리핑</div>
+      <div className='space-y-3'>
+        {TEAM_DEFINITIONS.map((team) => {
+          const teamSummary = buildTeamSummary(payload, team)
+          return (
+            <article key={team.key} className='rounded-[16px] border border-[#E8EAEE] bg-white px-4 py-4 shadow-[0_1px_3px_rgba(0,0,0,.04)]'>
+              <div className='flex items-start gap-3'>
+                <div className='flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[#F5F6F8] text-[16px]' aria-hidden='true'>{team.icon}</div>
+                <div className='min-w-0 flex-1'>
+                  <div className='flex items-start justify-between gap-2'>
+                    <div className='min-w-0'>
+                      <h3 className='truncate text-[13px] font-bold text-[#0F1419]'>{team.name}</h3>
+                      <p className='mt-0.5 truncate text-[10px] text-[#97A0AE]'>{team.description}</p>
+                    </div>
+                    <span className={cn('shrink-0 rounded-[6px] px-2 py-1 text-[10px] font-bold', teamSummary.warning ? 'bg-[#FCEBEB] text-[#A32D2D]' : 'bg-[#E5F3EB] text-[#1A7340]')}>{teamSummary.status}</span>
+                  </div>
+                  <p className='mt-3 text-[13px] leading-6 text-[#0F1419]'>{teamSummary.body}</p>
+                  <div className='mt-3 flex flex-wrap gap-1.5'>
+                    {teamSummary.tags.map((tag) => (
+                      <span key={`${team.key}-${tag}`} className={cn('rounded-[6px] px-2 py-1 text-[10px] font-semibold', teamSummary.warning ? 'bg-[#FCEBEB] text-[#A32D2D]' : 'bg-[#E5F3EB] text-[#1A7340]')}>{tag}</span>
+                    ))}
+                  </div>
                 </div>
-                <span className='shrink-0 font-black text-[#185fa5]'>{scenario.probability}</span>
               </div>
-            ))}
-          </div>
-        ) : null}
-      </article>
+            </article>
+          )
+        })}
+      </div>
 
-      <article className='rounded-[28px] border border-white bg-white/95 p-4 shadow-[0_14px_34px_rgba(24,95,165,0.10)]' aria-label='위원회 요약'>
-        <SectionTitle icon={Gauge} label='AI 위원회 요약' trailing={payload.metadata.llmCommittee ? `${payload.metadata.llmCommittee.completed}명 완료` : undefined} />
-        {committeeNotice ? <Notice>{committeeNotice}</Notice> : null}
-        {topAxis ? (
-          <div className='mt-3 rounded-[24px] border border-[#edf1f5] bg-[#fbfdff] p-3'>
-            <div className='flex items-center justify-between gap-3'>
-              <div>
-                <p className='text-[15px] font-black text-[#17202a]'>{topAxis.label}</p>
-                <p className='mt-1 text-xs text-[#657484]'>{topAxis.subtitle}</p>
-              </div>
-              <strong className='text-[22px] font-black text-[#185fa5]'>{topAxis.scoreText}</strong>
-            </div>
-            <p className='mt-2 text-xs font-bold text-[#7b8a98]'>{topAxis.axisStatusText}</p>
+      <article className='overflow-hidden rounded-[16px] border border-[#E8EAEE] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]' aria-label='AI 종합 결론'>
+        <div className='flex items-center gap-3 border-b border-[#EFF1F4] px-4 py-4'>
+          <div className='flex size-9 items-center justify-center rounded-[10px] bg-[#0F1419] text-[12px] font-black text-white'>AI</div>
+          <div><div className='text-[10px] text-[#97A0AE]'>종합 결론</div><h2 className='text-[14px] font-bold text-[#0F1419]'>세 팀의 의견을 모았어요</h2></div>
+        </div>
+        <div className='px-4 py-5 text-center'>
+          <div className={cn('text-[28px] font-black leading-none', strength.active <= 1 ? 'text-[#E5484D]' : 'text-[#1A9D55]')}>{strength.label}</div>
+          <div className='mx-auto mt-3 flex w-[122px] gap-1'>{Array.from({ length: 5 }, (_, index) => <span key={index} className={cn('h-[6px] flex-1 rounded-full', index < strength.active ? 'bg-[#1A9D55]' : 'bg-[#E8EAEE]')} />)}</div>
+          <p className='mt-2 text-[11px] text-[#5A6473]'>{strength.helper}</p>
+        </div>
+        <p className='border-t border-[#EFF1F4] px-4 py-4 text-[13px] leading-6 text-[#0F1419]'>{summary}</p>
+        <div className='border-t border-[#EFF1F4] px-4 py-4'>
+          <div className='mb-3 text-[10px] text-[#97A0AE]'>추천 행동</div>
+          <div className='space-y-3'>
+            {scenarios.map((scenario) => {
+              const tone = toneClasses(scenario.tone)
+              return (
+                <div key={`${scenario.label}-${scenario.probability}`}>
+                  <div className='mb-1 flex items-center gap-2 text-[13px]'>
+                    <span className={cn('size-2 rounded-full', tone.dot)} />
+                    <span className={cn('font-bold', scenario.recommended ? 'text-[#0F1419]' : 'text-[#5A6473]')}>{scenario.label}</span>
+                    {scenario.recommended ? <span className='rounded-[4px] bg-[#0F1419] px-1.5 py-0.5 text-[9px] font-bold text-white'>추천</span> : null}
+                    <span className='ml-auto font-bold text-[#5A6473]'>{scenario.probability || '--'}</span>
+                  </div>
+                  <div className='h-[5px] overflow-hidden rounded-full bg-[#EFF1F4]'><div className={cn('h-full rounded-full', tone.bar)} style={{ width: scenarioWidth(scenario) }} /></div>
+                  <div className={cn('mt-1 text-[10px]', scenario.tone === 'red' ? tone.text : 'text-[#97A0AE]')}>{scenario.condition}</div>
+                </div>
+              )
+            })}
           </div>
-        ) : null}
-        <div className='mt-3 grid gap-2'>
-          {payload.committee.axes.slice(0, 3).map((axis) => (
-            <div key={axis.label} className='rounded-2xl bg-[#f7fafc] px-3 py-2'>
-              <div className='flex justify-between gap-3 text-xs font-black text-[#17202a]'>
-                <span>{axis.label}</span>
-                <span>{axis.scoreText}</span>
-              </div>
-              <p className='mt-1 text-[11px] leading-4 text-[#657484]'>{axis.avgLabel}</p>
+        </div>
+        <div className='grid grid-cols-2 border-t border-[#EFF1F4]'>
+          {facts.map(([label, value]) => (
+            <div key={label} className='border-b border-r border-[#EFF1F4] px-4 py-3 last:border-r-0 [&:nth-child(2n)]:border-r-0 [&:nth-last-child(-n+2)]:border-b-0'>
+              <div className='text-[10px] text-[#97A0AE]'>{label}</div>
+              <div className={cn('mt-1 text-[14px] font-bold text-[#0F1419]', label === '상승 여력' && upside !== null && upside > 0 ? 'text-[#1A9D55]' : undefined)}>{value}</div>
             </div>
           ))}
         </div>
       </article>
-
-      <article className='rounded-[28px] border border-white bg-white/95 p-4 shadow-[0_14px_34px_rgba(24,95,165,0.10)]' aria-label='매도 및 포트폴리오 참고'>
-        <SectionTitle icon={BarChart3} label='행동 참고' />
-        {sellNotice ? <Notice>{sellNotice}</Notice> : null}
-        {portfolioNotice ? <Notice>{portfolioNotice}</Notice> : null}
-        <p className='mt-3 rounded-[24px] bg-[#fff8ed] p-3 text-sm font-black leading-6 text-[#8a5400]'>{payload.sellNow.realizedText || '즉시 매도 참고 데이터가 제공되지 않았습니다.'}</p>
-        {payload.sellNow.rows.length ? (
-          <div className='mt-3 grid gap-2'>
-            {payload.sellNow.rows.map((row) => (
-              <div key={`${row.label}-${row.value}`} className='flex items-center justify-between gap-3 rounded-2xl border border-[#edf1f5] bg-white px-3 py-2'>
-                <span className='text-xs font-bold text-[#657484]'>{row.label}</span>
-                <span className={cn('text-sm font-black', row.valueTone === 'danger' ? 'text-[#d64141]' : 'text-[#17202a]')}>{row.value}</span>
-              </div>
-            ))}
-          </div>
-        ) : null}
-        <div className='mt-3 grid grid-cols-3 gap-2 rounded-[24px] bg-[#f3f8fd] p-3 text-center'>
-          <Metric label='현재' value={String(payload.portfolioSimulation.beforeScore)} />
-          <Metric label='조정 후' value={String(payload.portfolioSimulation.afterScore)} />
-          <Metric label='변화' value={payload.portfolioSimulation.deltaLabel} />
-        </div>
-        {payload.portfolioSimulation.caption ? <p className='mt-2 text-[11px] leading-5 text-[#657484]'>{payload.portfolioSimulation.caption}</p> : null}
-      </article>
-
-      <article className='rounded-[28px] border border-white bg-white/95 p-4 shadow-[0_14px_34px_rgba(24,95,165,0.10)]' aria-label='근거와 출처'>
-        <SectionTitle icon={FileText} label={payload.insights.sectionLabel || '근거와 출처'} trailing={payload.insights.summaryTags.join(' · ')} />
-        {insightsNotice ? <Notice>{insightsNotice}</Notice> : null}
-        <div className='mt-3 space-y-2'>
-          {topInsights.length ? topInsights.map((item) => (
-            <details key={`${item.sourceLabel}-${item.title}`} className='rounded-2xl border border-[#edf1f5] bg-[#fbfdff] px-3 py-2'>
-              <summary className='cursor-pointer text-xs font-black text-[#17202a]'>{item.label} · {item.title}</summary>
-              <p className='mt-2 text-xs leading-5 text-[#657484]'>{item.body}</p>
-              <p className='mt-2 text-[10px] font-bold text-[#8a96a3]'>{item.sourceLabel} · {item.date}</p>
-            </details>
-          )) : <p className='rounded-2xl bg-[#f7fafc] px-3 py-3 text-xs text-[#657484]'>표시할 근거 항목이 없습니다.</p>}
-        </div>
-      </article>
-
-      <p className='px-2 pb-2 text-center text-[10px] leading-4 text-[#8a96a3]'>DeepScan은 데이터 분석 기반 참고 자료이며, 투자 권유나 수익 보장이 아닙니다.</p>
+      <p className='px-2 pb-2 text-center text-[10px] leading-4 text-[#97A0AE]'>AI 분석은 데이터 기반 참고 자료예요. 투자 권유나 수익 보장이 아닙니다.</p>
     </section>
-  )
-}
-
-function SectionTitle({ icon: Icon, label, trailing }: { icon: LucideIcon; label: string; trailing?: string }) {
-  return (
-    <div className='flex items-center justify-between gap-3'>
-      <div className='flex items-center gap-2'>
-        <span className='grid size-8 place-items-center rounded-2xl bg-[#eef6ff] text-[#185fa5]'><Icon className='size-4' aria-hidden /></span>
-        <h3 className='text-[15px] font-black tracking-[-0.03em] text-[#17202a]'>{label}</h3>
-      </div>
-      {trailing ? <span className='max-w-[42%] truncate rounded-full bg-[#f3f6f9] px-2.5 py-1 text-[10px] font-black text-[#657484]'>{trailing}</span> : null}
-    </div>
-  )
-}
-
-function Notice({ children }: { children: string }) {
-  return (
-    <p className='mt-3 flex gap-2 rounded-2xl bg-[#fff8ed] px-3 py-2 text-xs leading-5 text-[#8a5400]'>
-      <AlertTriangle className='mt-0.5 size-3.5 shrink-0' aria-hidden />
-      <span>{children}</span>
-    </p>
-  )
-}
-
-function Metric({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <p className='text-[10px] font-black text-[#7b8a98]'>{label}</p>
-      <p className='mt-1 text-sm font-black text-[#17202a]'>{value}</p>
-    </div>
   )
 }

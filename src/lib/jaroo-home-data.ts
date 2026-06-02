@@ -1,6 +1,6 @@
 import { buildDeepScanTargetSession, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding, type DeepScanTargetSession } from '@/lib/deepscan-target'
 import { buildIdentifierLabel, type PortfolioNormalizedItem, type WorkflowAsyncStatus } from '@/lib/workflow-types'
-import { normalizeStockName, parseOcrNumber, type OcrRow } from '@/lib/screenshot-ocr'
+import { normalizeStockName, parseOcrNumber, parseOcrProfitRate, type OcrRow } from '@/lib/screenshot-ocr'
 
 export type HomeBadgeTone = 'amber' | 'red' | 'green'
 export type HomeCardTone = 'danger' | 'warning' | 'halt' | 'profit' | 'etf'
@@ -126,6 +126,8 @@ export type AppliedHomePortfolioRow = Pick<
   OcrRow,
   | 'name'
   | 'quantity'
+  | 'profitRate'
+  | 'evaluationAmount'
   | 'averagePrice'
   | 'resolvedName'
   | 'resolvedCode'
@@ -172,7 +174,7 @@ export const homeHoldings: HomeHolding[] = [
     heatmapChange: '-23.4%',
     heatmapBadge: '긴급 점검',
     heatmapBadgeTone: 'red',
-    opinionLabel: 'AI 간략 의견',
+    opinionLabel: '간략 의견',
     opinionText: '이중 바닥 반등 시도 중. 외국인 순매도 부담이나 HBM 기대감 존재. 딥스캔으로 회복 시나리오를 확인하세요.',
     opinionBackground: '#f8f8f6',
     opinionBorder: 'transparent',
@@ -184,8 +186,8 @@ export const homeHoldings: HomeHolding[] = [
       { label: '추가 하락', value: '보통', tone: 'warning' },
     ],
     actionLabel: '딥스캔',
-    actionSubLabel: 'AI 9인 위원회 분석',
-    actionCredits: '300cr',
+    actionSubLabel: '세 팀이 분석해요',
+    actionCredits: undefined,
     actionHref: '/deepscan',
   },
   {
@@ -217,7 +219,7 @@ export const homeHoldings: HomeHolding[] = [
     heatmapChange: '-14.3%',
     heatmapBadge: '관찰 중',
     heatmapBadgeTone: 'amber',
-    opinionLabel: 'AI 간략 의견',
+    opinionLabel: '간략 의견',
     opinionText: '지지선 근처 횡보 중. 단기 변동성 주의. 회복 확률 확인 후 전략을 세워보세요.',
     opinionBackground: '#f8f8f6',
     opinionBorder: 'transparent',
@@ -229,8 +231,8 @@ export const homeHoldings: HomeHolding[] = [
       { label: '추가 하락', value: '보통', tone: 'warning' },
     ],
     actionLabel: '딥스캔',
-    actionSubLabel: 'AI 9인 위원회 분석',
-    actionCredits: '300cr',
+    actionSubLabel: '세 팀이 분석해요',
+    actionCredits: undefined,
     actionHref: null,
   },
   {
@@ -273,7 +275,7 @@ export const homeHoldings: HomeHolding[] = [
       { label: '상폐 위험', value: '확인필요', tone: 'danger' },
     ],
     actionLabel: 'DART 딥스캔',
-    actionCredits: '300cr',
+    actionCredits: undefined,
     actionHref: null,
   },
   {
@@ -315,8 +317,8 @@ export const homeHoldings: HomeHolding[] = [
       { label: '매도 전략', value: '잠금', tone: 'locked' },
     ],
     actionLabel: '딥스캔',
-    actionSubLabel: 'AI 9인 위원회 분석',
-    actionCredits: '300cr',
+    actionSubLabel: '세 팀이 분석해요',
+    actionCredits: undefined,
     actionHref: null,
   },
   {
@@ -360,7 +362,7 @@ export const homeHoldings: HomeHolding[] = [
     ],
     actionLabel: 'ETF 분석',
     actionSubLabel: '섹터 구성 + 회복 시나리오',
-    actionCredits: '300cr',
+    actionCredits: undefined,
     actionHref: '/etf',
   },
 ]
@@ -514,7 +516,7 @@ function formatMarketScoreUpdatedLabel(status: WorkflowAsyncStatus | undefined, 
   }
 
   if (status === 'loading') {
-    return '갱신 중'
+    return '불러오는 중'
   }
 
   if (status === 'success') {
@@ -881,6 +883,8 @@ function sanitizeAppliedHomePortfolioRows(input: unknown): AppliedHomePortfolioR
       return {
         name: readTrimmedString(item.name) ?? '',
         quantity: readTrimmedString(item.quantity) ?? '',
+        profitRate: readTrimmedString(item.profitRate) ?? '',
+        evaluationAmount: readTrimmedString(item.evaluationAmount) ?? '',
         averagePrice: readTrimmedString(item.averagePrice) ?? '',
         averagePriceCurrency,
         currentPrice,
@@ -1252,9 +1256,15 @@ function formatAveragePriceFromPortfolioItem(item: PortfolioNormalizedItem) {
 }
 
 function buildAppliedRowFromPortfolioItem(item: PortfolioNormalizedItem): AppliedHomePortfolioRow {
+  const evaluationAmount = typeof item.evaluationAmount === 'number'
+    ? formatCurrencyValue(String(item.evaluationAmount), item.currentPriceCurrency ?? item.averagePriceCurrency ?? (item.marketTone === 'nasdaq' ? 'USD' : 'KRW'))
+    : ''
+
   return {
     name: item.name,
     quantity: `${item.quantity}주`,
+    profitRate: typeof item.currentProfitRate === 'number' ? `${item.currentProfitRate.toFixed(1)}%` : '',
+    evaluationAmount,
     averagePrice: formatAveragePriceFromPortfolioItem(item),
     averagePriceCurrency: item.averagePriceCurrency,
     currentPrice: item.currentPrice,
@@ -1309,9 +1319,10 @@ export function buildPortfolioItemsFromAppliedHomePortfolioRows(rows: AppliedHom
         averagePriceCurrency: row.averagePriceCurrency
           ?? inferCurrencyFromMoneyText(row.averagePrice)
           ?? (marketTone === 'nasdaq' ? undefined : 'KRW'),
+        evaluationAmount: parseOcrNumber(row.evaluationAmount ?? '') ?? undefined,
         currentPrice: row.currentPrice,
         currentPriceCurrency: row.currentPriceCurrency,
-        currentProfitRate: row.currentProfitRate,
+        currentProfitRate: row.currentProfitRate ?? parseOcrProfitRate(row.profitRate ?? '') ?? undefined,
         identifierLabel: buildIdentifierLabel(ticker, code),
       }
     })
@@ -1334,10 +1345,22 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
       ?? inferCurrencyFromMoneyText(row.averagePrice)
       ?? (marketTone === 'nasdaq' ? undefined : 'KRW')
     const averagePriceRaw = row.averagePrice
-    const currentPriceCurrency = row.currentPriceCurrency ?? (marketTone === 'nasdaq' ? 'USD' : 'KRW')
-    const currentPriceText = typeof row.currentPrice === 'number'
-      ? formatCurrencyValue(String(row.currentPrice), currentPriceCurrency)
+    const evaluationAmountCurrency = inferCurrencyFromMoneyText(row.evaluationAmount)
+    const currentPriceCurrency = row.currentPriceCurrency
+      ?? evaluationAmountCurrency
+      ?? displayCurrency
+      ?? (marketTone === 'nasdaq' ? 'USD' : 'KRW')
+    const quantityValue = parseOcrNumber(row.quantity)
+    const evaluationAmountRawValue = parseOcrNumber(row.evaluationAmount ?? '')
+    const inferredCurrentPrice = typeof row.currentPrice === 'number'
+      ? row.currentPrice
+      : quantityValue !== null && quantityValue > 0 && evaluationAmountRawValue !== null
+        ? evaluationAmountRawValue / quantityValue
+        : undefined
+    const currentPriceText = typeof inferredCurrentPrice === 'number'
+      ? formatCurrencyValue(String(inferredCurrentPrice), currentPriceCurrency)
       : undefined
+    const currentProfitRate = row.currentProfitRate ?? parseOcrProfitRate(row.profitRate ?? '') ?? null
 
     return {
       row,
@@ -1348,6 +1371,9 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
       averagePriceCurrency: displayCurrency,
       averagePrice: formatCurrencyValue(averagePriceRaw, displayCurrency),
       currentPriceText,
+      currentPriceValue: inferredCurrentPrice,
+      currentProfitRate,
+      evaluationAmountRawValue,
       baseAmountValue: computeHoldingBaseAmount(row.quantity, averagePriceRaw),
     }
   })
@@ -1355,10 +1381,10 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
   const weights = preparedRows.map((item) => item.baseAmountValue ?? 1)
   const totalWeight = weights.reduce((sum, value) => sum + value, 0) || sanitizedRows.length
 
-  return preparedRows.map(({ row, kind, displayName, market, marketTone, averagePriceCurrency, averagePrice, currentPriceText, baseAmountValue }, index) => {
-    const tone = deriveHoldingTone(row.currentProfitRate ?? null)
+  return preparedRows.map(({ row, kind, displayName, market, marketTone, averagePriceCurrency, averagePrice, currentPriceText, currentPriceValue, currentProfitRate, evaluationAmountRawValue, baseAmountValue }, index) => {
+    const tone = deriveHoldingTone(currentProfitRate)
     const shares = formatQuantityValue(row.quantity)
-    const change = formatPercentValue(row.currentProfitRate ?? null)
+    const change = formatPercentValue(currentProfitRate)
     const placeholderCurrency = averagePriceCurrency ?? (marketTone === 'nasdaq' ? 'USD' : 'KRW')
     const donutPercent = weights[index] / totalWeight
     const identifierTicker = row.resolvedTicker?.trim() || row.ticker || undefined
@@ -1366,12 +1392,12 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
     const identifierLabel = buildHoldingIdentifierLabel(identifierTicker, identifierCode)
     const resolvedCode = identifierCode || identifierTicker
     const quantityValue = parseOcrNumber(row.quantity)
-    const evaluationAmount = typeof row.currentPrice === 'number' && quantityValue !== null
-      ? formatCurrencyValue(String(quantityValue * row.currentPrice), row.currentPriceCurrency ?? placeholderCurrency)
+    const evaluationAmountValue = typeof currentPriceValue === 'number' && quantityValue !== null
+      ? quantityValue * currentPriceValue
+      : evaluationAmountRawValue
+    const evaluationAmount = evaluationAmountValue !== null && typeof evaluationAmountValue === 'number'
+      ? formatCurrencyValue(String(evaluationAmountValue), row.currentPriceCurrency ?? placeholderCurrency)
       : undefined
-    const evaluationAmountValue = typeof row.currentPrice === 'number' && quantityValue !== null
-      ? quantityValue * row.currentPrice
-      : null
     const pnl = formatSignedCurrencyValue(
       evaluationAmountValue !== null && baseAmountValue !== null ? evaluationAmountValue - baseAmountValue : null,
       row.currentPriceCurrency ?? placeholderCurrency,
@@ -1413,7 +1439,7 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
       heatmapBadge: tone.badge,
       heatmapBadgeTone: tone.badgeTone,
       blink: tone.cardTone === 'danger' && kind !== 'etf',
-      opinionLabel: kind === 'etf' ? 'OCR 요약' : 'AI 간략 의견',
+      opinionLabel: kind === 'etf' ? '보유 요약' : '간략 의견',
       opinionText: buildOpinionText(displayName, kind, null),
       opinionBackground: kind === 'etf' ? '#f0f7ff' : tone.cardTone === 'profit' ? '#F0FAF4' : tone.cardTone === 'danger' ? '#FFF0F0' : '#f8f8f6',
       opinionBorder: kind === 'etf' ? '#B5D4F4' : tone.cardTone === 'danger' ? '#F7C1C1' : 'transparent',
@@ -1426,8 +1452,8 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
         { label: '현재가', value: currentPriceText ?? '-', tone: 'neutral' },
       ],
       actionLabel: kind === 'etf' ? 'ETF 분석' : '딥스캔',
-      actionSubLabel: kind === 'etf' ? '섹터 구성 + 회복 시나리오' : 'AI 9인 위원회 분석',
-      actionCredits: '300cr',
+      actionSubLabel: kind === 'etf' ? '섹터 구성 + 회복 시나리오' : '세 팀이 분석해요',
+      actionCredits: undefined,
       actionHref: kind === 'etf' ? '/etf' : '/deepscan',
     }
   })

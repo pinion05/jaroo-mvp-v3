@@ -1665,6 +1665,7 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
 
 function buildStrategy(input, evidence, scored) {
   const decisionBand = scored.sellNow.decisionBand;
+  const hasExplicitRisk = evidence.topRisks.length > 0 || evidence.missingSources.length > 0;
   const currentPriceText = evidence.currentQuote
     ? formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency)
     : '현재가 근거 없음';
@@ -1691,11 +1692,11 @@ function buildStrategy(input, evidence, scored) {
         probability: `${Math.max(10, 100 - scored.hero.score)}%`,
         condition: evidence.topFacts[0] ?? '핵심 근거를 다시 확보합니다.',
       },
-      {
+      ...(hasExplicitRisk ? [{
         label: '리스크 재점검',
         probability: `${Math.max(10, evidence.missingSources.length * 10)}%`,
         condition: evidence.topRisks[0] ?? '추가 리스크를 다시 확인합니다.',
-      },
+      }] : []),
     ],
     otherScenarioTags: [getDecisionBandLabel(decisionBand), evidence.currentQuote ? '현재가 확인' : '현재가 없음'],
   };

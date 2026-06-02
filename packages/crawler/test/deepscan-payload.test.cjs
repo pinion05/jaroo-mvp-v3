@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { WISEREPORT_KR_V12_PAGES } = require('../src/crawlers/wisereport-kr/page-specs.cjs');
 
 process.env.DEEPSCAN_KR_LLM_ENABLE = 'false';
 
@@ -121,6 +122,36 @@ function createStrongKrSources() {
       reportContent: 'ok',
       marketScoreSnapshot: { totalScore: 80 },
       boardAnalysis: { boardOpinions: [] },
+    },
+  };
+}
+
+function createFullCoverageKrSources() {
+  const pages = Object.fromEntries(
+    WISEREPORT_KR_V12_PAGES.map((page) => [page.id, { status: 'ok', note: 'reached' }]),
+  );
+
+  return {
+    slim: {
+      schemaVersion: 'wisereport-kr-slim-v1.2',
+      code: '003720',
+      company: {
+        code: '003720',
+        name: '삼영화학공업',
+      },
+      pages,
+    },
+    quotes: {
+      items: [{
+        market: 'KR',
+        code: '003720',
+        price: 8880,
+        currency: 'KRW',
+        volume: 1326000,
+        asOf: '2026-06-02T14:31:18+09:00',
+        source: 'fixture',
+        status: 'ok',
+      }],
     },
   };
 }
@@ -285,6 +316,29 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
     assertBlockMeta(payload[key], 'ok');
     assert.equal(payload.metadata.blockStatus[key], 'ok');
   }
+});
+
+test('buildJarooDeepScanPayload omits risk-recheck scenario when KR coverage and core inputs are complete', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+
+  const payload = await buildJarooDeepScanPayload({
+    instrument: {
+      name: '삼영화학공업',
+      code: '003720',
+      market: 'KR',
+    },
+    holding: {
+      shares: '85',
+      averagePrice: '6958.3427',
+    },
+    selectedAt: '2026-06-02T14:31:18+09:00',
+    sources: createFullCoverageKrSources(),
+  });
+
+  assertCanonicalPayloadShape(payload);
+  assert.equal(payload.strategy.scenarioCondition, '추가 리스크 없음');
+  assert.equal(payload.strategy.otherScenarios.some((scenario) => scenario.label === '리스크 재점검'), false);
+  assert.equal(payload.strategy.otherScenarios.length, 1);
 });
 
 test('buildJarooDeepScanPayload separates source-provided missing target price from source lookup failure', async () => {

@@ -880,6 +880,27 @@ function hasSlimV12Value(value) {
   return Boolean(value);
 }
 
+function hasSlimV12PagePayload(value) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+  if (typeof value === 'string') {
+    return value.trim().length > 0 && !isNoDataText(value);
+  }
+  if (Array.isArray(value)) {
+    return value.some((item) => hasSlimV12PagePayload(item));
+  }
+  if (typeof value === 'object') {
+    const status = typeof value.status === 'string' ? value.status.trim().toLowerCase() : '';
+    if (['error', 'failed', 'blocked', 'missing', 'unavailable'].includes(status)) {
+      return false;
+    }
+
+    return Object.keys(value).length > 0;
+  }
+  return Boolean(value);
+}
+
 function makeSlimV12Source({ provider = 'wisereport', pageId = null, fieldPath = null, checkedSources = null } = {}) {
   return {
     provider,
@@ -1131,10 +1152,10 @@ function buildWiseReportKrSlimPayloadV12(rawAggregate, code) {
   const instrumentKind = inferWiseReportKrInstrumentKind(slimV11);
   const availableV12PageIds = WISEREPORT_KR_V12_PAGES
     .map((page) => page.id)
-    .filter((pageId) => hasSlimV12Value(slimV11.pages?.[pageId]));
+    .filter((pageId) => hasSlimV12PagePayload(slimV11.pages?.[pageId]));
   const missingV12PageIds = WISEREPORT_KR_V12_PAGES
     .map((page) => page.id)
-    .filter((pageId) => !hasSlimV12Value(slimV11.pages?.[pageId]));
+    .filter((pageId) => !hasSlimV12PagePayload(slimV11.pages?.[pageId]));
   const v12PageCoverage = {
     totalKnownPages: WISEREPORT_KR_V12_PAGES.length,
     availablePageIds: availableV12PageIds,

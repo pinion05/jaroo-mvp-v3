@@ -232,7 +232,7 @@ export function createPlaceholderDeepScanHolding(): HomeHolding {
     ],
     actionLabel: '딥스캔',
     actionSubLabel: '실제 종목 선택 필요',
-    actionCredits: '300cr',
+    actionCredits: undefined,
     actionHref: '/deepscan',
   }
 }
@@ -386,7 +386,7 @@ export function buildDeepScanViewModel(holding: HomeHolding): DeepScanViewModel 
       tone: pnlValue !== null && pnlValue < 0 ? 'danger' : 'positive',
       label: pnlValue !== null && pnlValue < 0 ? '손실' : '유지',
       title: `실현 기준 손익 ${holding.pnl}`,
-      body: `${holding.name} 포지션은 ${holding.market} 시장 기준으로 현재 전략 카드와 포트폴리오 점수 계산에 그대로 반영돼요.`,
+      body: `${holding.name} 포지션은 ${holding.market} 시장 기준으로 현재 전략 카드와 포트폴리오 변화 판단에 함께 반영돼요.`,
     },
   ]
 

@@ -59,7 +59,7 @@ export function buildMergeRowsFromReviewRows(rows: OcrReviewRow[]): MergeRow[] {
         ...mergeRow,
         status: 'error',
         errorCode: 'merge-upstream-review-incomplete',
-        errorMessage: '이 행은 OCR 검수에서 아직 확정되지 않았어요. /ocr 로 돌아가 다시 확인해주세요.',
+        errorMessage: '이 행은 종목 확인에서 아직 확정되지 않았어요. 다시 확인해주세요.',
       }
     }
 
@@ -68,7 +68,7 @@ export function buildMergeRowsFromReviewRows(rows: OcrReviewRow[]): MergeRow[] {
         ...mergeRow,
         status: 'error',
         errorCode: 'merge-normalization-failed',
-        errorMessage: '이 행은 홈 포트폴리오 형식으로 변환할 수 없어요. /ocr 로 돌아가 값을 다시 확인해주세요.',
+        errorMessage: '이 행은 홈 포트폴리오 형식으로 변환할 수 없어요. 값을 다시 확인해주세요.',
       }
     }
 
@@ -80,6 +80,8 @@ export function buildAppliedHomePortfolioRowsFromConfirmedHoldings(holdings: Con
   return holdings.map((holding) => ({
     name: holding.displayName,
     quantity: holding.quantityText,
+    profitRate: holding.profitRateText,
+    evaluationAmount: holding.evaluationAmountText,
     averagePrice: holding.averagePriceText,
     averagePriceCurrency: holding.averagePriceCurrency ?? (holding.marketTone === 'nasdaq' ? 'USD' : 'KRW'),
     code: holding.code,

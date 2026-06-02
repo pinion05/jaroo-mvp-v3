@@ -173,6 +173,31 @@ function hasEvidence(value) {
   return Boolean(value);
 }
 
+function hasPagePayload(value) {
+  if (value === null || value === undefined) {
+    return false;
+  }
+
+  if (typeof value === 'string') {
+    return Boolean(normalizeEvidenceText(value));
+  }
+
+  if (Array.isArray(value)) {
+    return value.some((item) => hasPagePayload(item));
+  }
+
+  if (typeof value === 'object') {
+    const status = normalizeText(value.status ?? value.dataAvailability?.status)?.toLowerCase();
+    if (['error', 'failed', 'blocked', 'missing', 'unavailable'].includes(status)) {
+      return false;
+    }
+
+    return Object.keys(value).length > 0;
+  }
+
+  return Boolean(value);
+}
+
 function resolveKnownPageIds(slimSource, slimPages) {
   const schemaVersion = normalizeText(slimSource?.schemaVersion);
   const declaredTotalPages = slimSource?.sourceCoverage?.pageCoverage?.totalKnownPages;
@@ -1269,8 +1294,8 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
   const businessCommentary = extractBusinessCommentary(slimPages['company-status']);
 
   const knownPageIds = resolveKnownPageIds(safeSources.slim, slimPages);
-  const availablePageIds = knownPageIds.filter((pageId) => hasEvidence(slimPages[pageId]));
-  const missingPageIds = knownPageIds.filter((pageId) => !hasEvidence(slimPages[pageId]));
+  const availablePageIds = knownPageIds.filter((pageId) => hasPagePayload(slimPages[pageId]));
+  const missingPageIds = knownPageIds.filter((pageId) => !hasPagePayload(slimPages[pageId]));
   const hasConsensusPage = Object.prototype.hasOwnProperty.call(slimPages, 'consensus');
   const hasOpinionPage = Object.prototype.hasOwnProperty.call(slimPages, 'opinion');
   const pageCoverage = {

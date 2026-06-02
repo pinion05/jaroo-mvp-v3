@@ -1,15 +1,17 @@
 'use client'
 
-import { useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useRef, useState, type ChangeEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   MAX_SCREENSHOT_UPLOADS,
   persistScreenshotUploadSession,
 } from '@/lib/screenshot-ocr'
+import { readAppliedHomePortfolio } from '@/lib/jaroo-home-data'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
 import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
 import { useOcrUploadStore } from '@/lib/stores/use-ocr-upload-store'
+import { usePortfolioStore } from '@/lib/stores/use-portfolio-store'
 
 const MAX_TOTAL_IMAGE_DATA_URL_LENGTH = 4_000_000
 const PERSISTED_SCREENSHOT_BROKER = '기타'
@@ -148,6 +150,7 @@ function LoadingPanel() {
 export default function ScreenshotPage() {
   const router = useRouter()
   const setUploadInput = useOcrUploadStore((state) => state.setInput)
+  const portfolioItemCount = usePortfolioStore((state) => state.items.length)
   const clearReviewState = useOcrReviewStore((state) => state.resetForRestart)
   const clearMergeState = useMergeStore((state) => state.resetForBackNav)
   const clearDeepScanState = useDeepScanStore((state) => state.clear)
@@ -157,7 +160,16 @@ export default function ScreenshotPage() {
   const cameraInputRef = useRef<HTMLInputElement>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
-  const isFirstPortfolio = false
+  const [hasAppliedPortfolio, setHasAppliedPortfolio] = useState(false)
+  const isFirstPortfolio = portfolioItemCount === 0 && !hasAppliedPortfolio
+
+  useEffect(() => {
+    const syncAppliedPortfolio = window.setTimeout(() => {
+      setHasAppliedPortfolio(Boolean(readAppliedHomePortfolio()?.rows.length))
+    }, 0)
+
+    return () => window.clearTimeout(syncAppliedPortfolio)
+  }, [])
 
   const handleBack = () => {
     if (window.history.length > 1) {
