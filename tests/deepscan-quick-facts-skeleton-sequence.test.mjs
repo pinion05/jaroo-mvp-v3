@@ -16,6 +16,12 @@ function literalPattern(value) {
   return new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
 }
 
+function parseNumericConst(source, name) {
+  const match = source.match(new RegExp(`const ${name}\\s*=\\s*([0-9_]+)`))
+  assert.ok(match, `missing ${name}`)
+  return Number(match[1].replaceAll('_', ''))
+}
+
 const obsoleteSummaryField = ['three', 'Lens', 'Summary'].join('')
 const obsoleteServiceName = ['three', '-', 'lens'].join('')
 const obsoleteKoreanLens = ['3', '렌즈'].join('')
@@ -81,8 +87,8 @@ test('DeepScan loading sequencing is success-gated and no longer bypasses on raw
   assert.doesNotMatch(loadingSource, /elapsedSeconds >= card\.revealAt/)
   assert.doesNotMatch(loadingSource, /if \(resultsReady\) \{\s*return cards\s*\}/u)
 
-  assert.match(pageSource, /DEEPSCAN_STAGE_WAIT_MS\s*=\s*10_000/)
-  assert.match(pageSource, /DEEPSCAN_STAGE_FILL_DELAY_MS\s*=\s*3_000/)
+  assert.match(pageSource, /DEEPSCAN_STAGE_WAIT_MS\s*=\s*14_000/)
+  assert.match(pageSource, /DEEPSCAN_STAGE_FILL_DELAY_MS\s*=\s*5_000/)
   assert.match(pageSource, /markDeepScanLoadingSuccess/)
   assert.match(pageSource, /previous\.visibleStageCount === 1\s*\?\s*\{ \.\.\.previous, visibleStageCount: 2 \}/)
   assert.match(pageSource, /previous\.visibleStageCount === 2\s*\?\s*\{ \.\.\.previous, visibleStageCount: 3 \}/)
@@ -97,6 +103,19 @@ test('DeepScan loading sequencing is success-gated and no longer bypasses on raw
   assert.match(pageSource, /inlineResults=\{resultsReady && payload \? <DeepScanInlineResults/)
   assert.doesNotMatch(pageSource, /inlineResults=\{rawResultsReady && payload/)
   assert.doesNotMatch(pageSource, /firstSuccessObserved: true,\s*visibleStageCount: 2/u)
+})
+
+
+test('DeepScan slower dwell cadence spaces committee skeleton reveals instead of snapping through', () => {
+  const pageSource = readRepoFile('src', 'app', 'deepscan', 'page.tsx')
+  const stageWaitMs = parseNumericConst(pageSource, 'DEEPSCAN_STAGE_WAIT_MS')
+  const fillDelayMs = parseNumericConst(pageSource, 'DEEPSCAN_STAGE_FILL_DELAY_MS')
+
+  assert.equal(stageWaitMs, 14_000)
+  assert.equal(fillDelayMs, 5_000)
+  assert.ok(stageWaitMs >= 14_000, 'team stage progression should dwell for at least 14 seconds')
+  assert.ok(fillDelayMs >= 5_000, 'arrived team card fill should not pop in immediately')
+  assert.equal(stageWaitMs * 3, 42_000)
 })
 
 test('DeepScan loading screen only fetches internal team summaries and avoids result CTA', () => {

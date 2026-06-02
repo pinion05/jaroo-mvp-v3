@@ -54,8 +54,8 @@ type DeepScanLoadingStageArrivalState = {
   stageKeys: LoadingStageKey[]
 }
 
-const DEEPSCAN_STAGE_WAIT_MS = 10_000
-const DEEPSCAN_STAGE_FILL_DELAY_MS = 3_000
+const DEEPSCAN_STAGE_WAIT_MS = 14_000
+const DEEPSCAN_STAGE_FILL_DELAY_MS = 5_000
 const DEEPSCAN_MEMBER_STAGE_BY_KEY: Record<string, LoadingStageKey> = {
   profitability: 'fundamentalTeam',
   valuation: 'fundamentalTeam',
