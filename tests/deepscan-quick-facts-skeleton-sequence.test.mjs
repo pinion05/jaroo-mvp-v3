@@ -133,6 +133,18 @@ test("DeepScan team narrative waits until today\'s briefing sequence is fully vi
   assert.doesNotMatch(source, /loadingStages\.forEach\(\(card\) => \{/)
 })
 
+
+test('DeepScan keeps the loading clock running until every requested team card is visible', () => {
+  const source = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
+
+  assert.match(source, /const requestedNarrativeStageCount = Math\.min\(Math\.max\(visibleStageCount, 0\), orderedNarrativeCards\.length\)/)
+  assert.match(source, /const narrativeSequenceComplete = requestedNarrativeStageCount === 0 \|\| visibleNarrativeStageCount >= requestedNarrativeStageCount/)
+  assert.match(source, /const canShowInlineResults = resultsReady && narrativeSequenceComplete/)
+  assert.match(source, /if \(canShowInlineResults\) \{[\s\S]*?return undefined[\s\S]*?\}/)
+  assert.match(source, /canShowInlineResults && inlineResults \? <div className=\{styles\.inlineResultsSlot\}>\{inlineResults\}<\/div> : null/)
+  assert.doesNotMatch(source, literalPattern('if (resultsReady) {\n      return undefined\n    }\n\n    const intervalId'))
+})
+
 test('DeepScan loading screen only fetches internal team summaries and avoids result CTA', () => {
   const source = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
 
