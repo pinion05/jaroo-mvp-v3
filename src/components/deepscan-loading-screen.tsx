@@ -622,6 +622,26 @@ function buildVisibleNarrativeCards(cards: NarrativeCard[], visibleStageCount: n
   return cards.slice(0, Math.min(Math.max(visibleStageCount, 1), cards.length))
 }
 
+function isNarrativeCardSummarySettled(
+  card: NarrativeCard,
+  summaryState: TeamSummaryState | undefined,
+) {
+  if (card.placeholder || !card.summarizable) {
+    return true
+  }
+
+  const inputKey = hashSummaryInput(card.body)
+  if (summaryState?.inputKey !== inputKey) {
+    return false
+  }
+
+  if (summaryState.status === 'success') {
+    return Boolean(summaryState.summary)
+  }
+
+  return summaryState.status === 'error'
+}
+
 function getPostBriefingVisibleStageCount(elapsedSeconds: number, requestedVisibleStageCount: number) {
   if (elapsedSeconds < TODAY_BRIEFING_COMPLETE_SECONDS) {
     return 0
@@ -1069,11 +1089,14 @@ export function DeepScanLoadingScreen({
   const visibleNarrativeStageCount = getPostBriefingVisibleStageCount(elapsedSeconds, visibleStageCount)
   const requestedNarrativeStageCount = Math.min(Math.max(visibleStageCount, 0), orderedNarrativeCards.length)
   const narrativeSequenceComplete = requestedNarrativeStageCount === 0 || visibleNarrativeStageCount >= requestedNarrativeStageCount
-  const canShowInlineResults = resultsReady && narrativeSequenceComplete
   const visibleNarrativeCards = useMemo(
     () => visibleNarrativeStageCount > 0 ? buildVisibleNarrativeCards(orderedNarrativeCards, visibleNarrativeStageCount) : [],
     [orderedNarrativeCards, visibleNarrativeStageCount],
   )
+  const visibleNarrativeSummariesSettled = visibleNarrativeCards.every((card) => (
+    isNarrativeCardSummarySettled(card, card.teamKey ? teamSummaries[card.teamKey] : undefined)
+  ))
+  const canShowInlineResults = resultsReady && narrativeSequenceComplete && visibleNarrativeSummariesSettled
   const completionState = buildCompletionState(canShowInlineResults, elapsedSeconds)
   const progressPct = canShowInlineResults ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
   const activeNarrativeCard = visibleNarrativeCards.findLast((card) => !card.placeholder) ?? visibleNarrativeCards.at(-1)
@@ -1212,15 +1235,17 @@ export function DeepScanLoadingScreen({
             const summaryState = card.teamKey ? teamSummaries[card.teamKey] : undefined
             const summaryReady = summaryState?.inputKey === summaryInputKey && summaryState.status === 'success' && summaryState.summary
             const summaryLoading = summaryState?.inputKey === summaryInputKey && summaryState.status === 'loading'
+            const summaryFailed = summaryState?.inputKey === summaryInputKey && summaryState.status === 'error'
             const summaryText = summaryReady ? summaryState.summary! : null
-            const showSummarySkeleton = !card.placeholder && !summaryText
+            const displaySummaryText = summaryText ?? (summaryFailed ? '팀 요약을 불러오지 못했어요. 확보된 근거는 아래 종합 결론에서 이어서 확인하세요.' : null)
+            const showSummarySkeleton = !card.placeholder && !displaySummaryText
             const cardSettled = resultsReady || card.complete
-            const statusLabel = summaryReady ? '요약 완료' : summaryLoading ? '요약 중' : cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
-            const statusTone = summaryReady ? 'positive' : summaryLoading ? 'info' : cardSettled && !card.complete ? 'info' : card.statusTone
+            const statusLabel = summaryReady ? '요약 완료' : summaryLoading ? '요약 중' : summaryFailed ? '요약 생략' : cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
+            const statusTone = summaryReady ? 'positive' : summaryLoading ? 'info' : summaryFailed ? 'warning' : cardSettled && !card.complete ? 'info' : card.statusTone
             const tags = [
               ...card.tags,
               card.summarizable
-                ? { text: summaryReady ? '요약 완료' : '요약 중', tone: summaryReady ? 'positive' as const : 'info' as const }
+                ? { text: summaryReady ? '요약 완료' : summaryFailed ? '요약 생략' : '요약 중', tone: summaryReady ? 'positive' as const : summaryFailed ? 'warning' as const : 'info' as const }
                 : null,
             ].filter((tag): tag is { text: string; tone: NarrativeTone } => Boolean(tag))
 
@@ -1240,7 +1265,7 @@ export function DeepScanLoadingScreen({
                       <span />
                     </div>
                   ) : (
-                    <p className={cn(styles.narrativeText, styles.narrativeTextSummarized)}>{summaryText}</p>
+                    <p className={cn(styles.narrativeText, styles.narrativeTextSummarized)}>{displaySummaryText}</p>
                   )}
                   {card.teamKey === 'marketTeam' && positionQuickFact?.indicator ? (
                     <div

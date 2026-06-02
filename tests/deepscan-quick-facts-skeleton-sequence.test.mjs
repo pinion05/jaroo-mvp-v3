@@ -139,10 +139,25 @@ test('DeepScan keeps the loading clock running until every requested team card i
 
   assert.match(source, /const requestedNarrativeStageCount = Math\.min\(Math\.max\(visibleStageCount, 0\), orderedNarrativeCards\.length\)/)
   assert.match(source, /const narrativeSequenceComplete = requestedNarrativeStageCount === 0 \|\| visibleNarrativeStageCount >= requestedNarrativeStageCount/)
-  assert.match(source, /const canShowInlineResults = resultsReady && narrativeSequenceComplete/)
+  assert.match(source, /function isNarrativeCardSummarySettled/)
+  assert.match(source, /summaryState\.status === 'loading'/)
+  assert.match(source, /const visibleNarrativeSummariesSettled = visibleNarrativeCards\.every/)
+  assert.match(source, /const canShowInlineResults = resultsReady && narrativeSequenceComplete && visibleNarrativeSummariesSettled/)
   assert.match(source, /if \(canShowInlineResults\) \{[\s\S]*?return undefined[\s\S]*?\}/)
   assert.match(source, /canShowInlineResults && inlineResults \? <div className=\{styles\.inlineResultsSlot\}>\{inlineResults\}<\/div> : null/)
   assert.doesNotMatch(source, literalPattern('if (resultsReady) {\n      return undefined\n    }\n\n    const intervalId'))
+})
+
+test('DeepScan inline conclusion waits until visible team summaries finish', () => {
+  const source = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
+
+  assert.match(source, /summaryState\?\.inputKey !== inputKey/)
+  assert.match(source, /return false/)
+  assert.match(source, /summaryState\.status === 'success'/)
+  assert.match(source, /return summaryState\.status === 'error'/)
+  assert.match(source, /summaryFailed/)
+  assert.match(source, /요약 생략/)
+  assert.doesNotMatch(source, /const canShowInlineResults = resultsReady && narrativeSequenceComplete\s*$/m)
 })
 
 test('DeepScan loading screen only fetches internal team summaries and avoids result CTA', () => {
@@ -179,7 +194,8 @@ test('DeepScan team bubbles send raw member reasons for summaries but hide raw g
   assert.match(loadingSource, /`\$\{definition\.alias\}: \$\{member\.reason\}`/)
   assert.match(loadingSource, /`\$\{definition\.alias\}: 응답 대기 중`/)
   assert.match(loadingSource, /const summaryText = summaryReady \? summaryState\.summary! : null/)
-  assert.match(loadingSource, /const showSummarySkeleton = !card\.placeholder && !summaryText/)
+  assert.match(loadingSource, /const displaySummaryText = summaryText \?\?/)
+  assert.match(loadingSource, /const showSummarySkeleton = !card\.placeholder && !displaySummaryText/)
   assert.match(loadingSource, /card\.placeholder \|\| showSummarySkeleton/)
   assert.doesNotMatch(loadingSource, /const displayBody = summaryReady \? summaryState\.summary! : card\.body/)
   assert.doesNotMatch(loadingSource, /\{displayBody\}/)
