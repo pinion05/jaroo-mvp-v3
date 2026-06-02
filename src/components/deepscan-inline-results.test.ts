@@ -54,3 +54,19 @@ test('DeepScanInlineResults falls back when committee and strategy blocks are un
   assert.match(markup, /관망/)
   assert.match(markup, /전략 원천 차단/)
 })
+
+test('DeepScanInlineResults treats non-numeric price fields as unknown instead of zero', () => {
+  const payload = basePayload()
+  payload.strategy = {
+    ...payload.strategy,
+    currentPriceText: 'N/A',
+    targetPriceText: '목표가 미제공',
+    scenarioProbability: 'N/A',
+    otherScenarios: [{ label: '대기', probability: 'N/A', condition: '원천 확인 중' }],
+  }
+  const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
+
+  assert.match(markup, /상승 여력/)
+  assert.match(markup, /확인 중/)
+  assert.doesNotMatch(markup, /\\+0%/)
+})

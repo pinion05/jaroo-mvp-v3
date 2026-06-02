@@ -824,7 +824,7 @@ export function JarooHomeScreen() {
         <header className={styles.top}>
           <div className={styles.brand}>Jaroo</div>
           <div className={styles.topActions}>
-            <Link href='/ocr' className={styles.tbtn} aria-label='스크린샷 추가'>＋</Link>
+            <Link href='/screenshot' className={styles.tbtn} aria-label='스크린샷 추가'>＋</Link>
             <button type='button' className={styles.tbtn} aria-label='알림' onClick={() => setOpenSheet('momentum')}>
               🔔<span className={styles.dot} />
             </button>

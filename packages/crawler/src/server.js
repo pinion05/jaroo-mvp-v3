@@ -888,7 +888,7 @@ function hasSlimV12PagePayload(value) {
     return value.trim().length > 0 && !isNoDataText(value);
   }
   if (Array.isArray(value)) {
-    return value.length > 0;
+    return value.some((item) => hasSlimV12PagePayload(item));
   }
   if (typeof value === 'object') {
     const status = typeof value.status === 'string' ? value.status.trim().toLowerCase() : '';

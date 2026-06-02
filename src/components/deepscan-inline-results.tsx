@@ -50,7 +50,9 @@ function compact(value: string | null | undefined, max = 104) {
 
 function parsePercent(value: string | null | undefined) {
   if (!value) return null
-  const parsed = Number(value.replace(/[^0-9.-]/g, ''))
+  const cleaned = value.replace(/[^0-9.-]/g, '')
+  if (!cleaned) return null
+  const parsed = Number(cleaned)
   return Number.isFinite(parsed) ? parsed : null
 }
 
@@ -62,7 +64,9 @@ function formatPercent(value: number | null) {
 
 function parseMoneyNumber(value: string | null | undefined) {
   if (!value) return null
-  const parsed = Number(value.replace(/[^0-9.-]/g, ''))
+  const cleaned = value.replace(/[^0-9.-]/g, '')
+  if (!cleaned) return null
+  const parsed = Number(cleaned)
   return Number.isFinite(parsed) ? parsed : null
 }
 
@@ -74,7 +78,7 @@ function deriveUpside(currentText: string | null | undefined, targetText: string
 }
 
 function flattenMembers(payload: JarooDeepScanPayload) {
-  return payload.committee.axes.flatMap((axis) => axis.members)
+  return payload.committee?.axes?.flatMap((axis) => axis.members ?? []) ?? []
 }
 
 function resolveTeamMembers(payload: JarooDeepScanPayload, team: TeamDefinition) {
@@ -85,7 +89,7 @@ function resolveTeamMembers(payload: JarooDeepScanPayload, team: TeamDefinition)
 
   if (matched.length > 0) return matched
 
-  const fallbackAxis = payload.committee.axes.find((axis) => team.memberTitles.some((title) => axis.label.includes(title) || axis.subtitle.includes(title)))
+  const fallbackAxis = payload.committee?.axes?.find((axis) => team.memberTitles.some((title) => axis.label?.includes(title) || axis.subtitle?.includes(title)))
   return fallbackAxis?.members ?? []
 }
 
@@ -131,18 +135,18 @@ function buildStrength(payload: JarooDeepScanPayload) {
 }
 
 function buildScenarioViews(payload: JarooDeepScanPayload): ScenarioView[] {
-  if (payload.strategy.blockState !== 'ok') {
-    return [{ label: '관망', probability: '--', condition: payload.strategy.fallback?.label || payload.strategy.error?.message || '전략 데이터를 확인하는 중이에요.', tone: 'blue', recommended: true }]
+  if (payload.strategy?.blockState !== 'ok') {
+    return [{ label: '관망', probability: '--', condition: payload.strategy?.fallback?.label || payload.strategy?.error?.message || '전략 데이터를 확인하는 중이에요.', tone: 'blue', recommended: true }]
   }
 
   const primary: ScenarioView = {
-    label: payload.strategy.scenarioLabel || '보유 유지',
-    probability: payload.strategy.scenarioProbability || '--',
-    condition: [payload.strategy.scenarioCondition, payload.strategy.scenarioPeriod].filter(Boolean).join(' · ') || '조건 확인 중',
+    label: payload.strategy?.scenarioLabel || '보유 유지',
+    probability: payload.strategy?.scenarioProbability || '--',
+    condition: [payload.strategy?.scenarioCondition, payload.strategy?.scenarioPeriod].filter(Boolean).join(' · ') || '조건 확인 중',
     tone: 'green',
     recommended: true,
   }
-  const others = payload.strategy.otherScenarios.slice(0, 2).map((scenario, index): ScenarioView => ({
+  const others = (payload.strategy?.otherScenarios ?? []).slice(0, 2).map((scenario, index): ScenarioView => ({
     label: scenario.label,
     probability: scenario.probability,
     condition: scenario.condition,

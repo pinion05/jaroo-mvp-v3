@@ -183,7 +183,7 @@ function hasPagePayload(value) {
   }
 
   if (Array.isArray(value)) {
-    return value.length > 0;
+    return value.some((item) => hasPagePayload(item));
   }
 
   if (typeof value === 'object') {
