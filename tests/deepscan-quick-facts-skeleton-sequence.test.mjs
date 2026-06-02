@@ -107,7 +107,7 @@ test('DeepScan soft-motion skeleton cadence slows narrative motion and keeps red
   assert.match(cssSource, /\.narrativeSpinner \{[\s\S]*?animation: spin 1\.15s linear infinite/)
   assert.match(cssSource, /animation: shimmer 1\.8s ease-in-out infinite/)
   assert.match(cssSource, /transition: background 0\.55s ease, border-color 0\.55s ease, box-shadow 0\.55s ease/)
-  assert.match(cssSource, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.narrativeCard,[\s\S]*?\.narrativeSpinner,[\s\S]*?animation: none;[\s\S]*?transition: none;/)
+  assert.match(cssSource, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.narrativeCard,[\s\S]*?\.narrativeSpinner,[\s\S]*?\.narrativeTitleSkeleton,[\s\S]*?\.narrativeDescriptionSkeleton,[\s\S]*?\.narrativeTextSkeleton span,[\s\S]*?animation: none;[\s\S]*?transition: none;/)
   assert.match(cssSource, /@media \(prefers-reduced-motion: reduce\) \{[\s\S]*?\.narrativeBubble \{[\s\S]*?transition: none;/)
 })
 
