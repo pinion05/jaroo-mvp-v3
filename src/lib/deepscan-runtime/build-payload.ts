@@ -31,7 +31,12 @@ export type DeepScanRawInput = {
   holding?: {
     shares?: string
     averagePrice?: string
+    averagePriceCurrency?: string
+    currentPrice?: string
+    currentPriceCurrency?: string
+    currentProfitRate?: string
     evaluationAmount?: string
+    usdKrwRate?: string
   }
   selectedAt?: string
   sourceContext: {
@@ -86,6 +91,27 @@ type UsDeepScanFacts = {
   returns1y?: number
   news: Array<{ title: string; publishedAt?: string }>
   consensus?: ReturnType<typeof decodeUsConsensusObservation>
+}
+
+type MoneyCurrency = 'KRW' | 'USD'
+
+export type CurrencyAwareAveragePriceInput = {
+  averagePrice?: string | number | null
+  averagePriceCurrency?: string | null
+  currentPrice?: number | null
+  currentPriceCurrency?: string | null
+  usdKrwRate?: number | null
+}
+
+export type CurrencyAwareAveragePriceResult = {
+  averagePrice: number | null
+  averagePriceCurrency: MoneyCurrency | null
+  currentPriceCurrency: MoneyCurrency
+  averagePriceInCurrentCurrency: number | null
+  requiresFx: boolean
+  usdKrwRate: number | null
+  converted: boolean
+  blockedReason: string | null
 }
 
 type RuntimeDumpQuality = {
@@ -161,6 +187,140 @@ function parseNumberish(value: unknown) {
 
   const parsed = Number(cleaned)
   return Number.isFinite(parsed) ? parsed : null
+}
+
+function normalizeMoneyCurrency(value: unknown): MoneyCurrency | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+
+  const normalized = value.trim().toUpperCase()
+  if (normalized === 'KRW' || normalized.includes('원') || normalized.includes('₩')) {
+    return 'KRW'
+  }
+
+  if (normalized === 'USD' || normalized.includes('$') || normalized.includes('달러')) {
+    return 'USD'
+  }
+
+  return null
+}
+
+function normalizeUsdKrwRate(value: unknown) {
+  const parsed = parseNumberish(value)
+  return typeof parsed === 'number' && parsed > 0 ? parsed : null
+}
+
+function inferAveragePriceCurrency({
+  averagePrice,
+  averagePriceCurrency,
+  currentPrice,
+  currentPriceCurrency,
+  usdKrwRate,
+}: Required<Pick<CurrencyAwareAveragePriceResult, 'currentPriceCurrency'>> & {
+  averagePrice: number | null
+  averagePriceCurrency?: string | null
+  currentPrice?: number | null
+  usdKrwRate?: number | null
+}) {
+  const explicitCurrency = normalizeMoneyCurrency(averagePriceCurrency)
+  if (explicitCurrency) {
+    return explicitCurrency
+  }
+
+  if (averagePrice === null) {
+    return null
+  }
+
+  if (currentPriceCurrency === 'KRW') {
+    return 'KRW'
+  }
+
+  if (typeof currentPrice !== 'number' || !Number.isFinite(currentPrice) || currentPrice <= 0) {
+    return averagePrice > 10_000 ? 'KRW' : 'USD'
+  }
+
+  if (typeof usdKrwRate === 'number' && Number.isFinite(usdKrwRate) && usdKrwRate > 0) {
+    const krwComparablePrice = currentPrice * usdKrwRate
+    const usdDistance = Math.abs(averagePrice - currentPrice) / Math.max(Math.abs(currentPrice), 1)
+    const krwDistance = Math.abs(averagePrice - krwComparablePrice) / Math.max(Math.abs(krwComparablePrice), 1)
+    return krwDistance < usdDistance ? 'KRW' : 'USD'
+  }
+
+  return averagePrice > currentPrice * 20 ? 'KRW' : 'USD'
+}
+
+export function resolveCurrencyAwareAveragePrice({
+  averagePrice: rawAveragePrice,
+  averagePriceCurrency: rawAveragePriceCurrency,
+  currentPrice,
+  currentPriceCurrency: rawCurrentPriceCurrency,
+  usdKrwRate: rawUsdKrwRate,
+}: CurrencyAwareAveragePriceInput): CurrencyAwareAveragePriceResult {
+  const averagePrice = parseNumberish(rawAveragePrice)
+  const currentCurrency = normalizeMoneyCurrency(rawCurrentPriceCurrency) ?? 'USD'
+  const usdKrwRate = normalizeUsdKrwRate(rawUsdKrwRate)
+  const averagePriceCurrency = inferAveragePriceCurrency({
+    averagePrice,
+    averagePriceCurrency: rawAveragePriceCurrency,
+    currentPrice,
+    currentPriceCurrency: currentCurrency,
+    usdKrwRate,
+  })
+
+  if (averagePrice === null || averagePriceCurrency === null) {
+    return {
+      averagePrice,
+      averagePriceCurrency,
+      currentPriceCurrency: currentCurrency,
+      averagePriceInCurrentCurrency: null,
+      requiresFx: false,
+      usdKrwRate,
+      converted: false,
+      blockedReason: 'average-price-missing',
+    }
+  }
+
+  if (averagePriceCurrency === currentCurrency) {
+    return {
+      averagePrice,
+      averagePriceCurrency,
+      currentPriceCurrency: currentCurrency,
+      averagePriceInCurrentCurrency: averagePrice,
+      requiresFx: false,
+      usdKrwRate,
+      converted: false,
+      blockedReason: null,
+    }
+  }
+
+  if (usdKrwRate === null) {
+    return {
+      averagePrice,
+      averagePriceCurrency,
+      currentPriceCurrency: currentCurrency,
+      averagePriceInCurrentCurrency: null,
+      requiresFx: true,
+      usdKrwRate,
+      converted: false,
+      blockedReason: 'usd-krw-rate-missing',
+    }
+  }
+
+  const convertedAveragePrice = averagePriceCurrency === 'KRW' && currentCurrency === 'USD'
+    ? averagePrice / usdKrwRate
+    : averagePrice * usdKrwRate
+
+  return {
+    averagePrice,
+    averagePriceCurrency,
+    currentPriceCurrency: currentCurrency,
+    averagePriceInCurrentCurrency: convertedAveragePrice,
+    requiresFx: true,
+    usdKrwRate,
+    converted: true,
+    blockedReason: null,
+  }
 }
 
 function readRuntimeDumpFact<T>(memberDump: unknown, factKey: string): RuntimeDumpFact<T> | null {
@@ -346,9 +506,24 @@ function buildRawInputFromSearchParams(searchParams: URLSearchParams): DeepScanR
   const name = normalizeText(searchParams.get('name'))
   const shares = normalizeText(searchParams.get('shares'))
   const averagePrice = normalizeText(searchParams.get('averagePrice'))
+  const averagePriceCurrency = normalizeText(searchParams.get('averagePriceCurrency'))
+  const currentPrice = normalizeText(searchParams.get('currentPrice'))
+  const currentPriceCurrency = normalizeText(searchParams.get('currentPriceCurrency'))
+  const currentProfitRate = normalizeText(searchParams.get('currentProfitRate'))
   const evaluationAmount = normalizeText(searchParams.get('evaluationAmount'))
+  const usdKrwRate = normalizeText(searchParams.get('usdKrwRate'))
   const selectedAt = normalizeText(searchParams.get('selectedAt'))
   const from = normalizeText(searchParams.get('from'))
+  const holding = {
+    ...(shares ? { shares } : {}),
+    ...(averagePrice ? { averagePrice } : {}),
+    ...(averagePriceCurrency ? { averagePriceCurrency } : {}),
+    ...(currentPrice ? { currentPrice } : {}),
+    ...(currentPriceCurrency ? { currentPriceCurrency } : {}),
+    ...(currentProfitRate ? { currentProfitRate } : {}),
+    ...(evaluationAmount ? { evaluationAmount } : {}),
+    ...(usdKrwRate ? { usdKrwRate } : {}),
+  }
 
   return {
     instrument: {
@@ -358,13 +533,7 @@ function buildRawInputFromSearchParams(searchParams: URLSearchParams): DeepScanR
       market,
       kind: 'stock',
     },
-    holding: shares || averagePrice || evaluationAmount
-      ? {
-          shares: shares ?? undefined,
-          averagePrice: averagePrice ?? undefined,
-          evaluationAmount: evaluationAmount ?? undefined,
-        }
-      : undefined,
+    holding: Object.keys(holding).length > 0 ? holding : undefined,
     selectedAt: selectedAt ?? undefined,
     sourceContext: {
       from: parseSourceFrom(from),
@@ -914,12 +1083,69 @@ function buildUsInsights(
   }
 }
 
-function buildUsStrategy(heroScore: number, facts: UsDeepScanFacts, rawInput: DeepScanRawInput): JarooDeepScanStrategyBlock {
+function formatUsdKrwRate(rate: number | null) {
+  return typeof rate === 'number' && Number.isFinite(rate)
+    ? `${Math.round(rate).toLocaleString('ko-KR')}원/$`
+    : '환율 미확인'
+}
+
+async function fetchUsdKrwRateForDeepScan() {
+  const upstreamUrl = buildCrawlerUrl(getCrawlerBaseUrl(), '/api/major/market/fx/usd-krw')
+
+  try {
+    const response = await fetch(upstreamUrl, { cache: 'no-store' })
+    if (!response.ok) {
+      return null
+    }
+
+    const payload = await response.json()
+    return normalizeUsdKrwRate(payload?.data?.rate)
+  } catch {
+    return null
+  }
+}
+
+async function resolveUsDeepScanUsdKrwRate(rawInput: DeepScanRawInput, facts: UsDeepScanFacts) {
+  const explicitRate = normalizeUsdKrwRate(rawInput.holding?.usdKrwRate)
+  if (explicitRate !== null) {
+    return explicitRate
+  }
+
+  const averagePriceCurrency = normalizeMoneyCurrency(rawInput.holding?.averagePriceCurrency)
+  const currentPriceCurrency = normalizeMoneyCurrency(rawInput.holding?.currentPriceCurrency ?? facts.currency) ?? 'USD'
+  if (currentPriceCurrency !== 'USD') {
+    return null
+  }
+
+  if (averagePriceCurrency === 'KRW') {
+    return fetchUsdKrwRateForDeepScan()
+  }
+
+  if (averagePriceCurrency === 'USD') {
+    return null
+  }
+
   const averagePrice = parseNumberish(rawInput.holding?.averagePrice)
+  if (typeof averagePrice === 'number' && typeof facts.currentPrice === 'number' && facts.currentPrice > 0 && averagePrice > facts.currentPrice * 20) {
+    return fetchUsdKrwRateForDeepScan()
+  }
+
+  return null
+}
+
+function buildUsStrategy(heroScore: number, facts: UsDeepScanFacts, rawInput: DeepScanRawInput, usdKrwRate: number | null): JarooDeepScanStrategyBlock {
+  const costBasis = resolveCurrencyAwareAveragePrice({
+    averagePrice: rawInput.holding?.averagePrice,
+    averagePriceCurrency: rawInput.holding?.averagePriceCurrency,
+    currentPrice: facts.currentPrice,
+    currentPriceCurrency: facts.currency,
+    usdKrwRate,
+  })
   const shares = parseNumberish(rawInput.holding?.shares)
   const currentPrice = facts.currentPrice
-  const gapPct = typeof currentPrice === 'number' && typeof averagePrice === 'number' && averagePrice > 0
-    ? ((currentPrice - averagePrice) / averagePrice) * 100
+  const normalizedAveragePrice = costBasis.averagePriceInCurrentCurrency
+  const gapPct = typeof currentPrice === 'number' && typeof normalizedAveragePrice === 'number' && normalizedAveragePrice > 0
+    ? ((currentPrice - normalizedAveragePrice) / normalizedAveragePrice) * 100
     : null
   const targetPrice = facts.consensus?.forecastEps && facts.consensus?.forwardPer
     ? facts.consensus.forecastEps * facts.consensus.forwardPer
@@ -935,11 +1161,18 @@ function buildUsStrategy(heroScore: number, facts: UsDeepScanFacts, rawInput: De
     scenarioLabel: heroScore >= 70 ? '기본 시나리오' : '주의 시나리오',
     scenarioProbability: `${Math.max(10, heroScore)}%`,
     scenarioPeriod: '약 3개월',
-    scenarioCondition: typeof gapPct === 'number' ? `평단 대비 ${signedPercent(gapPct)} 구간 유지` : '보유 포지션 기준치 재확인',
+    scenarioCondition: typeof gapPct === 'number'
+      ? `평단 대비 ${signedPercent(gapPct)} 구간 유지`
+      : costBasis.requiresFx
+        ? '원화 평단 환산값 확인 필요'
+        : '보유 포지션 기준치 재확인',
     currentPriceText: formatCurrency(currentPrice, facts.currency),
     targetPriceText: formatCurrency(targetPrice, facts.currency),
     scenarioDetails: [
       `보유 수량 ${formatNumber(shares)}주 기준`,
+      costBasis.converted && typeof normalizedAveragePrice === 'number'
+        ? `원화 평단을 ${formatCurrency(normalizedAveragePrice, facts.currency)}로 환산 · USD/KRW ${formatUsdKrwRate(costBasis.usdKrwRate)}`
+        : `평단 ${formatCurrency(normalizedAveragePrice ?? costBasis.averagePrice, costBasis.averagePriceCurrency ?? facts.currency)}`,
       `추정 EPS ${formatNumber(facts.consensus?.forecastEps, 2)} · forward PER ${formatNumber(facts.consensus?.forwardPer, 1)}`,
     ],
     otherScenarios: [
@@ -958,18 +1191,32 @@ function buildUsStrategy(heroScore: number, facts: UsDeepScanFacts, rawInput: De
   }
 }
 
-function buildUsSellNow(heroScore: number, facts: UsDeepScanFacts, rawInput: DeepScanRawInput): JarooDeepScanSellNowBlock {
+function buildUsSellNow(heroScore: number, facts: UsDeepScanFacts, rawInput: DeepScanRawInput, usdKrwRate: number | null): JarooDeepScanSellNowBlock {
   const shares = parseNumberish(rawInput.holding?.shares)
-  const averagePrice = parseNumberish(rawInput.holding?.averagePrice)
   const currentPrice = facts.currentPrice
+  const costBasis = resolveCurrencyAwareAveragePrice({
+    averagePrice: rawInput.holding?.averagePrice,
+    averagePriceCurrency: rawInput.holding?.averagePriceCurrency,
+    currentPrice,
+    currentPriceCurrency: facts.currency,
+    usdKrwRate,
+  })
+  const averagePrice = costBasis.averagePriceInCurrentCurrency
 
   if (typeof shares !== 'number' || typeof averagePrice !== 'number' || typeof currentPrice !== 'number') {
     return {
       ...createBlockMeta('blocked', [createSourceRef('holding', 'deepscan-us-sell-now', 'US sell-now missing holding')], {
-        fallback: createFallback('holding-context-incomplete', '보유 데이터 부족'),
-        error: createError('holding-context-incomplete', '보유 수량/평단/현재가가 부족해 즉시 매도 판단을 계산할 수 없어요.'),
+        fallback: createFallback(costBasis.blockedReason ?? 'holding-context-incomplete', costBasis.requiresFx ? '환율 데이터 부족' : '보유 데이터 부족'),
+        error: createError(
+          costBasis.blockedReason ?? 'holding-context-incomplete',
+          costBasis.requiresFx
+            ? '원화 평단을 달러 현재가와 비교하려면 USD/KRW 환율이 필요해요.'
+            : '보유 수량/평단/현재가가 부족해 즉시 매도 판단을 계산할 수 없어요.',
+        ),
       }),
-      realizedText: '보유 수량, 평단가, 현재가가 모두 있어야 즉시 매도 판단을 계산할 수 있어요.',
+      realizedText: costBasis.requiresFx
+        ? '원화 평단 환산에 필요한 USD/KRW 환율이 없어 즉시 매도 판단을 계산하지 않았어요.'
+        : '보유 수량, 평단가, 현재가가 모두 있어야 즉시 매도 판단을 계산할 수 있어요.',
       rows: [],
     }
   }
@@ -984,7 +1231,12 @@ function buildUsSellNow(heroScore: number, facts: UsDeepScanFacts, rawInput: Dee
     rows: [
       { label: '판단', value: decisionBand, emphasis: true },
       { label: '현재가', value: formatCurrency(currentPrice, facts.currency) },
-      { label: '평단가', value: formatCurrency(averagePrice, facts.currency) },
+      {
+        label: '평단가',
+        value: costBasis.converted
+          ? `${formatCurrency(averagePrice, facts.currency)} (${formatUsdKrwRate(costBasis.usdKrwRate)})`
+          : formatCurrency(averagePrice, facts.currency),
+      },
       { label: '평가손익', value: `${formatCurrency(pnl, facts.currency)} / ${signedPercent(pnlPct)}`, tag: pnl >= 0 ? '수익' : '손실', tagTone: pnl >= 0 ? 'positive' : 'danger', valueTone: pnl >= 0 ? undefined : 'danger' },
     ],
   }
@@ -1227,8 +1479,9 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
   const heroScore = buildHeroScore(agentResults)
   const axes = buildAxes(agentResults)
   const insights = buildUsInsights(facts, agentResults, generatedSignals)
-  const strategy = buildUsStrategy(heroScore, facts, rawInput)
-  const sellNow = buildUsSellNow(heroScore, facts, rawInput)
+  const usdKrwRate = await resolveUsDeepScanUsdKrwRate(rawInput, facts)
+  const strategy = buildUsStrategy(heroScore, facts, rawInput, usdKrwRate)
+  const sellNow = buildUsSellNow(heroScore, facts, rawInput, usdKrwRate)
   const portfolioSimulation = buildUsPortfolioSimulation(heroScore, sellNow)
   const degraded = agentResults.some((agent) => agent.confidence === 'low') || llmErrors.length > 0
   const sourceContextFrom = normalizeSourceFrom(rawInput.sourceContext.from)

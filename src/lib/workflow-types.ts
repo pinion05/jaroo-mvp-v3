@@ -100,6 +100,7 @@ export type PortfolioNormalizedItem = {
   currentPriceCurrency?: WorkflowMoneyCurrency
   evaluationAmount?: number
   averagePriceCurrency?: WorkflowMoneyCurrency
+  usdKrwRate?: number
   identifierLabel?: string
 }
 
@@ -117,6 +118,7 @@ export type DeepScanTargetInput = {
   currentPriceCurrency?: WorkflowMoneyCurrency
   evaluationAmount?: number
   averagePriceCurrency?: WorkflowMoneyCurrency
+  usdKrwRate?: number
   identifierLabel?: string
 }
 
@@ -288,13 +290,24 @@ export function toDeepScanTargetInput(item: PortfolioNormalizedItem): DeepScanTa
     currentPriceCurrency: item.currentPriceCurrency,
     evaluationAmount: item.evaluationAmount,
     averagePriceCurrency: item.averagePriceCurrency,
+    usdKrwRate: item.usdKrwRate,
     identifierLabel: item.identifierLabel ?? buildIdentifierLabel(item.ticker, item.code),
   }
 }
 
 type DeepScanTargetKeyInput = Pick<
   DeepScanTargetInput,
-  'code' | 'ticker' | 'name' | 'market' | 'quantity' | 'averagePrice' | 'evaluationAmount'
+  | 'code'
+  | 'ticker'
+  | 'name'
+  | 'market'
+  | 'quantity'
+  | 'averagePrice'
+  | 'evaluationAmount'
+  | 'averagePriceCurrency'
+  | 'currentPrice'
+  | 'currentPriceCurrency'
+  | 'usdKrwRate'
 >
 
 function normalizeDeepScanTargetKeyText(value: string | undefined) {
@@ -318,5 +331,9 @@ export function getDeepScanTargetKey(target: DeepScanTargetKeyInput) {
     ['quantity', normalizeDeepScanTargetKeyNumber(target.quantity)],
     ['averagePrice', normalizeDeepScanTargetKeyNumber(target.averagePrice)],
     ['evaluationAmount', normalizeDeepScanTargetKeyNumber(target.evaluationAmount)],
+    ['averagePriceCurrency', normalizeDeepScanTargetKeyText(target.averagePriceCurrency)],
+    ['currentPrice', normalizeDeepScanTargetKeyNumber(target.currentPrice)],
+    ['currentPriceCurrency', normalizeDeepScanTargetKeyText(target.currentPriceCurrency)],
+    ['usdKrwRate', normalizeDeepScanTargetKeyNumber(target.usdKrwRate)],
   ].map(([label, value]) => `${label}:${value}`).join('|')
 }

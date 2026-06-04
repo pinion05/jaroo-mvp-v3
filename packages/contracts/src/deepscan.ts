@@ -69,7 +69,12 @@ export type JarooDeepScanInputInstrument = {
 export type JarooDeepScanInputHolding = {
   shares?: string
   averagePrice?: string
+  averagePriceCurrency?: string
+  currentPrice?: string
+  currentPriceCurrency?: string
+  currentProfitRate?: string
   evaluationAmount?: string
+  usdKrwRate?: string
 }
 
 export type JarooDeepScanInputSourceContext = {

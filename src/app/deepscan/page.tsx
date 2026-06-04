@@ -1150,7 +1150,12 @@ export default function DeepScanPage() {
               identifierTicker: target.ticker,
               shares: String(target.quantity),
               averagePrice: String(target.averagePrice),
+              averagePriceCurrency: target.averagePriceCurrency,
+              currentPrice: typeof target.currentPrice === 'number' ? String(target.currentPrice) : undefined,
+              currentPriceCurrency: target.currentPriceCurrency,
+              currentProfitRate: typeof target.currentProfitRate === 'number' ? String(target.currentProfitRate) : undefined,
               evaluationAmount: typeof target.evaluationAmount === 'number' ? String(target.evaluationAmount) : undefined,
+              usdKrwRate: typeof target.usdKrwRate === 'number' ? String(target.usdKrwRate) : undefined,
               market: target.market ?? target.marketTone?.toUpperCase() ?? '미확인',
               marketTone: (target.marketTone ?? (target.kind === 'etf' ? 'etf' : 'kospi')) as HomeMarketTone,
             },
@@ -1672,7 +1677,10 @@ export default function DeepScanPage() {
   const activeLoadingBriefingSnapshot = loadingBriefingSnapshot?.targetKey === targetKey ? loadingBriefingSnapshot : null
   const loadingTradingVolume = activeLoadingBriefingSnapshot?.quote?.volume ?? activeLoadingQuickQuote?.tradingVolume ?? buildLoadingTradingVolume(payload)
   const loadingCurrentPrice = activeLoadingBriefingSnapshot?.quote?.currentPrice ?? target?.currentPrice ?? activeLoadingQuickQuote?.currentPrice
-  const loadingCurrentPriceCurrency = target?.currentPriceCurrency ?? normalizeQuoteCurrency(activeLoadingBriefingSnapshot?.quote?.currency ?? undefined) ?? activeLoadingQuickQuote?.currentPriceCurrency
+  const loadingCurrentPriceCurrency = target?.currentPriceCurrency
+    ?? normalizeQuoteCurrency(activeLoadingBriefingSnapshot?.quote?.currency ?? undefined)
+    ?? activeLoadingQuickQuote?.currentPriceCurrency
+    ?? (requestSeed.holding.market === 'US' ? 'USD' : undefined)
   const loadingQuickFacts = buildLoadingQuickFacts(payload, activeLoadingQuickQuote, requestSeed.holding.name)
   const evidenceCollected = hasCollectedDeepScanEvidence(payload)
   const analysisLoadingNotice = {

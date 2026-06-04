@@ -768,7 +768,9 @@ function buildTodayFlow({ current, open, high, low }: { current: number | null; 
 
 function TodayBriefingCard({
   currentPriceText,
+  currentPriceCurrency,
   averagePriceText,
+  averagePriceCurrency,
   sharesText,
   profitRateText,
   profitAmountText,
@@ -776,7 +778,9 @@ function TodayBriefingCard({
   briefingSnapshot,
 }: {
   currentPriceText: string | null
+  currentPriceCurrency: MoneyCurrency
   averagePriceText: string | null
+  averagePriceCurrency: MoneyCurrency
   sharesText: string | null
   profitRateText: string | null
   profitAmountText: string | null
@@ -815,17 +819,18 @@ function TodayBriefingCard({
     }
   }, [averagePriceValue, briefingSnapshot?.daily, currentPriceText, quote])
   const currentPriceValue = briefingModel.currentPriceValue
-  const displayCurrentPrice = formatMoney(currentPriceValue ?? undefined, 'KRW') ?? currentPriceText ?? '현재가 확인 중'
+  const sameMoneyCurrency = currentPriceCurrency === averagePriceCurrency
+  const displayCurrentPrice = currentPriceText ?? formatMoney(currentPriceValue ?? undefined, currentPriceCurrency) ?? '현재가 확인 중'
   const displayAveragePrice = averagePriceText ?? '평단 확인 중'
   const displayShares = sharesText ?? '수량 확인 중'
-  const calculatedProfitRate = isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue) && averagePriceValue !== 0
+  const calculatedProfitRate = sameMoneyCurrency && isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue) && averagePriceValue !== 0
     ? ((currentPriceValue / averagePriceValue) - 1) * 100
     : null
-  const calculatedProfitAmount = isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue) && isFiniteNumber(sharesValue)
+  const calculatedProfitAmount = sameMoneyCurrency && isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue) && isFiniteNumber(sharesValue)
     ? (currentPriceValue - averagePriceValue) * sharesValue
     : null
   const displayProfitRate = formatSignedPercent(calculatedProfitRate ?? undefined) ?? profitRateText ?? '계산 중'
-  const displayProfitAmount = formatSignedMoney(calculatedProfitAmount, 'KRW') ?? profitAmountText ?? '계산 중'
+  const displayProfitAmount = formatSignedMoney(calculatedProfitAmount, currentPriceCurrency) ?? profitAmountText ?? '계산 중'
   const oneMonthPct = briefingModel.oneMonthPct
   const oneMonthLabel = formatPercentValue(oneMonthPct)
   const shortStreak = briefingModel.shortStreak
@@ -835,22 +840,22 @@ function TodayBriefingCard({
       ? `${shortStreak.count}일 연속 하락`
       : '전일과 비슷한 흐름'
   const positionPct = calculatedProfitRate
-  const needToBreakeven = isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue) && currentPriceValue < averagePriceValue
+  const needToBreakeven = sameMoneyCurrency && isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue) && currentPriceValue < averagePriceValue
     ? ((averagePriceValue / currentPriceValue) - 1) * 100
     : null
-  const breakevenGap = isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue)
+  const breakevenGap = sameMoneyCurrency && isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue)
     ? Math.round(Math.abs(averagePriceValue - currentPriceValue))
     : null
   const positionLabel = isFiniteNumber(positionPct)
     ? positionPct >= 0
       ? `평단보다 ${formatPercentValue(positionPct)}`
       : `본전까지 ${formatPercentValue(needToBreakeven)}`
-    : '평단 위치 계산 중'
+    : sameMoneyCurrency ? '평단 위치 계산 중' : '환산 평단 확인 중'
   const positionMeaning = isFiniteNumber(positionPct)
     ? positionPct >= 0
       ? '지금 가격은 평단 위라 수익 구간이에요.'
       : `${formatNumber(breakevenGap ?? 0)}원만 오르면 원금 회복이에요.`
-    : '현재가와 평단을 맞춰 보는 중이에요.'
+    : sameMoneyCurrency ? '현재가와 평단을 맞춰 보는 중이에요.' : '현재가는 달러, 평단은 원화 기준이라 환율 환산 후 비교해야 해요.'
   const todayFlow = briefingModel.todayFlow
   const volumeRatio = briefingModel.volumeRatio
   const volumeRatioLabel = isFiniteNumber(volumeRatio) ? `어제의 ${formatNumber(volumeRatio)}배` : '거래량 확인 중'
@@ -1044,15 +1049,22 @@ export function DeepScanLoadingScreen({
   const averagePriceText = formatMoney(averagePrice, averagePriceCurrency)
   const currentPriceText = formatMoney(currentPrice, currentPriceCurrency)
   const tradingVolumeText = formatTradingVolume(tradingVolume)
+  const evaluationAmountCurrency = currentPriceCurrency === 'USD' && averagePriceCurrency === 'KRW'
+    ? 'KRW'
+    : currentPriceCurrency
   const evaluationAmountText = formatMoney(
     calculateFallbackEvaluationAmount({ evaluationAmount, currentPrice, shares, averagePrice, currentProfitRate }),
-    currentPriceCurrency,
+    evaluationAmountCurrency,
   )
   const snapshotCurrentPrice = briefingSnapshot?.quote?.currentPrice ?? undefined
   const effectiveCurrentPrice = snapshotCurrentPrice ?? currentPrice
-  const profitRateText = formatSignedPercent(calculateProfitRate({ currentPrice: effectiveCurrentPrice, averagePrice }) ?? currentProfitRate)
+  const canCalculatePositionInOneCurrency = currentPriceCurrency === averagePriceCurrency
+  const profitRateText = formatSignedPercent(
+    (canCalculatePositionInOneCurrency ? calculateProfitRate({ currentPrice: effectiveCurrentPrice, averagePrice }) : null)
+      ?? currentProfitRate,
+  )
   const profitAmountText = formatSignedMoney(
-    calculateProfitAmount({ currentPrice: effectiveCurrentPrice, averagePrice, shares }),
+    canCalculatePositionInOneCurrency ? calculateProfitAmount({ currentPrice: effectiveCurrentPrice, averagePrice, shares }) : null,
     currentPriceCurrency,
   )
   const displayQuickFacts = useMemo(() => quickFacts.filter(hasDisplayValue), [quickFacts])
@@ -1182,7 +1194,9 @@ export function DeepScanLoadingScreen({
 
         <TodayBriefingCard
           currentPriceText={currentPriceText}
+          currentPriceCurrency={currentPriceCurrency}
           averagePriceText={averagePriceText}
+          averagePriceCurrency={averagePriceCurrency}
           sharesText={sharesText}
           profitRateText={profitRateText}
           profitAmountText={profitAmountText}
