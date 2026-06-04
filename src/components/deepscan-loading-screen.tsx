@@ -862,12 +862,15 @@ function TodayBriefingCard({
   const chartAverageLabel = chartAveragePriceValue !== null && chartAveragePriceValue !== averagePriceValue ? '환산 평단' : '내 평단'
   const chartContextLabel = chartAverageLabel === '환산 평단' ? '최근 3개월 · 점선은 환산 평단' : '최근 3개월 · 점선은 내 평단'
   const displayShares = sharesText ?? '수량 확인 중'
-  const calculatedProfitRate = sameMoneyCurrency && isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue) && averagePriceValue !== 0
-    ? ((currentPriceValue / averagePriceValue) - 1) * 100
+  const comparableAveragePriceValue = sameMoneyCurrency ? averagePriceValue : chartAveragePriceValue
+  const canCompareCostBasis = isFiniteNumber(currentPriceValue) && isFiniteNumber(comparableAveragePriceValue) && comparableAveragePriceValue !== 0
+  const calculatedProfitRate = canCompareCostBasis
+    ? ((currentPriceValue / comparableAveragePriceValue) - 1) * 100
     : null
-  const calculatedProfitAmount = sameMoneyCurrency && isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue) && isFiniteNumber(sharesValue)
-    ? (currentPriceValue - averagePriceValue) * sharesValue
+  const calculatedProfitAmount = canCompareCostBasis && isFiniteNumber(sharesValue)
+    ? (currentPriceValue - comparableAveragePriceValue) * sharesValue
     : null
+  const profitRateFromBroker = parseNumericValue(profitRateText ?? undefined)
   const displayProfitRate = formatSignedPercent(calculatedProfitRate ?? undefined) ?? profitRateText ?? '계산 중'
   const displayProfitAmount = formatSignedMoney(calculatedProfitAmount, currentPriceCurrency) ?? profitAmountText ?? '계산 중'
   const oneMonthPct = briefingModel.oneMonthPct
@@ -878,22 +881,32 @@ function TodayBriefingCard({
     : shortStreak.direction === 'down'
       ? `${shortStreak.count}일 연속 하락`
       : '전일과 비슷한 흐름'
-  const positionPct = calculatedProfitRate
-  const needToBreakeven = sameMoneyCurrency && isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue) && currentPriceValue < averagePriceValue
-    ? ((averagePriceValue / currentPriceValue) - 1) * 100
+  const positionPct = calculatedProfitRate ?? profitRateFromBroker
+  const needToBreakeven = canCompareCostBasis && currentPriceValue < comparableAveragePriceValue
+    ? ((comparableAveragePriceValue / currentPriceValue) - 1) * 100
     : null
-  const breakevenGap = sameMoneyCurrency && isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue)
-    ? Math.round(Math.abs(averagePriceValue - currentPriceValue))
+  const breakevenGap = canCompareCostBasis
+    ? Math.abs(comparableAveragePriceValue - currentPriceValue)
     : null
+  const breakevenGapText = breakevenGap !== null ? formatMoney(breakevenGap, currentPriceCurrency) : null
+  const breakevenRecoveryText = breakevenGapText
+    ? currentPriceCurrency === 'USD' ? `${breakevenGapText} 더 오르면 원금 회복이에요.` : `${breakevenGapText}만 오르면 원금 회복이에요.`
+    : '조금만 더 오르면 원금 회복이에요.'
   const positionLabel = isFiniteNumber(positionPct)
-    ? positionPct >= 0
-      ? `평단보다 ${formatPercentValue(positionPct)}`
-      : `본전까지 ${formatPercentValue(needToBreakeven)}`
+    ? canCompareCostBasis
+      ? positionPct >= 0
+        ? `${chartAverageLabel}보다 ${formatPercentValue(positionPct)}`
+        : isFiniteNumber(needToBreakeven) ? `본전까지 ${formatPercentValue(needToBreakeven)}` : `손실률 ${formatPercentValue(positionPct)}`
+      : `보유 수익률 ${formatPercentValue(positionPct)}`
     : sameMoneyCurrency ? '평단 위치 계산 중' : '환산 평단 확인 중'
   const positionMeaning = isFiniteNumber(positionPct)
-    ? positionPct >= 0
-      ? '지금 가격은 평단 위라 수익 구간이에요.'
-      : `${formatNumber(breakevenGap ?? 0)}원만 오르면 원금 회복이에요.`
+    ? canCompareCostBasis
+      ? positionPct >= 0
+        ? chartAverageLabel === '환산 평단'
+          ? `원화 평단 ${displayAveragePrice}을 ${displayChartAveragePrice}로 환산하면 현재가가 평단 위예요.`
+          : '지금 가격은 평단 위라 수익 구간이에요.'
+        : breakevenRecoveryText
+      : `보유 화면에서 확인한 수익률 기준으로 ${positionPct >= 0 ? '수익' : '손실'} 구간이에요.`
     : sameMoneyCurrency ? '현재가와 평단을 맞춰 보는 중이에요.' : '현재가는 달러, 평단은 원화 기준이라 환율 환산 후 비교해야 해요.'
   const todayFlow = briefingModel.todayFlow
   const volumeRatio = briefingModel.volumeRatio
