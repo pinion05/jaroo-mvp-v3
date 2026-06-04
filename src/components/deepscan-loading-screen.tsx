@@ -39,6 +39,7 @@ type DeepScanLoadingScreenProps = {
   averagePriceCurrency?: MoneyCurrency
   currentPrice?: string | number
   currentPriceCurrency?: MoneyCurrency
+  usdKrwRate?: number | null
   tradingVolume?: string | number
   currentProfitRate?: string | number
   evaluationAmount?: string | number
@@ -341,6 +342,29 @@ function calculateProfitAmount({
   }
 
   return (currentPriceValue - averagePriceValue) * shareCount
+}
+
+function normalizeMoneyValueToCurrency(
+  value: number | null,
+  fromCurrency: MoneyCurrency,
+  toCurrency: MoneyCurrency,
+  usdKrwRate?: number | null,
+) {
+  if (value === null) {
+    return null
+  }
+
+  if (fromCurrency === toCurrency) {
+    return value
+  }
+
+  if (typeof usdKrwRate !== 'number' || !Number.isFinite(usdKrwRate) || usdKrwRate <= 0) {
+    return null
+  }
+
+  return fromCurrency === 'KRW' && toCurrency === 'USD'
+    ? value / usdKrwRate
+    : value * usdKrwRate
 }
 
 function hasDisplayValue(value: unknown): boolean {
@@ -771,6 +795,7 @@ function TodayBriefingCard({
   currentPriceCurrency,
   averagePriceText,
   averagePriceCurrency,
+  usdKrwRate,
   sharesText,
   profitRateText,
   profitAmountText,
@@ -781,6 +806,7 @@ function TodayBriefingCard({
   currentPriceCurrency: MoneyCurrency
   averagePriceText: string | null
   averagePriceCurrency: MoneyCurrency
+  usdKrwRate?: number | null
   sharesText: string | null
   profitRateText: string | null
   profitAmountText: string | null
@@ -789,8 +815,14 @@ function TodayBriefingCard({
 }) {
   const quote = briefingSnapshot?.quote
   const averagePriceValue = parseNumericValue(averagePriceText ?? undefined)
+  const chartAveragePriceValue = normalizeMoneyValueToCurrency(
+    averagePriceValue,
+    averagePriceCurrency,
+    currentPriceCurrency,
+    usdKrwRate,
+  )
   const sharesValue = parseNumericValue(sharesText ?? undefined)
-  const briefingModel = useMemo(() => {
+  const briefingModel = (() => {
     const dailyRows = (briefingSnapshot?.daily ?? []).filter((row) => isFiniteNumber(row.close))
     const latestRow = getLatestBriefingDailyRow(dailyRows)
     const previousRow = getPreviousBriefingDailyRow(dailyRows)
@@ -806,7 +838,7 @@ function TodayBriefingCard({
     const volume = quote?.volume ?? latestRow?.volume ?? null
     const previousVolume = quote?.previousVolume ?? previousRow?.volume ?? null
     const volumeRatio = isFiniteNumber(volume) && isFiniteNumber(previousVolume) && previousVolume > 0 ? volume / previousVolume : null
-    const chart = buildChartGeometry(dailyRows.slice(-60), averagePriceValue)
+    const chart = buildChartGeometry(dailyRows.slice(-60), chartAveragePriceValue)
 
     return {
       currentPriceValue,
@@ -817,11 +849,18 @@ function TodayBriefingCard({
       volumeRatio,
       chart,
     }
-  }, [averagePriceValue, briefingSnapshot?.daily, currentPriceText, quote])
+  })()
   const currentPriceValue = briefingModel.currentPriceValue
   const sameMoneyCurrency = currentPriceCurrency === averagePriceCurrency
   const displayCurrentPrice = currentPriceText ?? formatMoney(currentPriceValue ?? undefined, currentPriceCurrency) ?? '현재가 확인 중'
   const displayAveragePrice = averagePriceText ?? '평단 확인 중'
+  const displayChartAveragePrice = (
+    chartAveragePriceValue !== null && chartAveragePriceValue !== averagePriceValue
+      ? formatMoney(chartAveragePriceValue, currentPriceCurrency)
+      : displayAveragePrice
+  ) ?? '확인 중'
+  const chartAverageLabel = chartAveragePriceValue !== null && chartAveragePriceValue !== averagePriceValue ? '환산 평단' : '내 평단'
+  const chartContextLabel = chartAverageLabel === '환산 평단' ? '최근 3개월 · 점선은 환산 평단' : '최근 3개월 · 점선은 내 평단'
   const displayShares = sharesText ?? '수량 확인 중'
   const calculatedProfitRate = sameMoneyCurrency && isFiniteNumber(currentPriceValue) && isFiniteNumber(averagePriceValue) && averagePriceValue !== 0
     ? ((currentPriceValue / averagePriceValue) - 1) * 100
@@ -890,7 +929,7 @@ function TodayBriefingCard({
 
       <div className={styles.todayChartWrap}>
         <div className={styles.todayChartLabel}>
-          <span>최근 3개월 · 점선은 내 평단</span>
+          <span>{chartContextLabel}</span>
           <span>일봉</span>
         </div>
         {chart.hasData ? (
@@ -898,7 +937,7 @@ function TodayBriefingCard({
             <path className={styles.todayChartArea} d={chart.areaPath} />
             <path className={styles.todayChartLine} d={chart.linePath} pathLength={1} />
             <line className={styles.todayAvgLine} x1='4' y1={chart.averageY} x2='296' y2={chart.averageY} />
-            <text className={styles.todayAvgText} x='296' y={Math.max(12, chart.averageY - 6)} textAnchor='end'>내 평단 {displayAveragePrice.replace(/원$/u, '')}</text>
+              <text className={styles.todayAvgText} x='296' y={Math.max(12, chart.averageY - 6)} textAnchor='end'>{chartAverageLabel} {displayChartAveragePrice.replace(/원$/u, '')}</text>
             <circle className={styles.todayChartDot} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='3' />
             <circle className={styles.todayChartRing} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='7' />
           </svg>
@@ -1023,6 +1062,7 @@ export function DeepScanLoadingScreen({
   averagePriceCurrency = 'KRW',
   currentPrice,
   currentPriceCurrency = averagePriceCurrency,
+  usdKrwRate,
   tradingVolume,
   currentProfitRate,
   evaluationAmount,
@@ -1197,6 +1237,7 @@ export function DeepScanLoadingScreen({
           currentPriceCurrency={currentPriceCurrency}
           averagePriceText={averagePriceText}
           averagePriceCurrency={averagePriceCurrency}
+          usdKrwRate={usdKrwRate}
           sharesText={sharesText}
           profitRateText={profitRateText}
           profitAmountText={profitAmountText}

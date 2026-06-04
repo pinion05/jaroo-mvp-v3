@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import type { LoadingBriefingDailyRow, LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
+import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 
 const NAVER_STOCK_API_BASE = 'https://m.stock.naver.com/api'
 const BRIEFING_SNAPSHOT_TIMEOUT_MS = 4_500
@@ -25,6 +26,31 @@ type NaverBasicPayload = {
   stockExchangeType?: {
     name?: string
     nameKor?: string
+  }
+}
+
+type UsOhlcRow = {
+  date?: string | null
+  open?: number | string | null
+  high?: number | string | null
+  low?: number | string | null
+  close?: number | string | null
+  volume?: number | string | null
+  changePercent?: number | string | null
+}
+
+type UsOhlcPayload = {
+  ok?: boolean
+  data?: {
+    ticker?: string | null
+    provider?: string | null
+    source?: string | null
+    series?: UsOhlcRow[]
+    meta?: {
+      status?: string | null
+      count?: number | null
+      primarySource?: string | null
+    }
   }
 }
 
@@ -86,6 +112,16 @@ function normalizeKrCode(value: string | null) {
   const normalized = value?.trim() ?? ''
   const match = normalized.match(/^\d{6}$/u)
   return match ? match[0] : null
+}
+
+function normalizeUsTicker(value: string | null) {
+  const normalized = value?.trim().toUpperCase() ?? ''
+  return /^[A-Z][A-Z0-9.-]{0,9}$/u.test(normalized) ? normalized : null
+}
+
+function isUsMarket(value: string | null) {
+  const normalized = value?.trim().toUpperCase() ?? ''
+  return normalized === 'US' || normalized === 'NASDAQ' || normalized === 'NYSE' || normalized === 'AMEX'
 }
 
 function isAbortError(error: unknown) {
@@ -164,6 +200,24 @@ function normalizePriceRow(row: NaverPriceRow): LoadingBriefingDailyRow | null {
   }
 }
 
+function normalizeUsOhlcRow(row: UsOhlcRow): LoadingBriefingDailyRow | null {
+  const date = typeof row.date === 'string' ? row.date.slice(0, 10) : ''
+  const close = parseNaverNumber(row.close)
+  if (!date || close === null) {
+    return null
+  }
+
+  return {
+    date,
+    open: parseNaverNumber(row.open),
+    high: parseNaverNumber(row.high),
+    low: parseNaverNumber(row.low),
+    close,
+    volume: parseNaverNumber(row.volume),
+    changePct: parseNaverNumber(row.changePercent),
+  }
+}
+
 async function fetchDailyRows(code: string, options: FetchJsonOptions) {
   const rows = await fetchJsonWithTimeout<NaverPriceRow[]>(
     `${NAVER_STOCK_API_BASE}/stock/${encodeURIComponent(code)}/price?page=1&pageSize=${DAILY_PRICE_PAGE_SIZE}`,
@@ -193,6 +247,21 @@ async function fetchIndexSnapshot(indexCode: 'KOSPI' | 'KOSDAQ', options: FetchJ
     changePct: parseNaverNumber(payload.fluctuationsRatio),
     asOf: typeof payload.localTradedAt === 'string' ? payload.localTradedAt : null,
   }
+}
+
+export function buildUsOhlcBriefingUpstreamUrl(baseUrl: string, ticker: string, limit = DAILY_PRICE_PAGE_SIZE) {
+  return buildCrawlerUrl(
+    baseUrl,
+    `/api/source/polygon/us/stocks/${encodeURIComponent(ticker)}/ohlc?limit=${encodeURIComponent(String(limit))}`,
+  )
+}
+
+function normalizeUsOhlcDailyRows(payload: UsOhlcPayload) {
+  const rows = Array.isArray(payload.data?.series)
+    ? payload.data.series.map(normalizeUsOhlcRow).filter((row): row is LoadingBriefingDailyRow => Boolean(row))
+    : []
+
+  return rows.sort((left, right) => left.date.localeCompare(right.date))
 }
 
 function getLatestRow(daily: LoadingBriefingDailyRow[]) {
@@ -291,6 +360,62 @@ export async function buildBriefingSnapshotData(
   }
 }
 
+export async function buildUsBriefingSnapshotData(
+  ticker: string,
+  options: Required<Pick<BriefingSnapshotRequestOptions, 'fetcher' | 'timeoutMs'>> & Pick<BriefingSnapshotRequestOptions, 'cacheTtlMs' | 'now'>,
+  requestSignal?: AbortSignal,
+): Promise<LoadingBriefingSnapshot> {
+  const normalizedTicker = normalizeUsTicker(ticker)
+  if (!normalizedTicker) {
+    throw new Error('us ticker is required')
+  }
+
+  const fetchOptions: FetchJsonOptions = {
+    fetcher: options.fetcher,
+    requestSignal,
+    timeoutMs: options.timeoutMs,
+  }
+  const upstreamUrl = buildUsOhlcBriefingUpstreamUrl(getCrawlerBaseUrl(), normalizedTicker)
+  const payload = await fetchJsonWithTimeout<UsOhlcPayload>(upstreamUrl, fetchOptions)
+  const daily = normalizeUsOhlcDailyRows(payload)
+  const latest = getLatestRow(daily)
+  const previous = getPreviousRow(daily)
+  const source = payload.data?.source ?? payload.data?.provider ?? payload.data?.meta?.primarySource ?? 'polygon'
+
+  if (!latest) {
+    throw new Error('us ohlc briefing snapshot unavailable')
+  }
+
+  return {
+    ticker: normalizedTicker,
+    asOf: latest.date,
+    quote: {
+      currentPrice: latest.close,
+      openPrice: latest.open ?? null,
+      highPrice: latest.high ?? null,
+      lowPrice: latest.low ?? null,
+      volume: latest.volume ?? null,
+      previousClose: previous?.close ?? null,
+      previousVolume: previous?.volume ?? null,
+      changePct: resolveChangePct(latest.close, latest, previous),
+      currency: 'USD',
+      asOf: latest.date,
+      marketStatus: null,
+      exchange: 'US',
+      source,
+    },
+    daily,
+    market: {},
+    sourceStatus: {
+      daily: 'ok',
+      stockBasic: 'ok',
+      kospi: 'error',
+      kosdaq: 'error',
+    },
+    sources: [source],
+  }
+}
+
 function jsonError(status: number, code: string, message: string) {
   return NextResponse.json(
     {
@@ -311,15 +436,18 @@ function jsonSuccess(body: BriefingSnapshotSuccessBody, cacheTtlMs: number) {
 
 export async function handleBriefingSnapshotRequest(request: NextRequest, options: BriefingSnapshotRequestOptions = {}) {
   const code = normalizeKrCode(request.nextUrl.searchParams.get('code'))
-  if (!code) {
-    return jsonError(400, 'invalid-code', 'code must be a 6 digit KR stock code')
+  const ticker = normalizeUsTicker(request.nextUrl.searchParams.get('ticker'))
+  const market = request.nextUrl.searchParams.get('market')
+  const useUsTicker = !code && Boolean(ticker) && isUsMarket(market)
+  if (!code && !useUsTicker) {
+    return jsonError(400, 'invalid-target', 'code must be a 6 digit KR stock code or ticker+market=US must be provided')
   }
 
   const fetcher = options.fetcher ?? fetch
   const timeoutMs = getBriefingSnapshotTimeoutMs(options)
   const cacheTtlMs = getBriefingSnapshotCacheTtlMs(options)
   const now = options.now?.() ?? Date.now()
-  const cacheKey = code
+  const cacheKey = code ? `KR:${code}` : `US:${ticker}`
 
   const cached = cacheTtlMs > 0 ? briefingSnapshotCache.get(cacheKey) : undefined
   if (cached && cached.expiresAt > now) {
@@ -329,7 +457,10 @@ export async function handleBriefingSnapshotRequest(request: NextRequest, option
   try {
     let inflight = briefingSnapshotInflight.get(cacheKey)
     if (!inflight) {
-      inflight = buildBriefingSnapshotData(code, { fetcher, timeoutMs, cacheTtlMs, now: options.now })
+      inflight = (code
+        ? buildBriefingSnapshotData(code, { fetcher, timeoutMs, cacheTtlMs, now: options.now })
+        : buildUsBriefingSnapshotData(ticker!, { fetcher, timeoutMs, cacheTtlMs, now: options.now })
+      )
         .then((data) => ({ ok: true as const, data }))
         .finally(() => {
           briefingSnapshotInflight.delete(cacheKey)
