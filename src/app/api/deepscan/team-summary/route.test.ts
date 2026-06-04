@@ -3,9 +3,22 @@ import assert from 'node:assert/strict'
 
 import {
   DEEPSCAN_TEAM_SUMMARY_MAX_TOKENS,
+  DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT,
   createDeepScanTeamSummaryResponse,
   parseTeamSummaryContent,
 } from './route'
+
+
+test('team summary system prompt favors detailed three-member interpretation', () => {
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /3명 위원/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /150~240자/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /3문장 초과 금지/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /위원명·역할명·개별 주체명 언급을 금지/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /평단 대비 수익률이나 이미 크게 오른 가격은 추가 상승 여력의 근거가 아니라 현재 포지션 상태/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /세 위원 모두, 모두 긍정 같은 만장일치 표현을 쓰지 말고/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /현재가가 목표가에 근접했다면 추가 상승 여력이 크다고 쓰지 말고/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /매수·매도·보유·포지션 유지 같은 투자 행동 권유/)
+})
 
 test('team summary route validates required fields', async () => {
   const response = await createDeepScanTeamSummaryResponse({}, async () => ({ summary: 'unused' }))

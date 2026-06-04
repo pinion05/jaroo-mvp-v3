@@ -487,15 +487,16 @@ function buildCommitteeTeamBody(
   committeeAxes: JarooDeepScanCommitteeAxis[] | undefined,
 ) {
   const members = flattenCommitteeMembers(committeeAxes)
-  const lines = team.members.map((definition) => {
+  const lines = team.members.map((definition, index) => {
+    const internalOpinionLabel = `의견 ${index + 1}`
     const member = members.find((candidate) => candidate.title === definition.sourceTitle)
     if (member?.status === 'success' && typeof member.reason === 'string' && member.reason.trim()) {
-      return `${definition.alias}: ${member.reason}`
+      return `${internalOpinionLabel}: ${member.reason}`
     }
     if (member?.status === 'error') {
-      return `${definition.alias}: 응답 실패`
+      return `${internalOpinionLabel}: 응답 실패`
     }
-    return `${definition.alias}: 응답 대기 중`
+    return `${internalOpinionLabel}: 응답 대기 중`
   })
 
   return {
@@ -616,6 +617,24 @@ function buildOrderedNarrativeCards(cards: NarrativeCard[], arrivedStageKeys: Lo
 
 function buildVisibleNarrativeCards(cards: NarrativeCard[], visibleStageCount: number): NarrativeCard[] {
   return cards.slice(0, Math.min(Math.max(visibleStageCount, 1), cards.length))
+}
+
+export function splitTeamSummarySentences(value: string) {
+  return value
+    .replace(/\s+/g, ' ')
+    .trim()
+    .match(/[^.!?。！？]+[.!?。！？]+|[^.!?。！？]+$/gu)
+    ?.map((sentence) => sentence.trim())
+    .filter(Boolean) ?? []
+}
+
+export function shouldCollapseTeamSummaryText(value: string) {
+  return splitTeamSummarySentences(value).length >= 2
+}
+
+export function getCollapsedTeamSummaryText(value: string) {
+  const sentences = splitTeamSummarySentences(value)
+  return sentences.length >= 2 ? `${sentences[0]} ....` : value.trim()
 }
 
 
@@ -1018,6 +1037,7 @@ export function DeepScanLoadingScreen({
 }: DeepScanLoadingScreenProps) {
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [teamSummaries, setTeamSummaries] = useState<Partial<Record<LoadingStageKey, TeamSummaryState>>>({})
+  const [expandedTeamSummaries, setExpandedTeamSummaries] = useState<ReadonlySet<LoadingStageKey>>(() => new Set())
   const requestedTeamSummariesRef = useRef<Set<string>>(new Set())
   const targetLine = [identifier, market].filter(Boolean).join(' · ')
   const sharesText = formatShares(shares)
@@ -1192,6 +1212,10 @@ export function DeepScanLoadingScreen({
             const summaryReady = summaryState?.inputKey === summaryInputKey && summaryState.status === 'success' && summaryState.summary
             const summaryLoading = summaryState?.inputKey === summaryInputKey && summaryState.status === 'loading'
             const summaryText = summaryReady ? summaryState.summary! : null
+            const summaryCollapsible = Boolean(summaryText && shouldCollapseTeamSummaryText(summaryText))
+            const summaryExpanded = Boolean(card.teamKey && expandedTeamSummaries.has(card.teamKey))
+            const displaySummaryText = summaryText && summaryCollapsible && !summaryExpanded ? getCollapsedTeamSummaryText(summaryText) : summaryText
+            const summaryTextId = `team-summary-${card.key}`
             const showSummarySkeleton = !card.placeholder && !summaryText
             const cardSettled = resultsReady || card.complete
             const statusLabel = summaryReady ? '요약 완료' : summaryLoading ? '요약 중' : cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
@@ -1219,7 +1243,31 @@ export function DeepScanLoadingScreen({
                       <span />
                     </div>
                   ) : (
-                    <p className={cn(styles.narrativeText, styles.narrativeTextSummarized)}>{summaryText}</p>
+                    <div className={styles.narrativeSummaryTextWrap}>
+                      <p className={cn(styles.narrativeText, styles.narrativeTextSummarized)} id={summaryTextId}>{displaySummaryText}</p>
+                      {summaryCollapsible && card.teamKey ? (
+                        <button
+                          type='button'
+                          className={styles.narrativeSummaryAppendixToggle}
+                          aria-expanded={summaryExpanded}
+                          aria-controls={summaryTextId}
+                          onClick={() => {
+                            setExpandedTeamSummaries((previous) => {
+                              const next = new Set(previous)
+                              if (next.has(card.teamKey!)) {
+                                next.delete(card.teamKey!)
+                              } else {
+                                next.add(card.teamKey!)
+                              }
+                              return next
+                            })
+                          }}
+                        >
+                          <span>{summaryExpanded ? '상세 해석 접기' : '상세 해석 펼치기'}</span>
+                          <span className={styles.narrativeSummaryAppendixIcon} aria-hidden='true'>{summaryExpanded ? '⌃' : '⌄'}</span>
+                        </button>
+                      ) : null}
+                    </div>
                   )}
                   {card.teamKey === 'marketTeam' && positionQuickFact?.indicator ? (
                     <div

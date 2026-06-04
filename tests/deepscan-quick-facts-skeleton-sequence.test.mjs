@@ -112,6 +112,31 @@ test('DeepScan loading screen only fetches internal team summaries and avoids re
   assert.match(source, /inlineResults/)
 })
 
+
+
+test('OCR apply navigation does not get overridden by missing upload-session guard', () => {
+  const source = readRepoFile('src', 'app', 'ocr', 'page.tsx')
+
+  assert.match(source, /const isLeavingAfterApplyRef = useRef\(false\)/)
+  assert.match(source, /if \(!isLeavingAfterApplyRef\.current\) \{\s*router\.replace\('\/screenshot'\)/u)
+  assert.match(source, /isLeavingAfterApplyRef\.current = true\s*clearPersistedScreenshotUploadSession\(\)\s*clearUploadInput\(\)\s*router\.push\('\/home'\)/u)
+})
+
+test('DeepScan long team summaries collapse behind an expand button', () => {
+  const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
+  const cssSource = readRepoFile('src', 'components', 'deepscan-loading-screen.module.css')
+
+  assert.match(loadingSource, /function splitTeamSummarySentences/)
+  assert.match(loadingSource, /function shouldCollapseTeamSummaryText/)
+  assert.match(loadingSource, /function getCollapsedTeamSummaryText/)
+  assert.match(loadingSource, /summaryCollapsible/)
+  assert.match(loadingSource, /aria-expanded=\{summaryExpanded\}/)
+  assert.match(loadingSource, /상세 해석 펼치기/)
+  assert.match(loadingSource, /`\$\{sentences\[0\]\} \.\.\.\.`/)
+  assert.match(cssSource, /\.narrativeSummaryAppendixToggle/)
+  assert.match(cssSource, /border-top: 0\.5px solid/)
+})
+
 test('/deepscan renders inline results without confirmed-result CTA gate', () => {
   const source = readRepoFile('src', 'app', 'deepscan', 'page.tsx')
 
@@ -130,8 +155,9 @@ test('DeepScan team bubbles send raw member reasons for summaries but hide raw g
   const summaryRouteSource = readRepoFile('src', 'app', 'api', 'deepscan', 'team-summary', 'route.ts')
 
   assert.match(loadingSource, /member\.reason/)
-  assert.match(loadingSource, /`\$\{definition\.alias\}: \$\{member\.reason\}`/)
-  assert.match(loadingSource, /`\$\{definition\.alias\}: 응답 대기 중`/)
+  assert.match(loadingSource, /const internalOpinionLabel = `의견 \$\{index \+ 1\}`/)
+  assert.match(loadingSource, /`\$\{internalOpinionLabel\}: \$\{member\.reason\}`/)
+  assert.match(loadingSource, /`\$\{internalOpinionLabel\}: 응답 대기 중`/)
   assert.match(loadingSource, /const summaryText = summaryReady \? summaryState\.summary! : null/)
   assert.match(loadingSource, /const showSummarySkeleton = !card\.placeholder && !summaryText/)
   assert.match(loadingSource, /card\.placeholder \|\| showSummarySkeleton/)

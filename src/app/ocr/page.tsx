@@ -370,6 +370,7 @@ export default function OcrPage() {
   const [hasCheckedPersistedUploadSession, setHasCheckedPersistedUploadSession] = useState(false)
   const ocrRunIdRef = useRef(0)
   const autoOcrSessionKeyRef = useRef<string | null>(null)
+  const isLeavingAfterApplyRef = useRef(false)
   const session = uploadStoreSession ?? persistedUploadSession
 
   useEffect(() => {
@@ -382,7 +383,9 @@ export default function OcrPage() {
       setRequestStatus('idle')
       setResolveStatus('idle')
       setUploadStatuses({})
-      router.replace('/screenshot')
+      if (!isLeavingAfterApplyRef.current) {
+        router.replace('/screenshot')
+      }
       return
     }
 
@@ -784,6 +787,7 @@ export default function OcrPage() {
           setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', null)
         })
       markApplied(appliedAt)
+      isLeavingAfterApplyRef.current = true
       clearPersistedScreenshotUploadSession()
       clearUploadInput()
       router.push('/home')

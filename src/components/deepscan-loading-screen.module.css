@@ -2066,6 +2066,53 @@
   white-space: normal;
 }
 
+.narrativeSummaryTextWrap {
+  display: grid;
+  gap: 0;
+}
+
+.narrativeSummaryAppendixToggle {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 9px 0 0;
+  border: 0;
+  border-top: 0.5px solid rgba(28, 85, 133, 0.14);
+  background: transparent;
+  color: var(--ds-blue);
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 850;
+  letter-spacing: -0.01em;
+  text-align: left;
+}
+
+.narrativeSummaryAppendixToggle:hover {
+  color: #0f4f8d;
+}
+
+.narrativeSummaryAppendixToggle:focus-visible {
+  border-top-color: rgba(35, 126, 209, 0.42);
+  outline: 2px solid rgba(35, 126, 209, 0.28);
+  outline-offset: 3px;
+}
+
+.narrativeSummaryAppendixIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: rgba(35, 126, 209, 0.08);
+  color: var(--ds-blue);
+  font-size: 13px;
+  line-height: 1;
+}
+
 .narrativeCardPending .narrativeText {
   color: var(--ds-muted);
 }

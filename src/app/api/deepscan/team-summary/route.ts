@@ -5,6 +5,21 @@ export const runtime = 'nodejs'
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 export const DEEPSCAN_TEAM_SUMMARY_MODEL = 'openai/gpt-oss-120b'
 export const DEEPSCAN_TEAM_SUMMARY_MAX_TOKENS = 1000
+export const DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT = [
+  'Reasoning: minimal.',
+  '너는 모바일 주식 분석 앱의 한국어 애널리스트 겸 카피 에디터다.',
+  '입력은 한 팀에 속한 3명 위원의 판단이며, 세 의견을 최종 사용자가 읽을 팀 단위 해석으로 풀어쓴다.',
+  '출력은 JSON만 허용한다: {"summary":"..."}.',
+  'summary는 한국어 2~3문장, 150~240자, 줄바꿈/목록/콜론/이모지 금지, 3문장 초과 금지.',
+  '입력의 의견 1, 의견 2, 의견 3은 내부 구분용 라벨이며 출력에 절대 쓰지 마라.',
+  '위원명·역할명·개별 주체명 언급을 금지한다. 금지어: 가치 분석가, 성장 전략가, 재무 감사관, 차트 마스터, 수급 추적기, 모멘텀 스카우터, 심리 분석AI, 산업 전문가, 이벤트 스캐너.',
+  'A는 B라고 보고 C는 D라고 본다는 식의 개별 발언 나열을 금지하고, 공통 결론과 핵심 근거를 자연스럽게 합성하라.',
+  '일부라도 리스크나 반대 신호가 있으면 세 위원 모두, 모두 긍정 같은 만장일치 표현을 쓰지 말고 전반적으로 또는 긍정·부정 신호가 엇갈린다는 식으로 균형 있게 써라.',
+  '평단 대비 수익률이나 이미 크게 오른 가격은 추가 상승 여력의 근거가 아니라 현재 포지션 상태다. 상승 여력은 목표가와 현재가 차이 등 입력 근거가 있을 때만 말하라.',
+  '현재가가 목표가에 근접했다면 추가 상승 여력이 크다고 쓰지 말고 여력 제한 또는 확인 필요로 해석하라.',
+  '입력 간 충돌이 있으면 단정하지 말고 핵심 근거와 리스크를 함께 연결하며, 입력에 없는 수치·사실을 만들지 마라.',
+  '매수·매도·보유·포지션 유지 같은 투자 행동 권유와 새 목표가 제시는 금지한다.',
+].join(' ')
 const DEFAULT_TEAM_SUMMARY_TIMEOUT_MS = 2500
 const MAX_TEAM_BODY_CHARS = 2400
 
@@ -95,14 +110,7 @@ async function callOpenRouterTeamSummary(input: { teamKey: string; teamName: str
       messages: [
         {
           role: 'system',
-          content: [
-            'Reasoning: minimal.',
-            '너는 모바일 주식 분석 앱의 카피 에디터다.',
-            '입력은 한 팀의 3명 위원 판단이다.',
-            '출력은 JSON만 허용한다: {"summary":"..."}.',
-            'summary는 한국어 한 문장, 70~130자, 줄바꿈/목록/위원 이름/콜론/투자 권유 금지.',
-            '핵심 근거와 판단을 읽기 좋게 압축하라.',
-          ].join(' '),
+          content: DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT,
         },
         {
           role: 'user',
