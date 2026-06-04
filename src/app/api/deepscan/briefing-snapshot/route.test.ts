@@ -5,6 +5,7 @@ import { NextRequest } from 'next/server'
 import {
   BriefingSnapshotTimeoutError,
   buildBriefingSnapshotData,
+  buildUsBriefingSnapshotData,
   clearBriefingSnapshotCache,
   handleBriefingSnapshotRequest,
 } from './route'
@@ -33,6 +34,20 @@ const indexBasic = {
   closePrice: '8,390.68',
   fluctuationsRatio: '2.43',
   localTradedAt: '2026-05-29T12:11:00+09:00',
+}
+
+const usOhlcPayload = {
+  ok: true,
+  data: {
+    ticker: 'TSLA',
+    provider: 'polygon',
+    source: 'polygon-v2-aggs-ticker-range-day',
+    series: [
+      { date: '2026-06-03', open: 418.7, high: 433.6, low: 416, close: 423.7, volume: 44500733.868013 },
+      { date: '2026-06-02', open: 429, high: 430, low: 410, close: 420, volume: 39000000 },
+      { date: '2026-06-01', open: 410, high: 425, low: 405, close: 412, volume: 35000000 },
+    ],
+  },
 }
 
 function createBriefingFetcher(overrides: Partial<Record<'daily' | 'stockBasic' | 'kospi' | 'kosdaq', Response | Error>> = {}) {
@@ -70,6 +85,20 @@ function createBriefingFetcher(overrides: Partial<Record<'daily' | 'stockBasic' 
   }) as typeof fetch
 }
 
+function createUsBriefingFetcher(overrides: { ohlc?: Response | Error } = {}) {
+  return (async (input: RequestInfo | URL) => {
+    const url = String(input)
+    if (!url.includes('/api/source/polygon/us/stocks/TSLA/ohlc')) {
+      return jsonResponse({ error: 'unexpected url' }, 404)
+    }
+
+    if (overrides.ohlc instanceof Error) {
+      throw overrides.ohlc
+    }
+    return overrides.ohlc ?? jsonResponse(usOhlcPayload)
+  }) as typeof fetch
+}
+
 test('briefing snapshot route rejects invalid KR code', async () => {
   const response = await handleBriefingSnapshotRequest(
     new NextRequest('http://localhost/api/deepscan/briefing-snapshot?code=abc'),
@@ -79,7 +108,34 @@ test('briefing snapshot route rejects invalid KR code', async () => {
 
   assert.equal(response.status, 400)
   assert.equal(body.ok, false)
-  assert.equal(body.error.code, 'invalid-code')
+  assert.equal(body.error.code, 'invalid-target')
+})
+
+test('briefing snapshot accepts US ticker and maps Polygon OHLC into daily chart rows', async () => {
+  clearBriefingSnapshotCache()
+  const response = await handleBriefingSnapshotRequest(
+    new NextRequest('http://localhost/api/deepscan/briefing-snapshot?ticker=TSLA&market=US'),
+    { fetcher: createUsBriefingFetcher(), cacheTtlMs: 0 },
+  )
+  const body = await response.json()
+
+  assert.equal(response.status, 200)
+  assert.equal(body.ok, true)
+  assert.equal(body.data.ticker, 'TSLA')
+  assert.equal(body.data.quote.exchange, 'US')
+  assert.equal(body.data.quote.currentPrice, 423.7)
+  assert.equal(body.data.quote.currency, 'USD')
+  assert.equal(body.data.daily.length, 3)
+  assert.deepEqual(body.data.daily.map((row: { date: string }) => row.date), ['2026-06-01', '2026-06-02', '2026-06-03'])
+  assert.equal(body.data.sourceStatus.daily, 'ok')
+})
+
+test('buildUsBriefingSnapshotData exposes latest US OHLC quote and previous close', async () => {
+  const snapshot = await buildUsBriefingSnapshotData('TSLA', { fetcher: createUsBriefingFetcher(), timeoutMs: 100, cacheTtlMs: 0 })
+
+  assert.equal(snapshot.quote?.currentPrice, 423.7)
+  assert.equal(snapshot.quote?.previousClose, 420)
+  assert.equal(snapshot.quote?.source, 'polygon-v2-aggs-ticker-range-day')
 })
 
 test('briefing snapshot returns partial response when daily source fails but basic quote is available', async () => {

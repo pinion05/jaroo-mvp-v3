@@ -429,13 +429,19 @@ function buildLoadingQuickQuoteUrl(target: { code?: string; ticker?: string } | 
   return `/api/quotes/current?${searchParams.toString()}`
 }
 
-function buildLoadingBriefingSnapshotUrl(target: { code?: string } | null) {
+function buildLoadingBriefingSnapshotUrl(target: { code?: string; ticker?: string; market?: string; marketTone?: HomeMarketTone } | null) {
   const code = normalizeDeepScanCode(target?.code)
-  if (!code) {
+  if (code) {
+    const searchParams = new URLSearchParams({ code })
+    return `/api/deepscan/briefing-snapshot?${searchParams.toString()}`
+  }
+
+  const ticker = target?.ticker?.trim().toUpperCase()
+  if (!ticker || (target?.marketTone !== 'nasdaq' && target?.market?.toUpperCase() !== 'US')) {
     return undefined
   }
 
-  const searchParams = new URLSearchParams({ code })
+  const searchParams = new URLSearchParams({ ticker, market: 'US' })
   return `/api/deepscan/briefing-snapshot?${searchParams.toString()}`
 }
 
@@ -1376,7 +1382,7 @@ export default function DeepScanPage() {
 
   useEffect(() => {
     const snapshotUrl = buildLoadingBriefingSnapshotUrl(target)
-    if (!snapshotUrl || !targetKey || requestStatus !== 'loading') {
+    if (!snapshotUrl || !targetKey || loadingBriefingSnapshot?.targetKey === targetKey) {
       return
     }
 
@@ -1409,7 +1415,7 @@ export default function DeepScanPage() {
     return () => {
       controller.abort()
     }
-  }, [requestStatus, target, targetKey])
+  }, [loadingBriefingSnapshot?.targetKey, target, targetKey])
 
   useEffect(() => {
     if (!requestSeed || !targetKey || requestStatus !== 'loading') {
@@ -1716,6 +1722,7 @@ export default function DeepScanPage() {
           averagePriceCurrency={target?.averagePriceCurrency}
           currentPrice={loadingCurrentPrice}
           currentPriceCurrency={loadingCurrentPriceCurrency}
+          usdKrwRate={target?.usdKrwRate}
           tradingVolume={loadingTradingVolume}
           currentProfitRate={target?.currentProfitRate}
           evaluationAmount={target?.evaluationAmount}

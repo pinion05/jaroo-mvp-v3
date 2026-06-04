@@ -18,6 +18,7 @@ export type LoadingBriefingMarketIndex = {
 
 export type LoadingBriefingSnapshot = {
   code?: string
+  ticker?: string
   asOf?: string | null
   quote?: {
     currentPrice?: number | null
