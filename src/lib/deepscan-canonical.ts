@@ -9,6 +9,11 @@ type DeepScanCanonicalHolding = Pick<
   'name' | 'code' | 'identifierCode' | 'identifierTicker' | 'shares' | 'averagePrice' | 'evaluationAmount' | 'market' | 'marketTone'
 > & {
   ticker?: string
+  averagePriceCurrency?: string
+  currentPrice?: string
+  currentPriceCurrency?: string
+  currentProfitRate?: string
+  usdKrwRate?: string
 }
 
 export type DeepScanCanonicalTargetSession = {
@@ -22,7 +27,12 @@ type CanonicalQueryKey =
   | 'name'
   | 'shares'
   | 'averagePrice'
+  | 'averagePriceCurrency'
+  | 'currentPrice'
+  | 'currentPriceCurrency'
+  | 'currentProfitRate'
   | 'evaluationAmount'
+  | 'usdKrwRate'
   | 'selectedAt'
   | 'from'
 
@@ -152,7 +162,16 @@ function isCanonicalInput(input: unknown) {
     return false
   }
 
-  if (holding && !hasOptionalStringFields(holding, ['shares', 'averagePrice', 'evaluationAmount'])) {
+  if (holding && !hasOptionalStringFields(holding, [
+    'shares',
+    'averagePrice',
+    'averagePriceCurrency',
+    'currentPrice',
+    'currentPriceCurrency',
+    'currentProfitRate',
+    'evaluationAmount',
+    'usdKrwRate',
+  ])) {
     return false
   }
 
@@ -269,7 +288,12 @@ export function buildDeepScanCanonicalQuery(targetSession: DeepScanCanonicalTarg
   setQueryValue(searchParams, 'name', holding.name)
   setQueryValue(searchParams, 'shares', holding.shares)
   setHoldingMetricQueryValue(searchParams, 'averagePrice', holding.averagePrice)
+  setQueryValue(searchParams, 'averagePriceCurrency', holding.averagePriceCurrency)
+  setQueryValue(searchParams, 'currentPrice', holding.currentPrice)
+  setQueryValue(searchParams, 'currentPriceCurrency', holding.currentPriceCurrency)
+  setQueryValue(searchParams, 'currentProfitRate', holding.currentProfitRate)
   setHoldingMetricQueryValue(searchParams, 'evaluationAmount', holding.evaluationAmount)
+  setQueryValue(searchParams, 'usdKrwRate', holding.usdKrwRate)
   setQueryValue(searchParams, 'selectedAt', targetSession.selectedAt)
   searchParams.set('from', 'home-handoff')
 

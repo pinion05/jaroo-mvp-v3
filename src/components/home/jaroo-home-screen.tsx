@@ -891,14 +891,17 @@ export function JarooHomeScreen() {
       currentProfitRate: item.currentProfitRate,
       evaluationAmount: item.evaluationAmount,
     })
-    setDeepScanTarget(toDeepScanTargetInput(item))
+    setDeepScanTarget({
+      ...toDeepScanTargetInput(item),
+      usdKrwRate: hasUsHomeHoldings ? usdKrwRate ?? undefined : undefined,
+    })
 
     if (deepScanNavigationIdRef.current !== navigationId) {
       return
     }
 
     router.push(actionHref)
-  }, [homeHoldings, portfolioItems, router, setDeepScanTarget])
+  }, [hasUsHomeHoldings, homeHoldings, portfolioItems, router, setDeepScanTarget, usdKrwRate])
 
   const cancelDeepScanLoading = useCallback(() => {
     deepScanNavigationIdRef.current += 1
