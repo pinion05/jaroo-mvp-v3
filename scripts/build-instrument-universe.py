@@ -1,9 +1,6 @@
 from __future__ import annotations
 
-import csv
-import gzip
 import html
-import io
 import json
 import re
 import urllib.request
@@ -13,7 +10,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 OUTPUT_PATH = ROOT / 'src/lib/data/instrument-universe.json'
 SEC_URL = 'https://www.sec.gov/files/company_tickers.json'
-KRX_URL = 'https://github.com/FinanceData/stock_master/raw/master/stock_master.csv.gz'
+KRX_KIND_LIST_URL = 'https://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13'
 WISE_ETF_LOOKUP_URL = 'https://comp.wisereport.co.kr/ETF/lookup.aspx'
 USER_AGENT = 'JarooMVP/4.0 contact@jaroo.app'
 
@@ -48,6 +45,13 @@ KR_NAME_OVERRIDES_BY_CODE = {
     '148020': 'KBSTAR 200',
     '100840': 'SNT에너지',
     '152100': 'ARIRANG 200',
+}
+
+KR_KIND_MARKET_MAP = {
+    '유가': 'KOSPI',
+    '코스피': 'KOSPI',
+    '코스닥': 'KOSDAQ',
+    '코넥스': 'KONEX',
 }
 
 KR_MANUAL_ENTRIES = [
@@ -176,23 +180,50 @@ def parse_wisereport_lookup_rows(html_text: str) -> list[tuple[str, str, str]]:
     ]
 
 
-def build_kr_entries() -> list[dict[str, object]]:
-    raw = fetch_bytes(KRX_URL)
-    with gzip.GzipFile(fileobj=io.BytesIO(raw)) as gz:
-        text = gz.read().decode('utf-8')
+def strip_html_cell(value: str) -> str:
+    without_tags = re.sub(r'<[^>]+>', '', value)
+    return html.unescape(without_tags).replace('\xa0', ' ').strip()
 
-    reader = csv.DictReader(io.StringIO(text))
+
+def parse_krx_kind_listing_rows(html_text: str) -> list[dict[str, str]]:
+    rows: list[dict[str, str]] = []
+    headers: list[str] = []
+
+    for raw_row in re.findall(r'<tr[^>]*>(.*?)</tr>', html_text, re.S | re.I):
+        cells = [
+            strip_html_cell(cell)
+            for cell in re.findall(r'<t[dh][^>]*>(.*?)</t[dh]>', raw_row, re.S | re.I)
+        ]
+
+        if not cells:
+            continue
+
+        if not headers:
+            headers = cells
+            continue
+
+        if len(cells) < len(headers):
+            continue
+
+        rows.append(dict(zip(headers, cells)))
+
+    return rows
+
+
+def build_kr_entries() -> list[dict[str, object]]:
+    text = fetch_bytes(KRX_KIND_LIST_URL).decode('euc-kr', 'ignore')
+    listing_rows = parse_krx_kind_listing_rows(text)
     entries: list[dict[str, object]] = []
 
-    for row in reader:
-        symbol = str(row.get('Symbol') or '').strip()
-        raw_name = str(row.get('Name') or '').strip()
-        market = str(row.get('Market') or '').strip().upper()
+    for row in listing_rows:
+        symbol = str(row.get('종목코드') or '').strip().upper()
+        raw_name = str(row.get('회사명') or '').strip()
+        market = KR_KIND_MARKET_MAP.get(str(row.get('시장구분') or '').strip())
 
         if not symbol or not raw_name or market not in {'KOSPI', 'KOSDAQ', 'KONEX'}:
             continue
 
-        code = symbol.zfill(6)
+        code = symbol.zfill(6) if symbol.isdigit() else symbol
         name = KR_NAME_OVERRIDES_BY_CODE.get(code, raw_name)
         entries.append(
             {

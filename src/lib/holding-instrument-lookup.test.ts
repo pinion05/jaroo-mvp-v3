@@ -25,6 +25,15 @@ test('한국 종목명은 fuzzy search로 종목코드까지 매핑한다', () =
   assert.equal(resolved?.market, 'KOSPI')
 })
 
+test('KRX KIND 보강 종목 HPSP는 KOSDAQ 코드로 매핑한다', () => {
+  const resolved = resolveHoldingInstrument('HPSP')
+
+  assert.equal(resolved?.name, 'HPSP')
+  assert.equal(resolved?.code, '403870')
+  assert.equal(resolved?.market, 'KOSDAQ')
+  assert.equal(resolved?.marketTone, 'kosdaq')
+})
+
 test('미국 회사명은 semantic search로 티커까지 매핑한다', () => {
   const resolved = resolveHoldingInstrument('Microsoft Corporation')
 
