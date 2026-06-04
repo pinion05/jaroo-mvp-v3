@@ -1,5 +1,5 @@
 import type { JarooDeepScanPayload } from '../../packages/contracts/src/deepscan'
-import { parseOcrNumber, parseOcrProfitRate } from './screenshot-ocr'
+import { isAveragePriceComputedFromEvaluation, parseOcrNumber, parseOcrProfitRate } from './screenshot-ocr'
 
 export type WorkflowMarketTone = 'kospi' | 'kosdaq' | 'nasdaq' | 'etf'
 export type WorkflowInstrumentKind = 'stock' | 'etf'
@@ -152,6 +152,10 @@ export function buildIdentifierLabel(ticker?: string, code?: string) {
   return identifiers.length > 0 ? identifiers.join(' · ') : undefined
 }
 
+function isUsResolvedMarket(row: Pick<OcrReviewRow, 'resolvedMarketTone' | 'resolvedMarket'>) {
+  return row.resolvedMarketTone === 'nasdaq' || /(nasdaq|nyse|amex|us)/i.test(row.resolvedMarket ?? '')
+}
+
 function inferMoneyCurrencyFromText(value: string | undefined) {
   const normalizedValue = value?.trim().toUpperCase() ?? ''
 
@@ -170,10 +174,31 @@ function inferMoneyCurrencyFromText(value: string | undefined) {
   return undefined
 }
 
+function inferAveragePriceCurrency(row: OcrReviewRow) {
+  const explicitAveragePriceCurrency = inferMoneyCurrencyFromText(row.averagePrice)
+
+  if (explicitAveragePriceCurrency) {
+    return explicitAveragePriceCurrency
+  }
+
+  const evaluationAmountCurrency = inferMoneyCurrencyFromText(row.evaluationAmount)
+
+  if (isUsResolvedMarket(row)) {
+    return evaluationAmountCurrency && isAveragePriceComputedFromEvaluation(
+      row.quantity,
+      row.profitRate,
+      row.evaluationAmount,
+      row.averagePrice,
+    )
+      ? evaluationAmountCurrency
+      : undefined
+  }
+
+  return evaluationAmountCurrency ?? 'KRW'
+}
+
 export function toConfirmedHolding(row: OcrReviewRow): ConfirmedHolding {
-  const averagePriceCurrency = inferMoneyCurrencyFromText(row.averagePrice)
-    ?? inferMoneyCurrencyFromText(row.evaluationAmount)
-    ?? (row.resolvedMarketTone === 'nasdaq' ? undefined : 'KRW')
+  const averagePriceCurrency = inferAveragePriceCurrency(row)
 
   return {
     displayName: row.resolvedName?.trim() || row.name.trim(),

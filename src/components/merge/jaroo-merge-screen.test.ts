@@ -126,6 +126,29 @@ test('buildAppliedHomePortfolioRowsFromConfirmedHoldings는 원화 평가금액�
   assert.equal(appliedRow?.evaluationAmount, '4,564,930원')
 })
 
+test('buildAppliedHomePortfolioRowsFromConfirmedHoldings는 미국 종목의 명시되지 않은 달러 평단을 원화 평가금액만으로 KRW 처리하지 않는다', () => {
+  const [mergeRow] = buildMergeRowsFromReviewRows([
+    createReviewRow({
+      name: '테슬라',
+      quantity: '10주',
+      profitRate: '+20.0%',
+      evaluationAmount: '4,200,000원',
+      averagePrice: '300.50',
+      resolvedName: 'Tesla, Inc.',
+      resolvedTicker: 'TSLA',
+      resolvedCode: undefined,
+      resolvedMarket: 'US',
+      resolvedMarketTone: 'nasdaq',
+      resolvedKind: 'stock',
+    }),
+  ])
+  const [appliedRow] = buildAppliedHomePortfolioRowsFromConfirmedHoldings([mergeRow])
+
+  assert.equal(mergeRow?.averagePriceCurrency, undefined)
+  assert.equal(appliedRow?.averagePriceCurrency, undefined)
+  assert.equal(appliedRow?.averagePrice, '300.50')
+})
+
 test('MergeResultRowCard는 수익률 값을 한 번만 렌더링한다', () => {
   const [mergeRow] = buildMergeRowsFromReviewRows([createReviewRow()])
   const markup = renderToStaticMarkup(createElement(MergeResultRowCard, { row: mergeRow, isLast: true }))

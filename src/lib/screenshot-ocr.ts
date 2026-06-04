@@ -232,6 +232,45 @@ export function computeAveragePrice(quantity: string, profitRate: string, evalua
   return formatComputedNumber(averagePrice)
 }
 
+export function isAveragePriceComputedFromEvaluation(
+  quantity: string,
+  profitRate: string,
+  evaluationAmount: string,
+  averagePrice: string,
+) {
+  const parsedQuantity = parseOcrNumber(quantity)
+  const parsedProfitRate = parseOcrProfitRate(profitRate)
+  const parsedEvaluationAmount = parseOcrNumber(evaluationAmount)
+  const parsedAveragePrice = parseOcrNumber(averagePrice)
+
+  if (
+    parsedQuantity === null
+    || parsedProfitRate === null
+    || parsedEvaluationAmount === null
+    || parsedAveragePrice === null
+    || parsedQuantity === 0
+  ) {
+    return false
+  }
+
+  const principalDivisor = 1 + (parsedProfitRate / 100)
+
+  if (!Number.isFinite(principalDivisor) || principalDivisor === 0) {
+    return false
+  }
+
+  const expectedAveragePrice = (parsedEvaluationAmount / principalDivisor) / parsedQuantity
+
+  if (!Number.isFinite(expectedAveragePrice) || expectedAveragePrice <= 0) {
+    return false
+  }
+
+  const absoluteDistance = Math.abs(parsedAveragePrice - expectedAveragePrice)
+  const relativeDistance = absoluteDistance / Math.max(Math.abs(expectedAveragePrice), 1)
+
+  return absoluteDistance <= 1 || relativeDistance <= 0.02
+}
+
 function normalizeInstrumentCode(value: unknown) {
   if (typeof value !== 'string') {
     return undefined
