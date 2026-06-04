@@ -1,8 +1,8 @@
 {
   "repo_path": "/home/pinion/kr-us-stock-name-ticker-maps",
   "files": {
-    "data/kr/kr-stock-name-to-code.json": 65583,
-    "data/kr/kr-stock-name-to-code.txt": 52254,
+    "data/kr/kr-stock-name-to-code.json": 103712,
+    "data/kr/kr-stock-name-to-code.txt": 82991,
     "data/us/us-stock-name-ko-to-ticker-exact.json": 259297,
     "data/us/us-stock-name-en-to-ticker-exact.json": 543512,
     "data/us/us-stock-name-exact-report.json": 1264,

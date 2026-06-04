@@ -16,9 +16,9 @@ Jaroo V3 모노레포 내부에서 사용하는 KR/US 종목명↔코드/티커 
   - 형식: `삼성전자 : 005930`
 
 기준:
-- KRX 상장(True) 기준
-- 총 2221개
-- KOSPI 788 / KOSDAQ 1285 / KONEX 148
+- KRX/KIND 상장법인목록으로 보강
+- 총 3453개 이름 매핑
+- 2026-06-04 수집 기준 KOSPI 838 / KOSDAQ 1819 / KONEX 107
 
 ### 2) 미국 주식 / 미국 상장 종목
 
@@ -59,7 +59,7 @@ Jaroo V3 모노레포 내부에서 사용하는 KR/US 종목명↔코드/티커 
 ## 현재 커버리지 요약
 
 ### 한국 주식
-- 상장 종목 기준 2221개 전체 수록
+- 기존 KR 맵에 KRX/KIND 상장법인목록 누락분을 보강해 3453개 이름 매핑 수록
 
 ### 미국 주식
 원천 기준:
@@ -79,8 +79,8 @@ Jaroo V3 모노레포 내부에서 사용하는 KR/US 종목명↔코드/티커 
 ## 데이터 출처
 
 ### 한국 주식
-- FinanceData/stock_master
-- 원본: `https://github.com/FinanceData/stock_master/raw/master/stock_master.csv.gz`
+- KRX KIND 상장법인목록(EXCEL)
+- 원본: `https://kind.krx.co.kr/corpgeneral/corpList.do?method=download&searchType=13`
 
 ### 미국 주식
 - SEC company tickers

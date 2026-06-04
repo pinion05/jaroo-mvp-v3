@@ -74,6 +74,28 @@ test('통합 엔드포인트는 한국 주식명을 코드로 반환한다', asy
   }
 });
 
+test('통합 엔드포인트는 KRX KIND 보강 종목 HPSP를 코드로 반환한다', async () => {
+  const server = createServer();
+
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
+  const address = server.address();
+
+  try {
+    const response = await fetch(`http://127.0.0.1:${address.port}/api/stock-search?q=${encodeURIComponent('HPSP')}&topN=3`);
+    assert.equal(response.status, 200);
+
+    const payload = await response.json();
+    assert.deepEqual(payload.kr, {
+      matched: true,
+      matchedBy: 'exact',
+      name: 'HPSP',
+      code: '403870',
+    });
+  } finally {
+    await closeServer(server);
+  }
+});
+
 test('통합 엔드포인트는 해외 주식 한글 오타를 퍼지 티커 후보로 반환한다', async () => {
   const server = createServer();
 
