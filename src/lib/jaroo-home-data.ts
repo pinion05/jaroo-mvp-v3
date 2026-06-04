@@ -1069,8 +1069,8 @@ function deriveHoldingTone(profitRateValue: number | null) {
   }
 
   return {
-    badge: '관찰 중',
-    badgeTone: 'amber' as HomeBadgeTone,
+    badge: '손실 중',
+    badgeTone: 'red' as HomeBadgeTone,
     cardTone: 'warning' as HomeCardTone,
     signalTone: 'warning' as HomeHolding['signalTone'],
     centerScoreColor: '#FAC775',

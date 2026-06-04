@@ -344,6 +344,8 @@ test('applied home portfolio handoff는 미국 종목 OCR 평단의 KRW 통화 �
     assert.equal(holding?.averagePrice, '79,577.3278원')
     assert.equal(holding?.evaluationAmount, '3,156,013원')
     assert.equal(holding?.change, '-15.5%')
+    assert.equal(holding?.badge, '손실 중')
+    assert.equal(holding?.badgeTone, 'red')
     assert.equal(holding?.metaLine, '티커 PYPL · 종목코드 US70450Y1038 · 평단 79,577.3278원 · 평가금액 3,156,013원 · 현재가 67,242.842원')
   } finally {
     restoreWindow()

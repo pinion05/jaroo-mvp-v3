@@ -172,6 +172,7 @@ function inferMoneyCurrencyFromText(value: string | undefined) {
 
 export function toConfirmedHolding(row: OcrReviewRow): ConfirmedHolding {
   const averagePriceCurrency = inferMoneyCurrencyFromText(row.averagePrice)
+    ?? inferMoneyCurrencyFromText(row.evaluationAmount)
     ?? (row.resolvedMarketTone === 'nasdaq' ? undefined : 'KRW')
 
   return {

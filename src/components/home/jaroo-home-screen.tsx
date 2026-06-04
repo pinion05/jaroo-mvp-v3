@@ -217,7 +217,7 @@ function getStockTag(item: HomeHolding) {
   }
 
   if (item.badgeTone === 'red') {
-    return item.cardTone === 'halt' ? '정지' : '점검'
+    return item.cardTone === 'halt' ? '정지' : '손실'
   }
 
   return '관찰'
@@ -245,8 +245,8 @@ function buildHomeV2Summary(holdings: HomeHolding[], isAppliedPortfolio: boolean
   const principal = totalEvaluation !== null && totalPnl !== null ? totalEvaluation - totalPnl : null
   const totalRate = principal !== null && principal > 0 && totalPnl !== null ? (totalPnl / principal) * 100 : null
   const negativeCount = holdings.filter((item) => (getHoldingChangeValue(item) ?? 0) < 0).length
-  const badgeTone: HomeBadgeTone = negativeCount === 0 ? 'green' : negativeCount >= Math.ceil(holdings.length / 2) ? 'red' : 'amber'
-  const badge = badgeTone === 'green' ? '수익' : badgeTone === 'red' ? '점검' : '관찰'
+  const badgeTone: HomeBadgeTone = totalPnl === null ? 'amber' : totalPnl >= 0 ? 'green' : 'red'
+  const badge = badgeTone === 'green' ? '수익' : badgeTone === 'red' ? '손실' : '관찰'
   const averageRate = holdings.length > 0
     ? holdings.reduce((sum, item) => sum + (getHoldingChangeValue(item) ?? 0), 0) / holdings.length
     : 0

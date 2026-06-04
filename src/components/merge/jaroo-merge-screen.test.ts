@@ -102,6 +102,30 @@ test('buildAppliedHomePortfolioRowsFromConfirmedHoldings는 홈 호환 payload�
   assert.equal(appliedRow?.averagePriceCurrency, 'KRW')
 })
 
+test('buildAppliedHomePortfolioRowsFromConfirmedHoldings는 원화 평가금액에서 계산한 미국 종목 평단을 KRW로 보존한다', () => {
+  const [mergeRow] = buildMergeRowsFromReviewRows([
+    createReviewRow({
+      name: '바이두(ADR)',
+      quantity: '22.729086주',
+      profitRate: '+30.2%',
+      evaluationAmount: '4,564,930원',
+      averagePrice: '154,255.6806',
+      resolvedName: 'Baidu, Inc.',
+      resolvedTicker: 'BIDU',
+      resolvedCode: undefined,
+      resolvedMarket: 'US',
+      resolvedMarketTone: 'nasdaq',
+      resolvedKind: 'stock',
+    }),
+  ])
+  const [appliedRow] = buildAppliedHomePortfolioRowsFromConfirmedHoldings([mergeRow])
+
+  assert.equal(mergeRow?.averagePriceCurrency, 'KRW')
+  assert.equal(appliedRow?.averagePriceCurrency, 'KRW')
+  assert.equal(appliedRow?.averagePrice, '154,255.6806')
+  assert.equal(appliedRow?.evaluationAmount, '4,564,930원')
+})
+
 test('MergeResultRowCard는 수익률 값을 한 번만 렌더링한다', () => {
   const [mergeRow] = buildMergeRowsFromReviewRows([createReviewRow()])
   const markup = renderToStaticMarkup(createElement(MergeResultRowCard, { row: mergeRow, isLast: true }))

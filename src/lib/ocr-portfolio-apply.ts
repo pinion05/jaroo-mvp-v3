@@ -83,7 +83,7 @@ export function buildAppliedHomePortfolioRowsFromConfirmedHoldings(holdings: Con
     profitRate: holding.profitRateText,
     evaluationAmount: holding.evaluationAmountText,
     averagePrice: holding.averagePriceText,
-    averagePriceCurrency: holding.averagePriceCurrency ?? (holding.marketTone === 'nasdaq' ? 'USD' : 'KRW'),
+    averagePriceCurrency: holding.averagePriceCurrency ?? (holding.marketTone === 'nasdaq' ? undefined : 'KRW'),
     code: holding.code,
     ticker: holding.ticker,
     resolvedName: holding.displayName,
