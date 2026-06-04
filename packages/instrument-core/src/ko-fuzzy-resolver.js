@@ -36,6 +36,14 @@ function normalizeText(text) {
     .trim();
 }
 
+function exposeBracketedTokens(text) {
+  return normalizeText(text)
+    .replace(/\(([^)]*)\)/g, ' $1 ')
+    .replace(/\[([^\]]*)\]/g, ' $1 ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
 function compactText(text) {
   return normalizeText(text).replace(/[^0-9A-Za-z가-힣]+/g, '').toUpperCase();
 }
@@ -248,8 +256,20 @@ function addCompactMatches(list, seen, compactKey, compactToEntries) {
 function collectBaselineAliases(query, index) {
   const aliases = [];
   const seen = new Set();
+  const qWithBracketTokens = exposeBracketedTokens(query);
   const qStripped = stripDecorators(query);
+  const qWithBracketTokensCompact = compactText(qWithBracketTokens);
   const qCompact = compactText(qStripped);
+
+  if (qWithBracketTokensCompact && qWithBracketTokensCompact !== qCompact) {
+    addCompactMatches(aliases, seen, qWithBracketTokensCompact, index.compactToEntries);
+  }
+
+  if (qWithBracketTokens && qWithBracketTokens !== qStripped) {
+    for (const alias of correctByDistance(qWithBracketTokens, index.displayCorpus, { distance: 2, maxSlice: 2, isSplit: false }).slice(0, 6)) {
+      addAliasToRecall(aliases, seen, alias);
+    }
+  }
 
   if (qStripped) {
     for (const alias of correctByDistance(qStripped, index.displayCorpus, { distance: 4, maxSlice: 2, isSplit: false }).slice(0, 10)) {
@@ -269,9 +289,21 @@ function collectBaselineAliases(query, index) {
 function collectExpandedAliases(query, index) {
   const aliases = [];
   const seen = new Set();
+  const qWithBracketTokens = exposeBracketedTokens(query);
   const qStripped = stripDecorators(query);
+  const qWithBracketTokensCompact = compactText(qWithBracketTokens);
   const qCompact = compactText(qStripped || query);
   const qLen = qCompact.length;
+
+  if (qWithBracketTokensCompact && qWithBracketTokensCompact !== qCompact) {
+    addCompactMatches(aliases, seen, qWithBracketTokensCompact, index.compactToEntries);
+  }
+
+  if (qWithBracketTokens && qWithBracketTokens !== qStripped) {
+    for (const alias of correctByDistance(qWithBracketTokens, index.displayCorpus, { distance: 2, maxSlice: 4, isSplit: false }).slice(0, 10)) {
+      addAliasToRecall(aliases, seen, alias);
+    }
+  }
 
   for (const alias of collectBaselineAliases(query, index)) {
     addAliasToRecall(aliases, seen, alias);
@@ -353,6 +385,24 @@ function sanitizeTopN(value, fallback = 5) {
   return Math.max(1, Math.min(20, Math.trunc(value)));
 }
 
+function collectExactTickers(index, displayKeys, compactKeys) {
+  const exactTickerSet = new Set();
+
+  for (const key of displayKeys) {
+    if (key && index.displayAliasToTickers.has(key)) {
+      for (const ticker of index.displayAliasToTickers.get(key)) exactTickerSet.add(ticker);
+    }
+  }
+
+  for (const key of compactKeys) {
+    if (key && index.compactAliasToTickers.has(key)) {
+      for (const ticker of index.compactAliasToTickers.get(key)) exactTickerSet.add(ticker);
+    }
+  }
+
+  return exactTickerSet;
+}
+
 function createKoFuzzyResolver(options = {}) {
   const koMapPath = options.koMapPath || DEFAULT_KO_MAP_PATH;
   const tickerInfoPath = options.tickerInfoPath || DEFAULT_TICKER_INFO_PATH;
@@ -363,21 +413,20 @@ function createKoFuzzyResolver(options = {}) {
 
   function legacyResolve(query, topN = 5) {
     const qNorm = normalizeText(query);
+    const qWithBracketTokens = exposeBracketedTokens(query);
     const qStripped = stripDecorators(query);
     const qCompact = compactText(query);
+    const qWithBracketTokensCompact = compactText(qWithBracketTokens);
     const qStrippedCompact = compactText(qStripped);
 
-    const exactTickerSet = new Set();
-    for (const key of [qNorm, qStripped]) {
-      if (index.displayAliasToTickers.has(key)) {
-        for (const ticker of index.displayAliasToTickers.get(key)) exactTickerSet.add(ticker);
-      }
-    }
-    for (const key of [qCompact, qStrippedCompact]) {
-      if (index.compactAliasToTickers.has(key)) {
-        for (const ticker of index.compactAliasToTickers.get(key)) exactTickerSet.add(ticker);
-      }
-    }
+    const bracketExactTickerSet =
+      qWithBracketTokensCompact && qWithBracketTokensCompact !== qStrippedCompact
+        ? collectExactTickers(index, [qWithBracketTokens], [qWithBracketTokensCompact])
+        : new Set();
+    const exactTickerSet =
+      bracketExactTickerSet.size > 0
+        ? bracketExactTickerSet
+        : collectExactTickers(index, [qNorm, qStripped], [qCompact, qStrippedCompact]);
 
     if (exactTickerSet.size > 0) {
       const exactResults = [...exactTickerSet]
@@ -446,21 +495,20 @@ function createKoFuzzyResolver(options = {}) {
   function resolve(query, resolveOptions = {}) {
     const topN = sanitizeTopN(resolveOptions.topN ?? 5);
     const qNorm = normalizeText(query);
+    const qWithBracketTokens = exposeBracketedTokens(query);
     const qStripped = stripDecorators(query);
     const qCompact = compactText(query);
+    const qWithBracketTokensCompact = compactText(qWithBracketTokens);
     const qStrippedCompact = compactText(qStripped);
 
-    const exactTickerSet = new Set();
-    for (const key of [qNorm, qStripped]) {
-      if (index.displayAliasToTickers.has(key)) {
-        for (const ticker of index.displayAliasToTickers.get(key)) exactTickerSet.add(ticker);
-      }
-    }
-    for (const key of [qCompact, qStrippedCompact]) {
-      if (index.compactAliasToTickers.has(key)) {
-        for (const ticker of index.compactAliasToTickers.get(key)) exactTickerSet.add(ticker);
-      }
-    }
+    const bracketExactTickerSet =
+      qWithBracketTokensCompact && qWithBracketTokensCompact !== qStrippedCompact
+        ? collectExactTickers(index, [qWithBracketTokens], [qWithBracketTokensCompact])
+        : new Set();
+    const exactTickerSet =
+      bracketExactTickerSet.size > 0
+        ? bracketExactTickerSet
+        : collectExactTickers(index, [qNorm, qStripped], [qCompact, qStrippedCompact]);
 
     if (exactTickerSet.size > 0) {
       const exactResults = [...exactTickerSet]

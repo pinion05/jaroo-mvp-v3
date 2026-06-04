@@ -27,6 +27,19 @@ test('resolves exact Korean stock name to ticker', () => {
   assert.equal(results[0].score, 1);
 });
 
+test('preserves parenthesized ADR qualifier when resolving Korean aliases', () => {
+  const resolver = createKoFuzzyResolver({
+    koMapPath: path.join(repoRoot, 'data/us/us-stock-name-ko-to-ticker-coverage100.json'),
+    tickerInfoPath: path.join(repoRoot, 'data/us/us-stock-ticker-to-ko-en-coverage100.json'),
+  });
+
+  const parenthesizedResults = resolver.resolve('바이두(ADR)', { topN: 3 });
+  assert.equal(parenthesizedResults[0].ticker, 'BIDU');
+
+  const spacedResults = resolver.resolve('바이두 ADR', { topN: 3 });
+  assert.equal(spacedResults[0].ticker, 'BIDU');
+});
+
 test('resolves common Korean typo to expected ticker within top3', () => {
   const resolver = createKoFuzzyResolver({
     koMapPath: path.join(repoRoot, 'data/us/us-stock-name-ko-to-ticker-coverage100.json'),
