@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { Cell, Pie, PieChart } from 'recharts'
 import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
 import { shouldUseDeepScanLoadingHandoff } from '@/lib/deepscan-navigation'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
@@ -91,8 +92,7 @@ type MoneySummary = {
 
 type DonutSegment = {
   holding: HomeHolding
-  start: number
-  end: number
+  value: number
   labelTop: string
   labelLeft: string
 }
@@ -394,27 +394,13 @@ export function buildHomeV2Summary(holdings: HomeHolding[], isAppliedPortfolio: 
   }
 }
 
-function buildConicGradient(holdings: HomeHolding[]) {
-  let cursor = 0
-  const stops: string[] = []
-  const totalWeight = holdings.reduce((sum, item) => sum + Math.max(item.donutPercent, 0.01), 0) || 1
-
-  for (const item of holdings) {
-    const size = (Math.max(item.donutPercent, 0.01) / totalWeight) * 360
-    const end = cursor + size
-    stops.push(`${item.donutColor} ${cursor.toFixed(1)}deg ${end.toFixed(1)}deg`)
-    cursor = end
-  }
-
-  return `conic-gradient(${stops.join(', ')})`
-}
-
 function buildDonutSegments(holdings: HomeHolding[]): DonutSegment[] {
   const totalWeight = holdings.reduce((sum, item) => sum + Math.max(item.donutPercent, 0.01), 0) || 1
   let cursor = -90
 
   return holdings.map((holding, index) => {
-    const size = (Math.max(holding.donutPercent, 0.01) / totalWeight) * 360
+    const value = Math.max(holding.donutPercent, 0.01)
+    const size = (value / totalWeight) * 360
     const middle = cursor + size / 2
     const radians = (middle * Math.PI) / 180
     const x = 50 + Math.cos(radians) * 42
@@ -422,8 +408,7 @@ function buildDonutSegments(holdings: HomeHolding[]): DonutSegment[] {
     const presetPosition = DONUT_LABEL_POSITIONS[index]
     const segment = {
       holding,
-      start: cursor,
-      end: cursor + size,
+      value,
       labelTop: presetPosition?.top ?? `${clamp(y, 10, 86).toFixed(1)}%`,
       labelLeft: presetPosition?.left ?? `${clamp(x, 9, 91).toFixed(1)}%`,
     }
@@ -443,7 +428,38 @@ function HomeDonut({ holdings, summary, selectedId, onSelect }: {
 
   return (
     <div className={styles.donutWrap}>
-      <div className={styles.donut} style={{ background: buildConicGradient(holdings) }}>
+      <div className={styles.donut}>
+        <PieChart
+          width={220}
+          height={220}
+          className={styles.donutChart}
+          role='img'
+          aria-label='보유 종목 비중 원차트'
+        >
+          <Pie
+            data={segments}
+            dataKey='value'
+            nameKey='holding.name'
+            cx='50%'
+            cy='50%'
+            innerRadius={62}
+            outerRadius={110}
+            startAngle={90}
+            endAngle={-270}
+            paddingAngle={0}
+            stroke='none'
+            isAnimationActive={false}
+            rootTabIndex={-1}
+          >
+            {segments.map((segment) => (
+              <Cell
+                key={segment.holding.id}
+                fill={segment.holding.donutColor}
+                opacity={selectedId === null || selectedId === segment.holding.id ? 1 : 0.72}
+              />
+            ))}
+          </Pie>
+        </PieChart>
         {topSegments.map((segment) => (
           <button
             key={segment.holding.id}
