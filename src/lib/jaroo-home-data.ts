@@ -1,6 +1,6 @@
 import { buildDeepScanTargetSession, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding, type DeepScanTargetSession } from '@/lib/deepscan-target'
 import { buildIdentifierLabel, type PortfolioNormalizedItem, type WorkflowAsyncStatus } from '@/lib/workflow-types'
-import { normalizeStockName, parseOcrNumber, parseOcrProfitRate, type OcrRow } from '@/lib/screenshot-ocr'
+import { isAveragePriceComputedFromEvaluation, normalizeStockName, parseOcrNumber, parseOcrProfitRate, type OcrRow } from '@/lib/screenshot-ocr'
 
 export type HomeBadgeTone = 'amber' | 'red' | 'green'
 export type HomeCardTone = 'danger' | 'warning' | 'halt' | 'profit' | 'etf'
@@ -854,7 +854,15 @@ function resolveAppliedAveragePriceCurrency(
   const evaluationAmountCurrency = inferCurrencyFromMoneyText(item.evaluationAmount)
 
   if (isUsResolvedMarket(resolvedMarketTone, resolvedMarket)) {
-    return evaluationAmountCurrency
+    const averagePriceLooksComputedFromEvaluation = evaluationAmountCurrency
+      && isAveragePriceComputedFromEvaluation(
+        readTrimmedString(item.quantity) ?? '',
+        readTrimmedString(item.profitRate) ?? '',
+        readTrimmedString(item.evaluationAmount) ?? '',
+        readTrimmedString(item.averagePrice) ?? '',
+      )
+
+    return averagePriceLooksComputedFromEvaluation ? evaluationAmountCurrency : undefined
   }
 
   return evaluationAmountCurrency ?? 'KRW'
@@ -1069,8 +1077,8 @@ function deriveHoldingTone(profitRateValue: number | null) {
   }
 
   return {
-    badge: '관찰 중',
-    badgeTone: 'amber' as HomeBadgeTone,
+    badge: '손실 중',
+    badgeTone: 'red' as HomeBadgeTone,
     cardTone: 'warning' as HomeCardTone,
     signalTone: 'warning' as HomeHolding['signalTone'],
     centerScoreColor: '#FAC775',

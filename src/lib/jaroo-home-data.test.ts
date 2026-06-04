@@ -344,7 +344,49 @@ test('applied home portfolio handoff는 미국 종목 OCR 평단의 KRW 통화 �
     assert.equal(holding?.averagePrice, '79,577.3278원')
     assert.equal(holding?.evaluationAmount, '3,156,013원')
     assert.equal(holding?.change, '-15.5%')
+    assert.equal(holding?.badge, '손실 중')
+    assert.equal(holding?.badgeTone, 'red')
     assert.equal(holding?.metaLine, '티커 PYPL · 종목코드 US70450Y1038 · 평단 79,577.3278원 · 평가금액 3,156,013원 · 현재가 67,242.842원')
+  } finally {
+    restoreWindow()
+  }
+})
+
+test('applied home portfolio handoff는 미국 종목의 명시되지 않은 달러 평단을 원화 평가금액만으로 KRW 처리하지 않는다', () => {
+  const restoreWindow = installWindowMock()
+
+  try {
+    const ocrRow = {
+      name: '테슬라',
+      quantity: '10주',
+      profitRate: '+20.0%',
+      evaluationAmount: '4,200,000원',
+      averagePrice: '300.50',
+      resolvedName: 'Tesla, Inc.',
+      resolvedTicker: 'TSLA',
+      resolvedMarket: 'NASDAQ',
+      resolvedMarketTone: 'nasdaq',
+      resolvedKind: 'stock',
+    } as Parameters<typeof persistAppliedHomePortfolio>[0]['rows'][number] & {
+      profitRate: string
+      evaluationAmount: string
+    }
+
+    const persisted = persistAppliedHomePortfolio({
+      broker: '테스트증권',
+      rows: [ocrRow],
+    })
+
+    assert.equal(persisted, true)
+
+    const session = readAppliedHomePortfolio()
+    const [portfolioItem] = buildPortfolioItemsFromAppliedHomePortfolioRows(session?.rows ?? [])
+    const [holding] = buildHomeHoldingsFromOcrRows(session?.rows ?? [])
+
+    assert.equal(session?.rows[0]?.averagePriceCurrency, undefined)
+    assert.equal(portfolioItem?.averagePriceCurrency, undefined)
+    assert.equal(holding?.averagePriceCurrency, undefined)
+    assert.equal(holding?.averagePrice, '300.5')
   } finally {
     restoreWindow()
   }

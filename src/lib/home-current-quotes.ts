@@ -315,16 +315,16 @@ function applyLiveTone(holding: HomeHolding, changeValue: number | null) {
 
   return {
     ...holding,
-    badge: '관찰 중' as const,
-    badgeTone: 'amber' as const,
+    badge: '손실 중' as const,
+    badgeTone: 'red' as const,
     cardTone: 'warning' as const,
     signalTone: 'warning' as const,
     centerScoreColor: '#FAC775',
-    centerBadge: '관찰 중',
-    centerBadgeTone: 'amber' as const,
+    centerBadge: '손실 중',
+    centerBadgeTone: 'red' as const,
     heatmapBackground: '#BC7010',
-    heatmapBadge: '관찰 중',
-    heatmapBadgeTone: 'amber' as const,
+    heatmapBadge: '손실 중',
+    heatmapBadgeTone: 'red' as const,
     blink: undefined,
   }
 }

@@ -72,6 +72,23 @@ type HomeV2Summary = {
   momentumStages: typeof defaultMomentumStages
 }
 
+type HomeV2SummaryOptions = {
+  usdKrwRate?: number | null
+}
+
+type MoneyCurrency = 'KRW' | 'USD'
+
+type MoneyEntry = {
+  value: number
+  currency: MoneyCurrency
+}
+
+type MoneySummary = {
+  value: number | null
+  currency: MoneyCurrency
+  mixedWithoutFx: boolean
+}
+
 type DonutSegment = {
   holding: HomeHolding
   start: number
@@ -142,14 +159,75 @@ function getEvaluationAmountText(item: HomeHolding) {
   return metricValue !== '-' ? metricValue : (item.evaluationAmount?.trim() || '-')
 }
 
-function inferHomogeneousMoneyCurrency(values: string[]) {
-  const populatedValues = values.map((value) => value.trim()).filter((value) => value && value !== '-')
+function inferMoneyCurrencyFromText(value: string) {
+  const normalizedValue = value.trim().toUpperCase()
 
-  if (populatedValues.length > 0 && populatedValues.every((value) => /^[+-]?\$/.test(value))) {
+  if (!normalizedValue || normalizedValue === '-') {
+    return null
+  }
+
+  if (/^[+-]?\$/.test(normalizedValue) || normalizedValue.includes('USD')) {
     return 'USD'
   }
 
-  return 'KRW'
+  if (normalizedValue.includes('₩') || normalizedValue.includes('KRW') || normalizedValue.includes('원')) {
+    return 'KRW'
+  }
+
+  return null
+}
+
+function inferMoneyCurrencyForHoldingText(item: HomeHolding, value: string): MoneyCurrency {
+  return inferMoneyCurrencyFromText(value) ?? (item.marketTone === 'nasdaq' ? 'USD' : 'KRW')
+}
+
+function getMoneyEntry(item: HomeHolding, value: number | null, text: string): MoneyEntry | null {
+  if (value === null || !Number.isFinite(value)) {
+    return null
+  }
+
+  return {
+    value,
+    currency: inferMoneyCurrencyForHoldingText(item, text),
+  }
+}
+
+function hasUsableUsdKrwRate(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+}
+
+function convertMoneyEntryToKrw(entry: MoneyEntry, usdKrwRate: number) {
+  return entry.currency === 'USD' ? entry.value * usdKrwRate : entry.value
+}
+
+function summarizeMoneyEntries(entries: MoneyEntry[], options: HomeV2SummaryOptions = {}): MoneySummary {
+  if (entries.length === 0) {
+    return { value: null, currency: 'KRW', mixedWithoutFx: false }
+  }
+
+  const currencies = new Set(entries.map((entry) => entry.currency))
+
+  if (currencies.size === 1) {
+    const [currency] = [...currencies] as MoneyCurrency[]
+
+    return {
+      value: entries.reduce((sum, entry) => sum + entry.value, 0),
+      currency,
+      mixedWithoutFx: false,
+    }
+  }
+
+  const usdKrwRate = options.usdKrwRate
+
+  if (hasUsableUsdKrwRate(usdKrwRate)) {
+    return {
+      value: entries.reduce((sum, entry) => sum + convertMoneyEntryToKrw(entry, usdKrwRate), 0),
+      currency: 'KRW',
+      mixedWithoutFx: false,
+    }
+  }
+
+  return { value: null, currency: 'KRW', mixedWithoutFx: true }
 }
 
 function formatKrw(value: number | null) {
@@ -217,7 +295,7 @@ function getStockTag(item: HomeHolding) {
   }
 
   if (item.badgeTone === 'red') {
-    return item.cardTone === 'halt' ? '정지' : '점검'
+    return item.cardTone === 'halt' ? '정지' : '손실'
   }
 
   return '관찰'
@@ -235,18 +313,34 @@ function getStockTagClass(item: HomeHolding) {
   return styles.watch
 }
 
-function buildHomeV2Summary(holdings: HomeHolding[], isAppliedPortfolio: boolean): HomeV2Summary {
-  const totalEvaluationValues = holdings.map(getEvaluationAmount).filter((value): value is number => value !== null)
-  const pnlValues = holdings.map(getPnlAmount).filter((value): value is number => value !== null)
-  const evaluationCurrency = inferHomogeneousMoneyCurrency(holdings.map(getEvaluationAmountText))
-  const pnlCurrency = inferHomogeneousMoneyCurrency(holdings.map((item) => item.pnl))
-  const totalEvaluation = totalEvaluationValues.length > 0 ? totalEvaluationValues.reduce((sum, value) => sum + value, 0) : null
-  const totalPnl = pnlValues.length > 0 ? pnlValues.reduce((sum, value) => sum + value, 0) : null
-  const principal = totalEvaluation !== null && totalPnl !== null ? totalEvaluation - totalPnl : null
+export function buildHomeV2Summary(holdings: HomeHolding[], isAppliedPortfolio: boolean, options: HomeV2SummaryOptions = {}): HomeV2Summary {
+  const evaluationSummary = summarizeMoneyEntries(
+    holdings.flatMap((item) => {
+      const text = getEvaluationAmountText(item)
+      const entry = getMoneyEntry(item, getEvaluationAmount(item), text)
+      return entry ? [entry] : []
+    }),
+    options,
+  )
+  const pnlSummary = summarizeMoneyEntries(
+    holdings.flatMap((item) => {
+      const entry = getMoneyEntry(item, getPnlAmount(item), item.pnl)
+      return entry ? [entry] : []
+    }),
+    options,
+  )
+  const totalEvaluation = evaluationSummary.value
+  const totalPnl = pnlSummary.value
+  const canCalculateTotalRate = totalEvaluation !== null
+    && totalPnl !== null
+    && evaluationSummary.currency === pnlSummary.currency
+    && !evaluationSummary.mixedWithoutFx
+    && !pnlSummary.mixedWithoutFx
+  const principal = canCalculateTotalRate ? totalEvaluation - totalPnl : null
   const totalRate = principal !== null && principal > 0 && totalPnl !== null ? (totalPnl / principal) * 100 : null
   const negativeCount = holdings.filter((item) => (getHoldingChangeValue(item) ?? 0) < 0).length
-  const badgeTone: HomeBadgeTone = negativeCount === 0 ? 'green' : negativeCount >= Math.ceil(holdings.length / 2) ? 'red' : 'amber'
-  const badge = badgeTone === 'green' ? '수익' : badgeTone === 'red' ? '점검' : '관찰'
+  const badgeTone: HomeBadgeTone = totalPnl === null || totalPnl === 0 ? 'amber' : totalPnl > 0 ? 'green' : 'red'
+  const badge = badgeTone === 'green' ? '수익' : badgeTone === 'red' ? '손실' : '관찰'
   const averageRate = holdings.length > 0
     ? holdings.reduce((sum, item) => sum + (getHoldingChangeValue(item) ?? 0), 0) / holdings.length
     : 0
@@ -258,9 +352,9 @@ function buildHomeV2Summary(holdings: HomeHolding[], isAppliedPortfolio: boolean
 
   return {
     totalEvaluation,
-    totalEvaluationText: formatMoneyValue(totalEvaluation, evaluationCurrency),
+    totalEvaluationText: formatMoneyValue(totalEvaluation, evaluationSummary.currency),
     totalPnl,
-    totalPnlText: formatSignedMoneyValue(totalPnl, pnlCurrency),
+    totalPnlText: formatSignedMoneyValue(totalPnl, pnlSummary.currency),
     totalRate,
     badge,
     badgeTone,
@@ -696,7 +790,10 @@ export function JarooHomeScreen() {
   }, [hasUsHomeHoldings, liveQuoteSnapshot, portfolioBaseItems, quoteFailureKinds, quoteQuery, quoteSurfaceEnabled, rawHomeHoldings, usdKrwRate])
 
   const selectedHolding = selectedId === null ? null : homeHoldings.find((item) => item.id === selectedId) ?? null
-  const summary = useMemo(() => buildHomeV2Summary(homeHoldings, isAppliedPortfolio), [homeHoldings, isAppliedPortfolio])
+  const summary = useMemo(
+    () => buildHomeV2Summary(homeHoldings, isAppliedPortfolio, { usdKrwRate: hasUsHomeHoldings ? usdKrwRate : null }),
+    [hasUsHomeHoldings, homeHoldings, isAppliedPortfolio, usdKrwRate],
+  )
   const defaultDeepScanHolding = useMemo(() => {
     if (selectedHolding?.kind === 'stock') {
       return selectedHolding
