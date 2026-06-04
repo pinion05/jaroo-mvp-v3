@@ -177,13 +177,10 @@
   filter: drop-shadow(0 6px 16px rgba(15, 20, 25, 0.08));
 }
 
-.donut::before {
-  content: "";
+.donutChart {
   position: absolute;
-  inset: 54px;
-  border-radius: 50%;
-  background: #fff;
-  box-shadow: inset 0 0 0 0.5px #e8eaee;
+  inset: 0;
+  z-index: 1;
 }
 
 .dLbl {
@@ -201,7 +198,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
   cursor: pointer;
-  z-index: 2;
+  z-index: 3;
 }
 
 .dLblOn {
@@ -220,7 +217,7 @@
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  z-index: 1;
+  z-index: 2;
 }
 
 .dCenterPl {

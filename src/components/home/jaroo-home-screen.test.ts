@@ -10,8 +10,8 @@ require.extensions['.css'] = (module) => {
 }
 
 async function loadSummaryBuilder() {
-  const module = await import('./jaroo-home-screen')
-  return module.buildHomeV2Summary
+  const homeScreenModule = await import('./jaroo-home-screen')
+  return homeScreenModule.buildHomeV2Summary
 }
 
 function createHolding(overrides: Partial<HomeHolding>): HomeHolding {
