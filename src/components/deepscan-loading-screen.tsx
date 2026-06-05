@@ -108,7 +108,7 @@ type PlaceholderStageKey = `pendingStage${number}`
 type NarrativeCardKey = LoadingStageKey | PlaceholderStageKey
 type NarrativeTone = 'positive' | 'warning' | 'neutral' | 'info'
 type CommitteeTeamMemberDefinition = {
-  sourceTitle: string
+  sourceTitle: string | string[]
   alias: string
 }
 type CommitteeTeamDefinition = {
@@ -171,9 +171,9 @@ const committeeTeams: readonly CommitteeTeamDefinition[] = [
     description: '가치 분석가 · 성장 전략가 · 재무 감사관',
     avatar: '🏛️',
     members: [
-      { sourceTitle: '밸류에이션', alias: '가치 분석가' },
-      { sourceTitle: '수익성/기본체력', alias: '성장 전략가' },
-      { sourceTitle: '지분/안정성', alias: '재무 감사관' },
+      { sourceTitle: ['밸류에이션', 'Valuation'], alias: '가치 분석가' },
+      { sourceTitle: ['수익성/기본체력', 'Growth'], alias: '성장 전략가' },
+      { sourceTitle: ['지분/안정성', 'Profitability'], alias: '재무 감사관' },
     ],
   },
   {
@@ -182,9 +182,9 @@ const committeeTeams: readonly CommitteeTeamDefinition[] = [
     description: '차트 마스터 · 수급 추적기 · 모멘텀 스카우터',
     avatar: '📈',
     members: [
-      { sourceTitle: '가격 위치', alias: '차트 마스터' },
-      { sourceTitle: '평단 격차', alias: '수급 추적기' },
-      { sourceTitle: '트렌드', alias: '모멘텀 스카우터' },
+      { sourceTitle: ['가격 위치', 'Momentum'], alias: '차트 마스터' },
+      { sourceTitle: ['평단 격차', 'Revision'], alias: '수급 추적기' },
+      { sourceTitle: ['트렌드', 'Event Risk'], alias: '모멘텀 스카우터' },
     ],
   },
   {
@@ -193,9 +193,9 @@ const committeeTeams: readonly CommitteeTeamDefinition[] = [
     description: '심리 분석AI · 산업 전문가 · 이벤트 스캐너',
     avatar: '🧠',
     members: [
-      { sourceTitle: '입력 완성도', alias: '심리 분석AI' },
-      { sourceTitle: '상방 버퍼', alias: '산업 전문가' },
-      { sourceTitle: '컨센서스 모멘텀', alias: '이벤트 스캐너' },
+      { sourceTitle: ['입력 완성도', 'Safety'], alias: '심리 분석AI' },
+      { sourceTitle: ['상방 버퍼', 'Ownership'], alias: '산업 전문가' },
+      { sourceTitle: ['컨센서스 모멘텀', '포지션 적합도'], alias: '이벤트 스캐너' },
     ],
   },
 ] as const
@@ -506,6 +506,14 @@ function flattenCommitteeMembers(committeeAxes: JarooDeepScanCommitteeAxis[] | u
   return (committeeAxes ?? []).flatMap((axis) => axis.members)
 }
 
+function findCommitteeMemberBySourceTitle(
+  members: ReturnType<typeof flattenCommitteeMembers>,
+  sourceTitle: CommitteeTeamMemberDefinition['sourceTitle'],
+) {
+  const sourceTitles = Array.isArray(sourceTitle) ? sourceTitle : [sourceTitle]
+  return members.find((candidate) => sourceTitles.includes(candidate.title))
+}
+
 function buildCommitteeTeamBody(
   team: CommitteeTeamDefinition,
   committeeAxes: JarooDeepScanCommitteeAxis[] | undefined,
@@ -513,7 +521,7 @@ function buildCommitteeTeamBody(
   const members = flattenCommitteeMembers(committeeAxes)
   const lines = team.members.map((definition, index) => {
     const internalOpinionLabel = `의견 ${index + 1}`
-    const member = members.find((candidate) => candidate.title === definition.sourceTitle)
+    const member = findCommitteeMemberBySourceTitle(members, definition.sourceTitle)
     if (member?.status === 'success' && typeof member.reason === 'string' && member.reason.trim()) {
       return `${internalOpinionLabel}: ${member.reason}`
     }
@@ -526,11 +534,11 @@ function buildCommitteeTeamBody(
   return {
     body: lines.join('\n'),
     readyCount: team.members.filter((definition) => {
-      const member = members.find((candidate) => candidate.title === definition.sourceTitle)
+      const member = findCommitteeMemberBySourceTitle(members, definition.sourceTitle)
       return member?.status === 'success' && typeof member.reason === 'string' && member.reason.trim().length > 0
     }).length,
     errorCount: team.members.filter((definition) => {
-      const member = members.find((candidate) => candidate.title === definition.sourceTitle)
+      const member = findCommitteeMemberBySourceTitle(members, definition.sourceTitle)
       return member?.status === 'error'
     }).length,
   }
@@ -552,6 +560,56 @@ function buildCompletionState(resultsReady: boolean, elapsedSeconds: number): Co
     title: '분석가 의견을 차례로 모으는 중이에요',
     body: '완료 신호가 오면 기다리지 않고 바로 상세 결과로 넘어갈 수 있게 바뀝니다.',
   }
+}
+
+
+function QuickFactCard({ fact }: { fact: LoadingQuickFact }) {
+  const indicator = fact.indicator
+  const consensus = fact.consensus
+
+  return (
+    <article className={cn(styles.quickFact, fact.key === 'week52-position' ? styles.positionQuickFact : undefined, fact.key === 'analyst-consensus' ? styles.consensusQuickFact : undefined)}>
+      <div className={styles.narrativeTags}>
+        <span className={cn(styles.narrativeTag, narrativeToneClass(quickFactToneToNarrativeTone(fact.tone)))}>{fact.category}</span>
+        <span className={cn(styles.narrativeTag, fact.key === 'week52-position' ? styles.positionSegmentBadge : narrativeToneClass(quickFactToneToNarrativeTone(fact.tone)))}>{fact.badge}</span>
+      </div>
+      <p className={styles.quickFactDetail}>{fact.body}</p>
+      {fact.detail ? <p className={styles.positionDeltaLine}>{fact.detail}</p> : null}
+      {indicator ? (
+        <div className={styles.positionIndicator} aria-label={`${fact.category}: ${indicator.leftLabel}부터 ${indicator.rightLabel} 사이 ${indicator.markerLabel ?? '현재 위치'}`}>
+          <div className={styles.positionScale} aria-hidden='true'>
+            <span className={styles.positionTrack} />
+            <span className={styles.positionMarker} style={{ top: `${100 - indicator.positionPct}%` }}>
+              <span className={styles.positionLeader} />
+              <span className={styles.positionMarkerDot} />
+            </span>
+          </div>
+          <div className={styles.positionReadout}>
+            <span className={styles.positionHighLabel}>{indicator.rightLabel}</span>
+            <span className={styles.positionLowLabel}>{indicator.leftLabel}</span>
+            <span className={styles.positionCurrentCallout} style={{ top: `${100 - indicator.positionPct}%` }}>
+              <strong>{indicator.markerLabel ?? '현재 위치'}</strong>
+              {indicator.deltaLabels?.length ? <span className={styles.positionDeltaLine}>{indicator.deltaLabels.join(' · ')}</span> : null}
+            </span>
+          </div>
+        </div>
+      ) : null}
+      {consensus ? (
+        <div className={styles.consensusInsight}>
+          <div className={styles.consensusChartTop}>
+            <div>
+              <span className={styles.consensusEyebrow}>{consensus.analystCountLabel ?? 'TARGET VIEW'}</span>
+              <strong>{consensus.targetPriceLabel}</strong>
+            </div>
+            {consensus.upsideLabel ? <span>{consensus.upsideLabel}</span> : null}
+          </div>
+          <p className={styles.positionDeltaLine}>
+            {[consensus.currentPriceLabel ? `현재 ${consensus.currentPriceLabel}` : null, consensus.highTargetLabel ? `최고 ${consensus.highTargetLabel}` : null, consensus.lowTargetLabel ? `최저 ${consensus.lowTargetLabel}` : null, consensus.summary].filter(Boolean).join(' · ')}
+          </p>
+        </div>
+      ) : null}
+    </article>
+  )
 }
 
 function buildLoadingStages({
@@ -963,7 +1021,15 @@ function TodayBriefingCard({
         <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} icon='🗓️' question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
         <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} icon='📈' question='단기 흐름은요?' data={<span className={shortStreak.direction === 'up' ? styles.todayUp : shortStreak.direction === 'down' ? styles.todayDown : styles.todayBlue}>{streakLabel}</span>} meaning={shortStreak.direction === 'up' ? '짧게 봐도 흐름이 살아나고 있어요.' : shortStreak.direction === 'down' ? '단기적으로는 숨 고르기가 이어지고 있어요.' : '아직 한쪽 방향으로 강하게 기울지는 않았어요.'} />
         <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} icon='🎯' question='내 자리는 어디쯤일까요?' data={<span className={isFiniteNumber(positionPct) && positionPct < 0 ? styles.todayDown : styles.todayUp}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
-        <TodayMarketBriefing at={briefStartSeconds[3]} elapsedSeconds={elapsedSeconds} kospiPct={briefingSnapshot?.market?.kospi?.changePct ?? null} kosdaqPct={briefingSnapshot?.market?.kosdaq?.changePct ?? null} stockPct={quote?.changePct ?? briefingModel.latestRow?.changePct ?? null} />
+        <TodayMarketBriefing
+          at={briefStartSeconds[3]}
+          elapsedSeconds={elapsedSeconds}
+          firstLabel={briefingSnapshot?.market?.sp500 ? 'S&P 500' : '코스피'}
+          firstPct={briefingSnapshot?.market?.sp500?.changePct ?? briefingSnapshot?.market?.kospi?.changePct ?? null}
+          secondLabel={briefingSnapshot?.market?.nasdaq ? 'NASDAQ' : '코스닥'}
+          secondPct={briefingSnapshot?.market?.nasdaq?.changePct ?? briefingSnapshot?.market?.kosdaq?.changePct ?? null}
+          stockPct={quote?.changePct ?? briefingModel.latestRow?.changePct ?? null}
+        />
         <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} icon='📊' question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
         <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} icon='🔥' question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
       </div>
@@ -1005,12 +1071,12 @@ function TodayBriefingItem({
 }
 
 
-function buildMarketMeaning(kospiPct: number | null, kosdaqPct: number | null, stockPct: number | null) {
+function buildMarketMeaning(firstPct: number | null, secondPct: number | null, stockPct: number | null) {
   if (!isFiniteNumber(stockPct)) {
     return '내 종목의 장중 등락률을 확인하는 중이에요.'
   }
 
-  const marketValues = [kospiPct, kosdaqPct].filter(isFiniteNumber)
+  const marketValues = [firstPct, secondPct].filter(isFiniteNumber)
   if (marketValues.length === 0) {
     return '시장 지수와 내 종목 흐름을 맞춰 보는 중이에요.'
   }
@@ -1030,21 +1096,25 @@ function buildMarketMeaning(kospiPct: number | null, kosdaqPct: number | null, s
 function TodayMarketBriefing({
   at,
   elapsedSeconds,
-  kospiPct,
-  kosdaqPct,
+  firstLabel,
+  firstPct,
+  secondLabel,
+  secondPct,
   stockPct,
 }: {
   at: number
   elapsedSeconds: number
-  kospiPct: number | null
-  kosdaqPct: number | null
+  firstLabel: string
+  firstPct: number | null
+  secondLabel: string
+  secondPct: number | null
   stockPct: number | null
 }) {
   const isVisible = elapsedSeconds >= at
   const isDataVisible = elapsedSeconds >= at + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS
   const isMeaningVisible = elapsedSeconds >= at + TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS
-  const kospiLabel = formatPercentValue(kospiPct) ?? '확인 중'
-  const kosdaqLabel = formatPercentValue(kosdaqPct) ?? '확인 중'
+  const firstPctLabel = formatPercentValue(firstPct) ?? '확인 중'
+  const secondPctLabel = formatPercentValue(secondPct) ?? '확인 중'
   const stockLabel = formatPercentValue(stockPct) ?? '확인 중'
 
   return (
@@ -1055,11 +1125,11 @@ function TodayMarketBriefing({
       </div>
       <div className={cn(styles.todayBriefBody, isDataVisible ? styles.todayBriefBodyIn : undefined)}>
         <div className={styles.todayMarketGrid}>
-          <div className={styles.todayMarketCell}><span>코스피</span><b className={pctToneClass(kospiPct)}>{kospiLabel}</b></div>
-          <div className={styles.todayMarketCell}><span>코스닥</span><b className={pctToneClass(kosdaqPct)}>{kosdaqLabel}</b></div>
+          <div className={styles.todayMarketCell}><span>{firstLabel}</span><b className={pctToneClass(firstPct)}>{firstPctLabel}</b></div>
+          <div className={styles.todayMarketCell}><span>{secondLabel}</span><b className={pctToneClass(secondPct)}>{secondPctLabel}</b></div>
           <div className={`${styles.todayMarketCell} ${styles.todayMarketCellMe}`}><span>내 종목</span><b className={pctToneClass(stockPct)}>{stockLabel}</b></div>
         </div>
-        <p className={cn(styles.todayBriefMeaning, isMeaningVisible ? styles.todayBriefMeaningIn : undefined)}><b>{buildMarketMeaning(kospiPct, kosdaqPct, stockPct)}</b></p>
+        <p className={cn(styles.todayBriefMeaning, isMeaningVisible ? styles.todayBriefMeaningIn : undefined)}><b>{buildMarketMeaning(firstPct, secondPct, stockPct)}</b></p>
       </div>
     </article>
   )
@@ -1272,6 +1342,12 @@ export function DeepScanLoadingScreen({
             <span className={styles.metaValue}>{tradingVolumeText ?? '확인 중'}</span>
           </div>
         </section>
+
+        {displayQuickFacts.length > 0 ? (
+          <section className={styles.quickFactsCard} aria-label='수집된 빠른 근거'>
+            {displayQuickFacts.map((fact) => <QuickFactCard key={fact.key} fact={fact} />)}
+          </section>
+        ) : null}
 
         <section className={styles.narrativeStream} aria-label='분석가 진행 메시지'>
           {visibleNarrativeCards.map((card) => {

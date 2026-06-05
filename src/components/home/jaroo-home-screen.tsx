@@ -30,6 +30,7 @@ import {
   homeForecast as defaultHomeForecast,
   momentumSignals as defaultMomentumSignals,
   momentumStages as defaultMomentumStages,
+  persistDeepScanTarget,
   readAppliedHomePortfolio,
   type HomeBadgeTone,
   type HomeHolding,
@@ -891,6 +892,7 @@ export function JarooHomeScreen() {
       currentProfitRate: item.currentProfitRate,
       evaluationAmount: item.evaluationAmount,
     })
+    persistDeepScanTarget(holding)
     setDeepScanTarget({
       ...toDeepScanTargetInput(item),
       usdKrwRate: hasUsHomeHoldings ? usdKrwRate ?? undefined : undefined,
