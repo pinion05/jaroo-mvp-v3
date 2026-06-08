@@ -122,7 +122,7 @@ function extractLoadingStageKeysFromCommitteeAxes(committeeAxes: JarooDeepScanCo
     (committeeAxes ?? [])
       .flatMap((axis) => axis.members)
       .filter((member) => member.status === 'success' || member.status === 'error')
-      .map((member) => DEEPSCAN_MEMBER_STAGE_BY_TITLE[member.title])
+      .map((member) => (member.memberKey ? DEEPSCAN_MEMBER_STAGE_BY_KEY[member.memberKey] : undefined) ?? DEEPSCAN_MEMBER_STAGE_BY_TITLE[member.title])
       .filter((stageKey): stageKey is LoadingStageKey => Boolean(stageKey)),
   )
 }
@@ -183,7 +183,7 @@ const committeeMemberIcons: Record<string, LucideIcon> = {
 
 const emptyDeepScanSteps: ReadonlyArray<{ icon: LucideIcon; label: string; body: string }> = [
   { icon: BadgeCheck, label: '보유 종목 선택', body: '홈에서 분석할 주식 카드를 고릅니다.' },
-  { icon: LineChart, label: '시장 데이터 확인', body: '현재가·목표가·52주 위치를 먼저 보여줘요.' },
+  { icon: LineChart, label: '시장 데이터 확인', body: '현재가·52주 위치·핵심 근거를 먼저 보여줘요.' },
   { icon: ShieldCheck, label: '세 팀 분석', body: '회복 가능성과 리스크를 순서대로 정리합니다.' },
 ]
 
@@ -732,7 +732,16 @@ function isTargetPriceFailureText(value: string) {
 }
 
 function isTargetPriceMissingText(value: string) {
-  return /목표가\s*미제공|데[이]?타가\s*존재하지\s*않습니다|데[이]?터가\s*존재하지\s*않습니다|최근\s*3개월\s*이내에\s*제시된\s*의견이\s*없습니다/u.test(value)
+  return /목표가\s*미제공|ETF는\s*목표가\s*대신|데[이]?타가\s*존재하지\s*않습니다|데[이]?터가\s*존재하지\s*않습니다|최근\s*3개월\s*이내에\s*제시된\s*의견이\s*없습니다/u.test(value)
+}
+
+function isExchangeProductMarket(value: string | null | undefined) {
+  return /(?:^|\b)(?:ETF|ETN)(?:\b|$)/iu.test(value ?? '')
+}
+
+function isExchangeProductPayload(payload: JarooDeepScanPayload | null, fallbackMarket?: string, fallbackKind?: string) {
+  return isExchangeProductMarket(payload?.input.instrument.market ?? fallbackMarket)
+    || /^(?:etf|etn)$/iu.test(payload?.input.instrument.kind ?? fallbackKind ?? '')
 }
 
 function hasHangulBatchim(value: string) {
@@ -750,9 +759,13 @@ function getTargetPriceSubject(payload: JarooDeepScanPayload | null, fallbackNam
   return name ? `${name}${hasHangulBatchim(name) ? '은' : '는'}` : '이 종목은'
 }
 
-function summarizeTargetPriceReason(value: string, payload: JarooDeepScanPayload | null, fallbackName?: string) {
+function summarizeTargetPriceReason(value: string, payload: JarooDeepScanPayload | null, fallbackName?: string, fallbackMarket?: string, fallbackKind?: string) {
   const normalized = value.replace(/\s+/gu, ' ').trim()
   const subject = getTargetPriceSubject(payload, fallbackName)
+  if (isExchangeProductPayload(payload, fallbackMarket, fallbackKind)) {
+    return 'ETF는 NAV 괴리율, 기초지수 흐름, 구성종목 비중을 기준으로 해석합니다.'
+  }
+
   if (!normalized) {
     return `${subject} 증권사 목표가를 확인하는 중입니다.`
   }
@@ -768,43 +781,47 @@ function summarizeTargetPriceReason(value: string, payload: JarooDeepScanPayload
   return normalized
 }
 
-function buildTargetPriceStatusQuickFact(payload: JarooDeepScanPayload | null, sourceBody?: string, fallbackName?: string): LoadingQuickFact {
+function buildTargetPriceStatusQuickFact(payload: JarooDeepScanPayload | null, sourceBody?: string, fallbackName?: string, fallbackMarket?: string, fallbackKind?: string): LoadingQuickFact {
+  const exchangeProduct = isExchangeProductPayload(payload, fallbackMarket, fallbackKind)
   const targetPriceText = payload?.strategy.targetPriceText?.trim() ?? ''
   const reasonSource = sourceBody?.trim() || targetPriceText
   const isFailure = isTargetPriceFailureText(reasonSource)
   const isMissing = !isFailure && isTargetPriceMissingText(reasonSource)
   const hasTargetPriceValue = Boolean(targetPriceText && targetPriceText !== 'N/A' && !isFailure && !isMissing)
-  const body = hasTargetPriceValue
-    ? `목표가 ${targetPriceText}`
-    : summarizeTargetPriceReason(reasonSource, payload, fallbackName)
+  const body = exchangeProduct
+    ? summarizeTargetPriceReason(reasonSource, payload, fallbackName, fallbackMarket, fallbackKind)
+    : hasTargetPriceValue
+      ? `목표가 ${targetPriceText}`
+      : summarizeTargetPriceReason(reasonSource, payload, fallbackName, fallbackMarket, fallbackKind)
 
   return {
-    key: 'analyst-consensus',
-    category: '목표가',
-    badge: isFailure ? '조회 실패' : isMissing ? '미제공' : '확인 중',
-    tone: isFailure ? 'warning' : 'info',
+    key: exchangeProduct ? 'etf-product-context' : 'analyst-consensus',
+    category: exchangeProduct ? 'ETF 기준' : '목표가',
+    badge: exchangeProduct ? 'NAV·구성' : isFailure ? '조회 실패' : isMissing ? '미제공' : '확인 중',
+    tone: isFailure && !exchangeProduct ? 'warning' : 'info',
     body,
-    detail: isFailure ? '목표가 없음으로 확정하지 않고, 원천 조회 실패로 분리해 표시합니다.' : undefined,
+    detail: isFailure && !exchangeProduct ? '목표가 없음으로 확정하지 않고, 원천 조회 실패로 분리해 표시합니다.' : undefined,
   }
 }
 
-function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null, fallbackName?: string): LoadingQuickFact | null {
-  const consensus = payload?.insights.items.find((item) => item.sourceLabel === '증권사 의견' || item.label === '컨센서스')
+function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null, fallbackName?: string, fallbackMarket?: string, fallbackKind?: string): LoadingQuickFact | null {
+  const exchangeProduct = isExchangeProductPayload(payload, fallbackMarket, fallbackKind)
+  const consensus = exchangeProduct ? undefined : payload?.insights.items.find((item) => item.sourceLabel === '증권사 의견' || item.label === '컨센서스')
   if (!payload) {
-    return buildTargetPriceStatusQuickFact(null, undefined, fallbackName)
+    return buildTargetPriceStatusQuickFact(null, undefined, fallbackName, fallbackMarket, fallbackKind)
   }
 
   if (!consensus?.body?.trim()) {
-    return buildTargetPriceStatusQuickFact(payload, undefined, fallbackName)
+    return buildTargetPriceStatusQuickFact(payload, undefined, fallbackName, fallbackMarket, fallbackKind)
   }
 
   if (isNoDataConsensusBody(consensus.body)) {
-    return buildTargetPriceStatusQuickFact(payload, consensus.body, fallbackName)
+    return buildTargetPriceStatusQuickFact(payload, consensus.body, fallbackName, fallbackMarket, fallbackKind)
   }
 
   const parsedConsensus = parseLoadingConsensusBody(consensus.body)
   if (!parsedConsensus.targetPriceLabel) {
-    return buildTargetPriceStatusQuickFact(payload, consensus.body, fallbackName)
+    return buildTargetPriceStatusQuickFact(payload, consensus.body, fallbackName, fallbackMarket, fallbackKind)
   }
 
   const isPositive = /매수|buy|상향|positive/i.test(consensus.body) || (parsedConsensus.upsidePct ?? 0) > 0 || (parsedConsensus.opinionScore ?? 0) >= 3.5
@@ -833,10 +850,10 @@ function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null, fa
   }
 }
 
-function buildLoadingQuickFacts(payload: JarooDeepScanPayload | null, quickQuote: LoadingQuickQuote | null, briefingSnapshot: LoadingBriefingSnapshot | null, fallbackName?: string): LoadingQuickFact[] {
+function buildLoadingQuickFacts(payload: JarooDeepScanPayload | null, quickQuote: LoadingQuickQuote | null, briefingSnapshot: LoadingBriefingSnapshot | null, fallbackName?: string, fallbackMarket?: string, fallbackKind?: string): LoadingQuickFact[] {
   return [
     buildWeek52LoadingQuickFact(quickQuote) ?? buildWeek52LoadingQuickFactFromBriefingSnapshot(briefingSnapshot),
-    buildConsensusLoadingQuickFact(payload, fallbackName),
+    buildConsensusLoadingQuickFact(payload, fallbackName, fallbackMarket, fallbackKind),
   ].filter((fact): fact is LoadingQuickFact => Boolean(fact))
 }
 
@@ -1395,6 +1412,7 @@ export default function DeepScanPage() {
               usdKrwRate: typeof target.usdKrwRate === 'number' ? String(target.usdKrwRate) : undefined,
               market: target.market ?? target.marketTone?.toUpperCase() ?? '미확인',
               marketTone: (target.marketTone ?? (target.kind === 'etf' ? 'etf' : 'kospi')) as HomeMarketTone,
+              kind: target.kind,
             },
             selectedAt: undefined,
           }
@@ -1874,13 +1892,13 @@ export default function DeepScanPage() {
           </div>
 
           <p className='relative mt-4 max-w-[260px] text-sm leading-6 text-[#c8d8e8]'>
-            홈에서 분석할 종목을 선택하면 가격 위치, 목표가, 실적 코멘트, 세 팀 판단을 한 흐름으로 보여드려요.
+            홈에서 분석할 대상을 선택하면 가격 위치, 핵심 근거, 세 팀 판단을 한 흐름으로 보여드려요.
           </p>
 
           <div className='relative mt-5 grid grid-cols-3 gap-2'>
             {[
               ['52주', '위치'],
-              ['목표가', '비교'],
+              ['핵심', '근거'],
               ['세 팀', '판단'],
             ].map(([top, bottom]) => (
               <div key={top} className='rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-3 backdrop-blur'>
@@ -1969,7 +1987,7 @@ export default function DeepScanPage() {
     ?? normalizeQuoteCurrency(activeLoadingBriefingSnapshot?.quote?.currency ?? undefined)
     ?? activeLoadingQuickQuote?.currentPriceCurrency
     ?? (requestSeed.holding.market === 'US' ? 'USD' : undefined)
-  const loadingQuickFacts = buildLoadingQuickFacts(payload, activeLoadingQuickQuote, activeLoadingBriefingSnapshot, requestSeed.holding.name)
+  const loadingQuickFacts = buildLoadingQuickFacts(payload, activeLoadingQuickQuote, activeLoadingBriefingSnapshot, requestSeed.holding.name, requestSeed.holding.market, requestSeed.holding.kind)
   const evidenceCollected = hasCollectedDeepScanEvidence(payload)
   const analysisLoadingNotice = {
     badge: '로딩 중',
@@ -1999,6 +2017,7 @@ export default function DeepScanPage() {
           name={requestSeed.holding.name}
           identifier={identifier}
           market={requestSeed.holding.market}
+          instrumentKind={target?.kind}
           shares={target?.quantity}
           averagePrice={target?.averagePrice}
           averagePriceCurrency={target?.averagePriceCurrency}

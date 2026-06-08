@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { getCurrentQuotes } from '../crawlers/current-quotes.js';
+import { fetchWiseReportEtfSnapshot } from '../crawlers/wisereport-etf.js';
 import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
 import { scoreDeepScanKrEvidence, scoreDeepScanKrFromCommittee } from './deepscan-kr-score.js';
 import { invokeDeepScanKrPackage } from './deepscan-kr-package-adapter.js';
@@ -41,6 +42,7 @@ const OPENROUTER_CHAT_COMPLETIONS_URL = 'https://openrouter.ai/api/v1/chat/compl
 const DEFAULT_COMMENTARY_SUMMARY_TIMEOUT_MS = 2_500;
 const DEFAULT_DEEPSCAN_KR_LLM_MODEL = 'deepseek/deepseek-v4-flash';
 const DEFAULT_DEEPSCAN_KR_CURRENT_QUOTES_TIMEOUT_MS = 4_500;
+const DEFAULT_DEEPSCAN_KR_ETF_SNAPSHOT_TIMEOUT_MS = 4_500;
 
 function normalizeText(value) {
   if (typeof value !== 'string') {
@@ -479,7 +481,13 @@ function hasOwn(target, key) {
 function isKrInput(input) {
   const market = normalizeText(input.instrument.market)?.toUpperCase();
   const code = normalizeText(input.instrument.code);
-  return market === 'KR' || market === 'KOSPI' || market === 'KOSDAQ' || /^\d{6}$/.test(code ?? '');
+  return market === 'KR' || market === 'KOSPI' || market === 'KOSDAQ' || market === 'ETF' || market === 'ETN' || /^\d{6}$/.test(code ?? '');
+}
+
+function isKrExchangeProductInput(input) {
+  const market = normalizeText(input.instrument.market)?.toUpperCase();
+  const kind = normalizeText(input.instrument.kind)?.toLowerCase();
+  return market === 'ETF' || market === 'ETN' || kind === 'etf' || kind === 'etn';
 }
 
 function normalizeTradeDate(value) {
@@ -845,7 +853,7 @@ async function resolveKrSourceBundle(rawInput, input) {
   const tradeDate = normalizeTradeDate(input.selectedAt ?? input.sourceContext.appliedAt);
   const cacheClient = getCrawlerCacheClientFromRawInput(rawInput);
   const cacheOptions = getCrawlerCacheOptions(rawInput);
-  const [slimResult, quotesResult, packageResult] = await Promise.all([
+  const [slimResult, quotesResult, packageResult, etfSnapshotResult] = await Promise.all([
     captureSource('slim', async () => loadWiseReportKrSlimSource(input, {
       cacheClient,
       ...cacheOptions,
@@ -864,6 +872,15 @@ async function resolveKrSourceBundle(rawInput, input) {
       ),
     })),
     maybeResolveKrPackageResult(rawInput, input),
+    captureSource('etf-snapshot', async () => (isKrExchangeProductInput(input)
+      ? fetchWiseReportEtfSnapshot(input.instrument.code, {
+          timeoutMs: parsePositiveInteger(
+            process.env.DEEPSCAN_KR_ETF_SNAPSHOT_TIMEOUT_MS
+              ?? process.env.WISEREPORT_ETF_SNAPSHOT_TIMEOUT_MS,
+            DEFAULT_DEEPSCAN_KR_ETF_SNAPSHOT_TIMEOUT_MS,
+          ),
+        })
+      : null)),
   ]);
 
   return {
@@ -871,8 +888,9 @@ async function resolveKrSourceBundle(rawInput, input) {
       ...(slimResult.value ? { slim: slimResult.value } : {}),
       ...(quotesResult.value ? { quotes: quotesResult.value } : {}),
       ...(packageResult.value ? { packageResult: packageResult.value } : {}),
+      ...(etfSnapshotResult.value ? { etfSnapshot: etfSnapshotResult.value } : {}),
     },
-    sourceIssues: [slimResult.issue, quotesResult.issue, packageResult.issue].filter(Boolean),
+    sourceIssues: [slimResult.issue, quotesResult.issue, packageResult.issue, etfSnapshotResult.issue].filter(Boolean),
   };
 }
 
@@ -945,6 +963,10 @@ function resolveConsensusOpinionSummary(consensusSnapshot) {
 }
 
 function resolveTargetPriceText(evidence) {
+  if (isKrExchangeProductEvidence(evidence)) {
+    return 'NAV·기초지수·구성종목 기준';
+  }
+
   const consensusSnapshot = evidence?.consensusSnapshot ?? {};
   const targetPrice = typeof consensusSnapshot.targetPrice === 'number' && Number.isFinite(consensusSnapshot.targetPrice) && consensusSnapshot.targetPrice > 0
     ? consensusSnapshot.targetPrice
@@ -1043,8 +1065,9 @@ function getDecisionBandLabel(decisionBand) {
   }
 }
 
-function createCommitteeMember(shortLabel, title, score, reason) {
+function createCommitteeMember(shortLabel, title, score, reason, memberKey) {
   return {
+    ...(memberKey ? { memberKey } : {}),
     shortLabel,
     title,
     status: 'success',
@@ -1115,7 +1138,152 @@ function createKrBusinessQualityReasonOverrides(packageResult) {
   return uniqueTexts;
 }
 
+function isKrExchangeProductEvidence(evidence) {
+  const market = normalizeText(evidence?.instrument?.market ?? evidence?.market)?.toUpperCase();
+  const kind = normalizeText(evidence?.instrument?.kind ?? evidence?.kind)?.toLowerCase();
+  return market === 'ETF' || market === 'ETN' || kind === 'etf' || kind === 'etn';
+}
+
+function createEtfCommitteeAxes(evidence, scored) {
+  const quoteText = evidence.currentQuote
+    ? `현재가 ${formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency)}`
+    : '현재가 근거 없음';
+  const avgPriceText = evidence.holding.averagePrice !== null
+    ? `평단 ${formatNumber(evidence.holding.averagePrice)}`
+    : '평단 근거 없음';
+  const reportCount = evidence.reportSignals.recentReportCount ?? 0;
+  const etfSnapshot = evidence.etfProductSnapshot ?? null;
+  const baseIndexName = normalizeText(etfSnapshot?.product?.baseIndexName);
+  const issuerName = normalizeText(etfSnapshot?.product?.issuerName);
+  const totalFeePct = etfSnapshot?.product?.totalFeePct;
+  const top10WeightPct = etfSnapshot?.constituents?.top10WeightPct;
+  const topHoldings = Array.isArray(etfSnapshot?.constituents?.top10)
+    ? etfSnapshot.constituents.top10.slice(0, 3).map((row) => `${row.name}${typeof row.weightPct === 'number' ? ` ${formatNumber(row.weightPct)}%` : ''}`).filter(Boolean).join(', ')
+    : '';
+  const recentReturn1m = etfSnapshot?.marketStatus?.returns?.oneMonthPct;
+  const avgVolume20 = etfSnapshot?.marketStatus?.avgTradingVolume20 ?? etfSnapshot?.liquidity?.avgTradingVolume;
+  const pageCoverageText = etfSnapshot
+    ? `ETF 스냅샷 반영 · TOP10 ${typeof top10WeightPct === 'number' ? `${formatNumber(top10WeightPct)}%` : '확인'}`
+    : `${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages} KR 페이지 반영`;
+
+  return [
+    {
+      label: 'ETF 구조 품질',
+      score: scored.committee.businessQuality.score,
+      scoreText: `${scored.committee.businessQuality.score} / 100`,
+      axisStatusText: pageCoverageText,
+      subtitle: '추종지수·구성·유동성 연결 범위를 반영한 ETF 품질 점수',
+      avgLabel: `위원 평균 ${scored.committee.businessQuality.score}`,
+      members: [
+        createCommitteeMember(
+          '구조',
+          '상품 구조/운용 품질',
+          scored.committee.businessQuality.profitability,
+          etfSnapshot
+            ? `기초지수 ${baseIndexName ?? '확인'}, 운용사 ${issuerName ?? '확인'}, 총보수 ${typeof totalFeePct === 'number' ? `${formatNumber(totalFeePct)}%` : '확인'}까지 ETF 상품 구조 근거를 반영했습니다.`
+            : `ETF는 기업 실적 대신 추종지수·운용 구조·유동성을 봐야 하며 현재 입력은 ${quoteText}와 보유 맥락 중심입니다.`,
+          'profitability',
+        ),
+        createCommitteeMember(
+          '가격',
+          '가격/NAV 단서',
+          scored.committee.businessQuality.valuation,
+          `ETF는 NAV 괴리와 가격 위치가 중요하며 현재 입력은 ${quoteText} 기준으로 계산했습니다.`,
+          'valuation',
+        ),
+        createCommitteeMember(
+          '분산',
+          '구성/분산 안정성',
+          scored.committee.businessQuality.ownershipStability,
+          topHoldings
+            ? `상위 구성 ${topHoldings}${typeof top10WeightPct === 'number' ? `, TOP10 ${formatNumber(top10WeightPct)}%` : ''}를 분산 안정성 근거로 반영했습니다.`
+            : `구성종목·섹터 비중 데이터는 아직 연결되지 않아 분산 안정성은 ${pageCoverageText} 범위에서 보수적으로 봅니다.`,
+          'ownershipStability',
+        ),
+      ],
+    },
+    {
+      label: '지수/가격 흐름',
+      score: scored.committee.marketTiming.score,
+      scoreText: `${scored.committee.marketTiming.score} / 100`,
+      axisStatusText: evidence.currentQuote ? '현재가·ETF 정보 밀도 반영' : '현재가 근거 부족',
+      subtitle: '현재가, 지수/가격 흐름, 정보 밀도를 반영한 ETF 신호',
+      avgLabel: `위원 평균 ${scored.committee.marketTiming.score}`,
+      members: [
+        createCommitteeMember(
+          '흐름',
+          '지수/가격 흐름',
+          scored.committee.marketTiming.trend,
+          typeof recentReturn1m === 'number'
+            ? `ETF 스냅샷의 1개월 수익률 ${formatSignedPercent(recentReturn1m)}와 ${quoteText}를 지수/가격 흐름에 반영했습니다.`
+            : `상대수익률 ${evidence.reportSignals.relativeReturnAvailable ? '확보' : '없음'}, 스타일 분석 ${evidence.reportSignals.styleAnalysisAvailable ? '확보' : '없음'}, ${quoteText} 기준입니다.`,
+          'trend',
+        ),
+        createCommitteeMember(
+          '정보',
+          '시장 신호/정보 밀도',
+          scored.committee.marketTiming.consensusMomentum,
+          avgVolume20
+            ? `ETF는 시장·지수 정보와 유동성이 중요해서 20일 평균 거래량 ${formatNumber(avgVolume20)}와 현재가 근거를 중심으로 봅니다.`
+            : `ETF는 시장·지수 정보와 유동성이 중요해서 최근 리포트 ${reportCount}건과 현재가 근거를 중심으로 봅니다.`,
+          'consensusMomentum',
+        ),
+        createCommitteeMember(
+          '위치',
+          '가격 위치',
+          scored.committee.marketTiming.priceLocation,
+          evidence.currentQuote
+            ? `${quoteText}와 ${avgPriceText}의 간격을 현재 ETF 가격 위치 판단에 반영했습니다.`
+            : '현재가가 없어 ETF 가격 위치 점수는 보수적으로 계산했습니다.',
+          'priceLocation',
+        ),
+      ],
+    },
+    {
+      label: '내 포지션 적합도',
+      score: scored.committee.positionFit.score,
+      scoreText: `${scored.committee.positionFit.score} / 100`,
+      axisStatusText: evidence.holding.hasHoldingContext ? '보유 맥락 반영' : '보유 맥락 부족',
+      subtitle: '평단, 수량, 현재가 등 내 ETF 보유 맥락을 반영한 점수',
+      avgLabel: `위원 평균 ${scored.committee.positionFit.score}`,
+      members: [
+        createCommitteeMember(
+          '평단',
+          '평단 격차',
+          scored.committee.positionFit.avgPriceGap,
+          evidence.currentQuote && evidence.holding.averagePrice !== null
+            ? `${quoteText}와 ${avgPriceText}의 차이를 보유 ETF의 현재 위치로 반영했습니다.`
+            : '현재가 또는 평단이 부족해 ETF 평단 격차 점수를 보수적으로 계산했습니다.',
+          'avgPriceGap',
+        ),
+        createCommitteeMember(
+          '여지',
+          '상하방 여지',
+          scored.committee.positionFit.upsideBuffer,
+          typeof recentReturn1m === 'number'
+            ? `ETF의 상하방 여지는 기초지수 흐름과 최근 1개월 수익률 ${formatSignedPercent(recentReturn1m)}를 중심으로 봅니다.`
+            : `ETF의 추가 여지는 지수 흐름과 현재 가격대가 핵심이라 현재 입력 범위에서만 보수적으로 봅니다.`,
+          'upsideBuffer',
+        ),
+        createCommitteeMember(
+          '입력',
+          '입력 완성도',
+          scored.committee.positionFit.holdingCompleteness,
+          evidence.holding.hasFullSellNowInputs
+            ? '보유 수량, 평단, 현재가가 모두 확인되어 ETF 포지션 계산이 가능합니다.'
+            : '보유 수량·평단·현재가 중 일부가 없어 ETF 포지션 계산이 제한됩니다.',
+          'holdingCompleteness',
+        ),
+      ],
+    },
+  ];
+}
+
 function createCommitteeAxes(evidence, scored, packageResult) {
+  if (isKrExchangeProductEvidence(evidence)) {
+    return createEtfCommitteeAxes(evidence, scored);
+  }
+
   const businessQualityReason = evidence.sourceCoverage.hasPackageResult
     ? `회사개요·재무·리포트 근거를 합산했습니다. 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건, package-result 확보 기준입니다.`
     : `회사개요·재무·리포트 근거를 합산했습니다. 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건 기준입니다.`;
@@ -1137,18 +1305,21 @@ function createCommitteeAxes(evidence, scored, packageResult) {
           '수익성/기본체력',
           scored.committee.businessQuality.profitability,
           nextBusinessQualityReason(businessQualityReason),
+          'profitability',
         ),
         createCommitteeMember(
           '밸류',
           '밸류에이션',
           scored.committee.businessQuality.valuation,
           nextBusinessQualityReason(`컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 현재가 ${evidence.currentQuote ? '확보' : '없음'}를 반영했습니다.`),
+          'valuation',
         ),
         createCommitteeMember(
           '지배',
           '지분/안정성',
           scored.committee.businessQuality.ownershipStability,
           nextBusinessQualityReason(`보유 맥락 ${evidence.holding.hasHoldingContext ? '확인' : '없음'}, 스타일/지분 페이지 ${evidence.reportSignals.styleAnalysisAvailable || evidence.pageCoverage.availablePageIds.includes('shareholding') ? '일부 확보' : '부족'} 상태입니다.`),
+          'ownershipStability',
         ),
       ],
     },
@@ -1165,12 +1336,14 @@ function createCommitteeAxes(evidence, scored, packageResult) {
           '트렌드',
           scored.committee.marketTiming.trend,
           `상대수익률 ${evidence.reportSignals.relativeReturnAvailable ? '확보' : '없음'}, 스타일 분석 ${evidence.reportSignals.styleAnalysisAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportsAvailable ? '확보' : '없음'} 기준입니다.`,
+          'trend',
         ),
         createCommitteeMember(
           '컨센',
           '컨센서스 모멘텀',
           scored.committee.marketTiming.consensusMomentum,
           `컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건을 반영했습니다.`,
+          'consensusMomentum',
         ),
         createCommitteeMember(
           '가격',
@@ -1179,6 +1352,7 @@ function createCommitteeAxes(evidence, scored, packageResult) {
           evidence.currentQuote
             ? `현재가 ${formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency)}와 평단 ${formatNumber(evidence.holding.averagePrice)} 비교 기준입니다.`
             : '현재가가 없어 가격 위치 점수는 보수적으로 계산했습니다.',
+          'priceLocation',
         ),
       ],
     },
@@ -1197,12 +1371,14 @@ function createCommitteeAxes(evidence, scored, packageResult) {
           evidence.currentQuote && evidence.holding.averagePrice !== null
             ? `현재가 ${formatNumber(evidence.currentQuote.price)} 대비 평단 ${formatNumber(evidence.holding.averagePrice)} 간격을 반영했습니다.`
             : '현재가 또는 평단이 부족해 평단 격차 점수를 보수적으로 계산했습니다.',
+          'avgPriceGap',
         ),
         createCommitteeMember(
           '여지',
           '상방 버퍼',
           scored.committee.positionFit.upsideBuffer,
           `컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportsAvailable ? '확보' : '없음'} 반영입니다.`,
+          'upsideBuffer',
         ),
         createCommitteeMember(
           '입력',
@@ -1211,6 +1387,7 @@ function createCommitteeAxes(evidence, scored, packageResult) {
           evidence.holding.hasFullSellNowInputs
             ? '보유 수량, 평단, 현재가가 모두 확인되어 즉시 매도 계산이 가능합니다.'
             : '보유 수량·평단·현재가 중 일부가 없어 즉시 매도 계산이 제한됩니다.',
+          'holdingCompleteness',
         ),
       ],
     },
@@ -1663,6 +1840,34 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
   };
 }
 
+
+function clampNumber(value, min, max) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, numeric));
+}
+
+function buildNormalizedScenarioProbabilities(heroScore, hasExplicitRisk, riskSignalCount) {
+  const primary = Math.round(clampNumber(heroScore, 5, hasExplicitRisk ? 90 : 95));
+  if (!hasExplicitRisk) {
+    return {
+      primary,
+      support: Math.max(0, 100 - primary),
+      risk: null,
+    };
+  }
+
+  const desiredRisk = Math.round(clampNumber(riskSignalCount > 0 ? riskSignalCount * 10 : 10, 10, 30));
+  const risk = Math.min(desiredRisk, Math.max(0, 100 - primary));
+  return {
+    primary,
+    support: Math.max(0, 100 - primary - risk),
+    risk,
+  };
+}
+
 function buildStrategy(input, evidence, scored) {
   const decisionBand = scored.sellNow.decisionBand;
   const hasExplicitRisk = evidence.topRisks.length > 0 || evidence.missingSources.length > 0;
@@ -1675,12 +1880,18 @@ function buildStrategy(input, evidence, scored) {
     ...scored.hero.penalties.map((penalty) => `패널티: ${penalty}`),
   ].slice(0, 4);
 
+  const probabilities = buildNormalizedScenarioProbabilities(
+    scored.hero.score,
+    hasExplicitRisk,
+    Math.max(evidence.missingSources.length, evidence.topRisks.length),
+  );
+
   return {
     weekSignal: getWeekSignal(decisionBand, scored.hero.score),
     weekSignalTone: getWeekSignalTone(decisionBand),
     weekBadgeText: scored.hero.statusText,
     scenarioLabel: getScenarioLabel(decisionBand),
-    scenarioProbability: `${Math.max(5, scored.hero.score)}%`,
+    scenarioProbability: `${probabilities.primary}%`,
     scenarioPeriod: evidence.currentQuote?.asOf ? `${evidence.currentQuote.asOf} 기준 1-2주` : '1~2주',
     scenarioCondition: evidence.topRisks[0] ?? '추가 리스크 없음',
     currentPriceText,
@@ -1689,12 +1900,12 @@ function buildStrategy(input, evidence, scored) {
     otherScenarios: [
       {
         label: '근거 유지',
-        probability: `${Math.max(10, 100 - scored.hero.score)}%`,
+        probability: `${probabilities.support}%`,
         condition: evidence.topFacts[0] ?? '핵심 근거를 다시 확보합니다.',
       },
       ...(hasExplicitRisk ? [{
         label: '리스크 재점검',
-        probability: `${Math.max(10, evidence.missingSources.length * 10)}%`,
+        probability: `${probabilities.risk ?? 0}%`,
         condition: evidence.topRisks[0] ?? '추가 리스크를 다시 확인합니다.',
       }] : []),
     ],

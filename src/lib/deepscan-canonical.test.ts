@@ -179,6 +179,27 @@ test('buildDeepScanCanonicalQuery는 identifier fallback을 지원한다', () =>
   assert.equal(query.toString(), 'ticker=AAPL&market=US&name=Apple&shares=-&from=home-handoff')
 })
 
+
+
+test('buildDeepScanCanonicalQuery preserves ETF kind in canonical handoff', () => {
+  const query = buildDeepScanCanonicalQuery(createTargetSession({
+    holding: {
+      name: 'KODEX 코스피',
+      market: 'ETF',
+      marketTone: 'etf',
+      kind: 'etf',
+      code: '226490',
+      ticker: undefined,
+      shares: '35주',
+      averagePrice: '58,828.75원',
+      evaluationAmount: '2,320,500원',
+    },
+  }))
+
+  assert.equal(query.get('market'), 'ETF')
+  assert.equal(query.get('kind'), 'etf')
+})
+
 test('buildDeepScanCanonicalQuery는 미국 홈 보유종목을 US market으로 canonicalize한다', () => {
   const query = buildDeepScanCanonicalQuery(createTargetSession({
     holding: {

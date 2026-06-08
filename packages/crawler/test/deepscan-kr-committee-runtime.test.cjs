@@ -228,6 +228,192 @@ test('KR committee axes render pending members and score completed members only'
   assert.match(marketAxis.axisStatusText, /LLM 위원 응답 대기 중/);
 });
 
+test('KR ETF committee axes use exchange-product labels without changing member keys', async () => {
+  const { buildKrCommitteeAxesFromLlmResults } = await import('../src/services/deepscan-kr-committee-runtime.js');
+
+  const shape = buildKrCommitteeAxesFromLlmResults({
+    instrument: {
+      code: '226490',
+      name: 'KODEX 코스피',
+      market: 'ETF',
+    },
+  }, {
+    profitability: { score: 70, reason: 'ETF 구조 reason', confidence: 'medium' },
+    valuation: { score: 65, reason: 'ETF 가격 reason', confidence: 'medium' },
+    ownershipStability: { score: 55, reason: 'ETF 분산 reason', confidence: 'medium' },
+    trend: { score: 60, reason: 'ETF 흐름 reason', confidence: 'medium' },
+    consensusMomentum: { score: 50, reason: 'ETF 정보 reason', confidence: 'medium' },
+    priceLocation: { score: 80, reason: 'ETF 위치 reason', confidence: 'medium' },
+    avgPriceGap: { score: 85, reason: '평단 reason', confidence: 'medium' },
+    upsideBuffer: { score: 60, reason: '여지 reason', confidence: 'medium' },
+    holdingCompleteness: { score: 90, reason: '입력 reason', confidence: 'medium' },
+  });
+
+  assert.deepEqual(shape.axes.map((axis) => axis.label), ['ETF 구조 품질', '지수/가격 흐름', '내 포지션 적합도']);
+  assert.deepEqual(shape.axes[0].members.map((member) => member.title), ['상품 구조/운용 품질', '가격/NAV 단서', '구성/분산 안정성']);
+  assert.deepEqual(shape.axes[1].members.map((member) => member.title), ['지수/가격 흐름', '시장 신호/정보 밀도', '가격 위치']);
+  assert.match(shape.axes[0].subtitle, /추종지수·구성·유동성/);
+  assert.equal(shape.hasMemberErrors, false);
+});
+
+test('KR ETF committee axes honor etf kind even when market is generic KR', async () => {
+  const { buildKrCommitteeAxesFromLlmResults } = await import('../src/services/deepscan-kr-committee-runtime.js');
+
+  const shape = buildKrCommitteeAxesFromLlmResults({
+    instrument: {
+      code: '226490',
+      name: 'KODEX 코스피',
+      market: 'KR',
+      kind: 'etf',
+    },
+  }, {
+    profitability: { score: 70, reason: 'ETF 구조 reason', confidence: 'medium' },
+    valuation: { score: 65, reason: 'ETF 가격 reason', confidence: 'medium' },
+    ownershipStability: { score: 55, reason: 'ETF 분산 reason', confidence: 'medium' },
+    trend: { score: 60, reason: 'ETF 흐름 reason', confidence: 'medium' },
+    consensusMomentum: { score: 50, reason: 'ETF 정보 reason', confidence: 'medium' },
+    priceLocation: { score: 80, reason: 'ETF 위치 reason', confidence: 'medium' },
+    avgPriceGap: { score: 85, reason: '평단 reason', confidence: 'medium' },
+    upsideBuffer: { score: 60, reason: '여지 reason', confidence: 'medium' },
+    holdingCompleteness: { score: 90, reason: '입력 reason', confidence: 'medium' },
+  });
+
+  assert.deepEqual(shape.axes.map((axis) => axis.label), ['ETF 구조 품질', '지수/가격 흐름', '내 포지션 적합도']);
+  assert.deepEqual(shape.axes[0].members.map((member) => member.title), ['상품 구조/운용 품질', '가격/NAV 단서', '구성/분산 안정성']);
+});
+
+test('KR ETF committee prompts forbid stock-only missing-data interpretations', async () => {
+  const { scoreDeepScanKrCommitteeFromDump } = await import('../src/services/deepscan-kr-committee-runtime.js');
+  const originalFetch = global.fetch;
+  const originalKey = process.env.OPENROUTER_API_KEY;
+  const originalEnabled = process.env.DEEPSCAN_KR_LLM_ENABLE;
+  const capturedBodies = [];
+
+  process.env.OPENROUTER_API_KEY = 'test-key';
+  process.env.DEEPSCAN_KR_LLM_ENABLE = '1';
+
+  global.fetch = (async (_url, init) => {
+    const body = JSON.parse(String(init?.body ?? '{}'));
+    capturedBodies.push(body);
+    const userMessage = Array.isArray(body?.messages)
+      ? body.messages.find((message) => message.role === 'user')
+      : null;
+    const content = typeof userMessage?.content === 'string' ? userMessage.content : '';
+    const memberKey = content.match(/"member":"([^"]+)"/)?.[1] ?? 'unknown';
+
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            score: 70,
+            reason: `${memberKey} ETF reason`,
+            confidence: 'medium',
+          }),
+        },
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  try {
+    await scoreDeepScanKrCommitteeFromDump({}, {
+      instrument: {
+        code: '226490',
+        name: 'KODEX 코스피',
+        market: 'ETF',
+      },
+      sourceContext: {},
+    }, {
+      instrument: {
+        code: '226490',
+        name: 'KODEX 코스피',
+        market: 'ETF',
+      },
+      currentQuote: {
+        price: 79870,
+        currency: 'KRW',
+      },
+      holding: {
+        shares: 35,
+        averagePrice: 58828.75,
+        hasHoldingContext: true,
+        hasFullSellNowInputs: true,
+      },
+      marketSnapshot: {
+        averagePriceGapPct: 35.77,
+      },
+      consensusSnapshot: {},
+      valuationSnapshot: {},
+      pageCoverage: {
+        totalKnownPages: 14,
+        availablePageIds: ['current-quote'],
+        missingPageIds: [],
+        availableCount: 1,
+      },
+      sourceCoverage: {
+        hasCurrentQuote: true,
+        hasHolding: true,
+        hasPackageResult: false,
+        hasEtfSnapshot: true,
+        availableReportPages: [],
+      },
+      etfProductSnapshot: {
+        product: {
+          baseIndexName: '코스피지수',
+          issuerName: '삼성자산운용(주)',
+          totalFeePct: 0.15,
+        },
+        marketStatus: {
+          returns: { oneMonthPct: 18.52 },
+          avgTradingVolume20: 596968,
+        },
+        constituents: {
+          top10WeightPct: 57.12,
+          top10: [
+            { rank: 1, name: '삼성전자', weightPct: 29.6 },
+            { rank: 2, name: 'SK하이닉스', weightPct: 22.72 },
+          ],
+        },
+      },
+      reportSignals: {},
+      missingSources: [],
+      sourceLimitations: [],
+      topFacts: [],
+      topRisks: [],
+    }, {});
+
+    assert.equal(capturedBodies.length, 9);
+    const systemPrompts = capturedBodies.flatMap((body) => body.messages ?? [])
+      .filter((message) => message.role === 'system')
+      .map((message) => message.content)
+      .join('\n');
+    const serializedBodies = JSON.stringify(capturedBodies);
+
+    assert.match(systemPrompts, /treat the instrument as an exchange-traded product/);
+    assert.match(systemPrompts, /PER, PBR, ROE, corporate profitability, shareholder stability, analyst recommendation, or target price/);
+    assert.match(systemPrompts, /never infer low risk or high stability from missing shareholder or constituent data/);
+    assert.match(serializedBodies, /KODEX 코스피/);
+    assert.match(serializedBodies, /ETF/);
+    assert.match(serializedBodies, /코스피지수/);
+    assert.match(serializedBodies, /삼성전자/);
+    assert.match(serializedBodies, /SK하이닉스/);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = originalKey;
+    }
+    if (originalEnabled === undefined) {
+      delete process.env.DEEPSCAN_KR_LLM_ENABLE;
+    } else {
+      process.env.DEEPSCAN_KR_LLM_ENABLE = originalEnabled;
+    }
+  }
+});
+
 test('KR committee LLM prompt omits unavailable source-limitations data from model context', async () => {
   const { scoreDeepScanKrCommitteeFromDump } = await import('../src/services/deepscan-kr-committee-runtime.js');
   const originalFetch = global.fetch;
