@@ -13,13 +13,18 @@ import {
 
 test('team summary system prompt favors detailed three-member interpretation', () => {
   assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /3명 위원/)
-  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /150~240자/)
-  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /3문장 초과 금지/)
-  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /위원명·역할명·개별 주체명 언급을 금지/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /220~360자/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /4문장 초과 금지/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /Jaroo 말투를 고정/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /친근한 존댓말/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /~입니다/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /위원명·역할명·개별 주체명·메타 표현 언급을 금지/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /현재 상태 → 근거 → 리스크\/확인점/)
   assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /평단 대비 수익률이나 이미 크게 오른 가격은 추가 상승 여력의 근거가 아니라 현재 포지션 상태/)
-  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /세 위원 모두, 모두 긍정 같은 만장일치 표현을 쓰지 말고/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /모두 긍정/)
   assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /현재가가 목표가에 근접했다면 추가 상승 여력이 크다고 쓰지 말고/)
   assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /매수·매도·보유·포지션 유지 같은 투자 행동 권유/)
+  assert.match(DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT, /나쁜 예/)
 })
 
 
