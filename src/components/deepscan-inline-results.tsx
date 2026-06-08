@@ -21,6 +21,7 @@ type TeamDefinition = {
   name: string
   description: string
   icon: string
+  memberKeys: string[]
   memberTitles: string[]
 }
 
@@ -33,9 +34,30 @@ type ScenarioView = {
 }
 
 const TEAM_DEFINITIONS: readonly TeamDefinition[] = [
-  { key: 'market', name: '시장·차트 팀', description: '차트 마스터 · 거래량 · 상승세 추적', icon: '📈', memberTitles: ['가격 위치', '평단 격차', '트렌드'] },
-  { key: 'context', name: '심리·환경 팀', description: '증권사 의견 · 산업 전문가 · 이슈 탐색', icon: '🧠', memberTitles: ['입력 완성도', '상방 버퍼', '컨센서스 모멘텀'] },
-  { key: 'fundamental', name: '가치·기본 팀', description: '가치 분석 · 성장 전략 · 재무 점검', icon: '📊', memberTitles: ['밸류에이션', '수익성/기본체력', '지분/안정성'] },
+  {
+    key: 'market',
+    name: '시장·차트 팀',
+    description: '차트 마스터 · 거래량 · 상승세 추적',
+    icon: '📈',
+    memberKeys: ['priceLocation', 'avgPriceGap', 'trend', 'momentum', 'estimate-revision', 'event-risk'],
+    memberTitles: ['가격 위치', '평단 격차', '트렌드', '지수/가격 흐름'],
+  },
+  {
+    key: 'context',
+    name: '심리·환경 팀',
+    description: '증권사 의견 · 산업 전문가 · 이슈 탐색',
+    icon: '🧠',
+    memberKeys: ['holdingCompleteness', 'upsideBuffer', 'consensusMomentum', 'financial-safety', 'ownership-flow', 'portfolio-fit'],
+    memberTitles: ['입력 완성도', '상방 버퍼', '상하방 여지', '컨센서스 모멘텀', '시장 신호/정보 밀도'],
+  },
+  {
+    key: 'fundamental',
+    name: '가치·기본 팀',
+    description: '가치 분석 · 성장 전략 · 재무 점검',
+    icon: '📊',
+    memberKeys: ['valuation', 'profitability', 'ownershipStability', 'growth', 'profitability-quality'],
+    memberTitles: ['밸류에이션', '가격/NAV 단서', '수익성/기본체력', '상품 구조/운용 품질', '지분/안정성', '구성/분산 안정성'],
+  },
 ] as const
 
 function firstNonEmpty(...values: Array<string | undefined | null>) {
@@ -83,9 +105,14 @@ function flattenMembers(payload: JarooDeepScanPayload) {
 
 function resolveTeamMembers(payload: JarooDeepScanPayload, team: TeamDefinition) {
   const members = flattenMembers(payload)
-  const matched = team.memberTitles
+  const matchedByKey = team.memberKeys
+    .map((memberKey) => members.find((member) => member.memberKey === memberKey))
+    .filter((member): member is JarooDeepScanCommitteeMember => Boolean(member))
+  const matchedByTitle = team.memberTitles
     .map((title) => members.find((member) => member.title === title))
     .filter((member): member is JarooDeepScanCommitteeMember => Boolean(member))
+  const matched = [...matchedByKey, ...matchedByTitle]
+    .filter((member, index, values) => values.indexOf(member) === index)
 
   if (matched.length > 0) return matched
 

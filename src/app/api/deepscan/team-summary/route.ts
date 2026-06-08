@@ -59,6 +59,26 @@ function cleanupSummary(value: string) {
     .trim()
 }
 
+export function removeForbiddenInvestmentActionAdvice(value: string) {
+  return cleanupSummary(value)
+    .replace(/현재\s*포지션을\s*유지(?:하면서|하고|한다|하는|해야\s*한다)?/gu, '현재 구간을 기준으로')
+    .replace(/포지션을\s*유지(?:하면서|하고|한다|하는|해야\s*한다)?/gu, '현재 구간을 기준으로')
+    .replace(/포지션\s*유지/gu, '현재 구간 점검')
+    .replace(/보유를\s*유지(?:하면서|하고|한다|하는|해야\s*한다)?/gu, '현재 구간을 기준으로')
+    .replace(/보유\s*유지/gu, '현재 구간 점검')
+    .replace(/매수를?\s*(?:추천|권고|권장|제안|고려)(?:합니다|한다|하세요)?/gu, '추가 진입 판단')
+    .replace(/매수\s*하(?:세요|십시오|라|는\s*것이\s*좋습니다|는\s*게\s*좋습니다|는\s*전략)/gu, '추가 진입 판단')
+    .replace(/매수(?:하세요|하십시오|하라|해야\s*합니다|해야\s*한다|가\s*유리합니다|보다)/gu, '추가 진입 판단')
+    .replace(/매도를?\s*(?:추천|권고|권장|제안|고려)(?:합니다|한다|하세요)?/gu, '비중 조정 판단')
+    .replace(/매도\s*하(?:세요|십시오|라|는\s*것이\s*좋습니다|는\s*게\s*좋습니다|는\s*전략)/gu, '비중 조정 판단')
+    .replace(/매도(?:하세요|하십시오|하라|해야\s*합니다|해야\s*한다|가\s*유리합니다|보다)/gu, '비중 조정 판단')
+    .replace(/보유를?\s*(?:추천|권고|권장|제안|고려)(?:합니다|한다|하세요)?/gu, '현재 구간 점검')
+    .replace(/보유\s*하(?:세요|십시오|라|는\s*것이\s*좋습니다|는\s*게\s*좋습니다|는\s*전략)/gu, '현재 구간 점검')
+    .replace(/보유(?:하세요|하십시오|하라|해야\s*합니다|해야\s*한다|가\s*유리합니다|가\s*낫습니다|관점)/gu, '현재 구간 점검')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 export function parseTeamSummaryContent(content: string) {
   const text = content.trim()
   if (!text) {
@@ -69,13 +89,13 @@ export function parseTeamSummaryContent(content: string) {
     const parsed = JSON.parse(text) as unknown
     if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
       const summary = normalizeText((parsed as { summary?: unknown }).summary)
-      return summary ? cleanupSummary(summary) : null
+      return summary ? removeForbiddenInvestmentActionAdvice(summary) : null
     }
   } catch {
     // Some providers may return the sentence directly despite the JSON instruction.
   }
 
-  return cleanupSummary(text.replace(/^```(?:json)?/i, '').replace(/```$/i, ''))
+  return removeForbiddenInvestmentActionAdvice(text.replace(/^```(?:json)?/i, '').replace(/```$/i, ''))
 }
 
 async function callOpenRouterTeamSummary(input: { teamKey: string; teamName: string; body: string }): Promise<TeamSummaryResult> {
@@ -132,7 +152,7 @@ async function callOpenRouterTeamSummary(input: { teamKey: string; teamName: str
   }
 
   return {
-    summary,
+    summary: removeForbiddenInvestmentActionAdvice(summary),
     elapsedMs: Date.now() - startedAt,
     model,
     provider: 'Cerebras/fp16',
@@ -153,11 +173,12 @@ export async function createDeepScanTeamSummaryResponse(
 
   try {
     const result = await requester({ teamKey, teamName, body: rawBody })
+    const summary = removeForbiddenInvestmentActionAdvice(result.summary)
     return NextResponse.json({
       ok: true,
       teamKey,
       teamName,
-      summary: result.summary,
+      summary,
       model: result.model ?? process.env.DEEPSCAN_TEAM_SUMMARY_MODEL ?? DEEPSCAN_TEAM_SUMMARY_MODEL,
       provider: result.provider ?? 'Cerebras/fp16',
       elapsedMs: result.elapsedMs,

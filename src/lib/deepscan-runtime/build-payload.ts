@@ -958,6 +958,7 @@ function axisStatus(score: number) {
 
 function toMember(agent: DeepScanAgentResult): JarooDeepScanCommitteeMember {
   return {
+    memberKey: agent.key,
     shortLabel: agent.shortLabel,
     title: agent.label,
     status: 'success',

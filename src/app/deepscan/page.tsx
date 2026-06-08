@@ -122,7 +122,7 @@ function extractLoadingStageKeysFromCommitteeAxes(committeeAxes: JarooDeepScanCo
     (committeeAxes ?? [])
       .flatMap((axis) => axis.members)
       .filter((member) => member.status === 'success' || member.status === 'error')
-      .map((member) => DEEPSCAN_MEMBER_STAGE_BY_TITLE[member.title])
+      .map((member) => (member.memberKey ? DEEPSCAN_MEMBER_STAGE_BY_KEY[member.memberKey] : undefined) ?? DEEPSCAN_MEMBER_STAGE_BY_TITLE[member.title])
       .filter((stageKey): stageKey is LoadingStageKey => Boolean(stageKey)),
   )
 }

@@ -78,6 +78,78 @@ export const KR_MEMBER_SPECS = Object.freeze({
   },
 });
 
+const KR_EXCHANGE_PRODUCT_MARKETS = new Set(['ETF', 'ETN']);
+
+const ETF_MEMBER_PRESENTATION_SPECS = Object.freeze({
+  profitability: {
+    shortLabel: '구조',
+    title: '상품 구조/운용 품질',
+  },
+  valuation: {
+    shortLabel: '가격',
+    title: '가격/NAV 단서',
+  },
+  ownershipStability: {
+    shortLabel: '분산',
+    title: '구성/분산 안정성',
+  },
+  trend: {
+    shortLabel: '흐름',
+    title: '지수/가격 흐름',
+  },
+  consensusMomentum: {
+    shortLabel: '정보',
+    title: '시장 신호/정보 밀도',
+  },
+  priceLocation: {
+    shortLabel: '위치',
+    title: '가격 위치',
+  },
+  avgPriceGap: {
+    shortLabel: '평단',
+    title: '평단 격차',
+  },
+  upsideBuffer: {
+    shortLabel: '여지',
+    title: '상하방 여지',
+  },
+  holdingCompleteness: {
+    shortLabel: '입력',
+    title: '입력 완성도',
+  },
+});
+
+const ETF_MEMBER_PROMPT_GUIDANCE = Object.freeze({
+  profitability: 'For ETF/ETN inputs, reinterpret this member as product structure and operation quality; never discuss corporate revenue, operating profit, ROE, or business profitability unless such ETF-specific facts are explicitly provided.',
+  valuation: 'For ETF/ETN inputs, reinterpret valuation as price/NAV/premium-discount/position evidence; PER, PBR, ROE, analyst target price, and recommendation are not expected ETF facts and must not be treated as negative evidence.',
+  ownershipStability: 'For ETF/ETN inputs, reinterpret ownership stability as constituent/sector diversification stability; never infer low risk or high stability from missing shareholder or constituent data.',
+  trend: 'For ETF/ETN inputs, focus on index/price flow, relative return, current quote, and volume evidence actually present.',
+  consensusMomentum: 'For ETF/ETN inputs, analyst consensus is normally out-of-scope; use market signal density, report freshness, index trend, or say the provided facts are insufficient without criticizing missing target prices.',
+  priceLocation: 'For ETF/ETN inputs, compare current price, average price, recent return/location, and market context; do not invent a target price.',
+  avgPriceGap: 'For ETF/ETN inputs, explain this strictly as the user position gap between current ETF price and average buy price.',
+  upsideBuffer: 'For ETF/ETN inputs, describe remaining up/down room from current price, average-price gap, index/market trend, and NAV or 52-week context if present; never equate high unrealized return with future upside.',
+  holdingCompleteness: 'For ETF/ETN inputs, judge whether quantity, average price, current price, timestamps, and ETF product facts are complete enough for the current screen.',
+});
+
+function getInstrumentMarket(evidence) {
+  return normalizeText(evidence?.instrument?.market ?? evidence?.market)?.toUpperCase() ?? null;
+}
+
+function isKrExchangeProductEvidence(evidence) {
+  return KR_EXCHANGE_PRODUCT_MARKETS.has(getInstrumentMarket(evidence));
+}
+
+function getMemberPresentationSpec(memberKey, evidence) {
+  if (isKrExchangeProductEvidence(evidence)) {
+    return {
+      ...KR_MEMBER_SPECS[memberKey],
+      ...(ETF_MEMBER_PRESENTATION_SPECS[memberKey] ?? {}),
+    };
+  }
+
+  return KR_MEMBER_SPECS[memberKey];
+}
+
 function normalizeText(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : undefined;
 }
@@ -555,6 +627,10 @@ function systemPrompt(memberKey) {
     'Treat package-derived context as supplemental only, never as silent numeric truth.',
     'Treat absent fields as out-of-scope rather than negative evidence; do not request, infer, or mention data that is not present in sharedContext/memberContext.',
     'Lead with the strongest numeric or concrete evidence that is actually present.',
+    'If sharedContext.instrument.market or memberContext.facts.instrument.market is ETF or ETN, treat the instrument as an exchange-traded product, not an operating company.',
+    'For ETF/ETN, do not mention missing individual-stock facts such as PER, PBR, ROE, corporate profitability, shareholder stability, analyst recommendation, or target price unless the input explicitly provides those facts as applicable.',
+    'For ETF/ETN, absence of shareholder, constituent, or analyst-target data is not positive or negative evidence by itself; say only what can be judged from current quote, average-price gap, trend, liquidity, page coverage, NAV/premium-discount, constituents, or sector weights that are actually present.',
+    ETF_MEMBER_PROMPT_GUIDANCE[memberKey] ?? '',
     'Return only valid JSON matching the schema.',
     'Write reason as exactly one readable Korean sentence for a mobile chat bubble: no bullet, no newline, no colon label, no member name prefix, and no multi-sentence paragraph.',
     'Keep reason focused on one strongest evidence-to-judgment flow; prefer about 70-140 Korean characters and avoid cramming every metric into a long comma chain.',
@@ -709,10 +785,12 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
   };
 }
 
-function buildSuccessMember(memberKey, result) {
+function buildSuccessMember(memberKey, result, evidence) {
+  const spec = getMemberPresentationSpec(memberKey, evidence);
   return {
-    shortLabel: KR_MEMBER_SPECS[memberKey].shortLabel,
-    title: KR_MEMBER_SPECS[memberKey].title,
+    memberKey,
+    shortLabel: spec.shortLabel,
+    title: spec.title,
     status: 'success',
     reason: result.reason,
     score: result.score,
@@ -724,12 +802,14 @@ function buildSuccessMember(memberKey, result) {
   };
 }
 
-function buildErrorMember(memberKey, error) {
+function buildErrorMember(memberKey, error, evidence) {
   const attempts = Number.isFinite(Number(error?.attempts)) ? Number(error.attempts) : 4;
   const kind = normalizeText(error?.errorKind) ?? 'llm-unknown';
+  const spec = getMemberPresentationSpec(memberKey, evidence);
   return {
-    shortLabel: KR_MEMBER_SPECS[memberKey].shortLabel,
-    title: KR_MEMBER_SPECS[memberKey].title,
+    memberKey,
+    shortLabel: spec.shortLabel,
+    title: spec.title,
     status: 'error',
     reason: null,
     score: null,
@@ -745,10 +825,12 @@ function buildErrorMember(memberKey, error) {
   };
 }
 
-function buildPendingMember(memberKey) {
+function buildPendingMember(memberKey, evidence) {
+  const spec = getMemberPresentationSpec(memberKey, evidence);
   return {
-    shortLabel: KR_MEMBER_SPECS[memberKey].shortLabel,
-    title: KR_MEMBER_SPECS[memberKey].title,
+    memberKey,
+    shortLabel: spec.shortLabel,
+    title: spec.title,
     status: 'pending',
     reason: '이 위원은 추가 LLM 응답을 기다리는 중입니다.',
     score: null,
@@ -759,16 +841,32 @@ function buildPendingMember(memberKey) {
   };
 }
 
-function axisLabel(axisKey) {
+function axisLabel(axisKey, evidence) {
+  if (isKrExchangeProductEvidence(evidence)) {
+    if (axisKey === 'businessQuality') {
+      return 'ETF 구조 품질';
+    }
+    if (axisKey === 'marketTiming') {
+      return '지수/가격 흐름';
+    }
+    return '내 포지션 적합도';
+  }
   return axisKey === 'businessQuality' ? '사업 품질' : axisKey === 'marketTiming' ? '시장 타이밍' : '포지션 적합도';
 }
 
-function axisSubtitle(axisKey, hasErrors, hasPending) {
+function axisSubtitle(axisKey, hasErrors, hasPending, evidence) {
   if (hasErrors) {
     return '일부 LLM 위원 응답 실패로 축 점수를 보류했습니다.';
   }
   if (hasPending) {
     return '일부 LLM 위원이 아직 고민 중이라 완료 위원 점수만 임시 반영했습니다.';
+  }
+  if (isKrExchangeProductEvidence(evidence)) {
+    return axisKey === 'businessQuality'
+      ? '추종지수·구성·유동성 연결 범위를 반영한 ETF 품질 점수'
+      : axisKey === 'marketTiming'
+        ? '현재가, 지수/가격 흐름, 정보 밀도를 반영한 ETF 신호'
+        : '평단, 수량, 현재가 등 내 ETF 보유 맥락을 반영한 점수';
   }
   return axisKey === 'businessQuality'
     ? '덤프 기반 KR 기업 체력 점수'
@@ -792,7 +890,7 @@ export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErro
 
   const axes = [businessAxis, marketAxis, positionAxis]
     .map((axis) => ({
-      label: axisLabel(axis.axisKey),
+      label: axisLabel(axis.axisKey, evidence),
       score: axis.score,
       scoreText: axis.score === null ? 'N/A' : `${axis.score} / 100`,
       axisStatusText: axis.hasErrors
@@ -802,14 +900,14 @@ export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErro
             ? `LLM 위원 응답 대기 중 · ${axis.pendingMembers.length}명 고민중`
             : `LLM 위원 ${axis.validMembers.length}/3명 반영 · ${axis.pendingMembers.length}명 고민중`
           : 'LLM 위원 3/3명 반영',
-      subtitle: axisSubtitle(axis.axisKey, axis.hasErrors, axis.hasPending),
+      subtitle: axisSubtitle(axis.axisKey, axis.hasErrors, axis.hasPending, evidence),
       avgLabel: axis.score === null ? '위원 평균 N/A' : `위원 평균 ${axis.score}`,
       members: byAxis[axis.axisKey].map((memberKey) => (
         llmResults[memberKey]
-          ? buildSuccessMember(memberKey, llmResults[memberKey])
+          ? buildSuccessMember(memberKey, llmResults[memberKey], evidence)
           : axis.pendingMembers.includes(memberKey)
-            ? buildPendingMember(memberKey)
-            : buildErrorMember(memberKey, errorsByMember[memberKey])
+            ? buildPendingMember(memberKey, evidence)
+            : buildErrorMember(memberKey, errorsByMember[memberKey], evidence)
       )),
     }));
 

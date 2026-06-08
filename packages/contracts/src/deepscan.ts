@@ -91,6 +91,7 @@ export type JarooDeepScanInput = {
 }
 
 export type JarooDeepScanCommitteeMember = {
+  memberKey?: string
   shortLabel: string
   title: string
   status: JarooDeepScanCommitteeMemberStatus

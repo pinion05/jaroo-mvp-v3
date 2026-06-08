@@ -108,6 +108,7 @@ type PlaceholderStageKey = `pendingStage${number}`
 type NarrativeCardKey = LoadingStageKey | PlaceholderStageKey
 type NarrativeTone = 'positive' | 'warning' | 'neutral' | 'info'
 type CommitteeTeamMemberDefinition = {
+  sourceMemberKey?: string | string[]
   sourceTitle: string | string[]
   alias: string
 }
@@ -171,9 +172,9 @@ const committeeTeams: readonly CommitteeTeamDefinition[] = [
     description: '가치 분석가 · 성장 전략가 · 재무 감사관',
     avatar: '🏛️',
     members: [
-      { sourceTitle: ['밸류에이션', 'Valuation'], alias: '가치 분석가' },
-      { sourceTitle: ['수익성/기본체력', 'Growth'], alias: '성장 전략가' },
-      { sourceTitle: ['지분/안정성', 'Profitability'], alias: '재무 감사관' },
+      { sourceMemberKey: ['valuation', 'valuation'], sourceTitle: ['밸류에이션', '가격/NAV 단서', 'Valuation'], alias: '가치 분석가' },
+      { sourceMemberKey: ['profitability', 'growth'], sourceTitle: ['수익성/기본체력', '상품 구조/운용 품질', 'Growth'], alias: '성장 전략가' },
+      { sourceMemberKey: ['ownershipStability', 'profitability-quality'], sourceTitle: ['지분/안정성', '구성/분산 안정성', 'Profitability'], alias: '재무 감사관' },
     ],
   },
   {
@@ -182,9 +183,9 @@ const committeeTeams: readonly CommitteeTeamDefinition[] = [
     description: '차트 마스터 · 수급 추적기 · 모멘텀 스카우터',
     avatar: '📈',
     members: [
-      { sourceTitle: ['가격 위치', 'Momentum'], alias: '차트 마스터' },
-      { sourceTitle: ['평단 격차', 'Revision'], alias: '수급 추적기' },
-      { sourceTitle: ['트렌드', 'Event Risk'], alias: '모멘텀 스카우터' },
+      { sourceMemberKey: ['priceLocation', 'momentum'], sourceTitle: ['가격 위치', 'Momentum'], alias: '차트 마스터' },
+      { sourceMemberKey: ['avgPriceGap', 'estimate-revision'], sourceTitle: ['평단 격차', 'Revision'], alias: '수급 추적기' },
+      { sourceMemberKey: ['trend', 'event-risk'], sourceTitle: ['트렌드', '지수/가격 흐름', 'Event Risk'], alias: '모멘텀 스카우터' },
     ],
   },
   {
@@ -193,9 +194,9 @@ const committeeTeams: readonly CommitteeTeamDefinition[] = [
     description: '심리 분석AI · 산업 전문가 · 이벤트 스캐너',
     avatar: '🧠',
     members: [
-      { sourceTitle: ['입력 완성도', 'Safety'], alias: '심리 분석AI' },
-      { sourceTitle: ['상방 버퍼', 'Ownership'], alias: '산업 전문가' },
-      { sourceTitle: ['컨센서스 모멘텀', '포지션 적합도'], alias: '이벤트 스캐너' },
+      { sourceMemberKey: ['holdingCompleteness', 'financial-safety'], sourceTitle: ['입력 완성도', 'Safety'], alias: '심리 분석AI' },
+      { sourceMemberKey: ['upsideBuffer', 'ownership-flow'], sourceTitle: ['상방 버퍼', '상하방 여지', 'Ownership'], alias: '산업 전문가' },
+      { sourceMemberKey: ['consensusMomentum', 'portfolio-fit'], sourceTitle: ['컨센서스 모멘텀', '시장 신호/정보 밀도', '포지션 적합도'], alias: '이벤트 스캐너' },
     ],
   },
 ] as const
@@ -508,9 +509,19 @@ function flattenCommitteeMembers(committeeAxes: JarooDeepScanCommitteeAxis[] | u
 
 function findCommitteeMemberBySourceTitle(
   members: ReturnType<typeof flattenCommitteeMembers>,
-  sourceTitle: CommitteeTeamMemberDefinition['sourceTitle'],
+  definition: Pick<CommitteeTeamMemberDefinition, 'sourceTitle' | 'sourceMemberKey'>,
 ) {
-  const sourceTitles = Array.isArray(sourceTitle) ? sourceTitle : [sourceTitle]
+  const sourceMemberKeys = definition.sourceMemberKey
+    ? Array.isArray(definition.sourceMemberKey) ? definition.sourceMemberKey : [definition.sourceMemberKey]
+    : []
+  const memberByKey = sourceMemberKeys.length > 0
+    ? members.find((candidate) => candidate.memberKey && sourceMemberKeys.includes(candidate.memberKey))
+    : undefined
+  if (memberByKey) {
+    return memberByKey
+  }
+
+  const sourceTitles = Array.isArray(definition.sourceTitle) ? definition.sourceTitle : [definition.sourceTitle]
   return members.find((candidate) => sourceTitles.includes(candidate.title))
 }
 
@@ -521,7 +532,7 @@ function buildCommitteeTeamBody(
   const members = flattenCommitteeMembers(committeeAxes)
   const lines = team.members.map((definition, index) => {
     const internalOpinionLabel = `의견 ${index + 1}`
-    const member = findCommitteeMemberBySourceTitle(members, definition.sourceTitle)
+    const member = findCommitteeMemberBySourceTitle(members, definition)
     if (member?.status === 'success' && typeof member.reason === 'string' && member.reason.trim()) {
       return `${internalOpinionLabel}: ${member.reason}`
     }
@@ -534,11 +545,11 @@ function buildCommitteeTeamBody(
   return {
     body: lines.join('\n'),
     readyCount: team.members.filter((definition) => {
-      const member = findCommitteeMemberBySourceTitle(members, definition.sourceTitle)
+      const member = findCommitteeMemberBySourceTitle(members, definition)
       return member?.status === 'success' && typeof member.reason === 'string' && member.reason.trim().length > 0
     }).length,
     errorCount: team.members.filter((definition) => {
-      const member = findCommitteeMemberBySourceTitle(members, definition.sourceTitle)
+      const member = findCommitteeMemberBySourceTitle(members, definition)
       return member?.status === 'error'
     }).length,
   }

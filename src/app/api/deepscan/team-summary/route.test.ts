@@ -6,6 +6,7 @@ import {
   DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT,
   createDeepScanTeamSummaryResponse,
   parseTeamSummaryContent,
+  removeForbiddenInvestmentActionAdvice,
 } from './route'
 
 
@@ -60,4 +61,38 @@ test('team summary route returns requester summary with Cerebras max-token contr
 test('parseTeamSummaryContent accepts JSON or direct sentence and normalizes whitespace', () => {
   assert.equal(parseTeamSummaryContent('{"summary":"강한 추세입니다.\\n단, 변동성은 봐야 합니다."}'), '강한 추세입니다. 단, 변동성은 봐야 합니다.')
   assert.equal(parseTeamSummaryContent('  직접 한 문장입니다.  '), '직접 한 문장입니다.')
+})
+
+test('team summary removes forbidden investment action advice phrases', async () => {
+  assert.equal(
+    removeForbiddenInvestmentActionAdvice('현재 포지션을 유지하면서 시장 전반의 흐름을 주시할 필요가 있습니다.'),
+    '현재 구간을 기준으로 시장 전반의 흐름을 주시할 필요가 있습니다.',
+  )
+
+  assert.doesNotMatch(
+    removeForbiddenInvestmentActionAdvice('매수해야 합니다. 매도보다 보유가 낫습니다.'),
+    /매수해야|매도보다|보유가 낫/,
+  )
+  assert.doesNotMatch(
+    removeForbiddenInvestmentActionAdvice('매수하세요. 매도하세요. 보유하세요. 보유를 추천합니다.'),
+    /매수하세요|매도하세요|보유하세요|보유를 추천/,
+  )
+
+  const response = await createDeepScanTeamSummaryResponse(
+    {
+      teamKey: 'positionTeam',
+      teamName: '포지션 팀',
+      body: '의견 1: 수익권입니다. 의견 2: 변동성이 있습니다. 의견 3: 정보가 부족합니다.',
+    },
+    async () => ({
+      summary: '보유를 유지하면서 ETF 전반의 변동성을 주시할 필요가 있습니다.',
+      model: 'openai/gpt-oss-120b',
+      provider: 'Cerebras/fp16',
+    }),
+  )
+  const body = await response.json()
+
+  assert.equal(response.status, 200)
+  assert.doesNotMatch(body.summary, /포지션\s*유지|보유를\s*유지|보유\s*유지/)
+  assert.match(body.summary, /현재 구간/)
 })
