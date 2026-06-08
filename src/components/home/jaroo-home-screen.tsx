@@ -50,6 +50,7 @@ type DeepScanLoadingTarget = {
   name: string
   identifier?: string
   market?: string
+  kind?: string
   shares?: number
   averagePrice?: number
   averagePriceCurrency?: 'KRW' | 'USD'
@@ -884,6 +885,7 @@ export function JarooHomeScreen() {
       name: holding.name,
       identifier: getHoldingIdentifierText(holding),
       market: holding.market,
+      kind: holding.kind,
       shares: item.quantity,
       averagePrice: item.averagePrice,
       averagePriceCurrency: item.averagePriceCurrency,
@@ -1078,6 +1080,7 @@ export function JarooHomeScreen() {
               name={deepScanLoadingTarget.name}
               identifier={deepScanLoadingTarget.identifier}
               market={deepScanLoadingTarget.market}
+              instrumentKind={deepScanLoadingTarget.kind}
               shares={deepScanLoadingTarget.shares}
               averagePrice={deepScanLoadingTarget.averagePrice}
               averagePriceCurrency={deepScanLoadingTarget.averagePriceCurrency}

@@ -18,7 +18,6 @@ test('buildDeepScanCanonicalInput는 허용 query만 explicit raw input으로 �
         code: '005930',
         ticker: '005930.KS',
         market: 'KR',
-        kind: 'stock',
       },
       holding: {
         shares: '10주',
@@ -42,7 +41,6 @@ test('createDeepScanCanonicalResponse는 internal builder payload를 그대로 J
           name: 'NVIDIA',
           ticker: 'NVDA',
           market: 'US',
-          kind: 'stock',
         },
         sourceContext: { from: 'holding' },
       },

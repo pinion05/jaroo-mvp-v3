@@ -503,6 +503,7 @@ function buildRawInputFromSearchParams(searchParams: URLSearchParams): DeepScanR
   const code = normalizeText(searchParams.get('code'))
   const ticker = normalizeText(searchParams.get('ticker'))?.toUpperCase()
   const market = normalizeText(searchParams.get('market'))?.toUpperCase()
+  const kind = normalizeText(searchParams.get('kind'))?.toLowerCase()
   const name = normalizeText(searchParams.get('name'))
   const shares = normalizeText(searchParams.get('shares'))
   const averagePrice = normalizeText(searchParams.get('averagePrice'))
@@ -531,7 +532,7 @@ function buildRawInputFromSearchParams(searchParams: URLSearchParams): DeepScanR
       code,
       ticker,
       market,
-      kind: 'stock',
+      ...(kind === 'etf' ? { kind: 'etf' as const } : kind === 'stock' ? { kind: 'stock' as const } : {}),
     },
     holding: Object.keys(holding).length > 0 ? holding : undefined,
     selectedAt: selectedAt ?? undefined,
@@ -599,11 +600,25 @@ function setCrawlerDeepScanQueryValue(searchParams: URLSearchParams, key: string
   }
 }
 
+function resolveCrawlerDeepScanKind(input: DeepScanRawInput) {
+  const market = normalizeMarketForRoute(input.instrument.market)
+  if (market === 'ETN') {
+    return 'etn'
+  }
+
+  if (market === 'ETF') {
+    return input.instrument.kind ?? 'etf'
+  }
+
+  return input.instrument.kind === 'etf' ? 'etf' : undefined
+}
+
 export function buildKrDeepScanCrawlerCanonicalUrl(rawInput: DeepScanRawInput) {
   const input = prepareDeepScanRawInputForBuilder(rawInput)
   const searchParams = new URLSearchParams()
 
   setCrawlerDeepScanQueryValue(searchParams, 'market', input.instrument.market ?? 'KR')
+  setCrawlerDeepScanQueryValue(searchParams, 'kind', resolveCrawlerDeepScanKind(input))
   setCrawlerDeepScanQueryValue(searchParams, 'code', input.instrument.code)
   setCrawlerDeepScanQueryValue(searchParams, 'ticker', input.instrument.ticker)
   setCrawlerDeepScanQueryValue(searchParams, 'name', input.instrument.name)

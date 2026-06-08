@@ -25,6 +25,7 @@ test('deepscan-canonical endpoint definition is registered', async () => {
   assert.deepEqual(definition.dataSources, ['wisereport', 'fnguide', 'krx-js-client', 'polygon', 'fmp', 'deepscan-kr-package']);
   assert.deepEqual(definition.query, [
     'market(optional)',
+    'kind(optional)',
     'code(optional)',
     'ticker(optional)',
     'name(optional)',
@@ -41,7 +42,8 @@ test('GET explicit-source deepscan path returns raw canonical payload and builds
 
   const body = await withServer(app, async (baseUrl) => {
     const params = new URLSearchParams({
-      market: 'KR',
+      market: 'ETF',
+      kind: 'etf',
       code: '005930',
       name: '삼성전자',
       shares: '12',
@@ -58,7 +60,8 @@ test('GET explicit-source deepscan path returns raw canonical payload and builds
 
   assert.equal(Object.prototype.hasOwnProperty.call(body, 'ok'), false);
   assert.equal(body.metadata.errorCode, undefined);
-  assert.equal(body.input.instrument.market, 'KR');
+  assert.equal(body.input.instrument.market, 'ETF');
+  assert.equal(body.input.instrument.kind, 'etf');
   assert.equal(body.input.instrument.code, '005930');
   assert.equal(body.input.instrument.name, '삼성전자');
   assert.equal(body.input.holding.shares, '12');

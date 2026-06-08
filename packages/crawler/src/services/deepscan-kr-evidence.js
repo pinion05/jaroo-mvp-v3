@@ -1179,7 +1179,136 @@ function extractBusinessCommentary(page) {
   };
 }
 
-function buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals }) {
+
+function isKrExchangeProductMarket(value) {
+  const market = normalizeText(value)?.toUpperCase();
+  return market === 'ETF' || market === 'ETN';
+}
+
+function normalizeEtfProductSnapshot(value) {
+  const snapshot = asObject(value);
+  if (Object.keys(snapshot).length === 0) {
+    return null;
+  }
+
+  const product = asObject(snapshot.product);
+  const marketStatus = asObject(snapshot.marketStatus);
+  const returns = asObject(marketStatus.returns);
+  const constituents = asObject(snapshot.constituents);
+  const liquidity = asObject(snapshot.liquidity);
+  const top10 = Array.isArray(constituents.top10) ? constituents.top10 : [];
+  const rows = Array.isArray(constituents.rows) ? constituents.rows : [];
+
+  const normalizedTop10 = top10.map((row, index) => {
+    const item = asObject(row);
+    return {
+      rank: normalizeNumber(item.rank) ?? index + 1,
+      asOf: normalizeDate(item.asOf) ?? normalizeText(item.asOf),
+      name: normalizeText(item.name),
+      shares: normalizeNumber(item.shares),
+      weightPct: normalizePercent(item.weightPct),
+    };
+  }).filter((row) => row.name || row.shares !== null || row.weightPct !== null);
+
+  const normalizedRows = rows.map((row, index) => {
+    const item = asObject(row);
+    return {
+      rank: normalizeNumber(item.rank) ?? index + 1,
+      asOf: normalizeDate(item.asOf) ?? normalizeText(item.asOf),
+      name: normalizeText(item.name),
+      shares: normalizeNumber(item.shares),
+      weightPct: normalizePercent(item.weightPct),
+    };
+  }).filter((row) => row.name || row.shares !== null || row.weightPct !== null);
+
+  const normalized = {
+    schemaVersion: normalizeText(snapshot.schemaVersion) ?? 'wisereport-etf-snapshot-v1',
+    source: normalizeText(snapshot.source) ?? 'wisereport-etf',
+    code: normalizeCode(snapshot.code),
+    asOf: normalizeDate(snapshot.asOf) ?? normalizeText(snapshot.asOf),
+    product: {
+      name: normalizeText(product.name),
+      marketName: normalizeText(product.marketName),
+      baseIndexName: normalizeText(product.baseIndexName),
+      firstSettleDate: normalizeDate(product.firstSettleDate) ?? normalizeText(product.firstSettleDate),
+      listDate: normalizeDate(product.listDate) ?? normalizeText(product.listDate),
+      fundType: normalizeText(product.fundType),
+      totalFeePct: normalizePercent(product.totalFeePct),
+      financialPeriod: normalizeText(product.financialPeriod),
+      distributionBaseDate: normalizeText(product.distributionBaseDate),
+      liquidityProviders: normalizeText(product.liquidityProviders),
+      issuerName: normalizeText(product.issuerName),
+      issuerUrl: normalizeText(product.issuerUrl),
+    },
+    marketStatus: {
+      closePrice: normalizeNumber(marketStatus.closePrice),
+      priceChange: normalizeNumber(marketStatus.priceChange),
+      changePct: normalizePercent(marketStatus.changePct),
+      yearHigh: normalizeNumber(marketStatus.yearHigh),
+      yearLow: normalizeNumber(marketStatus.yearLow),
+      listedShares: normalizeNumber(marketStatus.listedShares),
+      tradingVolume: normalizeNumber(marketStatus.tradingVolume),
+      tradingValue: normalizeNumber(marketStatus.tradingValue),
+      marketCap: normalizeNumber(marketStatus.marketCap),
+      beta: normalizeNumber(marketStatus.beta),
+      avgTradingVolume20: normalizeNumber(marketStatus.avgTradingVolume20),
+      avgTradingValue20: normalizeNumber(marketStatus.avgTradingValue20),
+      foreignRatioPct: normalizePercent(marketStatus.foreignRatioPct),
+      returns: {
+        oneMonthPct: normalizePercent(returns.oneMonthPct),
+        threeMonthPct: normalizePercent(returns.threeMonthPct),
+        sixMonthPct: normalizePercent(returns.sixMonthPct),
+        twelveMonthPct: normalizePercent(returns.twelveMonthPct),
+      },
+    },
+    constituents: {
+      asOf: normalizeDate(constituents.asOf) ?? normalizeText(constituents.asOf),
+      totalCount: normalizeNumber(constituents.totalCount) ?? normalizedRows.length,
+      top10WeightPct: normalizePercent(constituents.top10WeightPct),
+      top10: normalizedTop10,
+      rows: normalizedRows,
+    },
+    liquidity: {
+      latestAsOf: normalizeDate(liquidity.latestAsOf) ?? normalizeText(liquidity.latestAsOf),
+      avgTradingVolume: normalizeNumber(liquidity.avgTradingVolume),
+      avgTradingValue: normalizeNumber(liquidity.avgTradingValue),
+      monthlyRows: Array.isArray(liquidity.monthlyRows) ? liquidity.monthlyRows.slice(0, 24) : [],
+    },
+  };
+
+  if (normalized.constituents.top10WeightPct === null && normalized.constituents.top10.length > 0) {
+    normalized.constituents.top10WeightPct = normalized.constituents.top10.reduce((sum, row) => sum + (row.weightPct ?? 0), 0);
+  }
+
+  const hasMeaningfulEtfData = hasEvidence(normalized.product)
+    || hasEvidence(normalized.marketStatus)
+    || normalized.constituents.top10.length > 0
+    || normalized.constituents.rows.length > 0
+    || hasEvidence(normalized.liquidity);
+
+  return hasMeaningfulEtfData ? normalized : null;
+}
+
+
+function buildCurrentQuoteFromEtfSnapshot(etfProductSnapshot) {
+  const price = normalizeNumber(etfProductSnapshot?.marketStatus?.closePrice);
+  if (price === null) {
+    return null;
+  }
+
+  const volume = normalizeNumber(etfProductSnapshot?.marketStatus?.tradingVolume);
+
+  return {
+    price,
+    currency: 'KRW',
+    ...(volume !== null ? { volume } : {}),
+    asOf: normalizeDate(etfProductSnapshot?.asOf) ?? normalizeDate(etfProductSnapshot?.constituents?.asOf) ?? null,
+    source: normalizeText(etfProductSnapshot?.source) ?? 'wisereport-etf',
+    status: 'ok',
+  };
+}
+
+function buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals, etfProductSnapshot }) {
   const facts = [];
 
   if (currentQuote) {
@@ -1195,6 +1324,22 @@ function buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals }) {
     }
   }
 
+  if (etfProductSnapshot) {
+    const baseIndexName = etfProductSnapshot.product?.baseIndexName;
+    const topNames = (etfProductSnapshot.constituents?.top10 ?? [])
+      .slice(0, 2)
+      .map((row) => row.name)
+      .filter(Boolean)
+      .join('·');
+    if (baseIndexName && topNames) {
+      facts.push(`ETF 기초지수 ${baseIndexName} / 상위 구성 ${topNames} 확인`);
+    } else if (baseIndexName) {
+      facts.push(`ETF 기초지수 ${baseIndexName} 확인`);
+    } else if (topNames) {
+      facts.push(`ETF 상위 구성 ${topNames} 확인`);
+    }
+  }
+
   if (pageCoverage.availableCount > 0) {
     facts.push(`KR 리포트 페이지 ${pageCoverage.availableCount}/${pageCoverage.totalKnownPages} 확보`);
   }
@@ -1206,7 +1351,7 @@ function buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals }) {
   return facts.slice(0, 3);
 }
 
-function buildTopRisks({ currentQuote, holding, pageCoverage, sourceCoverage }) {
+function buildTopRisks({ currentQuote, holding, pageCoverage, sourceCoverage, isExchangeProduct, etfProductSnapshot }) {
   const risks = [];
 
   if (!currentQuote) {
@@ -1219,6 +1364,10 @@ function buildTopRisks({ currentQuote, holding, pageCoverage, sourceCoverage }) 
     }
   } else {
     risks.push('KR 보유 맥락 없음');
+  }
+
+  if (isExchangeProduct && !etfProductSnapshot) {
+    risks.push('ETF 구성종목 근거 없음');
   }
 
   if (pageCoverage.availableCount === 0) {
@@ -1239,6 +1388,11 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
   const slimCompany = asObject(slim.company);
   const slimPages = asObject(slim.pages);
   const packageResult = asObject(safeSources.packageResult);
+  const rawMarket = pickFirst(normalizeText(rawInstrument.market), normalizeText(safeInput.market));
+  const rawKind = normalizeText(rawInstrument.kind)?.toLowerCase();
+  const exchangeProductKind = ['etf', 'etn'].includes(rawKind ?? '') ? rawKind : null;
+  const isExchangeProduct = isKrExchangeProductMarket(rawMarket) || Boolean(exchangeProductKind);
+  const etfProductSnapshot = normalizeEtfProductSnapshot(safeSources.etfSnapshot ?? safeSources.etfProductSnapshot ?? safeSources.exchangeProductSnapshot);
 
   const instrument = {
     code: pickFirst(
@@ -1253,12 +1407,15 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
       normalizeText(safeInput.name),
       normalizeText(slimCompany.name),
     ),
-    market: pickFirst(
-      normalizeText(packageResult.listingMarket),
-      normalizeText(slimPages['company-overview']?.summary?.market),
-      normalizeText(rawInstrument.market),
-      normalizeText(safeInput.market),
-    ),
+    market: isExchangeProduct
+      ? rawMarket
+      : pickFirst(
+          normalizeText(packageResult.listingMarket),
+          normalizeText(slimPages['company-overview']?.summary?.market),
+          normalizeText(rawInstrument.market),
+          normalizeText(safeInput.market),
+        ),
+    ...(exchangeProductKind ? { kind: exchangeProductKind } : {}),
   };
 
   const holding = {
@@ -1282,7 +1439,7 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
 
   holding.hasHoldingContext = holding.shares !== null || holding.averagePrice !== null || holding.evaluationAmount !== null;
 
-  const currentQuote = resolveCurrentQuote(safeSources.quotes, instrument.code);
+  const currentQuote = resolveCurrentQuote(safeSources.quotes, instrument.code) ?? buildCurrentQuoteFromEtfSnapshot(etfProductSnapshot);
   holding.hasFullSellNowInputs = holding.shares !== null && holding.averagePrice !== null && currentQuote !== null;
   const quoteAsOf = normalizeDate(currentQuote?.asOf);
   const selectedAt = normalizeDate(safeInput.selectedAt);
@@ -1333,6 +1490,7 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
     hasCurrentQuote: currentQuote !== null,
     hasHolding: holding.hasHoldingContext,
     hasPackageResult: Object.keys(packageResult).length > 0,
+    ...(isExchangeProduct ? { hasEtfSnapshot: etfProductSnapshot !== null } : {}),
     availableReportPages: availablePageIds,
   };
 
@@ -1345,6 +1503,9 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
   }
   if (!sourceCoverage.hasHolding) {
     missingSources.push('holding');
+  }
+  if (isExchangeProduct && !sourceCoverage.hasEtfSnapshot) {
+    missingSources.push('etf-snapshot');
   }
 
   const marketSnapshot = {
@@ -1419,10 +1580,11 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
     ownershipSnapshot,
     financialSnapshot,
     businessCommentary,
+    etfProductSnapshot,
     packageContext,
     sourceLimitations,
     missingSources,
-    topFacts: buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals }),
-    topRisks: buildTopRisks({ currentQuote, holding, pageCoverage, sourceCoverage }),
+    topFacts: buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals, etfProductSnapshot }),
+    topRisks: buildTopRisks({ currentQuote, holding, pageCoverage, sourceCoverage, isExchangeProduct, etfProductSnapshot }),
   };
 }

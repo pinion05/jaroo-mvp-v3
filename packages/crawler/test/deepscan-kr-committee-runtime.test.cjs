@@ -256,6 +256,32 @@ test('KR ETF committee axes use exchange-product labels without changing member 
   assert.equal(shape.hasMemberErrors, false);
 });
 
+test('KR ETF committee axes honor etf kind even when market is generic KR', async () => {
+  const { buildKrCommitteeAxesFromLlmResults } = await import('../src/services/deepscan-kr-committee-runtime.js');
+
+  const shape = buildKrCommitteeAxesFromLlmResults({
+    instrument: {
+      code: '226490',
+      name: 'KODEX 코스피',
+      market: 'KR',
+      kind: 'etf',
+    },
+  }, {
+    profitability: { score: 70, reason: 'ETF 구조 reason', confidence: 'medium' },
+    valuation: { score: 65, reason: 'ETF 가격 reason', confidence: 'medium' },
+    ownershipStability: { score: 55, reason: 'ETF 분산 reason', confidence: 'medium' },
+    trend: { score: 60, reason: 'ETF 흐름 reason', confidence: 'medium' },
+    consensusMomentum: { score: 50, reason: 'ETF 정보 reason', confidence: 'medium' },
+    priceLocation: { score: 80, reason: 'ETF 위치 reason', confidence: 'medium' },
+    avgPriceGap: { score: 85, reason: '평단 reason', confidence: 'medium' },
+    upsideBuffer: { score: 60, reason: '여지 reason', confidence: 'medium' },
+    holdingCompleteness: { score: 90, reason: '입력 reason', confidence: 'medium' },
+  });
+
+  assert.deepEqual(shape.axes.map((axis) => axis.label), ['ETF 구조 품질', '지수/가격 흐름', '내 포지션 적합도']);
+  assert.deepEqual(shape.axes[0].members.map((member) => member.title), ['상품 구조/운용 품질', '가격/NAV 단서', '구성/분산 안정성']);
+});
+
 test('KR ETF committee prompts forbid stock-only missing-data interpretations', async () => {
   const { scoreDeepScanKrCommitteeFromDump } = await import('../src/services/deepscan-kr-committee-runtime.js');
   const originalFetch = global.fetch;
@@ -330,7 +356,26 @@ test('KR ETF committee prompts forbid stock-only missing-data interpretations', 
         hasCurrentQuote: true,
         hasHolding: true,
         hasPackageResult: false,
+        hasEtfSnapshot: true,
         availableReportPages: [],
+      },
+      etfProductSnapshot: {
+        product: {
+          baseIndexName: '코스피지수',
+          issuerName: '삼성자산운용(주)',
+          totalFeePct: 0.15,
+        },
+        marketStatus: {
+          returns: { oneMonthPct: 18.52 },
+          avgTradingVolume20: 596968,
+        },
+        constituents: {
+          top10WeightPct: 57.12,
+          top10: [
+            { rank: 1, name: '삼성전자', weightPct: 29.6 },
+            { rank: 2, name: 'SK하이닉스', weightPct: 22.72 },
+          ],
+        },
       },
       reportSignals: {},
       missingSources: [],
@@ -351,6 +396,9 @@ test('KR ETF committee prompts forbid stock-only missing-data interpretations', 
     assert.match(systemPrompts, /never infer low risk or high stability from missing shareholder or constituent data/);
     assert.match(serializedBodies, /KODEX 코스피/);
     assert.match(serializedBodies, /ETF/);
+    assert.match(serializedBodies, /코스피지수/);
+    assert.match(serializedBodies, /삼성전자/);
+    assert.match(serializedBodies, /SK하이닉스/);
   } finally {
     global.fetch = originalFetch;
     if (originalKey === undefined) {

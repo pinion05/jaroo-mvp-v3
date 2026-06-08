@@ -15,6 +15,10 @@ import {
 import {
   getCurrentQuotes,
 } from './crawlers/current-quotes.js';
+import {
+  fetchWiseReportEtfSnapshot,
+  parseWiseReportEtfSnapshotHtml,
+} from './crawlers/wisereport-etf.js';
 
 const require = createRequire(import.meta.url);
 
@@ -190,4 +194,6 @@ export {
   getIndexSMA,
   getUSMarketIndicators,
   getCurrentQuotes,
+  fetchWiseReportEtfSnapshot,
+  parseWiseReportEtfSnapshotHtml,
 };
