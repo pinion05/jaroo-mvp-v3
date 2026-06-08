@@ -56,10 +56,13 @@ test('DeepScan loading screen uses v13 chat flow with three committee teams, not
 
 test('DeepScan target price quick fact remains visible with missing or failed reason', () => {
   const source = readRepoFile('src', 'app', 'deepscan', 'page.tsx')
+  const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
 
   assert.match(source, /function buildTargetPriceStatusQuickFact/)
   assert.match(source, /'조회 실패'/)
   assert.match(source, /'미제공'/)
+  assert.match(source, /'etf-product-context'/)
+  assert.match(loadingSource, /getQuickFactByKey\(displayQuickFacts, 'analyst-consensus'\) \?\? getQuickFactByKey\(displayQuickFacts, 'etf-product-context'\)/)
   assert.match(source, /아직 증권사 목표가가 제시되지 않은 종목입니다\./)
   assert.match(source, /증권사 목표가를 지금 불러오지 못했습니다\./)
   assert.match(source, /requestSeed\.holding\.name/)

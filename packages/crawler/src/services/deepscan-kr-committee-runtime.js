@@ -135,8 +135,13 @@ function getInstrumentMarket(evidence) {
   return normalizeText(evidence?.instrument?.market ?? evidence?.market)?.toUpperCase() ?? null;
 }
 
+function getInstrumentKind(evidence) {
+  return normalizeText(evidence?.instrument?.kind ?? evidence?.kind)?.toLowerCase() ?? null;
+}
+
 function isKrExchangeProductEvidence(evidence) {
-  return KR_EXCHANGE_PRODUCT_MARKETS.has(getInstrumentMarket(evidence));
+  const kind = getInstrumentKind(evidence);
+  return KR_EXCHANGE_PRODUCT_MARKETS.has(getInstrumentMarket(evidence)) || kind === 'etf' || kind === 'etn';
 }
 
 function getMemberPresentationSpec(memberKey, evidence) {
@@ -437,6 +442,7 @@ function buildSharedDump(input, evidence, sources) {
       code: presentValue(input.instrument.code ?? null, ['instrument_code']),
       name: presentValue(input.instrument.name ?? null, ['instrument_name']),
       market: presentValue(input.instrument.market ?? evidence.instrument?.market ?? null, ['instrument_market']),
+      kind: presentValue(input.instrument.kind ?? evidence.instrument?.kind ?? null, ['instrument_kind']),
     },
     timestamps: presentValue(evidence.timestamps ?? {}, ['timestamps']),
     sourceCoverage: presentValue(evidence.sourceCoverage ?? {}, ['source_coverage']),
@@ -646,7 +652,7 @@ function systemPrompt(memberKey) {
     'Treat package-derived context as supplemental only, never as silent numeric truth.',
     'Treat absent fields as out-of-scope rather than negative evidence; do not request, infer, or mention data that is not present in sharedContext/memberContext.',
     'Lead with the strongest numeric or concrete evidence that is actually present.',
-    'If sharedContext.instrument.market or memberContext.facts.instrument.market is ETF or ETN, treat the instrument as an exchange-traded product, not an operating company.',
+    'If sharedContext.instrument.market or memberContext.facts.instrument.market is ETF or ETN, or sharedContext.instrument.kind/memberContext.facts.instrument.kind is etf/etn, treat the instrument as an exchange-traded product, not an operating company.',
     'For ETF/ETN, do not mention missing individual-stock facts such as PER, PBR, ROE, corporate profitability, shareholder stability, analyst recommendation, or target price unless the input explicitly provides those facts as applicable.',
     'For ETF/ETN, absence of shareholder, constituent, or analyst-target data is not positive or negative evidence by itself; say only what can be judged from current quote, average-price gap, trend, liquidity, page coverage, NAV/premium-discount, constituents, or sector weights that are actually present.',
     'For ETF/ETN, when sharedContext.etfProductSnapshot or memberContext.facts.etfProductSnapshot is present, use its product, marketStatus, constituents.top10/top10WeightPct, and liquidity fields directly instead of saying constituent data is unavailable.',

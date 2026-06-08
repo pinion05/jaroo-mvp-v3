@@ -842,6 +842,7 @@ test('buildDeepScanKrEvidencePacket promotes ETF constituent snapshot into facts
   });
 
   assert.equal(packet.instrument.market, 'ETF');
+  assert.equal(packet.instrument.kind, 'etf');
   assert.equal(packet.sourceCoverage.hasEtfSnapshot, true);
   assert.equal(packet.etfProductSnapshot.product.baseIndexName, '코스피지수');
   assert.equal(packet.etfProductSnapshot.product.totalFeePct, 0.15);
@@ -854,6 +855,29 @@ test('buildDeepScanKrEvidencePacket promotes ETF constituent snapshot into facts
     'ETF 기초지수 코스피지수 / 상위 구성 삼성전자·SK하이닉스 확인',
   ]);
   assert.deepEqual(packet.topRisks, ['KR 리포트 페이지 근거 없음']);
+});
+
+test('buildDeepScanKrEvidencePacket preserves ETF kind even when market is generic KR', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  const packet = buildDeepScanKrEvidencePacket({
+    instrument: {
+      code: '226490',
+      name: 'KODEX 코스피',
+      market: 'KR',
+      kind: 'etf',
+    },
+  }, {
+    etfSnapshot: {
+      product: { baseIndexName: '코스피지수' },
+      marketStatus: { closePrice: '77,540' },
+      constituents: { top10: [{ name: '삼성전자', weightPct: '29.60' }] },
+    },
+  });
+
+  assert.equal(packet.instrument.market, 'KR');
+  assert.equal(packet.instrument.kind, 'etf');
+  assert.equal(packet.sourceCoverage.hasEtfSnapshot, true);
 });
 
 test('buildDeepScanKrEvidencePacket uses ETF snapshot close price as a quote fallback when quote crawler is unavailable', async () => {

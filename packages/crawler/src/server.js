@@ -220,6 +220,7 @@ const DEEPSCAN_MAJOR_BLOCK_KEYS = Object.freeze([
 
 function buildJarooDeepScanInputFromQuery(req) {
   const market = parseSingleQueryValue(req.query.market);
+  const kind = parseSingleQueryValue(req.query.kind);
   const code = parseSingleQueryValue(req.query.code);
   const ticker = parseSingleQueryValue(req.query.ticker);
   const name = parseSingleQueryValue(req.query.name);
@@ -246,6 +247,7 @@ function buildJarooDeepScanInputFromQuery(req) {
       ...(code ? { code } : {}),
       ...(ticker ? { ticker } : {}),
       ...(market ? { market } : {}),
+      ...(kind ? { kind } : {}),
     },
     ...(Object.keys(holding).length > 0 ? { holding } : {}),
     ...(selectedAt ? { selectedAt } : {}),
@@ -2910,6 +2912,7 @@ const endpointDefinitions = [
     params: [],
     query: [
       'market(optional)',
+      'kind(optional)',
       'code(optional)',
       'ticker(optional)',
       'name(optional)',

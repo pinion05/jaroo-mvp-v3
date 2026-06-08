@@ -22,11 +22,17 @@ export const DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT = [
 ].join(' ')
 const DEFAULT_TEAM_SUMMARY_TIMEOUT_MS = 2500
 const MAX_TEAM_BODY_CHARS = 2400
+const ETF_TEAM_SUMMARY_PROMPT_APPENDIX = [
+  'ETF/ETN 입력에서는 개별 기업식 목표가, 증권사 컨센서스, 실적, EPS, PER, PBR 부재를 리스크나 한계로 쓰지 마라.',
+  'ETF/ETN 입력에서는 NAV 괴리, 기초지수 흐름, 구성종목 비중, 유동성, 현재가와 평단 간격 등 실제 입력 근거만 합성하라.',
+].join(' ')
 
 type TeamSummaryRequestBody = {
   teamKey?: unknown
   teamName?: unknown
   body?: unknown
+  market?: unknown
+  instrumentKind?: unknown
 }
 
 type TeamSummaryResult = {
@@ -36,7 +42,7 @@ type TeamSummaryResult = {
   provider?: string
 }
 
-type TeamSummaryRequester = (input: { teamKey: string; teamName: string; body: string }) => Promise<TeamSummaryResult>
+type TeamSummaryRequester = (input: { teamKey: string; teamName: string; body: string; market?: string; instrumentKind?: string }) => Promise<TeamSummaryResult>
 
 function normalizeText(value: unknown) {
   return typeof value === 'string' && value.trim() ? value.trim() : null
@@ -45,6 +51,16 @@ function normalizeText(value: unknown) {
 function parsePositiveInteger(value: string | undefined, fallback: number) {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback
+}
+
+function isExchangeProductSummaryInput(input: { market?: string; instrumentKind?: string }) {
+  return /(?:^|\b)(?:ETF|ETN)(?:\b|$)/iu.test(input.market ?? '') || /^(?:etf|etn)$/iu.test(input.instrumentKind ?? '')
+}
+
+export function buildTeamSummarySystemPrompt(input: { market?: string; instrumentKind?: string } = {}) {
+  return isExchangeProductSummaryInput(input)
+    ? `${DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT} ${ETF_TEAM_SUMMARY_PROMPT_APPENDIX}`
+    : DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT
 }
 
 function truncateForPrompt(value: string) {
@@ -57,6 +73,34 @@ function cleanupSummary(value: string) {
     .replace(/^[-*•\d.\s]+/u, '')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+function removeForbiddenExchangeProductStockCopy(value: string) {
+  return cleanupSummary(value)
+    .replace(/ETF\s*특성상\s*개별\s*종목\s*분석과\s*목표가가?\s*없어\s*추가\s*상승\s*여력을\s*판단하기\s*어렵다\.?/gu, 'ETF는 NAV 괴리율과 기초지수 흐름 확인이 추가 판단의 핵심입니다.')
+    .replace(/(?:개별\s*)?(?:종목\s*)?(?:분석과\s*)?목표가(?:와|가|는|를)?\s*없(?:어|어서|고)?[^.!?。！？]*(?:상승\s*여력|판단)[^.!?。！？]*(?:[.!?。！？]|$)/gu, 'NAV 괴리율과 기초지수 흐름을 추가로 확인해야 합니다. ')
+    .replace(/목표가?\s*부재/gu, 'NAV·기초지수 확인 필요')
+    .replace(/목표가/gu, 'NAV·기초지수 기준')
+    .replace(/컨센서스[·\s]*(?:밸류|가치)?\s*(?:정보)?\s*부재/gu, 'NAV·괴리율 정보 추가 확인')
+    .replace(/추가\s*상승\s*여력/gu, '지수·가격 여지')
+    .replace(/수익을\s*실현했지만/gu, '평가이익이 있지만')
+    .replace(/매도\s*판단/gu, '비중 점검')
+    .replace(/매도\s*의사결정/gu, '비중 점검')
+    .replace(/애널리스트\s*ETF\s*기준와\s*종목별\s*PER\/PBR\s*데이터는\s*제공되지\s*않습니다\.?/gu, 'NAV·괴리율과 구성종목 정보를 추가로 확인해야 합니다.')
+    .replace(/종목별\s*PER\/PBR\s*데이터는\s*제공되지\s*않습니다\.?/gu, 'NAV·괴리율과 구성종목 정보를 추가로 확인해야 합니다.')
+    .replace(/PER\/PBR/gu, 'NAV·괴리율')
+    .replace(/ETF\s*기준와/gu, 'ETF 기준과')
+    .replace(/보유\s*종목/gu, '보유 ETF')
+    .replace(/보유\s*ETF은/gu, '보유 ETF는')
+    .replace(/지수·가격\s*여지이/gu, '지수·가격 여지가')
+    .replace(/보유\s*평가/gu, '현재 구간 평가')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function cleanupTeamSummaryForInstrument(value: string, input: { market?: string; instrumentKind?: string } = {}) {
+  const actionSafe = removeForbiddenInvestmentActionAdvice(value)
+  return isExchangeProductSummaryInput(input) ? removeForbiddenExchangeProductStockCopy(actionSafe) : actionSafe
 }
 
 export function removeForbiddenInvestmentActionAdvice(value: string) {
@@ -98,7 +142,7 @@ export function parseTeamSummaryContent(content: string) {
   return removeForbiddenInvestmentActionAdvice(text.replace(/^```(?:json)?/i, '').replace(/```$/i, ''))
 }
 
-async function callOpenRouterTeamSummary(input: { teamKey: string; teamName: string; body: string }): Promise<TeamSummaryResult> {
+async function callOpenRouterTeamSummary(input: Parameters<TeamSummaryRequester>[0]): Promise<TeamSummaryResult> {
   const apiKey = process.env.OPENROUTER_API_KEY
   if (!apiKey) {
     throw new Error('OPENROUTER_API_KEY is not configured.')
@@ -130,7 +174,7 @@ async function callOpenRouterTeamSummary(input: { teamKey: string; teamName: str
       messages: [
         {
           role: 'system',
-          content: DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT,
+          content: buildTeamSummarySystemPrompt(input),
         },
         {
           role: 'user',
@@ -152,7 +196,7 @@ async function callOpenRouterTeamSummary(input: { teamKey: string; teamName: str
   }
 
   return {
-    summary: removeForbiddenInvestmentActionAdvice(summary),
+    summary: cleanupTeamSummaryForInstrument(summary, input),
     elapsedMs: Date.now() - startedAt,
     model,
     provider: 'Cerebras/fp16',
@@ -166,14 +210,16 @@ export async function createDeepScanTeamSummaryResponse(
   const teamKey = normalizeText(body.teamKey)
   const teamName = normalizeText(body.teamName)
   const rawBody = normalizeText(body.body)
+  const market = normalizeText(body.market)
+  const instrumentKind = normalizeText(body.instrumentKind)
 
   if (!teamKey || !teamName || !rawBody) {
     return NextResponse.json({ ok: false, error: { message: 'teamKey, teamName and body are required.' } }, { status: 400 })
   }
 
   try {
-    const result = await requester({ teamKey, teamName, body: rawBody })
-    const summary = removeForbiddenInvestmentActionAdvice(result.summary)
+    const result = await requester({ teamKey, teamName, body: rawBody, market: market ?? undefined, instrumentKind: instrumentKind ?? undefined })
+    const summary = cleanupTeamSummaryForInstrument(result.summary, { market: market ?? undefined, instrumentKind: instrumentKind ?? undefined })
     return NextResponse.json({
       ok: true,
       teamKey,

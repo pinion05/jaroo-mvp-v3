@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  buildKrDeepScanCrawlerCanonicalUrl,
   buildKrDeepScanPayloadViaCrawler,
   describeMomentumProvenance,
   extractKrCodeFromTicker,
@@ -173,6 +174,46 @@ test('DeepScan runtime infers KR builder input from KR-like ticker without expli
 
   assert.equal(resolveDeepScanPayloadBuilderRoute(rawInput), 'kr')
   assert.equal(prepareDeepScanRawInputForBuilder(rawInput).instrument.code, '035720')
+})
+
+
+
+test('KR DeepScan crawler canonical URL preserves ETF kind query parameter', () => {
+  const url = buildKrDeepScanCrawlerCanonicalUrl({
+    instrument: {
+      name: 'KODEX 코스피',
+      code: '226490',
+      market: 'ETF',
+      kind: 'etf',
+    },
+    holding: {
+      shares: '35',
+      averagePrice: '58828.75',
+    },
+    sourceContext: {
+      from: 'holding',
+    },
+  })
+
+  assert.match(url, /market=ETF/)
+  assert.match(url, /kind=etf/)
+})
+
+test('KR DeepScan crawler canonical URL preserves ETN market as etn kind even with legacy etf kind', () => {
+  const url = buildKrDeepScanCrawlerCanonicalUrl({
+    instrument: {
+      name: '삼성 인버스 코스피 200 선물 ETN',
+      code: '530036',
+      market: 'ETN',
+      kind: 'etf',
+    },
+    sourceContext: {
+      from: 'holding',
+    },
+  })
+
+  assert.match(url, /market=ETN/)
+  assert.match(url, /kind=etn/)
 })
 
 test('KR DeepScan crawler proxy waits and retries busy admission responses', async () => {

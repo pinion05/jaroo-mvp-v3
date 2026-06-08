@@ -27,6 +27,7 @@ import {
   type LoadingBriefingSnapshot,
   type MoneyCurrency,
 } from '@/lib/deepscan-briefing-snapshot'
+import { calculateFallbackEvaluationMoney } from '@/lib/deepscan-loading-metrics'
 import { cn } from '@/lib/utils'
 import styles from './deepscan-loading-screen.module.css'
 
@@ -34,6 +35,7 @@ type DeepScanLoadingScreenProps = {
   name?: string
   identifier?: string
   market?: string
+  instrumentKind?: string
   shares?: string | number
   averagePrice?: string | number
   averagePriceCurrency?: MoneyCurrency
@@ -285,36 +287,6 @@ function formatSignedMoney(value: number | null, currency: MoneyCurrency = 'KRW'
   return `${sign}${formatNumber(Math.round(absoluteValue))}원`
 }
 
-function calculateFallbackEvaluationAmount({
-  evaluationAmount,
-  currentPrice,
-  shares,
-  averagePrice,
-  currentProfitRate,
-}: Pick<DeepScanLoadingScreenProps, 'evaluationAmount' | 'currentPrice' | 'shares' | 'averagePrice' | 'currentProfitRate'>) {
-  if (parseNumericValue(evaluationAmount) !== null) {
-    return evaluationAmount
-  }
-
-  const shareCount = parseNumericValue(shares)
-  if (shareCount === null) {
-    return undefined
-  }
-
-  const currentPriceValue = parseNumericValue(currentPrice)
-  if (currentPriceValue !== null) {
-    return currentPriceValue * shareCount
-  }
-
-  const averagePriceValue = parseNumericValue(averagePrice)
-  const profitRateValue = parseNumericValue(currentProfitRate)
-  if (averagePriceValue !== null && profitRateValue !== null) {
-    return averagePriceValue * (1 + profitRateValue / 100) * shareCount
-  }
-
-  return undefined
-}
-
 function calculateProfitRate({
   currentPrice,
   averagePrice,
@@ -503,6 +475,14 @@ function getQuickFactByKey(facts: LoadingQuickFact[], key: string) {
   return facts.find((fact) => fact.key === key)
 }
 
+function isExchangeTradedProductMarket(value: string | undefined) {
+  return /(?:^|\b)(?:ETF|ETN)(?:\b|$)/iu.test(value ?? '')
+}
+
+function isExchangeTradedProduct(market: string | undefined, instrumentKind: string | undefined) {
+  return isExchangeTradedProductMarket(market) || /^(?:etf|etn)$/iu.test(instrumentKind ?? '')
+}
+
 function flattenCommitteeMembers(committeeAxes: JarooDeepScanCommitteeAxis[] | undefined) {
   return (committeeAxes ?? []).flatMap((axis) => axis.members)
 }
@@ -630,6 +610,7 @@ function buildLoadingStages({
   committeeAxes,
   currentPriceText,
   tradingVolumeText,
+  exchangeProduct,
 }: {
   displayQuickFacts: LoadingQuickFact[]
   findingProgress?: Partial<Record<FindingKey, FindingProgress>>
@@ -637,9 +618,10 @@ function buildLoadingStages({
   committeeAxes?: JarooDeepScanCommitteeAxis[]
   currentPriceText: string | null
   tradingVolumeText: string | null
+  exchangeProduct?: boolean
 }): NarrativeCard[] {
   const positionFact = displayQuickFacts.find((fact) => fact.key === 'week52-position' || Boolean(fact.indicator))
-  const consensusFact = getQuickFactByKey(displayQuickFacts, 'analyst-consensus')
+  const consensusFact = getQuickFactByKey(displayQuickFacts, 'analyst-consensus') ?? getQuickFactByKey(displayQuickFacts, 'etf-product-context')
   const completedFindings = findingProgress ? Object.values(findingProgress).filter(Boolean) : []
   const performanceLines = performanceComment && hasDisplayValue(performanceComment) ? getCommentLines(performanceComment) : []
 
@@ -647,7 +629,7 @@ function buildLoadingStages({
     const teamBody = buildCommitteeTeamBody(team, committeeAxes)
     const tags = team.key === 'fundamentalTeam'
       ? [
-          { text: performanceLines.length ? '실적 코멘트 확인' : '실적 대기', tone: performanceLines.length ? 'positive' as const : 'neutral' as const },
+          { text: exchangeProduct ? '상품 구조 확인' : performanceLines.length ? '실적 코멘트 확인' : '실적 대기', tone: exchangeProduct || performanceLines.length ? 'positive' as const : 'neutral' as const },
           { text: completedFindings.length ? `근거 ${completedFindings.length}개 확인` : '세 팀 대기', tone: completedFindings.length ? 'info' as const : 'neutral' as const },
         ]
       : team.key === 'marketTeam'
@@ -713,11 +695,15 @@ function buildVisibleNarrativeCards(cards: NarrativeCard[], visibleStageCount: n
 }
 
 export function splitTeamSummarySentences(value: string) {
-  return value
+  const decimalDotPlaceholder = '__JAROO_DECIMAL_DOT__'
+  const normalized = value
+    .replace(/(\d)\.(\d)/g, `$1${decimalDotPlaceholder}$2`)
     .replace(/\s+/g, ' ')
     .trim()
+
+  return normalized
     .match(/[^.!?。！？]+[.!?。！？]+|[^.!?。！？]+$/gu)
-    ?.map((sentence) => sentence.trim())
+    ?.map((sentence) => sentence.replaceAll(decimalDotPlaceholder, '.').trim())
     .filter(Boolean) ?? []
 }
 
@@ -1151,6 +1137,7 @@ export function DeepScanLoadingScreen({
   name = '선택 종목',
   identifier,
   market,
+  instrumentKind,
   shares,
   averagePrice,
   averagePriceCurrency = 'KRW',
@@ -1179,19 +1166,24 @@ export function DeepScanLoadingScreen({
   const [expandedTeamSummaries, setExpandedTeamSummaries] = useState<ReadonlySet<LoadingStageKey>>(() => new Set())
   const requestedTeamSummariesRef = useRef<Set<string>>(new Set())
   const targetLine = [identifier, market].filter(Boolean).join(' · ')
+  const exchangeProduct = isExchangeTradedProduct(market, instrumentKind)
   const sharesText = formatShares(shares)
   const averagePriceText = formatMoney(averagePrice, averagePriceCurrency)
   const currentPriceText = formatMoney(currentPrice, currentPriceCurrency)
   const tradingVolumeText = formatTradingVolume(tradingVolume)
-  const evaluationAmountCurrency = currentPriceCurrency === 'USD' && averagePriceCurrency === 'KRW'
-    ? 'KRW'
-    : currentPriceCurrency
-  const evaluationAmountText = formatMoney(
-    calculateFallbackEvaluationAmount({ evaluationAmount, currentPrice, shares, averagePrice, currentProfitRate }),
-    evaluationAmountCurrency,
-  )
   const snapshotCurrentPrice = briefingSnapshot?.quote?.currentPrice ?? undefined
   const effectiveCurrentPrice = snapshotCurrentPrice ?? currentPrice
+  const fallbackEvaluationMoney = calculateFallbackEvaluationMoney({
+    evaluationAmount,
+    currentPrice: effectiveCurrentPrice,
+    shares,
+    averagePrice,
+    currentProfitRate,
+    currentPriceCurrency,
+    averagePriceCurrency,
+    evaluationAmountCurrency: averagePriceCurrency,
+  })
+  const evaluationAmountText = formatMoney(fallbackEvaluationMoney?.amount, fallbackEvaluationMoney?.currency ?? currentPriceCurrency)
   const canCalculatePositionInOneCurrency = currentPriceCurrency === averagePriceCurrency
   const profitRateText = formatSignedPercent(
     (canCalculatePositionInOneCurrency ? calculateProfitRate({ currentPrice: effectiveCurrentPrice, averagePrice }) : null)
@@ -1211,8 +1203,9 @@ export function DeepScanLoadingScreen({
       committeeAxes,
       currentPriceText,
       tradingVolumeText,
+      exchangeProduct,
     }),
-    [committeeAxes, currentPriceText, displayQuickFacts, findingProgress, performanceComment, tradingVolumeText],
+    [committeeAxes, currentPriceText, displayQuickFacts, exchangeProduct, findingProgress, performanceComment, tradingVolumeText],
   )
   const orderedNarrativeCards = useMemo(
     () => buildOrderedNarrativeCards(loadingStages, arrivedStageKeys),
@@ -1271,6 +1264,8 @@ export function DeepScanLoadingScreen({
           teamKey: card.key,
           teamName: card.analystName,
           body: card.body,
+          market,
+          instrumentKind: exchangeProduct ? 'etf' : 'stock',
         }),
       })
         .then(async (response) => {
@@ -1292,7 +1287,7 @@ export function DeepScanLoadingScreen({
           }))
         })
     })
-  }, [loadingStages])
+  }, [exchangeProduct, loadingStages, market])
 
   return (
     <div className={cn(styles.loadingCard, className)}>
@@ -1322,7 +1317,7 @@ export function DeepScanLoadingScreen({
       <div className={styles.body}>
         <section className={styles.intro} aria-label='딥스캔 안내'>
           <p className={styles.introGreet}>{new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date())}</p>
-          <h2 className={styles.introTitle}>세 분석가가 종목을<br />차례로 살펴보고 있어요</h2>
+          <h2 className={styles.introTitle}>세 분석가가 {exchangeProduct ? 'ETF를' : '종목을'}<br />차례로 살펴보고 있어요</h2>
           <p className={styles.introBody}>{resultsReady ? '실제 응답이 도착했어요. 아래 결과 카드가 바로 이어집니다.' : '완료 신호가 오면 기다림 없이 이 화면 아래에 결과가 이어집니다.'}</p>
         </section>
 

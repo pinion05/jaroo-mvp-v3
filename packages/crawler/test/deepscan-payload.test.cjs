@@ -1012,3 +1012,92 @@ test('buildJarooDeepScanPayload returns canonical internal-service-error payload
     assert.equal(payload[key].error?.code, 'internal-service-error');
   }
 });
+
+test('buildJarooDeepScanPayload normalizes KR strategy scenario percentages to 100 with risk scenario', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+
+  const payload = await buildJarooDeepScanPayload({
+    instrument: {
+      name: 'KODEX 코스피',
+      code: '226490',
+      market: 'ETF',
+      kind: 'etf',
+    },
+    holding: {
+      shares: '35',
+      averagePrice: '58828.75',
+    },
+    selectedAt: '2026-06-08T14:42:22+09:00',
+    sources: {
+      quotes: {
+        items: [{ code: '226490', price: 77540, currency: 'KRW', asOf: '2026-06-08T14:42:22+09:00', source: 'fixture', status: 'ok' }],
+      },
+      etfSnapshot: {
+        code: '226490',
+        asOf: '2026-06-08',
+        product: { baseIndexName: '코스피지수', issuerName: '삼성자산운용(주)', totalFeePct: '0.150' },
+        marketStatus: { closePrice: '77,540', returns: { oneMonthPct: '2.16' }, avgTradingVolume20: '858,000' },
+        constituents: {
+          asOf: '2026-06-08',
+          top10WeightPct: '65.0',
+          top10: [
+            { rank: 1, name: '삼성전자', shares: '3,778', weightPct: '29.60' },
+            { rank: 2, name: 'SK하이닉스', shares: 461, weightPct: 22.72 },
+          ],
+        },
+      },
+    },
+  });
+
+  const percentages = [payload.strategy.scenarioProbability, ...payload.strategy.otherScenarios.map((scenario) => scenario.probability)]
+    .map((value) => Number(String(value).replace(/[^0-9.-]/g, '')));
+  assert.equal(percentages.reduce((sum, value) => sum + value, 0), 100);
+  assert.equal(payload.strategy.targetPriceText, 'NAV·기초지수·구성종목 기준');
+
+  const allStrings = collectStrings(payload).join('\n');
+  assert.doesNotMatch(allStrings, /목표가 미제공|증권사 목표가|기업 실적|EPS|PER|PBR/);
+});
+
+test('buildJarooDeepScanPayload uses ETF-native payload when kind is etf and market remains KR', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+
+  const payload = await buildJarooDeepScanPayload({
+    instrument: {
+      name: 'KODEX 코스피',
+      code: '226490',
+      market: 'KR',
+      kind: 'etf',
+    },
+    holding: {
+      shares: '35',
+      averagePrice: '58828.75',
+    },
+    selectedAt: '2026-06-08T14:42:22+09:00',
+    sources: {
+      quotes: {
+        items: [{ code: '226490', price: 77540, currency: 'KRW', asOf: '2026-06-08T14:42:22+09:00', source: 'fixture', status: 'ok' }],
+      },
+      etfSnapshot: {
+        code: '226490',
+        asOf: '2026-06-08',
+        product: { baseIndexName: '코스피지수', issuerName: '삼성자산운용(주)', totalFeePct: '0.150' },
+        marketStatus: { closePrice: '77,540', returns: { oneMonthPct: '2.16' }, avgTradingVolume20: '858,000' },
+        constituents: {
+          top10WeightPct: '65.0',
+          top10: [
+            { rank: 1, name: '삼성전자', shares: '3,778', weightPct: '29.60' },
+            { rank: 2, name: 'SK하이닉스', shares: 461, weightPct: 22.72 },
+          ],
+        },
+      },
+    },
+  });
+
+  assert.equal(payload.input.instrument.market, 'KR');
+  assert.equal(payload.input.instrument.kind, 'etf');
+  assert.equal(payload.strategy.targetPriceText, 'NAV·기초지수·구성종목 기준');
+  assert.deepEqual(payload.committee.axes.map((axis) => axis.label), ['ETF 구조 품질', '지수/가격 흐름', '내 포지션 적합도']);
+
+  const allStrings = collectStrings(payload).join('\n');
+  assert.doesNotMatch(allStrings, /목표가 조회 실패|사업 품질|밸류에이션|기업 실적|PER|PBR/);
+});

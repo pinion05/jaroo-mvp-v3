@@ -64,6 +64,17 @@ function firstNonEmpty(...values: Array<string | undefined | null>) {
   return values.find((value) => typeof value === 'string' && value.trim().length > 0)?.trim() ?? null
 }
 
+function isExchangeProductPayload(payload: JarooDeepScanPayload) {
+  return /(?:^|\b)(?:ETF|ETN)(?:\b|$)/iu.test(payload.input.instrument.market ?? '') || /^(?:etf|etn)$/iu.test(payload.input.instrument.kind ?? '')
+}
+
+function getTeamDisplay(team: TeamDefinition, exchangeProduct: boolean) {
+  if (!exchangeProduct) return team
+  if (team.key === 'market') return { ...team, description: '가격 흐름 · 거래량 · 지수 추적' }
+  if (team.key === 'context') return { ...team, description: '상품 정보 · 기초지수 · 유동성' }
+  return { ...team, description: 'ETF 구조 · 운용 · 구성' }
+}
+
 function compact(value: string | null | undefined, max = 104) {
   const normalized = value?.replace(/\s+/g, ' ').trim()
   if (!normalized) return ''
@@ -120,7 +131,7 @@ function resolveTeamMembers(payload: JarooDeepScanPayload, team: TeamDefinition)
   return fallbackAxis?.members ?? []
 }
 
-function buildTeamSummary(payload: JarooDeepScanPayload, team: TeamDefinition) {
+function buildTeamSummary(payload: JarooDeepScanPayload, team: TeamDefinition, exchangeProduct = false) {
   if (payload.committee.blockState !== 'ok') {
     return {
       body: payload.committee.fallback?.label || payload.committee.error?.message || '위원회 분석 원천을 지금 불러오지 못했어요.',
@@ -150,7 +161,7 @@ function buildTeamSummary(payload: JarooDeepScanPayload, team: TeamDefinition) {
     pending.length > 0 ? `${pending.length}개 준비 중` : null,
   ].filter((tag): tag is string => Boolean(tag))
 
-  return { body, tags: tags.length ? tags : ['확인 중'], status: errored.length > 0 ? '일부 실패' : pending.length > 0 ? '분석 중' : '확인', warning: errored.length > 0 }
+  return { body: exchangeProduct ? sanitizeExchangeProductCopy(body) : body, tags: tags.length ? tags : ['확인 중'], status: errored.length > 0 ? '일부 실패' : pending.length > 0 ? '분석 중' : '확인', warning: errored.length > 0 }
 }
 
 function buildStrength(payload: JarooDeepScanPayload) {
@@ -161,22 +172,47 @@ function buildStrength(payload: JarooDeepScanPayload) {
   return { label: '주의', helper: '방어 우선', active: 1 }
 }
 
-function buildScenarioViews(payload: JarooDeepScanPayload): ScenarioView[] {
+function sanitizeExchangeProductCopy(value: string) {
+  return value
+    .replace(/ETF\s*특성상\s*개별\s*종목\s*분석과\s*목표가가?\s*없어\s*추가\s*상승\s*여력을\s*판단하기\s*어렵다\.?/gu, 'ETF는 NAV 괴리율과 기초지수 흐름 확인이 추가 판단의 핵심입니다.')
+    .replace(/(?:개별\s*)?(?:종목\s*)?(?:분석과\s*)?목표가(?:와|가|는|를)?\s*없(?:어|어서|고)?[^.!?。！？]*(?:상승\s*여력|판단)[^.!?。！？]*(?:[.!?。！？]|$)/gu, 'NAV 괴리율과 기초지수 흐름을 추가로 확인해야 합니다. ')
+    .replace(/목표가?\s*부재/gu, 'NAV·기초지수 확인 필요')
+    .replace(/목표가/gu, 'ETF 기준')
+    .replace(/상승\s*여력/gu, '지수·가격 여지')
+    .replace(/수익을\s*실현했지만/gu, '평가이익이 있지만')
+    .replace(/매도\s*판단/gu, '비중 점검')
+    .replace(/매도\s*의사결정/gu, '비중 점검')
+    .replace(/애널리스트\s*ETF\s*기준와\s*종목별\s*PER\/PBR\s*데이터는\s*제공되지\s*않습니다\.?/gu, 'NAV·괴리율과 구성종목 정보를 추가로 확인해야 합니다.')
+    .replace(/종목별\s*PER\/PBR\s*데이터는\s*제공되지\s*않습니다\.?/gu, 'NAV·괴리율과 구성종목 정보를 추가로 확인해야 합니다.')
+    .replace(/PER\/PBR/gu, 'NAV·괴리율')
+    .replace(/ETF\s*기준와/gu, 'ETF 기준과')
+    .replace(/보유\s*종목/gu, '보유 ETF')
+    .replace(/보유\s*ETF은/gu, '보유 ETF는')
+    .replace(/지수·가격\s*여지이/gu, '지수·가격 여지가')
+    .replace(/보유\s*평가/gu, '현재 구간 평가')
+    .replace(/추가\s*매수/gu, '추가 점검')
+    .replace(/분할\s*매도/gu, '단계별 점검')
+    .replace(/손절/gu, '방어 점검')
+}
+
+function buildScenarioViews(payload: JarooDeepScanPayload, exchangeProduct = false): ScenarioView[] {
   if (payload.strategy?.blockState !== 'ok') {
     return [{ label: '관망', probability: '--', condition: payload.strategy?.fallback?.label || payload.strategy?.error?.message || '전략 데이터를 확인하는 중이에요.', tone: 'blue', recommended: true }]
   }
 
   const primary: ScenarioView = {
-    label: payload.strategy?.scenarioLabel || '보유 유지',
+    label: exchangeProduct ? sanitizeExchangeProductCopy(payload.strategy?.scenarioLabel || '기준 시나리오') : payload.strategy?.scenarioLabel || '보유 유지',
     probability: payload.strategy?.scenarioProbability || '--',
-    condition: [payload.strategy?.scenarioCondition, payload.strategy?.scenarioPeriod].filter(Boolean).join(' · ') || '조건 확인 중',
+    condition: exchangeProduct
+      ? sanitizeExchangeProductCopy([payload.strategy?.scenarioCondition, payload.strategy?.scenarioPeriod].filter(Boolean).join(' · ') || '조건 확인 중')
+      : [payload.strategy?.scenarioCondition, payload.strategy?.scenarioPeriod].filter(Boolean).join(' · ') || '조건 확인 중',
     tone: 'green',
     recommended: true,
   }
   const others = (payload.strategy?.otherScenarios ?? []).slice(0, 2).map((scenario, index): ScenarioView => ({
-    label: scenario.label,
+    label: exchangeProduct ? sanitizeExchangeProductCopy(scenario.label) : scenario.label,
     probability: scenario.probability,
-    condition: scenario.condition,
+    condition: exchangeProduct ? sanitizeExchangeProductCopy(scenario.condition) : scenario.condition,
     tone: index === 0 ? 'blue' : 'red',
   }))
   return [primary, ...others]
@@ -194,36 +230,46 @@ function toneClasses(tone: ScenarioView['tone']) {
 }
 
 export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScanInlineResultsProps) {
+  const exchangeProduct = isExchangeProductPayload(payload)
   const name = firstNonEmpty(payload.input.instrument.name, target?.name, requestSeed?.holding.name) ?? '선택 종목'
   const strength = buildStrength(payload)
-  const scenarios = buildScenarioViews(payload)
-  const upside = deriveUpside(payload.strategy.currentPriceText, payload.strategy.targetPriceText)
+  const scenarios = buildScenarioViews(payload, exchangeProduct)
+  const upside = exchangeProduct ? null : deriveUpside(payload.strategy.currentPriceText, payload.strategy.targetPriceText)
   const evidenceCount = payload.metadata.sourceRefs.length || payload.insights.items.length
-  const summary = payload.hero.blockState === 'ok'
+  const rawSummary = payload.hero.blockState === 'ok'
     ? payload.hero.body
     : payload.hero.fallback?.label || payload.hero.error?.message || `${name} 분석 결과를 일부만 표시하고 있어요.`
-  const facts = [
-    ['현재가', payload.strategy.currentPriceText || '확인 중'],
-    ['목표가', payload.strategy.targetPriceText || '확인 중'],
-    ['상승 여력', upside === null ? '확인 중' : formatPercent(upside)],
-    ['근거', evidenceCount > 0 ? `${evidenceCount}개` : payload.insights.summaryTags[0] ?? '확인 중'],
-  ]
+  const summary = exchangeProduct ? sanitizeExchangeProductCopy(rawSummary) : rawSummary
+  const facts = exchangeProduct
+    ? [
+        ['현재가', payload.strategy.currentPriceText || '확인 중'],
+        ['ETF 기준', payload.strategy.targetPriceText || 'NAV·구성 확인'],
+        ['가격 위치', payload.strategy.otherScenarioTags?.[1] ?? '확인 중'],
+        ['근거', evidenceCount > 0 ? `${evidenceCount}개` : payload.insights.summaryTags[0] ?? '확인 중'],
+      ]
+    : [
+        ['현재가', payload.strategy.currentPriceText || '확인 중'],
+        ['목표가', payload.strategy.targetPriceText || '확인 중'],
+        ['상승 여력', upside === null ? '확인 중' : formatPercent(upside)],
+        ['근거', evidenceCount > 0 ? `${evidenceCount}개` : payload.insights.summaryTags[0] ?? '확인 중'],
+      ]
 
   return (
     <section className='space-y-3 pb-2' aria-label='딥스캔 v7 실제 결과'>
       <div className='px-2 pt-1 text-[11px] font-semibold tracking-[0.08em] text-[#97A0AE]'>AI 팀 브리핑</div>
       <div className='space-y-3'>
         {TEAM_DEFINITIONS.map((team) => {
-          const teamSummary = buildTeamSummary(payload, team)
+          const displayTeam = getTeamDisplay(team, exchangeProduct)
+          const teamSummary = buildTeamSummary(payload, team, exchangeProduct)
           return (
             <article key={team.key} className='rounded-[16px] border border-[#E8EAEE] bg-white px-4 py-4 shadow-[0_1px_3px_rgba(0,0,0,.04)]'>
               <div className='flex items-start gap-3'>
-                <div className='flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[#F5F6F8] text-[16px]' aria-hidden='true'>{team.icon}</div>
+                <div className='flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[#F5F6F8] text-[16px]' aria-hidden='true'>{displayTeam.icon}</div>
                 <div className='min-w-0 flex-1'>
                   <div className='flex items-start justify-between gap-2'>
                     <div className='min-w-0'>
-                      <h3 className='truncate text-[13px] font-bold text-[#0F1419]'>{team.name}</h3>
-                      <p className='mt-0.5 truncate text-[10px] text-[#97A0AE]'>{team.description}</p>
+                      <h3 className='truncate text-[13px] font-bold text-[#0F1419]'>{displayTeam.name}</h3>
+                      <p className='mt-0.5 truncate text-[10px] text-[#97A0AE]'>{displayTeam.description}</p>
                     </div>
                     <span className={cn('shrink-0 rounded-[6px] px-2 py-1 text-[10px] font-bold', teamSummary.warning ? 'bg-[#FCEBEB] text-[#A32D2D]' : 'bg-[#E5F3EB] text-[#1A7340]')}>{teamSummary.status}</span>
                   </div>
@@ -252,7 +298,7 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
         </div>
         <p className='border-t border-[#EFF1F4] px-4 py-4 text-[13px] leading-6 text-[#0F1419]'>{summary}</p>
         <div className='border-t border-[#EFF1F4] px-4 py-4'>
-          <div className='mb-3 text-[10px] text-[#97A0AE]'>추천 행동</div>
+          <div className='mb-3 text-[10px] text-[#97A0AE]'>{exchangeProduct ? '가능 시나리오' : '추천 행동'}</div>
           <div className='space-y-3'>
             {scenarios.map((scenario) => {
               const tone = toneClasses(scenario.tone)
@@ -261,7 +307,7 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
                   <div className='mb-1 flex items-center gap-2 text-[13px]'>
                     <span className={cn('size-2 rounded-full', tone.dot)} />
                     <span className={cn('font-bold', scenario.recommended ? 'text-[#0F1419]' : 'text-[#5A6473]')}>{scenario.label}</span>
-                    {scenario.recommended ? <span className='rounded-[4px] bg-[#0F1419] px-1.5 py-0.5 text-[9px] font-bold text-white'>추천</span> : null}
+                    {scenario.recommended ? <span className='rounded-[4px] bg-[#0F1419] px-1.5 py-0.5 text-[9px] font-bold text-white'>{exchangeProduct ? '주요' : '추천'}</span> : null}
                     <span className='ml-auto font-bold text-[#5A6473]'>{scenario.probability || '--'}</span>
                   </div>
                   <div className='h-[5px] overflow-hidden rounded-full bg-[#EFF1F4]'><div className={cn('h-full rounded-full', tone.bar)} style={{ width: scenarioWidth(scenario) }} /></div>

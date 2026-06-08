@@ -8,6 +8,7 @@ type DeepScanCanonicalHolding = Pick<
   HomeHolding,
   'name' | 'code' | 'identifierCode' | 'identifierTicker' | 'shares' | 'averagePrice' | 'evaluationAmount' | 'market' | 'marketTone'
 > & {
+  kind?: HomeHolding['kind']
   ticker?: string
   averagePriceCurrency?: string
   currentPrice?: string
@@ -24,6 +25,7 @@ type CanonicalQueryKey =
   | 'code'
   | 'ticker'
   | 'market'
+  | 'kind'
   | 'name'
   | 'shares'
   | 'averagePrice'
@@ -285,6 +287,7 @@ export function buildDeepScanCanonicalQuery(targetSession: DeepScanCanonicalTarg
   setQueryValue(searchParams, 'code', normalizeText(holding.code) ?? normalizeText(holding.identifierCode))
   setQueryValue(searchParams, 'ticker', normalizeText(holding.ticker) ?? normalizeText(holding.identifierTicker))
   setQueryValue(searchParams, 'market', holding.marketTone === 'nasdaq' ? 'US' : holding.market)
+  setQueryValue(searchParams, 'kind', holding.kind)
   setQueryValue(searchParams, 'name', holding.name)
   setQueryValue(searchParams, 'shares', holding.shares)
   setHoldingMetricQueryValue(searchParams, 'averagePrice', holding.averagePrice)

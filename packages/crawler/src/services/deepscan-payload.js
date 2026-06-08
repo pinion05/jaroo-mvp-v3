@@ -963,6 +963,10 @@ function resolveConsensusOpinionSummary(consensusSnapshot) {
 }
 
 function resolveTargetPriceText(evidence) {
+  if (isKrExchangeProductEvidence(evidence)) {
+    return 'NAV·기초지수·구성종목 기준';
+  }
+
   const consensusSnapshot = evidence?.consensusSnapshot ?? {};
   const targetPrice = typeof consensusSnapshot.targetPrice === 'number' && Number.isFinite(consensusSnapshot.targetPrice) && consensusSnapshot.targetPrice > 0
     ? consensusSnapshot.targetPrice
@@ -1136,7 +1140,8 @@ function createKrBusinessQualityReasonOverrides(packageResult) {
 
 function isKrExchangeProductEvidence(evidence) {
   const market = normalizeText(evidence?.instrument?.market ?? evidence?.market)?.toUpperCase();
-  return market === 'ETF' || market === 'ETN';
+  const kind = normalizeText(evidence?.instrument?.kind ?? evidence?.kind)?.toLowerCase();
+  return market === 'ETF' || market === 'ETN' || kind === 'etf' || kind === 'etn';
 }
 
 function createEtfCommitteeAxes(evidence, scored) {
@@ -1183,7 +1188,7 @@ function createEtfCommitteeAxes(evidence, scored) {
           '가격',
           '가격/NAV 단서',
           scored.committee.businessQuality.valuation,
-          `ETF에는 PER/PBR보다 NAV 괴리와 가격 위치가 중요하며 현재 입력은 ${quoteText} 기준으로 계산했습니다.`,
+          `ETF는 NAV 괴리와 가격 위치가 중요하며 현재 입력은 ${quoteText} 기준으로 계산했습니다.`,
           'valuation',
         ),
         createCommitteeMember(
@@ -1219,8 +1224,8 @@ function createEtfCommitteeAxes(evidence, scored) {
           '시장 신호/정보 밀도',
           scored.committee.marketTiming.consensusMomentum,
           avgVolume20
-            ? `ETF는 목표가보다 시장·지수 정보가 우선이라 20일 평균 거래량 ${formatNumber(avgVolume20)}와 현재가 근거를 중심으로 봅니다.`
-            : `ETF는 목표가보다 시장·지수 정보가 우선이라 최근 리포트 ${reportCount}건과 현재가 근거를 중심으로 봅니다.`,
+            ? `ETF는 시장·지수 정보와 유동성이 중요해서 20일 평균 거래량 ${formatNumber(avgVolume20)}와 현재가 근거를 중심으로 봅니다.`
+            : `ETF는 시장·지수 정보와 유동성이 중요해서 최근 리포트 ${reportCount}건과 현재가 근거를 중심으로 봅니다.`,
           'consensusMomentum',
         ),
         createCommitteeMember(
@@ -1256,8 +1261,8 @@ function createEtfCommitteeAxes(evidence, scored) {
           '상하방 여지',
           scored.committee.positionFit.upsideBuffer,
           typeof recentReturn1m === 'number'
-            ? `ETF의 상하방 여지는 목표가가 아니라 기초지수 흐름과 최근 1개월 수익률 ${formatSignedPercent(recentReturn1m)}를 중심으로 봅니다.`
-            : `ETF의 추가 여지는 목표가가 아니라 지수 흐름과 현재 가격대가 핵심이라 현재 입력 범위에서만 보수적으로 봅니다.`,
+            ? `ETF의 상하방 여지는 기초지수 흐름과 최근 1개월 수익률 ${formatSignedPercent(recentReturn1m)}를 중심으로 봅니다.`
+            : `ETF의 추가 여지는 지수 흐름과 현재 가격대가 핵심이라 현재 입력 범위에서만 보수적으로 봅니다.`,
           'upsideBuffer',
         ),
         createCommitteeMember(
@@ -1835,6 +1840,34 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
   };
 }
 
+
+function clampNumber(value, min, max) {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) {
+    return min;
+  }
+  return Math.min(max, Math.max(min, numeric));
+}
+
+function buildNormalizedScenarioProbabilities(heroScore, hasExplicitRisk, riskSignalCount) {
+  const primary = Math.round(clampNumber(heroScore, 5, hasExplicitRisk ? 90 : 95));
+  if (!hasExplicitRisk) {
+    return {
+      primary,
+      support: Math.max(0, 100 - primary),
+      risk: null,
+    };
+  }
+
+  const desiredRisk = Math.round(clampNumber(riskSignalCount > 0 ? riskSignalCount * 10 : 10, 10, 30));
+  const risk = Math.min(desiredRisk, Math.max(0, 100 - primary));
+  return {
+    primary,
+    support: Math.max(0, 100 - primary - risk),
+    risk,
+  };
+}
+
 function buildStrategy(input, evidence, scored) {
   const decisionBand = scored.sellNow.decisionBand;
   const hasExplicitRisk = evidence.topRisks.length > 0 || evidence.missingSources.length > 0;
@@ -1847,12 +1880,18 @@ function buildStrategy(input, evidence, scored) {
     ...scored.hero.penalties.map((penalty) => `패널티: ${penalty}`),
   ].slice(0, 4);
 
+  const probabilities = buildNormalizedScenarioProbabilities(
+    scored.hero.score,
+    hasExplicitRisk,
+    Math.max(evidence.missingSources.length, evidence.topRisks.length),
+  );
+
   return {
     weekSignal: getWeekSignal(decisionBand, scored.hero.score),
     weekSignalTone: getWeekSignalTone(decisionBand),
     weekBadgeText: scored.hero.statusText,
     scenarioLabel: getScenarioLabel(decisionBand),
-    scenarioProbability: `${Math.max(5, scored.hero.score)}%`,
+    scenarioProbability: `${probabilities.primary}%`,
     scenarioPeriod: evidence.currentQuote?.asOf ? `${evidence.currentQuote.asOf} 기준 1-2주` : '1~2주',
     scenarioCondition: evidence.topRisks[0] ?? '추가 리스크 없음',
     currentPriceText,
@@ -1861,12 +1900,12 @@ function buildStrategy(input, evidence, scored) {
     otherScenarios: [
       {
         label: '근거 유지',
-        probability: `${Math.max(10, 100 - scored.hero.score)}%`,
+        probability: `${probabilities.support}%`,
         condition: evidence.topFacts[0] ?? '핵심 근거를 다시 확보합니다.',
       },
       ...(hasExplicitRisk ? [{
         label: '리스크 재점검',
-        probability: `${Math.max(10, evidence.missingSources.length * 10)}%`,
+        probability: `${probabilities.risk ?? 0}%`,
         condition: evidence.topRisks[0] ?? '추가 리스크를 다시 확인합니다.',
       }] : []),
     ],

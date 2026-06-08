@@ -1389,7 +1389,9 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
   const slimPages = asObject(slim.pages);
   const packageResult = asObject(safeSources.packageResult);
   const rawMarket = pickFirst(normalizeText(rawInstrument.market), normalizeText(safeInput.market));
-  const isExchangeProduct = isKrExchangeProductMarket(rawMarket) || ['etf', 'etn'].includes(normalizeText(rawInstrument.kind)?.toLowerCase() ?? '');
+  const rawKind = normalizeText(rawInstrument.kind)?.toLowerCase();
+  const exchangeProductKind = ['etf', 'etn'].includes(rawKind ?? '') ? rawKind : null;
+  const isExchangeProduct = isKrExchangeProductMarket(rawMarket) || Boolean(exchangeProductKind);
   const etfProductSnapshot = normalizeEtfProductSnapshot(safeSources.etfSnapshot ?? safeSources.etfProductSnapshot ?? safeSources.exchangeProductSnapshot);
 
   const instrument = {
@@ -1413,6 +1415,7 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
           normalizeText(rawInstrument.market),
           normalizeText(safeInput.market),
         ),
+    ...(exchangeProductKind ? { kind: exchangeProductKind } : {}),
   };
 
   const holding = {

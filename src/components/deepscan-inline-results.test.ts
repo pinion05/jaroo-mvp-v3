@@ -77,7 +77,7 @@ test('DeepScanInlineResults resolves ETF committee teams by stable memberKey bef
   payload.committee.axes = [{
     label: 'ETF 구조 품질', score: 65, scoreText: '65 / 100', axisStatusText: 'LLM 위원 3/3명 반영', subtitle: 'ETF 품질', avgLabel: '위원 평균 65',
     members: [
-      { memberKey: 'valuation', shortLabel: '가격', title: '가격/NAV 단서', status: 'success', reason: 'ETF 가격은 현재가와 NAV 괴리 단서를 함께 봐야 해요.', score: 65, scoreLabel: '65', tone: 'neutral', iconTone: 'blue' },
+      { memberKey: 'valuation', shortLabel: '가격', title: '가격/NAV 단서', status: 'success', reason: 'ETF 특성상 개별 종목 분석과 목표가가 없어 추가 상승 여력을 판단하기 어렵다. 매도 판단 데이터는 충분합니다.', score: 65, scoreLabel: '65', tone: 'neutral', iconTone: 'blue' },
       { shortLabel: '구조', title: '상품 구조/운용 품질', status: 'success', reason: 'ETF는 기업 실적보다 추종지수와 운용 구조가 핵심이에요.', score: 68, scoreLabel: '68', tone: 'neutral', iconTone: 'green' },
       { shortLabel: '분산', title: '구성/분산 안정성', status: 'success', reason: '구성종목 데이터가 없어 분산 안정성은 보수적으로 봐야 해요.', score: 55, scoreLabel: '55', tone: 'neutral', iconTone: 'amber' },
     ],
@@ -85,6 +85,26 @@ test('DeepScanInlineResults resolves ETF committee teams by stable memberKey bef
   const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
 
   assert.match(markup, /가치·기본 팀/)
-  assert.match(markup, /ETF 가격은 현재가와 NAV 괴리/)
+  assert.doesNotMatch(markup, /목표가|추가 상승 여력|매도 판단/)
+  assert.match(markup, /NAV|기초지수|비중 점검/)
   assert.match(markup, /3개 근거/)
+})
+
+test('DeepScanInlineResults uses ETF-native labels instead of target-price upside copy', () => {
+  const payload = basePayload()
+  payload.input.instrument = { name: 'KODEX 코스피', code: '226490', market: 'ETF', kind: 'etf' }
+  payload.strategy = {
+    ...payload.strategy,
+    targetPriceText: 'NAV·기초지수·구성종목 기준',
+    otherScenarioTags: ['축소 대기', '현재가 확인'],
+  }
+
+  const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
+
+  assert.match(markup, /ETF 기준/)
+  assert.match(markup, /가능 시나리오/)
+  assert.match(markup, /상품 정보 · 기초지수 · 유동성/)
+  assert.doesNotMatch(markup, /증권사 의견/)
+  assert.doesNotMatch(markup, />목표가</)
+  assert.doesNotMatch(markup, /상승 여력/)
 })
