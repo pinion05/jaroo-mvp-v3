@@ -178,6 +178,19 @@ def parse_numberish(value):
         return None
 
 
+def normalize_money_currency(value):
+    if value is None:
+        return None
+    normalized = str(value).strip().upper()
+    if not normalized:
+        return None
+    if normalized in ('KRW', '원', '₩') or 'KRW' in normalized or '원' in normalized:
+        return 'KRW'
+    if normalized in ('USD', '$', '달러') or 'USD' in normalized or '$' in normalized or '달러' in normalized:
+        return 'USD'
+    return None
+
+
 def load_runtime_input(path):
     if not path:
         return None
@@ -185,17 +198,38 @@ def load_runtime_input(path):
     return value if isinstance(value, dict) else None
 
 
-def build_holding_context(runtime_input, quote_price):
+def build_holding_context(runtime_input, quote_price, quote_currency):
     holding = runtime_input.get('holding') if isinstance(runtime_input, dict) else None
     source_codes = ['provided_runtime_input'] if isinstance(holding, dict) else ['example_holding']
     shares = parse_numberish((holding or {}).get('shares')) if isinstance(holding, dict) else 12.0
     average_price = parse_numberish((holding or {}).get('averagePrice')) if isinstance(holding, dict) else 185.0
+    average_price_currency = normalize_money_currency((holding or {}).get('averagePriceCurrency')) if isinstance(holding, dict) else normalize_money_currency(quote_currency)
+    current_price_currency = normalize_money_currency((holding or {}).get('currentPriceCurrency')) if isinstance(holding, dict) else normalize_money_currency(quote_currency)
+    current_price_currency = current_price_currency or normalize_money_currency(quote_currency)
+    usd_krw_rate = parse_numberish((holding or {}).get('usdKrwRate')) if isinstance(holding, dict) else None
     evaluation_amount = parse_numberish((holding or {}).get('evaluationAmount')) if isinstance(holding, dict) else None
     if evaluation_amount is None and shares is not None and quote_price is not None:
         evaluation_amount = round(float(quote_price) * shares, 2)
+    average_price_in_quote_currency = average_price
+    if (
+        average_price is not None
+        and average_price_currency is not None
+        and current_price_currency is not None
+        and average_price_currency != current_price_currency
+    ):
+        if average_price_currency == 'KRW' and current_price_currency == 'USD' and usd_krw_rate is not None and usd_krw_rate > 0:
+            average_price_in_quote_currency = round(average_price / usd_krw_rate, 4)
+        elif average_price_currency == 'USD' and current_price_currency == 'KRW' and usd_krw_rate is not None and usd_krw_rate > 0:
+            average_price_in_quote_currency = round(average_price * usd_krw_rate, 4)
+        else:
+            average_price_in_quote_currency = None
     return {
         'shares': shares,
         'averagePrice': average_price,
+        'averagePriceCurrency': average_price_currency,
+        'currentPriceCurrency': current_price_currency,
+        'usdKrwRate': usd_krw_rate,
+        'averagePriceInQuoteCurrency': average_price_in_quote_currency,
         'evaluationAmount': evaluation_amount,
         'reasonCodes': source_codes if isinstance(holding, dict) else source_codes + ['derived_from_example_defaults'],
         'inputProvided': isinstance(holding, dict),
@@ -265,10 +299,14 @@ def main():
                 notes,
             )
 
-        holding_input = build_holding_context(runtime_input, quote_item.get('price'))
+        holding_input = build_holding_context(runtime_input, quote_item.get('price'), quote_item.get('currency'))
         holding_context = {
             'shares': mk('runtime-input', {'kind': 'runtime_input', 'path': '$.holding.shares'}, holding_input['shares'], quality('present' if holding_input['shares'] is not None else 'missing', input_origin='runtime_input', reason_codes=holding_input['reasonCodes'])),
-            'averagePrice': mk('runtime-input', {'kind': 'runtime_input', 'path': '$.holding.averagePrice'}, holding_input['averagePrice'], quality('present' if holding_input['averagePrice'] is not None else 'missing', input_origin='runtime_input', reason_codes=holding_input['reasonCodes'])),
+            'averagePrice': mk('runtime-input', {'kind': 'runtime_input', 'path': '$.holding.averagePrice', 'note': 'raw average price in averagePriceCurrency; do not compare directly with a quote in another currency'}, holding_input['averagePrice'], quality('present' if holding_input['averagePrice'] is not None else 'missing', input_origin='runtime_input', reason_codes=holding_input['reasonCodes'])),
+            'averagePriceCurrency': mk('runtime-input', {'kind': 'runtime_input', 'path': '$.holding.averagePriceCurrency'}, holding_input['averagePriceCurrency'], quality('present' if holding_input['averagePriceCurrency'] is not None else 'missing', input_origin='runtime_input', reason_codes=holding_input['reasonCodes'])),
+            'currentPriceCurrency': mk('runtime-input', {'kind': 'runtime_input', 'path': '$.holding.currentPriceCurrency'}, holding_input['currentPriceCurrency'], quality('present' if holding_input['currentPriceCurrency'] is not None else 'missing', input_origin='runtime_input', reason_codes=holding_input['reasonCodes'])),
+            'usdKrwRate': mk('runtime-input', {'kind': 'runtime_input', 'path': '$.holding.usdKrwRate'}, holding_input['usdKrwRate'], quality('present' if holding_input['usdKrwRate'] is not None else 'missing', input_origin='runtime_input', reason_codes=holding_input['reasonCodes'])),
+            'averagePriceInQuoteCurrency': mk('runtime-input', {'kind': 'derived', 'note': 'average price converted into current quote currency; use this for portfolio-fit comparison'}, holding_input['averagePriceInQuoteCurrency'], quality('present' if holding_input['averagePriceInQuoteCurrency'] is not None else 'missing', derivation_kind='derived', input_origin='runtime_input', reason_codes=holding_input['reasonCodes'] + ['currency_normalized_cost_basis'])),
             'evaluationAmount': mk('runtime-input', {'kind': 'derived', 'note': 'quote price * runtime shares'} if holding_input['inputProvided'] is False else {'kind': 'runtime_input', 'path': '$.holding.evaluationAmount'}, holding_input['evaluationAmount'], quality('present' if holding_input['evaluationAmount'] is not None else 'missing', derivation_kind='derived' if holding_input['inputProvided'] is False else None, input_origin='runtime_input', reason_codes=['derived_from_runtime_holding'] if holding_input['inputProvided'] is False else holding_input['reasonCodes'])),
         }
 

@@ -19,6 +19,9 @@ export type DeepScanRawInputForDump = {
   holding?: {
     shares?: string
     averagePrice?: string
+    averagePriceCurrency?: string
+    currentPriceCurrency?: string
+    usdKrwRate?: string
     evaluationAmount?: string
   }
   selectedAt?: string

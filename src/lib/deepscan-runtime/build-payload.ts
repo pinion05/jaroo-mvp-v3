@@ -1133,6 +1133,80 @@ async function resolveUsDeepScanUsdKrwRate(rawInput: DeepScanRawInput, facts: Us
   return null
 }
 
+function sanitizeUsPortfolioFitAgentReason(
+  agentResults: DeepScanAgentResult[],
+  facts: UsDeepScanFacts,
+  rawInput: DeepScanRawInput,
+  usdKrwRate: number | null,
+  generatedSignals: GeneratedDumpSignalSummary,
+) {
+  const costBasis = resolveCurrencyAwareAveragePrice({
+    averagePrice: rawInput.holding?.averagePrice,
+    averagePriceCurrency: rawInput.holding?.averagePriceCurrency,
+    currentPrice: facts.currentPrice,
+    currentPriceCurrency: facts.currency,
+    usdKrwRate,
+  })
+  const currentPrice = facts.currentPrice
+  const shares = parseNumberish(rawInput.holding?.shares)
+  const averagePrice = costBasis.averagePriceInCurrentCurrency
+
+  if (
+    typeof currentPrice !== 'number'
+    || !Number.isFinite(currentPrice)
+    || typeof averagePrice !== 'number'
+    || !Number.isFinite(averagePrice)
+  ) {
+    return agentResults
+  }
+
+  const pnlPct = averagePrice === 0 ? null : ((currentPrice - averagePrice) / averagePrice) * 100
+  const pnl = typeof shares === 'number' && Number.isFinite(shares)
+    ? (currentPrice - averagePrice) * shares
+    : null
+  const convertedAverageText = formatCurrency(averagePrice, facts.currency)
+  const rawAverageText = costBasis.converted && costBasis.averagePriceCurrency === 'KRW'
+    ? `${formatCurrency(costBasis.averagePrice, 'KRW')} 원화 평단을 ${convertedAverageText}로 환산`
+    : `평단 ${convertedAverageText}`
+  const pnlText = typeof pnl === 'number'
+    ? `보유 손익은 약 ${formatCurrency(pnl, facts.currency)}(${signedPercent(pnlPct)})`
+    : `현재가 대비 수익률은 ${signedPercent(pnlPct)}`
+  const targetPrice = facts.consensus?.forecastEps && facts.consensus?.forwardPer
+    ? facts.consensus.forecastEps * facts.consensus.forwardPer
+    : null
+  const targetText = typeof targetPrice === 'number' && Number.isFinite(targetPrice)
+    ? `컨센서스 EPS×PER 기준 가격 ${formatCurrency(targetPrice, facts.currency)}`
+    : '컨센서스 기준 가격 미확인'
+  const positionTone = typeof pnlPct === 'number' && pnlPct >= 0
+    ? '평단 위 수익권이므로 추격 매수보다 분할 매도·리스크 관리 기준을 우선 확인해야 합니다.'
+    : '평단 아래 손실권이므로 반등 조건과 손절 기준을 함께 관리해야 합니다.'
+  const safeReason = `${rawAverageText}했고 현재가 ${formatCurrency(currentPrice, facts.currency)}와 같은 ${facts.currency ?? 'USD'} 기준으로 비교했습니다. ${pnlText}입니다. ${targetText}와 현재 가격 위치를 함께 보면 ${positionTone}`
+  const ownershipSummary = generatedSignals.ownershipFlow?.summary?.replace(/\s*$/u, '').replace(/[.。]?$/u, '.')
+  const ownershipReason = `${ownershipSummary ?? 'SEC ownership/insider-flow 공시가 확인되었습니다.'} Ownership/flow는 내부자·소유권 흐름 근거로만 해석하며, 세부 순매수·순매도 규모가 제한적이면 신뢰도는 보수적으로 봅니다.`
+  const holdingConfusionPattern = /averagePriceCurrency|currentPriceCurrency|usdKrwRate|averagePriceInQuoteCurrency|평균단가|평단|보유\s*원가|손익\s*평가|수익성\s*평가|환산할\s*수\s*없|통화\s*불일치|현재\s*USD\s*가격|514[,，]?\d{3}/u
+  const sanitizeNonPortfolioReason = (reason: string) => {
+    if (!holdingConfusionPattern.test(reason)) {
+      return reason
+    }
+
+    const sentences = reason
+      .split(/(?<=\.)\s+|(?<=다\.)\s*/u)
+      .map((sentence) => sentence.trim())
+      .filter(Boolean)
+      .filter((sentence) => !holdingConfusionPattern.test(sentence))
+
+    return sentences.join(' ') || '해당 위원은 자기 역할의 시장·기업 근거만 반영하고, 보유 단가·환율 비교는 포지션 적합도 위원에서 별도로 계산합니다.'
+  }
+
+  return agentResults.map((agent) => (
+    agent.key === 'portfolio-fit'
+      ? { ...agent, reason: safeReason }
+      : agent.key === 'ownership-flow'
+        ? { ...agent, reason: ownershipReason }
+        : { ...agent, reason: sanitizeNonPortfolioReason(agent.reason) }
+  ))
+}
+
 function buildUsStrategy(heroScore: number, facts: UsDeepScanFacts, rawInput: DeepScanRawInput, usdKrwRate: number | null): JarooDeepScanStrategyBlock {
   const costBasis = resolveCurrencyAwareAveragePrice({
     averagePrice: rawInput.holding?.averagePrice,
@@ -1476,10 +1550,11 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
     )
   }
 
+  const usdKrwRate = await resolveUsDeepScanUsdKrwRate(rawInput, facts)
+  agentResults = sanitizeUsPortfolioFitAgentReason(agentResults, facts, rawInput, usdKrwRate, generatedSignals)
   const heroScore = buildHeroScore(agentResults)
   const axes = buildAxes(agentResults)
   const insights = buildUsInsights(facts, agentResults, generatedSignals)
-  const usdKrwRate = await resolveUsDeepScanUsdKrwRate(rawInput, facts)
   const strategy = buildUsStrategy(heroScore, facts, rawInput, usdKrwRate)
   const sellNow = buildUsSellNow(heroScore, facts, rawInput, usdKrwRate)
   const portfolioSimulation = buildUsPortfolioSimulation(heroScore, sellNow)

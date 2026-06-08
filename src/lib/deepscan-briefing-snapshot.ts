@@ -39,6 +39,9 @@ export type LoadingBriefingSnapshot = {
   market?: {
     kospi?: LoadingBriefingMarketIndex | null
     kosdaq?: LoadingBriefingMarketIndex | null
+    sp500?: LoadingBriefingMarketIndex | null
+    nasdaq?: LoadingBriefingMarketIndex | null
+    vix?: LoadingBriefingMarketIndex | null
   }
   sourceStatus?: {
     daily?: 'ok' | 'error'

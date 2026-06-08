@@ -1,6 +1,6 @@
 'use client'
 
-import type { JarooDeepScanCommitteeAxis, JarooDeepScanInsightItem, JarooDeepScanPayload } from '../../../packages/contracts/src/deepscan'
+import type { DeepScanSourceRef, JarooDeepScanCommitteeAxis, JarooDeepScanInsightItem, JarooDeepScanPayload } from '../../../packages/contracts/src/deepscan'
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -28,7 +28,7 @@ import { DeepScanInlineResults } from '@/components/deepscan-inline-results'
 import { DeepScanLoadingScreen, type FindingProgress, type LoadingPerformanceComment, type LoadingQuickFact, type LoadingStageKey } from '@/components/deepscan-loading-screen'
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
-import type { LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
+import { isFiniteNumber, type LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
 import {
   buildDeepScanHeroCard,
   buildDeepScanPageHeader,
@@ -36,8 +36,10 @@ import {
   getDeepScanBlockNotice,
   resolveDeepScanPageCacheState,
 } from '@/lib/deepscan-page-projection'
+import { readDeepScanTargetSession, resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
+import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
-import { getDeepScanTargetKey, type WorkflowMoneyCurrency } from '@/lib/workflow-types'
+import { getDeepScanTargetKey, type DeepScanTargetInput, type WorkflowMoneyCurrency } from '@/lib/workflow-types'
 import { cn } from '@/lib/utils'
 
 type TabValue = 'analysis' | 'strategy'
@@ -293,6 +295,23 @@ type BriefingSnapshotProxyResponse = {
   ok?: boolean
   data?: LoadingBriefingSnapshot
 }
+type TargetLoadingMarketSnapshot = Pick<LoadingBriefingSnapshot, 'market'> & {
+  targetKey: string
+}
+type UsMarketIndicatorsProxyResponse = {
+  ok?: boolean
+  data?: {
+    sp500?: UsMarketIndicatorItem | null
+    nasdaq?: UsMarketIndicatorItem | null
+    vix?: UsMarketIndicatorItem | null
+  } | null
+}
+type UsMarketIndicatorItem = {
+  close?: number | null
+  value?: number | null
+  changePct?: number | null
+  timestamp?: number | string | null
+}
 
 const loadingFindingAxisKeys = ['quality', 'timing', 'position'] as const
 const MAX_FINDING_TEXT_LENGTH = 96
@@ -411,6 +430,60 @@ function normalizeDeepScanTicker(value: string | undefined) {
   return normalized || undefined
 }
 
+
+function buildDeepScanTargetInputFromSession(session: ReturnType<typeof resolveDeepScanTargetSession>): DeepScanTargetInput | null {
+  const holding = session?.holding
+  if (!holding || holding.id === -1 || holding.name === '종목 미선택') {
+    return null
+  }
+
+  const quantity = parseOcrNumber(holding.shares)
+  const averagePrice = parseOcrNumber(holding.averagePrice)
+  if (quantity === null || averagePrice === null) {
+    return null
+  }
+
+  return {
+    code: holding.identifierCode ?? holding.code,
+    ticker: holding.identifierTicker,
+    market: holding.market,
+    marketTone: holding.marketTone,
+    kind: holding.kind,
+    name: holding.name,
+    quantity,
+    averagePrice,
+    currentPrice: parseOcrNumber(holding.metrics.find((metric) => metric.label === '현재가')?.value ?? '') ?? undefined,
+    currentProfitRate: parseOcrNumber(holding.change) ?? undefined,
+    currentPriceCurrency: holding.marketTone === 'nasdaq' ? 'USD' : 'KRW',
+    evaluationAmount: parseOcrNumber(holding.evaluationAmount ?? '') ?? undefined,
+    averagePriceCurrency: holding.averagePriceCurrency,
+    identifierLabel: holding.identifierLabel,
+  }
+}
+
+
+function needsHydratedUsdKrwRate(target: DeepScanTargetInput) {
+  return target.marketTone === 'nasdaq'
+    && target.averagePriceCurrency === 'KRW'
+    && target.currentPriceCurrency === 'USD'
+    && !isFiniteNumber(target.usdKrwRate)
+}
+
+async function fetchHydrationUsdKrwRate() {
+  try {
+    const response = await fetch('/api/market/fx/usd-krw', { cache: 'no-store' })
+    if (!response.ok) {
+      return undefined
+    }
+
+    const payload = await response.json()
+    const rate = Number(payload?.data?.rate)
+    return Number.isFinite(rate) && rate > 0 ? rate : undefined
+  } catch {
+    return undefined
+  }
+}
+
 function buildLoadingQuickQuoteUrl(target: { code?: string; ticker?: string } | null) {
   const code = normalizeDeepScanCode(target?.code)
   const ticker = normalizeDeepScanTicker(target?.ticker)
@@ -443,6 +516,54 @@ function buildLoadingBriefingSnapshotUrl(target: { code?: string; ticker?: strin
 
   const searchParams = new URLSearchParams({ ticker, market: 'US' })
   return `/api/deepscan/briefing-snapshot?${searchParams.toString()}`
+}
+
+function isDeepScanUsTarget(target: { ticker?: string; market?: string; marketTone?: HomeMarketTone } | null) {
+  return Boolean(target?.ticker?.trim())
+    && (target?.marketTone === 'nasdaq' || target?.market?.toUpperCase() === 'US' || target?.market?.toUpperCase() === 'NASDAQ')
+}
+
+function normalizeUsMarketIndicator(item: UsMarketIndicatorItem | null | undefined) {
+  if (!item) {
+    return null
+  }
+
+  const value = isFiniteNumber(item.close) ? item.close : isFiniteNumber(item.value) ? item.value : null
+  const changePct = isFiniteNumber(item.changePct) ? item.changePct : null
+  const timestamp = item.timestamp
+  const asOf = typeof timestamp === 'number'
+    ? new Date(timestamp).toISOString()
+    : typeof timestamp === 'string' && timestamp.trim()
+      ? timestamp
+      : null
+
+  return {
+    value,
+    changePct,
+    asOf,
+  }
+}
+
+function buildUsLoadingMarketSnapshot(body: UsMarketIndicatorsProxyResponse, targetKey: string): TargetLoadingMarketSnapshot | null {
+  if (!body.ok || !body.data) {
+    return null
+  }
+
+  const sp500 = normalizeUsMarketIndicator(body.data.sp500)
+  const nasdaq = normalizeUsMarketIndicator(body.data.nasdaq)
+  const vix = normalizeUsMarketIndicator(body.data.vix)
+  if (!sp500 && !nasdaq && !vix) {
+    return null
+  }
+
+  return {
+    targetKey,
+    market: {
+      ...(sp500 ? { sp500 } : {}),
+      ...(nasdaq ? { nasdaq } : {}),
+      ...(vix ? { vix } : {}),
+    },
+  }
 }
 
 function formatLoadingPercent(value: number | undefined) {
@@ -523,6 +644,33 @@ function buildWeek52LoadingQuickFact(quickQuote: LoadingQuickQuote | null): Load
       rightLabel: `최고 ${formatLoadingMoney(high, currency)}`,
     },
   }
+}
+
+
+function buildWeek52LoadingQuickFactFromBriefingSnapshot(snapshot: LoadingBriefingSnapshot | null): LoadingQuickFact | null {
+  const dailyRows = (snapshot?.daily ?? []).filter((row) => isFiniteNumber(row.close))
+  if (dailyRows.length === 0) {
+    return null
+  }
+
+  const quote = snapshot?.quote
+  const currentPrice = isFiniteNumber(quote?.currentPrice) ? quote.currentPrice : dailyRows.at(-1)?.close
+  const high = dailyRows.reduce<number | null>((max, row) => {
+    const value = isFiniteNumber(row.high) ? row.high : row.close
+    return max === null || value > max ? value : max
+  }, null)
+  const low = dailyRows.reduce<number | null>((min, row) => {
+    const value = isFiniteNumber(row.low) ? row.low : row.close
+    return min === null || value < min ? value : min
+  }, null)
+
+  return buildWeek52LoadingQuickFact({
+    targetKey: 'briefing-snapshot',
+    ...(isFiniteNumber(currentPrice) ? { currentPrice } : {}),
+    ...(isFiniteNumber(high) ? { week52High: high } : {}),
+    ...(isFiniteNumber(low) ? { week52Low: low } : {}),
+    ...(normalizeQuoteCurrency(quote?.currency) ? { currentPriceCurrency: normalizeQuoteCurrency(quote?.currency) } : {}),
+  })
 }
 
 function parseLoadingConsensusBody(body: string) {
@@ -685,9 +833,9 @@ function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null, fa
   }
 }
 
-function buildLoadingQuickFacts(payload: JarooDeepScanPayload | null, quickQuote: LoadingQuickQuote | null, fallbackName?: string): LoadingQuickFact[] {
+function buildLoadingQuickFacts(payload: JarooDeepScanPayload | null, quickQuote: LoadingQuickQuote | null, briefingSnapshot: LoadingBriefingSnapshot | null, fallbackName?: string): LoadingQuickFact[] {
   return [
-    buildWeek52LoadingQuickFact(quickQuote),
+    buildWeek52LoadingQuickFact(quickQuote) ?? buildWeek52LoadingQuickFactFromBriefingSnapshot(briefingSnapshot),
     buildConsensusLoadingQuickFact(payload, fallbackName),
   ].filter((fact): fact is LoadingQuickFact => Boolean(fact))
 }
@@ -1014,6 +1162,55 @@ function InsightEvidenceCard({ item }: { item: JarooDeepScanInsightItem }) {
   )
 }
 
+const sourceTypeLabels: Record<DeepScanSourceRef['type'], string> = {
+  ocr: 'OCR',
+  holding: '보유',
+  report: '리포트',
+  news: '뉴스',
+  market: '시장',
+  system: '시스템',
+}
+
+function SourceRefsCard({ sourceRefs }: { sourceRefs: DeepScanSourceRef[] }) {
+  if (sourceRefs.length === 0) {
+    return null
+  }
+
+  return (
+    <Card className='rounded-[26px] border border-white/90 bg-white/95 p-4 shadow-[0_14px_34px_rgba(24,95,165,0.08)]'>
+      <div className='flex items-start justify-between gap-3'>
+        <div>
+          <p className='text-[11px] font-black tracking-[0.1em] text-[color:var(--jaroo-primary)]'>SOURCE MAP</p>
+          <p className='mt-1 text-sm font-black text-[color:var(--jaroo-ink)]'>이번 분석에 들어간 원천 데이터</p>
+        </div>
+        <span className='rounded-full bg-[#e6f1fb] px-2.5 py-1 text-[11px] font-bold text-[color:var(--jaroo-primary)]'>
+          {sourceRefs.length}개
+        </span>
+      </div>
+      <div className='mt-3 grid gap-2'>
+        {sourceRefs.map((sourceRef) => (
+          <div
+            key={`${sourceRef.type}-${sourceRef.id}`}
+            className='rounded-[18px] border border-[#e6edf4] bg-[#f8fbfe] px-3 py-2'
+          >
+            <div className='flex items-center gap-2'>
+              <span className='shrink-0 rounded-full bg-white px-2 py-0.5 text-[10px] font-black text-[#185fa5] shadow-[inset_0_0_0_1px_rgba(24,95,165,0.12)]'>
+                {sourceTypeLabels[sourceRef.type]}
+              </span>
+              <p className='min-w-0 truncate text-xs font-bold text-[color:var(--jaroo-ink)]'>
+                {sourceRef.label ?? sourceRef.id}
+              </p>
+            </div>
+            <p className='mt-1 truncate text-[11px] text-[color:var(--jaroo-muted)]'>
+              {[sourceRef.id, sourceRef.note, sourceRef.at].filter(Boolean).join(' · ')}
+            </p>
+          </div>
+        ))}
+      </div>
+    </Card>
+  )
+}
+
 function resolveScenarioTone(index: number, total: number): keyof typeof scenarioToneStyles {
   if (index === 0) {
     return 'primary'
@@ -1118,14 +1315,15 @@ export default function DeepScanPage() {
   const [tab, setTab] = useState<TabValue>('analysis')
   const [selectedAxis, setSelectedAxis] = useState(0)
   const [openSections, setOpenSections] = useState<Record<SectionKey, boolean>>({
-    why: false,
-    news: false,
-    scenarioDetail: false,
-    otherScenarios: false,
-    sellNow: false,
-    pfSim: false,
+    why: true,
+    news: true,
+    scenarioDetail: true,
+    otherScenarios: true,
+    sellNow: true,
+    pfSim: true,
   })
   const target = useDeepScanStore((state) => state.target)
+  const setDeepScanTarget = useDeepScanStore((state) => state.setTarget)
   const requestStatus = useDeepScanStore((state) => state.requestStatus)
   const errorMessage = useDeepScanStore((state) => state.errorMessage)
   const activePayload = useDeepScanStore((state) => state.activePayload)
@@ -1138,9 +1336,42 @@ export default function DeepScanPage() {
   const abandonInFlight = useDeepScanStore((state) => state.abandonInFlight)
   const [loadingQuickQuote, setLoadingQuickQuote] = useState<LoadingQuickQuote | null>(null)
   const [loadingBriefingSnapshot, setLoadingBriefingSnapshot] = useState<TargetLoadingBriefingSnapshot | null>(null)
+  const [loadingMarketSnapshot, setLoadingMarketSnapshot] = useState<TargetLoadingMarketSnapshot | null>(null)
   const [loadingSequence, setLoadingSequence] = useState<DeepScanLoadingSequenceState>(() => createDeepScanLoadingSequence(null))
   const [arrivedLoadingStages, setArrivedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
   const [displayedLoadingStages, setDisplayedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
+
+  useEffect(() => {
+    if (target) {
+      return undefined
+    }
+
+    let cancelled = false
+    const hydrateTarget = async () => {
+      const sessionTarget = readDeepScanTargetSession() ?? resolveDeepScanTargetSession()
+      const hydratedTarget = buildDeepScanTargetInputFromSession(sessionTarget)
+      if (!hydratedTarget) {
+        return
+      }
+
+      const usdKrwRate = needsHydratedUsdKrwRate(hydratedTarget)
+        ? await fetchHydrationUsdKrwRate()
+        : hydratedTarget.usdKrwRate
+
+      if (!cancelled) {
+        setDeepScanTarget({
+          ...hydratedTarget,
+          ...(usdKrwRate ? { usdKrwRate } : {}),
+        })
+      }
+    }
+
+    void hydrateTarget()
+
+    return () => {
+      cancelled = true
+    }
+  }, [setDeepScanTarget, target])
 
   const targetKey = useMemo(() => (target ? getDeepScanTargetKey(target) : null), [target])
   const targetKeyRef = useRef(targetKey)
@@ -1418,6 +1649,42 @@ export default function DeepScanPage() {
   }, [loadingBriefingSnapshot?.targetKey, target, targetKey])
 
   useEffect(() => {
+    if (!isDeepScanUsTarget(target) || !targetKey || loadingMarketSnapshot?.targetKey === targetKey) {
+      return undefined
+    }
+
+    const requestedTargetKey = targetKey
+    const controller = new AbortController()
+
+    const run = async () => {
+      try {
+        const response = await fetch('/api/market/us-indicators', { cache: 'no-store', signal: controller.signal })
+        if (!response.ok) {
+          return
+        }
+
+        const body = (await response.json()) as UsMarketIndicatorsProxyResponse
+        if (controller.signal.aborted) {
+          return
+        }
+
+        const snapshot = buildUsLoadingMarketSnapshot(body, requestedTargetKey)
+        if (snapshot) {
+          setLoadingMarketSnapshot(snapshot)
+        }
+      } catch {
+        // Market comparison is decorative; DeepScan loading should continue if US market data is unavailable.
+      }
+    }
+
+    void run()
+
+    return () => {
+      controller.abort()
+    }
+  }, [loadingMarketSnapshot?.targetKey, target, targetKey])
+
+  useEffect(() => {
     if (!requestSeed || !targetKey || requestStatus !== 'loading') {
       return
     }
@@ -1680,14 +1947,29 @@ export default function DeepScanPage() {
   const loadingFindingProgress = buildLoadingFindingProgress(payload)
   const loadingPerformanceComment = buildLoadingPerformanceComment(payload)
   const activeLoadingQuickQuote = loadingQuickQuote?.targetKey === targetKey ? loadingQuickQuote : null
-  const activeLoadingBriefingSnapshot = loadingBriefingSnapshot?.targetKey === targetKey ? loadingBriefingSnapshot : null
+  const activeLoadingBaseBriefingSnapshot = loadingBriefingSnapshot?.targetKey === targetKey ? loadingBriefingSnapshot : null
+  const activeLoadingMarketSnapshot = loadingMarketSnapshot?.targetKey === targetKey ? loadingMarketSnapshot : null
+  const activeLoadingBriefingSnapshot: TargetLoadingBriefingSnapshot | null = (() => {
+    if (!activeLoadingBaseBriefingSnapshot && !activeLoadingMarketSnapshot) {
+      return null
+    }
+
+    return {
+      ...(activeLoadingBaseBriefingSnapshot ?? {}),
+      targetKey: targetKey ?? activeLoadingBaseBriefingSnapshot?.targetKey ?? activeLoadingMarketSnapshot?.targetKey ?? '',
+      market: {
+        ...(activeLoadingBaseBriefingSnapshot?.market ?? {}),
+        ...(activeLoadingMarketSnapshot?.market ?? {}),
+      },
+    }
+  })()
   const loadingTradingVolume = activeLoadingBriefingSnapshot?.quote?.volume ?? activeLoadingQuickQuote?.tradingVolume ?? buildLoadingTradingVolume(payload)
   const loadingCurrentPrice = activeLoadingBriefingSnapshot?.quote?.currentPrice ?? target?.currentPrice ?? activeLoadingQuickQuote?.currentPrice
   const loadingCurrentPriceCurrency = target?.currentPriceCurrency
     ?? normalizeQuoteCurrency(activeLoadingBriefingSnapshot?.quote?.currency ?? undefined)
     ?? activeLoadingQuickQuote?.currentPriceCurrency
     ?? (requestSeed.holding.market === 'US' ? 'USD' : undefined)
-  const loadingQuickFacts = buildLoadingQuickFacts(payload, activeLoadingQuickQuote, requestSeed.holding.name)
+  const loadingQuickFacts = buildLoadingQuickFacts(payload, activeLoadingQuickQuote, activeLoadingBriefingSnapshot, requestSeed.holding.name)
   const evidenceCollected = hasCollectedDeepScanEvidence(payload)
   const analysisLoadingNotice = {
     badge: '로딩 중',
@@ -1951,15 +2233,9 @@ export default function DeepScanPage() {
 
                 <div className='my-4 h-px bg-[color:var(--jaroo-border)]' />
 
-                {(() => {
-                  const axis = payload.committee.axes[selectedAxis] ?? payload.committee.axes[0]
-
-                  if (!axis) {
-                    return null
-                  }
-
-                  return (
-                    <div key={`${axis.label}-detail`}>
+                <div className='grid gap-5'>
+                  {payload.committee.axes.map((axis) => (
+                    <div key={`${axis.label}-detail`} className='rounded-[22px] border border-[#e6edf4] bg-[#fbfdff] p-3'>
                       <div className='mb-3 flex items-center justify-between gap-3'>
                         <p className='text-sm font-semibold text-[color:var(--jaroo-ink)]'>{axis.label} — {axis.members.length}인 위원</p>
                         <p className='text-xs text-[color:var(--jaroo-muted)]'>{axis.avgLabel}</p>
@@ -2021,8 +2297,8 @@ export default function DeepScanPage() {
                         })}
                       </div>
                     </div>
-                  )
-                })()}
+                  ))}
+                </div>
               </Card>
             )}
           </SectionToggle>
@@ -2089,6 +2365,10 @@ export default function DeepScanPage() {
               </Card>
             )}
           </SectionToggle>
+
+          {fetchState === 'success' && payload ? (
+            <SourceRefsCard sourceRefs={payload.metadata.sourceRefs} />
+          ) : null}
 
           <button
             type='button'

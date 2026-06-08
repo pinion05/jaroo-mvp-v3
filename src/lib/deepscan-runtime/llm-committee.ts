@@ -93,6 +93,7 @@ function systemPromptForMember(member: UsMemberKey) {
     prompt.focus,
     'Use only the provided shared/member JSON generated from the frozen llm-deepscan-us-dump-contract contract.',
     'Respect quality/issues metadata. Missing or unavailable facts must lower confidence and can lower the score.',
+    'If holdingContext has different averagePriceCurrency and currentPrice currency, compare price only with holdingContext.averagePriceInQuoteCurrency; never describe raw KRW averagePrice as USD.',
     'Return only valid JSON matching the schema. Write the reason in concise Korean.',
     'Score semantics: 0 extremely negative, 50 mixed/unclear, 100 extremely positive. Warnings are optional short Korean caveats.',
   ].join(' ')
