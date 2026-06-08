@@ -3,12 +3,12 @@ import assert from 'node:assert/strict'
 
 import { shouldUseDeepScanLoadingHandoff } from './deepscan-navigation'
 
-test('DeepScan loading handoff includes stock and legacy ETF/ETN targets on the DeepScan route', () => {
+test('DeepScan loading handoff includes stock and ETF/ETN targets on the DeepScan route', () => {
   assert.equal(shouldUseDeepScanLoadingHandoff({ actionHref: '/deepscan', kind: 'stock' }), true)
   assert.equal(shouldUseDeepScanLoadingHandoff({ actionHref: '/deepscan', kind: 'etf' }), true)
 })
 
-test('DeepScan loading handoff includes ETF/ETN targets on the ETF analysis route', () => {
+test('DeepScan loading handoff still accepts legacy ETF analysis links', () => {
   assert.equal(shouldUseDeepScanLoadingHandoff({ actionHref: '/etf', kind: 'etf' }), true)
 })
 

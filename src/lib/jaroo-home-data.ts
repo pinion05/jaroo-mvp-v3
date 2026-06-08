@@ -363,7 +363,7 @@ export const homeHoldings: HomeHolding[] = [
     actionLabel: 'ETF 분석',
     actionSubLabel: '섹터 구성 + 회복 시나리오',
     actionCredits: undefined,
-    actionHref: '/etf',
+    actionHref: '/deepscan',
   },
 ]
 
@@ -1089,7 +1089,7 @@ function deriveHoldingTone(profitRateValue: number | null) {
 
 function buildOpinionText(name: string, kind: HomeHolding['kind'], profitRateValue: number | null) {
   if (kind === 'etf') {
-    return `${name} ETF를 OCR에서 읽어 홈 포트폴리오에 반영했어요. 섹터 구성과 회복 시나리오는 ETF 분석에서 더 확인할 수 있어요.`
+    return `${name} ETF를 OCR에서 읽어 홈 포트폴리오에 반영했어요. 섹터 구성과 회복 시나리오는 딥스캔에서 더 확인할 수 있어요.`
   }
 
   if (profitRateValue === null) {
@@ -1462,7 +1462,7 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
       actionLabel: kind === 'etf' ? 'ETF 분석' : '딥스캔',
       actionSubLabel: kind === 'etf' ? '섹터 구성 + 회복 시나리오' : '세 팀이 분석해요',
       actionCredits: undefined,
-      actionHref: kind === 'etf' ? '/etf' : '/deepscan',
+      actionHref: '/deepscan',
     }
   })
 }
