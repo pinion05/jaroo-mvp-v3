@@ -45,6 +45,25 @@ def row_index(rows, label):
     return None, None
 
 
+def row_index_or_empty(rows, label):
+    idx, row = row_index(rows, label)
+    if isinstance(row, dict):
+        return idx, row
+    return None, {'label': label, 'cells': {}}
+
+
+def first_record(value):
+    return value[0] if isinstance(value, list) and value and isinstance(value[0], dict) else {}
+
+
+def last_record(value):
+    return value[-1] if isinstance(value, list) and value and isinstance(value[-1], dict) else {}
+
+
+def safe_items(value):
+    return value if isinstance(value, list) else []
+
+
 def debug_source(alias, raw_file, request_path, selector, snapshot_generated_at=None, note=None):
     out = {
         'sourceAlias': alias,
@@ -274,12 +293,17 @@ def main():
         report = raw['report']['data']
         ownership = raw['ownership']['data']
         ohlc = raw['ohlc']['data']
-        fs_rows = slim['pages']['snap']['financialSummary']['rows']
-        metrics = slim['pages']['analysis']['metrics'][0]
-        returns = slim['pages']['analysis']['returns'][0]
-        obs = slim['pages']['consensus']['observations'][-1]
-        price_row = slim['pages']['snap']['priceVolume']['rows'][-1]
-        quote_item = quotes['items'][0]
+        pages = slim.get('pages') if isinstance(slim, dict) else {}
+        snap_page = pages.get('snap') if isinstance(pages, dict) else {}
+        analysis_page = pages.get('analysis') if isinstance(pages, dict) else {}
+        consensus_page = pages.get('consensus') if isinstance(pages, dict) else {}
+        fs_rows = (((snap_page or {}).get('financialSummary') or {}).get('rows') or [])
+        metrics = first_record((analysis_page or {}).get('metrics'))
+        returns = first_record((analysis_page or {}).get('returns'))
+        obs = last_record((consensus_page or {}).get('observations'))
+        obs_metrics = obs.get('metrics') if isinstance(obs.get('metrics'), dict) else {}
+        price_row = last_record(((snap_page or {}).get('priceVolume') or {}).get('rows'))
+        quote_item = first_record(quotes.get('items') if isinstance(quotes, dict) else None)
         ownership_summary = ownership.get('summary') or {}
         ownership_counts = ownership_summary.get('counts') if isinstance(ownership_summary.get('counts'), dict) else {}
         ownership_total_direct_events = ownership_counts.get('totalDirectEvents', 0)
@@ -288,7 +312,7 @@ def main():
         per_value = metrics.get('per') if isinstance(metrics, dict) else None
         per_quality = None if per_value is not None else quality('missing', reason_codes=['missing_metric_per'], severity='medium', actionability='caution')
         labels = ['시가총액','자산총계','자본총계','매출액','영업이익','당기순이익','영업활동현금흐름','CAPEX','Free Cash Flow','매출총이익률','영업이익률','순이익률','ROA','BPS']
-        rowmap = {label: row_index(fs_rows, label) for label in labels}
+        rowmap = {label: row_index_or_empty(fs_rows, label) for label in labels}
 
         def mk(alias, selector, value, q=None, issues=None, notes=None, note=None):
             return debug_fact(
@@ -332,11 +356,11 @@ def main():
 
         member = {}
         member['valuation'] = {**make_member_base('valuation', 'business-quality', instrument), 'facts': {
-            'currentPrice': mk('quotes', {'kind': 'field', 'path': '$.data.items[0].price'}, {'amount': quote_item['price'], 'currency': quote_item.get('currency'), 'asOf': quote_item.get('asOf'), 'kind': 'market_quote'}),
+            'currentPrice': mk('quotes', {'kind': 'field', 'path': '$.data.items[0].price'}, {'amount': quote_item.get('price'), 'currency': quote_item.get('currency'), 'asOf': quote_item.get('asOf'), 'kind': 'market_quote'}),
             'marketCapSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['시가총액'][0]}].cells"}, map_cell_record_to_series(rowmap['시가총액'][1]['cells'])),
             'per': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].per'}, per_value, per_quality),
-            'pbr': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].pbr'}, metrics['pbr']),
-            'eps': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].eps'}, metrics['eps']),
+            'pbr': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].pbr'}, metrics.get('pbr')),
+            'eps': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].eps'}, metrics.get('eps')),
             'bpsSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['BPS'][0]}].cells"}, map_cell_record_to_series(rowmap['BPS'][1]['cells'])),
             'targetConsensus': mk('consensus', {'kind': 'field', 'path': '$.data.consensus.targetConsensus'}, consensus_obj.get('targetConsensus'), quality('present') if consensus_obj.get('targetConsensus') is not None else quality('missing', reason_codes=['no_target_consensus'])),
         }}
@@ -344,20 +368,20 @@ def main():
             'revenueSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['매출액'][0]}].cells"}, map_cell_record_to_series(rowmap['매출액'][1]['cells'])),
             'operatingIncomeSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['영업이익'][0]}].cells"}, map_cell_record_to_series(rowmap['영업이익'][1]['cells'])),
             'netIncomeSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['당기순이익'][0]}].cells"}, map_cell_record_to_series(rowmap['당기순이익'][1]['cells'])),
-            'epsGrowth': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].epsGw'}, metrics['epsGw']),
+            'epsGrowth': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].epsGw'}, metrics.get('epsGw')),
         }}
         member['profitability-quality'] = {**make_member_base('profitability-quality', 'business-quality', instrument), 'facts': {
             'grossMarginSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['매출총이익률'][0]}].cells"}, map_cell_record_to_series(rowmap['매출총이익률'][1]['cells'])),
             'operatingMarginSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['영업이익률'][0]}].cells"}, map_cell_record_to_series(rowmap['영업이익률'][1]['cells'])),
             'netMarginSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['순이익률'][0]}].cells"}, map_cell_record_to_series(rowmap['순이익률'][1]['cells'])),
-            'roe': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].roe'}, metrics['roe']),
+            'roe': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].roe'}, metrics.get('roe')),
         }}
         member['momentum'] = {**make_member_base('momentum', 'market-timing', instrument), 'facts': {
-            'currentPrice': mk('quotes', {'kind': 'field', 'path': '$.data.items[0].price'}, {'amount': quote_item['price'], 'currency': quote_item.get('currency'), 'asOf': quote_item.get('asOf'), 'kind': 'market_quote'}),
-            'latestCloseFromSlim': mk('slim', {'kind': 'field', 'path': '$.pages.snap.priceVolume.rows[-1].close'}, price_row['close'], quality('present', derivation_kind='proxy', reason_codes=['latest_close_proxy'])),
-            'returns1w': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.returns[0].1w'}, returns['1w']),
-            'returns3m': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.returns[0].3m'}, returns['3m']),
-            'returns1y': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.returns[0].1y'}, returns['1y']),
+            'currentPrice': mk('quotes', {'kind': 'field', 'path': '$.data.items[0].price'}, {'amount': quote_item.get('price'), 'currency': quote_item.get('currency'), 'asOf': quote_item.get('asOf'), 'kind': 'market_quote'}),
+            'latestCloseFromSlim': mk('slim', {'kind': 'field', 'path': '$.pages.snap.priceVolume.rows[-1].close'}, price_row.get('close'), quality('present', derivation_kind='proxy', reason_codes=['latest_close_proxy'])),
+            'returns1w': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.returns[0].1w'}, returns.get('1w')),
+            'returns3m': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.returns[0].3m'}, returns.get('3m')),
+            'returns1y': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.returns[0].1y'}, returns.get('1y')),
             'nasdaqChangePct': mk('market', {'kind': 'field', 'path': '$.data.summary.nasdaqChangePct'}, market['summary']['nasdaqChangePct']),
             'sp500Above200Sma': mk('market', {'kind': 'field', 'path': '$.data.summary.sp500Above200Sma'}, market['summary']['sp500Above200Sma']),
             'ohlcSeries': mk(
@@ -371,16 +395,16 @@ def main():
             issue('facts.ohlcSeries', 'missing', reason_codes=['no_ohlc_series'], severity='medium', actionability='caution') if len(ohlc_series) == 0 else None,
         ] if x]}
         member['estimate-revision'] = {**make_member_base('estimate-revision', 'market-timing', instrument), 'facts': {
-            'spotPriceConsensus': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val1'}, {'amount': obs['metrics']['val1'], 'currency': slim['company']['currency'], 'kind': 'consensus_spot'}, quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
-            'spotPriceMarket': mk('quotes', {'kind': 'field', 'path': '$.data.items[0].price'}, {'amount': quote_item['price'], 'currency': quote_item.get('currency'), 'asOf': quote_item.get('asOf'), 'kind': 'market_quote'}),
-            'forecastRevenue': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val2'}, obs['metrics']['val2'], quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
-            'forecastRevenueRevisionPct': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val3'}, obs['metrics']['val3'], quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
-            'forecastEps': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val4'}, obs['metrics']['val4'], quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
-            'forecastEpsRevisionPct': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val5'}, obs['metrics']['val5'], quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
-            'forwardPer': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val6'}, obs['metrics']['val6'], quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
-            'forecastBps': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val7'}, obs['metrics']['val7'], quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
-            'forecastBpsRevisionPct': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val8'}, obs['metrics']['val8'], quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
-            'forwardPbr': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val9'}, obs['metrics']['val9'], quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
+            'spotPriceConsensus': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val1'}, {'amount': obs_metrics.get('val1'), 'currency': slim['company']['currency'], 'kind': 'consensus_spot'}, quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
+            'spotPriceMarket': mk('quotes', {'kind': 'field', 'path': '$.data.items[0].price'}, {'amount': quote_item.get('price'), 'currency': quote_item.get('currency'), 'asOf': quote_item.get('asOf'), 'kind': 'market_quote'}),
+            'forecastRevenue': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val2'}, obs_metrics.get('val2'), quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
+            'forecastRevenueRevisionPct': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val3'}, obs_metrics.get('val3'), quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
+            'forecastEps': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val4'}, obs_metrics.get('val4'), quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
+            'forecastEpsRevisionPct': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val5'}, obs_metrics.get('val5'), quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
+            'forwardPer': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val6'}, obs_metrics.get('val6'), quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
+            'forecastBps': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val7'}, obs_metrics.get('val7'), quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
+            'forecastBpsRevisionPct': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val8'}, obs_metrics.get('val8'), quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
+            'forwardPbr': mk('slim', {'kind': 'field', 'path': '$.pages.consensus.observations[-1].metrics.val9'}, obs_metrics.get('val9'), quality('present', derivation_kind='decoded_alias', reason_codes=['decoded_val_alias']), notes=['decoded by current val1..val9 adapter']),
         }}
         member['event-risk'] = {**make_member_base('event-risk', 'market-timing', instrument), 'facts': {
             'recentNewsCount': mk('news', {'kind': 'derived', 'note': 'count of fetched news items'}, len(news['news']), quality('present', derivation_kind='derived', reason_codes=['derived_count'])),
@@ -397,12 +421,12 @@ def main():
             issue('facts.rating', 'missing', reason_codes=['null_from_source'], severity='low') if cons.get('rating') is None else None,
         ] if x]}
         member['financial-safety'] = {**make_member_base('financial-safety', 'position-fit', instrument), 'facts': {
-            'totalAssetsSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{row_index(fs_rows,'자산총계')[0]}].cells"}, map_cell_record_to_series(row_index(fs_rows,'자산총계')[1]['cells'])),
-            'totalEquitySeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{row_index(fs_rows,'자본총계')[0]}].cells"}, map_cell_record_to_series(row_index(fs_rows,'자본총계')[1]['cells'])),
-            'operatingCashFlowSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{row_index(fs_rows,'영업활동현금흐름')[0]}].cells"}, map_cell_record_to_series(row_index(fs_rows,'영업활동현금흐름')[1]['cells'])),
-            'capexSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{row_index(fs_rows,'CAPEX')[0]}].cells"}, map_cell_record_to_series(row_index(fs_rows,'CAPEX')[1]['cells'])),
-            'freeCashFlowSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{row_index(fs_rows,'Free Cash Flow')[0]}].cells"}, map_cell_record_to_series(row_index(fs_rows,'Free Cash Flow')[1]['cells'])),
-            'roe': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].roe'}, metrics['roe']),
+            'totalAssetsSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['자산총계'][0]}].cells"}, map_cell_record_to_series(rowmap['자산총계'][1]['cells'])),
+            'totalEquitySeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['자본총계'][0]}].cells"}, map_cell_record_to_series(rowmap['자본총계'][1]['cells'])),
+            'operatingCashFlowSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['영업활동현금흐름'][0]}].cells"}, map_cell_record_to_series(rowmap['영업활동현금흐름'][1]['cells'])),
+            'capexSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['CAPEX'][0]}].cells"}, map_cell_record_to_series(rowmap['CAPEX'][1]['cells'])),
+            'freeCashFlowSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['Free Cash Flow'][0]}].cells"}, map_cell_record_to_series(rowmap['Free Cash Flow'][1]['cells'])),
+            'roe': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.metrics[0].roe'}, metrics.get('roe')),
         }}
         member['ownership-flow'] = {**make_member_base('ownership-flow', 'position-fit', instrument), 'facts': {
             'directOwnershipFlow': mk(
@@ -425,9 +449,9 @@ def main():
             issue('facts.directOwnershipFlow', 'missing', reason_codes=['no_recent_direct_ownership_filings'], derivation_kind='direct', severity='medium', actionability='caution') if ownership_total_direct_events == 0 else None,
         ] if x]}
         member['portfolio-fit'] = {**make_member_base('portfolio-fit', 'position-fit', instrument), 'holdingContext': holding_context, 'facts': {
-            'currentPrice': mk('quotes', {'kind': 'field', 'path': '$.data.items[0].price'}, {'amount': quote_item['price'], 'currency': quote_item.get('currency'), 'asOf': quote_item.get('asOf'), 'kind': 'market_quote'}),
-            'marketCapSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{row_index(fs_rows,'시가총액')[0]}].cells"}, map_cell_record_to_series(row_index(fs_rows,'시가총액')[1]['cells'])),
-            'returns3m': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.returns[0].3m'}, returns['3m']),
+            'currentPrice': mk('quotes', {'kind': 'field', 'path': '$.data.items[0].price'}, {'amount': quote_item.get('price'), 'currency': quote_item.get('currency'), 'asOf': quote_item.get('asOf'), 'kind': 'market_quote'}),
+            'marketCapSeries': mk('slim', {'kind': 'series_map', 'path': f"$.pages.snap.financialSummary.rows[{rowmap['시가총액'][0]}].cells"}, map_cell_record_to_series(rowmap['시가총액'][1]['cells'])),
+            'returns3m': mk('slim', {'kind': 'field', 'path': '$.pages.analysis.returns[0].3m'}, returns.get('3m')),
         }, 'issues': []}
 
         axis = {

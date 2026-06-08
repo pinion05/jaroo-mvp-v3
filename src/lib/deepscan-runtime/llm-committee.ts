@@ -86,17 +86,23 @@ const MEMBER_PROMPTS: Record<UsMemberKey, { role: string; focus: string }> = {
   },
 }
 
-function systemPromptForMember(member: UsMemberKey) {
+function systemPromptForMember(member: UsMemberKey, exchangeProduct = false) {
   const prompt = MEMBER_PROMPTS[member]
   return [
     `You are Jaroo US DeepScan committee member: ${prompt.role}.`,
     prompt.focus,
     'Use only the provided shared/member JSON generated from the frozen llm-deepscan-us-dump-contract contract.',
     'Respect quality/issues metadata. Missing or unavailable facts must lower confidence and can lower the score.',
+    exchangeProduct
+      ? 'The instrument is a US-listed ETF/fund, not an operating company. Do not penalize it merely because company revenue, margins, EPS, ROE, PER/PBR, analyst target, or ownership-flow facts are absent; those stock-only facts are often out of scope for ETFs.'
+      : '',
+    exchangeProduct
+      ? 'For a US ETF/fund, judge only ETF-relevant evidence that is actually present: price/OHLC trend, benchmark or index exposure, fund/news context, liquidity/volume, holding cost basis, market regime, and data coverage. Mention missing stock-only fundamentals only as out-of-scope, not as a negative thesis.'
+      : '',
     'If holdingContext has different averagePriceCurrency and currentPrice currency, compare price only with holdingContext.averagePriceInQuoteCurrency; never describe raw KRW averagePrice as USD.',
     'Return only valid JSON matching the schema. Write the reason in concise Korean.',
     'Score semantics: 0 extremely negative, 50 mixed/unclear, 100 extremely positive. Warnings are optional short Korean caveats.',
-  ].join(' ')
+  ].filter(Boolean).join(' ')
 }
 
 export async function scoreUsCommitteeMember(
@@ -116,6 +122,7 @@ export async function scoreUsCommitteeFromGeneratedDump(rawInput: DeepScanRawInp
   const dumpElapsed = Date.now() - totalT0
   const shared = artifacts.runtimeShape.shared
   const members = artifacts.runtimeShape.members as Record<UsMemberKey, unknown>
+  const exchangeProduct = rawInput.instrument?.kind === 'etf'
 
   const { results, errors } = await scoreCommitteeMembers({
     memberKeys: [...US_MEMBER_KEYS],
@@ -124,7 +131,7 @@ export async function scoreUsCommitteeFromGeneratedDump(rawInput: DeepScanRawInp
     options: {
       schemaName: COMMITTEE_SCHEMA.name,
       title: 'jaroo-mvp-v3 DeepScan Committee',
-      systemPrompt: (memberKey: string) => systemPromptForMember(memberKey as UsMemberKey),
+      systemPrompt: (memberKey: string) => systemPromptForMember(memberKey as UsMemberKey, exchangeProduct),
       summaryKey: ticker,
     },
   }) as { results: Partial<Record<UsMemberKey, CommitteeLlmVerdict>>; errors: CommitteeMemberError[] }
