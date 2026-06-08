@@ -330,7 +330,26 @@ test('KR ETF committee prompts forbid stock-only missing-data interpretations', 
         hasCurrentQuote: true,
         hasHolding: true,
         hasPackageResult: false,
+        hasEtfSnapshot: true,
         availableReportPages: [],
+      },
+      etfProductSnapshot: {
+        product: {
+          baseIndexName: '코스피지수',
+          issuerName: '삼성자산운용(주)',
+          totalFeePct: 0.15,
+        },
+        marketStatus: {
+          returns: { oneMonthPct: 18.52 },
+          avgTradingVolume20: 596968,
+        },
+        constituents: {
+          top10WeightPct: 57.12,
+          top10: [
+            { rank: 1, name: '삼성전자', weightPct: 29.6 },
+            { rank: 2, name: 'SK하이닉스', weightPct: 22.72 },
+          ],
+        },
       },
       reportSignals: {},
       missingSources: [],
@@ -351,6 +370,9 @@ test('KR ETF committee prompts forbid stock-only missing-data interpretations', 
     assert.match(systemPrompts, /never infer low risk or high stability from missing shareholder or constituent data/);
     assert.match(serializedBodies, /KODEX 코스피/);
     assert.match(serializedBodies, /ETF/);
+    assert.match(serializedBodies, /코스피지수/);
+    assert.match(serializedBodies, /삼성전자/);
+    assert.match(serializedBodies, /SK하이닉스/);
   } finally {
     global.fetch = originalFetch;
     if (originalKey === undefined) {

@@ -793,3 +793,94 @@ test('buildDeepScanKrEvidencePacket parses display-formatted holding strings fro
     'KR 리포트 페이지 근거 없음',
   ]);
 });
+
+test('buildDeepScanKrEvidencePacket promotes ETF constituent snapshot into facts and source coverage', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  const packet = buildDeepScanKrEvidencePacket({
+    instrument: {
+      code: '226490',
+      name: 'KODEX 코스피',
+      market: 'ETF',
+      kind: 'etf',
+    },
+    holding: {
+      shares: '35',
+      averagePrice: '58828.75',
+    },
+  }, {
+    quotes: {
+      items: [{ code: '226490', price: 84235, currency: 'KRW', asOf: '2026-06-05', source: 'wisereport-etf', status: 'ok' }],
+    },
+    etfSnapshot: {
+      code: '226490',
+      asOf: '2026-06-05',
+      product: {
+        baseIndexName: '코스피지수',
+        issuerName: '삼성자산운용(주)',
+        totalFeePct: '0.150',
+      },
+      marketStatus: {
+        closePrice: '84,235',
+        returns: { oneMonthPct: '18.52' },
+        avgTradingVolume20: '596,968',
+      },
+      constituents: {
+        asOf: '2026-06-05',
+        top10WeightPct: '57.12',
+        top10: [
+          { rank: 1, name: '삼성전자', shares: '3,778', weightPct: '29.60' },
+          { rank: 2, name: 'SK하이닉스', shares: 461, weightPct: 22.72 },
+        ],
+        rows: [
+          { rank: 1, name: '삼성전자', shares: '3,778', weightPct: '29.60' },
+          { rank: 2, name: 'SK하이닉스', shares: 461, weightPct: 22.72 },
+        ],
+      },
+      liquidity: { avgTradingVolume: '450' },
+    },
+  });
+
+  assert.equal(packet.instrument.market, 'ETF');
+  assert.equal(packet.sourceCoverage.hasEtfSnapshot, true);
+  assert.equal(packet.etfProductSnapshot.product.baseIndexName, '코스피지수');
+  assert.equal(packet.etfProductSnapshot.product.totalFeePct, 0.15);
+  assert.equal(packet.etfProductSnapshot.constituents.top10[0].name, '삼성전자');
+  assert.equal(packet.etfProductSnapshot.constituents.top10WeightPct, 57.12);
+  assert.deepEqual(packet.missingSources, ['slim']);
+  assert.deepEqual(packet.topFacts, [
+    '현재가 84235 KRW 확인',
+    '보유 35주 / 평단 58828.75 확인',
+    'ETF 기초지수 코스피지수 / 상위 구성 삼성전자·SK하이닉스 확인',
+  ]);
+  assert.deepEqual(packet.topRisks, ['KR 리포트 페이지 근거 없음']);
+});
+
+test('buildDeepScanKrEvidencePacket uses ETF snapshot close price as a quote fallback when quote crawler is unavailable', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  const packet = buildDeepScanKrEvidencePacket({
+    instrument: { code: '226490', name: 'KODEX 코스피', market: 'ETF', kind: 'etf' },
+    holding: { shares: '35', averagePrice: '58828.75' },
+  }, {
+    etfSnapshot: {
+      source: 'wisereport-etf',
+      asOf: '2026-06-05',
+      product: { baseIndexName: '코스피지수' },
+      marketStatus: { closePrice: '84,235', tradingVolume: '543,884' },
+      constituents: { top10: [{ name: '삼성전자', weightPct: '29.60' }] },
+    },
+  });
+
+  assert.deepEqual(packet.currentQuote, {
+    price: 84235,
+    currency: 'KRW',
+    volume: 543884,
+    asOf: '2026-06-05',
+    source: 'wisereport-etf',
+    status: 'ok',
+  });
+  assert.equal(packet.sourceCoverage.hasCurrentQuote, true);
+  assert.equal(packet.marketSnapshot.averagePriceGapPct, ((84235 - 58828.75) / 58828.75) * 100);
+  assert.equal(packet.missingSources.includes('current-quote'), false);
+});

@@ -120,10 +120,10 @@ const ETF_MEMBER_PRESENTATION_SPECS = Object.freeze({
 });
 
 const ETF_MEMBER_PROMPT_GUIDANCE = Object.freeze({
-  profitability: 'For ETF/ETN inputs, reinterpret this member as product structure and operation quality; never discuss corporate revenue, operating profit, ROE, or business profitability unless such ETF-specific facts are explicitly provided.',
+  profitability: 'For ETF/ETN inputs, reinterpret this member as product structure and operation quality; if etfProductSnapshot is present, use base index, issuer, fee, liquidity, and constituent facts before generic report coverage; never discuss corporate revenue, operating profit, ROE, or business profitability unless such ETF-specific facts are explicitly provided.',
   valuation: 'For ETF/ETN inputs, reinterpret valuation as price/NAV/premium-discount/position evidence; PER, PBR, ROE, analyst target price, and recommendation are not expected ETF facts and must not be treated as negative evidence.',
-  ownershipStability: 'For ETF/ETN inputs, reinterpret ownership stability as constituent/sector diversification stability; never infer low risk or high stability from missing shareholder or constituent data.',
-  trend: 'For ETF/ETN inputs, focus on index/price flow, relative return, current quote, and volume evidence actually present.',
+  ownershipStability: 'For ETF/ETN inputs, reinterpret ownership stability as constituent/sector diversification stability; if etfProductSnapshot.constituents exists, discuss top holding weights and concentration; never infer low risk or high stability from missing shareholder or constituent data.',
+  trend: 'For ETF/ETN inputs, focus on index/price flow, relative return, current quote, product return windows, and volume evidence actually present.',
   consensusMomentum: 'For ETF/ETN inputs, analyst consensus is normally out-of-scope; use market signal density, report freshness, index trend, or say the provided facts are insufficient without criticizing missing target prices.',
   priceLocation: 'For ETF/ETN inputs, compare current price, average price, recent return/location, and market context; do not invent a target price.',
   avgPriceGap: 'For ETF/ETN inputs, explain this strictly as the user position gap between current ETF price and average buy price.',
@@ -310,6 +310,9 @@ function buildKrFactBank(evidence) {
       performanceCommentAsOf: evidence.reportSignals?.performanceCommentAsOf ?? null,
     }, ['kr_reports']),
     businessCommentary: snapshotValue(evidence.businessCommentary ?? {}, ['kr_business_commentary']),
+    etfProduct: evidence.etfProductSnapshot
+      ? snapshotValue(evidence.etfProductSnapshot, ['wisereport_etf_snapshot'])
+      : missingFact('ETF 상품/구성종목 스냅샷이 없습니다.', ['etf_product_snapshot_missing']),
   };
 }
 
@@ -333,10 +336,12 @@ function sanitizeOwnershipSnapshotForLlm(snapshot) {
 
 function buildMemberKrFacts(memberKey, evidence) {
   const ownershipSnapshotForLlm = sanitizeOwnershipSnapshotForLlm(evidence.ownershipSnapshot);
+  const etfProductSnapshot = evidence.etfProductSnapshot ?? null;
   const base = {
     schemaVersion: 'jaroo.deepscan.kr-member-slice.v2',
     locale: 'KR',
     sourceFlavor: 'wisereport-fnguide-krx',
+    ...(etfProductSnapshot ? { etfProductSnapshot } : {}),
   };
 
   switch (memberKey) {
@@ -449,6 +454,9 @@ function buildSharedDump(input, evidence, sources) {
     ownershipSnapshot: presentValue(sanitizeOwnershipSnapshotForLlm(evidence.ownershipSnapshot), ['ownership_snapshot']),
     financialSnapshot: presentValue(evidence.financialSnapshot ?? {}, ['financial_snapshot']),
     businessCommentary: presentValue(evidence.businessCommentary ?? {}, ['business_commentary']),
+    etfProductSnapshot: evidence.etfProductSnapshot
+      ? presentValue(evidence.etfProductSnapshot, ['wisereport_etf_snapshot'])
+      : missingFact('ETF 상품/구성종목 스냅샷이 없습니다.', ['etf_product_snapshot_missing']),
     topFacts: presentValue(Array.isArray(evidence.topFacts) ? evidence.topFacts : [], ['top_facts']),
     topRisks: presentValue(Array.isArray(evidence.topRisks) ? evidence.topRisks : [], ['top_risks']),
     packageContext: presentValue(evidence.packageContext ?? { available: false, summaryFacts: [], marketView: null, boardHighlights: [] }, ['package_context'], ['Supplemental only; not numeric truth.']),
@@ -469,6 +477,8 @@ function buildMemberDump(memberKey, input, evidence, sources) {
     styleAnalysisSnapshot: shared.styleAnalysisSnapshot,
     ownershipSnapshot: shared.ownershipSnapshot,
     financialSnapshot: shared.financialSnapshot,
+    businessCommentary: shared.businessCommentary,
+    etfProductSnapshot: shared.etfProductSnapshot,
     pageCoverage: shared.pageCoverage,
     reportSignals: shared.reportSignals,
     sourceCoverage: shared.sourceCoverage,
@@ -484,6 +494,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
         member: memberKey,
         facts: {
           krFacts,
+          etfProductSnapshot: common.etfProductSnapshot,
           instrument: common.instrument,
           financialSnapshot: presentValue({
             revenueLatest: evidence.financialSnapshot?.revenueLatest ?? null,
@@ -505,6 +516,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
         member: memberKey,
         facts: {
           krFacts,
+          etfProductSnapshot: common.etfProductSnapshot,
           instrument: common.instrument,
           marketSnapshot: common.marketSnapshot,
           consensusSnapshot: presentValue({
@@ -528,6 +540,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
         member: memberKey,
         facts: {
           krFacts,
+          etfProductSnapshot: common.etfProductSnapshot,
           instrument: common.instrument,
           ownershipSnapshot: presentValue(sanitizeOwnershipSnapshotForLlm(evidence.ownershipSnapshot), ['ownership_inputs']),
           styleAnalysisSnapshot: presentValue(evidence.styleAnalysisSnapshot ?? {}, ['style_analysis_snapshot']),
@@ -540,6 +553,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
         member: memberKey,
         facts: {
           krFacts,
+          etfProductSnapshot: common.etfProductSnapshot,
           instrument: common.instrument,
           marketSnapshot: common.marketSnapshot,
           relativeReturnSnapshot: presentValue(evidence.relativeReturnSnapshot ?? {}, ['relative_return_snapshot']),
@@ -553,6 +567,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
         member: memberKey,
         facts: {
           krFacts,
+          etfProductSnapshot: common.etfProductSnapshot,
           instrument: common.instrument,
           consensusSnapshot: common.consensusSnapshot,
           recentReportCount: optionalFact(evidence.reportSignals?.recentReportCount ?? null, ['recent_report_count'], '최근 리포트 수가 없습니다.'),
@@ -565,6 +580,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
         member: memberKey,
         facts: {
           krFacts,
+          etfProductSnapshot: common.etfProductSnapshot,
           instrument: common.instrument,
           marketSnapshot: common.marketSnapshot,
           consensusSnapshot: common.consensusSnapshot,
@@ -579,6 +595,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
         member: memberKey,
         facts: {
           krFacts,
+          etfProductSnapshot: common.etfProductSnapshot,
           instrument: common.instrument,
           holding: common.holding,
           marketSnapshot: common.marketSnapshot,
@@ -589,6 +606,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
         member: memberKey,
         facts: {
           krFacts,
+          etfProductSnapshot: common.etfProductSnapshot,
           instrument: common.instrument,
           marketSnapshot: common.marketSnapshot,
           consensusSnapshot: common.consensusSnapshot,
@@ -601,6 +619,7 @@ function buildMemberDump(memberKey, input, evidence, sources) {
         member: memberKey,
         facts: {
           krFacts,
+          etfProductSnapshot: common.etfProductSnapshot,
           instrument: common.instrument,
           holding: common.holding,
           marketSnapshot: common.marketSnapshot,
@@ -630,6 +649,7 @@ function systemPrompt(memberKey) {
     'If sharedContext.instrument.market or memberContext.facts.instrument.market is ETF or ETN, treat the instrument as an exchange-traded product, not an operating company.',
     'For ETF/ETN, do not mention missing individual-stock facts such as PER, PBR, ROE, corporate profitability, shareholder stability, analyst recommendation, or target price unless the input explicitly provides those facts as applicable.',
     'For ETF/ETN, absence of shareholder, constituent, or analyst-target data is not positive or negative evidence by itself; say only what can be judged from current quote, average-price gap, trend, liquidity, page coverage, NAV/premium-discount, constituents, or sector weights that are actually present.',
+    'For ETF/ETN, when sharedContext.etfProductSnapshot or memberContext.facts.etfProductSnapshot is present, use its product, marketStatus, constituents.top10/top10WeightPct, and liquidity fields directly instead of saying constituent data is unavailable.',
     ETF_MEMBER_PROMPT_GUIDANCE[memberKey] ?? '',
     'Return only valid JSON matching the schema.',
     'Write reason as exactly one readable Korean sentence for a mobile chat bubble: no bullet, no newline, no colon label, no member name prefix, and no multi-sentence paragraph.',
