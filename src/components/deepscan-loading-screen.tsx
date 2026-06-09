@@ -155,6 +155,20 @@ const TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS = 0.9
 const TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS = 1.8
 const COMPLETION_SOON_REVEAL_SECONDS = 43
 const TODAY_BRIEFING_ITEM_COUNT = 6
+const TEAM_BRIDGE_REVEAL_SECONDS = 38
+const TEAM_BRIDGE_DONE_SECONDS = 48
+const TEAM_SEQUENCE_COMPLETE_SECONDS = 56
+const TEAM_PRESENTATION_ORDER: LoadingStageKey[] = ['marketTeam', 'contextTeam', 'fundamentalTeam']
+const TEAM_REVEAL_SECONDS: Record<LoadingStageKey, number> = {
+  marketTeam: 48,
+  contextTeam: 50.5,
+  fundamentalTeam: 53,
+}
+const TEAM_BRIDGE_STATUS_MESSAGES = [
+  '증권사 리포트를 읽는 중…',
+  '시장 흐름과 평단을 맞춰보는 중…',
+  '세 팀이 의견을 정리하는 중…',
+] as const
 
 const committeeMembers: ReadonlyArray<{ key: string; Icon: CommitteeMemberIcon; label: string; state: CommitteeMemberState }> = [
   { key: 'valuation', Icon: Scale, label: '가치\n분석가', state: 'active' },
@@ -171,7 +185,7 @@ const committeeMembers: ReadonlyArray<{ key: string; Icon: CommitteeMemberIcon; 
 const committeeTeams: readonly CommitteeTeamDefinition[] = [
   {
     key: 'fundamentalTeam',
-    analystName: '가치/기본 팀',
+    analystName: '가치·기본 팀',
     description: '가치 분석가 · 성장 전략가 · 재무 감사관',
     avatar: '🏛️',
     members: [
@@ -182,7 +196,7 @@ const committeeTeams: readonly CommitteeTeamDefinition[] = [
   },
   {
     key: 'marketTeam',
-    analystName: '시장/차트 팀',
+    analystName: '시장·차트 팀',
     description: '차트 마스터 · 수급 추적기 · 모멘텀 스카우터',
     avatar: '📈',
     members: [
@@ -193,7 +207,7 @@ const committeeTeams: readonly CommitteeTeamDefinition[] = [
   },
   {
     key: 'contextTeam',
-    analystName: '심리/환경 팀',
+    analystName: '심리·환경 팀',
     description: '심리 분석AI · 산업 전문가 · 이벤트 스캐너',
     avatar: '🧠',
     members: [
@@ -613,6 +627,10 @@ function QuickFactCard({ fact }: { fact: LoadingQuickFact }) {
   )
 }
 
+function isHiddenLoadingQuickFact(fact: LoadingQuickFact) {
+  return fact.key === 'week52-position' || fact.key === 'etf-product-context' || Boolean(fact.indicator)
+}
+
 function buildLoadingStages({
   displayQuickFacts,
   findingProgress,
@@ -669,12 +687,15 @@ function buildLoadingStages({
   })
 }
 
-function buildPlaceholderNarrativeCard(index: number): NarrativeCard {
+function buildPlaceholderNarrativeCard(index: number, teamKey?: LoadingStageKey): NarrativeCard {
+  const team = teamKey ? committeeTeams.find((definition) => definition.key === teamKey) : undefined
+
   return {
     key: `pendingStage${index + 1}`,
-    analystName: '',
-    description: '',
-    avatar: '',
+    teamKey,
+    analystName: team?.analystName ?? '',
+    description: team?.description ?? '',
+    avatar: team?.avatar ?? '',
     body: '',
     tags: [],
     statusLabel: '응답 대기',
@@ -689,19 +710,39 @@ function buildOrderedNarrativeCards(cards: NarrativeCard[], arrivedStageKeys: Lo
   const cardsByKey = new Map<LoadingStageKey, NarrativeCard>(
     cards.flatMap((card) => (card.teamKey ? [[card.teamKey, card] as const] : [])),
   )
-  const arrivedCards = arrivedStageKeys
-    .map((stageKey) => cardsByKey.get(stageKey))
-    .filter((card): card is NarrativeCard => typeof card !== 'undefined')
-  const remainingSlotCount = Math.max(0, cards.length - arrivedCards.length)
+  const arrivedKeySet = new Set(arrivedStageKeys)
 
-  return [
-    ...arrivedCards,
-    ...Array.from({ length: remainingSlotCount }, (_, index) => buildPlaceholderNarrativeCard(arrivedCards.length + index)),
-  ]
+  return TEAM_PRESENTATION_ORDER.map((stageKey, index) => (
+    arrivedKeySet.has(stageKey) ? cardsByKey.get(stageKey) ?? buildPlaceholderNarrativeCard(index, stageKey) : buildPlaceholderNarrativeCard(index, stageKey)
+  ))
 }
 
 function buildVisibleNarrativeCards(cards: NarrativeCard[], visibleStageCount: number): NarrativeCard[] {
   return cards.slice(0, Math.min(Math.max(visibleStageCount, 1), cards.length))
+}
+
+function buildTimelineNarrativeCards(cards: NarrativeCard[], elapsedSeconds: number, resultsReady: boolean): NarrativeCard[] {
+  const revealCount = resultsReady
+    ? cards.length
+    : TEAM_PRESENTATION_ORDER.filter((stageKey) => elapsedSeconds >= TEAM_REVEAL_SECONDS[stageKey]).length
+
+  return cards.slice(0, Math.min(revealCount, cards.length))
+}
+
+function buildTeamBridgeState(elapsedSeconds: number, resultsReady: boolean) {
+  if (resultsReady || elapsedSeconds < TEAM_BRIDGE_REVEAL_SECONDS || elapsedSeconds >= TEAM_BRIDGE_DONE_SECONDS) {
+    return null
+  }
+
+  const remainingSeconds = TEAM_BRIDGE_DONE_SECONDS - elapsedSeconds
+  const statusText = elapsedSeconds >= COMPLETION_SOON_REVEAL_SECONDS
+    ? '곧 결과를 보여드릴게요…'
+    : TEAM_BRIDGE_STATUS_MESSAGES[Math.floor(Math.max(0, elapsedSeconds - TEAM_BRIDGE_REVEAL_SECONDS) / 2) % TEAM_BRIDGE_STATUS_MESSAGES.length]
+
+  return {
+    statusText,
+    remainingText: formatElapsedTime(remainingSeconds),
+  }
 }
 
 export function splitTeamSummarySentences(value: string) {
@@ -1022,6 +1063,7 @@ function TodayBriefingCard({
         ) : (
           <div className={styles.todayChartEmpty} role='status'>차트 데이터를 확인하는 중이에요</div>
         )}
+
       </div>
 
       <div className={styles.todayBriefList}>
@@ -1204,7 +1246,10 @@ export function DeepScanLoadingScreen({
     currentPriceCurrency,
   )
   const displayQuickFacts = useMemo(() => quickFacts.filter(hasDisplayValue), [quickFacts])
-  const positionQuickFact = displayQuickFacts.find((fact) => fact.key === 'week52-position' || Boolean(fact.indicator))
+  const standaloneQuickFacts = useMemo(
+    () => displayQuickFacts.filter((fact) => !isHiddenLoadingQuickFact(fact)),
+    [displayQuickFacts],
+  )
   const loadingStages = useMemo(
     () => buildLoadingStages({
       displayQuickFacts,
@@ -1245,17 +1290,25 @@ export function DeepScanLoadingScreen({
     () => buildVisibleNarrativeCards(orderedNarrativeCards, visibleStageCount),
     [orderedNarrativeCards, visibleStageCount],
   )
+  const timelineNarrativeCards = useMemo(
+    () => buildTimelineNarrativeCards(orderedNarrativeCards, elapsedSeconds, resultsReady),
+    [elapsedSeconds, orderedNarrativeCards, resultsReady],
+  )
   const completionState = buildCompletionState(resultsReady, elapsedSeconds)
+  const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReady)
+  const shouldAdvanceTimeline = !resultsReady || elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS
   const progressPct = resultsReady ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
-  const activeNarrativeCard = visibleNarrativeCards.findLast((card) => !card.placeholder) ?? visibleNarrativeCards.at(-1) ?? orderedNarrativeCards[0]
+  const activeNarrativeCard = timelineNarrativeCards.findLast((card) => !card.placeholder) ?? timelineNarrativeCards.at(-1) ?? visibleNarrativeCards.at(-1) ?? orderedNarrativeCards[0]
   const progressLabel = resultsReady
     ? '상세 결과 준비 완료'
+    : teamBridgeState
+      ? teamBridgeState.statusText
     : activeNarrativeCard.placeholder
       ? '분석가 응답을 기다리는 중…'
       : `${activeNarrativeCard.analystName}가 살펴보는 중…`
 
   useEffect(() => {
-    if (resultsReady) {
+    if (!shouldAdvanceTimeline) {
       return undefined
     }
 
@@ -1266,7 +1319,7 @@ export function DeepScanLoadingScreen({
     return () => {
       window.clearInterval(intervalId)
     }
-  }, [resultsReady])
+  }, [shouldAdvanceTimeline])
 
   useEffect(() => {
     teamSummaryRequests.forEach((request) => {
@@ -1373,14 +1426,23 @@ export function DeepScanLoadingScreen({
           </div>
         </section>
 
-        {displayQuickFacts.length > 0 ? (
+        {standaloneQuickFacts.length > 0 ? (
           <section className={styles.quickFactsCard} aria-label='수집된 빠른 근거'>
-            {displayQuickFacts.map((fact) => <QuickFactCard key={fact.key} fact={fact} />)}
+            {standaloneQuickFacts.map((fact) => <QuickFactCard key={fact.key} fact={fact} />)}
           </section>
         ) : null}
 
+        <section className={cn(styles.teamBridgeCard, teamBridgeState ? styles.teamBridgeCardShow : styles.teamBridgeCardDone)} aria-label='세 팀 분석 전환 상태' aria-hidden={teamBridgeState ? undefined : true}>
+          <p className={styles.teamBridgeText}>시세는 다 봤어요. 이제 <b>세 팀이 더 깊이</b> 분석하는 중이에요.</p>
+          <div className={styles.teamBridgeProgress}>
+            <span className={styles.teamBridgeSpinner} aria-hidden='true' />
+            <span className={styles.teamBridgeStatus}>{teamBridgeState?.statusText ?? '세 팀이 의견을 정리하는 중…'}</span>
+            <span className={styles.teamBridgeTime}>{teamBridgeState?.remainingText ?? '0:00'}</span>
+          </div>
+        </section>
+
         <section className={styles.narrativeStream} aria-label='분석가 진행 메시지'>
-          {visibleNarrativeCards.map((card) => {
+          {timelineNarrativeCards.map((card) => {
             const summaryInputKey = hashSummaryInput(card.body)
             const summaryState = card.teamKey ? teamSummaries[card.teamKey] : undefined
             const summaryReady = summaryState?.inputKey === summaryInputKey && summaryState.status === 'success' && summaryState.summary
@@ -1404,10 +1466,10 @@ export function DeepScanLoadingScreen({
             return (
               <article key={card.key} className={cn(styles.narrativeCard, cardSettled ? styles.narrativeCardComplete : styles.narrativeCardPending)}>
                 <div className={styles.narrativeHead}>
-                  <span className={cn(styles.narrativeAvatar, cardSettled && !card.placeholder ? undefined : styles.narrativeAvatarPending)} aria-hidden='true'>{cardSettled && !card.placeholder ? card.avatar : <Loader2 className={styles.narrativeSpinner} aria-hidden />}</span>
+                  <span className={cn(styles.narrativeAvatar, card.placeholder && !card.teamKey ? styles.narrativeAvatarPending : undefined)} aria-hidden='true'>{card.placeholder && !card.teamKey ? <Loader2 className={styles.narrativeSpinner} aria-hidden /> : card.avatar}</span>
                   <div className={styles.narrativeNameWrap}>
-                    <strong>{card.placeholder ? <span className={styles.narrativeTitleSkeleton} aria-hidden='true' /> : card.analystName}</strong>
-                    <span>{card.placeholder ? <span className={styles.narrativeDescriptionSkeleton} aria-hidden='true' /> : card.description}</span>
+                    <strong>{card.placeholder && !card.teamKey ? <span className={styles.narrativeTitleSkeleton} aria-hidden='true' /> : card.analystName}</strong>
+                    <span>{card.placeholder && !card.teamKey ? <span className={styles.narrativeDescriptionSkeleton} aria-hidden='true' /> : card.description}</span>
                   </div>
                   <span className={cn(styles.narrativeStatus, narrativeToneClass(statusTone))}>{statusLabel}</span>
                 </div>
@@ -1443,27 +1505,6 @@ export function DeepScanLoadingScreen({
                       ) : null}
                     </div>
                   )}
-                  {card.teamKey === 'marketTeam' && positionQuickFact?.indicator ? (
-                    <div
-                      className={styles.narrativePricebar}
-                      aria-label={`시장/차트 팀 가격 위치: ${positionQuickFact.indicator.leftLabel}부터 ${positionQuickFact.indicator.rightLabel} 사이 ${positionQuickFact.indicator.markerLabel ?? '현재 위치'}`}
-                    >
-                      <div className={styles.narrativePricebarRow}>
-                        <span>{positionQuickFact.indicator.leftLabel}</span>
-                        <span>{positionQuickFact.indicator.rightLabel}</span>
-                      </div>
-                      <div className={styles.narrativePricebarTrack} aria-hidden='true'>
-                        <span
-                          className={styles.narrativePricebarMarker}
-                          style={{ left: `${positionQuickFact.indicator.positionPct}%` }}
-                        />
-                      </div>
-                      <div className={styles.narrativePricebarNow}>
-                        <strong>{positionQuickFact.indicator.markerLabel ?? '현재 위치'}</strong>
-                        {positionQuickFact.indicator.deltaLabels?.length ? <span>{positionQuickFact.indicator.deltaLabels.join(' · ')}</span> : null}
-                      </div>
-                    </div>
-                  ) : null}
                   <div className={styles.narrativeTags}>
                     {tags.map((tag) => (
                       <span key={`${card.key}-${tag.text}`} className={cn(styles.narrativeTag, narrativeToneClass(tag.tone))}>{tag.text}</span>
@@ -1474,20 +1515,18 @@ export function DeepScanLoadingScreen({
             )
           })}
         </section>
-
-
-
-
-        <section className={cn(styles.completionCard, completionState.ready ? styles.completionCardReady : styles.completionCardWaiting)} aria-label='완료 전환 상태'>
-          <div className={styles.completionHead}>
-            <span className={styles.completionIcon} aria-hidden='true'>{completionState.ready ? '✓' : '…'}</span>
-            <div>
-              <span className={styles.completionEyebrow}>{completionState.eyebrow}</span>
-              <h2 className={styles.completionTitle}>{completionState.title}</h2>
+        {resultsReady ? (
+          <section className={cn(styles.completionCard, styles.completionCardReady)} aria-label='완료 전환 상태'>
+            <div className={styles.completionHead}>
+              <span className={styles.completionIcon} aria-hidden='true'>✓</span>
+              <div>
+                <span className={styles.completionEyebrow}>{completionState.eyebrow}</span>
+                <h2 className={styles.completionTitle}>{completionState.title}</h2>
+              </div>
             </div>
-          </div>
-          <p className={styles.completionBody}>{completionState.body}</p>
-        </section>
+            <p className={styles.completionBody}>{completionState.body}</p>
+          </section>
+        ) : null}
 
         <details className={styles.progressDetails}>
           <summary className={styles.progressDetailsSummary}>세부 진행 단계·분석 상태</summary>
