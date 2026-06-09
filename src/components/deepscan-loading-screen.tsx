@@ -1211,6 +1211,26 @@ export function DeepScanLoadingScreen({
     () => buildOrderedNarrativeCards(loadingStages, arrivedStageKeys),
     [arrivedStageKeys, loadingStages],
   )
+  const teamSummaryRequests = useMemo(
+    () => loadingStages.flatMap((card) => {
+      const teamKey = card.teamKey
+      if (!teamKey || !card.summarizable || !card.body.trim()) {
+        return []
+      }
+
+      const inputKey = hashSummaryInput(card.body)
+
+      return [{
+        teamKey,
+        inputKey,
+        requestKey: `${teamKey}:${inputKey}`,
+        cardKey: card.key,
+        analystName: card.analystName,
+        body: card.body,
+      }]
+    }),
+    [loadingStages],
+  )
   const visibleNarrativeCards = useMemo(
     () => buildVisibleNarrativeCards(orderedNarrativeCards, visibleStageCount),
     [orderedNarrativeCards, visibleStageCount],
@@ -1239,14 +1259,8 @@ export function DeepScanLoadingScreen({
   }, [resultsReady])
 
   useEffect(() => {
-    loadingStages.forEach((card) => {
-      const teamKey = card.teamKey
-      if (!teamKey || !card.summarizable || !card.body.trim()) {
-        return
-      }
-
-      const inputKey = hashSummaryInput(card.body)
-      const requestKey = `${teamKey}:${inputKey}`
+    teamSummaryRequests.forEach((request) => {
+      const { teamKey, inputKey, requestKey } = request
       if (requestedTeamSummariesRef.current.has(requestKey)) {
         return
       }
@@ -1261,9 +1275,9 @@ export function DeepScanLoadingScreen({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          teamKey: card.key,
-          teamName: card.analystName,
-          body: card.body,
+          teamKey: request.cardKey,
+          teamName: request.analystName,
+          body: request.body,
           market,
           instrumentKind: exchangeProduct ? 'etf' : 'stock',
         }),
@@ -1287,7 +1301,7 @@ export function DeepScanLoadingScreen({
           }))
         })
     })
-  }, [exchangeProduct, loadingStages, market])
+  }, [exchangeProduct, market, teamSummaryRequests])
 
   return (
     <div className={cn(styles.loadingCard, className)}>

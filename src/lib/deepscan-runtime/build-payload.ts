@@ -935,11 +935,31 @@ const US_AGENT_META: Record<UsMemberKey, Pick<DeepScanAgentResult, 'label' | 'sh
   'portfolio-fit': { label: '포지션 적합도', shortLabel: 'FIT', iconTone: 'teal' },
 }
 
-function buildUsAgentResultsFromLlm(results: Partial<Record<UsMemberKey, { score: number; reason: string; confidence: 'low' | 'medium' | 'high' }>>): DeepScanAgentResult[] {
+const US_ETF_AGENT_META: Record<UsMemberKey, Pick<DeepScanAgentResult, 'label' | 'shortLabel' | 'iconTone'>> = {
+  valuation: { label: 'ETF 가격/NAV 단서', shortLabel: 'ETF', iconTone: 'blue' },
+  growth: { label: '기초자산 흐름', shortLabel: 'IDX', iconTone: 'green' },
+  'profitability-quality': { label: '상품 구조', shortLabel: 'FND', iconTone: 'teal' },
+  momentum: { label: '가격 모멘텀', shortLabel: 'MOM', iconTone: 'amber' },
+  'estimate-revision': { label: '시장 신호', shortLabel: 'SIG', iconTone: 'purple' },
+  'event-risk': { label: '뉴스/이벤트', shortLabel: 'EVT', iconTone: 'red' },
+  'financial-safety': { label: '유동성/규모', shortLabel: 'LIQ', iconTone: 'purple' },
+  'ownership-flow': { label: '수급 단서', shortLabel: 'FLOW', iconTone: 'amber' },
+  'portfolio-fit': { label: '내 포지션', shortLabel: 'FIT', iconTone: 'teal' },
+}
+
+function isUsExchangeProductInput(rawInput: DeepScanRawInput) {
+  return rawInput.instrument.kind === 'etf'
+}
+
+function buildUsAgentResultsFromLlm(
+  results: Partial<Record<UsMemberKey, { score: number; reason: string; confidence: 'low' | 'medium' | 'high' }>>,
+  exchangeProduct = false,
+): DeepScanAgentResult[] {
+  const meta = exchangeProduct ? US_ETF_AGENT_META : US_AGENT_META
   return (Object.entries(results) as Array<[UsMemberKey, { score: number; reason: string; confidence: 'low' | 'medium' | 'high' }]>)
     .map(([key, result]) => ({
       key,
-      ...US_AGENT_META[key],
+      ...meta[key],
       score: clamp(result.score),
       reason: result.reason,
       confidence: result.confidence,
@@ -987,24 +1007,42 @@ function toMember(agent: DeepScanAgentResult): JarooDeepScanCommitteeMember {
   }
 }
 
-function buildAxes(agentResults: DeepScanAgentResult[]): JarooDeepScanCommitteeAxis[] {
-  const groups = [
-    {
-      label: '사업 품질',
-      subtitle: '성장성과 수익성, 밸류에이션을 함께 봅니다.',
-      agents: ['growth', 'profitability-quality', 'valuation'] as const,
-    },
-    {
-      label: '시장 타이밍',
-      subtitle: '모멘텀과 추정치 변화, 이벤트 리스크를 묶어 봅니다.',
-      agents: ['momentum', 'estimate-revision', 'event-risk'] as const,
-    },
-    {
-      label: '포지션 적합도',
-      subtitle: '재무안정성과 소유구조, 내 포지션 적합도를 봅니다.',
-      agents: ['financial-safety', 'ownership-flow', 'portfolio-fit'] as const,
-    },
-  ]
+function buildAxes(agentResults: DeepScanAgentResult[], exchangeProduct = false): JarooDeepScanCommitteeAxis[] {
+  const groups = exchangeProduct
+    ? [
+        {
+          label: 'ETF 구조',
+          subtitle: '기초자산, 상품 구조, 가격 단서를 함께 봅니다.',
+          agents: ['growth', 'profitability-quality', 'valuation'] as const,
+        },
+        {
+          label: '시장 흐름',
+          subtitle: '가격 모멘텀, 시장 신호, 뉴스 이벤트를 묶어 봅니다.',
+          agents: ['momentum', 'estimate-revision', 'event-risk'] as const,
+        },
+        {
+          label: '포지션 적합도',
+          subtitle: '유동성, 수급 단서, 내 평단 위치를 함께 봅니다.',
+          agents: ['financial-safety', 'ownership-flow', 'portfolio-fit'] as const,
+        },
+      ]
+    : [
+        {
+          label: '사업 품질',
+          subtitle: '성장성과 수익성, 밸류에이션을 함께 봅니다.',
+          agents: ['growth', 'profitability-quality', 'valuation'] as const,
+        },
+        {
+          label: '시장 타이밍',
+          subtitle: '모멘텀과 추정치 변화, 이벤트 리스크를 묶어 봅니다.',
+          agents: ['momentum', 'estimate-revision', 'event-risk'] as const,
+        },
+        {
+          label: '포지션 적합도',
+          subtitle: '재무안정성과 소유구조, 내 포지션 적합도를 봅니다.',
+          agents: ['financial-safety', 'ownership-flow', 'portfolio-fit'] as const,
+        },
+      ]
 
   return groups.map((group) => {
     const members = group.agents
@@ -1156,6 +1194,7 @@ function sanitizeUsPortfolioFitAgentReason(
   usdKrwRate: number | null,
   generatedSignals: GeneratedDumpSignalSummary,
 ) {
+  const exchangeProduct = isUsExchangeProductInput(rawInput)
   const costBasis = resolveCurrencyAwareAveragePrice({
     averagePrice: rawInput.holding?.averagePrice,
     averagePriceCurrency: rawInput.holding?.averagePriceCurrency,
@@ -1190,13 +1229,21 @@ function sanitizeUsPortfolioFitAgentReason(
   const targetPrice = facts.consensus?.forecastEps && facts.consensus?.forwardPer
     ? facts.consensus.forecastEps * facts.consensus.forwardPer
     : null
-  const targetText = typeof targetPrice === 'number' && Number.isFinite(targetPrice)
-    ? `컨센서스 EPS×PER 기준 가격 ${formatCurrency(targetPrice, facts.currency)}`
-    : '컨센서스 기준 가격 미확인'
+  const targetText = exchangeProduct
+    ? '기업 목표가 대신 ETF의 가격 흐름, 유동성, 기초자산 노출'
+    : (
+        typeof targetPrice === 'number' && Number.isFinite(targetPrice)
+          ? `컨센서스 EPS×PER 기준 가격 ${formatCurrency(targetPrice, facts.currency)}`
+          : '컨센서스 기준 가격 미확인'
+      )
   const positionTone = typeof pnlPct === 'number' && pnlPct >= 0
-    ? '평단 위 수익권이므로 추격 매수보다 분할 매도·리스크 관리 기준을 우선 확인해야 합니다.'
-    : '평단 아래 손실권이므로 반등 조건과 손절 기준을 함께 관리해야 합니다.'
-  const safeReason = `${rawAverageText}했고 현재가 ${formatCurrency(currentPrice, facts.currency)}와 같은 ${facts.currency ?? 'USD'} 기준으로 비교했습니다. ${pnlText}입니다. ${targetText}와 현재 가격 위치를 함께 보면 ${positionTone}`
+    ? exchangeProduct
+      ? '평단 위 수익권이므로 기초자산 조정과 변동성 확대 여부를 우선 확인해야 합니다.'
+      : '평단 위 수익권이므로 추격 매수보다 분할 매도·리스크 관리 기준을 우선 확인해야 합니다.'
+    : exchangeProduct
+      ? '평단 아래 손실권이므로 기초자산 회복과 거래량 유지 여부를 함께 확인해야 합니다.'
+      : '평단 아래 손실권이므로 반등 조건과 손절 기준을 함께 관리해야 합니다.'
+  const safeReason = `${rawAverageText}했고 현재가 ${formatCurrency(currentPrice, facts.currency)}와 같은 ${facts.currency ?? 'USD'} 기준으로 비교했습니다. ${pnlText}입니다. ${targetText}를 현재 가격 위치와 함께 보면 ${positionTone}`
   const ownershipSummary = generatedSignals.ownershipFlow?.summary?.replace(/\s*$/u, '').replace(/[.。]?$/u, '.')
   const ownershipReason = `${ownershipSummary ?? 'SEC ownership/insider-flow 공시가 확인되었습니다.'} Ownership/flow는 내부자·소유권 흐름 근거로만 해석하며, 세부 순매수·순매도 규모가 제한적이면 신뢰도는 보수적으로 봅니다.`
   const holdingConfusionPattern = /averagePriceCurrency|currentPriceCurrency|usdKrwRate|averagePriceInQuoteCurrency|평균단가|평단|보유\s*원가|손익\s*평가|수익성\s*평가|환산할\s*수\s*없|통화\s*불일치|현재\s*USD\s*가격|514[,，]?\d{3}/u
@@ -1223,7 +1270,7 @@ function sanitizeUsPortfolioFitAgentReason(
   ))
 }
 
-function buildUsStrategy(heroScore: number, facts: UsDeepScanFacts, rawInput: DeepScanRawInput, usdKrwRate: number | null): JarooDeepScanStrategyBlock {
+function buildUsStrategy(heroScore: number, facts: UsDeepScanFacts, rawInput: DeepScanRawInput, usdKrwRate: number | null, exchangeProduct = false): JarooDeepScanStrategyBlock {
   const costBasis = resolveCurrencyAwareAveragePrice({
     averagePrice: rawInput.holding?.averagePrice,
     averagePriceCurrency: rawInput.holding?.averagePriceCurrency,
@@ -1241,7 +1288,9 @@ function buildUsStrategy(heroScore: number, facts: UsDeepScanFacts, rawInput: De
     ? facts.consensus.forecastEps * facts.consensus.forwardPer
     : currentPrice
   const tone = heroScore >= 70 ? 'positive' : heroScore >= 55 ? 'primary' : 'warning'
-  const weekSignal = heroScore >= 70 ? '보유 유지' : heroScore >= 55 ? '관찰 지속' : '리스크 점검'
+  const weekSignal = exchangeProduct
+    ? heroScore >= 70 ? '흐름 양호' : heroScore >= 55 ? '관찰 지속' : '리스크 점검'
+    : heroScore >= 70 ? '보유 유지' : heroScore >= 55 ? '관찰 지속' : '리스크 점검'
 
   return {
     ...createBlockMeta('ok', [createSourceRef('system', 'deepscan-us-strategy', 'US strategy synthesis')]),
@@ -1257,24 +1306,26 @@ function buildUsStrategy(heroScore: number, facts: UsDeepScanFacts, rawInput: De
         ? '원화 평단 환산값 확인 필요'
         : '보유 포지션 기준치 재확인',
     currentPriceText: formatCurrency(currentPrice, facts.currency),
-    targetPriceText: formatCurrency(targetPrice, facts.currency),
+    targetPriceText: exchangeProduct ? 'ETF 기준' : formatCurrency(targetPrice, facts.currency),
     scenarioDetails: [
       `보유 수량 ${formatNumber(shares)}주 기준`,
       costBasis.converted && typeof normalizedAveragePrice === 'number'
         ? `원화 평단을 ${formatCurrency(normalizedAveragePrice, facts.currency)}로 환산 · USD/KRW ${formatUsdKrwRate(costBasis.usdKrwRate)}`
         : `평단 ${formatCurrency(normalizedAveragePrice ?? costBasis.averagePrice, costBasis.averagePriceCurrency ?? facts.currency)}`,
-      `추정 EPS ${formatNumber(facts.consensus?.forecastEps, 2)} · forward PER ${formatNumber(facts.consensus?.forwardPer, 1)}`,
+      exchangeProduct
+        ? `ETF는 목표가보다 가격 흐름·유동성·기초자산 노출을 우선 확인`
+        : `추정 EPS ${formatNumber(facts.consensus?.forecastEps, 2)} · forward PER ${formatNumber(facts.consensus?.forwardPer, 1)}`,
     ],
     otherScenarios: [
       {
         label: '상방',
         probability: `${Math.max(5, 100 - heroScore)}%`,
-        condition: '추정치 상향 지속',
+        condition: exchangeProduct ? '기초지수 상승 + 거래량 유지' : '추정치 상향 지속',
       },
       {
         label: '하방',
         probability: `${Math.max(5, 65 - Math.floor(heroScore / 2))}%`,
-        condition: '모멘텀 둔화 + 뉴스 리스크 확대',
+        condition: exchangeProduct ? '기초자산 조정 + 변동성 확대' : '모멘텀 둔화 + 뉴스 리스크 확대',
       },
     ],
     otherScenarioTags: [facts.market ?? 'US', facts.currency ?? 'USD'],
@@ -1443,6 +1494,7 @@ async function fetchUsSlimPayload(ticker: string) {
 async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScanPayload> {
   const ticker = normalizeText(rawInput.instrument.ticker)?.toUpperCase()
   const name = normalizeText(rawInput.instrument.name) ?? ticker ?? '미국 종목'
+  const exchangeProduct = isUsExchangeProductInput(rawInput)
 
   if (!ticker) {
     return createInvalidInputPayload(rawInput)
@@ -1537,7 +1589,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
     return payload
   }
 
-  const facts = findUsFacts(slimPayload, ticker)
+  let facts = findUsFacts(slimPayload, ticker)
   let agentResults: DeepScanAgentResult[]
   let llmDebugId: string | undefined
 
@@ -1546,7 +1598,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
 
   try {
     const llm = await scoreUsCommitteeFromGeneratedDump(rawInput, ticker)
-    agentResults = buildUsAgentResultsFromLlm(llm.results)
+    agentResults = buildUsAgentResultsFromLlm(llm.results, exchangeProduct)
     llmDebugId = llm.artifacts.manifest.requestId
     llmErrors = llm.errors
     generatedSignals = summarizeGeneratedDumpSignals(llm.artifacts.runtimeShape)
@@ -1566,12 +1618,20 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
     )
   }
 
+  if (
+    typeof facts.currentPrice !== 'number'
+    && typeof generatedSignals.momentum?.latestClose === 'number'
+    && Number.isFinite(generatedSignals.momentum.latestClose)
+  ) {
+    facts = { ...facts, currentPrice: generatedSignals.momentum.latestClose }
+  }
+
   const usdKrwRate = await resolveUsDeepScanUsdKrwRate(rawInput, facts)
   agentResults = sanitizeUsPortfolioFitAgentReason(agentResults, facts, rawInput, usdKrwRate, generatedSignals)
   const heroScore = buildHeroScore(agentResults)
-  const axes = buildAxes(agentResults)
+  const axes = buildAxes(agentResults, exchangeProduct)
   const insights = buildUsInsights(facts, agentResults, generatedSignals)
-  const strategy = buildUsStrategy(heroScore, facts, rawInput, usdKrwRate)
+  const strategy = buildUsStrategy(heroScore, facts, rawInput, usdKrwRate, exchangeProduct)
   const sellNow = buildUsSellNow(heroScore, facts, rawInput, usdKrwRate)
   const portfolioSimulation = buildUsPortfolioSimulation(heroScore, sellNow)
   const degraded = agentResults.some((agent) => agent.confidence === 'low') || llmErrors.length > 0
@@ -1594,7 +1654,9 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
 
   const heroBodyParts = [
     `현재가 ${formatCurrency(facts.currentPrice, facts.currency)} 확인`,
-    `forward PER ${formatNumber(facts.consensus?.forwardPer ?? facts.per, 1)} / PBR ${formatNumber(facts.consensus?.forwardPbr ?? facts.pbr, 1)}`,
+    exchangeProduct
+      ? 'US ETF 기준 가격·유동성 중심'
+      : `forward PER ${formatNumber(facts.consensus?.forwardPer ?? facts.per, 1)} / PBR ${formatNumber(facts.consensus?.forwardPbr ?? facts.pbr, 1)}`,
     generatedSignals.momentum?.availability === 'present'
       ? (momentumProvenance?.heroBodyText ?? `OHLC ${generatedSignals.momentum.pointCount}개 반영`)
       : `최근 뉴스 ${facts.news.length}건 반영`,
@@ -1617,7 +1679,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
     },
     hero: {
       ...createBlockMeta('ok', sourceRefsWithPayload, degraded ? { fallback: createFallback('weak-data-degradation', llmErrors.length > 0 ? `일부 위원 실패 ${llmErrors.length}건` : '일부 근거 부족') } : undefined),
-      headline: `${name} US DeepScan ${heroScore}점`,
+      headline: `${name} ${exchangeProduct ? 'US ETF' : 'US'} DeepScan ${heroScore}점`,
       body: heroBodyParts.join(' · '),
       statusText: axisStatus(heroScore),
       score: heroScore,

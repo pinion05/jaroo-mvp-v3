@@ -160,6 +160,29 @@ test('DeepScan runtime preserves US ticker-only routing for non-KR tickers', () 
   )
 })
 
+test('DeepScan runtime preserves US ETF routing for ticker-only requests', () => {
+  const rawInput: DeepScanRawInput = {
+    instrument: {
+      name: 'SPDR S&P 500 ETF Trust',
+      ticker: 'SPY',
+      market: 'US',
+      kind: 'etf',
+    },
+    holding: {
+      shares: '10주',
+      averagePrice: '$450',
+      averagePriceCurrency: 'USD',
+    },
+    sourceContext: {
+      from: 'holding',
+    },
+  }
+
+  assert.equal(resolveDeepScanPayloadBuilderRoute(rawInput), 'us')
+  assert.equal(prepareDeepScanRawInputForBuilder(rawInput).instrument.kind, 'etf')
+})
+
+
 test('DeepScan runtime infers KR builder input from KR-like ticker without explicit market', () => {
   const rawInput: DeepScanRawInput = {
     instrument: {
