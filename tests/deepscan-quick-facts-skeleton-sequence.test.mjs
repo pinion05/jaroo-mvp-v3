@@ -81,6 +81,9 @@ test('DeepScan loading sequencing is success-gated and no longer bypasses on raw
   assert.match(loadingSource, /arrivedStageKeys/)
   assert.match(loadingSource, /narrativeTitleSkeleton/)
   assert.match(loadingSource, /cards\.slice\(0, Math\.min\(Math\.max\(visibleStageCount, 1\), cards\.length\)\)/)
+  assert.match(loadingSource, /COMPLETION_SOON_REVEAL_SECONDS\s*=\s*43/)
+  assert.match(loadingSource, /세 팀이 의견을 정리하는 중…/)
+  assert.match(loadingSource, /곧 결과를 보여드릴게요…/)
   assert.doesNotMatch(loadingSource, /elapsedSeconds >= card\.revealAt/)
   assert.doesNotMatch(loadingSource, /if \(resultsReady\) \{\s*return cards\s*\}/u)
 

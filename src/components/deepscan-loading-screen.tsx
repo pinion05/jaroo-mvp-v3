@@ -153,6 +153,7 @@ const TODAY_BRIEFING_FIRST_REVEAL_SECONDS = 5
 const TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS = 5
 const TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS = 0.9
 const TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS = 1.8
+const COMPLETION_SOON_REVEAL_SECONDS = 43
 const TODAY_BRIEFING_ITEM_COUNT = 6
 
 const committeeMembers: ReadonlyArray<{ key: string; Icon: CommitteeMemberIcon; label: string; state: CommitteeMemberState }> = [
@@ -545,11 +546,20 @@ function buildCompletionState(resultsReady: boolean, elapsedSeconds: number): Co
     }
   }
 
+  if (elapsedSeconds >= COMPLETION_SOON_REVEAL_SECONDS) {
+    return {
+      ready: false,
+      eyebrow: '마무리 중',
+      title: '곧 결과를 보여드릴게요…',
+      body: '세 팀의 의견을 정리해 결과 카드로 연결하고 있어요.',
+    }
+  }
+
   return {
     ready: false,
     eyebrow: '분석 진행 중',
-    title: '분석가 의견을 차례로 모으는 중이에요',
-    body: '완료 신호가 오면 기다리지 않고 바로 상세 결과로 넘어갈 수 있게 바뀝니다.',
+    title: '세 팀이 의견을 정리하는 중…',
+    body: '근거와 해석을 맞춰 보면서 결과 카드로 넘길 준비를 하고 있어요.',
   }
 }
 
