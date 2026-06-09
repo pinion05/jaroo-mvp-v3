@@ -62,12 +62,20 @@ const DEEPSCAN_MEMBER_STAGE_BY_KEY: Record<string, LoadingStageKey> = {
   profitability: 'fundamentalTeam',
   valuation: 'fundamentalTeam',
   ownershipStability: 'fundamentalTeam',
+  growth: 'fundamentalTeam',
+  'profitability-quality': 'fundamentalTeam',
   trend: 'marketTeam',
   consensusMomentum: 'marketTeam',
   priceLocation: 'marketTeam',
+  momentum: 'marketTeam',
+  'estimate-revision': 'marketTeam',
+  'event-risk': 'marketTeam',
   avgPriceGap: 'contextTeam',
   upsideBuffer: 'contextTeam',
   holdingCompleteness: 'contextTeam',
+  'financial-safety': 'contextTeam',
+  'ownership-flow': 'contextTeam',
+  'portfolio-fit': 'contextTeam',
 }
 const DEEPSCAN_MEMBER_STAGE_BY_TITLE: Record<string, LoadingStageKey> = {
   '수익성/기본체력': 'fundamentalTeam',
@@ -1960,7 +1968,7 @@ export default function DeepScanPage() {
   const loadingSequenceComplete = loadingSequence.targetKey === targetKey && loadingSequence.sequenceComplete
   const canReuseReadyPayloadWithoutSequence = rawResultsReady && loadingSequence.targetKey !== targetKey
   const resultsReady = rawResultsReady && (loadingSequenceComplete || canReuseReadyPayloadWithoutSequence)
-  const visibleStageCount = loadingSequence.targetKey === targetKey ? loadingSequence.visibleStageCount : 1
+  const visibleStageCount = resultsReady ? 3 : loadingSequence.targetKey === targetKey ? loadingSequence.visibleStageCount : 1
   const arrivedStageKeys = displayedLoadingStages.targetKey === targetKey ? displayedLoadingStages.stageKeys : []
   const loadingFindingProgress = buildLoadingFindingProgress(payload)
   const loadingPerformanceComment = buildLoadingPerformanceComment(payload)
