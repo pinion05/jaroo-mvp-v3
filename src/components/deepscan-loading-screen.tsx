@@ -27,6 +27,7 @@ import {
   type LoadingBriefingSnapshot,
   type MoneyCurrency,
 } from '@/lib/deepscan-briefing-snapshot'
+import { resolveDeepScanBriefingCardCurrentPrice, resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
 import { calculateFallbackEvaluationMoney } from '@/lib/deepscan-loading-metrics'
 import { cn } from '@/lib/utils'
 import styles from './deepscan-loading-screen.module.css'
@@ -932,7 +933,12 @@ function TodayBriefingCard({
     const dailyRows = (briefingSnapshot?.daily ?? []).filter((row) => isFiniteNumber(row.close))
     const latestRow = getLatestBriefingDailyRow(dailyRows)
     const previousRow = getPreviousBriefingDailyRow(dailyRows)
-    const currentPriceValue = quote?.currentPrice ?? latestRow?.close ?? parseNumericValue(currentPriceText ?? undefined)
+    const displayCurrentPriceValue = parseNumericValue(currentPriceText ?? undefined)
+    const currentPriceValue = resolveDeepScanBriefingCardCurrentPrice({
+      displayCurrentPrice: displayCurrentPriceValue,
+      briefingQuotePrice: quote?.currentPrice,
+      latestClose: latestRow?.close,
+    }) ?? null
     const oneMonthPct = calculateBriefingOneMonthChangePct(dailyRows)
     const shortStreak = calculateBriefingShortStreak(dailyRows)
     const todayFlow = buildTodayFlow({
@@ -944,7 +950,11 @@ function TodayBriefingCard({
     const volume = quote?.volume ?? latestRow?.volume ?? null
     const previousVolume = quote?.previousVolume ?? previousRow?.volume ?? null
     const volumeRatio = isFiniteNumber(volume) && isFiniteNumber(previousVolume) && previousVolume > 0 ? volume / previousVolume : null
-    const chart = buildChartGeometry(dailyRows.slice(-60), chartAveragePriceValue)
+    const chartRows = dailyRows.slice(-60)
+    const chartRowsWithDisplayPrice = isFiniteNumber(currentPriceValue) && chartRows.length > 0
+      ? chartRows.map((row, index) => index === chartRows.length - 1 ? { ...row, close: currentPriceValue } : row)
+      : chartRows
+    const chart = buildChartGeometry(chartRowsWithDisplayPrice, chartAveragePriceValue)
 
     return {
       currentPriceValue,
@@ -1224,7 +1234,10 @@ export function DeepScanLoadingScreen({
   const currentPriceText = formatMoney(currentPrice, currentPriceCurrency)
   const tradingVolumeText = formatTradingVolume(tradingVolume)
   const snapshotCurrentPrice = briefingSnapshot?.quote?.currentPrice ?? undefined
-  const effectiveCurrentPrice = snapshotCurrentPrice ?? currentPrice
+  const effectiveCurrentPrice = resolveDeepScanLoadingCurrentPrice({
+    quickQuoteCurrentPrice: parseNumericValue(currentPrice),
+    briefingCurrentPrice: snapshotCurrentPrice,
+  })
   const fallbackEvaluationMoney = calculateFallbackEvaluationMoney({
     evaluationAmount,
     currentPrice: effectiveCurrentPrice,
