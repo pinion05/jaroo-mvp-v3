@@ -37,7 +37,7 @@ import {
   resolveDeepScanPageCacheState,
 } from '@/lib/deepscan-page-projection'
 import { resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
-import { readDeepScanTargetSession, resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
+import { resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
 import { getDeepScanTargetKey, type DeepScanTargetInput, type WorkflowMoneyCurrency } from '@/lib/workflow-types'
@@ -1368,15 +1368,19 @@ export default function DeepScanPage() {
   const [displayedLoadingStages, setDisplayedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
 
   useEffect(() => {
-    if (target) {
-      return undefined
-    }
-
     let cancelled = false
     const hydrateTarget = async () => {
-      const sessionTarget = readDeepScanTargetSession() ?? resolveDeepScanTargetSession()
+      const sessionTarget = resolveDeepScanTargetSession()
       const hydratedTarget = buildDeepScanTargetInputFromSession(sessionTarget)
       if (!hydratedTarget) {
+        return
+      }
+
+      if (
+        target
+        && getDeepScanTargetKey(target) === getDeepScanTargetKey(hydratedTarget)
+        && Math.abs(target.quantity - hydratedTarget.quantity) < 1e-9
+      ) {
         return
       }
 

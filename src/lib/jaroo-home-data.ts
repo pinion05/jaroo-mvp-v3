@@ -925,6 +925,13 @@ function formatNumber(value: number, maximumFractionDigits = 0) {
   })
 }
 
+function formatQuantityNumber(value: number) {
+  return value.toLocaleString('ko-KR', {
+    minimumFractionDigits: 0,
+    maximumFractionDigits: 8,
+  })
+}
+
 function formatCurrencyValue(value: string, currency?: AveragePriceCurrency) {
   const parsedValue = parseOcrNumber(value)
 
@@ -956,7 +963,7 @@ function formatQuantityValue(value: string) {
     return value.trim() || '-'
   }
 
-  return `${formatNumber(parsedValue)}주`
+  return `${formatQuantityNumber(parsedValue)}주`
 }
 
 function formatSignedCurrencyValue(value: number | null, currency: 'KRW' | 'USD' = 'KRW') {
@@ -1276,6 +1283,60 @@ export function resolveDeepScanTargetServerSnapshot(): DeepScanTargetSession {
   return DEEPSCAN_SERVER_SNAPSHOT
 }
 
+function findAppliedHoldingForStoredTarget(storedTarget: DeepScanTargetSession, appliedHoldings: HomeHolding[]) {
+  const storedHolding = storedTarget.holding
+  const storedTicker = storedHolding.identifierTicker?.trim().toUpperCase()
+  const storedCode = storedHolding.identifierCode?.trim().toUpperCase() || storedHolding.code?.trim().toUpperCase()
+  const storedName = normalizeStockName(storedHolding.name)
+
+  return appliedHoldings.find((holding) => {
+    const ticker = holding.identifierTicker?.trim().toUpperCase()
+    const code = holding.identifierCode?.trim().toUpperCase() || holding.code?.trim().toUpperCase()
+
+    return Boolean(
+      (storedTicker && ticker && storedTicker === ticker)
+      || (storedCode && code && storedCode === code)
+      || (storedName && normalizeStockName(holding.name) === storedName),
+    )
+  }) ?? null
+}
+
+function repairDeepScanTargetFractionalShares(storedTarget: DeepScanTargetSession | null, appliedHoldings: HomeHolding[]) {
+  if (!storedTarget || appliedHoldings.length === 0) {
+    return storedTarget
+  }
+
+  const appliedHolding = findAppliedHoldingForStoredTarget(storedTarget, appliedHoldings)
+  if (!appliedHolding) {
+    return storedTarget
+  }
+
+  const storedQuantity = parseOcrNumber(storedTarget.holding.shares)
+  const appliedQuantity = parseOcrNumber(appliedHolding.shares)
+
+  if (
+    storedQuantity === null
+    || appliedQuantity === null
+    || Math.abs(storedQuantity - appliedQuantity) < 1e-9
+  ) {
+    return storedTarget
+  }
+
+  const patchedHolding: HomeHolding = {
+    ...storedTarget.holding,
+    shares: appliedHolding.shares,
+    metrics: storedTarget.holding.metrics.map((metric) =>
+      metric.label === '보유 수량' ? { ...metric, value: appliedHolding.shares } : metric,
+    ),
+  }
+  const rebuiltSession = buildDeepScanTargetSession(patchedHolding)
+
+  return {
+    ...rebuiltSession,
+    selectedAt: storedTarget.selectedAt,
+  }
+}
+
 export function resolveDeepScanTargetSession() {
   if (typeof window === 'undefined') {
     return DEEPSCAN_SERVER_SNAPSHOT
@@ -1291,10 +1352,12 @@ export function resolveDeepScanTargetSession() {
 
   const storedTarget = readDeepScanTargetSession()
   const appliedPortfolio = readAppliedHomePortfolio()
-  const appliedHolding = appliedPortfolio?.rows.length
-    ? pickDeepScanDefaultHolding(buildHomeHoldingsFromOcrRows(appliedPortfolio.rows))
+  const appliedHoldings = appliedPortfolio?.rows.length ? buildHomeHoldingsFromOcrRows(appliedPortfolio.rows) : []
+  const repairedStoredTarget = repairDeepScanTargetFractionalShares(storedTarget, appliedHoldings)
+  const appliedHolding = appliedHoldings.length
+    ? pickDeepScanDefaultHolding(appliedHoldings)
     : null
-  const resolvedSnapshot = storedTarget
+  const resolvedSnapshot = repairedStoredTarget
     ?? (appliedHolding ? buildDeepScanTargetSession(appliedHolding) : null)
     ?? DEEPSCAN_SERVER_SNAPSHOT
 
