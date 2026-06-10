@@ -126,7 +126,7 @@ test('resolveUsdKrwRateAfterFailedQuoteResponse preserves prior FX when quote an
 })
 
 test('home quote hydration only skips completed matching snapshots, not stale loading state', () => {
-  assert.equal(HOME_QUOTE_FETCH_TIMEOUT_MS >= 4000, true)
+  assert.equal(HOME_QUOTE_FETCH_TIMEOUT_MS, 15_000)
   assert.equal(shouldSkipHomeQuoteHydration({
     refreshVersion: 0,
     quoteQueryKey: 'codes=005930',

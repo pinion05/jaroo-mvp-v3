@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 import { recordDeepScanQuickQuotePerf } from '@/lib/deepscan-runtime/perf-trace'
 
-export const QUOTES_CURRENT_PROXY_TIMEOUT_MS = 4500
+export const QUOTES_CURRENT_PROXY_TIMEOUT_MS = 15_000
 
 export class QuotesCurrentProxyTimeoutError extends Error {
   constructor(message = 'quotes current upstream timed out') {

@@ -11,7 +11,7 @@ import {
   type CurrentQuoteItem,
 } from './home-current-quotes'
 
-export const HOME_QUOTE_FETCH_TIMEOUT_MS = 5000
+export const HOME_QUOTE_FETCH_TIMEOUT_MS = 15_000
 
 export class HomeQuoteTimeoutError extends Error {
   constructor(message = 'Home quote request timed out') {
