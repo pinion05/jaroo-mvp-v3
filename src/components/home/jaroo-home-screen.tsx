@@ -753,6 +753,7 @@ export function JarooHomeScreen() {
               currentPrice: quoteItem.price,
               currentPriceCurrency: quoteCurrency,
               currentProfitRate: parseOcrNumber(enrichedHolding?.change ?? '') ?? undefined,
+              usdKrwRate: needsFx && nextFxRate !== null ? nextFxRate : undefined,
             },
           )
         }

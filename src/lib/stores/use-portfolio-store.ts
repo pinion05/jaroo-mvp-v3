@@ -55,7 +55,7 @@ export const usePortfolioStore = create<PortfolioStoreState & PortfolioStoreActi
       return {
         items: state.items.map((item) =>
           getPortfolioItemKey(item) === targetKey
-            ? { ...item, currentPrice: undefined, currentProfitRate: undefined, currentPriceCurrency: undefined }
+            ? { ...item, currentPrice: undefined, currentProfitRate: undefined, currentPriceCurrency: undefined, usdKrwRate: undefined }
             : item,
         ),
       }

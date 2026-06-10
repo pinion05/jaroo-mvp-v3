@@ -142,6 +142,7 @@ export type AppliedHomePortfolioRow = Pick<
   currentPrice?: number
   currentPriceCurrency?: AveragePriceCurrency
   currentProfitRate?: number
+  usdKrwRate?: number
 }
 
 export const homeHoldings: HomeHolding[] = [
@@ -887,8 +888,11 @@ function sanitizeAppliedHomePortfolioRows(input: unknown): AppliedHomePortfolioR
       const currentPrice = typeof item.currentPrice === 'number' && Number.isFinite(item.currentPrice) ? item.currentPrice : undefined
       const currentProfitRate = typeof item.currentProfitRate === 'number' && Number.isFinite(item.currentProfitRate) ? item.currentProfitRate : undefined
       const currentPriceCurrency = normalizeAveragePriceCurrency(item.currentPriceCurrency)
+      const usdKrwRate = typeof item.usdKrwRate === 'number' && Number.isFinite(item.usdKrwRate) && item.usdKrwRate > 0
+        ? item.usdKrwRate
+        : undefined
 
-      return {
+      const normalizedRow: AppliedHomePortfolioRow = {
         name: readTrimmedString(item.name) ?? '',
         quantity: readTrimmedString(item.quantity) ?? '',
         profitRate: readTrimmedString(item.profitRate) ?? '',
@@ -898,6 +902,7 @@ function sanitizeAppliedHomePortfolioRows(input: unknown): AppliedHomePortfolioR
         currentPrice,
         currentPriceCurrency,
         currentProfitRate,
+        usdKrwRate,
         code: normalizeAppliedInstrumentCode(item.code),
         ticker: normalizeAppliedInstrumentCode(item.ticker),
         resolvedName: readTrimmedString(item.resolvedName),
@@ -907,6 +912,8 @@ function sanitizeAppliedHomePortfolioRows(input: unknown): AppliedHomePortfolioR
         resolvedMarketTone,
         resolvedKind,
       }
+
+      return normalizedRow
     })
     .filter((item) => item.name.length > 0 || item.quantity.length > 0 || item.averagePrice.length > 0)
 }
@@ -965,6 +972,53 @@ function formatSignedCurrencyValue(value: number | null, currency: 'KRW' | 'USD'
   }
 
   return `${value > 0 ? '+' : value < 0 ? '-' : ''}${formatNumber(Math.abs(value))}원`
+}
+
+function hasValidUsdKrwRate(value: number | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value) && value > 0
+}
+
+function convertHomeMoneyAmount(
+  value: number | null,
+  fromCurrency: AveragePriceCurrency | undefined,
+  toCurrency: AveragePriceCurrency,
+  usdKrwRate?: number,
+) {
+  if (value === null || !Number.isFinite(value) || !fromCurrency) {
+    return null
+  }
+
+  if (fromCurrency === toCurrency) {
+    return value
+  }
+
+  if (!hasValidUsdKrwRate(usdKrwRate)) {
+    return null
+  }
+
+  if (fromCurrency === 'KRW' && toCurrency === 'USD') {
+    return value / usdKrwRate
+  }
+
+  if (fromCurrency === 'USD' && toCurrency === 'KRW') {
+    return value * usdKrwRate
+  }
+
+  return null
+}
+
+function derivePnlFromProfitRate(evaluationAmount: number | null, profitRate: number | null) {
+  if (evaluationAmount === null || !Number.isFinite(evaluationAmount) || profitRate === null || !Number.isFinite(profitRate)) {
+    return null
+  }
+
+  const multiplier = 1 + profitRate / 100
+
+  if (multiplier <= 0) {
+    return null
+  }
+
+  return evaluationAmount - (evaluationAmount / multiplier)
 }
 
 function formatPercentValue(value: number | null) {
@@ -1265,7 +1319,7 @@ function formatAveragePriceFromPortfolioItem(item: PortfolioNormalizedItem) {
 
 function buildAppliedRowFromPortfolioItem(item: PortfolioNormalizedItem): AppliedHomePortfolioRow {
   const evaluationAmount = typeof item.evaluationAmount === 'number'
-    ? formatCurrencyValue(String(item.evaluationAmount), item.currentPriceCurrency ?? item.averagePriceCurrency ?? (item.marketTone === 'nasdaq' ? 'USD' : 'KRW'))
+    ? formatCurrencyValue(String(item.evaluationAmount), item.averagePriceCurrency ?? item.currentPriceCurrency ?? (item.marketTone === 'nasdaq' ? 'USD' : 'KRW'))
     : ''
 
   return {
@@ -1278,6 +1332,7 @@ function buildAppliedRowFromPortfolioItem(item: PortfolioNormalizedItem): Applie
     currentPrice: item.currentPrice,
     currentPriceCurrency: item.currentPriceCurrency,
     currentProfitRate: item.currentProfitRate,
+    usdKrwRate: item.usdKrwRate,
     code: item.code,
     ticker: item.ticker,
     resolvedName: item.name,
@@ -1331,6 +1386,7 @@ export function buildPortfolioItemsFromAppliedHomePortfolioRows(rows: AppliedHom
         currentPrice: row.currentPrice,
         currentPriceCurrency: row.currentPriceCurrency,
         currentProfitRate: row.currentProfitRate ?? parseOcrProfitRate(row.profitRate ?? '') ?? undefined,
+        ...(row.usdKrwRate ? { usdKrwRate: row.usdKrwRate } : {}),
         identifierLabel: buildIdentifierLabel(ticker, code),
       }
     })
@@ -1368,7 +1424,8 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
     const currentPriceText = typeof inferredCurrentPrice === 'number'
       ? formatCurrencyValue(String(inferredCurrentPrice), currentPriceCurrency)
       : undefined
-    const currentProfitRate = row.currentProfitRate ?? parseOcrProfitRate(row.profitRate ?? '') ?? null
+    const hasLiveProfitRate = typeof row.currentProfitRate === 'number' && Number.isFinite(row.currentProfitRate)
+    const currentProfitRate = hasLiveProfitRate ? row.currentProfitRate ?? null : parseOcrProfitRate(row.profitRate ?? '') ?? null
 
     return {
       row,
@@ -1380,7 +1437,9 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
       averagePrice: formatCurrencyValue(averagePriceRaw, displayCurrency),
       currentPriceText,
       currentPriceValue: inferredCurrentPrice,
+      currentPriceCurrency,
       currentProfitRate,
+      hasLiveProfitRate,
       evaluationAmountRawValue,
       baseAmountValue: computeHoldingBaseAmount(row.quantity, averagePriceRaw),
     }
@@ -1389,7 +1448,7 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
   const weights = preparedRows.map((item) => item.baseAmountValue ?? 1)
   const totalWeight = weights.reduce((sum, value) => sum + value, 0) || sanitizedRows.length
 
-  return preparedRows.map(({ row, kind, displayName, market, marketTone, averagePriceCurrency, averagePrice, currentPriceText, currentPriceValue, currentProfitRate, evaluationAmountRawValue, baseAmountValue }, index) => {
+  return preparedRows.map(({ row, kind, displayName, market, marketTone, averagePriceCurrency, averagePrice, currentPriceText, currentPriceValue, currentPriceCurrency, currentProfitRate, hasLiveProfitRate, evaluationAmountRawValue, baseAmountValue }, index) => {
     const tone = deriveHoldingTone(currentProfitRate)
     const shares = formatQuantityValue(row.quantity)
     const change = formatPercentValue(currentProfitRate)
@@ -1403,13 +1462,22 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
     const evaluationAmountValue = typeof currentPriceValue === 'number' && quantityValue !== null
       ? quantityValue * currentPriceValue
       : evaluationAmountRawValue
-    const evaluationAmount = evaluationAmountValue !== null && typeof evaluationAmountValue === 'number'
-      ? formatCurrencyValue(String(evaluationAmountValue), row.currentPriceCurrency ?? placeholderCurrency)
-      : undefined
-    const pnl = formatSignedCurrencyValue(
-      evaluationAmountValue !== null && baseAmountValue !== null ? evaluationAmountValue - baseAmountValue : null,
-      row.currentPriceCurrency ?? placeholderCurrency,
+    const displayAmountCurrency = currentPriceCurrency ?? placeholderCurrency
+    const convertedBaseAmountValue = convertHomeMoneyAmount(
+      baseAmountValue,
+      averagePriceCurrency ?? placeholderCurrency,
+      displayAmountCurrency,
+      row.usdKrwRate,
     )
+    const pnlValue = evaluationAmountValue !== null && convertedBaseAmountValue !== null
+      ? evaluationAmountValue - convertedBaseAmountValue
+      : hasLiveProfitRate
+        ? derivePnlFromProfitRate(evaluationAmountValue, currentProfitRate)
+        : null
+    const evaluationAmount = evaluationAmountValue !== null && typeof evaluationAmountValue === 'number'
+      ? formatCurrencyValue(String(evaluationAmountValue), displayAmountCurrency)
+      : undefined
+    const pnl = formatSignedCurrencyValue(pnlValue, displayAmountCurrency)
 
     return {
       id: index,

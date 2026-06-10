@@ -269,6 +269,59 @@ test('home holdings builder preserves portfolio-store live quote fields on remou
   ])
 })
 
+test('home holdings builder converts KRW cost basis before calculating US live quote pnl on remount', () => {
+  const [holding] = buildHomeHoldingsFromPortfolioItems([
+    {
+      name: 'Tesla, Inc.',
+      ticker: 'TSLA',
+      market: 'NASDAQ',
+      marketTone: 'nasdaq',
+      kind: 'stock',
+      quantity: 10,
+      averagePrice: 140000,
+      averagePriceCurrency: 'KRW',
+      currentPrice: 120,
+      currentPriceCurrency: 'USD',
+      currentProfitRate: 20,
+      usdKrwRate: 1400,
+      evaluationAmount: 1_400_000,
+      identifierLabel: 'TSLA',
+    },
+  ])
+
+  assert.equal(holding?.averagePrice, '140,000원')
+  assert.equal(holding?.evaluationAmount, '$1,200')
+  assert.equal(holding?.change, '+20.0%')
+  assert.equal(holding?.pnl, '+$200.00')
+  assert.equal(holding?.badge, '수익 중')
+  assert.match(holding?.metaLine ?? '', /현재가 \$120/)
+})
+
+test('home holdings builder derives US live quote pnl from current profit rate when FX is unavailable on remount', () => {
+  const [holding] = buildHomeHoldingsFromPortfolioItems([
+    {
+      name: 'KKR & Co. Inc.',
+      ticker: 'KKR',
+      market: 'NYSE',
+      marketTone: 'nasdaq',
+      kind: 'stock',
+      quantity: 2,
+      averagePrice: 131834.7717,
+      averagePriceCurrency: 'KRW',
+      currentPrice: 95.84,
+      currentPriceCurrency: 'USD',
+      currentProfitRate: 10.7,
+      evaluationAmount: 263669.5434,
+      identifierLabel: 'KKR',
+    },
+  ])
+
+  assert.equal(holding?.evaluationAmount, '$191.68')
+  assert.equal(holding?.change, '+10.7%')
+  assert.match(holding?.pnl ?? '', /^\+\$18\./)
+  assert.doesNotMatch(holding?.pnl ?? '', /263/)
+})
+
 test('applied home portfolio rows can rehydrate the in-memory portfolio store shape', () => {
   const restoredItems = buildPortfolioItemsFromAppliedHomePortfolioRows([
     {
