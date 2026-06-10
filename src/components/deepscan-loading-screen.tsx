@@ -247,6 +247,10 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 2 }).format(value)
 }
 
+function formatQuantityNumber(value: number) {
+  return new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 8 }).format(value)
+}
+
 function formatCompactNumber(value: number) {
   return new Intl.NumberFormat('ko-KR', {
     notation: 'compact',
@@ -412,7 +416,7 @@ function formatShares(value: string | number | undefined) {
   }
 
   const numericValue = parseNumericValue(value)
-  return numericValue === null ? null : `${formatNumber(numericValue)}주`
+  return numericValue === null ? null : `${formatQuantityNumber(numericValue)}주`
 }
 
 function formatTradingVolume(value: string | number | undefined) {

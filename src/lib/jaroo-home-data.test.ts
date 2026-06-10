@@ -3,6 +3,7 @@ import assert from 'node:assert/strict'
 
 import {
   APPLIED_HOME_PORTFOLIO_STORAGE_KEY,
+  DEEPSCAN_TARGET_STORAGE_KEY,
   buildHomeHoldingsFromOcrRows,
   buildHomeHoldingsFromPortfolioItems,
   buildHomeMarketScore,
@@ -267,6 +268,152 @@ test('home holdings builder preserves portfolio-store live quote fields on remou
     { label: '평가 금액', value: '852,000원', tone: 'neutral' },
     { label: '현재가', value: '85,200원', tone: 'neutral' },
   ])
+})
+
+test('home holdings builder preserves fractional US share quantities', () => {
+  const holdings = buildHomeHoldingsFromPortfolioItems([
+    {
+      name: 'Cloudflare, Inc.',
+      ticker: 'NET',
+      market: 'US',
+      marketTone: 'nasdaq',
+      kind: 'stock',
+      quantity: 0.5,
+      averagePrice: 281953.9823,
+      averagePriceCurrency: 'KRW',
+      currentPrice: 236.13,
+      currentPriceCurrency: 'USD',
+      currentProfitRate: 27.5,
+      evaluationAmount: 140976.99115,
+      identifierLabel: 'NET',
+    },
+    {
+      name: 'Arista Networks, Inc.',
+      ticker: 'ANET',
+      market: 'US',
+      marketTone: 'nasdaq',
+      kind: 'stock',
+      quantity: 0.320765,
+      averagePrice: 125281.1449,
+      averagePriceCurrency: 'KRW',
+      currentPrice: 152.16,
+      currentPriceCurrency: 'USD',
+      currentProfitRate: 55,
+      evaluationAmount: 40137,
+      identifierLabel: 'ANET',
+    },
+    {
+      name: 'BERKSHIRE HATHAWAY INC',
+      ticker: 'BRK-A',
+      market: 'US',
+      marketTone: 'nasdaq',
+      kind: 'stock',
+      quantity: 0.000005,
+      averagePrice: 993726937.2694,
+      averagePriceCurrency: 'KRW',
+      currentPrice: 729862,
+      currentPriceCurrency: 'USD',
+      currentProfitRate: 8.4,
+      evaluationAmount: 4968.6347,
+      identifierLabel: 'BRK-A',
+    },
+  ])
+
+  assert.equal(holdings[0]?.shares, '0.5주')
+  assert.equal(holdings[1]?.shares, '0.320765주')
+  assert.equal(holdings[2]?.shares, '0.000005주')
+})
+
+test('persistDeepScanTarget keeps fractional share quantities for reload handoff', () => {
+  const restoreWindow = installWindowMock()
+
+  try {
+    const [holding] = buildHomeHoldingsFromPortfolioItems([
+      {
+        name: 'Cloudflare, Inc.',
+        ticker: 'NET',
+        market: 'US',
+        marketTone: 'nasdaq',
+        kind: 'stock',
+        quantity: 0.5,
+        averagePrice: 281953.9823,
+        averagePriceCurrency: 'KRW',
+        currentPrice: 236.13,
+        currentPriceCurrency: 'USD',
+        currentProfitRate: 27.5,
+        evaluationAmount: 140976.99115,
+        identifierLabel: 'NET',
+      },
+    ])
+
+    assert.ok(holding)
+    assert.equal(persistDeepScanTarget(holding), true)
+
+    const session = resolveDeepScanTargetSession()
+
+    assert.equal(session.holding.shares, '0.5주')
+    assert.equal(session.viewModel.holding.shares, '0.5주')
+  } finally {
+    restoreWindow()
+  }
+})
+
+test('resolveDeepScanTargetSession repairs stale rounded target shares from applied portfolio', () => {
+  const restoreWindow = installWindowMock()
+
+  try {
+    const [staleHolding] = buildHomeHoldingsFromPortfolioItems([
+      {
+        name: 'Cloudflare, Inc.',
+        ticker: 'NET',
+        market: 'US',
+        marketTone: 'nasdaq',
+        kind: 'stock',
+        quantity: 1,
+        averagePrice: 281953.9823,
+        averagePriceCurrency: 'KRW',
+        currentPrice: 236.13,
+        currentPriceCurrency: 'USD',
+        currentProfitRate: 27.5,
+        evaluationAmount: 140976.99115,
+        identifierLabel: 'NET',
+      },
+    ])
+
+    const staleSession = {
+      holding: staleHolding,
+      viewModel: { holding: staleHolding },
+      selectedAt: '2026-06-10T00:00:00.000Z',
+    }
+    window.sessionStorage.setItem(DEEPSCAN_TARGET_STORAGE_KEY, JSON.stringify(staleSession))
+    window.sessionStorage.setItem(APPLIED_HOME_PORTFOLIO_STORAGE_KEY, JSON.stringify({
+      broker: 'OCR 적용 포트폴리오',
+      rows: [
+        {
+          name: 'Cloudflare, Inc.',
+          quantity: '0.5주',
+          profitRate: '+18,367 (13.0%)',
+          evaluationAmount: '159,304원',
+          averagePrice: '281,953.9823',
+          averagePriceCurrency: 'KRW',
+          ticker: 'NET',
+          resolvedName: 'Cloudflare, Inc.',
+          resolvedTicker: 'NET',
+          resolvedMarket: 'US',
+          resolvedMarketTone: 'nasdaq',
+          resolvedKind: 'stock',
+        },
+      ],
+    }))
+
+    const session = resolveDeepScanTargetSession()
+
+    assert.equal(session.holding.shares, '0.5주')
+    assert.equal(session.holding.metrics.find((metric) => metric.label === '보유 수량')?.value, '0.5주')
+    assert.equal(session.selectedAt, '2026-06-10T00:00:00.000Z')
+  } finally {
+    restoreWindow()
+  }
 })
 
 test('home holdings builder converts KRW cost basis before calculating US live quote pnl on remount', () => {
