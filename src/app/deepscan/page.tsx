@@ -36,6 +36,7 @@ import {
   getDeepScanBlockNotice,
   resolveDeepScanPageCacheState,
 } from '@/lib/deepscan-page-projection'
+import { resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
 import { readDeepScanTargetSession, resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
@@ -1990,7 +1991,13 @@ export default function DeepScanPage() {
     }
   })()
   const loadingTradingVolume = activeLoadingBriefingSnapshot?.quote?.volume ?? activeLoadingQuickQuote?.tradingVolume ?? buildLoadingTradingVolume(payload)
-  const loadingCurrentPrice = activeLoadingBriefingSnapshot?.quote?.currentPrice ?? target?.currentPrice ?? activeLoadingQuickQuote?.currentPrice
+  const loadingPayloadCurrentPrice = parseOcrNumber(payload?.strategy.currentPriceText ?? '')
+  const loadingCurrentPrice = resolveDeepScanLoadingCurrentPrice({
+    payloadCurrentPrice: loadingPayloadCurrentPrice,
+    quickQuoteCurrentPrice: activeLoadingQuickQuote?.currentPrice,
+    targetCurrentPrice: target?.currentPrice,
+    briefingCurrentPrice: activeLoadingBriefingSnapshot?.quote?.currentPrice,
+  })
   const loadingCurrentPriceCurrency = target?.currentPriceCurrency
     ?? normalizeQuoteCurrency(activeLoadingBriefingSnapshot?.quote?.currency ?? undefined)
     ?? activeLoadingQuickQuote?.currentPriceCurrency
