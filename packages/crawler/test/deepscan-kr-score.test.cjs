@@ -140,6 +140,43 @@ test('scoreDeepScanKrEvidence no longer awards hidden package-presence-only nume
   assert.deepEqual(withPackage.hero, withoutPackage.hero);
 });
 
+test('scoreDeepScanKrEvidence folds high-risk OpenDART disclosures into committee and hero penalties', async () => {
+  const { scoreDeepScanKrEvidence } = await import('../src/services/deepscan-kr-score.js');
+
+  const base = createStrongEvidencePacket();
+  const noDisclosure = scoreDeepScanKrEvidence(base);
+  const clean = scoreDeepScanKrEvidence({
+    ...base,
+    disclosureAnalysis: {
+      available: true,
+      totalCount: 3,
+      count: 3,
+      riskCount: 0,
+      correctionCount: 0,
+      dilutionCount: 0,
+      ownershipCount: 2,
+    },
+  });
+  const risky = scoreDeepScanKrEvidence({
+    ...base,
+    disclosureAnalysis: {
+      available: true,
+      totalCount: 4,
+      count: 4,
+      riskCount: 1,
+      correctionCount: 0,
+      dilutionCount: 0,
+      ownershipCount: 2,
+    },
+  });
+
+  assert.equal(clean.hero.penalties.includes('disclosure-risk'), false);
+  assert.equal(risky.hero.penalties.includes('disclosure-risk'), true);
+  assert.ok(clean.committee.businessQuality.ownershipStability > noDisclosure.committee.businessQuality.ownershipStability);
+  assert.ok(risky.committee.businessQuality.ownershipStability < clean.committee.businessQuality.ownershipStability);
+  assert.ok(risky.hero.score < clean.hero.score);
+});
+
 test('scoreDeepScanKrEvidence applies missing-data penalties and blocks sell-now/simulation without quote and coverage', async () => {
   const { scoreDeepScanKrEvidence } = await import('../src/services/deepscan-kr-score.js');
 

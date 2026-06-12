@@ -32,14 +32,14 @@ export const KR_MEMBER_SPECS = Object.freeze({
     shortLabel: '지배',
     title: '지분/안정성',
     role: 'KR ownership stability analyst',
-    focus: 'Judge ownership stability and reporting resilience from shareholding, style analysis, holding context, and company overview evidence.',
+    focus: 'Judge ownership stability and reporting resilience from shareholding, OpenDART disclosures, style analysis, holding context, and company overview evidence.',
   },
   trend: {
     axis: '시장 타이밍',
     shortLabel: '트렌드',
     title: '트렌드',
     role: 'KR trend analyst',
-    focus: 'Judge Korean equity trend quality from relative return, style analysis, report freshness, and current-price evidence.',
+    focus: 'Judge Korean equity trend quality from relative return, style analysis, report/disclosure freshness, and current-price evidence.',
   },
   consensusMomentum: {
     axis: '시장 타이밍',
@@ -67,7 +67,7 @@ export const KR_MEMBER_SPECS = Object.freeze({
     shortLabel: '여지',
     title: '상방 버퍼',
     role: 'KR upside buffer analyst',
-    focus: 'Judge remaining upside/downside buffer from consensus, opinion, recent reports, and current price evidence.',
+    focus: 'Judge remaining upside/downside buffer from consensus, opinion, recent reports, OpenDART disclosure risk, and current price evidence.',
   },
   holdingCompleteness: {
     axis: '포지션 적합도',
@@ -267,7 +267,7 @@ function buildKrFactBank(evidence) {
   return {
     schemaVersion: 'jaroo.deepscan.kr-fact-bank.v2',
     locale: 'KR',
-    sourceFlavor: 'wisereport-fnguide-krx',
+    sourceFlavor: 'wisereport-fnguide-krx-opendart',
     instrument: snapshotValue(evidence.instrument ?? {}, ['instrument']),
     quote: evidence.currentQuote
       ? snapshotValue(evidence.currentQuote, ['current_quote'])
@@ -305,6 +305,9 @@ function buildKrFactBank(evidence) {
       targetGapPct: evidence.consensusSnapshot?.targetGapPct ?? null,
     }, ['kr_valuation']),
     ownership: snapshotValue(evidence.ownershipSnapshot ?? {}, ['kr_ownership']),
+    disclosures: evidence.disclosureAnalysis
+      ? snapshotValue(evidence.disclosureAnalysis, ['opendart_disclosures'])
+      : missingFact('OpenDART 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
     styleFactors: snapshotValue(evidence.styleAnalysisSnapshot ?? {}, ['kr_style_factors']),
     reports: snapshotValue({
       recentReportCount: evidence.reportSignals?.recentReportCount ?? null,
@@ -345,7 +348,8 @@ function buildMemberKrFacts(memberKey, evidence) {
   const base = {
     schemaVersion: 'jaroo.deepscan.kr-member-slice.v2',
     locale: 'KR',
-    sourceFlavor: 'wisereport-fnguide-krx',
+    sourceFlavor: 'wisereport-fnguide-krx-opendart',
+    ...(evidence.disclosureAnalysis ? { disclosureAnalysis: evidence.disclosureAnalysis } : {}),
     ...(etfProductSnapshot ? { etfProductSnapshot } : {}),
   };
 
@@ -376,6 +380,7 @@ function buildMemberKrFacts(memberKey, evidence) {
       return {
         ...base,
         ownership: ownershipSnapshotForLlm,
+        disclosures: evidence.disclosureAnalysis ?? null,
         styleFactors: evidence.styleAnalysisSnapshot ?? {},
         pageCoverage: evidence.pageCoverage ?? {},
       };
@@ -385,6 +390,7 @@ function buildMemberKrFacts(memberKey, evidence) {
         market: evidence.marketSnapshot ?? {},
         relativeReturn: evidence.relativeReturnSnapshot ?? {},
         styleFactors: evidence.styleAnalysisSnapshot ?? {},
+        disclosures: evidence.disclosureAnalysis ?? null,
         reports: evidence.reportSignals ?? {},
         businessCommentary: evidence.businessCommentary ?? {},
       };
@@ -418,6 +424,7 @@ function buildMemberKrFacts(memberKey, evidence) {
         consensus: evidence.consensusSnapshot ?? {},
         valuation: evidence.valuationSnapshot ?? {},
         reports: evidence.reportSignals ?? {},
+        disclosures: evidence.disclosureAnalysis ?? null,
         businessCommentary: evidence.businessCommentary ?? {},
       };
     case 'holdingCompleteness':
@@ -437,7 +444,7 @@ function buildSharedDump(input, evidence, sources) {
   return {
     schemaVersion: 'jaroo.deepscan.runtime.shared.v2',
     locale: 'KR',
-    sourceFlavor: 'wisereport-fnguide-krx',
+    sourceFlavor: 'wisereport-fnguide-krx-opendart',
     instrument: {
       code: presentValue(input.instrument.code ?? null, ['instrument_code']),
       name: presentValue(input.instrument.name ?? null, ['instrument_name']),
@@ -460,6 +467,9 @@ function buildSharedDump(input, evidence, sources) {
     ownershipSnapshot: presentValue(sanitizeOwnershipSnapshotForLlm(evidence.ownershipSnapshot), ['ownership_snapshot']),
     financialSnapshot: presentValue(evidence.financialSnapshot ?? {}, ['financial_snapshot']),
     businessCommentary: presentValue(evidence.businessCommentary ?? {}, ['business_commentary']),
+    disclosureAnalysis: evidence.disclosureAnalysis
+      ? presentValue(evidence.disclosureAnalysis, ['opendart_disclosures'])
+      : missingFact('OpenDART 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
     etfProductSnapshot: evidence.etfProductSnapshot
       ? presentValue(evidence.etfProductSnapshot, ['wisereport_etf_snapshot'])
       : missingFact('ETF 상품/구성종목 스냅샷이 없습니다.', ['etf_product_snapshot_missing']),
@@ -647,7 +657,7 @@ function systemPrompt(memberKey) {
   return [
     `You are Jaroo KR DeepScan committee member: ${spec.role}.`,
     spec.focus,
-    'Use only the provided sharedContext/memberContext JSON generated from KR WiseReport/FnGuide/KRX evidence and dump inputs.',
+    'Use only the provided sharedContext/memberContext JSON generated from KR WiseReport/FnGuide/KRX/OpenDART evidence and dump inputs.',
     'Prefer memberContext.facts.krFacts when present; it is the source-specific normalized KR slice and should override generic global-shaped assumptions.',
     'Treat package-derived context as supplemental only, never as silent numeric truth.',
     'Treat absent fields as out-of-scope rather than negative evidence; do not request, infer, or mention data that is not present in sharedContext/memberContext.',

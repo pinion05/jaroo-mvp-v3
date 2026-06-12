@@ -116,9 +116,12 @@ export const KR_PORTFOLIO_DELTA_BY_DECISION = Object.freeze({
   'exit-now': 12,
 });
 
-function getHeroPenalties(currentPrice, reportSignals) {
+function getHeroPenalties(currentPrice, reportSignals, disclosureAnalysis = {}) {
   const penalties = [];
   let penaltyPoints = 0;
+  const disclosureRiskCount = Math.max(0, asFiniteNumber(disclosureAnalysis.riskCount) ?? 0);
+  const disclosureCorrectionCount = Math.max(0, asFiniteNumber(disclosureAnalysis.correctionCount) ?? 0);
+  const disclosureDilutionCount = Math.max(0, asFiniteNumber(disclosureAnalysis.dilutionCount) ?? 0);
 
   if (currentPrice === null) {
     penalties.push('missing-current-quote');
@@ -133,6 +136,17 @@ function getHeroPenalties(currentPrice, reportSignals) {
   if (reportSignals.recentReportsAvailable !== true) {
     penalties.push('missing-recent-reports');
     penaltyPoints += 4;
+  }
+
+  if (disclosureRiskCount > 0) {
+    penalties.push('disclosure-risk');
+    penaltyPoints += Math.min(20, disclosureRiskCount * 10);
+  } else if (disclosureDilutionCount > 0) {
+    penalties.push('disclosure-capital-change');
+    penaltyPoints += Math.min(12, disclosureDilutionCount * 4);
+  } else if (disclosureCorrectionCount > 0) {
+    penalties.push('disclosure-correction');
+    penaltyPoints += Math.min(6, disclosureCorrectionCount * 2);
   }
 
   return {
@@ -273,6 +287,7 @@ export function buildKrCommitteeFromMemberScores(memberScores = {}) {
 export function scoreDeepScanKrFromCommittee(evidence = {}, committee) {
   const safeEvidence = asObject(evidence);
   const reportSignals = asObject(safeEvidence.reportSignals);
+  const disclosureAnalysis = asObject(safeEvidence.disclosureAnalysis);
   const holding = asObject(safeEvidence.holding);
   const currentQuote = asObject(safeEvidence.currentQuote);
   const currentPrice = asFiniteNumber(currentQuote.price);
@@ -289,7 +304,7 @@ export function scoreDeepScanKrFromCommittee(evidence = {}, committee) {
       + marketTimingScore * KR_HERO_WEIGHTS.marketTiming
       + positionFitScore * KR_HERO_WEIGHTS.positionFit,
   ));
-  const { penalties, penaltyPoints } = getHeroPenalties(currentPrice, reportSignals);
+  const { penalties, penaltyPoints } = getHeroPenalties(currentPrice, reportSignals, disclosureAnalysis);
   const heroScore = clamp(baseHeroScore - penaltyPoints);
   const { sellNow, portfolioSimulation } = buildSellNowAndSimulation({
     heroScore,
@@ -319,6 +334,7 @@ export function scoreDeepScanKrEvidence(evidence = {}) {
   const pageCoverage = asObject(safeEvidence.pageCoverage);
   const sourceCoverage = asObject(safeEvidence.sourceCoverage);
   const reportSignals = asObject(safeEvidence.reportSignals);
+  const disclosureAnalysis = asObject(safeEvidence.disclosureAnalysis);
   const holding = asObject(safeEvidence.holding);
   const currentQuote = asObject(safeEvidence.currentQuote);
   const availablePageIds = Array.isArray(pageCoverage.availablePageIds) ? pageCoverage.availablePageIds : [];
@@ -327,6 +343,13 @@ export function scoreDeepScanKrEvidence(evidence = {}) {
   const shares = asFiniteNumber(holding.shares);
   const recentReportCount = Math.max(0, asFiniteNumber(reportSignals.recentReportCount) ?? 0);
   const gapPct = getGapPct(currentPrice, averagePrice);
+  const hasDisclosureAnalysis = disclosureAnalysis.available === true;
+  const disclosureRiskCount = Math.max(0, asFiniteNumber(disclosureAnalysis.riskCount) ?? 0);
+  const disclosureDilutionCount = Math.max(0, asFiniteNumber(disclosureAnalysis.dilutionCount) ?? 0);
+  const disclosureCorrectionCount = Math.max(0, asFiniteNumber(disclosureAnalysis.correctionCount) ?? 0);
+  const disclosureRiskPenalty = Math.min(20, disclosureRiskCount * 10)
+    + Math.min(10, disclosureDilutionCount * 3)
+    + Math.min(6, disclosureCorrectionCount * 2);
 
   const profitability = clamp(
     20
@@ -352,7 +375,9 @@ export function scoreDeepScanKrEvidence(evidence = {}) {
       + scoreFlag(reportSignals.styleAnalysisAvailable === true, 15)
       + scoreFlag(reportSignals.opinionAvailable === true, 10)
       + scoreFlag(sourceCoverage.hasHolding === true || holding.hasHoldingContext === true, 10)
-      + scoreFlag(hasPage(availablePageIds, 'company-overview'), 5),
+      + scoreFlag(hasPage(availablePageIds, 'company-overview'), 5)
+      + scoreFlag(hasDisclosureAnalysis, 5)
+      - disclosureRiskPenalty,
   );
 
   const businessQualityScore = clamp(round(
@@ -364,7 +389,9 @@ export function scoreDeepScanKrEvidence(evidence = {}) {
       + scoreFlag(reportSignals.relativeReturnAvailable === true, 30)
       + scoreFlag(reportSignals.styleAnalysisAvailable === true, 20)
       + scoreFlag(reportSignals.recentReportsAvailable === true, 10)
-      + scoreFlag(currentPrice !== null, 10),
+      + scoreFlag(currentPrice !== null, 10)
+      + scoreFlag(hasDisclosureAnalysis, 5)
+      - Math.min(15, disclosureRiskPenalty),
   );
 
   const consensusMomentum = clamp(
@@ -407,7 +434,9 @@ export function scoreDeepScanKrEvidence(evidence = {}) {
       + scoreFlag(reportSignals.recentReportsAvailable === true, 10)
       + scoreFlag(reportSignals.styleAnalysisAvailable === true, 10)
       + scoreFlag(currentPrice !== null, 5)
-      - upsidePenalty,
+      + scoreFlag(hasDisclosureAnalysis && disclosureRiskPenalty === 0, 5)
+      - upsidePenalty
+      - disclosureRiskPenalty,
   );
 
   const positionFitScore = clamp(round(

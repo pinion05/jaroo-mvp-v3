@@ -318,6 +318,85 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
   }
 });
 
+test('buildJarooDeepScanPayload adds OpenDART disclosure analysis to KR DeepScan insights and source refs', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+
+  const sources = createStrongKrSources();
+  sources.disclosures = {
+    source: 'opendart',
+    requested: { from: '2026-05-12', to: '2026-06-12' },
+    summary: { totalCount: 3, latestReceiptDate: '20260608' },
+    filings: [
+      {
+        rceptNo: '20260608800918',
+        reportName: '최대주주등소유주식변동신고서',
+        receiptDate: '20260608',
+        disclosureType: 'D',
+        disclosureTypeLabel: '지분공시',
+        filerName: '삼성전자',
+      },
+      {
+        rceptNo: '20260601000001',
+        reportName: '임원ㆍ주요주주특정증권등소유상황보고서',
+        receiptDate: '20260601',
+        disclosureType: 'D',
+        disclosureTypeLabel: '지분공시',
+        filerName: '하지훈',
+      },
+      {
+        rceptNo: '20260515000001',
+        reportName: '분기보고서 (2026.03)',
+        receiptDate: '20260515',
+        disclosureType: 'A',
+        disclosureTypeLabel: '정기공시',
+        filerName: '삼성전자',
+      },
+    ],
+  };
+
+  const payload = await buildJarooDeepScanPayload({
+    instrument: {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KR',
+    },
+    holding: {
+      shares: '12',
+      averagePrice: '71000',
+      evaluationAmount: '1022400',
+    },
+    selectedAt: '2026-06-12T00:00:00.000Z',
+    sourceContext: {
+      from: 'holding',
+      sessionKey: 'session-1',
+      appliedAt: '2026-06-12T00:00:00.000Z',
+    },
+    sources,
+  });
+
+  assertCanonicalPayloadShape(payload);
+  assert.equal(payload.metadata.degraded, false);
+  assert.match(payload.hero.body, /OpenDART 공시 3건/);
+  assert.equal(payload.metadata.sourceRefs.some((ref) => ref.id === 'opendart-disclosures:005930'), true);
+  assert.equal(payload.insights.summaryTags.includes('공시 3건'), true);
+  assert.deepEqual(
+    payload.insights.items.find((item) => item.sourceLabel === '공시 분석'),
+    {
+      sourceType: 'report',
+      sourceLabel: '공시 분석',
+      date: '2026-06-08',
+      label: '공시',
+      title: '삼성전자 최근 OpenDART 공시 흐름',
+      body: '2026-05-12~2026-06-12 공시 3건 · 최대주주등소유주식변동신고서 1건 · 지분/주요주주 2건 · 정기보고서 1건 · 주요 리스크 공시 없음',
+      sourceBody: [
+        '2026-06-08 · 최대주주등소유주식변동신고서 · 제출:삼성전자 · 지분 변동',
+        '2026-06-01 · 임원ㆍ주요주주특정증권등소유상황보고서 · 제출:하지훈 · 지분 변동',
+        '2026-05-15 · 분기보고서 (2026.03) · 제출:삼성전자 · 일반',
+      ].join('\n'),
+    },
+  );
+});
+
 test('buildJarooDeepScanPayload omits risk-recheck scenario when KR coverage and core inputs are complete', async () => {
   const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
 

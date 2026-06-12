@@ -22,7 +22,7 @@ test('deepscan-canonical endpoint definition is registered', async () => {
   assert.ok(definition);
   assert.equal(definition.primaryPath, '/api/source/wisereport-fnguide-krx-polygon-fmp-deepscan-package/deepscan/canonical');
   assert.equal('aliases' in definition, false);
-  assert.deepEqual(definition.dataSources, ['wisereport', 'fnguide', 'krx-js-client', 'polygon', 'fmp', 'deepscan-kr-package']);
+  assert.deepEqual(definition.dataSources, ['wisereport', 'fnguide', 'krx-js-client', 'polygon', 'fmp', 'opendart', 'deepscan-kr-package']);
   assert.deepEqual(definition.query, [
     'market(optional)',
     'kind(optional)',
@@ -34,6 +34,9 @@ test('deepscan-canonical endpoint definition is registered', async () => {
     'evaluationAmount(optional)',
     'selectedAt(optional)',
     'from(optional)',
+    'disclosureFrom(optional)',
+    'disclosureTo(optional)',
+    'disclosureLimit(optional)',
   ]);
 });
 

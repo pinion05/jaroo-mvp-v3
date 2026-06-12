@@ -1,5 +1,6 @@
 import { createRequire } from 'node:module';
 import { getCurrentQuotes } from '../crawlers/current-quotes.js';
+import { getDartDisclosures } from '../crawlers/dart-filings.js';
 import { fetchWiseReportEtfSnapshot } from '../crawlers/wisereport-etf.js';
 import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
 import { scoreDeepScanKrEvidence, scoreDeepScanKrFromCommittee } from './deepscan-kr-score.js';
@@ -43,6 +44,9 @@ const DEFAULT_COMMENTARY_SUMMARY_TIMEOUT_MS = 2_500;
 const DEFAULT_DEEPSCAN_KR_LLM_MODEL = 'deepseek/deepseek-v4-flash';
 const DEFAULT_DEEPSCAN_KR_CURRENT_QUOTES_TIMEOUT_MS = 4_500;
 const DEFAULT_DEEPSCAN_KR_ETF_SNAPSHOT_TIMEOUT_MS = 4_500;
+const DEFAULT_DEEPSCAN_KR_DISCLOSURE_TIMEOUT_MS = 4_500;
+const DEFAULT_DEEPSCAN_KR_DISCLOSURE_LOOKBACK_DAYS = 30;
+const DEFAULT_DEEPSCAN_KR_DISCLOSURE_LIMIT = 30;
 
 function normalizeText(value) {
   if (typeof value !== 'string') {
@@ -508,6 +512,50 @@ function normalizeTradeDate(value) {
   return undefined;
 }
 
+function compactDateToDashed(value) {
+  const normalized = normalizeText(value)?.replaceAll('-', '');
+  if (!normalized || !/^\d{8}$/.test(normalized)) {
+    return undefined;
+  }
+
+  return `${normalized.slice(0, 4)}-${normalized.slice(4, 6)}-${normalized.slice(6, 8)}`;
+}
+
+function shiftIsoDate(value, days) {
+  const normalized = normalizeTradeDate(value) ?? compactDateToDashed(value);
+  if (!normalized) {
+    return undefined;
+  }
+
+  const date = new Date(`${normalized}T00:00:00.000Z`);
+  if (Number.isNaN(date.getTime())) {
+    return undefined;
+  }
+
+  date.setUTCDate(date.getUTCDate() + days);
+  return date.toISOString().slice(0, 10);
+}
+
+function todayKstIsoDate(now = new Date()) {
+  return new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Seoul',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
+}
+
+function hasConfiguredDartApiKey(options = {}) {
+  return Boolean(
+    normalizeText(options.apiKey)
+    || normalizeText(process.env.DART_KEY)
+    || normalizeText(process.env.DART_API_KEY)
+    || normalizeText(process.env.OPENDART_API_KEY)
+    || normalizeText(process.env.OPEN_DART_API_KEY)
+    || normalizeText(process.env.API_K_DART)
+  );
+}
+
 function normalizeWiseReportKrAggregate(rawAggregate) {
   if (rawAggregate && typeof rawAggregate === 'object' && rawAggregate.pages && typeof rawAggregate.pages === 'object') {
     return rawAggregate;
@@ -820,6 +868,102 @@ async function maybeResolveKrPackageResult(rawInput, input) {
   }
 }
 
+function shouldInvokeKrDisclosures(rawInput, input) {
+  if (!isKrInput(input) || isKrExchangeProductInput(input) || !input.instrument.code) {
+    return false;
+  }
+
+  const safeRawInput = asObject(rawInput);
+  const disclosureOptions = asObject(safeRawInput.disclosureOptions ?? safeRawInput.dartOptions ?? safeRawInput.opendartOptions);
+  const explicitToggle = normalizeText(process.env.DEEPSCAN_KR_DISCLOSURES_ENABLE)?.toLowerCase();
+  const explicitEnable = safeRawInput.invokeDisclosures === true
+    || disclosureOptions.invoke === true
+    || ['1', 'true', 'on', 'yes'].includes(explicitToggle ?? '');
+  const explicitDisable = safeRawInput.invokeDisclosures === false
+    || disclosureOptions.invoke === false
+    || ['0', 'false', 'off', 'no'].includes(explicitToggle ?? '');
+
+  if (explicitDisable) {
+    return false;
+  }
+
+  return explicitEnable || hasConfiguredDartApiKey(disclosureOptions);
+}
+
+function buildKrDisclosureRequest(rawInput, input) {
+  const safeRawInput = asObject(rawInput);
+  const disclosureOptions = asObject(safeRawInput.disclosureOptions ?? safeRawInput.dartOptions ?? safeRawInput.opendartOptions);
+  const lookbackDays = parsePositiveInteger(
+    disclosureOptions.lookbackDays ?? process.env.DEEPSCAN_KR_DISCLOSURE_LOOKBACK_DAYS,
+    DEFAULT_DEEPSCAN_KR_DISCLOSURE_LOOKBACK_DAYS,
+  );
+  const endDate = normalizeTradeDate(disclosureOptions.to ?? disclosureOptions.endDate)
+    ?? normalizeTradeDate(input.sourceContext.appliedAt)
+    ?? normalizeTradeDate(input.selectedAt)
+    ?? todayKstIsoDate();
+  const fromDate = normalizeTradeDate(disclosureOptions.from ?? disclosureOptions.startDate)
+    ?? (endDate ? shiftIsoDate(endDate, -lookbackDays) : undefined);
+
+  return {
+    code: input.instrument.code,
+    ...(fromDate ? { from: fromDate } : {}),
+    ...(endDate ? { to: endDate } : {}),
+    finalOnly: disclosureOptions.finalOnly ?? disclosureOptions.lastReprtAt ?? 'N',
+    pageCount: parsePositiveInteger(
+      disclosureOptions.pageCount ?? disclosureOptions.limit ?? process.env.DEEPSCAN_KR_DISCLOSURE_LIMIT,
+      DEFAULT_DEEPSCAN_KR_DISCLOSURE_LIMIT,
+    ),
+    sort: disclosureOptions.sort ?? 'date',
+    sortMth: disclosureOptions.sortMth ?? disclosureOptions.sort_mth ?? 'desc',
+  };
+}
+
+async function maybeResolveKrDisclosures(rawInput, input) {
+  if (!shouldInvokeKrDisclosures(rawInput, input)) {
+    return {
+      value: null,
+      issue: null,
+    };
+  }
+
+  const safeRawInput = asObject(rawInput);
+  const disclosureOptions = asObject(safeRawInput.disclosureOptions ?? safeRawInput.dartOptions ?? safeRawInput.opendartOptions);
+
+  try {
+    const result = await getDartDisclosures(
+      buildKrDisclosureRequest(rawInput, input),
+      {
+        timeoutMs: parsePositiveInteger(
+          disclosureOptions.timeoutMs ?? process.env.DEEPSCAN_KR_DISCLOSURE_TIMEOUT_MS,
+          DEFAULT_DEEPSCAN_KR_DISCLOSURE_TIMEOUT_MS,
+        ),
+        ...(disclosureOptions.apiKey ? { apiKey: disclosureOptions.apiKey } : {}),
+        ...(disclosureOptions.fetchImpl ? { fetchImpl: disclosureOptions.fetchImpl } : {}),
+      },
+    );
+
+    return {
+      value: result,
+      issue: null,
+    };
+  } catch (error) {
+    if (error?.code === 'provider_unconfigured') {
+      return {
+        value: null,
+        issue: null,
+      };
+    }
+
+    return {
+      value: null,
+      issue: {
+        sourceId: 'disclosures',
+        message: normalizeText(error?.message) ?? 'OpenDART disclosures unavailable',
+      },
+    };
+  }
+}
+
 function shouldInvokeKrCommitteeLlm() {
   const explicitToggle = normalizeText(process.env.DEEPSCAN_KR_LLM_ENABLE)?.toLowerCase();
   if (['0', 'false', 'off', 'no'].includes(explicitToggle ?? '')) {
@@ -853,7 +997,7 @@ async function resolveKrSourceBundle(rawInput, input) {
   const tradeDate = normalizeTradeDate(input.selectedAt ?? input.sourceContext.appliedAt);
   const cacheClient = getCrawlerCacheClientFromRawInput(rawInput);
   const cacheOptions = getCrawlerCacheOptions(rawInput);
-  const [slimResult, quotesResult, packageResult, etfSnapshotResult] = await Promise.all([
+  const [slimResult, quotesResult, packageResult, etfSnapshotResult, disclosuresResult] = await Promise.all([
     captureSource('slim', async () => loadWiseReportKrSlimSource(input, {
       cacheClient,
       ...cacheOptions,
@@ -881,6 +1025,7 @@ async function resolveKrSourceBundle(rawInput, input) {
           ),
         })
       : null)),
+    maybeResolveKrDisclosures(rawInput, input),
   ]);
 
   return {
@@ -889,8 +1034,15 @@ async function resolveKrSourceBundle(rawInput, input) {
       ...(quotesResult.value ? { quotes: quotesResult.value } : {}),
       ...(packageResult.value ? { packageResult: packageResult.value } : {}),
       ...(etfSnapshotResult.value ? { etfSnapshot: etfSnapshotResult.value } : {}),
+      ...(disclosuresResult.value ? { disclosures: disclosuresResult.value } : {}),
     },
-    sourceIssues: [slimResult.issue, quotesResult.issue, packageResult.issue, etfSnapshotResult.issue].filter(Boolean),
+    sourceIssues: [
+      slimResult.issue,
+      quotesResult.issue,
+      packageResult.issue,
+      etfSnapshotResult.issue,
+      disclosuresResult.issue,
+    ].filter(Boolean),
   };
 }
 
@@ -1284,9 +1436,15 @@ function createCommitteeAxes(evidence, scored, packageResult) {
     return createEtfCommitteeAxes(evidence, scored);
   }
 
+  const disclosureText = evidence.disclosureAnalysis?.available
+    ? `, 최근 공시 ${formatNumber(evidence.disclosureAnalysis.totalCount ?? evidence.disclosureAnalysis.count ?? 0)}건`
+    : '';
+  const disclosureRiskText = evidence.disclosureAnalysis?.available && evidence.disclosureAnalysis.riskCount > 0
+    ? `, 주의 공시 ${formatNumber(evidence.disclosureAnalysis.riskCount)}건`
+    : '';
   const businessQualityReason = evidence.sourceCoverage.hasPackageResult
-    ? `회사개요·재무·리포트 근거를 합산했습니다. 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건, package-result 확보 기준입니다.`
-    : `회사개요·재무·리포트 근거를 합산했습니다. 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건 기준입니다.`;
+    ? `회사개요·재무·리포트·공시 근거를 합산했습니다. 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건${disclosureText}, package-result 확보 기준입니다.`
+    : `회사개요·재무·리포트·공시 근거를 합산했습니다. 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건${disclosureText} 기준입니다.`;
   const businessQualityReasonOverrides = createKrBusinessQualityReasonOverrides(packageResult);
   let businessQualityReasonIndex = 0;
   const nextBusinessQualityReason = (fallbackReason) => businessQualityReasonOverrides[businessQualityReasonIndex++] ?? fallbackReason;
@@ -1318,7 +1476,7 @@ function createCommitteeAxes(evidence, scored, packageResult) {
           '지배',
           '지분/안정성',
           scored.committee.businessQuality.ownershipStability,
-          nextBusinessQualityReason(`보유 맥락 ${evidence.holding.hasHoldingContext ? '확인' : '없음'}, 스타일/지분 페이지 ${evidence.reportSignals.styleAnalysisAvailable || evidence.pageCoverage.availablePageIds.includes('shareholding') ? '일부 확보' : '부족'} 상태입니다.`),
+          nextBusinessQualityReason(`보유 맥락 ${evidence.holding.hasHoldingContext ? '확인' : '없음'}, 스타일/지분 페이지 ${evidence.reportSignals.styleAnalysisAvailable || evidence.pageCoverage.availablePageIds.includes('shareholding') ? '일부 확보' : '부족'}${disclosureText}${disclosureRiskText} 상태입니다.`),
           'ownershipStability',
         ),
       ],
@@ -1335,7 +1493,7 @@ function createCommitteeAxes(evidence, scored, packageResult) {
           '트렌드',
           '트렌드',
           scored.committee.marketTiming.trend,
-          `상대수익률 ${evidence.reportSignals.relativeReturnAvailable ? '확보' : '없음'}, 스타일 분석 ${evidence.reportSignals.styleAnalysisAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportsAvailable ? '확보' : '없음'} 기준입니다.`,
+          `상대수익률 ${evidence.reportSignals.relativeReturnAvailable ? '확보' : '없음'}, 스타일 분석 ${evidence.reportSignals.styleAnalysisAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportsAvailable ? '확보' : '없음'}${disclosureText} 기준입니다.`,
           'trend',
         ),
         createCommitteeMember(
@@ -1377,7 +1535,7 @@ function createCommitteeAxes(evidence, scored, packageResult) {
           '여지',
           '상방 버퍼',
           scored.committee.positionFit.upsideBuffer,
-          `컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportsAvailable ? '확보' : '없음'} 반영입니다.`,
+          `컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportsAvailable ? '확보' : '없음'}${disclosureRiskText} 반영입니다.`,
           'upsideBuffer',
         ),
         createCommitteeMember(
@@ -1447,6 +1605,17 @@ function createEvidenceSourceRefs(input, evidence, sources, sourceIssues) {
       label: '국내 패키지 보조 근거',
       at: sources.packageResult.timestamp,
       note: normalizeText(sources.packageResult.listingMarket) ?? undefined,
+    }));
+  }
+
+  if (sources.disclosures) {
+    const totalCount = Number(evidence.disclosureAnalysis?.totalCount ?? sources.disclosures?.summary?.totalCount);
+    sourceRefs.push(createDeepScanSourceRef({
+      type: 'report',
+      id: `opendart-disclosures:${identifier}`,
+      label: 'OpenDART 공시 목록',
+      at: evidence.disclosureAnalysis?.latestReceiptDate ?? sources.disclosures?.summary?.latestReceiptDate ?? undefined,
+      note: Number.isFinite(totalCount) ? `최근 공시 ${totalCount}건` : '공시 목록 분석',
     }));
   }
 
@@ -1702,6 +1871,46 @@ async function summarizePerformanceCommentForLoading(input, performanceComment) 
   }
 }
 
+function buildDisclosureInsightBody(disclosureAnalysis) {
+  if (!disclosureAnalysis?.available) {
+    return null;
+  }
+
+  const periodLabel = [disclosureAnalysis.periodFrom, disclosureAnalysis.periodTo]
+    .filter(Boolean)
+    .join('~');
+  const leadingType = Array.isArray(disclosureAnalysis.topReportTypes)
+    ? disclosureAnalysis.topReportTypes[0]
+    : null;
+  const parts = [
+    `${periodLabel ? `${periodLabel} ` : ''}공시 ${formatNumber(disclosureAnalysis.totalCount ?? disclosureAnalysis.count ?? 0)}건`,
+    leadingType ? `${leadingType.reportName} ${formatNumber(leadingType.count)}건` : null,
+    disclosureAnalysis.ownershipCount > 0 ? `지분/주요주주 ${formatNumber(disclosureAnalysis.ownershipCount)}건` : null,
+    disclosureAnalysis.periodicReportCount > 0 ? `정기보고서 ${formatNumber(disclosureAnalysis.periodicReportCount)}건` : null,
+    disclosureAnalysis.correctionCount > 0 ? `정정 ${formatNumber(disclosureAnalysis.correctionCount)}건` : null,
+    disclosureAnalysis.dilutionCount > 0 ? `자본변동 ${formatNumber(disclosureAnalysis.dilutionCount)}건` : null,
+    disclosureAnalysis.riskCount > 0 ? `주요 리스크 ${formatNumber(disclosureAnalysis.riskCount)}건` : '주요 리스크 공시 없음',
+  ].filter(Boolean);
+
+  return parts.join(' · ');
+}
+
+function buildDisclosureInsightSourceBody(disclosureAnalysis) {
+  if (!Array.isArray(disclosureAnalysis?.latestFilings) || disclosureAnalysis.latestFilings.length === 0) {
+    return undefined;
+  }
+
+  return disclosureAnalysis.latestFilings
+    .slice(0, 8)
+    .map((filing) => [
+      filing.receiptDate,
+      filing.reportName,
+      filing.filerName ? `제출:${filing.filerName}` : null,
+      filing.riskLabel,
+    ].filter(Boolean).join(' · '))
+    .join('\n');
+}
+
 function buildInsights(input, evidence, scored, generatedAt, sourceIssues, options = {}) {
   const dateLabel = (input.selectedAt ?? generatedAt).slice(0, 10);
   const performanceComment = evidence.businessCommentary?.performanceComment ?? null;
@@ -1735,6 +1944,8 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
   const consensusLowestTargetPrice = typeof consensusSnapshot.lowestTargetPrice === 'number' && Number.isFinite(consensusSnapshot.lowestTargetPrice)
     ? consensusSnapshot.lowestTargetPrice
     : null;
+  const disclosureAnalysis = evidence.disclosureAnalysis ?? null;
+  const disclosureInsightBody = buildDisclosureInsightBody(disclosureAnalysis);
   const items = [
     {
       sourceType: evidence.currentQuote ? 'market' : 'system',
@@ -1801,6 +2012,17 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
           sourceBody: performanceComment.text,
         }]
       : []),
+    ...(disclosureInsightBody
+      ? [{
+          sourceType: 'report',
+          sourceLabel: '공시 분석',
+          date: disclosureAnalysis.latestReceiptDate ?? dateLabel,
+          label: disclosureAnalysis.riskCount > 0 || disclosureAnalysis.correctionCount > 0 || disclosureAnalysis.dilutionCount > 0 ? '공시주의' : '공시',
+          title: `${input.instrument.name} 최근 OpenDART 공시 흐름`,
+          body: disclosureInsightBody,
+          ...(buildDisclosureInsightSourceBody(disclosureAnalysis) ? { sourceBody: buildDisclosureInsightSourceBody(disclosureAnalysis) } : {}),
+        }]
+      : []),
     {
       sourceType: evidence.holding.hasHoldingContext ? 'holding' : 'system',
       sourceLabel: '보유 맥락',
@@ -1835,6 +2057,7 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
     summaryTags: [
       `점수 ${scored.hero.score}`,
       `리포트 ${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages}`,
+      ...(disclosureAnalysis?.available ? [`공시 ${formatNumber(disclosureAnalysis.totalCount ?? disclosureAnalysis.count ?? 0)}건`] : []),
       `판단 ${getDecisionBandLabel(scored.sellNow.decisionBand)}`,
     ],
   };
