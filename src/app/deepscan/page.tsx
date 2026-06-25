@@ -11,6 +11,7 @@ import {
   ChartCandlestick,
   CircleDollarSign,
   ClipboardCheck,
+  FileText,
   Landmark,
   LineChart,
   MapPin,
@@ -66,7 +67,7 @@ const DEEPSCAN_MEMBER_STAGE_BY_KEY: Record<string, LoadingStageKey> = {
   growth: 'fundamentalTeam',
   'profitability-quality': 'fundamentalTeam',
   trend: 'marketTeam',
-  consensusMomentum: 'marketTeam',
+  consensusMomentum: 'contextTeam',
   priceLocation: 'marketTeam',
   momentum: 'marketTeam',
   'estimate-revision': 'marketTeam',
@@ -83,7 +84,8 @@ const DEEPSCAN_MEMBER_STAGE_BY_TITLE: Record<string, LoadingStageKey> = {
   밸류에이션: 'fundamentalTeam',
   '지분/안정성': 'fundamentalTeam',
   트렌드: 'marketTeam',
-  '컨센서스 모멘텀': 'marketTeam',
+  '컨센서스 모멘텀': 'contextTeam',
+  '이벤트 스캐너': 'contextTeam',
   '가격 위치': 'marketTeam',
   '평단 격차': 'contextTeam',
   '상방 버퍼': 'contextTeam',
@@ -906,6 +908,10 @@ type DeepScanCommitteeStatusResponse = {
 }
 
 function resolveInsightTone(item: JarooDeepScanInsightItem): keyof typeof newsToneStyles {
+  if (item.sourceLabel === '공시 분석' && /주의|리스크|정정|자본변동/u.test(`${item.label} ${item.body}`)) {
+    return 'danger'
+  }
+
   if (item.sourceType === 'report' || item.sourceType === 'market') {
     return 'positive'
   }
@@ -983,6 +989,11 @@ function extractInsightMetric(item: JarooDeepScanInsightItem) {
     return '실적 요약'
   }
 
+  if (sourceLabel === '공시 분석') {
+    const count = body.match(/공시\s*([0-9,]+)건/u)?.[1] ?? body.match(/([0-9,]+)건/u)?.[1]
+    return count ? `공시 ${count}건` : '공시 확인'
+  }
+
   if (sourceLabel === '보유 맥락') {
     const shares = body.match(/보유\s*([^/\s]+주)/u)?.[1]
     return shares ? `보유 ${shares}` : '포지션 확인'
@@ -1011,6 +1022,13 @@ function buildInsightPills(item: JarooDeepScanInsightItem) {
       .slice(0, 3)
   }
 
+  if (sourceLabel === '공시 분석') {
+    return splitInsightBodyParts(body)
+      .map((part) => part.trim())
+      .filter(Boolean)
+      .slice(0, 5)
+  }
+
   if (sourceLabel === '보유 맥락') {
     return body
       .split(/\s*\/\s*/u)
@@ -1036,7 +1054,7 @@ function splitInsightDetailLines(value: string) {
 }
 
 function getInsightDetailLines(item: JarooDeepScanInsightItem) {
-  if (item.sourceLabel !== '기업실적코멘트') {
+  if (item.sourceLabel !== '기업실적코멘트' && item.sourceLabel !== '공시 분석') {
     return []
   }
 
@@ -1093,6 +1111,14 @@ function getInsightPresentation(item: JarooDeepScanInsightItem): {
         cardClass: 'border-[#f1d7a5] bg-[linear-gradient(135deg,#fff8ec,#ffffff)]',
         iconClass: 'bg-[#a16207] text-white',
         metricClass: 'text-[#854f0b]',
+      }
+    case '공시 분석':
+      return {
+        Icon: FileText,
+        eyebrow: 'DART FILINGS',
+        cardClass: 'border-[#c9dcf2] bg-[linear-gradient(135deg,#f1f7ff,#ffffff)]',
+        iconClass: 'bg-[#1f4f82] text-white',
+        metricClass: 'text-[#1f4f82]',
       }
     case '보유 맥락':
       return {

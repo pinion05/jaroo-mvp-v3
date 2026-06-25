@@ -122,6 +122,18 @@ export {
 } from './crawlers/us-stock-report.js';
 
 export {
+  DART_CORP_CLASS_LABELS,
+  DART_DISCLOSURE_TYPES,
+  DartDisclosureError,
+  clearDartCaches,
+  extractFirstXmlFromZipBuffer,
+  findDartCorporations,
+  getDartCorpCodeList,
+  getDartDisclosures,
+  parseDartCorpCodeXml,
+} from './crawlers/dart-filings.js';
+
+export {
   buildJarooDeepScanPayload,
 } from './services/deepscan-payload.js';
 

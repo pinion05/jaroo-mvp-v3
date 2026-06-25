@@ -295,6 +295,106 @@ test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a dire
   ]);
 });
 
+test('buildDeepScanKrEvidencePacket promotes OpenDART disclosures into structured analysis facts and risks', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  const packet = buildDeepScanKrEvidencePacket(
+    {
+      instrument: {
+        code: '005930',
+        name: '삼성전자',
+        market: 'KR',
+      },
+      holding: {
+        shares: '12',
+        averagePrice: '71000',
+      },
+    },
+    {
+      quotes: {
+        items: [{
+          market: 'KR',
+          code: '005930',
+          price: 85200,
+          currency: 'KRW',
+          asOf: '2026-06-12',
+          source: 'fixture',
+          status: 'ok',
+        }],
+      },
+      disclosures: {
+        source: 'opendart',
+        requested: { from: '20260512', to: '20260612' },
+        summary: { totalCount: 4, latestReceiptDate: '20260608' },
+        filings: [
+          {
+            rceptNo: '20260608800918',
+            reportName: '최대주주등소유주식변동신고서',
+            receiptDate: '20260608',
+            disclosureType: 'D',
+            disclosureTypeLabel: '지분공시',
+            filerName: '삼성전자',
+          },
+          {
+            rceptNo: '20260605000586',
+            reportName: '[기재정정]임원ㆍ주요주주특정증권등소유상황보고서',
+            receiptDate: '20260605',
+            disclosureType: 'D',
+            disclosureTypeLabel: '지분공시',
+            filerName: '윤장현',
+          },
+          {
+            rceptNo: '20260604000077',
+            reportName: '주요사항보고서(유상증자결정)',
+            receiptDate: '20260604',
+            disclosureType: 'B',
+            disclosureTypeLabel: '주요사항보고',
+            filerName: '삼성전자',
+          },
+          {
+            rceptNo: '20260603000077',
+            reportName: '소송등의제기ㆍ신청',
+            receiptDate: '20260603',
+            disclosureType: 'B',
+            disclosureTypeLabel: '주요사항보고',
+            filerName: '삼성전자',
+          },
+        ],
+      },
+    },
+  );
+
+  assert.equal(packet.disclosureAnalysis.available, true);
+  assert.equal(packet.disclosureAnalysis.totalCount, 4);
+  assert.equal(packet.disclosureAnalysis.latestReceiptDate, '2026-06-08');
+  assert.equal(packet.disclosureAnalysis.periodFrom, '2026-05-12');
+  assert.equal(packet.disclosureAnalysis.periodTo, '2026-06-12');
+  assert.equal(packet.disclosureAnalysis.ownershipCount, 2);
+  assert.equal(packet.disclosureAnalysis.correctionCount, 1);
+  assert.equal(packet.disclosureAnalysis.dilutionCount, 1);
+  assert.equal(packet.disclosureAnalysis.riskCount, 1);
+  assert.equal(packet.disclosureAnalysis.latestFilings[0].riskLabel, '지분 변동');
+  assert.deepEqual(packet.sourceCoverage, {
+    hasCurrentQuote: true,
+    hasHolding: true,
+    hasPackageResult: false,
+    hasDisclosures: true,
+    availableReportPages: [],
+  });
+  assert.equal(packet.reportSignals.disclosureAvailable, true);
+  assert.equal(packet.reportSignals.disclosureCount, 4);
+  assert.equal(packet.reportSignals.disclosureRiskCount, 1);
+  assert.deepEqual(packet.topFacts, [
+    '현재가 85200 KRW 확인',
+    '보유 12주 / 평단 71000 확인',
+    '최근 OpenDART 공시 4건 / 주요 리스크 1건 확인',
+  ]);
+  assert.deepEqual(packet.topRisks, [
+    '주의 공시 1건: 소송등의제기ㆍ신청',
+    'KR 리포트 페이지 근거 없음',
+  ]);
+});
+
 test('buildDeepScanKrEvidencePacket promotes KR WiseReport raw facts into structured snapshots instead of losing them behind global-shaped fields', async () => {
   const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
 

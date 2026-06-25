@@ -54,6 +54,11 @@ npm run dev
 | `FMP_API_KEY` | 미국주식 provider 호출용 |
 | `FINNHUB_API_KEY` | 미국주식 provider 호출용 |
 | `SEC_EDGAR_USER_AGENT` | SEC EDGAR 호출 User-Agent. 미설정 시 기본값 사용 |
+| `DART_KEY` | OpenDART 공시 목록/고유번호 API 호출용 인증키. 단독 공시 route와 KR DeepScan 공시 분석에서 사용 (`DART_API_KEY`, `OPENDART_API_KEY`, `OPEN_DART_API_KEY`, `API_K_DART` alias 지원) |
+| `DEEPSCAN_KR_DISCLOSURES_ENABLE` | optional `false`/`0`이면 KR DeepScan에서 OpenDART 공시 조회 비활성화, `true`/`1`이면 키가 있을 때 강제 활성화 |
+| `DEEPSCAN_KR_DISCLOSURE_LOOKBACK_DAYS` | optional KR DeepScan 공시 기본 조회 기간. 기본 `30`일 |
+| `DEEPSCAN_KR_DISCLOSURE_LIMIT` | optional KR DeepScan 공시 목록 page_count. 기본 `30` |
+| `DEEPSCAN_KR_DISCLOSURE_TIMEOUT_MS` | optional KR DeepScan OpenDART 조회 timeout. 기본 `4500`ms |
 
 메모:
 
@@ -96,7 +101,6 @@ DeepScan 호출별 override는 `crawlerCache` / `supabaseCrawlerCache` 입력으
 | 변수명 | 설명 |
 | --- | --- |
 | `TWELVE_DATA_API_KEY` | reserved key |
-| `DART_KEY` | reserved key |
 | `OPENROUTER_API_KEY` | ecosystem alignment / reference |
 | `OPENAI_API_KEY` | ecosystem alignment / reference |
 | `LLM_MODEL` | ecosystem alignment / reference |
@@ -104,8 +108,8 @@ DeepScan 호출별 override는 `crawlerCache` / `supabaseCrawlerCache` 입력으
 
 참고:
 
-- `DART_KEY` 는 `.env.example` 에는 남아 있지만 현재 runtime source는 직접 읽지 않습니다.
 - 미국주식 provider key가 일부 비어 있어도 서버는 뜰 수 있지만 provider별 partial / missing 응답은 생길 수 있습니다.
+- `DART_KEY` 가 없으면 OpenDART 공시 route는 `provider_unconfigured` 오류를 반환합니다. KR DeepScan은 공시 분석만 조용히 생략하고 나머지 분석을 계속합니다.
 
 ## 3. 응답 형식
 
@@ -170,7 +174,23 @@ DeepScan 호출별 override는 `crawlerCache` / `supabaseCrawlerCache` 입력으
 curl "http://localhost:3040/api/major/wisereport-fnguide/kr/companies/005930/slim/v1.1"
 ```
 
-### 4.3 WiseReport Global
+### 4.3 OpenDART KR Disclosures
+
+| Method | Primary Path | Query | 설명 |
+| --- | --- | --- | --- |
+| `GET` | `/api/source/opendart/kr/stocks/:code/disclosures` | `corpCode?`, `name?`, `from?`, `to?`, `finalOnly?`, `disclosureType?`, `disclosureDetailType?`, `corpCls?`, `sort?`, `sortMth?`, `pageNo?`, `pageCount?`, `limit?` | 한국주식 OpenDART 공시 목록. `:code`는 6자리 종목코드이며 내부적으로 DART `corp_code`를 조회합니다. |
+
+예시:
+
+```bash
+curl "http://localhost:3040/api/source/opendart/kr/stocks/005930/disclosures?from=2026-05-01&to=2026-05-31&limit=5"
+```
+
+`disclosureType`은 OpenDART `pblntf_ty` 값(`A` 정기공시, `B` 주요사항보고, `D` 지분공시 등)을 그대로 사용합니다. 날짜를 생략하면 최근 90일 범위를 기본 조회합니다.
+
+KR DeepScan canonical payload는 `DART_KEY`가 설정되어 있으면 같은 OpenDART 목록을 최근 30일 기준으로 자동 조회해 `insights`에 `공시 분석` 카드, `metadata.sourceRefs`에 `OpenDART 공시 목록` 출처, 위원회/점수 계산에는 정정·자본변동·고위험 공시 패널티를 반영합니다. 호출별로 `disclosureOptions` 입력 또는 query `disclosureFrom`, `disclosureTo`, `disclosureLimit`로 기간과 건수를 조정할 수 있습니다.
+
+### 4.4 WiseReport Global
 
 | Method | Primary Path | Query | 성공 응답 | 설명 |
 | --- | --- | --- | --- | --- |
@@ -195,7 +215,7 @@ Global slim v1.1 은 위 전체 route를 쓰지 않고 Company 5개 route만 사
 curl "http://localhost:3040/api/major/wisereport-global/us/companies/NVDA/slim/v1.1"
 ```
 
-### 4.4 Market
+### 4.5 Market
 
 | Method | Primary Path | 설명 |
 | --- | --- | --- |
@@ -206,7 +226,7 @@ curl "http://localhost:3040/api/major/wisereport-global/us/companies/NVDA/slim/v
 | `GET` | `/api/source/adrinfo/market/indicators/adr` | ADR |
 | `GET` | `/api/source/investing/us/market/indicators/vix` | US VIX |
 
-### 4.5 US Stock / US Market
+### 4.6 US Stock / US Market
 
 | Method | Primary Path | Query | 설명 |
 | --- | --- | --- | --- |
@@ -229,7 +249,7 @@ curl "http://localhost:3040/api/major/wisereport-global/us/companies/NVDA/slim/v
 - `from`, `to` 는 `YYYY-MM-DD`
 - `include*` 는 `true/false` 또는 `1/0`
 
-### 4.6 KRX
+### 4.7 KRX
 
 | Method | Primary Path | Query | 설명 |
 | --- | --- | --- | --- |

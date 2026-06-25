@@ -48,7 +48,7 @@ const TEAM_DEFINITIONS: readonly TeamDefinition[] = [
     description: '증권사 의견 · 산업 전문가 · 이슈 탐색',
     icon: '🧠',
     memberKeys: ['holdingCompleteness', 'upsideBuffer', 'consensusMomentum', 'financial-safety', 'ownership-flow', 'portfolio-fit'],
-    memberTitles: ['입력 완성도', '상방 버퍼', '상하방 여지', '컨센서스 모멘텀', '시장 신호/정보 밀도'],
+    memberTitles: ['입력 완성도', '상방 버퍼', '상하방 여지', '이벤트 스캐너', '컨센서스 모멘텀', '시장 신호/정보 밀도'],
   },
   {
     key: 'fundamental',

@@ -521,3 +521,153 @@ test('KR committee LLM prompt omits unavailable source-limitations data from mod
     }
   }
 });
+
+test('KR committee event scanner prompt and member dump prioritize OpenDART disclosures', async () => {
+  const { scoreDeepScanKrCommitteeFromDump } = await import('../src/services/deepscan-kr-committee-runtime.js');
+  const originalFetch = global.fetch;
+  const originalKey = process.env.OPENROUTER_API_KEY;
+  const originalEnabled = process.env.DEEPSCAN_KR_LLM_ENABLE;
+  const capturedBodies = [];
+
+  process.env.OPENROUTER_API_KEY = 'test-key';
+  process.env.DEEPSCAN_KR_LLM_ENABLE = '1';
+
+  global.fetch = (async (_url, init) => {
+    const body = JSON.parse(String(init?.body ?? '{}'));
+    capturedBodies.push(body);
+    const userMessage = Array.isArray(body?.messages)
+      ? body.messages.find((message) => message.role === 'user')
+      : null;
+    const content = typeof userMessage?.content === 'string' ? userMessage.content : '';
+    const memberKey = content.match(/"member":"([^"]+)"/)?.[1] ?? 'unknown';
+
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            score: 70,
+            reason: `${memberKey} reason`,
+            confidence: 'medium',
+          }),
+        },
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  try {
+    await scoreDeepScanKrCommitteeFromDump({}, {
+      instrument: {
+        code: '005930',
+        name: '삼성전자',
+        market: 'KR',
+      },
+      sourceContext: {},
+    }, {
+      instrument: {
+        code: '005930',
+        name: '삼성전자',
+        market: 'KR',
+      },
+      consensusSnapshot: {
+        targetPrice: 426000,
+        targetGapPct: 27.83,
+      },
+      reportSignals: {
+        consensusAvailable: true,
+        opinionAvailable: true,
+        recentReportsAvailable: true,
+        recentReportCount: 14,
+      },
+      disclosureAnalysis: {
+        available: true,
+        source: 'opendart',
+        totalCount: 23,
+        count: 23,
+        periodFrom: '2026-05-12',
+        periodTo: '2026-06-12',
+        latestReceiptDate: '2026-06-08',
+        ownershipCount: 16,
+        correctionCount: 3,
+        dilutionCount: 0,
+        materialEventCount: 0,
+        riskCount: 0,
+        mediumRiskCount: 3,
+        topReportTypes: [{ reportName: '임원ㆍ주요주주특정증권등소유상황보고서', count: 14 }],
+        latestFilings: [{ receiptDate: '2026-06-08', reportName: '최대주주등소유주식변동신고서', riskLabel: '지분 변동' }],
+      },
+      pageCoverage: {
+        totalKnownPages: 0,
+        availablePageIds: [],
+        missingPageIds: [],
+        availableCount: 0,
+      },
+      sourceCoverage: {
+        hasCurrentQuote: false,
+        hasHolding: false,
+        hasPackageResult: false,
+        availableReportPages: [],
+      },
+      missingSources: [],
+      sourceLimitations: [],
+      topFacts: ['최근 OpenDART 공시 23건 / 지분공시 16건 확인'],
+      topRisks: ['정정 공시 3건 확인'],
+    }, {
+      disclosures: {
+        documentDump: {
+          available: true,
+          source: 'opendart-document',
+          policy: 'skip_gte_max_chars_then_take_first_limit',
+          maxCharsPerFiling: 15000,
+          limit: 20,
+          includedCount: 2,
+          skippedTooLongCount: 1,
+          totalCharCount: 52,
+          combinedText: '[1] 2026-06-08 · 최대주주등소유주식변동신고서\n최대주주 관련 짧은 공시 본문\n\n---\n\n[2] 2026-06-02 · 정정 지분공시\n정정 사유가 포함된 짧은 공시 본문',
+          filings: [
+            { rceptNo: '20260608800918', reportName: '최대주주등소유주식변동신고서', receiptDate: '2026-06-08', charCount: 24 },
+            { rceptNo: '20260602000421', reportName: '[기재정정]임원ㆍ주요주주특정증권등소유상황보고서', receiptDate: '2026-06-02', charCount: 28 },
+          ],
+          skipped: [
+            { rceptNo: '20260601000172', reportName: '대규모기업집단현황공시', receiptDate: '2026-06-01', reason: 'too_long', charCount: 650710 },
+          ],
+        },
+      },
+    });
+
+    assert.equal(capturedBodies.length, 9);
+    const eventBody = capturedBodies.find((body) => {
+      const userMessage = body.messages?.find((message) => message.role === 'user');
+      return typeof userMessage?.content === 'string' && userMessage.content.includes('"member":"consensusMomentum"');
+    });
+
+    assert.ok(eventBody);
+    const systemPrompt = eventBody.messages.find((message) => message.role === 'system')?.content ?? '';
+    const userContent = eventBody.messages.find((message) => message.role === 'user')?.content ?? '';
+
+    assert.match(systemPrompt, /이벤트 스캐너 persona/);
+    assert.match(systemPrompt, /prioritize OpenDART disclosures before generic consensus/);
+    assert.match(userContent, /eventScannerContext/);
+    assert.match(userContent, /opendart_disclosures/);
+    assert.match(userContent, /"totalCount":23/);
+    assert.match(userContent, /"ownershipCount":16/);
+    assert.match(userContent, /"correctionCount":3/);
+    assert.match(userContent, /documentDump/);
+    assert.match(userContent, /최대주주 관련 짧은 공시 본문/);
+    assert.match(userContent, /"skippedTooLongCount":1/);
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = originalKey;
+    }
+    if (originalEnabled === undefined) {
+      delete process.env.DEEPSCAN_KR_LLM_ENABLE;
+    } else {
+      process.env.DEEPSCAN_KR_LLM_ENABLE = originalEnabled;
+    }
+  }
+});

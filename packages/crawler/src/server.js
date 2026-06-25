@@ -28,6 +28,7 @@ import {
   getMarketSnapshot,
   getTickerNames,
   getCurrentQuotes,
+  getDartDisclosures,
   getUSConsensus,
   getUSFilings,
   getUSFinancials,
@@ -153,6 +154,7 @@ function buildDeepscanKrJobKey(input) {
     holding: input.holding ?? null,
     selectedAt: input.selectedAt ?? null,
     sourceContext: input.sourceContext ?? null,
+    disclosureOptions: input.disclosureOptions ?? null,
   });
 }
 
@@ -229,7 +231,11 @@ function buildJarooDeepScanInputFromQuery(req) {
   const evaluationAmount = parseSingleQueryValue(req.query.evaluationAmount);
   const selectedAt = parseSingleQueryValue(req.query.selectedAt);
   const from = parseSingleQueryValue(req.query.from);
+  const disclosureFrom = parseSingleQueryValue(req.query.disclosureFrom ?? req.query.dartFrom);
+  const disclosureTo = parseSingleQueryValue(req.query.disclosureTo ?? req.query.dartTo);
+  const disclosureLimit = parseSingleQueryValue(req.query.disclosureLimit ?? req.query.dartLimit);
   const holding = {};
+  const disclosureOptions = {};
 
   if (shares) {
     holding.shares = shares;
@@ -239,6 +245,15 @@ function buildJarooDeepScanInputFromQuery(req) {
   }
   if (evaluationAmount) {
     holding.evaluationAmount = evaluationAmount;
+  }
+  if (disclosureFrom) {
+    disclosureOptions.from = disclosureFrom;
+  }
+  if (disclosureTo) {
+    disclosureOptions.to = disclosureTo;
+  }
+  if (disclosureLimit) {
+    disclosureOptions.limit = disclosureLimit;
   }
 
   return {
@@ -250,6 +265,7 @@ function buildJarooDeepScanInputFromQuery(req) {
       ...(kind ? { kind } : {}),
     },
     ...(Object.keys(holding).length > 0 ? { holding } : {}),
+    ...(Object.keys(disclosureOptions).length > 0 ? { disclosureOptions } : {}),
     ...(selectedAt ? { selectedAt } : {}),
     sourceContext: {
       from: from ?? 'system',
@@ -2427,6 +2443,55 @@ const endpointDefinitions = [
     }),
     handler: async (req) => crawlWiseReportKrPage(req.params.code, route.pageKey),
   })),
+
+  {
+    id: 'kr-stock-disclosures',
+    resource: 'kr-stock.disclosures',
+    description: '한국주식 OpenDART 공시 목록 데이터를 반환합니다.',
+    primaryPath: buildDataSourcePath('opendart', '/kr/stocks/:code/disclosures'),
+    dataSources: ['opendart'],
+    params: ['code'],
+    query: [
+      'corpCode(optional, 8-digit DART corp_code)',
+      'name(optional)',
+      'from(optional, YYYY-MM-DD or YYYYMMDD)',
+      'to(optional, YYYY-MM-DD or YYYYMMDD)',
+      'finalOnly(optional, boolean/Y/N)',
+      'disclosureType(optional, A-J)',
+      'disclosureDetailType(optional)',
+      'corpCls(optional, Y/K/N/E)',
+      'sort(optional, date|crp|rpt)',
+      'sortMth(optional, asc|desc)',
+      'pageNo(optional, default=1)',
+      'pageCount(optional, default=10, max=100)',
+      'limit(optional alias for pageCount)',
+    ],
+    count: (data) => Array.isArray(data?.filings) ? data.filings.length : 0,
+    handler: async (req) => {
+      try {
+        return await getDartDisclosures({
+          code: req.params.code,
+          corpCode: parseSingleQueryValue(req.query.corpCode ?? req.query.corp_code),
+          name: parseSingleQueryValue(req.query.name ?? req.query.corpName ?? req.query.corp_name),
+          from: parseSingleQueryValue(req.query.from ?? req.query.bgnDe ?? req.query.bgn_de),
+          to: parseSingleQueryValue(req.query.to ?? req.query.endDe ?? req.query.end_de),
+          finalOnly: parseSingleQueryValue(req.query.finalOnly ?? req.query.lastReprtAt ?? req.query.last_reprt_at),
+          disclosureType: parseSingleQueryValue(req.query.disclosureType ?? req.query.pblntfTy ?? req.query.pblntf_ty),
+          disclosureDetailType: parseSingleQueryValue(req.query.disclosureDetailType ?? req.query.pblntfDetailTy ?? req.query.pblntf_detail_ty),
+          corpCls: parseSingleQueryValue(req.query.corpCls ?? req.query.corp_cls),
+          sort: parseSingleQueryValue(req.query.sort),
+          sortMth: parseSingleQueryValue(req.query.sortMth ?? req.query.sort_mth),
+          pageNo: parseSingleQueryValue(req.query.pageNo ?? req.query.page_no),
+          pageCount: parseSingleQueryValue(req.query.pageCount ?? req.query.page_count ?? req.query.limit),
+        });
+      } catch (error) {
+        throw new HttpError(Number(error?.status) || 500, error?.message || 'DART disclosure request failed', {
+          code: error?.code ?? 'dart_disclosure_error',
+          ...(error?.details && typeof error.details === 'object' ? error.details : {}),
+        });
+      }
+    },
+  },
   {
     id: 'market-overview-kr',
     resource: 'market.overview.kr',
@@ -2908,7 +2973,7 @@ const endpointDefinitions = [
     resource: 'jaroo.deepscan.canonical',
     description: 'DeepScan canonical payload를 raw body로 반환합니다.',
     primaryPath: buildDataSourcePath('wisereport-fnguide-krx-polygon-fmp-deepscan-package', '/deepscan/canonical'),
-    dataSources: ['wisereport', 'fnguide', 'krx-js-client', 'polygon', 'fmp', 'deepscan-kr-package'],
+    dataSources: ['wisereport', 'fnguide', 'krx-js-client', 'polygon', 'fmp', 'opendart', 'deepscan-kr-package'],
     params: [],
     query: [
       'market(optional)',
@@ -2921,6 +2986,9 @@ const endpointDefinitions = [
       'evaluationAmount(optional)',
       'selectedAt(optional)',
       'from(optional)',
+      'disclosureFrom(optional)',
+      'disclosureTo(optional)',
+      'disclosureLimit(optional)',
     ],
     rawSuccess: true,
     successStatus: (payload) => {

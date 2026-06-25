@@ -155,9 +155,13 @@ export default function DebugDeepScanPage() {
   const [didHydrate, setDidHydrate] = useState(false)
 
   useEffect(() => {
-    const nextForm = readInitialFormFromUrl()
-    setForm(nextForm)
-    setDidHydrate(true)
+    const timer = window.setTimeout(() => {
+      const nextForm = readInitialFormFromUrl()
+      setForm(nextForm)
+      setDidHydrate(true)
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [])
 
   const previewTarget = useMemo(() => {
