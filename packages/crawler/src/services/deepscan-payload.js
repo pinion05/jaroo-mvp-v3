@@ -1,6 +1,6 @@
 import { createRequire } from 'node:module';
 import { getCurrentQuotes } from '../crawlers/current-quotes.js';
-import { getDartDisclosures } from '../crawlers/dart-filings.js';
+import { buildDartDisclosureDocumentDump, getDartDisclosures } from '../crawlers/dart-filings.js';
 import { fetchWiseReportEtfSnapshot } from '../crawlers/wisereport-etf.js';
 import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
 import { scoreDeepScanKrEvidence, scoreDeepScanKrFromCommittee } from './deepscan-kr-score.js';
@@ -47,6 +47,9 @@ const DEFAULT_DEEPSCAN_KR_ETF_SNAPSHOT_TIMEOUT_MS = 4_500;
 const DEFAULT_DEEPSCAN_KR_DISCLOSURE_TIMEOUT_MS = 4_500;
 const DEFAULT_DEEPSCAN_KR_DISCLOSURE_LOOKBACK_DAYS = 30;
 const DEFAULT_DEEPSCAN_KR_DISCLOSURE_LIMIT = 30;
+const DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_MAX_CHARS = 15_000;
+const DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_LIMIT = 20;
+const DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_CONCURRENCY = 4;
 
 function normalizeText(value) {
   if (typeof value !== 'string') {
@@ -159,6 +162,17 @@ function deriveGeneratedAt(input) {
 function parsePositiveInteger(value, fallback) {
   const parsed = Number(value);
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback;
+}
+
+function parseBooleanToggle(value, fallback = false) {
+  const normalized = normalizeText(value)?.toLowerCase();
+  if (['1', 'true', 'on', 'yes'].includes(normalized ?? '')) {
+    return true;
+  }
+  if (['0', 'false', 'off', 'no'].includes(normalized ?? '')) {
+    return false;
+  }
+  return fallback;
 }
 
 function createDebugId(input) {
@@ -942,6 +956,68 @@ async function maybeResolveKrDisclosures(rawInput, input) {
       },
     );
 
+    const includeDocumentDump = parseBooleanToggle(
+      disclosureOptions.includeDocumentDump
+        ?? disclosureOptions.documentDump
+        ?? process.env.DEEPSCAN_KR_DISCLOSURE_DOCUMENT_DUMP_ENABLE,
+      true,
+    );
+    if (includeDocumentDump && Array.isArray(result.filings) && result.filings.length > 0) {
+      try {
+        const documentDump = await buildDartDisclosureDocumentDump(result.filings, {
+          maxCharsPerFiling: parsePositiveInteger(
+            disclosureOptions.documentMaxChars
+              ?? disclosureOptions.documentMaxCharsPerFiling
+              ?? process.env.DEEPSCAN_KR_DISCLOSURE_DOCUMENT_MAX_CHARS,
+            DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_MAX_CHARS,
+          ),
+          limit: parsePositiveInteger(
+            disclosureOptions.documentLimit
+              ?? process.env.DEEPSCAN_KR_DISCLOSURE_DOCUMENT_LIMIT,
+            DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_LIMIT,
+          ),
+          fetchLimit: parsePositiveInteger(
+            disclosureOptions.documentFetchLimit
+              ?? process.env.DEEPSCAN_KR_DISCLOSURE_DOCUMENT_FETCH_LIMIT,
+            result.filings.length,
+          ),
+          concurrency: parsePositiveInteger(
+            disclosureOptions.documentConcurrency
+              ?? process.env.DEEPSCAN_KR_DISCLOSURE_DOCUMENT_CONCURRENCY,
+            DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_CONCURRENCY,
+          ),
+          timeoutMs: parsePositiveInteger(
+            disclosureOptions.documentTimeoutMs
+              ?? disclosureOptions.timeoutMs
+              ?? process.env.DEEPSCAN_KR_DISCLOSURE_DOCUMENT_TIMEOUT_MS
+              ?? process.env.DEEPSCAN_KR_DISCLOSURE_TIMEOUT_MS,
+            DEFAULT_DEEPSCAN_KR_DISCLOSURE_TIMEOUT_MS,
+          ),
+          ...(disclosureOptions.apiKey ? { apiKey: disclosureOptions.apiKey } : {}),
+          ...(disclosureOptions.fetchImpl ? { fetchImpl: disclosureOptions.fetchImpl } : {}),
+        });
+        return {
+          value: {
+            ...result,
+            documentDump,
+          },
+          issue: null,
+        };
+      } catch (error) {
+        return {
+          value: {
+            ...result,
+            documentDump: {
+              available: false,
+              source: 'opendart-document',
+              error: normalizeText(error?.message) ?? 'OpenDART document dump unavailable',
+            },
+          },
+          issue: null,
+        };
+      }
+    }
+
     return {
       value: result,
       issue: null,
@@ -1431,6 +1507,25 @@ function createEtfCommitteeAxes(evidence, scored) {
   ];
 }
 
+function buildEventScannerReason(evidence) {
+  const disclosureAnalysis = evidence.disclosureAnalysis;
+  const reportCount = evidence.reportSignals?.recentReportCount ?? 0;
+  if (disclosureAnalysis?.available) {
+    const totalCount = disclosureAnalysis.totalCount ?? disclosureAnalysis.count ?? 0;
+    const disclosureParts = [
+      `OpenDART 공시 ${formatNumber(totalCount)}건`,
+      disclosureAnalysis.ownershipCount > 0 ? `지분공시 ${formatNumber(disclosureAnalysis.ownershipCount)}건` : null,
+      disclosureAnalysis.correctionCount > 0 ? `정정 ${formatNumber(disclosureAnalysis.correctionCount)}건` : null,
+      disclosureAnalysis.dilutionCount > 0 ? `자본변동 ${formatNumber(disclosureAnalysis.dilutionCount)}건` : null,
+      disclosureAnalysis.materialEventCount > 0 ? `주요 이벤트 ${formatNumber(disclosureAnalysis.materialEventCount)}건` : null,
+      disclosureAnalysis.riskCount > 0 ? `고위험 ${formatNumber(disclosureAnalysis.riskCount)}건` : '고위험 공시 없음',
+    ].filter(Boolean);
+    return `${disclosureParts.join(', ')}을 확인했고 최근 리포트 ${formatNumber(reportCount)}건과 함께 이벤트 신호로 반영했습니다.`;
+  }
+
+  return `OpenDART 공시 근거는 없고 컨센서스 ${evidence.reportSignals?.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals?.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${formatNumber(reportCount)}건을 이벤트 신호로 반영했습니다.`;
+}
+
 function createCommitteeAxes(evidence, scored, packageResult) {
   if (isKrExchangeProductEvidence(evidence)) {
     return createEtfCommitteeAxes(evidence, scored);
@@ -1497,10 +1592,10 @@ function createCommitteeAxes(evidence, scored, packageResult) {
           'trend',
         ),
         createCommitteeMember(
-          '컨센',
-          '컨센서스 모멘텀',
+          '이벤트',
+          '이벤트 스캐너',
           scored.committee.marketTiming.consensusMomentum,
-          `컨센서스 ${evidence.reportSignals.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${evidence.reportSignals.recentReportCount ?? 0}건을 반영했습니다.`,
+          buildEventScannerReason(evidence),
           'consensusMomentum',
         ),
         createCommitteeMember(

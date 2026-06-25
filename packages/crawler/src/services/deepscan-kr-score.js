@@ -399,7 +399,9 @@ export function scoreDeepScanKrEvidence(evidence = {}) {
       + scoreFlag(reportSignals.consensusAvailable === true, 30)
       + scoreFlag(reportSignals.opinionAvailable === true, 20)
       + scoreFlag(reportSignals.recentReportsAvailable === true, 10)
-      + Math.min(recentReportCount * 3, 10),
+      + Math.min(recentReportCount * 3, 10)
+      + scoreFlag(hasDisclosureAnalysis, 10)
+      - Math.min(20, disclosureRiskPenalty),
   );
 
   const priceLocation = clamp(

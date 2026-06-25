@@ -43,10 +43,10 @@ export const KR_MEMBER_SPECS = Object.freeze({
   },
   consensusMomentum: {
     axis: '시장 타이밍',
-    shortLabel: '컨센',
-    title: '컨센서스 모멘텀',
-    role: 'KR consensus momentum analyst',
-    focus: 'Judge Korean equity consensus momentum from consensus, opinion, and recent report evidence.',
+    shortLabel: '이벤트',
+    title: '이벤트 스캐너',
+    role: 'KR disclosure and event scanner',
+    focus: 'Judge Korean equity event and disclosure risk from OpenDART filings first, then consensus, opinion, recent reports, and market signal freshness that are actually present.',
   },
   priceLocation: {
     axis: '시장 타이밍',
@@ -117,6 +117,10 @@ const ETF_MEMBER_PRESENTATION_SPECS = Object.freeze({
     shortLabel: '입력',
     title: '입력 완성도',
   },
+});
+
+const KR_MEMBER_PROMPT_GUIDANCE = Object.freeze({
+  consensusMomentum: 'For ordinary KR equities, behave as the 이벤트 스캐너 persona: prioritize OpenDART disclosures before generic consensus; explicitly use filing counts, latest filing date, ownership filings, correction filings, capital-change filings, material-event filings, and high-risk filings when present. If memberContext.facts.eventScannerContext.value.documentDump.combinedText is present, use only that curated under-15000-character document dump as filing text evidence and do not complain about longer skipped filings. If OpenDART disclosures are present, the reason should state whether they are clean, cautionary, or risk-bearing; use analyst consensus/recent reports only as supporting event context.',
 });
 
 const ETF_MEMBER_PROMPT_GUIDANCE = Object.freeze({
@@ -324,6 +328,76 @@ function buildKrFactBank(evidence) {
   };
 }
 
+function summarizeDisclosureAnalysisForEventScanner(disclosureAnalysis) {
+  if (!disclosureAnalysis?.available) {
+    return {
+      available: false,
+      reason: 'OpenDART disclosure analysis is unavailable.',
+    };
+  }
+
+  return {
+    available: true,
+    source: disclosureAnalysis.source ?? 'opendart',
+    periodFrom: disclosureAnalysis.periodFrom ?? null,
+    periodTo: disclosureAnalysis.periodTo ?? null,
+    latestReceiptDate: disclosureAnalysis.latestReceiptDate ?? null,
+    totalCount: disclosureAnalysis.totalCount ?? disclosureAnalysis.count ?? 0,
+    displayedCount: disclosureAnalysis.count ?? 0,
+    ownershipCount: disclosureAnalysis.ownershipCount ?? 0,
+    periodicReportCount: disclosureAnalysis.periodicReportCount ?? 0,
+    correctionCount: disclosureAnalysis.correctionCount ?? 0,
+    dilutionCount: disclosureAnalysis.dilutionCount ?? 0,
+    materialEventCount: disclosureAnalysis.materialEventCount ?? 0,
+    riskCount: disclosureAnalysis.riskCount ?? 0,
+    mediumRiskCount: disclosureAnalysis.mediumRiskCount ?? 0,
+    categoryCounts: disclosureAnalysis.categoryCounts ?? {},
+    topReportTypes: Array.isArray(disclosureAnalysis.topReportTypes) ? disclosureAnalysis.topReportTypes.slice(0, 6) : [],
+    latestFilings: Array.isArray(disclosureAnalysis.latestFilings) ? disclosureAnalysis.latestFilings.slice(0, 8) : [],
+  };
+}
+
+function summarizeDisclosureDocumentDumpForEventScanner(documentDump) {
+  if (!documentDump?.available || typeof documentDump.combinedText !== 'string' || !documentDump.combinedText.trim()) {
+    return {
+      available: false,
+      reason: documentDump?.error ?? 'OpenDART document text dump is unavailable.',
+    };
+  }
+
+  return {
+    available: true,
+    source: documentDump.source ?? 'opendart-document',
+    policy: documentDump.policy ?? 'skip_gte_max_chars_then_take_first_limit',
+    maxCharsPerFiling: documentDump.maxCharsPerFiling ?? null,
+    limit: documentDump.limit ?? null,
+    includedCount: documentDump.includedCount ?? 0,
+    skippedTooLongCount: documentDump.skippedTooLongCount ?? 0,
+    skippedUnavailableCount: documentDump.skippedUnavailableCount ?? 0,
+    totalCharCount: documentDump.totalCharCount ?? null,
+    filings: Array.isArray(documentDump.filings)
+      ? documentDump.filings.map((filing) => ({
+        rceptNo: filing.rceptNo ?? null,
+        reportName: filing.reportName ?? null,
+        receiptDate: filing.receiptDate ?? null,
+        filerName: filing.filerName ?? null,
+        charCount: filing.charCount ?? null,
+        wordishCount: filing.wordishCount ?? null,
+      }))
+      : [],
+    skipped: Array.isArray(documentDump.skipped)
+      ? documentDump.skipped.slice(0, 20).map((filing) => ({
+        rceptNo: filing.rceptNo ?? null,
+        reportName: filing.reportName ?? null,
+        receiptDate: filing.receiptDate ?? null,
+        reason: filing.reason ?? null,
+        charCount: filing.charCount ?? null,
+      }))
+      : [],
+    combinedText: documentDump.combinedText,
+  };
+}
+
 function sanitizeOwnershipSnapshotForLlm(snapshot) {
   if (!snapshot || typeof snapshot !== 'object') {
     return snapshot ?? {};
@@ -342,9 +416,10 @@ function sanitizeOwnershipSnapshotForLlm(snapshot) {
   return sanitized;
 }
 
-function buildMemberKrFacts(memberKey, evidence) {
+function buildMemberKrFacts(memberKey, evidence, sources = {}) {
   const ownershipSnapshotForLlm = sanitizeOwnershipSnapshotForLlm(evidence.ownershipSnapshot);
   const etfProductSnapshot = evidence.etfProductSnapshot ?? null;
+  const disclosureDocumentDump = summarizeDisclosureDocumentDumpForEventScanner(sources?.disclosures?.documentDump);
   const base = {
     schemaVersion: 'jaroo.deepscan.kr-member-slice.v2',
     locale: 'KR',
@@ -397,6 +472,15 @@ function buildMemberKrFacts(memberKey, evidence) {
     case 'consensusMomentum':
       return {
         ...base,
+        eventScanner: {
+          disclosures: summarizeDisclosureAnalysisForEventScanner(evidence.disclosureAnalysis),
+          documentDump: disclosureDocumentDump,
+          consensus: evidence.consensusSnapshot ?? {},
+          reports: evidence.reportSignals ?? {},
+          topFacts: Array.isArray(evidence.topFacts) ? evidence.topFacts : [],
+          topRisks: Array.isArray(evidence.topRisks) ? evidence.topRisks : [],
+        },
+        disclosures: evidence.disclosureAnalysis ?? null,
         consensus: evidence.consensusSnapshot ?? {},
         reports: evidence.reportSignals ?? {},
         businessCommentary: evidence.businessCommentary ?? {},
@@ -502,7 +586,8 @@ function buildMemberDump(memberKey, input, evidence, sources) {
     topRisks: shared.topRisks,
     packageContext: shared.packageContext,
   };
-  const krFacts = snapshotValue(buildMemberKrFacts(memberKey, evidence), ['kr_member_fact_slice']);
+  const krFacts = snapshotValue(buildMemberKrFacts(memberKey, evidence, sources), ['kr_member_fact_slice']);
+  const disclosureDocumentDump = summarizeDisclosureDocumentDumpForEventScanner(sources?.disclosures?.documentDump);
 
   switch (memberKey) {
     case 'profitability':
@@ -585,6 +670,15 @@ function buildMemberDump(memberKey, input, evidence, sources) {
           krFacts,
           etfProductSnapshot: common.etfProductSnapshot,
           instrument: common.instrument,
+          eventScannerContext: presentValue({
+            disclosures: summarizeDisclosureAnalysisForEventScanner(evidence.disclosureAnalysis),
+            documentDump: disclosureDocumentDump,
+            topFacts: Array.isArray(evidence.topFacts) ? evidence.topFacts : [],
+            topRisks: Array.isArray(evidence.topRisks) ? evidence.topRisks : [],
+          }, ['event_scanner_context']),
+          disclosureAnalysis: evidence.disclosureAnalysis
+            ? presentValue(summarizeDisclosureAnalysisForEventScanner(evidence.disclosureAnalysis), ['opendart_disclosures'])
+            : missingFact('OpenDART 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
           consensusSnapshot: common.consensusSnapshot,
           recentReportCount: optionalFact(evidence.reportSignals?.recentReportCount ?? null, ['recent_report_count'], '최근 리포트 수가 없습니다.'),
           recent30dReportCount: optionalFact(evidence.reportSignals?.recent30dReportCount ?? null, ['recent_30d_report_count'], '최근 30일 리포트 수가 없습니다.'),
@@ -666,6 +760,7 @@ function systemPrompt(memberKey) {
     'For ETF/ETN, do not mention missing individual-stock facts such as PER, PBR, ROE, corporate profitability, shareholder stability, analyst recommendation, or target price unless the input explicitly provides those facts as applicable.',
     'For ETF/ETN, absence of shareholder, constituent, or analyst-target data is not positive or negative evidence by itself; say only what can be judged from current quote, average-price gap, trend, liquidity, page coverage, NAV/premium-discount, constituents, or sector weights that are actually present.',
     'For ETF/ETN, when sharedContext.etfProductSnapshot or memberContext.facts.etfProductSnapshot is present, use its product, marketStatus, constituents.top10/top10WeightPct, and liquidity fields directly instead of saying constituent data is unavailable.',
+    KR_MEMBER_PROMPT_GUIDANCE[memberKey] ?? '',
     ETF_MEMBER_PROMPT_GUIDANCE[memberKey] ?? '',
     'Return only valid JSON matching the schema.',
     'Write reason as exactly one readable Korean sentence for a mobile chat bubble: no bullet, no newline, no colon label, no member name prefix, and no multi-sentence paragraph.',

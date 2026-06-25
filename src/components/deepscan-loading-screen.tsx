@@ -214,7 +214,7 @@ const committeeTeams: readonly CommitteeTeamDefinition[] = [
     members: [
       { sourceMemberKey: ['holdingCompleteness', 'financial-safety'], sourceTitle: ['입력 완성도', 'Safety'], alias: '심리 분석AI' },
       { sourceMemberKey: ['upsideBuffer', 'ownership-flow'], sourceTitle: ['상방 버퍼', '상하방 여지', 'Ownership'], alias: '산업 전문가' },
-      { sourceMemberKey: ['consensusMomentum', 'portfolio-fit'], sourceTitle: ['컨센서스 모멘텀', '시장 신호/정보 밀도', '포지션 적합도'], alias: '이벤트 스캐너' },
+      { sourceMemberKey: ['consensusMomentum', 'portfolio-fit'], sourceTitle: ['이벤트 스캐너', '컨센서스 모멘텀', '시장 신호/정보 밀도', '포지션 적합도'], alias: '이벤트 스캐너' },
     ],
   },
 ] as const

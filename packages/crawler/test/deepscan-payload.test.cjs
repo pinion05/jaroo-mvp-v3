@@ -379,6 +379,12 @@ test('buildJarooDeepScanPayload adds OpenDART disclosure analysis to KR DeepScan
   assert.match(payload.hero.body, /OpenDART 공시 3건/);
   assert.equal(payload.metadata.sourceRefs.some((ref) => ref.id === 'opendart-disclosures:005930'), true);
   assert.equal(payload.insights.summaryTags.includes('공시 3건'), true);
+  const eventScannerMember = payload.committee.axes
+    .flatMap((axis) => axis.members)
+    .find((member) => member.memberKey === 'consensusMomentum');
+  assert.equal(eventScannerMember.title, '이벤트 스캐너');
+  assert.match(eventScannerMember.reason, /OpenDART 공시 3건/);
+  assert.match(eventScannerMember.reason, /지분공시 2건/);
   assert.deepEqual(
     payload.insights.items.find((item) => item.sourceLabel === '공시 분석'),
     {

@@ -12,6 +12,10 @@ const DART_CORP_CODE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const DART_LIST_CACHE_TTL_MS = 5 * 60 * 1000;
 const DART_DEFAULT_LOOKBACK_DAYS = 90;
 const DART_DEFAULT_TIMEOUT_MS = 15_000;
+const DART_DOCUMENT_CACHE_TTL_MS = 30 * 60 * 1000;
+const DART_DOCUMENT_DUMP_DEFAULT_MAX_CHARS = 15_000;
+const DART_DOCUMENT_DUMP_DEFAULT_LIMIT = 20;
+const DART_DOCUMENT_DUMP_DEFAULT_CONCURRENCY = 4;
 const DART_DISCLOSURE_TYPES = Object.freeze({
   A: '정기공시',
   B: '주요사항보고',
@@ -284,6 +288,105 @@ function redactDartUrl(url) {
   }
 }
 
+function parseOpenDartXmlStatus(xmlText) {
+  const status = xmlText.match(/<status>\s*([\s\S]*?)\s*<\/status>/i)?.[1]?.trim();
+  if (!status) {
+    return null;
+  }
+
+  return {
+    status,
+    message: decodeXmlText(xmlText.match(/<message>\s*([\s\S]*?)\s*<\/message>/i)?.[1] ?? '').trim() || null,
+  };
+}
+
+function stripDartDocumentToText(value = '') {
+  return decodeXmlText(String(value))
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function extractAllTextFilesFromZipBuffer(bufferLike) {
+  const buffer = Buffer.isBuffer(bufferLike) ? bufferLike : Buffer.from(bufferLike);
+  const head = buffer.subarray(0, Math.min(buffer.length, 200)).toString('utf8').trimStart();
+  if (head.startsWith('<?xml') || head.startsWith('<')) {
+    return [{ fileName: 'document.xml', buffer }];
+  }
+
+  const eocdOffset = findEndOfCentralDirectory(buffer);
+  if (eocdOffset < 0) {
+    throw new DartDisclosureError('OpenDART document payload is not a ZIP/XML file', {
+      status: 502,
+      code: 'provider_invalid_document_zip',
+    });
+  }
+
+  const totalEntries = buffer.readUInt16LE(eocdOffset + 10);
+  let centralOffset = buffer.readUInt32LE(eocdOffset + 16);
+  const files = [];
+
+  for (let index = 0; index < totalEntries; index += 1) {
+    if (buffer.readUInt32LE(centralOffset) !== 0x02014b50) break;
+
+    const compressionMethod = buffer.readUInt16LE(centralOffset + 10);
+    const compressedSize = buffer.readUInt32LE(centralOffset + 20);
+    const fileNameLength = buffer.readUInt16LE(centralOffset + 28);
+    const extraLength = buffer.readUInt16LE(centralOffset + 30);
+    const commentLength = buffer.readUInt16LE(centralOffset + 32);
+    const localHeaderOffset = buffer.readUInt32LE(centralOffset + 42);
+    const fileName = buffer.subarray(centralOffset + 46, centralOffset + 46 + fileNameLength).toString('utf8');
+
+    if (/(\.xml|\.html?|\.xhtml|\.txt)$/i.test(fileName)) {
+      if (buffer.readUInt32LE(localHeaderOffset) !== 0x04034b50) {
+        throw new DartDisclosureError('OpenDART document ZIP has invalid local header', {
+          status: 502,
+          code: 'provider_invalid_document_zip',
+          details: { fileName },
+        });
+      }
+
+      const localFileNameLength = buffer.readUInt16LE(localHeaderOffset + 26);
+      const localExtraLength = buffer.readUInt16LE(localHeaderOffset + 28);
+      const dataStart = localHeaderOffset + 30 + localFileNameLength + localExtraLength;
+      const compressed = buffer.subarray(dataStart, dataStart + compressedSize);
+      const fileBuffer = compressionMethod === 0
+        ? compressed
+        : compressionMethod === 8
+          ? inflateRawSync(compressed)
+          : null;
+
+      if (fileBuffer) {
+        files.push({ fileName, buffer: fileBuffer });
+      }
+    }
+
+    centralOffset += 46 + fileNameLength + extraLength + commentLength;
+  }
+
+  return files;
+}
+
+async function mapWithConcurrency(items, concurrency, worker) {
+  const limit = Math.max(1, Math.min(items.length || 1, concurrency));
+  const results = new Array(items.length);
+  let nextIndex = 0;
+
+  async function runWorker() {
+    while (nextIndex < items.length) {
+      const index = nextIndex;
+      nextIndex += 1;
+      results[index] = await worker(items[index], index);
+    }
+  }
+
+  await Promise.all(Array.from({ length: limit }, () => runWorker()));
+  return results;
+}
+
 async function fetchWithTimeout(url, { fetchImpl = fetch, timeoutMs = DART_DEFAULT_TIMEOUT_MS, headers = {} } = {}) {
   const controller = timeoutMs > 0 ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
@@ -353,6 +456,186 @@ async function fetchDartJson(path, params, opts = {}) {
 
   listCache.set(cacheKey, { fetchedAt: Date.now(), value: data });
   return data;
+}
+
+export async function getDartDisclosureDocumentText(rceptNoInput, opts = {}) {
+  const rceptNo = normalizeText(rceptNoInput);
+  if (!rceptNo) {
+    throw new DartDisclosureError('invalid rceptNo: required', {
+      status: 400,
+      code: 'invalid_receipt_no',
+    });
+  }
+
+  const apiKey = getDartApiKey(opts);
+  const url = new URL(`${OPEN_DART_BASE_URL}/document.xml`);
+  url.searchParams.set('crtfc_key', apiKey);
+  url.searchParams.set('rcept_no', rceptNo);
+
+  const cacheKey = `document:${redactDartUrl(url.toString())}`;
+  const cached = listCache.get(cacheKey);
+  if (cached && Date.now() - cached.fetchedAt < (opts.cacheTtlMs ?? DART_DOCUMENT_CACHE_TTL_MS)) {
+    return cached.value;
+  }
+
+  const response = await fetchWithTimeout(url, {
+    ...opts,
+    headers: { Accept: 'application/zip, application/xml, text/xml, */*', ...(opts.headers ?? {}) },
+  });
+  if (!response.ok) {
+    throw new DartDisclosureError(`OpenDART document HTTP ${response.status}`, {
+      status: response.status >= 500 ? 502 : response.status,
+      code: 'provider_http_error',
+      details: { providerStatus: response.status, url: redactDartUrl(url.toString()) },
+    });
+  }
+
+  const payload = Buffer.from(await response.arrayBuffer());
+  const head = payload.subarray(0, Math.min(payload.length, 800)).toString('utf8').trimStart();
+  const xmlStatus = parseOpenDartXmlStatus(head);
+  if (xmlStatus && xmlStatus.status !== '000') {
+    throw new DartDisclosureError(`OpenDART ${xmlStatus.status}: ${xmlStatus.message ?? 'document unavailable'}`, {
+      status: xmlStatus.status === '013' ? 404 : 502,
+      code: 'provider_status_error',
+      details: { providerStatus: xmlStatus.status, providerMessage: xmlStatus.message, path: '/document.xml' },
+    });
+  }
+
+  const files = extractAllTextFilesFromZipBuffer(payload);
+  const textFiles = files
+    .map((file) => ({
+      fileName: file.fileName,
+      text: stripDartDocumentToText(file.buffer.toString('utf8')),
+    }))
+    .filter((file) => file.text);
+  const text = textFiles.map((file) => file.text).join('\n').trim();
+  const result = {
+    source: 'opendart-document',
+    rceptNo,
+    text,
+    charCount: [...text].length,
+    byteCount: Buffer.byteLength(text, 'utf8'),
+    wordishCount: text ? text.split(/\s+/).filter(Boolean).length : 0,
+    fileCount: textFiles.length,
+    documentBytes: payload.length,
+    generatedAt: new Date().toISOString(),
+  };
+
+  listCache.set(cacheKey, { fetchedAt: Date.now(), value: result });
+  return result;
+}
+
+export async function buildDartDisclosureDocumentDump(filings = [], opts = {}) {
+  const sourceFilings = Array.isArray(filings) ? filings : [];
+  const maxCharsPerFiling = normalizePositiveInteger(
+    opts.maxCharsPerFiling ?? opts.maxChars ?? opts.documentMaxChars,
+    'maxCharsPerFiling',
+    DART_DOCUMENT_DUMP_DEFAULT_MAX_CHARS,
+    { max: 500_000 },
+  );
+  const limit = normalizePositiveInteger(
+    opts.limit ?? opts.documentLimit,
+    'documentLimit',
+    DART_DOCUMENT_DUMP_DEFAULT_LIMIT,
+    { max: 100 },
+  );
+  const fetchLimit = normalizePositiveInteger(
+    opts.fetchLimit ?? opts.documentFetchLimit,
+    'documentFetchLimit',
+    sourceFilings.length || limit,
+    { max: 100 },
+  );
+  const concurrency = normalizePositiveInteger(
+    opts.concurrency ?? opts.documentConcurrency,
+    'documentConcurrency',
+    DART_DOCUMENT_DUMP_DEFAULT_CONCURRENCY,
+    { max: 10 },
+  );
+  const candidates = sourceFilings
+    .filter((filing) => normalizeText(filing?.rceptNo ?? filing?.rcept_no))
+    .slice(0, fetchLimit);
+
+  const fetched = await mapWithConcurrency(candidates, concurrency, async (filing) => {
+    const rceptNo = normalizeText(filing.rceptNo ?? filing.rcept_no);
+    try {
+      return {
+        filing,
+        document: await getDartDisclosureDocumentText(rceptNo, opts),
+        error: null,
+      };
+    } catch (error) {
+      return {
+        filing,
+        document: null,
+        error: normalizeText(error?.message) ?? 'document fetch failed',
+      };
+    }
+  });
+
+  const included = [];
+  const skipped = [];
+  for (const entry of fetched) {
+    const filing = entry.filing;
+    const rceptNo = normalizeText(filing.rceptNo ?? filing.rcept_no) ?? null;
+    const reportName = normalizeText(filing.reportName ?? filing.report_nm) ?? '';
+    const receiptDate = normalizeText(filing.receiptDate ?? filing.rcept_dt) ?? null;
+    const filerName = normalizeText(filing.filerName ?? filing.flr_nm) ?? null;
+
+    if (!entry.document) {
+      skipped.push({ rceptNo, reportName, receiptDate, filerName, reason: 'fetch_failed', error: entry.error });
+      continue;
+    }
+
+    const charCount = entry.document.charCount;
+    if (charCount >= maxCharsPerFiling) {
+      skipped.push({ rceptNo, reportName, receiptDate, filerName, reason: 'too_long', charCount });
+      continue;
+    }
+
+    if (included.length >= limit) {
+      skipped.push({ rceptNo, reportName, receiptDate, filerName, reason: 'limit_exceeded', charCount });
+      continue;
+    }
+
+    included.push({
+      rceptNo,
+      reportName,
+      receiptDate,
+      filerName,
+      charCount,
+      wordishCount: entry.document.wordishCount,
+      text: entry.document.text,
+    });
+  }
+
+  const combinedText = included
+    .map((entry, index) => [
+      `[${index + 1}] ${entry.receiptDate ?? 'date-unknown'} · ${entry.reportName || '제목 없음'}${entry.filerName ? ` · 제출:${entry.filerName}` : ''} · ${entry.rceptNo ?? 'receipt-unknown'} · ${entry.charCount}자`,
+      entry.text,
+    ].join('\n'))
+    .join('\n\n---\n\n');
+
+  const skippedTooLongCount = skipped.filter((entry) => entry.reason === 'too_long').length;
+  const skippedUnavailableCount = skipped.filter((entry) => entry.reason === 'fetch_failed').length;
+
+  return {
+    available: included.length > 0,
+    source: 'opendart-document',
+    policy: 'skip_gte_max_chars_then_take_first_limit',
+    maxCharsPerFiling,
+    limit,
+    fetchLimit,
+    fetchedCount: fetched.length,
+    includedCount: included.length,
+    skippedCount: skipped.length,
+    skippedTooLongCount,
+    skippedUnavailableCount,
+    totalCharCount: included.reduce((sum, entry) => sum + entry.charCount, 0),
+    combinedText,
+    filings: included,
+    skipped,
+    generatedAt: new Date().toISOString(),
+  };
 }
 
 function decodeXmlText(value = '') {

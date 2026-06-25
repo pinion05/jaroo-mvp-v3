@@ -180,6 +180,52 @@ test('getDartDisclosures reports missing API key as provider-unconfigured', asyn
   }
 });
 
+test('buildDartDisclosureDocumentDump includes only under-threshold documents up to limit', async () => {
+  const { buildDartDisclosureDocumentDump, clearDartCaches } = await import('../src/crawlers/dart-filings.js');
+  clearDartCaches();
+  const requestedReceiptNos = [];
+  const documents = {
+    '20260601000001': '<document><section>짧은 공시 본문입니다.</section></document>',
+    '20260601000002': `<document><section>${'긴'.repeat(20)}</section></document>`,
+    '20260601000003': '<document><section>두 번째 짧은 본문입니다.</section></document>',
+    '20260601000004': '<document><section>세 번째 짧은 본문입니다.</section></document>',
+  };
+
+  const dump = await buildDartDisclosureDocumentDump([
+    { rceptNo: '20260601000001', reportName: '짧은 공시', receiptDate: '20260601', filerName: '삼성전자' },
+    { rceptNo: '20260601000002', reportName: '긴 공시', receiptDate: '20260601', filerName: '삼성전자' },
+    { rceptNo: '20260601000003', reportName: '짧은 공시 2', receiptDate: '20260601', filerName: '삼성전자' },
+    { rceptNo: '20260601000004', reportName: '짧은 공시 3', receiptDate: '20260601', filerName: '삼성전자' },
+  ], {
+    apiKey: 'test-dart-key',
+    maxCharsPerFiling: 15,
+    limit: 2,
+    concurrency: 2,
+    fetchImpl: async (url) => {
+      const parsed = new URL(String(url));
+      requestedReceiptNos.push(parsed.searchParams.get('rcept_no'));
+      assert.equal(parsed.pathname, '/api/document.xml');
+      assert.equal(parsed.searchParams.get('crtfc_key'), 'test-dart-key');
+      return new Response(documents[parsed.searchParams.get('rcept_no')], {
+        status: 200,
+        headers: { 'Content-Type': 'application/xml' },
+      });
+    },
+  });
+
+  assert.equal(requestedReceiptNos.length, 4);
+  assert.equal(dump.available, true);
+  assert.equal(dump.maxCharsPerFiling, 15);
+  assert.equal(dump.limit, 2);
+  assert.equal(dump.includedCount, 2);
+  assert.equal(dump.skippedTooLongCount, 1);
+  assert.equal(dump.skipped.some((entry) => entry.reason === 'limit_exceeded'), true);
+  assert.deepEqual(dump.filings.map((filing) => filing.rceptNo), ['20260601000001', '20260601000003']);
+  assert.match(dump.combinedText, /짧은 공시 본문입니다/);
+  assert.match(dump.combinedText, /두 번째 짧은 본문입니다/);
+  assert.doesNotMatch(dump.combinedText, /긴긴긴/);
+});
+
 test('kr-stock-disclosures endpoint is registered and returns standard envelope', async () => {
   const { app, endpointDefinitions } = await import('../src/server.js');
   const definition = endpointDefinitions.find((item) => item.id === 'kr-stock-disclosures');
