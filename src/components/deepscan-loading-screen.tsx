@@ -731,7 +731,70 @@ function buildTimelineNarrativeCards(cards: NarrativeCard[], elapsedSeconds: num
     ? cards.length
     : TEAM_PRESENTATION_ORDER.filter((stageKey) => elapsedSeconds >= TEAM_REVEAL_SECONDS[stageKey]).length
 
-  return cards.slice(0, Math.min(revealCount, cards.length))
+  if (revealCount <= 0) {
+    return []
+  }
+
+  return buildVisibleNarrativeCards(cards, revealCount)
+}
+
+function getTeamSummaryState(card: NarrativeCard, teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>) {
+  const summaryInputKey = hashSummaryInput(card.body)
+  const summaryState = card.teamKey ? teamSummaries[card.teamKey] : undefined
+  const summaryMatchesCard = summaryState?.inputKey === summaryInputKey
+  const summaryReady = summaryMatchesCard && summaryState.status === 'success' && summaryState.summary
+  const summaryLoading = summaryMatchesCard && summaryState.status === 'loading'
+  const summaryFailed = summaryMatchesCard && summaryState.status === 'error'
+
+  return {
+    summaryInputKey,
+    summaryState,
+    summaryReady,
+    summaryLoading,
+    summaryFailed,
+    summaryText: summaryReady ? summaryState.summary! : null,
+  }
+}
+
+function buildNarrativeFallbackSummary(card: NarrativeCard, summaryFailed: boolean) {
+  if (card.placeholder || !card.complete) {
+    return null
+  }
+
+  if (summaryFailed) {
+    return `${card.analystName}의 원문 요약은 잠시 불러오지 못했지만, 도착한 팀 응답은 결과 계산에 반영했어요.`
+  }
+
+  if (!card.summarizable) {
+    return `${card.analystName}에서 요약할 수 있는 확정 의견은 부족하지만, 확인 가능한 응답 상태는 반영했어요.`
+  }
+
+  return null
+}
+
+function hasNarrativeLoadingSkeleton(card: NarrativeCard, teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>) {
+  if (card.placeholder) {
+    return true
+  }
+
+  const { summaryText, summaryFailed } = getTeamSummaryState(card, teamSummaries)
+  const fallbackSummary = buildNarrativeFallbackSummary(card, Boolean(summaryFailed))
+
+  return !summaryText && !fallbackSummary
+}
+
+function buildSequentialNarrativeCards(cards: NarrativeCard[], teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>) {
+  const sequentialCards: NarrativeCard[] = []
+
+  for (const card of cards) {
+    sequentialCards.push(card)
+
+    if (hasNarrativeLoadingSkeleton(card, teamSummaries)) {
+      break
+    }
+  }
+
+  return sequentialCards
 }
 
 function buildTeamBridgeState(elapsedSeconds: number, resultsReady: boolean) {
@@ -1311,11 +1374,15 @@ export function DeepScanLoadingScreen({
     () => buildTimelineNarrativeCards(orderedNarrativeCards, elapsedSeconds, resultsReady),
     [elapsedSeconds, orderedNarrativeCards, resultsReady],
   )
+  const sequentialNarrativeCards = useMemo(
+    () => buildSequentialNarrativeCards(timelineNarrativeCards, teamSummaries),
+    [teamSummaries, timelineNarrativeCards],
+  )
   const completionState = buildCompletionState(resultsReady, elapsedSeconds)
   const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReady)
   const shouldAdvanceTimeline = !resultsReady || elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS
   const progressPct = resultsReady ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
-  const activeNarrativeCard = timelineNarrativeCards.findLast((card) => !card.placeholder) ?? timelineNarrativeCards.at(-1) ?? visibleNarrativeCards.at(-1) ?? orderedNarrativeCards[0]
+  const activeNarrativeCard = sequentialNarrativeCards.findLast((card) => !card.placeholder) ?? sequentialNarrativeCards.at(-1) ?? visibleNarrativeCards.at(-1) ?? orderedNarrativeCards[0]
   const progressLabel = resultsReady
     ? '상세 결과 준비 완료'
     : teamBridgeState
@@ -1459,24 +1526,27 @@ export function DeepScanLoadingScreen({
         </section>
 
         <section className={styles.narrativeStream} aria-label='분석가 진행 메시지'>
-          {timelineNarrativeCards.map((card) => {
-            const summaryInputKey = hashSummaryInput(card.body)
-            const summaryState = card.teamKey ? teamSummaries[card.teamKey] : undefined
-            const summaryReady = summaryState?.inputKey === summaryInputKey && summaryState.status === 'success' && summaryState.summary
-            const summaryLoading = summaryState?.inputKey === summaryInputKey && summaryState.status === 'loading'
-            const summaryText = summaryReady ? summaryState.summary! : null
+          {sequentialNarrativeCards.map((card) => {
+            const {
+              summaryReady,
+              summaryLoading,
+              summaryFailed,
+              summaryText,
+            } = getTeamSummaryState(card, teamSummaries)
+            const fallbackSummaryText = buildNarrativeFallbackSummary(card, Boolean(summaryFailed))
+            const resolvedSummaryText = summaryText ?? fallbackSummaryText
             const summaryCollapsible = Boolean(summaryText && shouldCollapseTeamSummaryText(summaryText))
             const summaryExpanded = Boolean(card.teamKey && expandedTeamSummaries.has(card.teamKey))
-            const displaySummaryText = summaryText && summaryCollapsible && !summaryExpanded ? getCollapsedTeamSummaryText(summaryText) : summaryText
+            const displaySummaryText = summaryText && summaryCollapsible && !summaryExpanded ? getCollapsedTeamSummaryText(summaryText) : resolvedSummaryText
             const summaryTextId = `team-summary-${card.key}`
-            const showSummarySkeleton = !card.placeholder && !summaryText
+            const showSummarySkeleton = !card.placeholder && !resolvedSummaryText
             const cardSettled = resultsReady || card.complete
-            const statusLabel = summaryReady ? '요약 완료' : summaryLoading ? '요약 중' : cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
-            const statusTone = summaryReady ? 'positive' : summaryLoading ? 'info' : cardSettled && !card.complete ? 'info' : card.statusTone
+            const statusLabel = summaryReady ? '요약 완료' : summaryLoading ? '요약 중' : summaryFailed ? '요약 생략' : cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
+            const statusTone = summaryReady ? 'positive' : summaryLoading ? 'info' : summaryFailed ? 'warning' : cardSettled && !card.complete ? 'info' : card.statusTone
             const tags = [
               ...card.tags,
               card.summarizable
-                ? { text: summaryReady ? '요약 완료' : '요약 중', tone: summaryReady ? 'positive' as const : 'info' as const }
+                ? { text: summaryReady ? '요약 완료' : summaryFailed ? '요약 생략' : '요약 중', tone: summaryReady ? 'positive' as const : summaryFailed ? 'warning' as const : 'info' as const }
                 : null,
             ].filter((tag): tag is { text: string; tone: NarrativeTone } => Boolean(tag))
 
