@@ -12,6 +12,8 @@
   --ds-green: #3b6d11;
   --ds-green-soft: #eaf3de;
   --ds-red: #b84545;
+  --ds-skeleton-shimmer-duration: 4.2s;
+  --ds-member-pulse-duration: 4s;
 
   background: var(--ds-card);
   width: 100%;
@@ -909,7 +911,7 @@
   border-radius: 999px;
   background: linear-gradient(90deg, #eef3f7 25%, #e3ebf2 50%, #eef3f7 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
+  animation: shimmer var(--ds-skeleton-shimmer-duration) ease-in-out infinite;
 }
 
 .consensusSkeletonEyebrow {
@@ -1128,7 +1130,7 @@
   height: 10px;
   background: linear-gradient(90deg, #f0f0f0 25%, #e8e8e8 50%, #f0f0f0 75%);
   background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
+  animation: shimmer var(--ds-skeleton-shimmer-duration) ease-in-out infinite;
   border-radius: 5px;
 }
 
@@ -1392,7 +1394,7 @@
   background: var(--ds-blue-soft);
   color: var(--ds-blue);
   border-color: var(--ds-blue);
-  animation: pulse 1s infinite;
+  animation: pulse var(--ds-member-pulse-duration) ease-in-out infinite;
 }
 
 .memberDone {
@@ -2050,7 +2052,7 @@
   border-radius: 999px;
   background: linear-gradient(90deg, #e7ebf0 0%, #f5f7fa 48%, #e7ebf0 100%);
   background-size: 180% 100%;
-  animation: shimmer 1.15s ease-in-out infinite;
+  animation: shimmer var(--ds-skeleton-shimmer-duration) ease-in-out infinite;
 }
 
 .narrativeTitleSkeleton {
