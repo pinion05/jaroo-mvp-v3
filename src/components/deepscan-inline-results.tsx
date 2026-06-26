@@ -1,7 +1,6 @@
 'use client'
 
 import type {
-  JarooDeepScanCommitteeMember,
   JarooDeepScanPayload,
   JarooDeepScanStrategyScenario,
 } from '../../packages/contracts/src/deepscan'
@@ -16,15 +15,6 @@ type DeepScanInlineResultsProps = {
   target?: DeepScanTargetInput | null
 }
 
-type TeamDefinition = {
-  key: string
-  name: string
-  description: string
-  icon: string
-  memberKeys: string[]
-  memberTitles: string[]
-}
-
 type ScenarioView = {
   label: string
   probability: string
@@ -33,52 +23,12 @@ type ScenarioView = {
   recommended?: boolean
 }
 
-const TEAM_DEFINITIONS: readonly TeamDefinition[] = [
-  {
-    key: 'market',
-    name: '시장·차트 팀',
-    description: '차트 마스터 · 거래량 · 상승세 추적',
-    icon: '📈',
-    memberKeys: ['priceLocation', 'avgPriceGap', 'trend', 'momentum', 'estimate-revision', 'event-risk'],
-    memberTitles: ['가격 위치', '평단 격차', '트렌드', '지수/가격 흐름'],
-  },
-  {
-    key: 'context',
-    name: '심리·환경 팀',
-    description: '증권사 의견 · 산업 전문가 · 이슈 탐색',
-    icon: '🧠',
-    memberKeys: ['holdingCompleteness', 'upsideBuffer', 'consensusMomentum', 'financial-safety', 'ownership-flow', 'portfolio-fit'],
-    memberTitles: ['입력 완성도', '상방 버퍼', '상하방 여지', '이벤트 스캐너', '컨센서스 모멘텀', '시장 신호/정보 밀도'],
-  },
-  {
-    key: 'fundamental',
-    name: '가치·기본 팀',
-    description: '가치 분석 · 성장 전략 · 재무 점검',
-    icon: '📊',
-    memberKeys: ['valuation', 'profitability', 'ownershipStability', 'growth', 'profitability-quality'],
-    memberTitles: ['밸류에이션', '가격/NAV 단서', '수익성/기본체력', '상품 구조/운용 품질', '지분/안정성', '구성/분산 안정성'],
-  },
-] as const
-
 function firstNonEmpty(...values: Array<string | undefined | null>) {
   return values.find((value) => typeof value === 'string' && value.trim().length > 0)?.trim() ?? null
 }
 
 function isExchangeProductPayload(payload: JarooDeepScanPayload) {
   return /(?:^|\b)(?:ETF|ETN)(?:\b|$)/iu.test(payload.input.instrument.market ?? '') || /^(?:etf|etn)$/iu.test(payload.input.instrument.kind ?? '')
-}
-
-function getTeamDisplay(team: TeamDefinition, exchangeProduct: boolean) {
-  if (!exchangeProduct) return team
-  if (team.key === 'market') return { ...team, description: '가격 흐름 · 거래량 · 지수 추적' }
-  if (team.key === 'context') return { ...team, description: '상품 정보 · 기초지수 · 유동성' }
-  return { ...team, description: 'ETF 구조 · 운용 · 구성' }
-}
-
-function compact(value: string | null | undefined, max = 104) {
-  const normalized = value?.replace(/\s+/g, ' ').trim()
-  if (!normalized) return ''
-  return normalized.length > max ? `${normalized.slice(0, max - 1).trim()}…` : normalized
 }
 
 function parsePercent(value: string | null | undefined) {
@@ -108,60 +58,6 @@ function deriveUpside(currentText: string | null | undefined, targetText: string
   const target = parseMoneyNumber(targetText)
   if (current === null || target === null || current === 0) return null
   return ((target / current) - 1) * 100
-}
-
-function flattenMembers(payload: JarooDeepScanPayload) {
-  return payload.committee?.axes?.flatMap((axis) => axis.members ?? []) ?? []
-}
-
-function resolveTeamMembers(payload: JarooDeepScanPayload, team: TeamDefinition) {
-  const members = flattenMembers(payload)
-  const matchedByKey = team.memberKeys
-    .map((memberKey) => members.find((member) => member.memberKey === memberKey))
-    .filter((member): member is JarooDeepScanCommitteeMember => Boolean(member))
-  const matchedByTitle = team.memberTitles
-    .map((title) => members.find((member) => member.title === title))
-    .filter((member): member is JarooDeepScanCommitteeMember => Boolean(member))
-  const matched = [...matchedByKey, ...matchedByTitle]
-    .filter((member, index, values) => values.indexOf(member) === index)
-
-  if (matched.length > 0) return matched
-
-  const fallbackAxis = payload.committee?.axes?.find((axis) => team.memberTitles.some((title) => axis.label?.includes(title) || axis.subtitle?.includes(title)))
-  return fallbackAxis?.members ?? []
-}
-
-function buildTeamSummary(payload: JarooDeepScanPayload, team: TeamDefinition, exchangeProduct = false) {
-  if (payload.committee.blockState !== 'ok') {
-    return {
-      body: payload.committee.fallback?.label || payload.committee.error?.message || '위원회 분석 원천을 지금 불러오지 못했어요.',
-      tags: ['원천 상태 확인', '관망'],
-      status: '보류',
-      warning: true,
-    }
-  }
-
-  const members = resolveTeamMembers(payload, team)
-  if (members.length === 0) {
-    return { body: '이 팀의 실제 위원 응답이 아직 도착하지 않았어요.', tags: ['응답 대기'], status: '대기', warning: false }
-  }
-
-  const successful = members.filter((member) => member.status === 'success' && member.reason?.trim())
-  const errored = members.filter((member) => member.status === 'error')
-  const pending = members.filter((member) => member.status === 'pending')
-  const lead = successful[0]
-  const body = lead
-    ? compact(lead.reason)
-    : errored.length > 0
-      ? compact(errored[0]?.error?.message) || '일부 위원 응답 실패. 도착한 근거만 먼저 보여드려요.'
-      : '응답 대기 중이에요. 도착한 실제 데이터부터 순서대로 붙습니다.'
-  const tags = [
-    successful.length > 0 ? `${successful.length}개 근거` : null,
-    errored.length > 0 ? `${errored.length}개 대기` : null,
-    pending.length > 0 ? `${pending.length}개 준비 중` : null,
-  ].filter((tag): tag is string => Boolean(tag))
-
-  return { body: exchangeProduct ? sanitizeExchangeProductCopy(body) : body, tags: tags.length ? tags : ['확인 중'], status: errored.length > 0 ? '일부 실패' : pending.length > 0 ? '분석 중' : '확인', warning: errored.length > 0 }
 }
 
 function buildStrength(payload: JarooDeepScanPayload) {
@@ -256,36 +152,6 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
 
   return (
     <section className='space-y-3 pb-2' aria-label='딥스캔 v7 실제 결과'>
-      <div className='px-2 pt-1 text-[11px] font-semibold tracking-[0.08em] text-[#97A0AE]'>AI 팀 브리핑</div>
-      <div className='space-y-3'>
-        {TEAM_DEFINITIONS.map((team) => {
-          const displayTeam = getTeamDisplay(team, exchangeProduct)
-          const teamSummary = buildTeamSummary(payload, team, exchangeProduct)
-          return (
-            <article key={team.key} className='rounded-[16px] border border-[#E8EAEE] bg-white px-4 py-4 shadow-[0_1px_3px_rgba(0,0,0,.04)]'>
-              <div className='flex items-start gap-3'>
-                <div className='flex size-9 shrink-0 items-center justify-center rounded-[10px] bg-[#F5F6F8] text-[16px]' aria-hidden='true'>{displayTeam.icon}</div>
-                <div className='min-w-0 flex-1'>
-                  <div className='flex items-start justify-between gap-2'>
-                    <div className='min-w-0'>
-                      <h3 className='truncate text-[13px] font-bold text-[#0F1419]'>{displayTeam.name}</h3>
-                      <p className='mt-0.5 truncate text-[10px] text-[#97A0AE]'>{displayTeam.description}</p>
-                    </div>
-                    <span className={cn('shrink-0 rounded-[6px] px-2 py-1 text-[10px] font-bold', teamSummary.warning ? 'bg-[#FCEBEB] text-[#A32D2D]' : 'bg-[#E5F3EB] text-[#1A7340]')}>{teamSummary.status}</span>
-                  </div>
-                  <p className='mt-3 text-[13px] leading-6 text-[#0F1419]'>{teamSummary.body}</p>
-                  <div className='mt-3 flex flex-wrap gap-1.5'>
-                    {teamSummary.tags.map((tag) => (
-                      <span key={`${team.key}-${tag}`} className={cn('rounded-[6px] px-2 py-1 text-[10px] font-semibold', teamSummary.warning ? 'bg-[#FCEBEB] text-[#A32D2D]' : 'bg-[#E5F3EB] text-[#1A7340]')}>{tag}</span>
-                    ))}
-                  </div>
-                </div>
-              </div>
-            </article>
-          )
-        })}
-      </div>
-
       <article className='overflow-hidden rounded-[16px] border border-[#E8EAEE] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]' aria-label='AI 종합 결론'>
         <div className='flex items-center gap-3 border-b border-[#EFF1F4] px-4 py-4'>
           <div className='flex size-9 items-center justify-center rounded-[10px] bg-[#0F1419] text-[12px] font-black text-white'>AI</div>

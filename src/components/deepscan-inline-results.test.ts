@@ -29,15 +29,13 @@ function basePayload(): JarooDeepScanPayload {
   }
 }
 
-test('DeepScanInlineResults renders v7 team/conclusion stream with degraded real payload', () => {
+test('DeepScanInlineResults renders the aggregate result without repeating team briefing messages', () => {
   const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload: basePayload() }))
 
   assert.match(markup, /딥스캔 v7 실제 결과/)
-  assert.match(markup, /시장·차트 팀/)
-  assert.match(markup, /일부 실패/)
-  assert.match(markup, /1개 근거/)
-  assert.match(markup, /1개 대기/)
-  assert.match(markup, /1개 준비 중/)
+  assert.doesNotMatch(markup, /시장·차트 팀/)
+  assert.doesNotMatch(markup, /현재 가격은 52주 중상단/)
+  assert.doesNotMatch(markup, /1개 근거|1개 대기|1개 준비 중/)
   assert.match(markup, /세 팀의 의견을 모았어요/)
   assert.match(markup, /보유 유지/)
   assert.match(markup, /62%/)
@@ -50,7 +48,7 @@ test('DeepScanInlineResults falls back when committee and strategy blocks are un
   payload.strategy = { ...payload.strategy, blockState: 'blocked', fallback: { used: true, label: '전략 원천 차단' }, otherScenarios: [] }
   const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
 
-  assert.match(markup, /위원회 실패/)
+  assert.doesNotMatch(markup, /위원회 실패/)
   assert.match(markup, /관망/)
   assert.match(markup, /전략 원천 차단/)
 })
@@ -84,10 +82,10 @@ test('DeepScanInlineResults resolves ETF committee teams by stable memberKey bef
   }]
   const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
 
-  assert.match(markup, /가치·기본 팀/)
+  assert.doesNotMatch(markup, /가치·기본 팀/)
   assert.doesNotMatch(markup, /목표가|추가 상승 여력|매도 판단/)
-  assert.match(markup, /NAV|기초지수|비중 점검/)
-  assert.match(markup, /3개 근거/)
+  assert.doesNotMatch(markup, /ETF 특성상 개별 종목 분석/)
+  assert.doesNotMatch(markup, /3개 근거/)
 })
 
 test('DeepScanInlineResults uses ETF-native labels instead of target-price upside copy', () => {
@@ -103,7 +101,7 @@ test('DeepScanInlineResults uses ETF-native labels instead of target-price upsid
 
   assert.match(markup, /ETF 기준/)
   assert.match(markup, /가능 시나리오/)
-  assert.match(markup, /상품 정보 · 기초지수 · 유동성/)
+  assert.doesNotMatch(markup, /상품 정보 · 기초지수 · 유동성/)
   assert.doesNotMatch(markup, /증권사 의견/)
   assert.doesNotMatch(markup, />목표가</)
   assert.doesNotMatch(markup, /상승 여력/)
