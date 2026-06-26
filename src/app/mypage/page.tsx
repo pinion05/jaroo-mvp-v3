@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { useMemo, useRef, useState } from 'react'
-import { Avatar, AvatarFallback } from '@/components/ui/avatar'
+import { AuthAccountCard } from '@/components/auth/auth-account-card'
 import { Card } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { JarooShell } from '@/components/jaroo-shell'
@@ -269,23 +269,7 @@ export default function MyPage() {
 
   return (
     <JarooShell title='마이' leading={null} bottomNav={mypageBottomNav}>
-      <Card className='rounded-[26px] border-0 bg-[linear-gradient(180deg,var(--jaroo-primary-strong),var(--jaroo-primary))] p-5 text-white shadow-none ring-0'>
-        <div className='flex items-center gap-4'>
-          <Avatar className='size-[52px] border border-white/20'>
-            <AvatarFallback className='bg-white/15 text-lg font-semibold text-white'>호</AvatarFallback>
-          </Avatar>
-          <div className='min-w-0 flex-1'>
-            <p className='text-base font-semibold'>호식님</p>
-            <p className='mt-1 text-xs text-white/65'>무료 플랜 · 딥스캔 2회 사용</p>
-          </div>
-          <button
-            type='button'
-            className='rounded-xl border border-white/30 bg-white/12 px-3 py-1.5 text-[11px] font-semibold text-white transition hover:bg-white/20'
-          >
-            Pro 업그레이드
-          </button>
-        </div>
-      </Card>
+      <AuthAccountCard />
 
       <section className='space-y-2'>
         <SectionLabel>크레딧</SectionLabel>

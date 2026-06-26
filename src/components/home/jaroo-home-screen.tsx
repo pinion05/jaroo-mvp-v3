@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
 import { Cell, Pie, PieChart } from 'recharts'
+import { AuthHomeStatus } from '@/components/auth/auth-home-status'
 import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
 import { shouldUseDeepScanLoadingHandoff } from '@/lib/deepscan-navigation'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
@@ -928,6 +929,10 @@ export function JarooHomeScreen() {
     return (
       <div className={styles.viewport}>
         <div className={styles.frame}>
+          <header className={styles.top}>
+            <div className={styles.brand}>Jaroo</div>
+            <AuthHomeStatus />
+          </header>
           <main className={styles.body}>
             <div className={styles.forecastCard}>
               <div className={styles.forecastLabel}>스크린샷 준비</div>
@@ -944,6 +949,7 @@ export function JarooHomeScreen() {
       <div ref={frameRef} className={styles.frame}>
         <header className={styles.top}>
           <div className={styles.brand}>Jaroo</div>
+          <AuthHomeStatus />
           <div className={styles.topActions}>
             <Link href='/screenshot' className={styles.tbtn} aria-label='스크린샷 추가'>＋</Link>
             <button type='button' className={styles.tbtn} aria-label='알림' onClick={() => setOpenSheet('momentum')}>
