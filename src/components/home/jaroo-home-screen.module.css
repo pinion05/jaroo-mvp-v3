@@ -720,3 +720,41 @@
     display: none;
   }
 }
+
+
+.authStatus {
+  min-width: 74px;
+  max-width: 118px;
+  border: 0.5px solid #e8eaee;
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  color: #4d5b6a;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 6px 9px;
+  font-size: 11px;
+  font-weight: 750;
+  line-height: 1;
+}
+
+.authStatusName {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.authStatusAction {
+  border: 0;
+  background: transparent;
+  color: #0475e6;
+  cursor: pointer;
+  flex: 0 0 auto;
+  font: inherit;
+  font-size: 10px;
+  padding: 0;
+  text-decoration: none;
+}
