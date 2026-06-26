@@ -225,3 +225,15 @@ test('DeepScan team bubbles send raw member reasons for summaries but hide raw g
   assert.doesNotMatch(loadingSource, literalPattern(obsoleteServiceName))
   assert.doesNotMatch(loadingSource, literalPattern(obsoleteKoreanLens))
 })
+
+test('DeepScan skeleton shimmer uses a calmer shared cadence', () => {
+  const cssSource = readRepoFile('src', 'components', 'deepscan-loading-screen.module.css')
+
+  assert.match(cssSource, /--ds-skeleton-shimmer-duration:\s*4\.2s;/)
+  assert.match(cssSource, /--ds-member-pulse-duration:\s*4s;/)
+  assert.match(cssSource, /\.consensusSkeletonBlock,\s*\.consensusSkeletonPill\s*\{[\s\S]*?animation: shimmer var\(--ds-skeleton-shimmer-duration\) ease-in-out infinite;/)
+  assert.match(cssSource, /\.skeletonRow\s*\{[\s\S]*?animation: shimmer var\(--ds-skeleton-shimmer-duration\) ease-in-out infinite;/)
+  assert.match(cssSource, /\.narrativeTitleSkeleton,\s*\.narrativeDescriptionSkeleton,\s*\.narrativeTextSkeleton span\s*\{[\s\S]*?animation: shimmer var\(--ds-skeleton-shimmer-duration\) ease-in-out infinite;/)
+  assert.doesNotMatch(cssSource, /animation: shimmer 1\.(?:15|4)s/)
+  assert.doesNotMatch(cssSource, /animation: pulse 1s infinite/)
+})
