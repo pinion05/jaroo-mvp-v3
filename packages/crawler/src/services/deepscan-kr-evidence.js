@@ -1,4 +1,8 @@
 import { createRequire } from 'node:module';
+import {
+  hasKrDisclosureHighRiskSignal,
+  matchKrDisclosureRiskKeywords,
+} from './deepscan-kr-disclosure-risk-keywords.js';
 
 const require = createRequire(import.meta.url);
 const {
@@ -12,7 +16,6 @@ const V12_EXTRA_PAGE_IDS = Object.freeze(KNOWN_V12_PAGE_IDS.filter((pageId) => !
 const OCRISH_NUMBER_TEXT_PATTERN = /(shares?|share|stocks?|stock|주|원|krw|usd|eur|jpy|cny|aud|cad|hkd)/gi;
 const LABEL_PREFIX_PATTERN = /^(?:펼치기|접기)\s*/;
 const NO_DATA_TEXT_PATTERN = /^(?:[-—–]|n\/a|na|null|none|데[이]?타가\s*존재하지\s*않습니다\.?|데[이]?터가\s*존재하지\s*않습니다\.?|자료가\s*없습니다\.?|데[이]?터\s*없음|최근\s*3개월\s*이내에\s*제시된\s*의견이\s*없습니다\.?)$/i;
-const DISCLOSURE_HIGH_RISK_PATTERN = /(횡령|배임|감사의견|상장폐지|관리종목|불성실|거래정지|영업정지|소송|제재|부도|회생|파산|채무불이행|기타시장안내)/u;
 const DISCLOSURE_CORRECTION_PATTERN = /(\[기재정정\]|기재정정|정정)/u;
 const DISCLOSURE_DILUTION_PATTERN = /(유상증자|무상증자|전환사채|신주인수권|교환사채|감자|자기주식처분|주식매수선택권|증권발행|주요사항보고서)/u;
 const DISCLOSURE_OWNERSHIP_PATTERN = /(임원ㆍ주요주주|임원·주요주주|주요주주|최대주주|대량보유|소유주식변동|주식등의대량보유|지분공시)/u;
@@ -1207,8 +1210,9 @@ function classifyDisclosureFiling(reportName, disclosureType) {
   const name = normalizeText(reportName) ?? '';
   const type = normalizeText(disclosureType);
   const categories = [];
+  const riskKeywordMatch = matchKrDisclosureRiskKeywords(name);
 
-  if (DISCLOSURE_HIGH_RISK_PATTERN.test(name)) {
+  if (hasKrDisclosureHighRiskSignal(name)) {
     categories.push('high-risk');
   }
   if (DISCLOSURE_CORRECTION_PATTERN.test(name)) {
@@ -1248,6 +1252,9 @@ function classifyDisclosureFiling(reportName, disclosureType) {
     categories,
     riskLevel,
     riskLabel,
+    riskKeywordGroups: riskKeywordMatch.groups,
+    riskKeywords: riskKeywordMatch.keywords,
+    riskKeywordSeverity: riskKeywordMatch.maxSeverity,
   };
 }
 
