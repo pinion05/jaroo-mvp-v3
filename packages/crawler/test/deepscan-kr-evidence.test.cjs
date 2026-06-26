@@ -395,6 +395,84 @@ test('buildDeepScanKrEvidencePacket promotes OpenDART disclosures into structure
   ]);
 });
 
+test('KR disclosure risk keyword database catches sampled delisting disclosure title variants', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+  const {
+    KR_DELISTING_DISCLOSURE_KEYWORD_GROUPS,
+    matchKrDisclosureRiskKeywords,
+  } = await import('../src/services/deepscan-kr-disclosure-risk-keywords.js');
+
+  const sampledDelistingTitles = [
+    '주권매매거래정지해제 (상장폐지에 따른 정리매매 개시)',
+    '기타시장안내 (상장폐지 절차 진행 안내)',
+    '기타시장안내 (상장폐지결정 효력정지 등 가처분 신청 기각에 따른 정리매매절차 재개)',
+    '기타시장안내 (코스닥시장위원회 개최 결과 및 상장폐지 결정 안내)',
+    '기타시장안내 (상장폐지 절차 재개)',
+    '기타주요경영사항(자율공시) (상장폐지효력정지가처분 기각 결정에 대한 즉시항고장 제출)',
+    '주권매매거래정지 (자진상장폐지 신청)',
+    '투자유의안내 (상장폐지 우려 예고)',
+    '기타시장안내 (상장폐지 관련)',
+    '기타시장안내 (상장폐지사유 발생)',
+    '기타시장안내 (상장폐지 여부 결정일까지 개선기간 부여)',
+    '기타시장안내 (기업심사위원회 심의결과 안내)',
+    '기타시장안내 (상장적격성 실질심사 대상 결정)',
+    '기타시장안내 (개선기간 종료에 따른 상장폐지 여부 심의)',
+    '주권매매거래정지기간변경 (상장폐지 사유 발생)',
+    '감사보고서 제출 (감사의견 의견거절)',
+    '감사보고서 제출 (감사범위 제한 및 계속기업 존속능력 불확실성)',
+    '기타시장안내 (사업보고서 미제출에 따른 관리종목 지정)',
+    '기타시장안내 (관리종목 지정 후 사유 미해소)',
+    '기타시장안내 (상장예비심사 청구서 미제출)',
+    '기타시장안내 (발행한 어음의 최종부도)',
+    '회생절차개시신청',
+    '횡령ㆍ배임혐의발생',
+    '불성실공시법인지정',
+    '기타시장안내 (기업의 계속성 및 경영의 투명성 등을 종합적으로 고려)',
+    '기타시장안내 (지정자문인 선임계약 해지에 따른 상장폐지절차 안내)',
+    '주권매매거래정지 (지정자문인 계약해지)',
+    '반기검토의견부적정또는의견거절',
+    '회생절차폐지결정',
+    '회생절차폐지신청',
+    '기타시장안내 (상장공시위원회 심의결과 및 상장폐지 결정 안내)',
+    '기타시장안내 (투자주의 환기종목 지정사유 일부 해제 관련 시장조치 미진행)',
+    '기타시장안내 (회계처리기준 위반행위 관련 상장적격성 실질심사 절차 미진행 안내)',
+    '감사보고서 제출 (감사의견 거절 및 계속기업가정 불확실성)',
+    '주권매매거래정지기간변경 (주식의 병합, 분할 등 전자등록 변경, 말소)',
+  ];
+
+  assert.ok(KR_DELISTING_DISCLOSURE_KEYWORD_GROUPS.length >= 6);
+  for (const title of sampledDelistingTitles) {
+    const match = matchKrDisclosureRiskKeywords(title);
+    assert.equal(match.matched, true, title);
+    assert.ok(['high', 'critical'].includes(match.maxSeverity), title);
+  }
+  assert.equal(matchKrDisclosureRiskKeywords('기타시장안내').maxSeverity, 'medium');
+
+  const packet = buildDeepScanKrEvidencePacket(
+    { instrument: { code: '230980', name: '비유테크놀러지', market: 'KR' } },
+    {
+      disclosures: {
+        source: 'opendart',
+        requested: { from: '20251201', to: '20260626' },
+        summary: { totalCount: sampledDelistingTitles.length, latestReceiptDate: '20260521' },
+        filings: sampledDelistingTitles.map((reportName, index) => ({
+          rceptNo: String(20260000000000 + index),
+          reportName,
+          receiptDate: '20260521',
+        })),
+      },
+    },
+  );
+
+  assert.equal(packet.disclosureAnalysis.riskCount, sampledDelistingTitles.length);
+  assert.equal(packet.disclosureAnalysis.categoryCounts['high-risk'], sampledDelistingTitles.length);
+  assert.equal(packet.reportSignals.disclosureRiskCount, sampledDelistingTitles.length);
+  assert.equal(
+    packet.topRisks.includes(`주의 공시 ${sampledDelistingTitles.length}건: ${sampledDelistingTitles[0]}`),
+    true,
+  );
+});
+
 test('buildDeepScanKrEvidencePacket promotes KR WiseReport raw facts into structured snapshots instead of losing them behind global-shaped fields', async () => {
   const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
 
