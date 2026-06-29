@@ -88,6 +88,21 @@ test('DeepScan hides standalone price position and ETF context fact cards', () =
   assert.doesNotMatch(cssSource, /\.narrativePricebar/)
 })
 
+test('DeepScan Today briefing auto-scrolls newly revealed mobile items', () => {
+  const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
+
+  assert.match(loadingSource, literalPattern('TODAY_BRIEFING_ITEM_SELECTOR = \'[data-today-briefing-item="true"]\''))
+  assert.match(loadingSource, /TODAY_BRIEFING_MOBILE_SCROLL_QUERY = '\(max-width: 640px\)'/)
+  assert.match(loadingSource, /function startTodayBriefingMobileAutoScroll/)
+  assert.match(loadingSource, /querySelectorAll<HTMLElement>\(TODAY_BRIEFING_ITEM_SELECTOR\)\.item\(visibleItemCount - 1\)/)
+  assert.match(loadingSource, /scrollTodayBriefingItemBottomIntoView\(targetItem\)/)
+  assert.match(loadingSource, /ResizeObserver/)
+  assert.match(loadingSource, /const visibleBriefingItemCount = briefStartSeconds\.filter\(\(at\) => elapsedSeconds >= at\)\.length/)
+  assert.match(loadingSource, /startTodayBriefingMobileAutoScroll\(todayBriefListRef\.current, visibleBriefingItemCount\)/)
+  assert.match(loadingSource, /ref=\{todayBriefListRef\}/)
+  assert.match(loadingSource, /data-today-briefing-item='true'/)
+})
+
 test('DeepScan loading sequencing is success-gated and no longer bypasses on raw resultsReady', () => {
   const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
   const pageSource = readRepoFile('src', 'app', 'deepscan', 'page.tsx')

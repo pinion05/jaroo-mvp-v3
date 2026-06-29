@@ -156,6 +156,9 @@ const TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS = 0.9
 const TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS = 1.8
 const COMPLETION_SOON_REVEAL_SECONDS = 43
 const TODAY_BRIEFING_ITEM_COUNT = 6
+const TODAY_BRIEFING_ITEM_SELECTOR = '[data-today-briefing-item="true"]'
+const TODAY_BRIEFING_MOBILE_SCROLL_QUERY = '(max-width: 640px)'
+const TODAY_BRIEFING_SCROLL_BOTTOM_GAP_PX = 16
 const TEAM_BRIDGE_REVEAL_SECONDS = 38
 const TEAM_BRIDGE_FINAL_MESSAGE_MIN_SECONDS = 30
 const TEAM_BRIDGE_DONE_SECONDS = COMPLETION_SOON_REVEAL_SECONDS + TEAM_BRIDGE_FINAL_MESSAGE_MIN_SECONDS
@@ -965,6 +968,114 @@ function buildTodayFlow({ current, open, high, low }: { current: number | null; 
   }
 }
 
+function shouldAutoScrollTodayBriefingOnMobile() {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia(TODAY_BRIEFING_MOBILE_SCROLL_QUERY).matches
+}
+
+function prefersReducedAutoScrollMotion() {
+  return typeof window !== 'undefined'
+    && typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+}
+
+function getScrollableTodayBriefingContainer(item: HTMLElement) {
+  const loadingCard = item.closest<HTMLElement>(`.${styles.loadingCard}`)
+  if (!loadingCard || loadingCard.scrollHeight <= loadingCard.clientHeight + 1) {
+    return null
+  }
+
+  return loadingCard
+}
+
+function scrollTodayBriefingItemBottomIntoView(item: HTMLElement) {
+  if (!shouldAutoScrollTodayBriefingOnMobile()) {
+    return
+  }
+
+  const behavior: ScrollBehavior = prefersReducedAutoScrollMotion() ? 'auto' : 'smooth'
+  const container = getScrollableTodayBriefingContainer(item)
+  const itemRect = item.getBoundingClientRect()
+
+  if (container) {
+    const containerRect = container.getBoundingClientRect()
+    const bottomOverflow = itemRect.bottom - (containerRect.bottom - TODAY_BRIEFING_SCROLL_BOTTOM_GAP_PX)
+
+    if (bottomOverflow > 1) {
+      container.scrollTo({
+        top: container.scrollTop + bottomOverflow,
+        behavior,
+      })
+    }
+
+    return
+  }
+
+  const viewportBottom = window.innerHeight - TODAY_BRIEFING_SCROLL_BOTTOM_GAP_PX
+  const bottomOverflow = itemRect.bottom - viewportBottom
+  if (bottomOverflow > 1) {
+    window.scrollTo({
+      top: window.scrollY + bottomOverflow,
+      behavior,
+    })
+  }
+}
+
+function startTodayBriefingMobileAutoScroll(listElement: HTMLDivElement | null, visibleItemCount: number) {
+  if (!listElement || visibleItemCount <= 0 || !shouldAutoScrollTodayBriefingOnMobile()) {
+    return undefined
+  }
+
+  const targetItem = listElement.querySelectorAll<HTMLElement>(TODAY_BRIEFING_ITEM_SELECTOR).item(visibleItemCount - 1)
+  if (!targetItem) {
+    return undefined
+  }
+
+  let stopped = false
+  let animationFrameId: number | null = null
+  let resizeObserver: ResizeObserver | null = null
+  const timeoutIds: number[] = []
+
+  const queueScroll = () => {
+    if (stopped) {
+      return
+    }
+
+    if (animationFrameId !== null) {
+      window.cancelAnimationFrame(animationFrameId)
+    }
+
+    animationFrameId = window.requestAnimationFrame(() => {
+      animationFrameId = null
+      if (!stopped) {
+        scrollTodayBriefingItemBottomIntoView(targetItem)
+      }
+    })
+  }
+
+  queueScroll()
+  timeoutIds.push(
+    window.setTimeout(queueScroll, 460),
+    window.setTimeout(queueScroll, 960),
+    window.setTimeout(queueScroll, 1860),
+  )
+
+  if (typeof ResizeObserver !== 'undefined') {
+    resizeObserver = new ResizeObserver(queueScroll)
+    resizeObserver.observe(targetItem)
+  }
+
+  return () => {
+    stopped = true
+    if (animationFrameId !== null) {
+      window.cancelAnimationFrame(animationFrameId)
+    }
+    timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId))
+    resizeObserver?.disconnect()
+  }
+}
+
 function TodayBriefingCard({
   currentPriceText,
   currentPriceCurrency,
@@ -988,6 +1099,7 @@ function TodayBriefingCard({
   elapsedSeconds: number
   briefingSnapshot?: LoadingBriefingSnapshot | null
 }) {
+  const todayBriefListRef = useRef<HTMLDivElement | null>(null)
   const quote = briefingSnapshot?.quote
   const averagePriceValue = parseNumericValue(averagePriceText ?? undefined)
   const chartAveragePriceValue = normalizeMoneyValueToCurrency(
@@ -1107,6 +1219,11 @@ function TodayBriefingCard({
     { length: TODAY_BRIEFING_ITEM_COUNT },
     (_, index) => TODAY_BRIEFING_FIRST_REVEAL_SECONDS + index * TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS,
   )
+  const visibleBriefingItemCount = briefStartSeconds.filter((at) => elapsedSeconds >= at).length
+
+  useEffect(() => (
+    startTodayBriefingMobileAutoScroll(todayBriefListRef.current, visibleBriefingItemCount)
+  ), [visibleBriefingItemCount])
 
   return (
     <section className={styles.todayBriefingCard} aria-label='오늘 장 기준 시세 브리핑'>
@@ -1144,7 +1261,7 @@ function TodayBriefingCard({
 
       </div>
 
-      <div className={styles.todayBriefList}>
+      <div className={styles.todayBriefList} ref={todayBriefListRef}>
         <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} icon='🗓️' question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
         <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} icon='📈' question='단기 흐름은요?' data={<span className={shortStreak.direction === 'up' ? styles.todayUp : shortStreak.direction === 'down' ? styles.todayDown : styles.todayBlue}>{streakLabel}</span>} meaning={shortStreak.direction === 'up' ? '짧게 봐도 흐름이 살아나고 있어요.' : shortStreak.direction === 'down' ? '단기적으로는 숨 고르기가 이어지고 있어요.' : '아직 한쪽 방향으로 강하게 기울지는 않았어요.'} />
         <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} icon='🎯' question='내 자리는 어디쯤일까요?' data={<span className={isFiniteNumber(positionPct) && positionPct < 0 ? styles.todayDown : styles.todayUp}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
@@ -1184,7 +1301,7 @@ function TodayBriefingItem({
   const isMeaningVisible = elapsedSeconds >= at + TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS
 
   return (
-    <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)}>
+    <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-item='true'>
       <div className={styles.todayBriefQuestionRow}>
         <span className={styles.todayBriefIcon} aria-hidden='true'>{icon}</span>
         <span className={styles.todayBriefQuestion}>{question}</span>
@@ -1245,7 +1362,7 @@ function TodayMarketBriefing({
   const stockLabel = formatPercentValue(stockPct) ?? '확인 중'
 
   return (
-    <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)}>
+    <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-item='true'>
       <div className={styles.todayBriefQuestionRow}>
         <span className={styles.todayBriefIcon} aria-hidden='true'>🏛️</span>
         <span className={styles.todayBriefQuestion}>오늘 시장 속에서는?</span>
