@@ -157,8 +157,8 @@ const TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS = 1.8
 const COMPLETION_SOON_REVEAL_SECONDS = 43
 const TODAY_BRIEFING_ITEM_COUNT = 6
 const TODAY_BRIEFING_ITEM_SELECTOR = '[data-today-briefing-item="true"]'
-const TODAY_BRIEFING_MOBILE_SCROLL_QUERY = '(max-width: 640px)'
-const TODAY_BRIEFING_SCROLL_BOTTOM_GAP_PX = 16
+const DEEPSCAN_MOBILE_AUTO_SCROLL_QUERY = '(max-width: 640px)'
+const DEEPSCAN_AUTO_SCROLL_BOTTOM_GAP_PX = 16
 const TEAM_BRIDGE_REVEAL_SECONDS = 38
 const TEAM_BRIDGE_FINAL_MESSAGE_MIN_SECONDS = 30
 const TEAM_BRIDGE_DONE_SECONDS = COMPLETION_SOON_REVEAL_SECONDS + TEAM_BRIDGE_FINAL_MESSAGE_MIN_SECONDS
@@ -968,10 +968,10 @@ function buildTodayFlow({ current, open, high, low }: { current: number | null; 
   }
 }
 
-function shouldAutoScrollTodayBriefingOnMobile() {
+function shouldAutoScrollDeepScanOnMobile() {
   return typeof window !== 'undefined'
     && typeof window.matchMedia === 'function'
-    && window.matchMedia(TODAY_BRIEFING_MOBILE_SCROLL_QUERY).matches
+    && window.matchMedia(DEEPSCAN_MOBILE_AUTO_SCROLL_QUERY).matches
 }
 
 function prefersReducedAutoScrollMotion() {
@@ -980,7 +980,7 @@ function prefersReducedAutoScrollMotion() {
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches
 }
 
-function getScrollableTodayBriefingContainer(item: HTMLElement) {
+function getScrollableDeepScanContainer(item: HTMLElement) {
   const loadingCard = item.closest<HTMLElement>(`.${styles.loadingCard}`)
   if (!loadingCard || loadingCard.scrollHeight <= loadingCard.clientHeight + 1) {
     return null
@@ -989,18 +989,18 @@ function getScrollableTodayBriefingContainer(item: HTMLElement) {
   return loadingCard
 }
 
-function scrollTodayBriefingItemBottomIntoView(item: HTMLElement) {
-  if (!shouldAutoScrollTodayBriefingOnMobile()) {
+function scrollDeepScanElementBottomIntoView(item: HTMLElement) {
+  if (!shouldAutoScrollDeepScanOnMobile()) {
     return
   }
 
   const behavior: ScrollBehavior = prefersReducedAutoScrollMotion() ? 'auto' : 'smooth'
-  const container = getScrollableTodayBriefingContainer(item)
+  const container = getScrollableDeepScanContainer(item)
   const itemRect = item.getBoundingClientRect()
 
   if (container) {
     const containerRect = container.getBoundingClientRect()
-    const bottomOverflow = itemRect.bottom - (containerRect.bottom - TODAY_BRIEFING_SCROLL_BOTTOM_GAP_PX)
+    const bottomOverflow = itemRect.bottom - (containerRect.bottom - DEEPSCAN_AUTO_SCROLL_BOTTOM_GAP_PX)
 
     if (bottomOverflow > 1) {
       container.scrollTo({
@@ -1012,7 +1012,7 @@ function scrollTodayBriefingItemBottomIntoView(item: HTMLElement) {
     return
   }
 
-  const viewportBottom = window.innerHeight - TODAY_BRIEFING_SCROLL_BOTTOM_GAP_PX
+  const viewportBottom = window.innerHeight - DEEPSCAN_AUTO_SCROLL_BOTTOM_GAP_PX
   const bottomOverflow = itemRect.bottom - viewportBottom
   if (bottomOverflow > 1) {
     window.scrollTo({
@@ -1022,13 +1022,8 @@ function scrollTodayBriefingItemBottomIntoView(item: HTMLElement) {
   }
 }
 
-function startTodayBriefingMobileAutoScroll(listElement: HTMLDivElement | null, visibleItemCount: number) {
-  if (!listElement || visibleItemCount <= 0 || !shouldAutoScrollTodayBriefingOnMobile()) {
-    return undefined
-  }
-
-  const targetItem = listElement.querySelectorAll<HTMLElement>(TODAY_BRIEFING_ITEM_SELECTOR).item(visibleItemCount - 1)
-  if (!targetItem) {
+function startDeepScanMobileAutoScroll(targetElement: HTMLElement | null) {
+  if (!targetElement || !shouldAutoScrollDeepScanOnMobile()) {
     return undefined
   }
 
@@ -1049,7 +1044,7 @@ function startTodayBriefingMobileAutoScroll(listElement: HTMLDivElement | null, 
     animationFrameId = window.requestAnimationFrame(() => {
       animationFrameId = null
       if (!stopped) {
-        scrollTodayBriefingItemBottomIntoView(targetItem)
+        scrollDeepScanElementBottomIntoView(targetElement)
       }
     })
   }
@@ -1063,7 +1058,7 @@ function startTodayBriefingMobileAutoScroll(listElement: HTMLDivElement | null, 
 
   if (typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(queueScroll)
-    resizeObserver.observe(targetItem)
+    resizeObserver.observe(targetElement)
   }
 
   return () => {
@@ -1074,6 +1069,15 @@ function startTodayBriefingMobileAutoScroll(listElement: HTMLDivElement | null, 
     timeoutIds.forEach((timeoutId) => window.clearTimeout(timeoutId))
     resizeObserver?.disconnect()
   }
+}
+
+function startTodayBriefingMobileAutoScroll(listElement: HTMLDivElement | null, visibleItemCount: number) {
+  if (!listElement || visibleItemCount <= 0 || !shouldAutoScrollDeepScanOnMobile()) {
+    return undefined
+  }
+
+  const targetItem = listElement.querySelectorAll<HTMLElement>(TODAY_BRIEFING_ITEM_SELECTOR).item(visibleItemCount - 1)
+  return startDeepScanMobileAutoScroll(targetItem)
 }
 
 function TodayBriefingCard({
@@ -1412,6 +1416,7 @@ export function DeepScanLoadingScreen({
   const [teamSummaries, setTeamSummaries] = useState<Partial<Record<LoadingStageKey, TeamSummaryState>>>({})
   const [expandedTeamSummaries, setExpandedTeamSummaries] = useState<ReadonlySet<LoadingStageKey>>(() => new Set())
   const requestedTeamSummariesRef = useRef<Set<string>>(new Set())
+  const teamBridgeRef = useRef<HTMLElement | null>(null)
   const targetLine = [identifier, market].filter(Boolean).join(' · ')
   const exchangeProduct = isExchangeTradedProduct(market, instrumentKind)
   const sharesText = formatShares(shares)
@@ -1499,6 +1504,7 @@ export function DeepScanLoadingScreen({
   )
   const completionState = buildCompletionState(resultsReadyForDisplay, elapsedSeconds)
   const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReadyForDisplay)
+  const isTeamBridgeVisible = Boolean(teamBridgeState)
   const shouldAdvanceTimeline = !resultsReadyForDisplay || elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS
   const progressPct = resultsReadyForDisplay ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
   const activeNarrativeCard = sequentialNarrativeCards.findLast((card) => !card.placeholder) ?? sequentialNarrativeCards.at(-1) ?? visibleNarrativeCards.at(-1) ?? orderedNarrativeCards[0]
@@ -1523,6 +1529,12 @@ export function DeepScanLoadingScreen({
       window.clearInterval(intervalId)
     }
   }, [shouldAdvanceTimeline])
+
+  useEffect(() => (
+    isTeamBridgeVisible
+      ? startDeepScanMobileAutoScroll(teamBridgeRef.current)
+      : undefined
+  ), [isTeamBridgeVisible])
 
   useEffect(() => {
     teamSummaryRequests.forEach((request) => {
@@ -1635,7 +1647,7 @@ export function DeepScanLoadingScreen({
           </section>
         ) : null}
 
-        <section className={cn(styles.teamBridgeCard, teamBridgeState ? styles.teamBridgeCardShow : styles.teamBridgeCardDone)} aria-label='세 팀 분석 전환 상태' aria-hidden={teamBridgeState ? undefined : true}>
+        <section ref={teamBridgeRef} className={cn(styles.teamBridgeCard, teamBridgeState ? styles.teamBridgeCardShow : styles.teamBridgeCardDone)} aria-label='세 팀 분석 전환 상태' aria-hidden={teamBridgeState ? undefined : true}>
           <p className={styles.teamBridgeText}>시세는 다 봤어요. 이제 <b>세 팀이 더 깊이</b> 분석하는 중이에요.</p>
           <div className={styles.teamBridgeProgress}>
             <span className={styles.teamBridgeSpinner} aria-hidden='true' />

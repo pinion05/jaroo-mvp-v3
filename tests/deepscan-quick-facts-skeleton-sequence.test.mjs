@@ -92,15 +92,26 @@ test('DeepScan Today briefing auto-scrolls newly revealed mobile items', () => {
   const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
 
   assert.match(loadingSource, literalPattern('TODAY_BRIEFING_ITEM_SELECTOR = \'[data-today-briefing-item="true"]\''))
-  assert.match(loadingSource, /TODAY_BRIEFING_MOBILE_SCROLL_QUERY = '\(max-width: 640px\)'/)
+  assert.match(loadingSource, /DEEPSCAN_MOBILE_AUTO_SCROLL_QUERY = '\(max-width: 640px\)'/)
+  assert.match(loadingSource, /function startDeepScanMobileAutoScroll/)
   assert.match(loadingSource, /function startTodayBriefingMobileAutoScroll/)
   assert.match(loadingSource, /querySelectorAll<HTMLElement>\(TODAY_BRIEFING_ITEM_SELECTOR\)\.item\(visibleItemCount - 1\)/)
-  assert.match(loadingSource, /scrollTodayBriefingItemBottomIntoView\(targetItem\)/)
+  assert.match(loadingSource, /scrollDeepScanElementBottomIntoView\(targetElement\)/)
   assert.match(loadingSource, /ResizeObserver/)
   assert.match(loadingSource, /const visibleBriefingItemCount = briefStartSeconds\.filter\(\(at\) => elapsedSeconds >= at\)\.length/)
   assert.match(loadingSource, /startTodayBriefingMobileAutoScroll\(todayBriefListRef\.current, visibleBriefingItemCount\)/)
   assert.match(loadingSource, /ref=\{todayBriefListRef\}/)
   assert.match(loadingSource, /data-today-briefing-item='true'/)
+})
+
+test('DeepScan team bridge auto-scrolls into mobile view when it appears', () => {
+  const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
+
+  assert.match(loadingSource, /const teamBridgeRef = useRef<HTMLElement \| null>\(null\)/)
+  assert.match(loadingSource, /const isTeamBridgeVisible = Boolean\(teamBridgeState\)/)
+  assert.match(loadingSource, /isTeamBridgeVisible\s*\?\s*startDeepScanMobileAutoScroll\(teamBridgeRef\.current\)/u)
+  assert.match(loadingSource, /ref=\{teamBridgeRef\}/)
+  assert.match(loadingSource, /시세는 다 봤어요\. 이제 <b>세 팀이 더 깊이<\/b> 분석하는 중이에요\./)
 })
 
 test('DeepScan loading sequencing is success-gated and no longer bypasses on raw resultsReady', () => {
