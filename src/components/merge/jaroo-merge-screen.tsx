@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { JarooShell } from '@/components/jaroo-shell'
+import { saveAccountPortfolioItems } from '@/lib/account-portfolio-client'
 import { buildHomeCurrentQuoteQuery } from '@/lib/home-current-quotes'
 import { hydratePortfolioItemsWithCurrentQuotes } from '@/lib/home-quote-bootstrap'
 import {
@@ -115,7 +116,7 @@ export default function JarooMergeScreen() {
     router.push('/ocr')
   }
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (applyStatus === 'loading') {
       return
     }
@@ -137,6 +138,7 @@ export default function JarooMergeScreen() {
 
       const nextQuoteQuery = buildHomeCurrentQuoteQuery(applyResult.nextQuoteHoldings)
       replacePortfolioItems(applyResult.normalizedItems)
+      await saveAccountPortfolioItems(applyResult.normalizedItems)
       setQuoteStatus('loading', null, nextQuoteQuery)
       void hydratePortfolioItemsWithCurrentQuotes(applyResult.normalizedItems)
         .then((result) => {

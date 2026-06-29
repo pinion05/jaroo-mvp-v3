@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } fr
 import { Cell, Pie, PieChart } from 'recharts'
 import { AuthHomeStatus } from '@/components/auth/auth-home-status'
 import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
+import { fetchAccountPortfolioItems } from '@/lib/account-portfolio-client'
 import { shouldUseDeepScanLoadingHandoff } from '@/lib/deepscan-navigation'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
 import {
@@ -574,6 +575,7 @@ export function JarooHomeScreen() {
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [deepScanLoadingTarget, setDeepScanLoadingTarget] = useState<DeepScanLoadingTarget | null>(null)
   const hasCheckedPersistedPortfolioRef = useRef(false)
+  const hasCheckedAccountPortfolioRef = useRef(false)
 
   const portfolioBaseItems = useMemo(() => portfolioItems.map((item) => stripPortfolioQuoteFields(item)), [portfolioItems])
   const portfolioSignature = useMemo(
@@ -600,23 +602,47 @@ export function JarooHomeScreen() {
       return
     }
 
-    if (!hasCheckedPersistedPortfolioRef.current) {
-      hasCheckedPersistedPortfolioRef.current = true
-      const persistedPortfolio = readAppliedHomePortfolio()
-      const persistedItems = persistedPortfolio ? buildPortfolioItemsFromAppliedHomePortfolioRows(persistedPortfolio.rows) : []
+    let cancelled = false
+    let timeoutId: number | null = null
 
-      if (persistedItems.length > 0) {
-        replacePortfolioItems(persistedItems)
-        return
+    const restorePortfolio = async () => {
+      if (!hasCheckedPersistedPortfolioRef.current) {
+        hasCheckedPersistedPortfolioRef.current = true
+        const persistedPortfolio = readAppliedHomePortfolio()
+        const persistedItems = persistedPortfolio ? buildPortfolioItemsFromAppliedHomePortfolioRows(persistedPortfolio.rows) : []
+
+        if (persistedItems.length > 0) {
+          if (!cancelled) replacePortfolioItems(persistedItems)
+          return
+        }
       }
+
+      if (!hasCheckedAccountPortfolioRef.current) {
+        hasCheckedAccountPortfolioRef.current = true
+        const accountItems = await fetchAccountPortfolioItems()
+
+        if (cancelled) {
+          return
+        }
+
+        if (accountItems.length > 0) {
+          replacePortfolioItems(accountItems)
+          return
+        }
+      }
+
+      timeoutId = window.setTimeout(() => {
+        router.replace('/screenshot')
+      }, 350)
     }
 
-    const timeoutId = window.setTimeout(() => {
-      router.replace('/screenshot')
-    }, 350)
+    void restorePortfolio()
 
     return () => {
-      window.clearTimeout(timeoutId)
+      cancelled = true
+      if (timeoutId) {
+        window.clearTimeout(timeoutId)
+      }
     }
   }, [hasPortfolioItems, replacePortfolioItems, router])
 
