@@ -157,13 +157,14 @@ const TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS = 1.8
 const COMPLETION_SOON_REVEAL_SECONDS = 43
 const TODAY_BRIEFING_ITEM_COUNT = 6
 const TEAM_BRIDGE_REVEAL_SECONDS = 38
-const TEAM_BRIDGE_DONE_SECONDS = 48
-const TEAM_SEQUENCE_COMPLETE_SECONDS = 56
+const TEAM_BRIDGE_FINAL_MESSAGE_MIN_SECONDS = 30
+const TEAM_BRIDGE_DONE_SECONDS = COMPLETION_SOON_REVEAL_SECONDS + TEAM_BRIDGE_FINAL_MESSAGE_MIN_SECONDS
+const TEAM_SEQUENCE_COMPLETE_SECONDS = TEAM_BRIDGE_DONE_SECONDS + 8
 const TEAM_PRESENTATION_ORDER: LoadingStageKey[] = ['marketTeam', 'contextTeam', 'fundamentalTeam']
 const TEAM_REVEAL_SECONDS: Record<LoadingStageKey, number> = {
-  marketTeam: 48,
-  contextTeam: 50.5,
-  fundamentalTeam: 53,
+  marketTeam: TEAM_BRIDGE_DONE_SECONDS,
+  contextTeam: TEAM_BRIDGE_DONE_SECONDS + 2.5,
+  fundamentalTeam: TEAM_BRIDGE_DONE_SECONDS + 5,
 }
 const TEAM_BRIDGE_STATUS_MESSAGES = [
   '증권사 리포트를 읽는 중…',
@@ -1370,20 +1371,21 @@ export function DeepScanLoadingScreen({
     () => buildVisibleNarrativeCards(orderedNarrativeCards, visibleStageCount),
     [orderedNarrativeCards, visibleStageCount],
   )
+  const resultsReadyForDisplay = resultsReady && elapsedSeconds >= TEAM_SEQUENCE_COMPLETE_SECONDS
   const timelineNarrativeCards = useMemo(
-    () => buildTimelineNarrativeCards(orderedNarrativeCards, elapsedSeconds, resultsReady),
-    [elapsedSeconds, orderedNarrativeCards, resultsReady],
+    () => buildTimelineNarrativeCards(orderedNarrativeCards, elapsedSeconds, resultsReadyForDisplay),
+    [elapsedSeconds, orderedNarrativeCards, resultsReadyForDisplay],
   )
   const sequentialNarrativeCards = useMemo(
     () => buildSequentialNarrativeCards(timelineNarrativeCards, teamSummaries),
     [teamSummaries, timelineNarrativeCards],
   )
-  const completionState = buildCompletionState(resultsReady, elapsedSeconds)
-  const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReady)
-  const shouldAdvanceTimeline = !resultsReady || elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS
-  const progressPct = resultsReady ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
+  const completionState = buildCompletionState(resultsReadyForDisplay, elapsedSeconds)
+  const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReadyForDisplay)
+  const shouldAdvanceTimeline = !resultsReadyForDisplay || elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS
+  const progressPct = resultsReadyForDisplay ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
   const activeNarrativeCard = sequentialNarrativeCards.findLast((card) => !card.placeholder) ?? sequentialNarrativeCards.at(-1) ?? visibleNarrativeCards.at(-1) ?? orderedNarrativeCards[0]
-  const progressLabel = resultsReady
+  const progressLabel = resultsReadyForDisplay
     ? '상세 결과 준비 완료'
     : teamBridgeState
       ? teamBridgeState.statusText
@@ -1466,12 +1468,12 @@ export function DeepScanLoadingScreen({
             </p>
           </div>
         </div>
-        <div className={cn(styles.headerProgress, resultsReady ? styles.headerProgressDone : undefined)} aria-label={resultsReady ? '딥스캔 완료' : '딥스캔 진행 중'}>
+        <div className={cn(styles.headerProgress, resultsReadyForDisplay ? styles.headerProgressDone : undefined)} aria-label={resultsReadyForDisplay ? '딥스캔 완료' : '딥스캔 진행 중'}>
           <span className={styles.headerProgressText}>{progressLabel}</span>
           <span className={styles.headerProgressTrack} aria-hidden='true'>
             <span className={styles.headerProgressFill} style={{ width: `${progressPct}%` }} />
           </span>
-          <span className={styles.headerProgressTime}>{resultsReady ? '완료' : formatElapsedTime(elapsedSeconds)}</span>
+          <span className={styles.headerProgressTime}>{resultsReadyForDisplay ? '완료' : formatElapsedTime(elapsedSeconds)}</span>
         </div>
       </header>
 
@@ -1479,7 +1481,7 @@ export function DeepScanLoadingScreen({
         <section className={styles.intro} aria-label='딥스캔 안내'>
           <p className={styles.introGreet}>{new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date())}</p>
           <h2 className={styles.introTitle}>세 분석가가 {exchangeProduct ? 'ETF를' : '종목을'}<br />차례로 살펴보고 있어요</h2>
-          <p className={styles.introBody}>{resultsReady ? '실제 응답이 도착했어요. 아래 결과 카드가 바로 이어집니다.' : '완료 신호가 오면 기다림 없이 이 화면 아래에 결과가 이어집니다.'}</p>
+          <p className={styles.introBody}>{resultsReadyForDisplay ? '실제 응답이 도착했어요. 아래 결과 카드가 바로 이어집니다.' : '완료 신호가 오면 기다림 없이 이 화면 아래에 결과가 이어집니다.'}</p>
         </section>
 
         <TodayBriefingCard
@@ -1540,7 +1542,7 @@ export function DeepScanLoadingScreen({
             const displaySummaryText = summaryText && summaryCollapsible && !summaryExpanded ? getCollapsedTeamSummaryText(summaryText) : resolvedSummaryText
             const summaryTextId = `team-summary-${card.key}`
             const showSummarySkeleton = !card.placeholder && !resolvedSummaryText
-            const cardSettled = resultsReady || card.complete
+            const cardSettled = resultsReadyForDisplay || card.complete
             const statusLabel = summaryReady ? '요약 완료' : summaryLoading ? '요약 중' : summaryFailed ? '요약 생략' : cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
             const statusTone = summaryReady ? 'positive' : summaryLoading ? 'info' : summaryFailed ? 'warning' : cardSettled && !card.complete ? 'info' : card.statusTone
             const tags = [
@@ -1602,7 +1604,7 @@ export function DeepScanLoadingScreen({
             )
           })}
         </section>
-        {resultsReady ? (
+        {resultsReadyForDisplay ? (
           <section className={cn(styles.completionCard, styles.completionCardReady)} aria-label='완료 전환 상태'>
             <div className={styles.completionHead}>
               <span className={styles.completionIcon} aria-hidden='true'>✓</span>
@@ -1621,8 +1623,8 @@ export function DeepScanLoadingScreen({
             {[
               { label: '대상 종목 확인', state: 'done' },
               { label: '근거 데이터 수집', state: evidenceCollected ? 'done' : 'active' },
-              { label: '세 팀 분석 대기', state: resultsReady ? 'done' : evidenceCollected ? 'active' : 'wait' },
-              { label: '상세 리포트 연결', state: resultsReady ? 'done' : 'wait' },
+              { label: '세 팀 분석 대기', state: resultsReadyForDisplay ? 'done' : evidenceCollected ? 'active' : 'wait' },
+              { label: '상세 리포트 연결', state: resultsReadyForDisplay ? 'done' : 'wait' },
             ].map((step, index) => {
               const isDone = step.state === 'done'
               const isActive = step.state === 'active'
@@ -1635,18 +1637,18 @@ export function DeepScanLoadingScreen({
                   <div className={cn(styles.stepLabel, isDone && styles.stepLabelDone, isActive && styles.stepLabelActive, !isDone && !isActive && styles.stepLabelWait)}>
                     {step.label}
                   </div>
-                  {index === 2 ? <div className={styles.stepCount}>{resultsReady ? '완료' : `${pendingCommitteeMemberCount}명 대기`}</div> : null}
+                  {index === 2 ? <div className={styles.stepCount}>{resultsReadyForDisplay ? '완료' : `${pendingCommitteeMemberCount}명 대기`}</div> : null}
                 </div>
               )
             })}
           </div>
 
           <section className={styles.committeeWrap} aria-label='세 팀 분석 진행 상태'>
-            <div className={styles.committeeTitle}>{resultsReady ? '세 팀 분석 완료' : '세 팀 분석 대기 중'}</div>
+            <div className={styles.committeeTitle}>{resultsReadyForDisplay ? '세 팀 분석 완료' : '세 팀 분석 대기 중'}</div>
             <div className={styles.membersGrid}>
               {committeeMembers.map((member) => (
                 <div key={member.key} className={styles.member}>
-                  <div className={cn(styles.memberIcon, memberStateClass(resultsReady ? 'done' : member.state))}>
+                  <div className={cn(styles.memberIcon, memberStateClass(resultsReadyForDisplay ? 'done' : member.state))}>
                     <member.Icon className={styles.memberSvgIcon} aria-hidden />
                   </div>
                   <div className={styles.memberName}>
@@ -1663,7 +1665,7 @@ export function DeepScanLoadingScreen({
           </section>
         </details>
 
-        {inlineResults ? <div className={styles.inlineResultsSlot}>{inlineResults}</div> : null}
+        {resultsReadyForDisplay && inlineResults ? <div className={styles.inlineResultsSlot}>{inlineResults}</div> : null}
         <p className={styles.privacy}>분석 결과는 투자 권유가 아닌 참고 자료입니다.</p>
       </div>
     </div>
