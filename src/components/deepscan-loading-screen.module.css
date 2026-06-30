@@ -173,6 +173,7 @@
 .stockPriceBox {
   text-align: right;
   flex-shrink: 0;
+  margin-left: auto;
 }
 
 .stockPrice {
