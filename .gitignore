@@ -42,5 +42,8 @@ yarn-error.log*
 next-env.d.ts
 .omx/
 
+# local dev artifacts (logs, screenshots, debug output)
+.logs/
+
 # supabase
 supabase/.temp/
