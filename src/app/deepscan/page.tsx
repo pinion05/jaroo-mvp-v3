@@ -30,6 +30,7 @@ import { DeepScanLoadingScreen, type FindingProgress, type LoadingPerformanceCom
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import { isFiniteNumber, type LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
+import { fetchLoadingProxyJson } from '@/lib/loading-fetch-retry'
 import {
   buildDeepScanHeroCard,
   buildDeepScanPageHeader,
@@ -301,10 +302,6 @@ type QuotesCurrentProxyResponse = {
       week52Low?: number
     }>
   }
-}
-type BriefingSnapshotProxyResponse = {
-  ok?: boolean
-  data?: LoadingBriefingSnapshot
 }
 type TargetLoadingMarketSnapshot = Pick<LoadingBriefingSnapshot, 'market'> & {
   targetKey: string
@@ -1622,43 +1619,36 @@ export default function DeepScanPage() {
     const controller = new AbortController()
 
     const run = async () => {
-      try {
-        const response = await fetch(quickQuoteUrl, { cache: 'no-store', signal: controller.signal })
-        if (!response.ok) {
-          return
-        }
-
-        const body = (await response.json()) as QuotesCurrentProxyResponse
-        if (!body.ok || controller.signal.aborted) {
-          return
-        }
-
-        const item = selectLoadingQuickQuoteItem(body, target)
-        if (!item) {
-          return
-        }
-
-        setLoadingQuickQuote({
-          targetKey: requestedTargetKey,
-          ...(typeof item.price === 'number' && Number.isFinite(item.price)
-            ? { currentPrice: item.price }
-            : {}),
-          ...(typeof item.volume === 'number' && Number.isFinite(item.volume)
-            ? { tradingVolume: item.volume }
-            : {}),
-          ...(typeof item.week52High === 'number' && Number.isFinite(item.week52High)
-            ? { week52High: item.week52High }
-            : {}),
-          ...(typeof item.week52Low === 'number' && Number.isFinite(item.week52Low)
-            ? { week52Low: item.week52Low }
-            : {}),
-          ...(normalizeQuoteCurrency(item.currency)
-            ? { currentPriceCurrency: normalizeQuoteCurrency(item.currency) }
-            : {}),
-        })
-      } catch {
-        // The loading page should not fail just because quick quote decoration is unavailable.
+      const result = await fetchLoadingProxyJson<NonNullable<QuotesCurrentProxyResponse['data']>>(quickQuoteUrl, {
+        signal: controller.signal,
+      })
+      if (!result.ok || controller.signal.aborted) {
+        return
       }
+
+      const item = selectLoadingQuickQuoteItem({ ok: true, data: result.data }, target)
+      if (!item) {
+        return
+      }
+
+      setLoadingQuickQuote({
+        targetKey: requestedTargetKey,
+        ...(typeof item.price === 'number' && Number.isFinite(item.price)
+          ? { currentPrice: item.price }
+          : {}),
+        ...(typeof item.volume === 'number' && Number.isFinite(item.volume)
+          ? { tradingVolume: item.volume }
+          : {}),
+        ...(typeof item.week52High === 'number' && Number.isFinite(item.week52High)
+          ? { week52High: item.week52High }
+          : {}),
+        ...(typeof item.week52Low === 'number' && Number.isFinite(item.week52Low)
+          ? { week52Low: item.week52Low }
+          : {}),
+        ...(normalizeQuoteCurrency(item.currency)
+          ? { currentPriceCurrency: normalizeQuoteCurrency(item.currency) }
+          : {}),
+      })
     }
 
     void run()
@@ -1678,24 +1668,20 @@ export default function DeepScanPage() {
     const controller = new AbortController()
 
     const run = async () => {
-      try {
-        const response = await fetch(snapshotUrl, { cache: 'no-store', signal: controller.signal })
-        if (!response.ok) {
-          return
-        }
-
-        const body = (await response.json()) as BriefingSnapshotProxyResponse
-        if (!body.ok || !body.data || controller.signal.aborted) {
-          return
-        }
-
-        setLoadingBriefingSnapshot({
-          ...body.data,
-          targetKey: requestedTargetKey,
-        })
-      } catch {
-        // The loading page should keep working even if the v7 briefing snapshot is unavailable.
+      // Retry with backoff: briefing snapshot is crawler-backed and can 502
+      // transiently when Polygon.io rate-limits (429). Without retries the
+      // chart / one-month / volume cards stay stuck in their loading fallback.
+      const result = await fetchLoadingProxyJson<LoadingBriefingSnapshot>(snapshotUrl, {
+        signal: controller.signal,
+      })
+      if (!result.ok || controller.signal.aborted) {
+        return
       }
+
+      setLoadingBriefingSnapshot({
+        ...result.data,
+        targetKey: requestedTargetKey,
+      })
     }
 
     void run()
@@ -1714,23 +1700,16 @@ export default function DeepScanPage() {
     const controller = new AbortController()
 
     const run = async () => {
-      try {
-        const response = await fetch('/api/market/us-indicators', { cache: 'no-store', signal: controller.signal })
-        if (!response.ok) {
-          return
-        }
+      const result = await fetchLoadingProxyJson<NonNullable<UsMarketIndicatorsProxyResponse['data']>>('/api/market/us-indicators', {
+        signal: controller.signal,
+      })
+      if (!result.ok || controller.signal.aborted) {
+        return
+      }
 
-        const body = (await response.json()) as UsMarketIndicatorsProxyResponse
-        if (controller.signal.aborted) {
-          return
-        }
-
-        const snapshot = buildUsLoadingMarketSnapshot(body, requestedTargetKey)
-        if (snapshot) {
-          setLoadingMarketSnapshot(snapshot)
-        }
-      } catch {
-        // Market comparison is decorative; DeepScan loading should continue if US market data is unavailable.
+      const snapshot = buildUsLoadingMarketSnapshot({ ok: true, data: result.data }, requestedTargetKey)
+      if (snapshot) {
+        setLoadingMarketSnapshot(snapshot)
       }
     }
 
