@@ -735,6 +735,49 @@
   margin-top: 4px;
 }
 
+.consensusFanChart {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-height: 132px;
+}
+
+.consensusFanBand {
+  fill: var(--ds-blue-soft);
+  opacity: 0.55;
+}
+
+.consensusFanMedian {
+  fill: none;
+  stroke: var(--ds-blue);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.9;
+}
+
+.consensusFanRange {
+  stroke: var(--ds-muted);
+  stroke-width: 0.8;
+}
+
+.consensusFanTargetLine {
+  stroke: var(--ds-blue);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  opacity: 0.65;
+}
+
+.consensusFanCurrent {
+  fill: var(--ds-blue);
+}
+
+.consensusFanTargetDot {
+  fill: var(--ds-blue);
+  stroke: #fff;
+  stroke-width: 1.2;
+}
+
 .consensusChartTop {
   display: flex;
   align-items: flex-start;

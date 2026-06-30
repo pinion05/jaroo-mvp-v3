@@ -29,6 +29,12 @@ import {
 } from '@/lib/deepscan-briefing-snapshot'
 import { resolveDeepScanBriefingCardCurrentPrice, resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
 import { calculateFallbackEvaluationMoney } from '@/lib/deepscan-loading-metrics'
+import {
+  buildTargetPriceFanBands,
+  estimateDailyVolatility,
+  simulateTargetPricePaths,
+  type TargetPriceFanBands,
+} from '@/lib/deepscan-target-price-paths'
 import { cn } from '@/lib/utils'
 import styles from './deepscan-loading-screen.module.css'
 
@@ -103,6 +109,11 @@ export type LoadingQuickFact = {
     upsidePct?: number
     opinionLabel?: string
     opinionScore?: number
+    // Raw numeric values used to simulate the target-price fan chart.
+    targetPriceValue?: number
+    currentPriceValue?: number
+    highTargetValue?: number
+    lowTargetValue?: number
   }
 }
 
@@ -587,7 +598,71 @@ function buildCompletionState(resultsReady: boolean, elapsedSeconds: number): Co
 }
 
 
-function QuickFactCard({ fact }: { fact: LoadingQuickFact }) {
+function TargetPriceFanChart({
+  consensus,
+  dailyCloses,
+  seedKey,
+}: {
+  consensus: NonNullable<LoadingQuickFact['consensus']>
+  dailyCloses?: Array<number | null | undefined>
+  seedKey?: string
+}) {
+  const geometry = useMemo(() => {
+    const current = consensus.currentPriceValue
+    const target = consensus.targetPriceValue
+    if (!isFiniteNumber(current) || current <= 0 || !isFiniteNumber(target) || target <= 0) {
+      return null
+    }
+    const volatility = estimateDailyVolatility(dailyCloses ?? [])
+    const paths = simulateTargetPricePaths({
+      currentPrice: current,
+      targetPrice: target,
+      volatility,
+      seed: seedKey ?? `${current}|${target}`,
+    })
+    const bands = buildTargetPriceFanBands(paths)
+    if (!bands) {
+      return null
+    }
+    return buildTargetPriceFanGeometry({
+      bands,
+      currentPrice: current,
+      targetPrice: target,
+      highTarget: consensus.highTargetValue,
+      lowTarget: consensus.lowTargetValue,
+    })
+  }, [consensus.currentPriceValue, consensus.targetPriceValue, consensus.highTargetValue, consensus.lowTargetValue, dailyCloses, seedKey])
+
+  if (!geometry) {
+    return null
+  }
+
+  return (
+    <svg className={styles.consensusFanChart} viewBox='0 0 300 120' role='img' aria-label='목표가까지 예상 경로'>
+      <path className={styles.consensusFanBand} d={geometry.outerBandPath} />
+      {geometry.highY !== null ? (
+        <line className={styles.consensusFanRange} x1={geometry.leftX} y1={geometry.highY} x2={geometry.rightX} y2={geometry.highY} strokeDasharray='2 4' />
+      ) : null}
+      {geometry.lowY !== null ? (
+        <line className={styles.consensusFanRange} x1={geometry.leftX} y1={geometry.lowY} x2={geometry.rightX} y2={geometry.lowY} strokeDasharray='2 4' />
+      ) : null}
+      <path className={styles.consensusFanMedian} d={geometry.medianPath} />
+      <line className={styles.consensusFanTargetLine} x1={geometry.leftX} y1={geometry.targetY} x2={geometry.rightX} y2={geometry.targetY} />
+      <circle className={styles.consensusFanCurrent} cx={geometry.leftX} cy={geometry.currentY} r='3.5' />
+      <circle className={styles.consensusFanTargetDot} cx={geometry.rightX} cy={geometry.targetY} r='3.5' />
+    </svg>
+  )
+}
+
+function QuickFactCard({
+  fact,
+  dailyCloses,
+  seedKey,
+}: {
+  fact: LoadingQuickFact
+  dailyCloses?: Array<number | null | undefined>
+  seedKey?: string
+}) {
   const indicator = fact.indicator
   const consensus = fact.consensus
 
@@ -627,6 +702,7 @@ function QuickFactCard({ fact }: { fact: LoadingQuickFact }) {
             </div>
             {consensus.upsideLabel ? <span>{consensus.upsideLabel}</span> : null}
           </div>
+          <TargetPriceFanChart consensus={consensus} dailyCloses={dailyCloses} seedKey={seedKey} />
           <p className={styles.positionDeltaLine}>
             {[consensus.currentPriceLabel ? `현재 ${consensus.currentPriceLabel}` : null, consensus.highTargetLabel ? `최고 ${consensus.highTargetLabel}` : null, consensus.lowTargetLabel ? `최저 ${consensus.lowTargetLabel}` : null, consensus.summary].filter(Boolean).join(' · ')}
           </p>
@@ -915,6 +991,70 @@ function buildChartGeometry(rows: LoadingBriefingDailyRow[], averagePriceValue: 
     : 35
 
   return { hasData: true, linePath, areaPath, lastPoint, averageY }
+}
+
+/**
+ * Project the simulated target-price fan bands into SVG geometry (viewBox
+ * 300x120) consistent with buildChartGeometry. Produces a filled outer band,
+ * a median line, the current-price anchor and the target-price line.
+ */
+function buildTargetPriceFanGeometry(input: {
+  bands: TargetPriceFanBands
+  currentPrice: number
+  targetPrice: number
+  highTarget?: number | null
+  lowTarget?: number | null
+}) {
+  const { bands, currentPrice, targetPrice } = input
+  const left = 8
+  const right = 292
+  const top = 12
+  const bottom = 100
+  const width = right - left
+  const n = bands.median.length
+
+  const candidateExtents = [
+    ...bands.lower,
+    ...bands.upper,
+    currentPrice,
+    targetPrice,
+    ...(typeof input.highTarget === 'number' && isFiniteNumber(input.highTarget) ? [input.highTarget] : []),
+    ...(typeof input.lowTarget === 'number' && isFiniteNumber(input.lowTarget) ? [input.lowTarget] : []),
+  ].filter((v) => isFiniteNumber(v))
+  const minValue = Math.min(...candidateExtents)
+  const maxValue = Math.max(...candidateExtents)
+  const range = maxValue - minValue || Math.max(1, maxValue * 0.02)
+
+  const xAt = (i: number) => (n === 1 ? right : left + (width * i) / (n - 1))
+  const yAt = (value: number) => clamp(bottom - ((value - minValue) / range) * (bottom - top), top, bottom)
+  const round = (v: number) => Math.round(v * 10) / 10
+
+  const upperPoints = bands.upper.map((value, i) => ({ x: round(xAt(i)), y: round(yAt(value)) }))
+  const lowerPoints = bands.lower.map((value, i) => ({ x: round(xAt(i)), y: round(yAt(value)) }))
+  const medianPoints = bands.median.map((value, i) => ({ x: round(xAt(i)), y: round(yAt(value)) }))
+
+  const upperLine = upperPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ')
+  const lowerReversed = [...lowerPoints].reverse().map((p) => `L${p.x} ${p.y}`).join(' ')
+  const outerBandPath = `${upperLine} ${lowerReversed} Z`
+  const medianPath = medianPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ')
+
+  const currentY = round(yAt(currentPrice))
+  const targetY = round(yAt(targetPrice))
+  const highY = typeof input.highTarget === 'number' && isFiniteNumber(input.highTarget) ? round(yAt(input.highTarget)) : null
+  const lowY = typeof input.lowTarget === 'number' && isFiniteNumber(input.lowTarget) ? round(yAt(input.lowTarget)) : null
+
+  return {
+    hasData: true,
+    outerBandPath,
+    medianPath,
+    leftX: left,
+    rightX: right,
+    currentY,
+    targetY,
+    highY,
+    lowY,
+    lastMedian: medianPoints[medianPoints.length - 1],
+  }
 }
 
 function buildOneMonthMeaning(value: number | null) {
@@ -1453,6 +1593,10 @@ export function DeepScanLoadingScreen({
     () => displayQuickFacts.filter((fact) => !isHiddenLoadingQuickFact(fact)),
     [displayQuickFacts],
   )
+  const briefingDailyCloses = useMemo(
+    () => (briefingSnapshot?.daily ?? []).map((row) => row.close),
+    [briefingSnapshot?.daily],
+  )
   const loadingStages = useMemo(
     () => buildLoadingStages({
       displayQuickFacts,
@@ -1643,7 +1787,7 @@ export function DeepScanLoadingScreen({
 
         {standaloneQuickFacts.length > 0 ? (
           <section className={styles.quickFactsCard} aria-label='수집된 빠른 근거'>
-            {standaloneQuickFacts.map((fact) => <QuickFactCard key={fact.key} fact={fact} />)}
+            {standaloneQuickFacts.map((fact) => <QuickFactCard key={fact.key} fact={fact} dailyCloses={briefingDailyCloses} seedKey={identifier} />)}
           </section>
         ) : null}
 

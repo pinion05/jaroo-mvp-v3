@@ -728,6 +728,11 @@ function parseLoadingConsensusBody(body: string) {
       ? new Intl.NumberFormat('ko-KR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(opinionScore)
       : undefined,
     opinionScore: typeof opinionScore === 'number' && Number.isFinite(opinionScore) ? opinionScore : undefined,
+    // Raw numeric values feed the target-price fan chart simulation.
+    targetPriceValue: typeof targetValue === 'number' && Number.isFinite(targetValue) ? targetValue : undefined,
+    currentPriceValue: typeof currentPrice === 'number' && Number.isFinite(currentPrice) ? currentPrice : undefined,
+    highTargetValue: typeof highTargetValue === 'number' && Number.isFinite(highTargetValue) ? highTargetValue : undefined,
+    lowTargetValue: typeof lowTargetValue === 'number' && Number.isFinite(lowTargetValue) ? lowTargetValue : undefined,
   }
 }
 
@@ -852,6 +857,10 @@ function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null, fa
           ...(typeof parsedConsensus.upsidePct === 'number' ? { upsidePct: parsedConsensus.upsidePct } : {}),
           ...(parsedConsensus.opinionLabel ? { opinionLabel: parsedConsensus.opinionLabel } : {}),
           ...(typeof parsedConsensus.opinionScore === 'number' ? { opinionScore: parsedConsensus.opinionScore } : {}),
+          ...(typeof parsedConsensus.targetPriceValue === 'number' ? { targetPriceValue: parsedConsensus.targetPriceValue } : {}),
+          ...(typeof parsedConsensus.currentPriceValue === 'number' ? { currentPriceValue: parsedConsensus.currentPriceValue } : {}),
+          ...(typeof parsedConsensus.highTargetValue === 'number' ? { highTargetValue: parsedConsensus.highTargetValue } : {}),
+          ...(typeof parsedConsensus.lowTargetValue === 'number' ? { lowTargetValue: parsedConsensus.lowTargetValue } : {}),
         },
       }
       : {}),
