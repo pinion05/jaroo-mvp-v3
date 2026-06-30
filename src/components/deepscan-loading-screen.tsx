@@ -639,7 +639,7 @@ function TargetPriceFanChart({
     <div className={styles.consensusFanWrap}>
       <svg className={styles.consensusFanChart} viewBox='0 0 300 120' role='img' aria-label='현재가에서 목표가까지 예상 경로'>
         <line className={styles.consensusFanCurrentLine} x1={geometry.leftX} y1={geometry.currentY} x2={geometry.rightX} y2={geometry.currentY} />
-        <path className={styles.consensusFanTargetPath} d={geometry.medianPath} />
+        <path className={styles.consensusFanTargetPath} d={geometry.medianPath} pathLength={1} />
         <circle className={styles.consensusFanCurrentDot} cx={geometry.leftX} cy={geometry.currentY} r='3.6' />
         <circle className={styles.consensusFanTargetDot} cx={geometry.rightX} cy={geometry.targetY} r='3.6' />
       </svg>
