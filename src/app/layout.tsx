@@ -19,9 +19,15 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  // suppressHydrationWarning: Immersive Translate 등 브라우저 확장이 hydration 전에
+  // <html>/<body>에 속성을 끼워넣어 발생하는 hydration mismatch를 방지
   return (
-    <html lang='ko' className={`${notoSansKr.variable} h-full antialiased`}>
-      <body className='min-h-full bg-background font-sans text-foreground'>
+    <html
+      lang='ko'
+      className={`${notoSansKr.variable} h-full antialiased`}
+      suppressHydrationWarning
+    >
+      <body className='min-h-full bg-background font-sans text-foreground' suppressHydrationWarning>
         <DebugPageNav />
         <div className='lg:pl-28'>{children}</div>
       </body>
