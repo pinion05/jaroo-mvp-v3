@@ -700,9 +700,33 @@ function QuickFactCard({
             {consensus.upsideLabel ? <span>{consensus.upsideLabel}</span> : null}
           </div>
           <TargetPriceFanChart consensus={consensus} dailyCloses={dailyCloses} seedKey={seedKey} />
-          <p className={styles.positionDeltaLine}>
-            {[consensus.currentPriceLabel ? `현재 ${consensus.currentPriceLabel}` : null, consensus.highTargetLabel ? `최고 ${consensus.highTargetLabel}` : null, consensus.lowTargetLabel ? `최저 ${consensus.lowTargetLabel}` : null, consensus.summary].filter(Boolean).join(' · ')}
-          </p>
+          <dl className={styles.consensusStats}>
+            {consensus.currentPriceLabel ? (
+              <div className={styles.consensusStat}>
+                <dt>현재가</dt>
+                <dd>{consensus.currentPriceLabel}</dd>
+              </div>
+            ) : null}
+            {consensus.opinionLabel ? (
+              <div className={styles.consensusStat}>
+                <dt>투자의견</dt>
+                <dd>{consensus.opinionLabel}</dd>
+              </div>
+            ) : null}
+            {consensus.highTargetLabel ? (
+              <div className={styles.consensusStat}>
+                <dt>최고</dt>
+                <dd>{consensus.highTargetLabel}</dd>
+              </div>
+            ) : null}
+            {consensus.lowTargetLabel ? (
+              <div className={styles.consensusStat}>
+                <dt>최저</dt>
+                <dd>{consensus.lowTargetLabel}</dd>
+              </div>
+            ) : null}
+          </dl>
+          {consensus.summary ? <p className={styles.consensusSummary}>{consensus.summary}</p> : null}
         </div>
       ) : null}
     </article>
