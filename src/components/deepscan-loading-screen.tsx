@@ -1015,15 +1015,31 @@ function buildTargetPriceFanGeometry(input: {
   const maxValue = Math.max(...candidateExtents)
   const range = maxValue - minValue || Math.max(1, maxValue * 0.02)
 
+  // inset the dots from the chart edges so neither sits flush at the
+  // very top or bottom, which would read as clipped.
+  const padY = 10
+  const plotTop = top + padY
+  const plotBottom = bottom - padY
   const xAt = (i: number) => (n === 1 ? right : left + (width * i) / (n - 1))
-  const yAt = (value: number) => clamp(bottom - ((value - minValue) / range) * (bottom - top), top, bottom)
+  const yAt = (value: number) => clamp(plotBottom - ((value - minValue) / range) * (plotBottom - plotTop), top, bottom)
   const round = (v: number) => Math.round(v * 10) / 10
-
-  const medianPoints = bands.median.map((value, i) => ({ x: round(xAt(i)), y: round(yAt(value)) }))
-  const medianPath = medianPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ')
 
   const currentY = round(yAt(currentPrice))
   const targetY = round(yAt(targetPrice))
+
+  // The Monte-Carlo median of a lognormal walk undershoots the target,
+  // so its last point would sit below the target dot and leave the end
+  // dot detached. Anchor the path: keep point 0 exactly at the current
+  // dot (t=0 contributes no shift) and nudge the tail so point n-1 lands
+  // exactly on the target dot, spreading the (small) correction linearly
+  // so there is no kink.
+  const lastMedianY = yAt(bands.median[n - 1])
+  const medianPoints = bands.median.map((value, i) => {
+    const t = n === 1 ? 1 : i / (n - 1)
+    const shift = (targetY - lastMedianY) * t
+    return { x: round(xAt(i)), y: round(yAt(value) + shift) }
+  })
+  const medianPath = medianPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ')
 
   return {
     hasData: true,
