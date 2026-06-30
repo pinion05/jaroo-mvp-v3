@@ -628,29 +628,26 @@ function TargetPriceFanChart({
       bands,
       currentPrice: current,
       targetPrice: target,
-      highTarget: consensus.highTargetValue,
-      lowTarget: consensus.lowTargetValue,
     })
-  }, [consensus.currentPriceValue, consensus.targetPriceValue, consensus.highTargetValue, consensus.lowTargetValue, dailyCloses, seedKey])
+  }, [consensus.currentPriceValue, consensus.targetPriceValue, dailyCloses, seedKey])
 
   if (!geometry) {
     return null
   }
 
   return (
-    <svg className={styles.consensusFanChart} viewBox='0 0 300 120' role='img' aria-label='목표가까지 예상 경로'>
-      <path className={styles.consensusFanBand} d={geometry.outerBandPath} />
-      {geometry.highY !== null ? (
-        <line className={styles.consensusFanRange} x1={geometry.leftX} y1={geometry.highY} x2={geometry.rightX} y2={geometry.highY} strokeDasharray='2 4' />
-      ) : null}
-      {geometry.lowY !== null ? (
-        <line className={styles.consensusFanRange} x1={geometry.leftX} y1={geometry.lowY} x2={geometry.rightX} y2={geometry.lowY} strokeDasharray='2 4' />
-      ) : null}
-      <path className={styles.consensusFanMedian} d={geometry.medianPath} />
-      <line className={styles.consensusFanTargetLine} x1={geometry.leftX} y1={geometry.targetY} x2={geometry.rightX} y2={geometry.targetY} />
-      <circle className={styles.consensusFanCurrent} cx={geometry.leftX} cy={geometry.currentY} r='3.5' />
-      <circle className={styles.consensusFanTargetDot} cx={geometry.rightX} cy={geometry.targetY} r='3.5' />
-    </svg>
+    <div className={styles.consensusFanWrap}>
+      <svg className={styles.consensusFanChart} viewBox='0 0 300 120' role='img' aria-label='현재가에서 목표가까지 예상 경로'>
+        <line className={styles.consensusFanCurrentLine} x1={geometry.leftX} y1={geometry.currentY} x2={geometry.rightX} y2={geometry.currentY} />
+        <path className={styles.consensusFanTargetPath} d={geometry.medianPath} />
+        <circle className={styles.consensusFanCurrentDot} cx={geometry.leftX} cy={geometry.currentY} r='3.6' />
+        <circle className={styles.consensusFanTargetDot} cx={geometry.rightX} cy={geometry.targetY} r='3.6' />
+      </svg>
+      <div className={styles.consensusFanLegend}>
+        <span className={styles.consensusFanLegendCurrent}><i />현재가</span>
+        <span className={styles.consensusFanLegendTarget}><i />목표가 예상</span>
+      </div>
+    </div>
   )
 }
 
@@ -1002,57 +999,55 @@ function buildTargetPriceFanGeometry(input: {
   bands: TargetPriceFanBands
   currentPrice: number
   targetPrice: number
-  highTarget?: number | null
-  lowTarget?: number | null
 }) {
   const { bands, currentPrice, targetPrice } = input
-  const left = 8
-  const right = 292
-  const top = 12
+  const left = 10
+  const right = 290
+  const top = 18
   const bottom = 100
   const width = right - left
   const n = bands.median.length
 
-  const candidateExtents = [
-    ...bands.lower,
-    ...bands.upper,
-    currentPrice,
-    targetPrice,
-    ...(typeof input.highTarget === 'number' && isFiniteNumber(input.highTarget) ? [input.highTarget] : []),
-    ...(typeof input.lowTarget === 'number' && isFiniteNumber(input.lowTarget) ? [input.lowTarget] : []),
-  ].filter((v) => isFiniteNumber(v))
+  // y-extent covers current -> target only (band/range markers removed),
+  // so the two lines use the full vertical range and stay legible.
+  const candidateExtents = [currentPrice, targetPrice, ...bands.median].filter((v) => isFiniteNumber(v))
   const minValue = Math.min(...candidateExtents)
   const maxValue = Math.max(...candidateExtents)
   const range = maxValue - minValue || Math.max(1, maxValue * 0.02)
 
+  // inset the dots from the chart edges so neither sits flush at the
+  // very top or bottom, which would read as clipped.
+  const padY = 10
+  const plotTop = top + padY
+  const plotBottom = bottom - padY
   const xAt = (i: number) => (n === 1 ? right : left + (width * i) / (n - 1))
-  const yAt = (value: number) => clamp(bottom - ((value - minValue) / range) * (bottom - top), top, bottom)
+  const yAt = (value: number) => clamp(plotBottom - ((value - minValue) / range) * (plotBottom - plotTop), top, bottom)
   const round = (v: number) => Math.round(v * 10) / 10
-
-  const upperPoints = bands.upper.map((value, i) => ({ x: round(xAt(i)), y: round(yAt(value)) }))
-  const lowerPoints = bands.lower.map((value, i) => ({ x: round(xAt(i)), y: round(yAt(value)) }))
-  const medianPoints = bands.median.map((value, i) => ({ x: round(xAt(i)), y: round(yAt(value)) }))
-
-  const upperLine = upperPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ')
-  const lowerReversed = [...lowerPoints].reverse().map((p) => `L${p.x} ${p.y}`).join(' ')
-  const outerBandPath = `${upperLine} ${lowerReversed} Z`
-  const medianPath = medianPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ')
 
   const currentY = round(yAt(currentPrice))
   const targetY = round(yAt(targetPrice))
-  const highY = typeof input.highTarget === 'number' && isFiniteNumber(input.highTarget) ? round(yAt(input.highTarget)) : null
-  const lowY = typeof input.lowTarget === 'number' && isFiniteNumber(input.lowTarget) ? round(yAt(input.lowTarget)) : null
+
+  // The Monte-Carlo median of a lognormal walk undershoots the target,
+  // so its last point would sit below the target dot and leave the end
+  // dot detached. Anchor the path: keep point 0 exactly at the current
+  // dot (t=0 contributes no shift) and nudge the tail so point n-1 lands
+  // exactly on the target dot, spreading the (small) correction linearly
+  // so there is no kink.
+  const lastMedianY = yAt(bands.median[n - 1])
+  const medianPoints = bands.median.map((value, i) => {
+    const t = n === 1 ? 1 : i / (n - 1)
+    const shift = (targetY - lastMedianY) * t
+    return { x: round(xAt(i)), y: round(yAt(value) + shift) }
+  })
+  const medianPath = medianPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ')
 
   return {
     hasData: true,
-    outerBandPath,
     medianPath,
     leftX: left,
     rightX: right,
     currentY,
     targetY,
-    highY,
-    lowY,
     lastMedian: medianPoints[medianPoints.length - 1],
   }
 }

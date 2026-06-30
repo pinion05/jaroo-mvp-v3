@@ -735,6 +735,11 @@
   margin-top: 4px;
 }
 
+.consensusFanWrap {
+  display: grid;
+  gap: 6px;
+}
+
 .consensusFanChart {
   display: block;
   width: 100%;
@@ -742,40 +747,61 @@
   max-height: 132px;
 }
 
-.consensusFanBand {
-  fill: var(--ds-blue-soft);
-  opacity: 0.55;
+.consensusFanCurrentLine {
+  stroke: var(--ds-muted);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+  opacity: 0.7;
 }
 
-.consensusFanMedian {
+.consensusFanTargetPath {
   fill: none;
   stroke: var(--ds-blue);
-  stroke-width: 1.6;
+  stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
-  opacity: 0.9;
 }
 
-.consensusFanRange {
-  stroke: var(--ds-muted);
-  stroke-width: 0.8;
-}
-
-.consensusFanTargetLine {
-  stroke: var(--ds-blue);
-  stroke-width: 1;
-  stroke-dasharray: 4 3;
-  opacity: 0.65;
-}
-
-.consensusFanCurrent {
-  fill: var(--ds-blue);
+.consensusFanCurrentDot {
+  fill: var(--ds-ink);
 }
 
 .consensusFanTargetDot {
   fill: var(--ds-blue);
   stroke: #fff;
-  stroke-width: 1.2;
+  stroke-width: 1.4;
+}
+
+.consensusFanLegend {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  color: var(--ds-mid);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.consensusFanLegendCurrent,
+.consensusFanLegendTarget {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.consensusFanLegendCurrent i {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top: 1.5px dashed var(--ds-muted);
+}
+
+.consensusFanLegendTarget i {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top: 2.5px solid var(--ds-blue);
+  border-radius: 2px;
 }
 
 .consensusChartTop {
