@@ -1,6 +1,6 @@
 'use client'
 
-import type { DeepScanSourceRef, JarooDeepScanCommitteeAxis, JarooDeepScanInsightItem, JarooDeepScanPayload } from '../../../packages/contracts/src/deepscan'
+import type { DeepScanSourceRef, JarooDeepScanCommitteeAxis, JarooDeepScanConsensusStructured, JarooDeepScanInsightItem, JarooDeepScanPayload } from '../../../packages/contracts/src/deepscan'
 
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
@@ -681,7 +681,10 @@ function buildWeek52LoadingQuickFactFromBriefingSnapshot(snapshot: LoadingBriefi
   })
 }
 
-function parseLoadingConsensusBody(body: string) {
+function parseLoadingConsensusBody(body: string, structured?: JarooDeepScanConsensusStructured) {
+  const s = structured ?? {}
+  // Structured fields are authoritative when the crawler emits them; the regex
+  // matches below stay as a fallback for older crawlers / the US payload path.
   const analystCountMatch = body.match(/증권사\s*(\d+)\s*곳/u)
   const targetMatch = body.match(/평균\s*목표가\s*([0-9,]+(?:\.\d+)?)\s*(KRW|USD|원|달러)?/iu)
   const upsideMatch = body.match(/현재가\s*대비\s*([+-]?\d+(?:\.\d+)?)%/u)
@@ -689,13 +692,19 @@ function parseLoadingConsensusBody(body: string) {
   const highTargetMatch = body.match(/최고\s*([0-9,]+(?:\.\d+)?)\s*(KRW|USD|원|달러)?/iu)
   const lowTargetMatch = body.match(/최저\s*([0-9,]+(?:\.\d+)?)\s*(KRW|USD|원|달러)?/iu)
   const summaryMatch = body.match(/(모두 매수 의견이에요|매수 의견이 우세해요|의견이 갈리고 있어요|신중한 의견이 많아요)/u)
-  const targetValue = targetMatch?.[1] ? Number(targetMatch[1].replace(/,/gu, '')) : undefined
-  const targetCurrency: WorkflowMoneyCurrency = targetMatch?.[2]?.toUpperCase() === 'USD' || targetMatch?.[2] === '달러' ? 'USD' : 'KRW'
-  const upsidePct = upsideMatch?.[1] ? Number(upsideMatch[1]) : undefined
-  const opinionScore = opinionMatch?.[1] ? Number(opinionMatch[1]) : undefined
-  const highTargetValue = highTargetMatch?.[1] ? Number(highTargetMatch[1].replace(/,/gu, '')) : undefined
+  const regexTargetCurrency: WorkflowMoneyCurrency = targetMatch?.[2]?.toUpperCase() === 'USD' || targetMatch?.[2] === '달러' ? 'USD' : 'KRW'
+  const targetCurrency: WorkflowMoneyCurrency = s.currency?.toUpperCase() === 'USD' ? 'USD' : (s.currency ? 'KRW' : regexTargetCurrency)
+
+  const pickNum = (v: number | null | undefined, fallback: number | undefined) => (typeof v === 'number' && Number.isFinite(v) ? v : fallback)
+  const regexTargetValue = targetMatch?.[1] ? Number(targetMatch[1].replace(/,/gu, '')) : undefined
+  const targetValue = typeof s.targetPrice === 'number' && Number.isFinite(s.targetPrice) && s.targetPrice > 0 ? s.targetPrice : regexTargetValue
+  const upsidePct = pickNum(s.targetGapPct, upsideMatch?.[1] ? Number(upsideMatch[1]) : undefined)
+  const opinionScore = pickNum(s.recommendationScore, opinionMatch?.[1] ? Number(opinionMatch[1]) : undefined)
+  const analystCount = pickNum(s.analystCount, analystCountMatch?.[1] ? Number(analystCountMatch[1]) : undefined)
+  const highTargetValue = pickNum(s.highestTargetPrice, highTargetMatch?.[1] ? Number(highTargetMatch[1].replace(/,/gu, '')) : undefined)
+  const lowTargetValue = pickNum(s.lowestTargetPrice, lowTargetMatch?.[1] ? Number(lowTargetMatch[1].replace(/,/gu, '')) : undefined)
+  const summaryText = typeof s.opinionSummary === 'string' && s.opinionSummary.trim() ? s.opinionSummary.trim() : summaryMatch?.[1]
   const highTargetCurrency: WorkflowMoneyCurrency = highTargetMatch?.[2]?.toUpperCase() === 'USD' || highTargetMatch?.[2] === '달러' ? 'USD' : targetCurrency
-  const lowTargetValue = lowTargetMatch?.[1] ? Number(lowTargetMatch[1].replace(/,/gu, '')) : undefined
   const lowTargetCurrency: WorkflowMoneyCurrency = lowTargetMatch?.[2]?.toUpperCase() === 'USD' || lowTargetMatch?.[2] === '달러' ? 'USD' : targetCurrency
   const currentPrice = typeof targetValue === 'number'
     && Number.isFinite(targetValue)
@@ -706,7 +715,7 @@ function parseLoadingConsensusBody(body: string) {
     : undefined
 
   return {
-    analystCountLabel: analystCountMatch?.[1] ? `증권사 ${analystCountMatch[1]}곳` : undefined,
+    analystCountLabel: typeof analystCount === 'number' ? `증권사 ${analystCount}곳` : undefined,
     targetPriceLabel: typeof targetValue === 'number' && Number.isFinite(targetValue)
       ? formatLoadingMoney(targetValue, targetCurrency)
       : undefined,
@@ -719,7 +728,7 @@ function parseLoadingConsensusBody(body: string) {
     lowTargetLabel: typeof lowTargetValue === 'number' && Number.isFinite(lowTargetValue)
       ? formatLoadingMoney(lowTargetValue, lowTargetCurrency)
       : undefined,
-    summary: summaryMatch?.[1],
+    summary: summaryText,
     upsideLabel: typeof upsidePct === 'number' && Number.isFinite(upsidePct)
       ? formatLoadingPercent(upsidePct)
       : undefined,
@@ -832,7 +841,7 @@ function buildConsensusLoadingQuickFact(payload: JarooDeepScanPayload | null, fa
     return buildTargetPriceStatusQuickFact(payload, consensus.body, fallbackName, fallbackMarket, fallbackKind)
   }
 
-  const parsedConsensus = parseLoadingConsensusBody(consensus.body)
+  const parsedConsensus = parseLoadingConsensusBody(consensus.body, consensus.consensus)
   if (!parsedConsensus.targetPriceLabel) {
     return buildTargetPriceStatusQuickFact(payload, consensus.body, fallbackName, fallbackMarket, fallbackKind)
   }
