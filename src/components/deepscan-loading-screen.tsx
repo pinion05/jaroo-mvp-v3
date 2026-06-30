@@ -669,7 +669,7 @@ function QuickFactCard({
         <span className={cn(styles.narrativeTag, narrativeToneClass(quickFactToneToNarrativeTone(fact.tone)))}>{fact.category}</span>
         <span className={cn(styles.narrativeTag, fact.key === 'week52-position' ? styles.positionSegmentBadge : narrativeToneClass(quickFactToneToNarrativeTone(fact.tone)))}>{fact.badge}</span>
       </div>
-      <p className={styles.quickFactDetail}>{fact.body}</p>
+      {consensus ? null : <p className={styles.quickFactDetail}>{fact.body}</p>}
       {fact.detail ? <p className={styles.positionDeltaLine}>{fact.detail}</p> : null}
       {indicator ? (
         <div className={styles.positionIndicator} aria-label={`${fact.category}: ${indicator.leftLabel}부터 ${indicator.rightLabel} 사이 ${indicator.markerLabel ?? '현재 위치'}`}>
