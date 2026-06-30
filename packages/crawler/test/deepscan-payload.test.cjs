@@ -298,6 +298,17 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
       label: '컨센서스',
       title: '삼성전자 증권사 컨센서스',
       body: '평균 목표가 100000 KRW · 현재가 대비 +17.37% · 매수 의견이 우세해요 · 투자의견 BUY',
+      consensus: {
+        targetPrice: 100000,
+        targetGapPct: 17.370892018779344,
+        analystCount: null,
+        recommendation: 'BUY',
+        recommendationScore: null,
+        highestTargetPrice: null,
+        lowestTargetPrice: null,
+        opinionSummary: '매수 의견이 우세해요',
+        currency: 'KRW',
+      },
     },
   );
   assert.equal(payload.strategy.weekSignal, '관찰 지속');

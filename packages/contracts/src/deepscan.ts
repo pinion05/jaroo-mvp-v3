@@ -119,6 +119,18 @@ export type JarooDeepScanCommitteeAxis = {
   members: JarooDeepScanCommitteeMember[]
 }
 
+export type JarooDeepScanConsensusStructured = {
+  targetPrice?: number | null
+  targetGapPct?: number | null
+  analystCount?: number | null
+  recommendation?: string | null
+  recommendationScore?: number | null
+  highestTargetPrice?: number | null
+  lowestTargetPrice?: number | null
+  opinionSummary?: string | null
+  currency?: string | null
+}
+
 export type JarooDeepScanInsightItem = {
   sourceType: DeepScanSourceType
   sourceLabel: string
@@ -127,6 +139,10 @@ export type JarooDeepScanInsightItem = {
   title: string
   body: string
   sourceBody?: string
+  /** Structured consensus fields. Present on the "증권사 의견" insight when the
+   *  crawler emits them, so the web client can read values directly instead of
+   *  reverse-parsing `body` with regex. */
+  consensus?: JarooDeepScanConsensusStructured
 }
 
 export type JarooDeepScanStrategyScenario = {

@@ -2084,6 +2084,19 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
               ? `최고 ${formatCurrencyValue(consensusHighestTargetPrice, evidence.currentQuote?.currency ?? 'KRW')} / 최저 ${formatCurrencyValue(consensusLowestTargetPrice, evidence.currentQuote?.currency ?? 'KRW')}`
               : null,
           ].filter(Boolean).join(' · '),
+          // Structured mirror of the above body so the web client can read
+          // the exact numbers instead of reverse-parsing `body`.
+          consensus: {
+            targetPrice: consensusTargetPrice,
+            targetGapPct: consensusTargetGapPct,
+            analystCount: consensusAnalystCount,
+            recommendation: consensusRecommendation,
+            recommendationScore: consensusRecommendationScore,
+            highestTargetPrice: consensusHighestTargetPrice,
+            lowestTargetPrice: consensusLowestTargetPrice,
+            opinionSummary: consensusOpinionSummary,
+            currency: evidence.currentQuote?.currency ?? 'KRW',
+          },
         }]
       : []),
     {
