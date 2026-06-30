@@ -735,6 +735,42 @@
   margin-top: 4px;
 }
 
+.consensusStats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 12px;
+  margin: 0;
+  padding: 10px 0 0;
+  border-top: 0.5px solid rgba(28, 85, 133, 0.12);
+}
+
+.consensusStat dt {
+  margin: 0 0 2px;
+  color: var(--ds-muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.consensusStat dd {
+  margin: 0;
+  color: var(--ds-ink);
+  font-size: 13px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.consensusSummary {
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--ds-blue-soft);
+  color: var(--ds-blue);
+  font-size: 12px;
+  font-weight: 700;
+  line-height: 1.4;
+}
+
 .consensusFanWrap {
   display: grid;
   gap: 6px;
@@ -751,7 +787,8 @@
   stroke: var(--ds-muted);
   stroke-width: 1;
   stroke-dasharray: 3 3;
-  opacity: 0.7;
+  opacity: 0;
+  animation: consensus-current-reveal 0.6s 1.8s ease-out forwards;
 }
 
 .consensusFanTargetPath {
@@ -760,16 +797,23 @@
   stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: consensus-target-draw 1.8s 0.1s ease-out forwards;
 }
 
 .consensusFanCurrentDot {
   fill: var(--ds-ink);
+  opacity: 0;
+  animation: consensus-point-reveal 0.4s 1.9s ease-out forwards;
 }
 
 .consensusFanTargetDot {
   fill: var(--ds-blue);
   stroke: #fff;
   stroke-width: 1.4;
+  opacity: 0;
+  animation: consensus-point-reveal 0.4s 2.1s ease-out forwards;
 }
 
 .consensusFanLegend {
@@ -2611,6 +2655,24 @@
   }
 }
 
+@keyframes consensus-target-draw {
+  to {
+    stroke-dashoffset: 0;
+  }
+}
+
+@keyframes consensus-current-reveal {
+  to {
+    opacity: 0.7;
+  }
+}
+
+@keyframes consensus-point-reveal {
+  to {
+    opacity: 1;
+  }
+}
+
 @keyframes today-chart-draw {
   to {
     stroke-dashoffset: 0;
@@ -2641,19 +2703,30 @@
   .todayChartLine,
   .todayChartDot,
   .todayChartRing,
-  .todayBriefItem {
+  .todayBriefItem,
+  .consensusFanTargetPath,
+  .consensusFanCurrentLine,
+  .consensusFanCurrentDot,
+  .consensusFanTargetDot {
     animation: none;
     transition: none;
   }
 
   .todayChartArea,
   .todayChartDot,
-  .todayChartRing {
+  .todayChartRing,
+  .consensusFanCurrentDot,
+  .consensusFanTargetDot {
     opacity: 1;
   }
 
-  .todayChartLine {
+  .todayChartLine,
+  .consensusFanTargetPath {
     stroke-dashoffset: 0;
+  }
+
+  .consensusFanCurrentLine {
+    opacity: 0.7;
   }
 
   .todayBriefItem,

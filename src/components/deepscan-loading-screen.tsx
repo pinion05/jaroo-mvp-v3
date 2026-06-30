@@ -639,7 +639,7 @@ function TargetPriceFanChart({
     <div className={styles.consensusFanWrap}>
       <svg className={styles.consensusFanChart} viewBox='0 0 300 120' role='img' aria-label='현재가에서 목표가까지 예상 경로'>
         <line className={styles.consensusFanCurrentLine} x1={geometry.leftX} y1={geometry.currentY} x2={geometry.rightX} y2={geometry.currentY} />
-        <path className={styles.consensusFanTargetPath} d={geometry.medianPath} />
+        <path className={styles.consensusFanTargetPath} d={geometry.medianPath} pathLength={1} />
         <circle className={styles.consensusFanCurrentDot} cx={geometry.leftX} cy={geometry.currentY} r='3.6' />
         <circle className={styles.consensusFanTargetDot} cx={geometry.rightX} cy={geometry.targetY} r='3.6' />
       </svg>
@@ -669,7 +669,7 @@ function QuickFactCard({
         <span className={cn(styles.narrativeTag, narrativeToneClass(quickFactToneToNarrativeTone(fact.tone)))}>{fact.category}</span>
         <span className={cn(styles.narrativeTag, fact.key === 'week52-position' ? styles.positionSegmentBadge : narrativeToneClass(quickFactToneToNarrativeTone(fact.tone)))}>{fact.badge}</span>
       </div>
-      <p className={styles.quickFactDetail}>{fact.body}</p>
+      {consensus ? null : <p className={styles.quickFactDetail}>{fact.body}</p>}
       {fact.detail ? <p className={styles.positionDeltaLine}>{fact.detail}</p> : null}
       {indicator ? (
         <div className={styles.positionIndicator} aria-label={`${fact.category}: ${indicator.leftLabel}부터 ${indicator.rightLabel} 사이 ${indicator.markerLabel ?? '현재 위치'}`}>
@@ -700,9 +700,33 @@ function QuickFactCard({
             {consensus.upsideLabel ? <span>{consensus.upsideLabel}</span> : null}
           </div>
           <TargetPriceFanChart consensus={consensus} dailyCloses={dailyCloses} seedKey={seedKey} />
-          <p className={styles.positionDeltaLine}>
-            {[consensus.currentPriceLabel ? `현재 ${consensus.currentPriceLabel}` : null, consensus.highTargetLabel ? `최고 ${consensus.highTargetLabel}` : null, consensus.lowTargetLabel ? `최저 ${consensus.lowTargetLabel}` : null, consensus.summary].filter(Boolean).join(' · ')}
-          </p>
+          <dl className={styles.consensusStats}>
+            {consensus.currentPriceLabel ? (
+              <div className={styles.consensusStat}>
+                <dt>현재가</dt>
+                <dd>{consensus.currentPriceLabel}</dd>
+              </div>
+            ) : null}
+            {consensus.opinionLabel ? (
+              <div className={styles.consensusStat}>
+                <dt>투자의견</dt>
+                <dd>{consensus.opinionLabel}</dd>
+              </div>
+            ) : null}
+            {consensus.highTargetLabel ? (
+              <div className={styles.consensusStat}>
+                <dt>최고</dt>
+                <dd>{consensus.highTargetLabel}</dd>
+              </div>
+            ) : null}
+            {consensus.lowTargetLabel ? (
+              <div className={styles.consensusStat}>
+                <dt>최저</dt>
+                <dd>{consensus.lowTargetLabel}</dd>
+              </div>
+            ) : null}
+          </dl>
+          {consensus.summary ? <p className={styles.consensusSummary}>{consensus.summary}</p> : null}
         </div>
       ) : null}
     </article>
