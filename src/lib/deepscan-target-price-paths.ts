@@ -146,6 +146,146 @@ export function estimateDailyVolatility(
   return Number.isFinite(stdev) && stdev > 0 ? stdev : fallback
 }
 
+// ---------------------------------------------------------------------------
+// Multi-endpoint fan geometry
+//
+// Maps one median projection curve per active target-price endpoint (평균 /
+// 최고 / 최저) into the SVG pixel space used by the loading-screen consensus
+// chart. Pure + deterministic so it can be unit-tested with node:test
+// (the .tsx component itself cannot be imported there due to its CSS-module
+// import). The component consumes the returned `curves` array directly.
+// ---------------------------------------------------------------------------
+
+export type ConsensusFanCurveKey = 'high' | 'average' | 'low'
+
+export type ConsensusFanCurve = {
+  /** Which target-price level this curve projects to; drives styling + legend. */
+  key: ConsensusFanCurveKey
+  /** SVG path data for the median projection, e.g. "M10 50 L20 49 ...". */
+  pathD: string
+  /** Pixel y of the right-edge dot (the curve's terminal point lands here). */
+  dotY: number
+}
+
+export type ConsensusFanGeometryInput = {
+  currentPrice: number
+  averageTarget: number
+  highTarget?: number | null
+  lowTarget?: number | null
+  /** Per-step (daily) volatility; falls back to the default when not finite. */
+  volatility?: number
+  /** Base seed; suffixed per endpoint so each curve is independently stable. */
+  seed?: string
+}
+
+export type ConsensusFanGeometry = {
+  leftX: number
+  rightX: number
+  currentY: number
+  /**
+   * Active curves in render order `[low, high, average]` so the average
+   * (primary) curve is painted last and sits on top. `high`/`low` are omitted
+   * when their target is absent/non-positive.
+   */
+  curves: ConsensusFanCurve[]
+}
+
+/**
+ * Build the pixel geometry for the consensus fan chart. Returns `null` when
+ * the required current/average values are missing or no curve could be built.
+ */
+export function buildConsensusFanGeometry(input: ConsensusFanGeometryInput): ConsensusFanGeometry | null {
+  const { currentPrice, averageTarget } = input
+  if (!Number.isFinite(currentPrice) || currentPrice <= 0 || !Number.isFinite(averageTarget) || averageTarget <= 0) {
+    return null
+  }
+
+  // Plot region (must match the SVG viewBox 0 0 300 120 used by the component).
+  const left = 10
+  const right = 290
+  const top = 18
+  const bottom = 100
+  const width = right - left
+  const padY = 10
+  const plotTop = top + padY
+  const plotBottom = bottom - padY
+
+  // Collect active endpoints (average is always present; high/low optional).
+  const endpoints: Array<{ key: ConsensusFanCurveKey; price: number }> = []
+  if (Number.isFinite(input.lowTarget) && (input.lowTarget as number) > 0) {
+    endpoints.push({ key: 'low', price: input.lowTarget as number })
+  }
+  endpoints.push({ key: 'average', price: averageTarget })
+  if (Number.isFinite(input.highTarget) && (input.highTarget as number) > 0) {
+    endpoints.push({ key: 'high', price: input.highTarget as number })
+  }
+
+  const baseSeed = input.seed && input.seed.length ? input.seed : `${currentPrice}|${averageTarget}`
+  const volatility = Number.isFinite(input.volatility) && (input.volatility as number) > 0
+    ? (input.volatility as number)
+    : DEFAULT_TARGET_PRICE_DAILY_VOLATILITY
+
+  // Simulate a deterministic median path per endpoint.
+  const perEndpoint = endpoints.map((ep) => {
+    const paths = simulateTargetPricePaths({
+      currentPrice,
+      targetPrice: ep.price,
+      volatility,
+      seed: `${baseSeed}|${ep.key}`,
+    })
+    const bands = buildTargetPriceFanBands(paths)
+    return { key: ep.key, price: ep.price, median: bands ? bands.median : null }
+  })
+
+  // Shared y-extent across current + every active endpoint + their medians,
+  // so all curves + dots fit inside the plot area.
+  const extentValues: number[] = [currentPrice, ...endpoints.map((e) => e.price)]
+  for (const pe of perEndpoint) {
+    if (pe.median) {
+      extentValues.push(...pe.median)
+    }
+  }
+  const minValue = Math.min(...extentValues)
+  const maxValue = Math.max(...extentValues)
+  const range = maxValue - minValue || Math.max(1, maxValue * 0.02)
+
+  const stepCount = perEndpoint[0].median?.length ?? 0
+  const xAt = (i: number) => (stepCount <= 1 ? right : left + (width * i) / (stepCount - 1))
+  const yAt = (value: number) => clamp(plotBottom - ((value - minValue) / range) * (plotBottom - plotTop), top, bottom)
+  const round = (v: number) => Math.round(v * 10) / 10
+
+  const currentY = round(yAt(currentPrice))
+
+  const renderOrder: ConsensusFanCurveKey[] = ['low', 'high', 'average']
+  const curves: ConsensusFanCurve[] = []
+  for (const key of renderOrder) {
+    const pe = perEndpoint.find((p) => p.key === key)
+    if (!pe || !pe.median || pe.median.length === 0) {
+      continue
+    }
+    const median = pe.median
+    const n = median.length
+    const endpointY = round(yAt(pe.price))
+    const lastMedianY = yAt(median[n - 1])
+    // Anchor: nudge each point by a linear shift so the final point lands
+    // exactly on the endpoint dot (same technique the old single-target
+    // builder used), with no visible kink.
+    const points = median.map((value, i) => {
+      const t = n === 1 ? 1 : i / (n - 1)
+      const shift = (endpointY - lastMedianY) * t
+      return { x: round(xAt(i)), y: round(yAt(value) + shift) }
+    })
+    const pathD = points.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ')
+    curves.push({ key, pathD, dotY: endpointY })
+  }
+
+  if (curves.length === 0) {
+    return null
+  }
+
+  return { leftX: left, rightX: right, currentY, curves }
+}
+
 // --- internals ---
 
 function clampPositiveInteger(value: unknown, fallback: number): number {
