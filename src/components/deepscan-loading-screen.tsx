@@ -30,10 +30,8 @@ import {
 import { resolveDeepScanBriefingCardCurrentPrice, resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
 import { calculateFallbackEvaluationMoney } from '@/lib/deepscan-loading-metrics'
 import {
-  buildTargetPriceFanBands,
+  buildConsensusFanGeometry,
   estimateDailyVolatility,
-  simulateTargetPricePaths,
-  type TargetPriceFanBands,
 } from '@/lib/deepscan-target-price-paths'
 import { cn } from '@/lib/utils'
 import styles from './deepscan-loading-screen.module.css'
@@ -614,38 +612,60 @@ function TargetPriceFanChart({
       return null
     }
     const volatility = estimateDailyVolatility(dailyCloses ?? [])
-    const paths = simulateTargetPricePaths({
+    return buildConsensusFanGeometry({
       currentPrice: current,
-      targetPrice: target,
+      averageTarget: target,
+      highTarget: consensus.highTargetValue,
+      lowTarget: consensus.lowTargetValue,
       volatility,
       seed: seedKey ?? `${current}|${target}`,
     })
-    const bands = buildTargetPriceFanBands(paths)
-    if (!bands) {
-      return null
-    }
-    return buildTargetPriceFanGeometry({
-      bands,
-      currentPrice: current,
-      targetPrice: target,
-    })
-  }, [consensus.currentPriceValue, consensus.targetPriceValue, dailyCloses, seedKey])
+  }, [consensus.currentPriceValue, consensus.targetPriceValue, consensus.highTargetValue, consensus.lowTargetValue, dailyCloses, seedKey])
 
   if (!geometry) {
     return null
   }
 
+  const curveClass: Record<'high' | 'average' | 'low', string> = {
+    high: styles.consensusFanHighPath,
+    average: styles.consensusFanTargetPath,
+    low: styles.consensusFanLowPath,
+  }
+  const dotClass: Record<'high' | 'average' | 'low', string> = {
+    high: styles.consensusFanHighDot,
+    average: styles.consensusFanTargetDot,
+    low: styles.consensusFanLowDot,
+  }
+  const legendClass: Record<'high' | 'average' | 'low', string> = {
+    high: styles.consensusFanLegendHigh,
+    average: styles.consensusFanLegendTarget,
+    low: styles.consensusFanLegendLow,
+  }
+  const legendLabel: Record<'high' | 'average' | 'low', string> = {
+    high: '최고',
+    average: '평균',
+    low: '최저',
+  }
+  const legendOrder: Array<'high' | 'average' | 'low'> = ['average', 'high', 'low']
+  const activeKeys = new Set(geometry.curves.map((c) => c.key))
+
   return (
     <div className={styles.consensusFanWrap}>
       <svg className={styles.consensusFanChart} viewBox='0 0 300 120' role='img' aria-label='현재가에서 목표가까지 예상 경로'>
         <line className={styles.consensusFanCurrentLine} x1={geometry.leftX} y1={geometry.currentY} x2={geometry.rightX} y2={geometry.currentY} />
-        <path className={styles.consensusFanTargetPath} d={geometry.medianPath} pathLength={1} />
+        {geometry.curves.map((curve) => (
+          <path key={`path-${curve.key}`} className={curveClass[curve.key]} d={curve.pathD} pathLength={1} />
+        ))}
         <circle className={styles.consensusFanCurrentDot} cx={geometry.leftX} cy={geometry.currentY} r='3.6' />
-        <circle className={styles.consensusFanTargetDot} cx={geometry.rightX} cy={geometry.targetY} r='3.6' />
+        {geometry.curves.map((curve) => (
+          <circle key={`dot-${curve.key}`} className={dotClass[curve.key]} cx={geometry.rightX} cy={curve.dotY} r='3.6' />
+        ))}
       </svg>
       <div className={styles.consensusFanLegend}>
         <span className={styles.consensusFanLegendCurrent}><i />현재가</span>
-        <span className={styles.consensusFanLegendTarget}><i />목표가 예상</span>
+        {legendOrder.filter((key) => activeKeys.has(key)).map((key) => (
+          <span key={`legend-${key}`} className={legendClass[key]}><i />{legendLabel[key]}</span>
+        ))}
       </div>
     </div>
   )
@@ -1019,63 +1039,6 @@ function buildChartGeometry(rows: LoadingBriefingDailyRow[], averagePriceValue: 
  * 300x120) consistent with buildChartGeometry. Produces a filled outer band,
  * a median line, the current-price anchor and the target-price line.
  */
-function buildTargetPriceFanGeometry(input: {
-  bands: TargetPriceFanBands
-  currentPrice: number
-  targetPrice: number
-}) {
-  const { bands, currentPrice, targetPrice } = input
-  const left = 10
-  const right = 290
-  const top = 18
-  const bottom = 100
-  const width = right - left
-  const n = bands.median.length
-
-  // y-extent covers current -> target only (band/range markers removed),
-  // so the two lines use the full vertical range and stay legible.
-  const candidateExtents = [currentPrice, targetPrice, ...bands.median].filter((v) => isFiniteNumber(v))
-  const minValue = Math.min(...candidateExtents)
-  const maxValue = Math.max(...candidateExtents)
-  const range = maxValue - minValue || Math.max(1, maxValue * 0.02)
-
-  // inset the dots from the chart edges so neither sits flush at the
-  // very top or bottom, which would read as clipped.
-  const padY = 10
-  const plotTop = top + padY
-  const plotBottom = bottom - padY
-  const xAt = (i: number) => (n === 1 ? right : left + (width * i) / (n - 1))
-  const yAt = (value: number) => clamp(plotBottom - ((value - minValue) / range) * (plotBottom - plotTop), top, bottom)
-  const round = (v: number) => Math.round(v * 10) / 10
-
-  const currentY = round(yAt(currentPrice))
-  const targetY = round(yAt(targetPrice))
-
-  // The Monte-Carlo median of a lognormal walk undershoots the target,
-  // so its last point would sit below the target dot and leave the end
-  // dot detached. Anchor the path: keep point 0 exactly at the current
-  // dot (t=0 contributes no shift) and nudge the tail so point n-1 lands
-  // exactly on the target dot, spreading the (small) correction linearly
-  // so there is no kink.
-  const lastMedianY = yAt(bands.median[n - 1])
-  const medianPoints = bands.median.map((value, i) => {
-    const t = n === 1 ? 1 : i / (n - 1)
-    const shift = (targetY - lastMedianY) * t
-    return { x: round(xAt(i)), y: round(yAt(value) + shift) }
-  })
-  const medianPath = medianPoints.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ')
-
-  return {
-    hasData: true,
-    medianPath,
-    leftX: left,
-    rightX: right,
-    currentY,
-    targetY,
-    lastMedian: medianPoints[medianPoints.length - 1],
-  }
-}
-
 function buildOneMonthMeaning(value: number | null) {
   if (!isFiniteNumber(value)) {
     return '가격 흐름을 불러오는 중이에요.'

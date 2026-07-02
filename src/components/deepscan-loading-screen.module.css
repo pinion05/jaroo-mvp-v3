@@ -817,6 +817,44 @@
   animation: consensus-point-reveal 0.4s 2.1s ease-out forwards;
 }
 
+.consensusFanHighPath {
+  fill: none;
+  stroke: var(--ds-green);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: consensus-target-draw 1.8s 0.1s ease-out forwards;
+}
+
+.consensusFanLowPath {
+  fill: none;
+  stroke: var(--ds-red);
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  animation: consensus-target-draw 1.8s 0.1s ease-out forwards;
+}
+
+.consensusFanHighDot {
+  fill: var(--ds-green);
+  stroke: #fff;
+  stroke-width: 1.4;
+  opacity: 0;
+  animation: consensus-point-reveal 0.4s 2.1s ease-out forwards;
+}
+
+.consensusFanLowDot {
+  fill: var(--ds-red);
+  stroke: #fff;
+  stroke-width: 1.4;
+  opacity: 0;
+  animation: consensus-point-reveal 0.4s 2.1s ease-out forwards;
+}
+
 .consensusFanLegend {
   display: flex;
   align-items: center;
@@ -846,6 +884,29 @@
   width: 14px;
   height: 0;
   border-top: 2.5px solid var(--ds-blue);
+  border-radius: 2px;
+}
+
+.consensusFanLegendHigh,
+.consensusFanLegendLow {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.consensusFanLegendHigh i {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top: 2px solid var(--ds-green);
+  border-radius: 2px;
+}
+
+.consensusFanLegendLow i {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top: 2px solid var(--ds-red);
   border-radius: 2px;
 }
 
@@ -2706,9 +2767,13 @@
   .todayChartRing,
   .todayBriefItem,
   .consensusFanTargetPath,
+  .consensusFanHighPath,
+  .consensusFanLowPath,
   .consensusFanCurrentLine,
   .consensusFanCurrentDot,
-  .consensusFanTargetDot {
+  .consensusFanTargetDot,
+  .consensusFanHighDot,
+  .consensusFanLowDot {
     animation: none;
     transition: none;
   }
@@ -2717,12 +2782,16 @@
   .todayChartDot,
   .todayChartRing,
   .consensusFanCurrentDot,
-  .consensusFanTargetDot {
+  .consensusFanTargetDot,
+  .consensusFanHighDot,
+  .consensusFanLowDot {
     opacity: 1;
   }
 
   .todayChartLine,
-  .consensusFanTargetPath {
+  .consensusFanTargetPath,
+  .consensusFanHighPath,
+  .consensusFanLowPath {
     stroke-dashoffset: 0;
   }
 
