@@ -812,12 +812,6 @@
   animation: consensus-target-draw 1.8s 0.1s ease-out forwards;
 }
 
-.consensusFanCurrentDot {
-  fill: var(--ds-ink);
-  opacity: 0;
-  animation: consensus-point-reveal 0.4s 1.9s ease-out forwards;
-}
-
 .consensusFanTargetDot {
   fill: var(--ds-blue);
   stroke: #fff;
@@ -2780,7 +2774,6 @@
   .consensusFanLowPath,
   .consensusFanCurrentLine,
   .consensusFanCurrentPath,
-  .consensusFanCurrentDot,
   .consensusFanTargetDot,
   .consensusFanHighDot,
   .consensusFanLowDot {
@@ -2791,7 +2784,6 @@
   .todayChartArea,
   .todayChartDot,
   .todayChartRing,
-  .consensusFanCurrentDot,
   .consensusFanTargetDot,
   .consensusFanHighDot,
   .consensusFanLowDot {

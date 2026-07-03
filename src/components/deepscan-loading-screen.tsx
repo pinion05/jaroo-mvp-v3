@@ -661,7 +661,6 @@ function TargetPriceFanChart({
         {geometry.curves.map((curve) => (
           <path key={`path-${curve.key}`} className={curveClass[curve.key]} d={curve.pathD} pathLength={1} />
         ))}
-        <circle className={styles.consensusFanCurrentDot} cx={geometry.leftX} cy={geometry.currentY} r='3.6' />
         {geometry.curves.map((curve) => (
           <circle key={`dot-${curve.key}`} className={dotClass[curve.key]} cx={geometry.rightX} cy={curve.dotY} r='3.6' />
         ))}
