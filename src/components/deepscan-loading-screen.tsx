@@ -652,7 +652,7 @@ function TargetPriceFanChart({
   return (
     <div className={styles.consensusFanWrap}>
       <svg className={styles.consensusFanChart} viewBox='0 0 300 120' role='img' aria-label='현재가에서 목표가까지 예상 경로'>
-        <line className={styles.consensusFanCurrentLine} x1={geometry.leftX} y1={geometry.currentY} x2={geometry.rightX} y2={geometry.currentY} />
+        <line className={styles.consensusFanCurrentLine} x1={geometry.leftX} y1={geometry.currentY} x2={geometry.fanStartX} y2={geometry.currentY} />
         {geometry.curves.map((curve) => (
           <path key={`path-${curve.key}`} className={curveClass[curve.key]} d={curve.pathD} pathLength={1} />
         ))}

@@ -55,3 +55,28 @@ test('buildConsensusFanGeometry places the high dot above the low dot (smaller y
   assert.ok(low && high)
   assert.ok(high!.dotY < low!.dotY, 'high target should render above (lower y) the low target')
 })
+
+test('buildConsensusFanGeometry fans curves out from the left third (fanStartX) to the right edge', () => {
+  const g = buildConsensusFanGeometry({ currentPrice: 100, averageTarget: 120, lowTarget: 80, highTarget: 160, seed: 's' })
+  assert.ok(g)
+  // Plot is left=10, right=290 (width 280); current line ends ~1/3 in => ~103.3
+  assert.ok(g!.fanStartX > 100 && g!.fanStartX < 110, `fanStartX near 103, got ${g!.fanStartX}`)
+  for (const curve of g!.curves) {
+    const start = curve.pathD.match(/^M(\d+(?:\.\d+)?)/)
+    assert.ok(start, `curve ${curve.key} must start with an M segment`)
+    assert.equal(Number(start![1]), g!.fanStartX, `curve ${curve.key} must start at fanStartX`)
+    const end = curve.pathD.match(/L(\d+(?:\.\d+)?) \d+(?:\.\d+)?$/)
+    assert.ok(end, `curve ${curve.key} must end with an L segment`)
+    assert.equal(Number(end![1]), 290, `curve ${curve.key} must end at rightX=290`)
+  }
+})
+
+test('buildConsensusFanGeometry starts each curve at the current-price y so it joins the current line', () => {
+  const g = buildConsensusFanGeometry({ currentPrice: 100, averageTarget: 140, lowTarget: 70, highTarget: 200, seed: 's' })
+  assert.ok(g)
+  for (const curve of g!.curves) {
+    const start = curve.pathD.match(/^M\d+(?:\.\d+)? (\d+(?:\.\d+)?)/)
+    assert.ok(start, `curve ${curve.key} must start with an M segment`)
+    assert.equal(Number(start![1]), g!.currentY, `curve ${curve.key} must start at currentY`)
+  }
+})

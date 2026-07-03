@@ -181,6 +181,8 @@ export type ConsensusFanGeometryInput = {
 export type ConsensusFanGeometry = {
   leftX: number
   rightX: number
+  /** Right edge of the current-price line; the projection curves fan out from here (left third of the plot). */
+  fanStartX: number
   currentY: number
   /**
    * Active curves in render order `[low, high, average]` so the average
@@ -250,7 +252,12 @@ export function buildConsensusFanGeometry(input: ConsensusFanGeometryInput): Con
   const range = maxValue - minValue || Math.max(1, maxValue * 0.02)
 
   const stepCount = perEndpoint[0].median?.length ?? 0
-  const xAt = (i: number) => (stepCount <= 1 ? right : left + (width * i) / (stepCount - 1))
+  // The current-price line spans the LEFT THIRD of the plot; the projection
+  // curves fan out from `fanStart` (≈1/3 in) to `right`, so the chart reads as
+  // a short current-price line that splits into 최저/평균/최고 projections.
+  const fanStart = left + width * (1 / 3)
+  const fanWidth = right - fanStart
+  const xAt = (i: number) => (stepCount <= 1 ? right : fanStart + (fanWidth * i) / (stepCount - 1))
   const yAt = (value: number) => clamp(plotBottom - ((value - minValue) / range) * (plotBottom - plotTop), top, bottom)
   const round = (v: number) => Math.round(v * 10) / 10
 
@@ -283,7 +290,7 @@ export function buildConsensusFanGeometry(input: ConsensusFanGeometryInput): Con
     return null
   }
 
-  return { leftX: left, rightX: right, currentY, curves }
+  return { leftX: left, rightX: right, fanStartX: round(fanStart), currentY, curves }
 }
 
 // --- internals ---

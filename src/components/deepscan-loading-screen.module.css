@@ -787,7 +787,6 @@
 .consensusFanCurrentLine {
   stroke: var(--ds-muted);
   stroke-width: 1;
-  stroke-dasharray: 3 3;
   opacity: 0;
   animation: consensus-current-reveal 0.6s 1.8s ease-out forwards;
 }
