@@ -791,6 +791,16 @@
   animation: consensus-current-reveal 0.6s 1.8s ease-out forwards;
 }
 
+.consensusFanCurrentPath {
+  fill: none;
+  stroke: var(--ds-muted);
+  stroke-width: 1.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0;
+  animation: consensus-current-reveal 0.6s 1.8s ease-out forwards;
+}
+
 .consensusFanTargetPath {
   fill: none;
   stroke: var(--ds-blue);
@@ -2769,6 +2779,7 @@
   .consensusFanHighPath,
   .consensusFanLowPath,
   .consensusFanCurrentLine,
+  .consensusFanCurrentPath,
   .consensusFanCurrentDot,
   .consensusFanTargetDot,
   .consensusFanHighDot,
@@ -2794,7 +2805,8 @@
     stroke-dashoffset: 0;
   }
 
-  .consensusFanCurrentLine {
+  .consensusFanCurrentLine,
+  .consensusFanCurrentPath {
     opacity: 0.7;
   }
 

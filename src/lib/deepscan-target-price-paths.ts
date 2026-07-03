@@ -172,6 +172,8 @@ export type ConsensusFanGeometryInput = {
   averageTarget: number
   highTarget?: number | null
   lowTarget?: number | null
+  /** Recent close prices (oldest→newest); rendered as a left-third sparkline of real price action. */
+  recentCloses?: Array<number | null | undefined>
   /** Per-step (daily) volatility; falls back to the default when not finite. */
   volatility?: number
   /** Base seed; suffixed per endpoint so each curve is independently stable. */
@@ -184,6 +186,8 @@ export type ConsensusFanGeometry = {
   /** Right edge of the current-price line; the projection curves fan out from here (left third of the plot). */
   fanStartX: number
   currentY: number
+  /** Sparkline path for recent closes across the left third; `null` → caller draws a flat current-price line. */
+  recentPath: string | null
   /**
    * Active curves in render order `[low, high, average]` so the average
    * (primary) curve is painted last and sits on top. `high`/`low` are omitted
@@ -239,9 +243,15 @@ export function buildConsensusFanGeometry(input: ConsensusFanGeometryInput): Con
     return { key: ep.key, price: ep.price, median: bands ? bands.median : null }
   })
 
-  // Shared y-extent across current + every active endpoint + their medians,
-  // so all curves + dots fit inside the plot area.
-  const extentValues: number[] = [currentPrice, ...endpoints.map((e) => e.price)]
+  // Recent closes → left-third sparkline of real price action. Collected early
+  // so they join the shared y-extent (option A: one honest axis).
+  const recentCloses = (input.recentCloses ?? []).filter(
+    (p): p is number => typeof p === 'number' && Number.isFinite(p) && p > 0,
+  )
+
+  // Shared y-extent across current + recent closes + endpoints + medians,
+  // so the sparkline, curves and dots all fit inside the plot area.
+  const extentValues: number[] = [currentPrice, ...recentCloses, ...endpoints.map((e) => e.price)]
   for (const pe of perEndpoint) {
     if (pe.median) {
       extentValues.push(...pe.median)
@@ -262,6 +272,23 @@ export function buildConsensusFanGeometry(input: ConsensusFanGeometryInput): Con
   const round = (v: number) => Math.round(v * 10) / 10
 
   const currentY = round(yAt(currentPrice))
+
+  // Left-third sparkline of recent closes, evenly mapped left→fanStart and
+  // anchored so its tail lands exactly on currentY, joining the fan at the split.
+  let recentPath: string | null = null
+  if (recentCloses.length >= 2) {
+    const n = recentCloses.length
+    const recentWidth = fanStart - left
+    const lastCloseY = yAt(recentCloses[n - 1])
+    const sparkPts = recentCloses.map((value, i) => {
+      const t = i / (n - 1)
+      return {
+        x: round(left + recentWidth * t),
+        y: round(yAt(value) + (currentY - lastCloseY) * t),
+      }
+    })
+    recentPath = sparkPts.map((p, i) => `${i === 0 ? 'M' : 'L'}${p.x} ${p.y}`).join(' ')
+  }
 
   const renderOrder: ConsensusFanCurveKey[] = ['low', 'high', 'average']
   const curves: ConsensusFanCurve[] = []
@@ -290,7 +317,7 @@ export function buildConsensusFanGeometry(input: ConsensusFanGeometryInput): Con
     return null
   }
 
-  return { leftX: left, rightX: right, fanStartX: round(fanStart), currentY, curves }
+  return { leftX: left, rightX: right, fanStartX: round(fanStart), currentY, recentPath, curves }
 }
 
 // --- internals ---

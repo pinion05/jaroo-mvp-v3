@@ -80,3 +80,33 @@ test('buildConsensusFanGeometry starts each curve at the current-price y so it j
     assert.equal(Number(start![1]), g!.currentY, `curve ${curve.key} must start at currentY`)
   }
 })
+
+test('buildConsensusFanGeometry renders a recent-closes sparkline across the left third when provided', () => {
+  const g = buildConsensusFanGeometry({
+    currentPrice: 100,
+    averageTarget: 120,
+    recentCloses: [95, 98, 97, 102, 100],
+    seed: 's',
+  })
+  assert.ok(g)
+  assert.ok(g!.recentPath, 'recentPath should be set when recentCloses provided')
+  const start = g!.recentPath!.match(/^M(\d+(?:\.\d+)?)/)
+  assert.ok(start)
+  assert.equal(Number(start![1]), 10, 'sparkline should start at leftX=10')
+  const end = g!.recentPath!.match(/L(\d+(?:\.\d+)?) \d+(?:\.\d+)?$/)
+  assert.ok(end)
+  assert.equal(Number(end![1]), g!.fanStartX, 'sparkline should end at fanStartX')
+  const endY = g!.recentPath!.match(/ (\d+(?:\.\d+)?)$/)
+  assert.ok(endY)
+  assert.equal(Number(endY![1]), g!.currentY, 'sparkline tail must land on currentY')
+})
+
+test('buildConsensusFanGeometry sets recentPath null when fewer than 2 valid closes', () => {
+  const g = buildConsensusFanGeometry({ currentPrice: 100, averageTarget: 120, recentCloses: [100], seed: 's' })
+  assert.ok(g)
+  assert.equal(g!.recentPath, null)
+
+  const none = buildConsensusFanGeometry({ currentPrice: 100, averageTarget: 120, recentCloses: [null, undefined], seed: 's' })
+  assert.ok(none)
+  assert.equal(none!.recentPath, null)
+})
