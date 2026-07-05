@@ -801,14 +801,19 @@
   animation: consensus-current-reveal 0.6s 1.8s ease-out forwards;
 }
 
-.consensusFanTargetPath {
+.consensusFanTargetPath,
+.consensusFanHighPath,
+.consensusFanLowPath {
   fill: none;
-  stroke: var(--ds-blue);
-  stroke-width: 2.4;
   stroke-linecap: round;
   stroke-linejoin: round;
   opacity: 0;
   animation: consensus-current-reveal 0.6s 1.8s ease-out forwards;
+}
+
+.consensusFanTargetPath {
+  stroke: var(--ds-blue);
+  stroke-width: 2.4;
 }
 
 .consensusFanTargetDot {
@@ -820,23 +825,13 @@
 }
 
 .consensusFanHighPath {
-  fill: none;
   stroke: var(--ds-green);
   stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0;
-  animation: consensus-current-reveal 0.6s 1.8s ease-out forwards;
 }
 
 .consensusFanLowPath {
-  fill: none;
   stroke: var(--ds-red);
   stroke-width: 1.8;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-  opacity: 0;
-  animation: consensus-current-reveal 0.6s 1.8s ease-out forwards;
 }
 
 .consensusFanHighDot {

@@ -12,7 +12,7 @@
 
 - Reuse existing CSS color tokens — do **not** introduce new hex values: 평균 `--ds-blue` (#2b6be6), 최고 `--ds-green` (#1a9d55), 최저 `--ds-red` (#e5484d), 현재가 `--ds-muted`, 현재 점 `--ds-ink`.
 - Keep SVG `viewBox='0 0 300 120'` and the existing plot insets (`left=10`, `right=290`, `top=18`, `bottom=100`, `padY=10`).
-- Reuse existing keyframes `consensus-target-draw` and `consensus-point-reveal` — do not add new keyframe animations.
+- Reuse existing keyframes `consensus-current-reveal` and `consensus-point-reveal` — do not add new keyframe animations. (Note: target curves originally used a separate stroke-draw keyframe; it was removed and unified to `consensus-current-reveal` in #166.)
 - The simulation must stay deterministic for the same seed (no flicker on re-render).
 - Tests run with `node:test`; only pure (non-React) logic is unit-tested, matching the existing pattern in `src/components/deepscan-loading-screen.test.ts`.
 - Korean copy in the legend: 평균 / 최고 / 최저 / 현재가.
@@ -288,9 +288,8 @@ In `src/components/deepscan-loading-screen.module.css`, find the `.consensusFanT
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: consensus-target-draw 1.8s 0.1s ease-out forwards;
+  opacity: 0;
+  animation: consensus-current-reveal 0.6s 1.8s ease-out forwards;
 }
 
 .consensusFanLowPath {
@@ -299,9 +298,8 @@ In `src/components/deepscan-loading-screen.module.css`, find the `.consensusFanT
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
-  stroke-dasharray: 1;
-  stroke-dashoffset: 1;
-  animation: consensus-target-draw 1.8s 0.1s ease-out forwards;
+  opacity: 0;
+  animation: consensus-current-reveal 0.6s 1.8s ease-out forwards;
 }
 
 .consensusFanHighDot {
