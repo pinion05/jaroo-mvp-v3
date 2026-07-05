@@ -677,12 +677,8 @@ function TargetPriceFanChart({
 
 function QuickFactCard({
   fact,
-  dailyCloses,
-  seedKey,
 }: {
   fact: LoadingQuickFact
-  dailyCloses?: Array<number | null | undefined>
-  seedKey?: string
 }) {
   const indicator = fact.indicator
   const consensus = fact.consensus
@@ -723,7 +719,6 @@ function QuickFactCard({
             </div>
             {consensus.upsideLabel ? <span>{consensus.upsideLabel}</span> : null}
           </div>
-          <TargetPriceFanChart consensus={consensus} dailyCloses={dailyCloses} seedKey={seedKey} />
           <dl className={styles.consensusStats}>
             {consensus.currentPriceLabel ? (
               <div className={styles.consensusStat}>
@@ -1217,6 +1212,9 @@ function TodayBriefingCard({
   profitAmountText,
   elapsedSeconds,
   briefingSnapshot,
+  consensus,
+  dailyCloses,
+  seedKey,
 }: {
   currentPriceText: string | null
   currentPriceCurrency: MoneyCurrency
@@ -1228,6 +1226,9 @@ function TodayBriefingCard({
   profitAmountText: string | null
   elapsedSeconds: number
   briefingSnapshot?: LoadingBriefingSnapshot | null
+  consensus?: LoadingQuickFact['consensus']
+  dailyCloses?: Array<number | null | undefined>
+  seedKey?: string
 }) {
   const todayBriefListRef = useRef<HTMLDivElement | null>(null)
   const quote = briefingSnapshot?.quote
@@ -1406,6 +1407,16 @@ function TodayBriefingCard({
         />
         <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} icon='📊' question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
         <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} icon='🔥' question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
+        {consensus ? (
+          <TodayBriefingItem
+            at={briefStartSeconds[briefStartSeconds.length - 1] + TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS}
+            elapsedSeconds={elapsedSeconds}
+            icon='🔭'
+            question='애널리스트 목표가는 어디쯤일까?'
+            data={<TargetPriceFanChart consensus={consensus} dailyCloses={dailyCloses} seedKey={seedKey} />}
+            meaning={consensus.summary ?? (consensus.upsideLabel ? `${consensus.targetPriceLabel} · ${consensus.upsideLabel}` : consensus.targetPriceLabel)}
+          />
+        ) : null}
       </div>
     </section>
   )
@@ -1579,6 +1590,8 @@ export function DeepScanLoadingScreen({
     () => displayQuickFacts.filter((fact) => !isHiddenLoadingQuickFact(fact)),
     [displayQuickFacts],
   )
+  const consensusQuickFact = displayQuickFacts.find((fact) => Boolean(fact.consensus))
+  const consensusData = consensusQuickFact?.consensus
   const briefingDailyCloses = useMemo(
     () => (briefingSnapshot?.daily ?? []).map((row) => row.close),
     [briefingSnapshot?.daily],
@@ -1754,6 +1767,9 @@ export function DeepScanLoadingScreen({
           profitAmountText={profitAmountText}
           elapsedSeconds={elapsedSeconds}
           briefingSnapshot={briefingSnapshot}
+          consensus={consensusData}
+          dailyCloses={briefingDailyCloses}
+          seedKey={identifier}
         />
 
         <section className={styles.positionSummaryCard} aria-label='보유 포지션 요약'>
@@ -1773,7 +1789,7 @@ export function DeepScanLoadingScreen({
 
         {standaloneQuickFacts.length > 0 ? (
           <section className={styles.quickFactsCard} aria-label='수집된 빠른 근거'>
-            {standaloneQuickFacts.map((fact) => <QuickFactCard key={fact.key} fact={fact} dailyCloses={briefingDailyCloses} seedKey={identifier} />)}
+            {standaloneQuickFacts.map((fact) => <QuickFactCard key={fact.key} fact={fact} />)}
           </section>
         ) : null}
 
