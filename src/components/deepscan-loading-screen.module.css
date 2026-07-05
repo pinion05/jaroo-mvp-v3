@@ -2568,7 +2568,9 @@
   transform: translateY(8px);
   transition:
     opacity 0.42s cubic-bezier(0.16, 1, 0.3, 1),
-    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+    transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
+    max-height 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+    padding 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .todayBriefItem:first-child {
@@ -2620,7 +2622,8 @@
   transform: translateY(4px);
   transition:
     opacity 0.34s ease,
-    transform 0.34s ease;
+    transform 0.34s ease,
+    max-height 0.12s ease;
 }
 
 .todayBriefBodyIn {
