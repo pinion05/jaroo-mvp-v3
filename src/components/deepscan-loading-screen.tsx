@@ -433,6 +433,9 @@ function formatShares(value: string | number | undefined) {
 function formatTradingVolume(value: string | number | undefined) {
   if (typeof value === 'string' && value.trim()) {
     const trimmed = value.trim()
+    if (!/\d/u.test(trimmed)) {
+      return null
+    }
     return /주$/.test(trimmed) ? trimmed : `${trimmed}주`
   }
 
@@ -1362,7 +1365,7 @@ function TodayBriefingCard({
         <div className={styles.todayPriceRow}>
           <div>
             <div className={styles.todayPrice}>{displayCurrentPrice}</div>
-            <div className={styles.todayPriceSub}>평단 {displayAveragePrice} · {displayShares}{tradingVolumeText ? ` · 거래량 ${tradingVolumeText}` : ''}</div>
+            <div className={styles.todayPriceSub}>평단 {displayAveragePrice} · {displayShares} · 거래량 {tradingVolumeText ?? '확인 중'}</div>
           </div>
           <div className={styles.todayProfitBox}>
             <div className={cn(styles.todayProfitRate, isFiniteNumber(calculatedProfitRate) && calculatedProfitRate < 0 ? styles.todayDown : styles.todayUp)}>{displayProfitRate}</div>
