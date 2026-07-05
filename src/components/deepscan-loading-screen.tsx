@@ -1350,7 +1350,9 @@ function TodayBriefingCard({
     { length: TODAY_BRIEFING_ITEM_COUNT },
     (_, index) => TODAY_BRIEFING_FIRST_REVEAL_SECONDS + index * TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS,
   )
-  const visibleBriefingItemCount = briefStartSeconds.filter((at) => elapsedSeconds >= at).length
+  const consensusAt = TODAY_BRIEFING_FIRST_REVEAL_SECONDS + TODAY_BRIEFING_ITEM_COUNT * TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS
+  const allBriefStartSeconds = consensus ? [...briefStartSeconds, consensusAt] : briefStartSeconds
+  const visibleBriefingItemCount = allBriefStartSeconds.filter((at) => elapsedSeconds >= at).length
 
   useEffect(() => (
     startTodayBriefingMobileAutoScroll(todayBriefListRef.current, visibleBriefingItemCount)
@@ -1409,11 +1411,11 @@ function TodayBriefingCard({
         <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} icon='🔥' question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
         {consensus ? (
           <TodayBriefingItem
-            at={briefStartSeconds[briefStartSeconds.length - 1] + TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS}
+            at={consensusAt}
             elapsedSeconds={elapsedSeconds}
             icon='🔭'
             question='애널리스트 목표가는 어디쯤일까?'
-            data={<TargetPriceFanChart consensus={consensus} dailyCloses={dailyCloses} seedKey={seedKey} />}
+            data={elapsedSeconds >= consensusAt + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS ? <TargetPriceFanChart consensus={consensus} dailyCloses={dailyCloses} seedKey={seedKey} /> : null}
             meaning={consensus.summary ?? (consensus.upsideLabel ? `${consensus.targetPriceLabel} · ${consensus.upsideLabel}` : consensus.targetPriceLabel)}
           />
         ) : null}
