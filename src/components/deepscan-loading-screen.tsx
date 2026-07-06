@@ -159,8 +159,8 @@ type CompletionState = {
 
 const TODAY_BRIEFING_FIRST_REVEAL_SECONDS = 5
 const TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS = 5
+const TODAY_BRIEFING_SKELETON_SECONDS = 3
 const TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS = 0.9
-const TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS = 1.8
 const COMPLETION_SOON_REVEAL_SECONDS = 43
 const TODAY_BRIEFING_ITEM_COUNT = 6
 const TODAY_BRIEFING_ITEM_SELECTOR = '[data-today-briefing-item="true"]'
@@ -1424,8 +1424,7 @@ function TodayBriefingItem({
   meaning: ReactNode
 }) {
   const isVisible = elapsedSeconds >= at
-  const isDataVisible = elapsedSeconds >= at + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS
-  const isMeaningVisible = elapsedSeconds >= at + TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS
+  const isContentReady = elapsedSeconds >= at + TODAY_BRIEFING_SKELETON_SECONDS
 
   return (
     <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-item='true'>
@@ -1433,9 +1432,15 @@ function TodayBriefingItem({
         <span className={styles.todayBriefIcon} aria-hidden='true'>{icon}</span>
         <span className={styles.todayBriefQuestion}>{question}</span>
       </div>
-      <div className={cn(styles.todayBriefBody, isDataVisible ? styles.todayBriefBodyIn : undefined)}>
-        <div className={styles.todayBriefData}>{data}</div>
-        <p className={cn(styles.todayBriefMeaning, isMeaningVisible ? styles.todayBriefMeaningIn : undefined)}>{meaning}</p>
+      <div className={cn(styles.todayBriefBody, isVisible ? styles.todayBriefBodyIn : undefined)}>
+        <div className={cn(styles.todayBriefBodyContent, isContentReady ? styles.todayBriefBodyContentIn : undefined)}>
+          <div className={styles.todayBriefData}>{data}</div>
+          <p className={styles.todayBriefMeaning}>{meaning}</p>
+        </div>
+        <div className={cn(styles.todayBriefSkeleton, isContentReady ? styles.todayBriefSkeletonOut : undefined)} aria-hidden='true'>
+          <span className={styles.todayBriefSkeletonBar} />
+          <span className={styles.todayBriefSkeletonBar} />
+        </div>
       </div>
     </article>
   )
@@ -1482,8 +1487,7 @@ function TodayMarketBriefing({
   stockPct: number | null
 }) {
   const isVisible = elapsedSeconds >= at
-  const isDataVisible = elapsedSeconds >= at + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS
-  const isMeaningVisible = elapsedSeconds >= at + TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS
+  const isContentReady = elapsedSeconds >= at + TODAY_BRIEFING_SKELETON_SECONDS
   const firstPctLabel = formatPercentValue(firstPct) ?? '확인 중'
   const secondPctLabel = formatPercentValue(secondPct) ?? '확인 중'
   const stockLabel = formatPercentValue(stockPct) ?? '확인 중'
@@ -1494,13 +1498,19 @@ function TodayMarketBriefing({
         <span className={styles.todayBriefIcon} aria-hidden='true'>🏛️</span>
         <span className={styles.todayBriefQuestion}>오늘 시장 속에서는?</span>
       </div>
-      <div className={cn(styles.todayBriefBody, isDataVisible ? styles.todayBriefBodyIn : undefined)}>
-        <div className={styles.todayMarketGrid}>
-          <div className={styles.todayMarketCell}><span>{firstLabel}</span><b className={pctToneClass(firstPct)}>{firstPctLabel}</b></div>
-          <div className={styles.todayMarketCell}><span>{secondLabel}</span><b className={pctToneClass(secondPct)}>{secondPctLabel}</b></div>
-          <div className={`${styles.todayMarketCell} ${styles.todayMarketCellMe}`}><span>내 종목</span><b className={pctToneClass(stockPct)}>{stockLabel}</b></div>
+      <div className={cn(styles.todayBriefBody, isVisible ? styles.todayBriefBodyIn : undefined)}>
+        <div className={cn(styles.todayBriefBodyContent, isContentReady ? styles.todayBriefBodyContentIn : undefined)}>
+          <div className={styles.todayMarketGrid}>
+            <div className={styles.todayMarketCell}><span>{firstLabel}</span><b className={pctToneClass(firstPct)}>{firstPctLabel}</b></div>
+            <div className={styles.todayMarketCell}><span>{secondLabel}</span><b className={pctToneClass(secondPct)}>{secondPctLabel}</b></div>
+            <div className={`${styles.todayMarketCell} ${styles.todayMarketCellMe}`}><span>내 종목</span><b className={pctToneClass(stockPct)}>{stockLabel}</b></div>
+          </div>
+          <p className={styles.todayBriefMeaning}><b>{buildMarketMeaning(firstPct, secondPct, stockPct)}</b></p>
         </div>
-        <p className={cn(styles.todayBriefMeaning, isMeaningVisible ? styles.todayBriefMeaningIn : undefined)}><b>{buildMarketMeaning(firstPct, secondPct, stockPct)}</b></p>
+        <div className={cn(styles.todayBriefSkeleton, isContentReady ? styles.todayBriefSkeletonOut : undefined)} aria-hidden='true'>
+          <span className={styles.todayBriefSkeletonBar} />
+          <span className={styles.todayBriefSkeletonBar} />
+        </div>
       </div>
     </article>
   )

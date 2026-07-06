@@ -2551,8 +2551,8 @@
   transition:
     opacity 0.42s cubic-bezier(0.16, 1, 0.3, 1),
     transform 0.42s cubic-bezier(0.16, 1, 0.3, 1),
-    max-height 0.56s cubic-bezier(0.16, 1, 0.3, 1),
-    padding 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+    max-height 0.15s cubic-bezier(0.16, 1, 0.3, 1),
+    padding 0.15s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
 .todayBriefItem:first-child {
@@ -2600,6 +2600,7 @@
 }
 
 .todayBriefBody {
+  position: relative;
   margin-top: 9px;
   margin-left: 40px;
   max-height: 0;
@@ -2609,13 +2610,60 @@
   transition:
     opacity 0.34s ease,
     transform 0.34s ease,
-    max-height 0.42s ease;
+    max-height 0.12s ease;
 }
 
 .todayBriefBodyIn {
   max-height: 240px;
   opacity: 1;
   transform: translateY(0);
+}
+
+.todayBriefBodyContent {
+  transition: opacity 0.3s ease;
+  opacity: 0;
+}
+
+.todayBriefBodyContentIn {
+  opacity: 1;
+}
+
+.todayBriefSkeleton {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  justify-content: flex-start;
+  margin: 0;
+  pointer-events: none;
+  transition: opacity 0.3s ease;
+  opacity: 1;
+}
+
+.todayBriefSkeletonOut {
+  opacity: 0;
+}
+
+.todayBriefSkeletonBar {
+  height: 12px;
+  border-radius: 6px;
+  background: linear-gradient(90deg, #eaecef 25%, #f4f5f7 50%, #eaecef 75%);
+  background-size: 200% 100%;
+  animation: today-brief-skeleton-shimmer 1.4s infinite linear;
+}
+
+.todayBriefSkeletonBar:nth-child(1) {
+  width: 65%;
+}
+
+.todayBriefSkeletonBar:nth-child(2) {
+  width: 90%;
+}
+
+@keyframes today-brief-skeleton-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
 }
 
 .todayBriefData {
@@ -2631,9 +2679,6 @@
   color: var(--ds-mid);
   font-size: 11.5px;
   line-height: 1.45;
-  opacity: 0;
-  transform: translateY(4px);
-  transition: opacity 0.34s ease, transform 0.34s ease;
 }
 
 .todayBriefMeaningIn {
