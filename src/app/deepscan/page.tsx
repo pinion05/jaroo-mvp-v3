@@ -2068,7 +2068,6 @@ export default function DeepScanPage() {
           usdKrwRate={target?.usdKrwRate}
           tradingVolume={loadingTradingVolume}
           currentProfitRate={target?.currentProfitRate}
-          evaluationAmount={target?.evaluationAmount}
           briefingSnapshot={activeLoadingBriefingSnapshot}
           findingProgress={loadingFindingProgress}
           committeeAxes={payload?.committee.axes}

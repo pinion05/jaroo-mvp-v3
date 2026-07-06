@@ -28,7 +28,6 @@ import {
   type MoneyCurrency,
 } from '@/lib/deepscan-briefing-snapshot'
 import { resolveDeepScanBriefingCardCurrentPrice, resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
-import { calculateFallbackEvaluationMoney } from '@/lib/deepscan-loading-metrics'
 import {
   buildConsensusFanGeometry,
   estimateDailyVolatility,
@@ -49,7 +48,6 @@ type DeepScanLoadingScreenProps = {
   usdKrwRate?: number | null
   tradingVolume?: string | number
   currentProfitRate?: string | number
-  evaluationAmount?: string | number
   briefingSnapshot?: LoadingBriefingSnapshot | null
   findingProgress?: Partial<Record<FindingKey, FindingProgress>>
   committeeAxes?: JarooDeepScanCommitteeAxis[]
@@ -435,6 +433,9 @@ function formatShares(value: string | number | undefined) {
 function formatTradingVolume(value: string | number | undefined) {
   if (typeof value === 'string' && value.trim()) {
     const trimmed = value.trim()
+    if (!/\d/u.test(trimmed)) {
+      return null
+    }
     return /주$/.test(trimmed) ? trimmed : `${trimmed}주`
   }
 
@@ -1217,6 +1218,7 @@ function TodayBriefingCard({
   profitAmountText,
   elapsedSeconds,
   briefingSnapshot,
+  tradingVolumeText,
 }: {
   currentPriceText: string | null
   currentPriceCurrency: MoneyCurrency
@@ -1228,6 +1230,7 @@ function TodayBriefingCard({
   profitAmountText: string | null
   elapsedSeconds: number
   briefingSnapshot?: LoadingBriefingSnapshot | null
+  tradingVolumeText?: string | null
 }) {
   const todayBriefListRef = useRef<HTMLDivElement | null>(null)
   const quote = briefingSnapshot?.quote
@@ -1362,7 +1365,7 @@ function TodayBriefingCard({
         <div className={styles.todayPriceRow}>
           <div>
             <div className={styles.todayPrice}>{displayCurrentPrice}</div>
-            <div className={styles.todayPriceSub}>평단 {displayAveragePrice} · {displayShares}</div>
+            <div className={styles.todayPriceSub}>평단 {displayAveragePrice} · {displayShares} · 거래량 {tradingVolumeText ?? '확인 중'}</div>
           </div>
           <div className={styles.todayProfitBox}>
             <div className={cn(styles.todayProfitRate, isFiniteNumber(calculatedProfitRate) && calculatedProfitRate < 0 ? styles.todayDown : styles.todayUp)}>{displayProfitRate}</div>
@@ -1523,7 +1526,6 @@ export function DeepScanLoadingScreen({
   usdKrwRate,
   tradingVolume,
   currentProfitRate,
-  evaluationAmount,
   briefingSnapshot,
   findingProgress,
   committeeAxes,
@@ -1554,17 +1556,6 @@ export function DeepScanLoadingScreen({
     quickQuoteCurrentPrice: parseNumericValue(currentPrice),
     briefingCurrentPrice: snapshotCurrentPrice,
   })
-  const fallbackEvaluationMoney = calculateFallbackEvaluationMoney({
-    evaluationAmount,
-    currentPrice: effectiveCurrentPrice,
-    shares,
-    averagePrice,
-    currentProfitRate,
-    currentPriceCurrency,
-    averagePriceCurrency,
-    evaluationAmountCurrency: averagePriceCurrency,
-  })
-  const evaluationAmountText = formatMoney(fallbackEvaluationMoney?.amount, fallbackEvaluationMoney?.currency ?? currentPriceCurrency)
   const canCalculatePositionInOneCurrency = currentPriceCurrency === averagePriceCurrency
   const profitRateText = formatSignedPercent(
     (canCalculatePositionInOneCurrency ? calculateProfitRate({ currentPrice: effectiveCurrentPrice, averagePrice }) : null)
@@ -1754,22 +1745,9 @@ export function DeepScanLoadingScreen({
           profitAmountText={profitAmountText}
           elapsedSeconds={elapsedSeconds}
           briefingSnapshot={briefingSnapshot}
+          tradingVolumeText={tradingVolumeText}
         />
 
-        <section className={styles.positionSummaryCard} aria-label='보유 포지션 요약'>
-          <div>
-            <span className={styles.metaLabel}>평단가</span>
-            <span className={styles.metaValue}>{averagePriceText ?? '확인 중'}</span>
-          </div>
-          <div>
-            <span className={styles.metaLabel}>평가금액</span>
-            <span className={styles.metaValue}>{evaluationAmountText ?? '계산 중'}</span>
-          </div>
-          <div>
-            <span className={styles.metaLabel}>거래량</span>
-            <span className={styles.metaValue}>{tradingVolumeText ?? '확인 중'}</span>
-          </div>
-        </section>
 
         {standaloneQuickFacts.length > 0 ? (
           <section className={styles.quickFactsCard} aria-label='수집된 빠른 근거'>
