@@ -681,15 +681,14 @@ function QuickFactCard({
   fact: LoadingQuickFact
 }) {
   const indicator = fact.indicator
-  const consensus = fact.consensus
 
   return (
-    <article className={cn(styles.quickFact, fact.key === 'week52-position' ? styles.positionQuickFact : undefined, fact.key === 'analyst-consensus' ? styles.consensusQuickFact : undefined)}>
+    <article className={cn(styles.quickFact, fact.key === 'week52-position' ? styles.positionQuickFact : undefined)}>
       <div className={styles.narrativeTags}>
         <span className={cn(styles.narrativeTag, narrativeToneClass(quickFactToneToNarrativeTone(fact.tone)))}>{fact.category}</span>
         <span className={cn(styles.narrativeTag, fact.key === 'week52-position' ? styles.positionSegmentBadge : narrativeToneClass(quickFactToneToNarrativeTone(fact.tone)))}>{fact.badge}</span>
       </div>
-      {consensus ? null : <p className={styles.quickFactDetail}>{fact.body}</p>}
+      <p className={styles.quickFactDetail}>{fact.body}</p>
       {fact.detail ? <p className={styles.positionDeltaLine}>{fact.detail}</p> : null}
       {indicator ? (
         <div className={styles.positionIndicator} aria-label={`${fact.category}: ${indicator.leftLabel}부터 ${indicator.rightLabel} 사이 ${indicator.markerLabel ?? '현재 위치'}`}>
@@ -710,50 +709,12 @@ function QuickFactCard({
           </div>
         </div>
       ) : null}
-      {consensus ? (
-        <div className={styles.consensusInsight}>
-          <div className={styles.consensusChartTop}>
-            <div>
-              <span className={styles.consensusEyebrow}>{consensus.analystCountLabel ?? 'TARGET VIEW'}</span>
-              <strong>{consensus.targetPriceLabel}</strong>
-            </div>
-            {consensus.upsideLabel ? <span>{consensus.upsideLabel}</span> : null}
-          </div>
-          <dl className={styles.consensusStats}>
-            {consensus.currentPriceLabel ? (
-              <div className={styles.consensusStat}>
-                <dt>현재가</dt>
-                <dd>{consensus.currentPriceLabel}</dd>
-              </div>
-            ) : null}
-            {consensus.opinionLabel ? (
-              <div className={styles.consensusStat}>
-                <dt>투자의견</dt>
-                <dd>{consensus.opinionLabel}</dd>
-              </div>
-            ) : null}
-            {consensus.highTargetLabel ? (
-              <div className={styles.consensusStat}>
-                <dt>최고</dt>
-                <dd>{consensus.highTargetLabel}</dd>
-              </div>
-            ) : null}
-            {consensus.lowTargetLabel ? (
-              <div className={styles.consensusStat}>
-                <dt>최저</dt>
-                <dd>{consensus.lowTargetLabel}</dd>
-              </div>
-            ) : null}
-          </dl>
-          {consensus.summary ? <p className={styles.consensusSummary}>{consensus.summary}</p> : null}
-        </div>
-      ) : null}
     </article>
   )
 }
 
 function isHiddenLoadingQuickFact(fact: LoadingQuickFact) {
-  return fact.key === 'week52-position' || fact.key === 'etf-product-context' || Boolean(fact.indicator)
+  return fact.key === 'week52-position' || fact.key === 'etf-product-context' || fact.key === 'analyst-consensus' || Boolean(fact.indicator)
 }
 
 function buildLoadingStages({
@@ -1410,14 +1371,34 @@ function TodayBriefingCard({
         <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} icon='📊' question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
         <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} icon='🔥' question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
         {consensus ? (
-          <TodayBriefingItem
-            at={consensusAt}
-            elapsedSeconds={elapsedSeconds}
-            icon='🔭'
-            question='애널리스트 목표가는 어디쯤일까?'
-            data={elapsedSeconds >= consensusAt + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS ? <TargetPriceFanChart consensus={consensus} dailyCloses={dailyCloses} seedKey={seedKey} /> : null}
-            meaning={consensus.summary ?? (consensus.upsideLabel ? `${consensus.targetPriceLabel} · ${consensus.upsideLabel}` : consensus.targetPriceLabel)}
-          />
+          <article
+            className={cn(styles.todayBriefItem, elapsedSeconds >= consensusAt ? styles.todayBriefItemIn : undefined, styles.todayBriefConsensusItem)}
+            data-today-briefing-item='true'
+          >
+            <div className={styles.todayBriefQuestionRow}>
+              <span className={styles.todayBriefIcon} aria-hidden='true'>🔭</span>
+              <span className={styles.todayBriefQuestion}>애널리스트 목표가는 어디쯤일까?</span>
+            </div>
+            {elapsedSeconds >= consensusAt + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS ? (
+              <div className={styles.consensusInsight}>
+                <div className={styles.consensusChartTop}>
+                  <div>
+                    <span className={styles.consensusEyebrow}>{consensus.analystCountLabel ?? 'TARGET VIEW'}</span>
+                    <strong>{consensus.targetPriceLabel}</strong>
+                  </div>
+                  {consensus.upsideLabel ? <span>{consensus.upsideLabel}</span> : null}
+                </div>
+                <TargetPriceFanChart consensus={consensus} dailyCloses={dailyCloses} seedKey={seedKey} />
+                <dl className={styles.consensusStats}>
+                  {consensus.currentPriceLabel ? (<div className={styles.consensusStat}><dt>현재가</dt><dd>{consensus.currentPriceLabel}</dd></div>) : null}
+                  {consensus.opinionLabel ? (<div className={styles.consensusStat}><dt>투자의견</dt><dd>{consensus.opinionLabel}</dd></div>) : null}
+                  {consensus.highTargetLabel ? (<div className={styles.consensusStat}><dt>최고</dt><dd>{consensus.highTargetLabel}</dd></div>) : null}
+                  {consensus.lowTargetLabel ? (<div className={styles.consensusStat}><dt>최저</dt><dd>{consensus.lowTargetLabel}</dd></div>) : null}
+                </dl>
+                {consensus.summary ? <p className={styles.consensusSummary}>{consensus.summary}</p> : null}
+              </div>
+            ) : null}
+          </article>
         ) : null}
       </div>
     </section>

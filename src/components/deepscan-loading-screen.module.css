@@ -2585,6 +2585,10 @@
   transform: translateY(0);
 }
 
+.todayBriefItemIn.todayBriefConsensusItem {
+  max-height: 500px;
+}
+
 .todayBriefItemIn:first-child {
   border-top: 0;
 }
