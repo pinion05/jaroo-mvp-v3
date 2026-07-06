@@ -1,4 +1,4 @@
-export type JarooAuthProvider = 'supabase-email-password'
+export type JarooAuthProvider = 'supabase-email-password' | 'google'
 export type JarooAuthScope = 'guest' | 'authenticated'
 
 export type JarooUserContract = {

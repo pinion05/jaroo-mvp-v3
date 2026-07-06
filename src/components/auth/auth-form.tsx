@@ -2,7 +2,8 @@
 
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { FormEvent, useState } from 'react'
+import { FormEvent, useEffect, useState } from 'react'
+import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 
 type AuthFormMode = 'login' | 'signup'
@@ -94,12 +95,48 @@ export function AuthForm({ mode }: AuthFormProps) {
     }
   }
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('error') === 'oauth') {
+      setErrorMessage('구글 로그인을 완료하지 못했어요. 다시 시도해주세요.')
+    }
+  }, [])
+
+  const handleGoogle = async () => {
+    setErrorMessage(null)
+    setInfoMessage(null)
+    setPending(true)
+    const supabase = createSupabaseBrowserClient()
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    })
+    if (error) {
+      setErrorMessage(error.message || '구글 로그인을 시작하지 못했어요.')
+      setPending(false)
+    }
+  }
+
   return (
     <section className='space-y-5 rounded-[28px] border border-[color:var(--jaroo-border)] bg-white p-5 shadow-[0_16px_40px_rgba(15,47,78,0.08)]'>
       <div>
         <p className='text-xs font-semibold text-[color:var(--jaroo-primary)]'>{c.eyebrow}</p>
         <h1 className='mt-2 text-2xl font-semibold tracking-[-0.03em] text-[color:var(--jaroo-ink)]'>{c.title}</h1>
         <p className='mt-2 text-sm leading-6 text-[color:var(--jaroo-muted)]'>{c.subtitle}</p>
+      </div>
+
+      {errorMessage ? <p className='rounded-2xl bg-[color:var(--jaroo-danger-ghost)] px-3 py-2 text-xs leading-5 text-[color:var(--jaroo-danger)]' aria-live='polite'>{errorMessage}</p> : null}
+      {infoMessage ? <p className='rounded-2xl bg-[color:var(--jaroo-success-ghost)] px-3 py-2 text-xs leading-5 text-[color:var(--jaroo-success)]' aria-live='polite'>{infoMessage}</p> : null}
+
+      <button type='button' onClick={handleGoogle} disabled={pending} className='flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[#d8e0ea] bg-white text-sm font-semibold text-[color:var(--jaroo-ink)] transition hover:bg-[#f3f5f8] disabled:cursor-wait disabled:opacity-65'>
+        <GoogleIcon />
+        Google로 계속하기
+      </button>
+
+      <div className='flex items-center gap-3 py-1 text-xs text-[color:var(--jaroo-muted)]'>
+        <span className='h-px flex-1 bg-[color:var(--jaroo-border)]' />
+        <span>또는</span>
+        <span className='h-px flex-1 bg-[color:var(--jaroo-border)]' />
       </div>
 
       <form className='space-y-3' onSubmit={handleSubmit}>
@@ -120,9 +157,6 @@ export function AuthForm({ mode }: AuthFormProps) {
           <input name='password' type='password' required minLength={8} autoComplete={mode === 'login' ? 'current-password' : 'new-password'} placeholder='8자 이상' className='h-12 w-full rounded-2xl border border-[#d8e0ea] bg-[#f8f8f6] px-4 text-sm outline-none transition focus:border-[color:var(--jaroo-primary)] focus:bg-white' />
         </label>
 
-        {errorMessage ? <p className='rounded-2xl bg-[color:var(--jaroo-danger-ghost)] px-3 py-2 text-xs leading-5 text-[color:var(--jaroo-danger)]' aria-live='polite'>{errorMessage}</p> : null}
-        {infoMessage ? <p className='rounded-2xl bg-[color:var(--jaroo-success-ghost)] px-3 py-2 text-xs leading-5 text-[color:var(--jaroo-success)]' aria-live='polite'>{infoMessage}</p> : null}
-
         <button type='submit' disabled={pending} className={cn('h-12 w-full rounded-2xl bg-[color:var(--jaroo-primary)] text-sm font-semibold text-white transition hover:bg-[color:var(--jaroo-primary-strong)]', pending && 'cursor-wait opacity-65')}>
           {pending ? '처리 중...' : c.cta}
         </button>
@@ -133,5 +167,16 @@ export function AuthForm({ mode }: AuthFormProps) {
         <Link href={c.switchHref} className='font-semibold text-[color:var(--jaroo-primary)]'>{c.switchCta}</Link>
       </div>
     </section>
+  )
+}
+
+function GoogleIcon() {
+  return (
+    <svg width='18' height='18' viewBox='0 0 18 18' aria-hidden='true'>
+      <path fill='#4285F4' d='M17.64 9.2c0-.64-.06-1.25-.17-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.91c1.7-1.57 2.69-3.88 2.69-6.62z' />
+      <path fill='#34A853' d='M9 18c2.43 0 4.47-.81 5.96-2.18l-2.91-2.26c-.81.54-1.84.86-3.05.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33A9 9 0 0 0 9 18z' />
+      <path fill='#FBBC05' d='M3.97 10.71A5.41 5.41 0 0 1 3.68 9c0-.59.1-1.17.29-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04l3.01-2.33z' />
+      <path fill='#EA4335' d='M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z' />
+    </svg>
   )
 }
