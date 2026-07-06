@@ -66,7 +66,7 @@ export default function MyPage() {
           <div className={styles.creditLabel}>지금 이용 가능</div>
           <div className={styles.creditAmt}>딥스캔 <span>{T.credit.deepScanLeft}</span>회</div>
           <div className={styles.creditSub}>스캔은 {T.credit.scanTotal}회 · 보유 크레딧 {T.credit.creditBalance.toLocaleString()}</div>
-          <button className={styles.creditBtn} disabled><CreditCard className='size-4' /> 크레딧 충전</button>
+          <Link href='/mypage/credit' className={styles.creditBtn}><CreditCard className='size-4' /> 크레딧 충전</Link>
         </div>
 
         {/* Pro (테스트 데이터) */}
@@ -77,7 +77,7 @@ export default function MyPage() {
             <div className={styles.proTitle}>Jaroo Pro</div>
             <div className={styles.proDesc}>딥스캔 무제한 · 월 {T.pro.pricePerMonth.toLocaleString()}원</div>
           </div>
-          <button className={styles.proBtn} disabled>시작하기</button>
+          <Link href='/mypage/pro' className={styles.proBtn}>시작하기</Link>
         </div>
 
         {/* 포트폴리오 */}
