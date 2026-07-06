@@ -1,0 +1,223 @@
+/* 시안 design/login/jaroo_login.html 포팅 — scoped to /login (A1) */
+
+.body {
+  padding: 20px 24px 24px;
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+/* hero */
+.hero {
+  margin-top: 36px;
+  margin-bottom: auto;
+}
+.heroSm {
+  margin-top: 20px;
+  margin-bottom: 28px;
+}
+.brand {
+  font-size: 32px;
+  font-weight: 700;
+  color: #0f1419;
+  letter-spacing: -1px;
+  margin-bottom: 12px;
+}
+.brandSm {
+  font-size: 24px;
+}
+.heroSub {
+  font-size: 15px;
+  color: #5a6473;
+  line-height: 1.55;
+}
+.heroSubSm {
+  font-size: 13px;
+}
+.heroSub b {
+  color: #0f1419;
+  font-weight: 600;
+}
+.heroVisual {
+  margin: 28px 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.hvRow {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: #fff;
+  border: 0.5px solid #e8eaee;
+  border-radius: 11px;
+  padding: 11px 13px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.03);
+}
+.hvDot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.hvName {
+  flex: 1;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #0f1419;
+}
+.hvRate {
+  font-size: 12.5px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.up {
+  color: #e5484d;
+}
+.down {
+  color: #2b6be6;
+}
+
+/* login buttons */
+.loginArea {
+  margin-top: 24px;
+}
+.loginBtn {
+  width: 100%;
+  padding: 14px;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin-bottom: 10px;
+  border: 0.5px solid #e8eaee;
+  background: #fff;
+  color: #0f1419;
+  position: relative;
+  font-family: inherit;
+}
+.loginBtnIco {
+  width: 18px;
+  height: 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.primary {
+  background: #0f1419;
+  color: #fff;
+  border: none;
+  box-shadow: 0 4px 12px rgba(15, 20, 25, 0.28);
+}
+.disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+.soon {
+  position: absolute;
+  right: 13px;
+  font-size: 9.5px;
+  font-weight: 600;
+  color: #97a0ae;
+  background: #f2f3f6;
+  padding: 2px 7px;
+  border-radius: 5px;
+}
+
+.divider {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 16px 0;
+}
+.divider::before,
+.divider::after {
+  content: '';
+  flex: 1;
+  height: 0.5px;
+  background: #e8eaee;
+}
+.dividerSpan {
+  font-size: 10.5px;
+  color: #97a0ae;
+}
+
+.terms {
+  font-size: 10px;
+  color: #97a0ae;
+  text-align: center;
+  line-height: 1.6;
+  margin-top: 18px;
+}
+.termsA {
+  color: #5a6473;
+  text-decoration: underline;
+}
+
+/* fields */
+.field {
+  margin-bottom: 14px;
+}
+.fieldLabel {
+  font-size: 11.5px;
+  color: #5a6473;
+  font-weight: 500;
+  margin-bottom: 6px;
+}
+.fieldInput {
+  width: 100%;
+  padding: 13px 14px;
+  border-radius: 11px;
+  border: 0.5px solid #e8eaee;
+  background: #fff;
+  font-size: 13.5px;
+  color: #0f1419;
+  font-family: inherit;
+  outline: none;
+}
+.fieldInput::placeholder {
+  color: #b8c0ca;
+}
+.fieldInput:focus {
+  border-color: #2b6be6;
+}
+.forgot {
+  text-align: right;
+  font-size: 11px;
+  color: #0f1419;
+  margin-top: 8px;
+}
+.signupLine {
+  text-align: center;
+  font-size: 12px;
+  color: #5a6473;
+  margin-top: 20px;
+}
+.signupLineBtn {
+  color: #0f1419;
+  font-weight: 600;
+  margin-left: 4px;
+}
+
+.error {
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: #fbe6e7;
+  color: #e5485d;
+  font-size: 12px;
+  line-height: 1.5;
+}
+.info {
+  margin: 4px 0 10px;
+  padding: 10px 12px;
+  border-radius: 11px;
+  background: #eaf0f8;
+  color: #2b6be6;
+  font-size: 12px;
+  line-height: 1.5;
+}
