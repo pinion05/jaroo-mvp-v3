@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jaroo — 마이 세부</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Pretendard',sans-serif;-webkit-font-smoothing:antialiased}
+:root{--navy:#0F1419;--navy-soft:#EAF0F8;--up:#E5484D;--down:#2B6BE6;--amber:#E5A23D;
+--bg:#F5F6F8;--card:#fff;--line:#E8EAEE;--t1:#0F1419;--t2:#5A6473;--t3:#97A0AE;}
+body{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;align-items:flex-start}
+.frame{background:var(--bg);border-radius:16px;width:340px;height:720px;overflow-y:auto;overflow-x:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative}
+.frame::-webkit-scrollbar{display:none}
+.caption{width:340px;text-align:center;font-size:12px;color:#555;margin-top:8px;font-weight:600}
+svg{display:block}
+
+.head{position:sticky;top:0;z-index:10;background:rgba(245,246,248,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;border-bottom:.5px solid var(--line);display:flex;align-items:center;gap:11px}
+.hb{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--t1);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.ht{font-size:15px;font-weight:600;color:var(--t1)}
+.body{padding:18px 16px 24px}
+
+/* 프로필 편집 */
+.avatar-lg{width:84px;height:84px;border-radius:50%;background:var(--navy);display:flex;align-items:center;justify-content:center;font-size:32px;color:#fff;font-weight:700;margin:8px auto 8px;position:relative}
+.avatar-cam{position:absolute;bottom:0;right:0;width:28px;height:28px;border-radius:50%;background:#fff;border:.5px solid var(--line);display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.1);color:var(--t2)}
+.avatar-hint{text-align:center;font-size:11px;color:var(--t3);margin-bottom:22px}
+.field{margin-bottom:16px}
+.field-label{font-size:11.5px;color:var(--t2);font-weight:500;margin-bottom:6px}
+.field-input{width:100%;padding:13px 14px;border-radius:11px;border:.5px solid var(--line);background:#fff;font-size:13.5px;color:var(--t1)}
+.field-fixed{width:100%;padding:13px 14px;border-radius:11px;background:#F2F3F6;font-size:13.5px;color:var(--t3);display:flex;justify-content:space-between;align-items:center}
+.field-note{font-size:10.5px;color:var(--t3);margin-top:5px}
+.save-btn{width:100%;padding:15px;border-radius:13px;border:none;background:var(--navy);color:#fff;font-size:14.5px;font-weight:700;margin-top:8px;box-shadow:0 4px 12px rgba(15,20,25,.28)}
+
+/* 종목 관리 */
+.mng-item{display:flex;align-items:center;gap:11px;background:#fff;border:.5px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:9px}
+.mng-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mng-info{flex:1;min-width:0}
+.mng-name{font-size:13.5px;font-weight:600;color:var(--t1)}
+.mng-meta{font-size:10.5px;color:var(--t3);margin-top:2px}
+.mng-right{text-align:right;margin-right:4px}
+.mng-rate{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.mng-rate.up{color:var(--up)}.mng-rate.down{color:var(--down)}
+.mng-del{width:26px;height:26px;border-radius:7px;background:#FBE6E7;display:flex;align-items:center;justify-content:center;color:var(--down);flex-shrink:0}
+.mng-add{display:flex;align-items:center;justify-content:center;gap:7px;padding:13px;border-radius:12px;border:1px dashed #B8C4D4;background:#fff;color:var(--t2);font-size:12.5px;font-weight:500;margin-top:4px}
+
+/* 분석 기록 */
+.rec-item{background:#fff;border:.5px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:9px}
+.rec-top{display:flex;align-items:center;gap:9px;margin-bottom:8px}
+.rec-dot{width:8px;height:8px;border-radius:50%}
+.rec-name{flex:1;font-size:13.5px;font-weight:600;color:var(--t1)}
+.rec-date{font-size:10.5px;color:var(--t3);font-variant-numeric:tabular-nums}
+.rec-body{display:flex;align-items:center;gap:8px}
+.rec-label{font-size:11.5px;font-weight:600;padding:3px 10px;border-radius:7px;background:var(--navy-soft);color:var(--navy)}
+.rec-summary{flex:1;font-size:11px;color:var(--t2);line-height:1.4}
+.rec-arrow{color:#C2C8D0;flex-shrink:0}
+
+/* 준비 중 */
+.soon-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:80px 24px;text-align:center}
+.soon-ico{width:64px;height:64px;border-radius:18px;background:var(--navy-soft);display:flex;align-items:center;justify-content:center;color:var(--navy);margin-bottom:20px}
+.soon-title{font-size:17px;font-weight:700;color:var(--t1);margin-bottom:8px}
+.soon-desc{font-size:12.5px;color:var(--t2);line-height:1.6}
+.soon-badge{display:inline-block;font-size:10.5px;font-weight:600;color:#5A6473;background:#EEF0F3;padding:4px 12px;border-radius:8px;margin-top:16px}
+.soon-back{margin-top:28px;padding:13px 24px;border-radius:12px;background:#fff;border:.5px solid var(--line);color:var(--t1);font-size:13px;font-weight:600}
+</style>
+</head>
+<body>
+
+<!-- 1. 프로필 편집 -->
+<div>
+<div class="frame">
+  <div class="head">
+    <div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+    <div class="ht">프로필 편집</div>
+  </div>
+  <div class="body">
+    <div class="avatar-lg">양
+      <div class="avatar-cam"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"/><circle cx="12" cy="13" r="4"/></svg></div>
+    </div>
+    <div class="avatar-hint">탭해서 프로필 사진 변경</div>
+
+    <div class="field">
+      <div class="field-label">닉네임</div>
+      <input class="field-input" value="양호식">
+    </div>
+    <div class="field">
+      <div class="field-label">이메일</div>
+      <div class="field-fixed">hosik@example.com
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#97A0AE" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+      </div>
+      <div class="field-note">로그인 이메일은 변경할 수 없어요</div>
+    </div>
+
+    <button class="save-btn">저장하기</button>
+  </div>
+</div>
+<div class="caption">1. 프로필 편집</div>
+</div>
+
+<!-- 2. 내 종목 관리 -->
+<div>
+<div class="frame">
+  <div class="head">
+    <div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+    <div class="ht">내 종목 관리</div>
+  </div>
+  <div class="body">
+    <div style="font-size:12px;color:var(--t2);margin-bottom:14px">3종목 보유 중 · 빼려면 오른쪽 버튼을 누르세요</div>
+
+    <div class="mng-item">
+      <span class="mng-dot" style="background:#E5484D"></span>
+      <div class="mng-info"><div class="mng-name">삼성전자</div><div class="mng-meta">KOSPI · 005930 · 1주</div></div>
+      <div class="mng-right"><div class="mng-rate up">+31.5%</div></div>
+      <div class="mng-del"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></div>
+    </div>
+    <div class="mng-item">
+      <span class="mng-dot" style="background:#E5484D"></span>
+      <div class="mng-info"><div class="mng-name">LG디스플레이</div><div class="mng-meta">KOSPI · 034220 · 16주</div></div>
+      <div class="mng-right"><div class="mng-rate up">+1.3%</div></div>
+      <div class="mng-del"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></div>
+    </div>
+    <div class="mng-item">
+      <span class="mng-dot" style="background:#2B6BE6"></span>
+      <div class="mng-info"><div class="mng-name">SFA반도체</div><div class="mng-meta">KOSDAQ · 036540 · 23주</div></div>
+      <div class="mng-right"><div class="mng-rate down">−14.3%</div></div>
+      <div class="mng-del"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M5 12h14"/></svg></div>
+    </div>
+
+    <div class="mng-add">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      스크린샷으로 종목 추가
+    </div>
+  </div>
+</div>
+<div class="caption">2. 내 종목 관리 (삭제/추가)</div>
+</div>
+
+<!-- 3. 분석 기록 -->
+<div>
+<div class="frame">
+  <div class="head">
+    <div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+    <div class="ht">분석 기록</div>
+  </div>
+  <div class="body">
+    <div style="font-size:12px;color:var(--t2);margin-bottom:14px">지난 딥스캔 결과를 다시 볼 수 있어요</div>
+
+    <div class="rec-item">
+      <div class="rec-top"><span class="rec-dot" style="background:#E5484D"></span><span class="rec-name">LG디스플레이</span><span class="rec-date">05.28 14:32</span></div>
+      <div class="rec-body"><span class="rec-label">강세</span><span class="rec-summary">1–2주 관찰 · 목표가 17,500원</span><span class="rec-arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span></div>
+    </div>
+    <div class="rec-item">
+      <div class="rec-top"><span class="rec-dot" style="background:#E5484D"></span><span class="rec-name">삼성전자</span><span class="rec-date">05.27 09:15</span></div>
+      <div class="rec-body"><span class="rec-label">강세</span><span class="rec-summary">보유 유지 · 상승 여력 충분</span><span class="rec-arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span></div>
+    </div>
+    <div class="rec-item">
+      <div class="rec-top"><span class="rec-dot" style="background:#2B6BE6"></span><span class="rec-name">SFA반도체</span><span class="rec-date">05.26 20:41</span></div>
+      <div class="rec-body"><span class="rec-label" style="background:#FCEFD2;color:#9A6B00">관찰</span><span class="rec-summary">추세 이탈 여부 주시 필요</span><span class="rec-arrow"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 18l6-6-6-6"/></svg></span></div>
+    </div>
+  </div>
+</div>
+<div class="caption">3. 분석 기록 (지난 딥스캔)</div>
+</div>
+
+<!-- 4. 크레딧 충전 (준비 중) -->
+<div>
+<div class="frame">
+  <div class="head">
+    <div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+    <div class="ht">크레딧 충전</div>
+  </div>
+  <div class="soon-wrap">
+    <div class="soon-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M2 10h20"/></svg></div>
+    <div class="soon-title">곧 만나요</div>
+    <div class="soon-desc">크레딧 충전을 준비하고 있어요.<br>지금은 무료로 딥스캔을 이용할 수 있어요.</div>
+    <div class="soon-badge">준비 중</div>
+    <button class="soon-back">돌아가기</button>
+  </div>
+</div>
+<div class="caption">4. 크레딧 충전 (준비 중)</div>
+</div>
+
+<!-- 5. Pro 구독 (준비 중) -->
+<div>
+<div class="frame">
+  <div class="head">
+    <div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div>
+    <div class="ht">Jaroo Pro</div>
+  </div>
+  <div class="soon-wrap">
+    <div class="soon-ico"><svg width="30" height="30" viewBox="0 0 24 24" fill="#0F1419"><path d="M12 2l2.9 6.3 6.9.7-5.1 4.6 1.4 6.8L12 17.3 5.9 20.4l1.4-6.8L2.2 9l6.9-.7z"/></svg></div>
+    <div class="soon-title">Jaroo Pro 준비 중</div>
+    <div class="soon-desc">딥스캔 무제한 구독을 준비하고 있어요.<br>출시되면 가장 먼저 알려드릴게요.</div>
+    <div class="soon-badge">준비 중</div>
+    <button class="soon-back">돌아가기</button>
+  </div>
+</div>
+<div class="caption">5. Pro 구독 (준비 중)</div>
+</div>
+
+</body>
+</html>

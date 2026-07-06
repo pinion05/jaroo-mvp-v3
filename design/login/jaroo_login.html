@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jaroo — 로그인</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Pretendard',sans-serif;-webkit-font-smoothing:antialiased}
+body{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;min-height:100vh;align-items:flex-start}
+.frame{background:#F5F6F8;border-radius:16px;width:340px;height:720px;overflow-y:auto;overflow-x:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative}
+.frame::-webkit-scrollbar{display:none}
+.caption{width:340px;text-align:center;font-size:12px;color:#555;margin-top:8px;font-weight:600}
+
+.head{padding:14px 16px;display:flex;align-items:center}
+.head-back{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;color:#0F1419;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+
+.body{padding:20px 24px 24px;display:flex;flex-direction:column;min-height:640px}
+
+.hero{margin-top:36px;margin-bottom:auto}
+.brand{font-size:32px;font-weight:700;color:#0F1419;letter-spacing:-1px;margin-bottom:12px}
+.hero-sub{font-size:15px;color:#5A6473;line-height:1.55}
+.hero-sub b{color:#0F1419;font-weight:600}
+
+.hero-visual{margin:28px 0;display:flex;flex-direction:column;gap:8px}
+.hv-row{display:flex;align-items:center;gap:10px;background:#fff;border:.5px solid #E8EAEE;border-radius:11px;padding:11px 13px;box-shadow:0 1px 3px rgba(0,0,0,.03)}
+.hv-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.hv-name{flex:1;font-size:12.5px;font-weight:600;color:#0F1419}
+.hv-rate{font-size:12.5px;font-weight:700;font-variant-numeric:tabular-nums}
+.hv-rate.up{color:#E5484D}.hv-rate.down{color:#2B6BE6}
+
+.login-area{margin-top:24px}
+.login-btn{width:100%;padding:14px;border-radius:12px;font-size:14px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;margin-bottom:10px;border:.5px solid #E8EAEE;background:#fff;color:#0F1419;position:relative}
+.login-btn .ico{width:18px;height:18px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.login-btn.primary{background:#0F1419;color:#fff;border:none;box-shadow:0 4px 12px rgba(15,20,25,.28)}
+.login-btn.disabled{opacity:.4;cursor:not-allowed}
+.soon{position:absolute;right:13px;font-size:9.5px;font-weight:600;color:#97A0AE;background:#F2F3F6;padding:2px 7px;border-radius:5px}
+
+.divider{display:flex;align-items:center;gap:10px;margin:16px 0}
+.divider::before,.divider::after{content:'';flex:1;height:.5px;background:#E8EAEE}
+.divider span{font-size:10.5px;color:#97A0AE}
+
+.terms{font-size:10px;color:#97A0AE;text-align:center;line-height:1.6;margin-top:18px}
+.terms a{color:#5A6473;text-decoration:underline}
+
+.field{margin-bottom:14px}
+.field-label{font-size:11.5px;color:#5A6473;font-weight:500;margin-bottom:6px}
+.field-input{width:100%;padding:13px 14px;border-radius:11px;border:.5px solid #E8EAEE;background:#fff;font-size:13.5px;color:#0F1419}
+.field-input::placeholder{color:#B8C0CA}
+.forgot{text-align:right;font-size:11px;color:#0F1419;margin-top:8px;cursor:pointer}
+.signup-line{text-align:center;font-size:12px;color:#5A6473;margin-top:20px}
+.signup-line b{color:#0F1419;font-weight:600;cursor:pointer}
+</style>
+</head>
+<body>
+
+<!-- 화면 1: 로그인 선택 -->
+<div>
+<div class="frame">
+  <div class="head"><div class="head-back">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+  </div></div>
+  <div class="body">
+    <div class="hero">
+      <div class="brand">Jaroo</div>
+      <div class="hero-sub">MTS 스크린샷 한 장으로<br><b>내 주식을 AI가 진단</b>해드려요.</div>
+
+      <div class="hero-visual">
+        <div class="hv-row"><span class="hv-dot" style="background:#E5484D"></span><span class="hv-name">삼성전자</span><span class="hv-rate up">+31.5%</span></div>
+        <div class="hv-row"><span class="hv-dot" style="background:#E5484D"></span><span class="hv-name">LG디스플레이</span><span class="hv-rate up">+1.3%</span></div>
+        <div class="hv-row"><span class="hv-dot" style="background:#2B6BE6"></span><span class="hv-name">SFA반도체</span><span class="hv-rate down">−14.3%</span></div>
+      </div>
+    </div>
+
+    <div class="login-area">
+      <button class="login-btn primary">
+        <span class="ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-10 6L2 7"/></svg></span>
+        이메일로 시작하기
+      </button>
+      <button class="login-btn">
+        <span class="ico"><svg width="17" height="17" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg></span>
+        Google로 시작하기
+      </button>
+      <div class="divider"><span>준비 중</span></div>
+      <button class="login-btn disabled">
+        <span class="ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="#97A0AE"><path d="M12 3C6.48 3 2 6.48 2 10.8c0 2.77 1.84 5.21 4.6 6.6-.2.7-.73 2.62-.83 3.03-.13.5.18.5.38.36.16-.1 2.5-1.7 3.52-2.4.75.1 1.53.16 2.33.16 5.52 0 10-3.48 10-7.75S17.52 3 12 3z"/></svg></span>
+        카카오로 시작하기
+        <span class="soon">준비 중</span>
+      </button>
+      <button class="login-btn disabled">
+        <span class="ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="#97A0AE"><path d="M17.05 12.04c-.03-2.6 2.12-3.85 2.22-3.91-1.21-1.77-3.1-2.02-3.77-2.04-1.6-.16-3.13.94-3.94.94-.81 0-2.07-.92-3.4-.9-1.75.03-3.36 1.02-4.26 2.58-1.82 3.15-.47 7.81 1.3 10.37.86 1.25 1.89 2.66 3.24 2.61 1.3-.05 1.79-.84 3.36-.84 1.57 0 2.01.84 3.39.81 1.4-.02 2.29-1.28 3.14-2.54.99-1.46 1.4-2.87 1.42-2.94-.03-.01-2.72-1.04-2.75-4.15zM14.53 4.5c.72-.87 1.2-2.08 1.07-3.28-1.03.04-2.28.69-3.02 1.55-.66.77-1.24 2-1.09 3.18 1.15.09 2.32-.58 3.04-1.45z"/></svg></span>
+        Apple로 시작하기
+        <span class="soon">준비 중</span>
+      </button>
+
+      <div class="terms">
+        시작하면 <a>서비스 약관</a>과 <a>개인정보처리방침</a>에<br>동의하는 것으로 간주돼요.
+      </div>
+    </div>
+  </div>
+</div>
+<div class="caption">1. 로그인 (구글·이메일 활성 · 공식 로고 SVG)</div>
+</div>
+
+<!-- 화면 2: 이메일 로그인 -->
+<div>
+<div class="frame">
+  <div class="head"><div class="head-back">
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+  </div></div>
+  <div class="body">
+    <div class="hero" style="margin-top:20px;margin-bottom:28px">
+      <div class="brand" style="font-size:24px">이메일로 시작</div>
+      <div class="hero-sub" style="font-size:13px">계정이 없으면 자동으로 만들어져요.</div>
+    </div>
+
+    <div>
+      <div class="field">
+        <div class="field-label">이메일</div>
+        <input class="field-input" placeholder="you@example.com">
+      </div>
+      <div class="field">
+        <div class="field-label">비밀번호</div>
+        <input class="field-input" type="password" placeholder="••••••••">
+        <div class="forgot">비밀번호를 잊으셨나요?</div>
+      </div>
+
+      <button class="login-btn primary" style="margin-top:8px">시작하기</button>
+
+      <div class="signup-line">처음이신가요? <b>이메일로 가입</b></div>
+
+      <div class="terms" style="margin-top:28px">
+        시작하면 <a>서비스 약관</a>과 <a>개인정보처리방침</a>에<br>동의하는 것으로 간주돼요.
+      </div>
+    </div>
+  </div>
+</div>
+<div class="caption">2. 이메일 로그인/가입</div>
+</div>
+
+</body>
+</html>
