@@ -22,13 +22,13 @@ type DebugFormState = {
 }
 
 const DEFAULT_FORM: DebugFormState = {
-  ticker: 'SPY',
-  name: 'SPY',
-  averagePrice: '450',
+  ticker: '005930',
+  name: '삼성전자',
+  averagePrice: '70000',
   shares: '10',
-  market: 'US',
-  kind: 'etf',
-  averagePriceCurrency: 'USD',
+  market: 'KOSPI',
+  kind: 'stock',
+  averagePriceCurrency: 'KRW',
 }
 
 function parseNumber(value: string) {
@@ -230,8 +230,8 @@ export default function DebugDeepScanPage() {
   }
 
   const exampleUrl = didHydrate
-    ? `/debug/deepscan?ticker=${encodeURIComponent(form.ticker || 'SPY')}&avg=${encodeURIComponent(form.averagePrice || '450')}&shares=${encodeURIComponent(form.shares || '10')}&market=${form.market}&kind=${form.kind}`
-    : '/debug/deepscan?ticker=SPY&avg=450&shares=10&market=US&kind=etf'
+    ? `/debug/deepscan?ticker=${encodeURIComponent(form.ticker || '005930')}&avg=${encodeURIComponent(form.averagePrice || '70000')}&shares=${encodeURIComponent(form.shares || '10')}&market=${form.market}&kind=${form.kind}`
+    : '/debug/deepscan?ticker=005930&avg=70000&shares=10&market=KOSPI&kind=stock'
 
   return (
     <main className='min-h-dvh bg-[#F5F6F8] px-4 py-6 text-[#0F1419]'>
