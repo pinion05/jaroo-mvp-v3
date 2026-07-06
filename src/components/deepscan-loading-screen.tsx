@@ -161,8 +161,6 @@ type CompletionState = {
 
 const TODAY_BRIEFING_FIRST_REVEAL_SECONDS = 5
 const TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS = 5
-const TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS = 0.9
-const TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS = 1.8
 const COMPLETION_SOON_REVEAL_SECONDS = 43
 const TODAY_BRIEFING_ITEM_COUNT = 6
 const TODAY_BRIEFING_ITEM_SELECTOR = '[data-today-briefing-item="true"]'
@@ -1427,8 +1425,8 @@ function TodayBriefingItem({
   meaning: ReactNode
 }) {
   const isVisible = elapsedSeconds >= at
-  const isDataVisible = elapsedSeconds >= at + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS
-  const isMeaningVisible = elapsedSeconds >= at + TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS
+  const isDataVisible = isVisible
+  const isMeaningVisible = isVisible
 
   return (
     <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-item='true'>
@@ -1485,8 +1483,8 @@ function TodayMarketBriefing({
   stockPct: number | null
 }) {
   const isVisible = elapsedSeconds >= at
-  const isDataVisible = elapsedSeconds >= at + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS
-  const isMeaningVisible = elapsedSeconds >= at + TODAY_BRIEFING_MEANING_REVEAL_DELAY_SECONDS
+  const isDataVisible = isVisible
+  const isMeaningVisible = isVisible
   const firstPctLabel = formatPercentValue(firstPct) ?? '확인 중'
   const secondPctLabel = formatPercentValue(secondPct) ?? '확인 중'
   const stockLabel = formatPercentValue(stockPct) ?? '확인 중'
