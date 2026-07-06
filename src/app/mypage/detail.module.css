@@ -120,6 +120,12 @@
   color: #2b6be6;
   margin-top: 10px;
 }
+.errorNote {
+  text-align: center;
+  font-size: 11px;
+  color: #e5484d;
+  margin-top: 10px;
+}
 
 /* 종목 관리 */
 .mngItem {

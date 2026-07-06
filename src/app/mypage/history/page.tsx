@@ -15,8 +15,8 @@ export default function HistoryPage() {
           <span className={styles.testBadge}>테스트 데이터</span>
         </div>
 
-        {HISTORY_TEST_DATA.map((r, i) => (
-          <div className={styles.recItem} key={i}>
+        {HISTORY_TEST_DATA.map((r) => (
+          <div className={styles.recItem} key={`${r.name}-${r.date}`}>
             <div className={styles.recTop}>
               <span className={styles.recDot} style={{ background: r.dot }} />
               <span className={styles.recName}>{r.name}</span>

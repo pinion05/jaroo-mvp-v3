@@ -12,6 +12,7 @@ export default function ProfileEditPage() {
   const [initial, setInitial] = useState('?')
   const [busy, setBusy] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/auth/me')
@@ -28,15 +29,18 @@ export default function ProfileEditPage() {
   async function save() {
     setBusy(true)
     setSaved(false)
+    setError(null)
     try {
       const supabase = createSupabaseBrowserClient()
       const { error } = await supabase.auth.updateUser({ data: { display_name: name.trim() } })
-      if (!error) {
+      if (error) {
+        setError(error.message || '저장하지 못했어요.')
+      } else {
         setSaved(true)
         setInitial((name || '?').trim().slice(0, 1))
       }
     } catch {
-      /* ignore */
+      setError('저장 중 문제가 생겼어요.')
     }
     setBusy(false)
   }
@@ -66,6 +70,7 @@ export default function ProfileEditPage() {
           {busy ? '저장 중...' : '저장하기'}
         </button>
         {saved ? <div className={styles.savedNote}>저장되었어요.</div> : null}
+        {error ? <div className={styles.errorNote}>{error}</div> : null}
       </div>
     </SpecFrame>
   )

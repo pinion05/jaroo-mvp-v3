@@ -81,7 +81,7 @@ export default function MyPage() {
         </div>
 
         {/* 포트폴리오 */}
-        <div className={styles.menuLabel}>포트폴리오</div>
+        <div className={styles.menuLabel}>포트폴리오<span className={styles.testBadgeInline}>테스트 데이터</span></div>
         <div className={styles.menuGroup}>
           <RowLink href='/mypage/watchlist' icon={<ListChecks className='size-[18px]' />} label='내 종목 관리' value={`${T.watchlistCount}종목`} />
           <RowLink href='/screenshot' icon={<Camera className='size-[18px]' />} label='스크린샷으로 종목 추가' />
