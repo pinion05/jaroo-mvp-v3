@@ -99,8 +99,9 @@ export function AuthForm({ mode }: AuthFormProps) {
     const params = new URLSearchParams(window.location.search)
     if (params.get('error') === 'oauth') {
       setErrorMessage('구글 로그인을 완료하지 못했어요. 다시 시도해주세요.')
+      router.replace('/login', { scroll: false })
     }
-  }, [])
+  }, [router])
 
   const handleGoogle = async () => {
     setErrorMessage(null)
@@ -115,6 +116,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       setErrorMessage(error.message || '구글 로그인을 시작하지 못했어요.')
       setPending(false)
     }
+    // 성공 시 signInWithOAuth 가 브라우저를 Google로 이동시키므로 pending 해제 불필요(컴포넌트 언마운트).
   }
 
   return (
