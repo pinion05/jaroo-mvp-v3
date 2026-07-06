@@ -44,6 +44,8 @@ next-env.d.ts
 
 # local dev artifacts (logs, screenshots, debug output)
 .logs/
+.pi-subagents/
+.pi/
 
 # supabase
 supabase/.temp/
