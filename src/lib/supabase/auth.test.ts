@@ -35,6 +35,22 @@ test('createAuthMeFromSupabaseUser maps Supabase user id to Jaroo user contract'
   })
 })
 
+test('createAuthMeFromSupabaseUser maps google OAuth provider', () => {
+  const googleUser = user({ email: 'user@gmail.com', app_metadata: { provider: 'google' }, user_metadata: { full_name: '구글 사용자' } })
+  const authMe = createAuthMeFromSupabaseUser(googleUser)
+
+  assert.equal(authMe.provider, 'google')
+  assert.equal(authMe.userContract.provider, 'google')
+  assert.equal(authMe.userContract.displayName, '구글 사용자')
+})
+
+test('createAuthMeFromSupabaseUser defaults email provider to supabase-email-password', () => {
+  const authMe = createAuthMeFromSupabaseUser(user({ email: 'user@example.com', app_metadata: { provider: 'email' } }))
+
+  assert.equal(authMe.provider, 'supabase-email-password')
+  assert.equal(authMe.userContract.provider, 'supabase-email-password')
+})
+
 test('createGuestAuthMe returns stable guest contract', () => {
   assert.deepEqual(createGuestAuthMe(), {
     authScope: 'guest',
