@@ -2562,9 +2562,13 @@
 .todayBriefItemIn {
   padding: 13px 0;
   border-top: 0.5px solid #eff1f4;
-  max-height: 190px;
+  max-height: 320px;
   opacity: 1;
   transform: translateY(0);
+}
+
+.todayBriefItemIn.todayBriefConsensusItem {
+  max-height: 500px;
 }
 
 .todayBriefItemIn:first-child {
@@ -2609,7 +2613,7 @@
 }
 
 .todayBriefBodyIn {
-  max-height: 130px;
+  max-height: 240px;
   opacity: 1;
   transform: translateY(0);
 }
