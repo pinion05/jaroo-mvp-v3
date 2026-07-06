@@ -1,0 +1,298 @@
+/* 시안 design/mypage/jaroo_mypage.html 포팅 — scoped to /mypage (A1) */
+
+.bodyWrap {
+  padding: 0;
+}
+
+.top {
+  padding: 16px 16px 8px;
+}
+.topTitle {
+  font-size: 20px;
+  font-weight: 700;
+  color: #0f1419;
+}
+.body {
+  padding: 8px 16px 24px;
+}
+
+/* 테스트 데이터 배지 (C2 명시) */
+.testBadge {
+  position: absolute;
+  top: 10px;
+  right: 12px;
+  font-size: 9px;
+  font-weight: 600;
+  color: #2b6be6;
+  background: #eaf0f8;
+  padding: 3px 7px;
+  border-radius: 5px;
+  letter-spacing: 0.02em;
+}
+.testBadgeInline {
+  position: static;
+  margin-left: 6px;
+  vertical-align: middle;
+}
+
+/* 프로필 */
+.profile {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  background: #fff;
+  border-radius: 14px;
+  border: 0.5px solid #e8eaee;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  padding: 16px;
+  margin-bottom: 14px;
+}
+.avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #0f1419;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  color: #fff;
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.pfInfo {
+  flex: 1;
+  min-width: 0;
+}
+.pfName {
+  font-size: 15px;
+  font-weight: 600;
+  color: #0f1419;
+}
+.pfEmail {
+  font-size: 11.5px;
+  color: #97a0ae;
+  margin-top: 2px;
+}
+.pfProvider {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 9.5px;
+  color: #5a6473;
+  background: #f2f3f6;
+  padding: 3px 8px;
+  border-radius: 5px;
+  margin-top: 6px;
+}
+.pfEdit {
+  font-size: 12px;
+  color: #0f1419;
+  font-weight: 500;
+}
+
+/* 크레딧 */
+.creditCard {
+  position: relative;
+  background: #fff;
+  border: 0.5px solid #e8eaee;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  border-radius: 16px;
+  padding: 18px;
+  margin-bottom: 14px;
+}
+.creditLabel {
+  font-size: 11px;
+  color: #97a0ae;
+  margin-bottom: 6px;
+  font-weight: 500;
+}
+.creditAmt {
+  font-size: 22px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.5px;
+  color: #0f1419;
+}
+.creditAmt span {
+  font-size: 26px;
+  font-weight: 800;
+}
+.creditSub {
+  font-size: 11px;
+  color: #97a0ae;
+  margin-top: 5px;
+}
+.creditBtn {
+  margin-top: 14px;
+  width: 100%;
+  padding: 11px;
+  border-radius: 10px;
+  background: #0f1419;
+  border: none;
+  color: #fff;
+  font-size: 12.5px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  font-family: inherit;
+}
+.creditBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Pro */
+.proCard {
+  position: relative;
+  background: #fff;
+  border-radius: 14px;
+  border: 0.5px solid #e8eaee;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  padding: 15px 16px;
+  margin-bottom: 20px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.proMark {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  background: #0f1419;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  color: #e5a23d;
+}
+.proInfo {
+  flex: 1;
+}
+.proTitle {
+  font-size: 13.5px;
+  font-weight: 600;
+  color: #0f1419;
+}
+.proDesc {
+  font-size: 11px;
+  color: #97a0ae;
+  margin-top: 2px;
+}
+.proBtn {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #fff;
+  background: #0f1419;
+  padding: 8px 13px;
+  border-radius: 9px;
+  flex-shrink: 0;
+  font-family: inherit;
+}
+.proBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* 메뉴 */
+.menuLabel {
+  font-size: 11px;
+  color: #97a0ae;
+  letter-spacing: 0.04em;
+  font-weight: 500;
+  margin: 0 0 8px 4px;
+  display: flex;
+  align-items: center;
+}
+.menuGroup {
+  background: #fff;
+  border-radius: 14px;
+  border: 0.5px solid #e8eaee;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  overflow: hidden;
+  margin-bottom: 20px;
+}
+.menuItem {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  border-bottom: 0.5px solid #eff1f4;
+  width: 100%;
+  text-align: left;
+  font-family: inherit;
+  background: transparent;
+  cursor: pointer;
+}
+.menuItem:last-child {
+  border-bottom: none;
+}
+.menuItem:disabled {
+  cursor: not-allowed;
+}
+.miIco {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #5a6473;
+  flex-shrink: 0;
+}
+.miLabel {
+  flex: 1;
+  font-size: 13.5px;
+  color: #0f1419;
+}
+.miValue {
+  font-size: 12px;
+  color: #97a0ae;
+  font-variant-numeric: tabular-nums;
+}
+.miArrow {
+  color: #c2c8d0;
+  flex-shrink: 0;
+}
+.danger {
+  color: #2b6be6;
+}
+
+/* toggle */
+.miToggle {
+  width: 40px;
+  height: 23px;
+  border-radius: 12px;
+  background: #0f1419;
+  position: relative;
+  flex-shrink: 0;
+  transition: background 0.18s ease;
+}
+.miToggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 19px;
+  height: 19px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: all 0.18s ease;
+}
+.miToggle.off {
+  background: #d8dce2;
+}
+.miToggle.off::after {
+  right: auto;
+  left: 2px;
+}
+
+.version {
+  text-align: center;
+  font-size: 10.5px;
+  color: #b8c0ca;
+  margin-top: 8px;
+}
