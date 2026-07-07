@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import type { AppliedHomePortfolioRow } from '@/lib/jaroo-home-data'
-import { mapAppliedRowsToSaveRows, mapDbRowsToAppliedRows } from './portfolio-sync'
+import { mapAppliedRowsToSaveRows, mapDbRowsToAppliedRows, parsePortfolioFetchResponse } from './portfolio-sync'
 
 function createRow(overrides: Partial<AppliedHomePortfolioRow> = {}): AppliedHomePortfolioRow {
   return {
@@ -70,4 +70,35 @@ test('mapDbRowsToAppliedRows는 DB row를 AppliedHomePortfolioRow로 round-trip 
 test('mapDbRowsToAppliedRows는 null evaluation_amount를 빈 문자열로 채운다', () => {
   const [roundTrip] = mapDbRowsToAppliedRows([{ name: 'X', quantity: 1, average_price: 100, evaluation_amount: null, sort_order: 0, source: 'ocr' }])
   assert.equal(roundTrip.evaluationAmount, '')
+})
+
+function createResponse(status: number, body: unknown): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'content-type': 'application/json' },
+  })
+}
+
+test('parsePortfolioFetchResponse: 401 → logged-out', async () => {
+  const result = await parsePortfolioFetchResponse(createResponse(401, { error: 'unauthorized' }))
+  assert.equal(result.status, 'logged-out')
+})
+
+test('parsePortfolioFetchResponse: 200 + rows → rows(AppliedHomePortfolioRow[])', async () => {
+  const result = await parsePortfolioFetchResponse(createResponse(200, { rows: [{ name: 'A', quantity: 1, average_price: 100, sort_order: 0, source: 'ocr' }] }))
+  assert.equal(result.status, 'rows')
+  if (result.status === 'rows') {
+    assert.equal(result.rows[0].name, 'A')
+    assert.equal(result.rows[0].quantity, '1')
+  }
+})
+
+test('parsePortfolioFetchResponse: 200 + 빈 배열 → empty', async () => {
+  const result = await parsePortfolioFetchResponse(createResponse(200, { rows: [] }))
+  assert.equal(result.status, 'empty')
+})
+
+test('parsePortfolioFetchResponse: 500 → error', async () => {
+  const result = await parsePortfolioFetchResponse(createResponse(500, { error: 'load-failed' }))
+  assert.equal(result.status, 'error')
 })

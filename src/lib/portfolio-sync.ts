@@ -65,3 +65,61 @@ export function mapDbRowsToAppliedRows(rows: PortfolioDbRow[]): AppliedHomePortf
     }
   })
 }
+
+export type PortfolioFetchResult =
+  | { status: 'rows'; rows: AppliedHomePortfolioRow[] }
+  | { status: 'empty' }
+  | { status: 'logged-out' }
+  | { status: 'error' }
+
+export async function parsePortfolioFetchResponse(response: Response): Promise<PortfolioFetchResult> {
+  if (response.status === 401) {
+    return { status: 'logged-out' }
+  }
+  if (!response.ok) {
+    return { status: 'error' }
+  }
+
+  const payload = (await response.json()) as { rows?: PortfolioDbRow[] }
+  const rows = Array.isArray(payload?.rows) ? payload.rows : []
+
+  if (rows.length === 0) {
+    return { status: 'empty' }
+  }
+
+  return { status: 'rows', rows: mapDbRowsToAppliedRows(rows) }
+}
+
+export async function fetchPortfolio(): Promise<PortfolioFetchResult> {
+  try {
+    const response = await fetch('/api/portfolio', {
+      method: 'GET',
+      headers: { 'content-type': 'application/json' },
+    })
+    return await parsePortfolioFetchResponse(response)
+  } catch {
+    return { status: 'error' }
+  }
+}
+
+export async function syncPortfolioToServer(rows: AppliedHomePortfolioRow[]): Promise<{ ok: boolean; saved?: number }> {
+  try {
+    const response = await fetch('/api/portfolio', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ rows: mapAppliedRowsToSaveRows(rows) }),
+    })
+
+    if (response.status === 401) {
+      return { ok: false } // logged-out: silent no-op
+    }
+    if (!response.ok) {
+      return { ok: false }
+    }
+
+    const payload = (await response.json()) as { saved?: number }
+    return { ok: true, saved: payload.saved }
+  } catch {
+    return { ok: false }
+  }
+}
