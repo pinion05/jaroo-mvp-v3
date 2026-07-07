@@ -71,6 +71,7 @@ end;
 $$;
 
 revoke execute on function public.sync_user_portfolio(uuid, jsonb) from public, anon, authenticated;
+grant execute on function public.sync_user_portfolio(uuid, jsonb) to service_role;
 
 -- 3. RLS (defense-in-depth; service_role bypasses regardless)
 alter table public.portfolio_holdings enable row level security;
