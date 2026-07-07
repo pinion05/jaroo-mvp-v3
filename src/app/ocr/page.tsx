@@ -19,6 +19,7 @@ import { buildHomeCurrentQuoteQuery } from '@/lib/home-current-quotes'
 import { hydratePortfolioItemsWithCurrentQuotes } from '@/lib/home-quote-bootstrap'
 import { aggregateResolvedOcrReviewRows, type AggregatedOcrReviewRow } from '@/lib/ocr-review-aggregation'
 import { buildMergeRowsFromReviewRows, persistAppliedPortfolioFromMergeRows } from '@/lib/ocr-portfolio-apply'
+import { syncPortfolioToServer } from '@/lib/portfolio-sync'
 import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
 import { useOcrUploadStore } from '@/lib/stores/use-ocr-upload-store'
@@ -774,6 +775,12 @@ export default function OcrPage() {
       if (!applyResult.persisted || applyResult.normalizedItems.length === 0) {
         throw new Error('포트폴리오에 적용할 종목을 찾지 못했어요.')
       }
+
+      void syncPortfolioToServer(applyResult.persistedRows).then((result) => {
+        if (!result.ok) {
+          console.warn('portfolio save failed (logged-out or server error)')
+        }
+      })
 
       const nextQuoteQuery = buildHomeCurrentQuoteQuery(applyResult.nextQuoteHoldings)
       replacePortfolioItems(applyResult.normalizedItems)

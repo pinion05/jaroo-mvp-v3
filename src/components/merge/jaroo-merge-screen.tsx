@@ -12,6 +12,7 @@ import {
   buildMergeRowsFromReviewRows,
   persistAppliedPortfolioFromMergeRows,
 } from '@/lib/ocr-portfolio-apply'
+import { syncPortfolioToServer } from '@/lib/portfolio-sync'
 import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
 import { usePortfolioStore } from '@/lib/stores/use-portfolio-store'
@@ -134,6 +135,12 @@ export default function JarooMergeScreen() {
       if (!applyResult.persisted) {
         throw new Error('홈 포트폴리오 저장에 실패했어요.')
       }
+
+      void syncPortfolioToServer(applyResult.persistedRows).then((result) => {
+        if (!result.ok) {
+          console.warn('portfolio save failed (logged-out or server error)')
+        }
+      })
 
       const nextQuoteQuery = buildHomeCurrentQuoteQuery(applyResult.nextQuoteHoldings)
       replacePortfolioItems(applyResult.normalizedItems)

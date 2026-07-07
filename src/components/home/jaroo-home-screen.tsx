@@ -36,6 +36,7 @@ import {
   type HomeBadgeTone,
   type HomeHolding,
 } from '@/lib/jaroo-home-data'
+import { fetchPortfolio } from '@/lib/portfolio-sync'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
 import { usePortfolioStore } from '@/lib/stores/use-portfolio-store'
@@ -573,7 +574,8 @@ export function JarooHomeScreen() {
   const [quoteSummaryMessage, setQuoteSummaryMessage] = useState<string | null>(null)
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [deepScanLoadingTarget, setDeepScanLoadingTarget] = useState<DeepScanLoadingTarget | null>(null)
-  const hasCheckedPersistedPortfolioRef = useRef(false)
+  const [persistedPortfolioLoading, setPersistedPortfolioLoading] = useState(() => portfolioItems.length === 0)
+  const [persistedPortfolioEmpty, setPersistedPortfolioEmpty] = useState(false)
 
   const portfolioBaseItems = useMemo(() => portfolioItems.map((item) => stripPortfolioQuoteFields(item)), [portfolioItems])
   const portfolioSignature = useMemo(
@@ -600,15 +602,47 @@ export function JarooHomeScreen() {
       return
     }
 
-    if (!hasCheckedPersistedPortfolioRef.current) {
-      hasCheckedPersistedPortfolioRef.current = true
-      const persistedPortfolio = readAppliedHomePortfolio()
-      const persistedItems = persistedPortfolio ? buildPortfolioItemsFromAppliedHomePortfolioRows(persistedPortfolio.rows) : []
+    let active = true
+    setPersistedPortfolioLoading(true)
 
-      if (persistedItems.length > 0) {
-        replacePortfolioItems(persistedItems)
+    void (async () => {
+      const result = await fetchPortfolio()
+
+      if (!active) {
         return
       }
+
+      // logged-in: DB is single source of truth (rows or empty). no session fallback here.
+      if (result.status === 'rows') {
+        const items = buildPortfolioItemsFromAppliedHomePortfolioRows(result.rows)
+        setPersistedPortfolioLoading(false)
+        if (items.length > 0) {
+          replacePortfolioItems(items)
+          return
+        }
+        setPersistedPortfolioEmpty(true)
+        return
+      }
+
+      // logged-out (401) or fetch error → session cache fallback (resilience), then empty.
+      const sessionPortfolio = readAppliedHomePortfolio()
+      const sessionItems = sessionPortfolio ? buildPortfolioItemsFromAppliedHomePortfolioRows(sessionPortfolio.rows) : []
+      setPersistedPortfolioLoading(false)
+      if (sessionItems.length > 0) {
+        replacePortfolioItems(sessionItems)
+        return
+      }
+      setPersistedPortfolioEmpty(true)
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [hasPortfolioItems, replacePortfolioItems])
+
+  useEffect(() => {
+    if (hasPortfolioItems || !persistedPortfolioEmpty) {
+      return
     }
 
     const timeoutId = window.setTimeout(() => {
@@ -618,7 +652,7 @@ export function JarooHomeScreen() {
     return () => {
       window.clearTimeout(timeoutId)
     }
-  }, [hasPortfolioItems, replacePortfolioItems, router])
+  }, [hasPortfolioItems, persistedPortfolioEmpty, router])
 
   useEffect(() => {
     portfolioBaseItemsRef.current = portfolioBaseItems
@@ -926,6 +960,25 @@ export function JarooHomeScreen() {
   }, [navigateToDeepScanForHolding])
 
   if (!hasPortfolioItems) {
+    if (persistedPortfolioLoading) {
+      return (
+        <div className={styles.viewport}>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              display: 'grid',
+              placeItems: 'center',
+              background: 'var(--jaroo-bg)',
+              zIndex: 50,
+            }}
+          >
+            <span style={{ fontSize: 13, color: 'var(--jaroo-muted)' }}>포트폴리오를 불러오는 중…</span>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className={styles.viewport}>
         <div className={styles.frame}>
