@@ -1,18 +1,10 @@
 'use client'
 
 import Link from 'next/link'
-import { usePathname } from 'next/navigation'
 import type { ReactNode } from 'react'
-import { ArrowLeft, FilePlus2, ScanSearch, GitMerge, House, UserRound } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { cn } from '@/lib/utils'
-
-const navItems = [
-  { href: '/screenshot', label: '추가', icon: FilePlus2 },
-  { href: '/ocr', label: '검수', icon: ScanSearch },
-  { href: '/merge', label: '병합', icon: GitMerge },
-  { href: '/home', label: '홈', icon: House },
-  { href: '/mypage', label: '마이', icon: UserRound },
-]
+import { AppBottomNav } from '@/components/app-bottom-nav'
 
 export function JarooShell({
   title,
@@ -37,8 +29,6 @@ export function JarooShell({
   mainClassName?: string
   frameClassName?: string
 }) {
-  const pathname = usePathname()
-
   return (
     <div className='min-h-screen min-h-dvh bg-white text-foreground sm:bg-[color:var(--jaroo-canvas)] sm:px-6 sm:py-4'>
       <div className={cn('relative mx-auto flex min-h-screen min-h-dvh w-full flex-col overflow-hidden bg-white sm:min-h-[calc(100vh-2rem)] sm:max-w-[390px] sm:rounded-[32px] sm:border sm:border-white/70 sm:shadow-[0_20px_60px_rgba(12,68,124,0.18)]', frameClassName)}>
@@ -74,29 +64,7 @@ export function JarooShell({
         </main>
 
         {showBottomNav ? (
-          bottomNav ?? (
-            <nav className='sticky bottom-0 z-20 grid grid-cols-5 border-t border-[color:var(--jaroo-border)] bg-white/95 px-2 py-2 backdrop-blur'>
-              {navItems.map((item) => {
-                const Icon = item.icon
-                const active = pathname === item.href
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={cn(
-                      'flex flex-col items-center gap-1 rounded-2xl px-2 py-2 text-[11px] font-medium transition',
-                      active
-                        ? 'bg-[color:var(--jaroo-accent)] text-[color:var(--jaroo-primary)]'
-                        : 'text-[color:var(--jaroo-muted)] hover:bg-[color:var(--jaroo-secondary)]',
-                    )}
-                  >
-                    <Icon className={cn('size-4', active && 'text-[color:var(--jaroo-primary)]')} />
-                    <span>{item.label}</span>
-                  </Link>
-                )
-              })}
-            </nav>
-          )
+          bottomNav ?? <AppBottomNav />
         ) : null}
       </div>
     </div>
