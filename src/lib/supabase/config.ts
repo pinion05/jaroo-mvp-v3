@@ -20,3 +20,18 @@ export function assertSupabaseConfig(): { url: string; anonKey: string } {
 
   return { url, anonKey }
 }
+
+export function getSupabaseServiceRoleKey(): string {
+  return process.env.SUPABASE_SERVICE_ROLE_KEY?.trim() || ''
+}
+
+export function assertSupabaseServiceConfig(): { url: string; serviceRoleKey: string } {
+  const url = getSupabaseUrl()
+  const serviceRoleKey = getSupabaseServiceRoleKey()
+
+  if (!url || !serviceRoleKey) {
+    throw new Error('Supabase URL/service-role key is not configured')
+  }
+
+  return { url, serviceRoleKey }
+}
