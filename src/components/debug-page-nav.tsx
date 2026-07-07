@@ -36,9 +36,13 @@ const navItems: NavItem[] = [
 
 export function DebugPageNav() {
   const pathname = usePathname()
+  const isDev = process.env.NODE_ENV === 'development'
   const [canShowDebugNav, setCanShowDebugNav] = useState(false)
 
   useEffect(() => {
+    if (!isDev) {
+      return
+    }
     const query = window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)')
     const updateVisibility = () => {
       setCanShowDebugNav(query.matches)
@@ -52,7 +56,7 @@ export function DebugPageNav() {
     }
   }, [])
 
-  if (!canShowDebugNav) {
+  if (!isDev || !canShowDebugNav) {
     return null
   }
 
