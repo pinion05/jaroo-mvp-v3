@@ -574,7 +574,6 @@ export function JarooHomeScreen() {
   const [quoteSummaryMessage, setQuoteSummaryMessage] = useState<string | null>(null)
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [deepScanLoadingTarget, setDeepScanLoadingTarget] = useState<DeepScanLoadingTarget | null>(null)
-  const hasCheckedPersistedPortfolioRef = useRef(false)
   const [persistedPortfolioLoading, setPersistedPortfolioLoading] = useState(false)
   const [persistedPortfolioEmpty, setPersistedPortfolioEmpty] = useState(false)
 
@@ -602,18 +601,14 @@ export function JarooHomeScreen() {
     if (hasPortfolioItems) {
       return
     }
-    if (hasCheckedPersistedPortfolioRef.current) {
-      return
-    }
-    hasCheckedPersistedPortfolioRef.current = true
-    setPersistedPortfolioLoading(true)
 
-    let cancelled = false
+    let active = true
+    setPersistedPortfolioLoading(true)
 
     void (async () => {
       const result = await fetchPortfolio()
 
-      if (cancelled) {
+      if (!active) {
         return
       }
 
@@ -641,7 +636,7 @@ export function JarooHomeScreen() {
     })()
 
     return () => {
-      cancelled = true
+      active = false
     }
   }, [hasPortfolioItems, replacePortfolioItems])
 
