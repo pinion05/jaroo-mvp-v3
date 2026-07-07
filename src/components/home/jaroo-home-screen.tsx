@@ -965,6 +965,25 @@ export function JarooHomeScreen() {
   }, [navigateToDeepScanForHolding])
 
   if (!hasPortfolioItems) {
+    if (persistedPortfolioLoading) {
+      return (
+        <div className={styles.viewport}>
+          <div
+            style={{
+              position: 'fixed',
+              inset: 0,
+              display: 'grid',
+              placeItems: 'center',
+              background: 'var(--jaroo-bg)',
+              zIndex: 50,
+            }}
+          >
+            <span style={{ fontSize: 13, color: 'var(--jaroo-muted)' }}>포트폴리오를 불러오는 중…</span>
+          </div>
+        </div>
+      )
+    }
+
     return (
       <div className={styles.viewport}>
         <div className={styles.frame}>
@@ -985,20 +1004,6 @@ export function JarooHomeScreen() {
 
   return (
     <div className={styles.viewport}>
-      {persistedPortfolioLoading && !hasPortfolioItems ? (
-        <div
-          style={{
-            position: 'fixed',
-            inset: 0,
-            display: 'grid',
-            placeItems: 'center',
-            background: 'var(--jaroo-bg)',
-            zIndex: 50,
-          }}
-        >
-          <span style={{ fontSize: 13, color: 'var(--jaroo-muted)' }}>포트폴리오를 불러오는 중…</span>
-        </div>
-      ) : null}
       <div ref={frameRef} className={styles.frame}>
         <header className={styles.top}>
           <div className={styles.brand}>Jaroo</div>
