@@ -38,6 +38,7 @@ import {
 } from '@/lib/jaroo-home-data'
 import { fetchPortfolio } from '@/lib/portfolio-sync'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
+import { AppBottomNav } from '@/components/app-bottom-nav'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
 import { usePortfolioStore } from '@/lib/stores/use-portfolio-store'
 import { cn } from '@/lib/utils'
@@ -1090,12 +1091,7 @@ export function JarooHomeScreen() {
           </div> : null}
         </main>
 
-        <nav className={styles.tabbar} aria-label='하단 탭'>
-          <button type='button' className={cn(styles.tab, styles.on)}><span className={styles.tabIco}>🏠</span>홈</button>
-          <button type='button' className={styles.tab}><span className={styles.tabIco}>📁</span>포트폴리오</button>
-          <Link href='/deepscan' className={styles.tab}><span className={styles.tabIco}>📈</span>분석</Link>
-          <Link href='/mypage' className={styles.tab}><span className={styles.tabIco}>👤</span>마이</Link>
-        </nav>
+        <AppBottomNav />
       </div>
 
       <div className={styles.modalMount}>
