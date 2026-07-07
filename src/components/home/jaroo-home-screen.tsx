@@ -574,7 +574,7 @@ export function JarooHomeScreen() {
   const [quoteSummaryMessage, setQuoteSummaryMessage] = useState<string | null>(null)
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [deepScanLoadingTarget, setDeepScanLoadingTarget] = useState<DeepScanLoadingTarget | null>(null)
-  const [persistedPortfolioLoading, setPersistedPortfolioLoading] = useState(false)
+  const [persistedPortfolioLoading, setPersistedPortfolioLoading] = useState(() => portfolioItems.length === 0)
   const [persistedPortfolioEmpty, setPersistedPortfolioEmpty] = useState(false)
 
   const portfolioBaseItems = useMemo(() => portfolioItems.map((item) => stripPortfolioQuoteFields(item)), [portfolioItems])
