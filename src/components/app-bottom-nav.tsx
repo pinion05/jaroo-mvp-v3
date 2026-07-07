@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { FilePlus2, ScanSearch, GitMerge, House, UserRound } from 'lucide-react'
+import { FilePlus2, ScanSearch, GitMerge, House, LineChart, UserRound } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -21,6 +21,7 @@ export const NAV_ITEMS: NavItem[] = [
   { href: '/ocr', label: '검수', icon: ScanSearch },
   { href: '/merge', label: '병합', icon: GitMerge },
   { href: '/home', label: '홈', icon: House },
+  { href: '/deepscan', label: '분석', icon: LineChart },
   { href: '/mypage', label: '마이', icon: UserRound },
 ]
 
