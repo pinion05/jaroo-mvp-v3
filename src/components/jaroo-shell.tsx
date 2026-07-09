@@ -40,8 +40,9 @@ export function JarooShell({
               <Link
                 href={backHref}
                 className='flex size-9 items-center justify-center rounded-full bg-[color:var(--jaroo-secondary)] text-[color:var(--jaroo-ink)] transition hover:bg-[color:var(--jaroo-accent)]'
+                aria-label='뒤로 가기'
               >
-                <ArrowLeft className='size-4' />
+                <ArrowLeft className='size-4' aria-hidden='true' />
               </Link>
             ) : (
               <div className='flex size-9 items-center justify-center rounded-full bg-[color:var(--jaroo-accent)] text-[color:var(--jaroo-primary)]'>

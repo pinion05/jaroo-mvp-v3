@@ -39,6 +39,7 @@ import {
   resolveDeepScanPageCacheState,
 } from '@/lib/deepscan-page-projection'
 import { resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
+import { isDeepScanInlineResultsReady } from '@/lib/deepscan-loading-behavior'
 import { resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
@@ -1346,20 +1347,26 @@ function SectionToggle({
   label,
   tags,
   isOpen,
+  sectionKey,
   onToggle,
   children,
 }: {
   label: string
   tags?: ReactNode
+  sectionKey: SectionKey
   isOpen: boolean
   onToggle: () => void
   children: ReactNode
 }) {
+  const panelId = `deepscan-section-${sectionKey}-panel`
+
   return (
     <div className='space-y-3'>
       <button
         type='button'
         onClick={onToggle}
+        aria-expanded={isOpen}
+        aria-controls={panelId}
         className='flex w-full items-center justify-between rounded-[26px] border border-white/90 bg-white/95 px-4 py-4 text-left shadow-[0_12px_30px_rgba(24,95,165,0.08)] transition active:scale-[0.99]'
       >
         <div className='min-w-0'>
@@ -1367,13 +1374,16 @@ function SectionToggle({
           {tags ? <div className='mt-2 flex flex-wrap gap-1.5'>{tags}</div> : null}
         </div>
         <ChevronDown
+          aria-hidden='true'
           className={cn(
             'ml-4 size-4 shrink-0 text-[color:var(--jaroo-muted)] transition-transform',
             isOpen && 'rotate-180',
           )}
         />
       </button>
-      {isOpen ? children : null}
+      <div id={panelId} hidden={!isOpen}>
+        {children}
+      </div>
     </div>
   )
 }
@@ -1754,7 +1764,7 @@ export default function DeepScanPage() {
           (input, init) => fetch(input, { ...init, signal: controller.signal }),
         )
 
-        if (controller.signal.aborted) {
+        if (controller.signal.aborted || targetKeyRef.current !== requestedTargetKey) {
           return
         }
 
@@ -1771,7 +1781,7 @@ export default function DeepScanPage() {
         }
         finishSuccess(nextPayload)
       } catch (error) {
-        if (controller.signal.aborted) {
+        if (controller.signal.aborted || targetKeyRef.current !== requestedTargetKey) {
           return
         }
 
@@ -1992,10 +2002,12 @@ export default function DeepScanPage() {
   const partialSuccessNotice = buildDeepScanPartialSuccessNotice(payload)
   const weekTone = resolveWeekToneClasses(payload?.strategy.weekSignalTone ?? 'neutral')
   const isCommitteeHydrating = fetchState === 'success' && payload?.metadata.llmCommittee?.status === 'partial'
-  const rawResultsReady = fetchState === 'success' && Boolean(payload) && !isCommitteeHydrating
-  const loadingSequenceComplete = loadingSequence.targetKey === targetKey && loadingSequence.sequenceComplete
-  const canReuseReadyPayloadWithoutSequence = rawResultsReady && loadingSequence.targetKey !== targetKey
-  const resultsReady = rawResultsReady && (loadingSequenceComplete || canReuseReadyPayloadWithoutSequence)
+  const rawResultsReady = isDeepScanInlineResultsReady({
+    fetchState,
+    hasPayload: Boolean(payload),
+    isCommitteeHydrating,
+  })
+  const resultsReady = rawResultsReady
   const visibleStageCount = resultsReady ? 3 : loadingSequence.targetKey === targetKey ? loadingSequence.visibleStageCount : 1
   const arrivedStageKeys = displayedLoadingStages.targetKey === targetKey ? displayedLoadingStages.stageKeys : []
   const loadingFindingProgress = buildLoadingFindingProgress(payload)
@@ -2095,6 +2107,8 @@ export default function DeepScanPage() {
       [key]: !current[key],
     }))
   }
+
+  const scenarioDetailPanelId = 'deepscan-section-scenarioDetail-panel'
 
   return (
     <JarooShell
@@ -2209,6 +2223,7 @@ export default function DeepScanPage() {
 
           <SectionToggle
             label='세 팀 분석 결과'
+            sectionKey='why'
             isOpen={openSections.why}
             onToggle={() => toggleSection('why')}
             tags={
@@ -2365,6 +2380,7 @@ export default function DeepScanPage() {
 
           <SectionToggle
             label={payload?.insights.sectionLabel ?? '인사이트'}
+            sectionKey='news'
             isOpen={openSections.news}
             onToggle={() => toggleSection('news')}
             tags={
@@ -2516,18 +2532,21 @@ export default function DeepScanPage() {
                 <button
                   type='button'
                   onClick={() => toggleSection('scenarioDetail')}
+                  aria-expanded={openSections.scenarioDetail}
+                  aria-controls={scenarioDetailPanelId}
                   className='mt-4 flex w-full items-center justify-between border-t border-[color:var(--jaroo-border)] pt-4 text-left'
                 >
                   <span className='text-sm font-semibold text-[color:var(--jaroo-primary)]'>상세 분석 보기</span>
                   <ChevronDown
+                    aria-hidden='true'
                     className={cn(
                       'size-4 text-[color:var(--jaroo-primary)] transition-transform',
                       openSections.scenarioDetail && 'rotate-180',
                     )}
                   />
                 </button>
-                {openSections.scenarioDetail ? (
-                  payload.strategy.scenarioDetails.length > 0 ? (
+                <div id={scenarioDetailPanelId} hidden={!openSections.scenarioDetail}>
+                  {payload.strategy.scenarioDetails.length > 0 ? (
                     <div className='mt-3 space-y-3'>
                       {payload.strategy.scenarioDetails.map((detail, index) => (
                         <div
@@ -2543,14 +2562,15 @@ export default function DeepScanPage() {
                     </div>
                   ) : (
                     <p className='mt-3 text-xs leading-5 text-[color:var(--jaroo-muted)]'>상세 시나리오 설명이 아직 없습니다.</p>
-                  )
-                ) : null}
+                  )}
+                </div>
               </Card>
             </>
           )}
 
           <SectionToggle
             label='다른 시나리오 비교'
+            sectionKey='otherScenarios'
             isOpen={openSections.otherScenarios}
             onToggle={() => toggleSection('otherScenarios')}
             tags={
@@ -2622,6 +2642,7 @@ export default function DeepScanPage() {
 
           <SectionToggle
             label='지금 팔면'
+            sectionKey='sellNow'
             isOpen={openSections.sellNow}
             onToggle={() => toggleSection('sellNow')}
             tags={
@@ -2697,6 +2718,7 @@ export default function DeepScanPage() {
 
           <SectionToggle
             label='포트폴리오 변화'
+            sectionKey='pfSim'
             isOpen={openSections.pfSim}
             onToggle={() => toggleSection('pfSim')}
             tags={

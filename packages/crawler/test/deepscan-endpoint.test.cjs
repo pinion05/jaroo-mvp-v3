@@ -31,7 +31,12 @@ test('deepscan-canonical endpoint definition is registered', async () => {
     'name(optional)',
     'shares(optional)',
     'averagePrice(optional)',
+    'averagePriceCurrency(optional)',
+    'currentPrice(optional)',
+    'currentPriceCurrency(optional)',
+    'currentProfitRate(optional)',
     'evaluationAmount(optional)',
+    'usdKrwRate(optional)',
     'selectedAt(optional)',
     'from(optional)',
     'disclosureFrom(optional)',
@@ -51,7 +56,12 @@ test('GET explicit-source deepscan path returns raw canonical payload and builds
       name: '삼성전자',
       shares: '12',
       averagePrice: '71000',
+      averagePriceCurrency: 'KRW',
+      currentPrice: '85200',
+      currentPriceCurrency: 'KRW',
+      currentProfitRate: '20%',
       evaluationAmount: '1022400',
+      usdKrwRate: '1380',
       selectedAt: '2026-04-15T09:00:00.000Z',
       from: 'holding',
     });
@@ -69,7 +79,12 @@ test('GET explicit-source deepscan path returns raw canonical payload and builds
   assert.equal(body.input.instrument.name, '삼성전자');
   assert.equal(body.input.holding.shares, '12');
   assert.equal(body.input.holding.averagePrice, '71000');
+  assert.equal(body.input.holding.averagePriceCurrency, 'KRW');
+  assert.equal(body.input.holding.currentPrice, '85200');
+  assert.equal(body.input.holding.currentPriceCurrency, 'KRW');
+  assert.equal(body.input.holding.currentProfitRate, '20%');
   assert.equal(body.input.holding.evaluationAmount, '1022400');
+  assert.equal(body.input.holding.usdKrwRate, '1380');
   assert.equal(body.input.selectedAt, '2026-04-15T09:00:00.000Z');
   assert.equal(body.input.sourceContext.from, 'holding');
 });

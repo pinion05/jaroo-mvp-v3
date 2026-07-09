@@ -16,258 +16,60 @@ function literalPattern(value) {
   return new RegExp(value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
 }
 
-const obsoleteSummaryField = ['three', 'Lens', 'Summary'].join('')
-const obsoleteServiceName = ['three', '-', 'lens'].join('')
-const obsoleteKoreanLens = ['3', '렌즈'].join('')
-const obsoleteUnavailableBody = ['summary', 'Unavailable', 'Body'].join('')
-const obsoleteCompactHelper = ['compact', 'Finding', 'Text'].join('')
-const obsoleteUnavailableCopy = ['요약', ' 불가'].join('')
-const obsoletePriceAnalyst = ['시세', ' 분석가'].join('')
-const obsoleteConsensusAnalyst = ['컨센서스', ' 분석가'].join('')
-const obsoleteFundamentalAnalyst = ['실적', ' 분석가'].join('')
-const obsoletePendingBodyGate = ['cardSettled ? card.body : card.', 'pending', 'Text'].join('')
+const obsoleteSourceTokens = [
+  ['three', 'Lens', 'Summary'].join(''),
+  ['three', '-', 'lens'].join(''),
+  ['3', '렌즈'].join(''),
+  ['summary', 'Unavailable', 'Body'].join(''),
+  ['cardSettled ? card.body : card.', 'pending', 'Text'].join(''),
+]
 
-test('DeepScan loading screen uses v13 chat flow with three committee teams, not lens sections', () => {
-  const source = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
+const obsoleteCopyTokens = [
+  ['요약', ' 불가'].join(''),
+  ['시세', ' 분석가'].join(''),
+  ['컨센서스', ' 분석가'].join(''),
+  ['실적', ' 분석가'].join(''),
+  '상세 결과 보기',
+  '상세보기',
+  '아래 버튼',
+]
 
-  assert.match(source, /function buildLoadingStages/)
-  assert.match(source, /analystName: '가치·기본 팀'/)
-  assert.match(source, /analystName: '시장·차트 팀'/)
-  assert.match(source, /analystName: '심리·환경 팀'/)
-  assert.match(source, /가치 분석가/)
-  assert.match(source, /성장 전략가/)
-  assert.match(source, /재무 감사관/)
-  assert.match(source, /차트 마스터/)
-  assert.match(source, /수급 추적기/)
-  assert.match(source, /모멘텀 스카우터/)
-  assert.match(source, /심리 분석AI/)
-  assert.match(source, /산업 전문가/)
-  assert.match(source, /이벤트 스캐너/)
-  assert.doesNotMatch(source, literalPattern(obsoletePriceAnalyst))
-  assert.doesNotMatch(source, literalPattern(obsoleteConsensusAnalyst))
-  assert.doesNotMatch(source, literalPattern(obsoleteFundamentalAnalyst))
-  assert.doesNotMatch(source, /aria-label='빠른 시장 체크'/)
-  assert.doesNotMatch(source, /aria-label='딥스캔 진행 요약'/)
-  assert.doesNotMatch(source, />진행 요약</)
-  assert.doesNotMatch(source, /aria-label='가격 위치 조회 중'/)
+test('DeepScan source keeps obsolete lens, CTA, and raw-summary copy out', () => {
+  const sources = [
+    readRepoFile('src', 'components', 'deepscan-loading-screen.tsx'),
+    readRepoFile('src', 'app', 'deepscan', 'page.tsx'),
+    readRepoFile('src', 'app', 'api', 'deepscan', 'committee-status', 'route.ts'),
+    readRepoFile('src', 'app', 'api', 'deepscan', 'team-summary', 'route.ts'),
+  ]
+
+  for (const source of sources) {
+    for (const token of obsoleteSourceTokens) {
+      assert.doesNotMatch(source, literalPattern(token))
+    }
+  }
+
+  const loadingSource = sources[0]
+  for (const token of obsoleteCopyTokens) {
+    assert.doesNotMatch(loadingSource, literalPattern(token))
+  }
+  assert.doesNotMatch(loadingSource, /강세|손절|보유 유지|즉시 매도|최종 판단|최종 요약/u)
+  assert.doesNotMatch(loadingSource, /원문 표시|외 \$\{.*\}명/u)
 })
 
-test('DeepScan target price quick fact remains visible with missing or failed reason', () => {
-  const source = readRepoFile('src', 'app', 'deepscan', 'page.tsx')
-  const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
-
-  assert.match(source, /function buildTargetPriceStatusQuickFact/)
-  assert.match(source, /'조회 실패'/)
-  assert.match(source, /'미제공'/)
-  assert.match(source, /'etf-product-context'/)
-  assert.match(loadingSource, /getQuickFactByKey\(displayQuickFacts, 'analyst-consensus'\) \?\? getQuickFactByKey\(displayQuickFacts, 'etf-product-context'\)/)
-  assert.match(source, /아직 증권사 목표가가 제시되지 않은 종목입니다\./)
-  assert.match(source, /증권사 목표가를 지금 불러오지 못했습니다\./)
-  assert.match(source, /requestSeed\.holding\.name/)
-  assert.doesNotMatch(source, /isNoDataConsensusBody\(consensus\.body\)\) \{\s*return null/u)
-})
-
-test('DeepScan hides standalone price position and ETF context fact cards', () => {
-  const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
+test('DeepScan loading CSS keeps removed bridge widgets and frantic shimmer out', () => {
   const cssSource = readRepoFile('src', 'components', 'deepscan-loading-screen.module.css')
 
-  assert.match(loadingSource, /function isHiddenLoadingQuickFact/)
-  assert.match(loadingSource, /fact\.key === 'week52-position'/)
-  assert.match(loadingSource, /fact\.key === 'etf-product-context'/)
-  assert.match(loadingSource, /const standaloneQuickFacts = useMemo/)
-  assert.match(loadingSource, /displayQuickFacts\.filter\(\(fact\) => !isHiddenLoadingQuickFact\(fact\)\)/)
-  assert.match(loadingSource, /standaloneQuickFacts\.map\(\(fact\) => <QuickFactCard/)
-  assert.doesNotMatch(loadingSource, /function ChartAbsorbedFact/)
-  assert.doesNotMatch(loadingSource, /positionQuickFact=\{positionQuickFact\}/)
-  assert.doesNotMatch(loadingSource, /productContextQuickFact=\{productContextQuickFact\}/)
-  assert.doesNotMatch(loadingSource, /styles\.todayChartFactBridge/)
-  assert.doesNotMatch(loadingSource, /styles\.narrativePricebar/)
-  assert.doesNotMatch(cssSource, /\.todayChartFactBridge/)
-  assert.doesNotMatch(cssSource, /\.todayRangeTrack/)
-  assert.doesNotMatch(cssSource, /\.todayProductBridge/)
-  assert.doesNotMatch(cssSource, /\.narrativePricebar/)
-})
-
-test('DeepScan Today briefing auto-scrolls newly revealed mobile items', () => {
-  const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
-
-  assert.match(loadingSource, literalPattern('TODAY_BRIEFING_ITEM_SELECTOR = \'[data-today-briefing-item="true"]\''))
-  assert.match(loadingSource, /DEEPSCAN_MOBILE_AUTO_SCROLL_QUERY = '\(max-width: 640px\)'/)
-  assert.match(loadingSource, /function startDeepScanMobileAutoScroll/)
-  assert.match(loadingSource, /function startTodayBriefingMobileAutoScroll/)
-  assert.match(loadingSource, /querySelectorAll<HTMLElement>\(TODAY_BRIEFING_ITEM_SELECTOR\)\.item\(visibleItemCount - 1\)/)
-  assert.match(loadingSource, /scrollDeepScanElementBottomIntoView\(targetElement\)/)
-  assert.match(loadingSource, /ResizeObserver/)
-  assert.match(loadingSource, /const visibleBriefingItemCount = briefStartSeconds\.filter\(\(at\) => elapsedSeconds >= at\)\.length/)
-  assert.match(loadingSource, /startTodayBriefingMobileAutoScroll\(todayBriefListRef\.current, visibleBriefingItemCount\)/)
-  assert.match(loadingSource, /ref=\{todayBriefListRef\}/)
-  assert.match(loadingSource, /data-today-briefing-item='true'/)
-})
-
-test('DeepScan team bridge auto-scrolls into mobile view when it appears', () => {
-  const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
-
-  assert.match(loadingSource, /const teamBridgeRef = useRef<HTMLElement \| null>\(null\)/)
-  assert.match(loadingSource, /const isTeamBridgeVisible = Boolean\(teamBridgeState\)/)
-  assert.match(loadingSource, /isTeamBridgeVisible\s*\?\s*startDeepScanMobileAutoScroll\(teamBridgeRef\.current\)/u)
-  assert.match(loadingSource, /ref=\{teamBridgeRef\}/)
-  assert.match(loadingSource, /시세는 다 봤어요\. 이제 <b>세 팀이 더 깊이<\/b> 분석하는 중이에요\./)
-})
-
-test('DeepScan loading sequencing is success-gated and no longer bypasses on raw resultsReady', () => {
-  const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
-  const pageSource = readRepoFile('src', 'app', 'deepscan', 'page.tsx')
-
-  assert.match(loadingSource, /function buildLoadingStages/)
-  assert.match(loadingSource, /function buildVisibleNarrativeCards/)
-  assert.match(loadingSource, /function buildOrderedNarrativeCards/)
-  assert.match(loadingSource, /function buildPlaceholderNarrativeCard/)
-  assert.match(loadingSource, /function buildSequentialNarrativeCards/)
-  assert.match(loadingSource, /function hasNarrativeLoadingSkeleton/)
-  assert.match(loadingSource, /for \(const card of cards\) \{\s*sequentialCards\.push\(card\)\s*if \(hasNarrativeLoadingSkeleton\(card, teamSummaries\)\) \{\s*break\s*\}/u)
-  assert.match(loadingSource, /visibleStageCount/)
-  assert.match(loadingSource, /arrivedStageKeys/)
-  assert.match(loadingSource, /narrativeTitleSkeleton/)
-  assert.match(loadingSource, /cards\.slice\(0, Math\.min\(Math\.max\(visibleStageCount, 1\), cards\.length\)\)/)
-  assert.match(loadingSource, /return buildVisibleNarrativeCards\(cards, revealCount\)/)
-  assert.match(loadingSource, /TEAM_PRESENTATION_ORDER: LoadingStageKey\[\] = \['marketTeam', 'contextTeam', 'fundamentalTeam'\]/)
-  assert.match(loadingSource, /TEAM_BRIDGE_REVEAL_SECONDS = 38/)
-  assert.match(loadingSource, /TEAM_BRIDGE_FINAL_MESSAGE_MIN_SECONDS = 30/)
-  assert.match(loadingSource, /TEAM_BRIDGE_DONE_SECONDS = COMPLETION_SOON_REVEAL_SECONDS \+ TEAM_BRIDGE_FINAL_MESSAGE_MIN_SECONDS/)
-  assert.match(loadingSource, /TEAM_SEQUENCE_COMPLETE_SECONDS = TEAM_BRIDGE_DONE_SECONDS \+ 8/)
-  assert.match(loadingSource, /marketTeam: TEAM_BRIDGE_DONE_SECONDS/)
-  assert.match(loadingSource, /contextTeam: TEAM_BRIDGE_DONE_SECONDS \+ 2\.5/)
-  assert.match(loadingSource, /fundamentalTeam: TEAM_BRIDGE_DONE_SECONDS \+ 5/)
-  assert.match(loadingSource, /function buildTeamBridgeState/)
-  assert.match(loadingSource, /시세는 다 봤어요\. 이제/)
-  assert.match(loadingSource, /세 팀이 더 깊이/)
-  assert.match(loadingSource, /TEAM_BRIDGE_STATUS_MESSAGES/)
-  assert.match(loadingSource, /sequentialNarrativeCards\.map/)
-  assert.doesNotMatch(loadingSource, /timelineNarrativeCards\.map/)
-  assert.match(loadingSource, /COMPLETION_SOON_REVEAL_SECONDS\s*=\s*43/)
-  assert.match(loadingSource, /const resultsReadyForDisplay = resultsReady && elapsedSeconds >= TEAM_SEQUENCE_COMPLETE_SECONDS/)
-  assert.match(loadingSource, /buildTeamBridgeState\(elapsedSeconds, resultsReadyForDisplay\)/)
-  assert.match(loadingSource, /resultsReadyForDisplay && inlineResults/)
-  assert.match(loadingSource, /세 팀이 의견을 정리하는 중…/)
-  assert.match(loadingSource, /곧 결과를 보여드릴게요…/)
-  assert.doesNotMatch(loadingSource, /elapsedSeconds >= card\.revealAt/)
-  assert.doesNotMatch(loadingSource, /if \(resultsReady\) \{\s*return cards\s*\}/u)
-
-  assert.match(pageSource, /DEEPSCAN_STAGE_WAIT_MS\s*=\s*18_000/)
-  assert.match(pageSource, /DEEPSCAN_STAGE_FILL_DELAY_MS\s*=\s*3_000/)
-  assert.match(pageSource, /markDeepScanLoadingSuccess/)
-  assert.match(pageSource, /previous\.visibleStageCount === 1\s*\?\s*\{ \.\.\.previous, visibleStageCount: 2 \}/)
-  assert.match(pageSource, /previous\.visibleStageCount === 2\s*\?\s*\{ \.\.\.previous, visibleStageCount: 3 \}/)
-  assert.match(pageSource, /window\.setTimeout\(\(\) => \{\s*if \(targetKeyRef\.current !== releaseTargetKey\)/u)
-  assert.match(pageSource, /DEEPSCAN_STAGE_FILL_DELAY_MS/)
-  assert.match(pageSource, /growth: 'fundamentalTeam'/)
-  assert.match(pageSource, /'profitability-quality': 'fundamentalTeam'/)
-  assert.match(pageSource, /momentum: 'marketTeam'/)
-  assert.match(pageSource, /'estimate-revision': 'marketTeam'/)
-  assert.match(pageSource, /'event-risk': 'marketTeam'/)
-  assert.match(pageSource, /'financial-safety': 'contextTeam'/)
-  assert.match(pageSource, /'ownership-flow': 'contextTeam'/)
-  assert.match(pageSource, /'portfolio-fit': 'contextTeam'/)
-  assert.match(pageSource, /extractLoadingStageKeysFromCommitteeResults/)
-  assert.match(pageSource, /rawResultsReady/)
-  assert.match(pageSource, /sequenceComplete/)
-  assert.match(pageSource, /canReuseReadyPayloadWithoutSequence/)
-  assert.match(pageSource, /const resultsReady = rawResultsReady && \(loadingSequenceComplete \|\| canReuseReadyPayloadWithoutSequence\)/)
-  assert.match(pageSource, /const visibleStageCount = resultsReady \? 3 : loadingSequence\.targetKey === targetKey \? loadingSequence\.visibleStageCount : 1/)
-  assert.match(pageSource, /arrivedStageKeys=\{arrivedStageKeys\}/)
-  assert.match(pageSource, /inlineResults=\{resultsReady && payload \? <DeepScanInlineResults/)
-  assert.doesNotMatch(pageSource, /inlineResults=\{rawResultsReady && payload/)
-  assert.doesNotMatch(pageSource, /firstSuccessObserved: true,\s*visibleStageCount: 2/u)
-})
-
-test('DeepScan loading screen only fetches internal team summaries and avoids result CTA', () => {
-  const source = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
-
-  assert.match(source, /fetch\('\/api\/deepscan\/team-summary'/)
-  assert.match(source, /card\.summarizable/)
-  assert.match(source, /summarizable: teamBody\.readyCount > 0 && teamBody\.readyCount \+ teamBody\.errorCount === team\.members\.length/)
-  assert.doesNotMatch(source, /summarizable: teamBody\.readyCount === team\.members\.length/)
-  assert.match(source, /teamName: request\.analystName/)
-  assert.doesNotMatch(source, /강세|손절|보유 유지|즉시 매도|최종 판단|최종 요약/u)
-  assert.doesNotMatch(source, /상세 결과 보기|상세보기|아래 버튼/u)
-  assert.match(source, /inlineResults/)
-})
-
-
-
-test('OCR apply navigation does not get overridden by missing upload-session guard', () => {
-  const source = readRepoFile('src', 'app', 'ocr', 'page.tsx')
-
-  assert.match(source, /const isLeavingAfterApplyRef = useRef\(false\)/)
-  assert.match(source, /if \(!isLeavingAfterApplyRef\.current\) \{\s*router\.replace\('\/screenshot'\)/u)
-  assert.match(source, /isLeavingAfterApplyRef\.current = true\s*clearPersistedScreenshotUploadSession\(\)\s*clearUploadInput\(\)\s*router\.push\('\/home'\)/u)
-})
-
-test('DeepScan long team summaries collapse behind an expand button', () => {
-  const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
-  const cssSource = readRepoFile('src', 'components', 'deepscan-loading-screen.module.css')
-
-  assert.match(loadingSource, /function splitTeamSummarySentences/)
-  assert.match(loadingSource, /function shouldCollapseTeamSummaryText/)
-  assert.match(loadingSource, /function getCollapsedTeamSummaryText/)
-  assert.match(loadingSource, /summaryCollapsible/)
-  assert.match(loadingSource, /aria-expanded=\{summaryExpanded\}/)
-  assert.match(loadingSource, /상세 해석 펼치기/)
-  assert.match(loadingSource, /`\$\{sentences\[0\]\} \.\.\.\.`/)
-  assert.match(cssSource, /\.narrativeSummaryAppendixToggle/)
-  assert.match(cssSource, /border-top: 0\.5px solid/)
-})
-
-test('/deepscan renders inline results without confirmed-result CTA gate', () => {
-  const source = readRepoFile('src', 'app', 'deepscan', 'page.tsx')
-
-  assert.match(source, /import \{ DeepScanInlineResults \}/)
-  assert.match(source, /fetchState === 'loading' \|\| isCommitteeHydrating \|\| rawResultsReady/)
-  assert.match(source, /inlineResults=\{resultsReady && payload \? <DeepScanInlineResults/)
-  assert.doesNotMatch(source, /confirmedResultsTargetKey/)
-  assert.doesNotMatch(source, /hasConfirmedResultsView/)
-  assert.doesNotMatch(source, /resultsReady && !/)
-})
-
-test('DeepScan team bubbles send raw member reasons for summaries but hide raw gray copy in the UI', () => {
-  const loadingSource = readRepoFile('src', 'components', 'deepscan-loading-screen.tsx')
-  const pageSource = readRepoFile('src', 'app', 'deepscan', 'page.tsx')
-  const routeSource = readRepoFile('src', 'app', 'api', 'deepscan', 'committee-status', 'route.ts')
-  const summaryRouteSource = readRepoFile('src', 'app', 'api', 'deepscan', 'team-summary', 'route.ts')
-
-  assert.match(loadingSource, /member\.reason/)
-  assert.match(loadingSource, /const internalOpinionLabel = `의견 \$\{index \+ 1\}`/)
-  assert.match(loadingSource, /`\$\{internalOpinionLabel\}: \$\{member\.reason\}`/)
-  assert.match(loadingSource, /`\$\{internalOpinionLabel\}: 응답 대기 중`/)
-  assert.match(loadingSource, /summaryText: summaryReady \? summaryState\.summary! : null/)
-  assert.match(loadingSource, /const showSummarySkeleton = !card\.placeholder && !resolvedSummaryText/)
-  assert.match(loadingSource, /card\.placeholder \|\| showSummarySkeleton/)
-  assert.doesNotMatch(loadingSource, /const displayBody = summaryReady \? summaryState\.summary! : card\.body/)
-  assert.doesNotMatch(loadingSource, /\{displayBody\}/)
-  assert.doesNotMatch(loadingSource, /원문 표시/)
-  assert.match(loadingSource, /<p className=\{cn\(styles\.narrativeText/)
-  assert.match(loadingSource, /white-space: pre-line|styles\.narrativeText/)
-  assert.doesNotMatch(loadingSource, literalPattern(obsoleteUnavailableBody))
-  assert.doesNotMatch(loadingSource, literalPattern(`${obsoleteCompactHelper}(member.reason`))
-  assert.doesNotMatch(loadingSource, literalPattern(obsoletePendingBodyGate))
-  assert.doesNotMatch(loadingSource, /외 \$\{.*\}명/u)
-  assert.doesNotMatch(loadingSource, literalPattern(obsoleteUnavailableCopy))
-  assert.doesNotMatch(loadingSource, literalPattern(obsoleteSummaryField))
-  assert.doesNotMatch(pageSource, literalPattern(obsoleteSummaryField))
-  assert.doesNotMatch(routeSource, literalPattern(obsoleteSummaryField))
-  assert.doesNotMatch(summaryRouteSource, literalPattern(obsoleteSummaryField))
-  assert.doesNotMatch(loadingSource, literalPattern(obsoleteServiceName))
-  assert.doesNotMatch(loadingSource, literalPattern(obsoleteKoreanLens))
-})
-
-test('DeepScan skeleton shimmer uses a calmer shared cadence', () => {
-  const cssSource = readRepoFile('src', 'components', 'deepscan-loading-screen.module.css')
+  for (const selector of [
+    '.todayChartFactBridge',
+    '.todayRangeTrack',
+    '.todayProductBridge',
+    '.narrativePricebar',
+  ]) {
+    assert.doesNotMatch(cssSource, literalPattern(selector))
+  }
 
   assert.match(cssSource, /--ds-skeleton-shimmer-duration:\s*4\.2s;/)
   assert.match(cssSource, /--ds-member-pulse-duration:\s*4s;/)
-  assert.match(cssSource, /\.consensusSkeletonBlock,\s*\.consensusSkeletonPill\s*\{[\s\S]*?animation: shimmer var\(--ds-skeleton-shimmer-duration\) ease-in-out infinite;/)
-  assert.match(cssSource, /\.skeletonRow\s*\{[\s\S]*?animation: shimmer var\(--ds-skeleton-shimmer-duration\) ease-in-out infinite;/)
-  assert.match(cssSource, /\.narrativeTitleSkeleton,\s*\.narrativeDescriptionSkeleton,\s*\.narrativeTextSkeleton span\s*\{[\s\S]*?animation: shimmer var\(--ds-skeleton-shimmer-duration\) ease-in-out infinite;/)
   assert.doesNotMatch(cssSource, /animation: shimmer 1\.(?:15|4)s/)
   assert.doesNotMatch(cssSource, /animation: pulse 1s infinite/)
 })

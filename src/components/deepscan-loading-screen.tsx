@@ -29,6 +29,14 @@ import {
 } from '@/lib/deepscan-briefing-snapshot'
 import { resolveDeepScanBriefingCardCurrentPrice, resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
 import {
+  getVisibleDeepScanBriefingItemCount,
+  isHiddenDeepScanLoadingQuickFact,
+  isDeepScanBriefingItemContentReady,
+  shouldAdvanceDeepScanTimeline,
+  shouldDisplayDeepScanReadyResults,
+  shouldShowDeepScanSummarySkeleton,
+} from '@/lib/deepscan-loading-behavior'
+import {
   buildConsensusFanGeometry,
   estimateDailyVolatility,
 } from '@/lib/deepscan-target-price-paths'
@@ -715,7 +723,7 @@ function QuickFactCard({
 }
 
 function isHiddenLoadingQuickFact(fact: LoadingQuickFact) {
-  return fact.key === 'week52-position' || fact.key === 'etf-product-context' || fact.key === 'analyst-consensus' || Boolean(fact.indicator)
+  return isHiddenDeepScanLoadingQuickFact({ key: fact.key, hasIndicator: Boolean(fact.indicator) })
 }
 
 function buildLoadingStages({
@@ -1172,6 +1180,7 @@ function TodayBriefingCard({
   sharesText,
   profitRateText,
   profitAmountText,
+  forceReady = false,
   elapsedSeconds,
   briefingSnapshot,
   tradingVolumeText,
@@ -1187,6 +1196,7 @@ function TodayBriefingCard({
   sharesText: string | null
   profitRateText: string | null
   profitAmountText: string | null
+  forceReady?: boolean
   elapsedSeconds: number
   briefingSnapshot?: LoadingBriefingSnapshot | null
   tradingVolumeText?: string | null
@@ -1315,8 +1325,7 @@ function TodayBriefingCard({
     (_, index) => TODAY_BRIEFING_FIRST_REVEAL_SECONDS + index * TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS,
   )
   const consensusAt = TODAY_BRIEFING_FIRST_REVEAL_SECONDS + TODAY_BRIEFING_ITEM_COUNT * TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS
-  const allBriefStartSeconds = consensus ? [...briefStartSeconds, consensusAt] : briefStartSeconds
-  const visibleBriefingItemCount = allBriefStartSeconds.filter((at) => elapsedSeconds >= at).length
+  const visibleBriefingItemCount = getVisibleDeepScanBriefingItemCount(elapsedSeconds, briefStartSeconds, { forceReady })
 
   useEffect(() => (
     startTodayBriefingMobileAutoScroll(todayBriefListRef.current, visibleBriefingItemCount)
@@ -1359,30 +1368,31 @@ function TodayBriefingCard({
       </div>
 
       <div className={styles.todayBriefList} ref={todayBriefListRef}>
-        <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} icon='🗓️' question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
-        <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} icon='📈' question='단기 흐름은요?' data={<span className={shortStreak.direction === 'up' ? styles.todayUp : shortStreak.direction === 'down' ? styles.todayDown : styles.todayBlue}>{streakLabel}</span>} meaning={shortStreak.direction === 'up' ? '짧게 봐도 흐름이 살아나고 있어요.' : shortStreak.direction === 'down' ? '단기적으로는 숨 고르기가 이어지고 있어요.' : '아직 한쪽 방향으로 강하게 기울지는 않았어요.'} />
-        <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} icon='🎯' question='내 자리는 어디쯤일까요?' data={<span className={isFiniteNumber(positionPct) && positionPct < 0 ? styles.todayDown : styles.todayUp}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
+        <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='🗓️' question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
+        <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='📈' question='단기 흐름은요?' data={<span className={shortStreak.direction === 'up' ? styles.todayUp : shortStreak.direction === 'down' ? styles.todayDown : styles.todayBlue}>{streakLabel}</span>} meaning={shortStreak.direction === 'up' ? '짧게 봐도 흐름이 살아나고 있어요.' : shortStreak.direction === 'down' ? '단기적으로는 숨 고르기가 이어지고 있어요.' : '아직 한쪽 방향으로 강하게 기울지는 않았어요.'} />
+        <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='🎯' question='내 자리는 어디쯤일까요?' data={<span className={isFiniteNumber(positionPct) && positionPct < 0 ? styles.todayDown : styles.todayUp}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
         <TodayMarketBriefing
           at={briefStartSeconds[3]}
           elapsedSeconds={elapsedSeconds}
+          forceReady={forceReady}
           firstLabel={briefingSnapshot?.market?.sp500 ? 'S&P 500' : '코스피'}
           firstPct={briefingSnapshot?.market?.sp500?.changePct ?? briefingSnapshot?.market?.kospi?.changePct ?? null}
           secondLabel={briefingSnapshot?.market?.nasdaq ? 'NASDAQ' : '코스닥'}
           secondPct={briefingSnapshot?.market?.nasdaq?.changePct ?? briefingSnapshot?.market?.kosdaq?.changePct ?? null}
           stockPct={quote?.changePct ?? briefingModel.latestRow?.changePct ?? null}
         />
-        <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} icon='📊' question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
-        <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} icon='🔥' question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
+        <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='📊' question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
+        <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='🔥' question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
         {consensus ? (
           <article
-            className={cn(styles.todayBriefItem, elapsedSeconds >= consensusAt ? styles.todayBriefItemIn : undefined, styles.todayBriefConsensusItem)}
+            className={cn(styles.todayBriefItem, (forceReady || elapsedSeconds >= consensusAt) ? styles.todayBriefItemIn : undefined, styles.todayBriefConsensusItem)}
             data-today-briefing-item='true'
           >
             <div className={styles.todayBriefQuestionRow}>
               <span className={styles.todayBriefIcon} aria-hidden='true'>🔭</span>
               <span className={styles.todayBriefQuestion}>애널리스트 목표가는 어디쯤일까?</span>
             </div>
-            {elapsedSeconds >= consensusAt + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS ? (
+            {forceReady || elapsedSeconds >= consensusAt + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS ? (
               <div className={styles.consensusInsight}>
                 <div className={styles.consensusChartTop}>
                   <div>
@@ -1415,6 +1425,7 @@ function TodayBriefingItem({
   question,
   data,
   meaning,
+  forceReady = false,
 }: {
   at: number
   elapsedSeconds: number
@@ -1422,9 +1433,15 @@ function TodayBriefingItem({
   question: string
   data: ReactNode
   meaning: ReactNode
+  forceReady?: boolean
 }) {
-  const isVisible = elapsedSeconds >= at
-  const isContentReady = elapsedSeconds >= at + TODAY_BRIEFING_SKELETON_SECONDS
+  const isVisible = forceReady || elapsedSeconds >= at
+  const isContentReady = isDeepScanBriefingItemContentReady({
+    elapsedSeconds,
+    revealAtSeconds: at,
+    skeletonSeconds: TODAY_BRIEFING_SKELETON_SECONDS,
+    forceReady,
+  })
 
   return (
     <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-item='true'>
@@ -1477,6 +1494,7 @@ function TodayMarketBriefing({
   secondLabel,
   secondPct,
   stockPct,
+  forceReady = false,
 }: {
   at: number
   elapsedSeconds: number
@@ -1485,9 +1503,15 @@ function TodayMarketBriefing({
   secondLabel: string
   secondPct: number | null
   stockPct: number | null
+  forceReady?: boolean
 }) {
-  const isVisible = elapsedSeconds >= at
-  const isContentReady = elapsedSeconds >= at + TODAY_BRIEFING_SKELETON_SECONDS
+  const isVisible = forceReady || elapsedSeconds >= at
+  const isContentReady = isDeepScanBriefingItemContentReady({
+    elapsedSeconds,
+    revealAtSeconds: at,
+    skeletonSeconds: TODAY_BRIEFING_SKELETON_SECONDS,
+    forceReady,
+  })
   const firstPctLabel = formatPercentValue(firstPct) ?? '확인 중'
   const secondPctLabel = formatPercentValue(secondPct) ?? '확인 중'
   const stockLabel = formatPercentValue(stockPct) ?? '확인 중'
@@ -1605,22 +1629,24 @@ export function DeepScanLoadingScreen({
 
       const inputKey = hashSummaryInput(card.body)
 
+      const requestScopeKey = `${market ?? 'unknown'}:${instrumentKind ?? 'unknown'}:${exchangeProduct ? 'etf' : 'stock'}`
+
       return [{
         teamKey,
         inputKey,
-        requestKey: `${teamKey}:${inputKey}`,
+        requestKey: `${requestScopeKey}:${teamKey}:${inputKey}`,
         cardKey: card.key,
         analystName: card.analystName,
         body: card.body,
       }]
     }),
-    [loadingStages],
+    [exchangeProduct, instrumentKind, loadingStages, market],
   )
   const visibleNarrativeCards = useMemo(
     () => buildVisibleNarrativeCards(orderedNarrativeCards, visibleStageCount),
     [orderedNarrativeCards, visibleStageCount],
   )
-  const resultsReadyForDisplay = resultsReady && elapsedSeconds >= TEAM_SEQUENCE_COMPLETE_SECONDS
+  const resultsReadyForDisplay = shouldDisplayDeepScanReadyResults(resultsReady)
   const timelineNarrativeCards = useMemo(
     () => buildTimelineNarrativeCards(orderedNarrativeCards, elapsedSeconds, resultsReadyForDisplay),
     [elapsedSeconds, orderedNarrativeCards, resultsReadyForDisplay],
@@ -1632,7 +1658,7 @@ export function DeepScanLoadingScreen({
   const completionState = buildCompletionState(resultsReadyForDisplay, elapsedSeconds)
   const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReadyForDisplay)
   const isTeamBridgeVisible = Boolean(teamBridgeState)
-  const shouldAdvanceTimeline = !resultsReadyForDisplay || elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS
+  const shouldAdvanceTimeline = shouldAdvanceDeepScanTimeline({ resultsReadyForDisplay, elapsedSeconds, sequenceCompleteSeconds: TEAM_SEQUENCE_COMPLETE_SECONDS })
   const progressPct = resultsReadyForDisplay ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
   const activeNarrativeCard = sequentialNarrativeCards.findLast((card) => !card.placeholder) ?? sequentialNarrativeCards.at(-1) ?? visibleNarrativeCards.at(-1) ?? orderedNarrativeCards[0]
   const progressLabel = resultsReadyForDisplay
@@ -1664,6 +1690,9 @@ export function DeepScanLoadingScreen({
   ), [isTeamBridgeVisible])
 
   useEffect(() => {
+    const controller = new AbortController()
+    let stopped = false
+
     teamSummaryRequests.forEach((request) => {
       const { teamKey, inputKey, requestKey } = request
       if (requestedTeamSummariesRef.current.has(requestKey)) {
@@ -1679,6 +1708,7 @@ export function DeepScanLoadingScreen({
       fetch('/api/deepscan/team-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
         body: JSON.stringify({
           teamKey: request.cardKey,
           teamName: request.analystName,
@@ -1694,18 +1724,31 @@ export function DeepScanLoadingScreen({
             throw new Error('team summary unavailable')
           }
 
+          if (stopped || controller.signal.aborted) {
+            return
+          }
+
           setTeamSummaries((previous) => ({
             ...previous,
             [teamKey]: { inputKey, status: 'success', summary },
           }))
         })
         .catch(() => {
+          if (stopped || controller.signal.aborted) {
+            return
+          }
+
           setTeamSummaries((previous) => ({
             ...previous,
             [teamKey]: { inputKey, status: 'error' },
           }))
         })
     })
+
+    return () => {
+      stopped = true
+      controller.abort()
+    }
   }, [exchangeProduct, market, teamSummaryRequests])
 
   return (
@@ -1750,6 +1793,7 @@ export function DeepScanLoadingScreen({
           profitRateText={profitRateText}
           profitAmountText={profitAmountText}
           elapsedSeconds={elapsedSeconds}
+          forceReady={resultsReadyForDisplay}
           briefingSnapshot={briefingSnapshot}
           tradingVolumeText={tradingVolumeText}
           consensus={consensusData}
@@ -1787,7 +1831,7 @@ export function DeepScanLoadingScreen({
             const summaryExpanded = Boolean(card.teamKey && expandedTeamSummaries.has(card.teamKey))
             const displaySummaryText = summaryText && summaryCollapsible && !summaryExpanded ? getCollapsedTeamSummaryText(summaryText) : resolvedSummaryText
             const summaryTextId = `team-summary-${card.key}`
-            const showSummarySkeleton = !card.placeholder && !resolvedSummaryText
+            const showSummarySkeleton = shouldShowDeepScanSummarySkeleton({ placeholder: card.placeholder, resolvedSummaryText })
             const cardSettled = resultsReadyForDisplay || card.complete
             const statusLabel = summaryReady ? '요약 완료' : summaryLoading ? '요약 중' : summaryFailed ? '요약 생략' : cardSettled && !card.complete ? '확인 가능한 정보' : card.statusLabel
             const statusTone = summaryReady ? 'positive' : summaryLoading ? 'info' : summaryFailed ? 'warning' : cardSettled && !card.complete ? 'info' : card.statusTone

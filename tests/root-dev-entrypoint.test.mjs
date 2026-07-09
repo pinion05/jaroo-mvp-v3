@@ -56,8 +56,9 @@ test('root dev script launches the stack launcher instead of web-only dev', () =
 test('root test script runs root smoke tests and key workspace package suites', () => {
   assert.equal(
     packageJson.scripts.test,
-    'node --test tests/*.test.mjs && npm run test:crawler && npm run test:instrument-core',
+    'node --test tests/*.test.mjs && npm run test:web:ts && npm run test:crawler && npm run test:instrument-core',
   )
+  assert.equal(packageJson.scripts['test:web:ts'], 'node scripts/run-web-ts-tests.cjs')
 })
 
 test('dev stack launcher starts both web and crawler dev scripts and stops siblings on exit', () => {

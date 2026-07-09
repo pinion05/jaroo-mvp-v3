@@ -14,8 +14,9 @@ export async function createSupabaseServerClient() {
       setAll(cookiesToSet) {
         try {
           cookiesToSet.forEach(({ name, value, options }) => cookieStore.set(name, value, options))
-        } catch {
+        } catch (error) {
           // Server Components cannot set cookies. Route handlers and proxy can.
+          console.warn('[supabase/server] Cookie write failed', error)
         }
       },
     },

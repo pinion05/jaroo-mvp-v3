@@ -28,7 +28,7 @@ export const NAV_ITEMS: NavItem[] = [
 export function AppBottomNav() {
   const pathname = usePathname()
   return (
-    <nav className='sticky bottom-0 z-20 flex border-t border-[#E8EAEE] bg-white/95 px-2 pt-[9px] pb-[11px] backdrop-blur'>
+    <nav aria-label='주요 화면' className='sticky bottom-0 z-20 flex border-t border-[#E8EAEE] bg-white/95 px-2 pt-[9px] pb-[11px] backdrop-blur'>
       {NAV_ITEMS.map((item) => {
         const active = pathname === item.href
         const Icon = item.icon
@@ -36,12 +36,13 @@ export function AppBottomNav() {
           <Link
             key={item.href}
             href={item.href}
+            aria-current={active ? 'page' : undefined}
             className={cn(
               'flex flex-1 flex-col items-center gap-1 text-[10px] transition',
               active ? 'font-semibold text-[#0F1419]' : 'text-[#97A0AE]',
             )}
           >
-            <Icon className='size-[18px]' />
+            <Icon className='size-[18px]' aria-hidden='true' />
             <span>{item.label}</span>
           </Link>
         )

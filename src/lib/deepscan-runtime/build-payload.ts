@@ -624,7 +624,12 @@ export function buildKrDeepScanCrawlerCanonicalUrl(rawInput: DeepScanRawInput) {
   setCrawlerDeepScanQueryValue(searchParams, 'name', input.instrument.name)
   setCrawlerDeepScanQueryValue(searchParams, 'shares', input.holding?.shares)
   setCrawlerDeepScanQueryValue(searchParams, 'averagePrice', input.holding?.averagePrice)
+  setCrawlerDeepScanQueryValue(searchParams, 'averagePriceCurrency', input.holding?.averagePriceCurrency)
+  setCrawlerDeepScanQueryValue(searchParams, 'currentPrice', input.holding?.currentPrice)
+  setCrawlerDeepScanQueryValue(searchParams, 'currentPriceCurrency', input.holding?.currentPriceCurrency)
+  setCrawlerDeepScanQueryValue(searchParams, 'currentProfitRate', input.holding?.currentProfitRate)
   setCrawlerDeepScanQueryValue(searchParams, 'evaluationAmount', input.holding?.evaluationAmount)
+  setCrawlerDeepScanQueryValue(searchParams, 'usdKrwRate', input.holding?.usdKrwRate)
   setCrawlerDeepScanQueryValue(searchParams, 'selectedAt', input.selectedAt)
   setCrawlerDeepScanQueryValue(searchParams, 'from', normalizeSourceFrom(input.sourceContext.from))
 
@@ -646,6 +651,8 @@ export class CrawlerDeepScanRequestError extends Error {
 
 const DEFAULT_KR_DEEPSCAN_BUSY_MAX_WAIT_MS = 30_000
 const DEFAULT_KR_DEEPSCAN_BUSY_RETRY_AFTER_MS = 2_000
+const DEFAULT_KR_DEEPSCAN_FETCH_TIMEOUT_MS = 45_000
+const DEFAULT_US_SLIM_FETCH_TIMEOUT_MS = 30_000
 
 function parsePositiveInteger(value: string | undefined, fallback: number) {
   const parsed = Number(value)
@@ -690,6 +697,7 @@ function isCrawlerBusyResponse(response: Response, payload: unknown) {
 
 type KrDeepScanCrawlerFetchOptions = {
   maxBusyWaitMs?: number
+  fetchTimeoutMs?: number
   sleep?: (durationMs: number) => Promise<void>
 }
 
@@ -697,6 +705,85 @@ function sleep(durationMs: number) {
   return new Promise<void>((resolve) => {
     setTimeout(resolve, durationMs)
   })
+}
+
+function unrefTimer(timeoutId: ReturnType<typeof setTimeout>) {
+  const timer = timeoutId as ReturnType<typeof setTimeout> & { unref?: () => void }
+  timer.unref?.()
+}
+
+async function fetchWithDeadline(
+  fetcher: typeof fetch,
+  input: Parameters<typeof fetch>[0],
+  init: RequestInit,
+  timeoutMs: number,
+  context: string,
+) {
+  const controller = new AbortController()
+  let timeoutId: ReturnType<typeof setTimeout> | undefined
+
+  const timeout = new Promise<Response>((_, reject) => {
+    timeoutId = setTimeout(() => {
+      controller.abort()
+      reject(new CrawlerDeepScanRequestError(`${context} timed out after ${timeoutMs}ms`, 504))
+    }, timeoutMs)
+    if (timeoutId) {
+      unrefTimer(timeoutId)
+    }
+  })
+
+  try {
+    return await Promise.race([
+      fetcher(input, {
+        ...init,
+        signal: controller.signal,
+      }),
+      timeout,
+    ])
+  } catch (error) {
+    if (error instanceof CrawlerDeepScanRequestError) {
+      throw error
+    }
+
+    if (controller.signal.aborted) {
+      throw new CrawlerDeepScanRequestError(`${context} timed out after ${timeoutMs}ms`, 504)
+    }
+
+    throw new CrawlerDeepScanRequestError(
+      error instanceof Error ? `${context} failed: ${error.message}` : `${context} failed`,
+      502,
+    )
+  } finally {
+    if (timeoutId) {
+      clearTimeout(timeoutId)
+    }
+  }
+}
+
+async function readResponseText(response: Response, context: string) {
+  try {
+    return await response.text()
+  } catch (error) {
+    throw new CrawlerDeepScanRequestError(
+      error instanceof Error ? `${context} response read failed: ${error.message}` : `${context} response read failed`,
+      response.ok ? 502 : response.status,
+    )
+  }
+}
+
+async function readJsonPayload(response: Response, context: string) {
+  const body = await readResponseText(response, context)
+
+  try {
+    return JSON.parse(body)
+  } catch {
+    throw new CrawlerDeepScanRequestError(
+      body.trim()
+        ? `${context} returned invalid JSON`
+        : `${context} returned an empty response`,
+      response.ok ? 502 : response.status,
+    )
+  }
 }
 
 export async function buildKrDeepScanPayloadViaCrawler(
@@ -708,11 +795,13 @@ export async function buildKrDeepScanPayloadViaCrawler(
   const maxBusyWaitMs = options.maxBusyWaitMs
     ?? parsePositiveInteger(process.env.DEEPSCAN_KR_BUSY_MAX_WAIT_MS, DEFAULT_KR_DEEPSCAN_BUSY_MAX_WAIT_MS)
   const wait = options.sleep ?? sleep
+  const fetchTimeoutMs = options.fetchTimeoutMs
+    ?? parsePositiveInteger(process.env.DEEPSCAN_KR_FETCH_TIMEOUT_MS, DEFAULT_KR_DEEPSCAN_FETCH_TIMEOUT_MS)
   let waitedMs = 0
 
   while (true) {
-    const response = await fetcher(upstreamUrl, { cache: 'no-store' })
-    const payload = await response.json()
+    const response = await fetchWithDeadline(fetcher, upstreamUrl, { cache: 'no-store' }, fetchTimeoutMs, 'crawler deepscan request')
+    const payload = await readJsonPayload(response, 'crawler deepscan request')
 
     if (response.ok) {
       return payload as JarooDeepScanPayload
@@ -1481,14 +1570,15 @@ function createUsRuntimeFailurePayload(rawInput: DeepScanRawInput, ticker: strin
 
 async function fetchUsSlimPayload(ticker: string) {
   const upstreamUrl = buildCrawlerUrl(getCrawlerBaseUrl(), `/api/major/wisereport-global/us/companies/${encodeURIComponent(ticker)}/slim/v1.1`)
-  const response = await fetch(upstreamUrl, { cache: 'no-store' })
+  const fetchTimeoutMs = parsePositiveInteger(process.env.DEEPSCAN_US_SLIM_FETCH_TIMEOUT_MS, DEFAULT_US_SLIM_FETCH_TIMEOUT_MS)
+  const response = await fetchWithDeadline(fetch, upstreamUrl, { cache: 'no-store' }, fetchTimeoutMs, 'US slim fetch')
 
   if (!response.ok) {
-    const body = await response.text()
-    throw new Error(`US slim fetch failed (${response.status}): ${body.slice(0, 200)}`)
+    const body = await readResponseText(response, 'US slim fetch')
+    throw new CrawlerDeepScanRequestError(`US slim fetch failed (${response.status}): ${body.slice(0, 200)}`, response.status)
   }
 
-  return response.json()
+  return readJsonPayload(response, 'US slim fetch')
 }
 
 async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScanPayload> {

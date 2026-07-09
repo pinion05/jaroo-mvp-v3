@@ -4,13 +4,19 @@ import { createSupabaseServerClient } from '@/lib/supabase/server'
 
 export const runtime = 'nodejs'
 
+const NO_STORE_PRIVATE_HEADERS = { 'Cache-Control': 'no-store, private' }
+
+function jsonNoStore(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, { ...init, headers: NO_STORE_PRIVATE_HEADERS })
+}
+
 type LoginBody = {
   email?: unknown
   password?: unknown
 }
 
 function errorJson(message: string, status = 400, code = 'auth_error') {
-  return NextResponse.json({ error: { code, message } }, { status })
+  return jsonNoStore({ error: { code, message } }, { status })
 }
 
 export async function POST(request: Request) {
@@ -34,7 +40,7 @@ export async function POST(request: Request) {
       return errorJson('로그인 응답에서 사용자를 확인하지 못했어요.', 502, 'login_missing_user')
     }
 
-    return NextResponse.json(createAuthMeFromSupabaseUser(data.user))
+    return jsonNoStore(createAuthMeFromSupabaseUser(data.user))
   } catch (error) {
     const message = error instanceof Error && /Supabase URL\/anon key/.test(error.message)
       ? 'Supabase 환경변수가 설정되지 않았어요.'

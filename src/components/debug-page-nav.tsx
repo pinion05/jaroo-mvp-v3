@@ -16,6 +16,7 @@ import {
 } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
+import { DEBUG_PAGE_NAV_DESKTOP_MEDIA_QUERY, shouldShowDebugPageNav } from '@/lib/debug-page-nav'
 
 type NavItem = {
   href: string
@@ -43,7 +44,7 @@ export function DebugPageNav() {
     if (!isDev) {
       return
     }
-    const query = window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)')
+    const query = window.matchMedia(DEBUG_PAGE_NAV_DESKTOP_MEDIA_QUERY)
     const updateVisibility = () => {
       setCanShowDebugNav(query.matches)
     }
@@ -54,13 +55,9 @@ export function DebugPageNav() {
     return () => {
       query.removeEventListener('change', updateVisibility)
     }
-  }, [])
+  }, [isDev])
 
-  if (!isDev || !canShowDebugNav) {
-    return null
-  }
-
-  if (pathname === '/screenshot' || pathname === '/ocr') {
+  if (!shouldShowDebugPageNav({ isDevelopment: isDev, matchesDesktopPointer: canShowDebugNav, pathname })) {
     return null
   }
 

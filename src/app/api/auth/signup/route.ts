@@ -5,6 +5,12 @@ import { EXISTING_SIGNUP_MESSAGE, isLikelyExistingSignupUser, signupErrorMessage
 
 export const runtime = 'nodejs'
 
+const NO_STORE_PRIVATE_HEADERS = { 'Cache-Control': 'no-store, private' }
+
+function jsonNoStore(body: unknown, init?: ResponseInit) {
+  return NextResponse.json(body, { ...init, headers: NO_STORE_PRIVATE_HEADERS })
+}
+
 type SignupBody = {
   email?: unknown
   password?: unknown
@@ -20,7 +26,7 @@ function normalizeName(value: unknown): string | undefined {
 }
 
 function errorJson(message: string, status = 400, code = 'auth_error') {
-  return NextResponse.json({ error: { code, message } }, { status })
+  return jsonNoStore({ error: { code, message } }, { status })
 }
 
 export async function POST(request: Request) {
@@ -55,7 +61,7 @@ export async function POST(request: Request) {
       return errorJson(EXISTING_SIGNUP_MESSAGE, 409, 'signup_existing_email')
     }
 
-    return NextResponse.json({ ...createAuthMeFromSupabaseUser(data.user), needsEmailConfirmation: !data.session })
+    return jsonNoStore({ ...createAuthMeFromSupabaseUser(data.user), needsEmailConfirmation: !data.session })
   } catch (error) {
     const message = error instanceof Error && /Supabase URL\/anon key/.test(error.message)
       ? 'Supabase 환경변수가 설정되지 않았어요.'

@@ -58,6 +58,7 @@ function requireSinglePathLine(stdout: string) {
 }
 
 export async function generateUsDumpContractArtifacts(rawInput: DeepScanRawInputForDump, ticker: string): Promise<UsDumpContractArtifacts> {
+  const projectRoot = /* turbopackIgnore: true */ process.cwd()
   const tempRoot = await mkdtemp(join(tmpdir(), 'jaroo-dump-input-'))
   const runtimeInputPath = join(tempRoot, 'runtime-input.json')
 
@@ -68,7 +69,7 @@ export async function generateUsDumpContractArtifacts(rawInput: DeepScanRawInput
       'python3',
       ['scripts/generate_llm_dump_examples.py', '--runtime-input-file', runtimeInputPath, ticker],
       {
-        cwd: process.cwd(),
+        cwd: projectRoot,
         maxBuffer: 8 * 1024 * 1024,
       },
     )
@@ -81,12 +82,12 @@ export async function generateUsDumpContractArtifacts(rawInput: DeepScanRawInput
     }
 
     const root = requireSinglePathLine(stdout)
-    const tickerDir = resolve(process.cwd(), root, ticker.toUpperCase())
-    const manifest = JSON.parse(await readFile(join(tickerDir, 'manifest.json'), 'utf8')) as DebugManifest
-    const runtimeShape = JSON.parse(await readFile(join(tickerDir, 'processed', 'runtime-shape.json'), 'utf8')) as UsDumpRuntimeShape
+    const tickerDir = resolve(/* turbopackIgnore: true */ projectRoot, root, ticker.toUpperCase())
+    const manifest = JSON.parse(await readFile(join(/* turbopackIgnore: true */ tickerDir, 'manifest.json'), 'utf8')) as DebugManifest
+    const runtimeShape = JSON.parse(await readFile(join(/* turbopackIgnore: true */ tickerDir, 'processed', 'runtime-shape.json'), 'utf8')) as UsDumpRuntimeShape
 
     return {
-      root: resolve(process.cwd(), root),
+      root: resolve(/* turbopackIgnore: true */ projectRoot, root),
       tickerDir,
       manifest,
       runtimeShape,

@@ -2,46 +2,19 @@
 
 import Link from 'next/link'
 import type { ReactNode } from 'react'
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { CreditCard, Crown, ListChecks, Camera, History, Bell, TrendingDown, Megaphone, FileText, Shield, MessageCircle, LogOut, UserMinus, ChevronRight } from 'lucide-react'
+import { useState } from 'react'
+
+import { CreditCard, Crown, ListChecks, Camera, History, Bell, TrendingDown, Megaphone, FileText, Shield, MessageCircle, UserMinus, ChevronRight } from 'lucide-react'
 import { SpecFrame } from '@/components/spec/spec-frame'
+import { AuthAccountCard } from '@/components/auth/auth-account-card'
 import { cn } from '@/lib/utils'
 import { MYPAGE_TEST_DATA as T } from '@/data/mypage-test-data'
 import styles from './mypage.module.css'
 
-type Me = {
-  provider: string | null
-  user: { displayName: string | null; email: string | null } | null
-}
+
 
 export default function MyPage() {
-  const router = useRouter()
-  const [me, setMe] = useState<Me | null>(null)
   const [notif, setNotif] = useState(T.notifications)
-  const [busy, setBusy] = useState(false)
-
-  useEffect(() => {
-    fetch('/api/auth/me')
-      .then((r) => r.json())
-      .then(setMe)
-      .catch(() => {})
-  }, [])
-
-  async function handleLogout() {
-    setBusy(true)
-    try {
-      await fetch('/api/auth/logout', { method: 'POST' })
-    } catch {
-      /* ignore */
-    }
-    router.replace('/login')
-  }
-
-  const name = me?.user?.displayName ?? '게스트'
-  const email = me?.user?.email ?? ''
-  const isGoogle = me?.provider === 'google'
-  const initial = (name || '?').trim().slice(0, 1)
 
   return (
     <SpecFrame showBottomNav>
@@ -49,16 +22,7 @@ export default function MyPage() {
         <div className={styles.topTitle}>마이</div>
       </div>
       <div className={styles.body}>
-        {/* 프로필 (실데이터: /api/auth/me) */}
-        <div className={styles.profile}>
-          <div className={styles.avatar}>{initial}</div>
-          <div className={styles.pfInfo}>
-            <div className={styles.pfName}>{name}</div>
-            <div className={styles.pfEmail}>{email || '이메일 없음'}</div>
-            <div className={styles.pfProvider}>{isGoogle ? '구글 로그인' : '이메일 로그인'}</div>
-          </div>
-          <Link href='/mypage/profile' className={styles.pfEdit}>편집</Link>
-        </div>
+        <AuthAccountCard />
 
         {/* 크레딧 (테스트 데이터) */}
         <div className={styles.creditCard}>
@@ -105,7 +69,6 @@ export default function MyPage() {
           <RowButton icon={<FileText className='size-[18px]' />} label='서비스 약관' />
           <RowButton icon={<Shield className='size-[18px]' />} label='개인정보처리방침' />
           <RowButton icon={<MessageCircle className='size-[18px]' />} label='문의하기' />
-          <RowButton icon={<LogOut className='size-[18px]' />} label={busy ? '로그아웃 중...' : '로그아웃'} onClick={handleLogout} />
           <RowButton icon={<UserMinus className='size-[18px]' />} label='회원 탈퇴' danger />
         </div>
 

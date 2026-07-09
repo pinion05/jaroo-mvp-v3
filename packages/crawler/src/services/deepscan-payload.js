@@ -79,7 +79,12 @@ function normalizeInput(rawInput = {}) {
     ? {
         shares: normalizeText(rawHolding.shares),
         averagePrice: normalizeText(rawHolding.averagePrice),
+        averagePriceCurrency: normalizeText(rawHolding.averagePriceCurrency),
+        currentPrice: normalizeText(rawHolding.currentPrice),
+        currentPriceCurrency: normalizeText(rawHolding.currentPriceCurrency),
+        currentProfitRate: normalizeText(rawHolding.currentProfitRate),
         evaluationAmount: normalizeText(rawHolding.evaluationAmount),
+        usdKrwRate: normalizeText(rawHolding.usdKrwRate),
       }
     : undefined;
 

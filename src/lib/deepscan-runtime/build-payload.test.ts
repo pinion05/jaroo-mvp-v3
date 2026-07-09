@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   buildKrDeepScanCrawlerCanonicalUrl,
   buildKrDeepScanPayloadViaCrawler,
+  CrawlerDeepScanRequestError,
   describeMomentumProvenance,
   extractKrCodeFromTicker,
   prepareDeepScanRawInputForBuilder,
@@ -212,6 +213,11 @@ test('KR DeepScan crawler canonical URL preserves ETF kind query parameter', () 
     holding: {
       shares: '35',
       averagePrice: '58828.75',
+      averagePriceCurrency: 'KRW',
+      currentPrice: '64100',
+      currentPriceCurrency: 'KRW',
+      currentProfitRate: '-2.4%',
+      usdKrwRate: '1380',
     },
     sourceContext: {
       from: 'holding',
@@ -220,6 +226,11 @@ test('KR DeepScan crawler canonical URL preserves ETF kind query parameter', () 
 
   assert.match(url, /market=ETF/)
   assert.match(url, /kind=etf/)
+  assert.match(url, /averagePriceCurrency=KRW/)
+  assert.match(url, /currentPrice=64100/)
+  assert.match(url, /currentPriceCurrency=KRW/)
+  assert.match(url, /currentProfitRate=-2.4%25/)
+  assert.match(url, /usdKrwRate=1380/)
 })
 
 test('KR DeepScan crawler canonical URL preserves ETN market as etn kind even with legacy etf kind', () => {
@@ -297,4 +308,54 @@ test('KR DeepScan crawler proxy waits and retries busy admission responses', asy
   assert.equal(requestedUrls[0], requestedUrls[1])
   assert.deepEqual(waits, [25])
   assert.equal(payload.metadata.debugId, 'deepscan:KR:003720')
+})
+
+test('KR DeepScan crawler proxy times out an unresponsive upstream fetch', async () => {
+  const rawInput: DeepScanRawInput = {
+    instrument: {
+      name: '삼영화학공업',
+      code: '003720',
+      market: 'KR',
+      kind: 'stock',
+    },
+    sourceContext: {
+      from: 'holding',
+    },
+  }
+
+  await assert.rejects(
+    () => buildKrDeepScanPayloadViaCrawler(
+      rawInput,
+      (() => new Promise<Response>(() => undefined)) as typeof fetch,
+      { fetchTimeoutMs: 1 },
+    ),
+    (error) => error instanceof CrawlerDeepScanRequestError
+      && error.status === 504
+      && /timed out/.test(error.message),
+  )
+})
+
+test('KR DeepScan crawler proxy maps invalid upstream JSON to a typed gateway error', async () => {
+  const rawInput: DeepScanRawInput = {
+    instrument: {
+      name: '삼영화학공업',
+      code: '003720',
+      market: 'KR',
+      kind: 'stock',
+    },
+    sourceContext: {
+      from: 'holding',
+    },
+  }
+
+  await assert.rejects(
+    () => buildKrDeepScanPayloadViaCrawler(
+      rawInput,
+      (async () => new Response('not-json', { status: 200 })) as typeof fetch,
+      { fetchTimeoutMs: 100 },
+    ),
+    (error) => error instanceof CrawlerDeepScanRequestError
+      && error.status === 502
+      && /invalid JSON/.test(error.message),
+  )
 })

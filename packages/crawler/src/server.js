@@ -228,7 +228,12 @@ function buildJarooDeepScanInputFromQuery(req) {
   const name = parseSingleQueryValue(req.query.name);
   const shares = parseSingleQueryValue(req.query.shares);
   const averagePrice = parseSingleQueryValue(req.query.averagePrice);
+  const averagePriceCurrency = parseSingleQueryValue(req.query.averagePriceCurrency);
+  const currentPrice = parseSingleQueryValue(req.query.currentPrice);
+  const currentPriceCurrency = parseSingleQueryValue(req.query.currentPriceCurrency);
+  const currentProfitRate = parseSingleQueryValue(req.query.currentProfitRate);
   const evaluationAmount = parseSingleQueryValue(req.query.evaluationAmount);
+  const usdKrwRate = parseSingleQueryValue(req.query.usdKrwRate);
   const selectedAt = parseSingleQueryValue(req.query.selectedAt);
   const from = parseSingleQueryValue(req.query.from);
   const disclosureFrom = parseSingleQueryValue(req.query.disclosureFrom ?? req.query.dartFrom);
@@ -243,8 +248,23 @@ function buildJarooDeepScanInputFromQuery(req) {
   if (averagePrice) {
     holding.averagePrice = averagePrice;
   }
+  if (averagePriceCurrency) {
+    holding.averagePriceCurrency = averagePriceCurrency;
+  }
+  if (currentPrice) {
+    holding.currentPrice = currentPrice;
+  }
+  if (currentPriceCurrency) {
+    holding.currentPriceCurrency = currentPriceCurrency;
+  }
+  if (currentProfitRate) {
+    holding.currentProfitRate = currentProfitRate;
+  }
   if (evaluationAmount) {
     holding.evaluationAmount = evaluationAmount;
+  }
+  if (usdKrwRate) {
+    holding.usdKrwRate = usdKrwRate;
   }
   if (disclosureFrom) {
     disclosureOptions.from = disclosureFrom;
@@ -2983,7 +3003,12 @@ const endpointDefinitions = [
       'name(optional)',
       'shares(optional)',
       'averagePrice(optional)',
+      'averagePriceCurrency(optional)',
+      'currentPrice(optional)',
+      'currentPriceCurrency(optional)',
+      'currentProfitRate(optional)',
       'evaluationAmount(optional)',
+      'usdKrwRate(optional)',
       'selectedAt(optional)',
       'from(optional)',
       'disclosureFrom(optional)',
