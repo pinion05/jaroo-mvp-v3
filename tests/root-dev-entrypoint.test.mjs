@@ -12,6 +12,8 @@ const __dirname = path.dirname(__filename)
 const rootDir = path.resolve(__dirname, '..')
 const packageJson = JSON.parse(fs.readFileSync(path.join(rootDir, 'package.json'), 'utf8'))
 const launcher = launcherModule
+const rootPageSource = fs.readFileSync(path.join(rootDir, 'src/app/page.tsx'), 'utf8')
+const homeScreenSource = fs.readFileSync(path.join(rootDir, 'src/components/home/jaroo-home-screen.tsx'), 'utf8')
 
 class FakeChild extends EventEmitter {
   constructor(name, pid) {
@@ -51,6 +53,11 @@ class FakeProcess extends EventEmitter {
 
 test('root dev script launches the stack launcher instead of web-only dev', () => {
   assert.equal(packageJson.scripts.dev, 'node scripts/dev-stack.cjs')
+})
+
+test('root entry opens home and home does not force empty guests to screenshot', () => {
+  assert.match(rootPageSource, /redirect\('\/home'\)/)
+  assert.doesNotMatch(homeScreenSource, /router\.replace\('\/screenshot'\)/)
 })
 
 test('root test script runs root smoke tests and key workspace package suites', () => {

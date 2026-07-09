@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import {
   MAX_SCREENSHOT_UPLOADS,
@@ -45,7 +46,8 @@ function UploadDesignStyles() {
       .jaroo-upload-frame::-webkit-scrollbar{display:none}
       .jaroo-upload-head{position:sticky;top:0;z-index:10;background:rgba(245,246,248,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;border-bottom:.5px solid #E8EAEE;display:flex;align-items:center;gap:11px}
       .jaroo-upload-head-back{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;color:#0F1419;box-shadow:0 1px 2px rgba(0,0,0,.04);border:0;cursor:pointer;line-height:1}
-      .jaroo-upload-head-title{font-size:15px;font-weight:600;color:#0F1419}
+      .jaroo-upload-head-title{font-size:15px;font-weight:600;color:#0F1419;flex:1}
+      .jaroo-upload-head-login{min-height:28px;border-radius:999px;background:#fff;display:inline-flex;align-items:center;justify-content:center;padding:0 11px;font-size:12px;font-weight:700;color:#2B6BE6;text-decoration:none;box-shadow:0 1px 2px rgba(0,0,0,.04)}
       .jaroo-upload-body{padding:18px 16px 24px}
       .jaroo-upload-body.first{padding-top:24px}
       .jaroo-upload-body.sheet-open{filter:blur(1px);opacity:.5}
@@ -161,6 +163,7 @@ export default function ScreenshotPage() {
   const fileInputRef = useRef<HTMLInputElement>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [hasAppliedPortfolio, setHasAppliedPortfolio] = useState(false)
+  const [showLoginAction, setShowLoginAction] = useState(true)
   const isFirstPortfolio = portfolioItemCount === 0 && !hasAppliedPortfolio
 
   useEffect(() => {
@@ -171,8 +174,44 @@ export default function ScreenshotPage() {
     return () => window.clearTimeout(syncAppliedPortfolio)
   }, [])
 
+  useEffect(() => {
+    let active = true
+
+    void (async () => {
+      try {
+        const response = await fetch('/api/auth/me', { cache: 'no-store' })
+        if (!response.ok) {
+          return
+        }
+
+        const payload = (await response.json()) as { authScope?: string }
+        if (active) {
+          setShowLoginAction(payload.authScope !== 'authenticated')
+        }
+      } catch {
+        if (active) {
+          setShowLoginAction(true)
+        }
+      }
+    })()
+
+    return () => {
+      active = false
+    }
+  }, [])
+
   const handleBack = () => {
-    if (window.history.length > 1) {
+    const canUseBrowserBack = (() => {
+      try {
+        return window.history.length > 1
+          && Boolean(document.referrer)
+          && new URL(document.referrer).origin === window.location.origin
+      } catch {
+        return false
+      }
+    })()
+
+    if (canUseBrowserBack) {
       router.back()
       return
     }
@@ -255,12 +294,11 @@ export default function ScreenshotPage() {
     <div className='jaroo-upload-page'>
       <UploadDesignStyles />
       <div className='jaroo-upload-frame'>
-        {!isFirstPortfolio || isPreparing ? (
-          <div className='jaroo-upload-head'>
-            <button type='button' className='jaroo-upload-head-back' onClick={handleBack} aria-label='뒤로 가기'>←</button>
-            <div className='jaroo-upload-head-title'>스크린샷 추가</div>
-          </div>
-        ) : null}
+        <div className='jaroo-upload-head'>
+          <button type='button' className='jaroo-upload-head-back' onClick={handleBack} aria-label='뒤로 가기'>←</button>
+          <div className='jaroo-upload-head-title'>스크린샷 추가</div>
+          {showLoginAction ? <Link href='/login' className='jaroo-upload-head-login'>로그인</Link> : null}
+        </div>
 
         {isPreparing ? (
           <LoadingPanel />

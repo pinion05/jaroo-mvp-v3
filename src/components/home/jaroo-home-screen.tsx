@@ -576,7 +576,7 @@ export function JarooHomeScreen() {
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [deepScanLoadingTarget, setDeepScanLoadingTarget] = useState<DeepScanLoadingTarget | null>(null)
   const [persistedPortfolioLoading, setPersistedPortfolioLoading] = useState(true)
-  const [persistedPortfolioEmpty, setPersistedPortfolioEmpty] = useState(false)
+
 
   const portfolioBaseItems = useMemo(() => portfolioItems.map((item) => stripPortfolioQuoteFields(item)), [portfolioItems])
   const portfolioSignature = useMemo(
@@ -620,7 +620,6 @@ export function JarooHomeScreen() {
           replacePortfolioItems(items)
           return
         }
-        setPersistedPortfolioEmpty(true)
         return
       }
 
@@ -632,7 +631,6 @@ export function JarooHomeScreen() {
         replacePortfolioItems(sessionItems)
         return
       }
-      setPersistedPortfolioEmpty(true)
     })()
 
     return () => {
@@ -640,19 +638,7 @@ export function JarooHomeScreen() {
     }
   }, [hasPortfolioItems, replacePortfolioItems])
 
-  useEffect(() => {
-    if (hasPortfolioItems || !persistedPortfolioEmpty) {
-      return
-    }
 
-    const timeoutId = window.setTimeout(() => {
-      router.replace('/screenshot')
-    }, 350)
-
-    return () => {
-      window.clearTimeout(timeoutId)
-    }
-  }, [hasPortfolioItems, persistedPortfolioEmpty, router])
 
   useEffect(() => {
     portfolioBaseItemsRef.current = portfolioBaseItems
@@ -988,8 +974,9 @@ export function JarooHomeScreen() {
           </header>
           <main className={styles.body}>
             <div className={styles.forecastCard}>
-              <div className={styles.forecastLabel}>스크린샷 준비</div>
-              <div className={styles.forecastText}>보유 종목을 만들기 위해 스크린샷 추가 화면으로 이동합니다.</div>
+              <div className={styles.forecastLabel}>포트폴리오 준비</div>
+              <div className={styles.forecastText}>로그인하거나 스크린샷을 추가해서 보유 종목을 불러와요.</div>
+              <Link href='/screenshot' className={styles.refreshBtn}>스크린샷 추가하기</Link>
             </div>
           </main>
         </div>

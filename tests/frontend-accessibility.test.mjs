@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 const shellSource = readFileSync('src/components/jaroo-shell.tsx', 'utf8')
 const bottomNavSource = readFileSync('src/components/app-bottom-nav.tsx', 'utf8')
 const deepScanSource = readFileSync('src/app/deepscan/page.tsx', 'utf8')
+const screenshotSource = readFileSync('src/app/screenshot/page.tsx', 'utf8')
 
 test('Jaroo shell icon-only back link has an accessible label', () => {
   assert.match(shellSource, /aria-label='뒤로 가기'/)
@@ -15,6 +16,14 @@ test('bottom nav exposes a label and current page state', () => {
   assert.match(bottomNavSource, /<nav aria-label='주요 화면'/)
   assert.match(bottomNavSource, /aria-current=\{active \? 'page' : undefined\}/)
   assert.match(bottomNavSource, /<Icon[^>]+aria-hidden='true'/)
+})
+
+test('screenshot upload keeps escape and login controls visible for guests', () => {
+  assert.match(screenshotSource, /<div className='jaroo-upload-head'>/)
+  assert.match(screenshotSource, /aria-label='뒤로 가기'/)
+  assert.match(screenshotSource, /href='\/login'/)
+  assert.match(screenshotSource, /router\.push\('\/home'\)/)
+  assert.doesNotMatch(screenshotSource, /\{!isFirstPortfolio \|\| isPreparing \? \(/)
 })
 
 test('DeepScan collapsible sections expose expanded state and controlled panels', () => {
