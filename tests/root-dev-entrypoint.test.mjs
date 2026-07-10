@@ -58,6 +58,7 @@ test('root dev script launches the stack launcher instead of web-only dev', () =
 test('root entry opens home and home does not force empty guests to screenshot', () => {
   assert.match(rootPageSource, /redirect\('\/home'\)/)
   assert.doesNotMatch(homeScreenSource, /router\.replace\('\/screenshot'\)/)
+  assert.match(rootPageSource, /redirect\(`\/auth\/callback\?\$\{query\.toString\(\)\}`\)/)
 })
 
 test('root test script runs root smoke tests and key workspace package suites', () => {

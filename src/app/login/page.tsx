@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { FormEvent, useEffect, useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
+import { buildOAuthRedirectTo } from '@/lib/supabase/oauth-redirect'
 import { SpecFrame } from '@/components/spec/spec-frame'
 import { cn } from '@/lib/utils'
 import styles from './login.module.css'
@@ -41,7 +42,7 @@ export default function LoginPage() {
     const supabase = createSupabaseBrowserClient()
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${window.location.origin}/auth/callback` },
+      options: { redirectTo: buildOAuthRedirectTo() },
     })
     if (error) {
       setError(error.message || '구글 로그인을 시작하지 못했어요.')
