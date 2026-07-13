@@ -705,18 +705,8 @@ export function buildRecoveryForecastFromPriceSeries(input, options = {}) {
     jumpDiffusion: modelResultFromDetail(modelDetails.jumpDiffusion),
   }
 
-  const missingModels = RECOVERY_FORECAST_MODEL_KEYS.filter((key) => modelResults[key] === null)
-  if (missingModels.length > 0) {
-    return {
-      status: 'unavailable',
-      reason: `최종 예측에 필요한 모델 결과가 부족합니다: ${missingModels.join(', ')}`,
-      models: modelResults,
-      consensus: null,
-      parameters,
-      modelDetails,
-    }
-  }
-
+  // summarizeRecoveryForecast 가 가용 모델(≥2) 재정규화 합의를 담당. 한 모델이 데이터 부족으로
+  // 실패해도 남은 모델로 fallback 하며, 가용이 1개 이하일 때만 unavailable 반환한다.
   const forecast = summarizeRecoveryForecast(modelResults, options.consensus)
   const anyLowConfidenceModel = Object.values(modelDetails).some((detail) => detail?.status === 'low_confidence')
   if (forecast.status === 'available' && anyLowConfidenceModel) {
@@ -971,14 +961,14 @@ export function calculateRecoveryForecastConfidence(medianRecoveryDays, threshol
     ? medianRecoveryDays.filter((value) => isFiniteNumber(value) && value >= 0)
     : []
 
-  if (values.length < 3) {
+  if (values.length < 2) {
     return {
       level: 'low',
       deviationRatio: null,
       averageMedianDays: null,
       minMedianDays: null,
       maxMedianDays: null,
-      reason: '신뢰도 계산에는 세 모델의 중앙 회수 기간이 모두 필요합니다.',
+      reason: '신뢰도 계산에는 두 모델 이상의 중앙 회수 기간이 필요합니다.',
     }
   }
 
@@ -994,8 +984,10 @@ export function calculateRecoveryForecastConfidence(medianRecoveryDays, threshol
     ? thresholds.mediumMaxDeviationRatio
     : DEFAULT_RECOVERY_FORECAST_CONFIDENCE_THRESHOLDS.mediumMaxDeviationRatio
 
+  // 가용 모델이 3개일 때만 '높음' 신뢰 허용. 2모델 합의(한 모델 데이터 부족 제외)는 편차가 작아도
+  // 상호 검증이 부족해 '보통'까지로 캡 — 2모델이 크게 엇갈리면 '낮음'.
   let level = 'low'
-  if (deviationRatio < highMaxDeviationRatio) {
+  if (values.length >= 3 && deviationRatio < highMaxDeviationRatio) {
     level = 'high'
   } else if (deviationRatio <= mediumMaxDeviationRatio) {
     level = 'medium'
@@ -1014,8 +1006,16 @@ export function calculateRecoveryForecastConfidence(medianRecoveryDays, threshol
 export function summarizeRecoveryForecast(modelResults, options = {}) {
   const { models, errors } = normalizeModelResults(modelResults)
 
-  if (errors.length > 0) {
-    return buildUnavailableForecast(errors.join('; '), models)
+  // 가용 모델(유효한 medianRecoveryDays)이 2개 이상이면 남은 모델들로 가중치를 재정규화해 합의 산출.
+  // 한 모델(특히 가파른 손실 종목의 similarPattern)이 데이터 부족으로 실패해도 GBM/JD 등 가용 모델로
+  // 예측을 제공. 가용 모델이 1개 이하면 합의 신뢰 불가 → unavailable.
+  // (weightedAverage 는 models 에 없는 키를 건너뛰고 가용 가중치로 나누므로 자동 재정규화.)
+  const availableKeys = RECOVERY_FORECAST_MODEL_KEYS.filter((key) => isFiniteNumber(models[key]?.medianRecoveryDays))
+  if (availableKeys.length < 2) {
+    return buildUnavailableForecast(
+      errors.length > 0 ? errors.join('; ') : '최종 예측에 필요한 모델 결과가 부족합니다.',
+      models,
+    )
   }
 
   const weights = normalizeWeights(options.weights)
@@ -1023,15 +1023,15 @@ export function summarizeRecoveryForecast(modelResults, options = {}) {
     return buildUnavailableForecast('model weights must be non-negative numbers with a positive total', models)
   }
 
+  // 종합 회수일 = 가용 모델 medianRecoveryDays 의 가중평균(기본 40/30/30, 재정규화).
+  // 기획서 '원금회수 모델 설명서' §7-1 공식(3모델 40/30/30) 준수. §7-3 코칩 예시(58일/높음)는
+  // GBM+JD만 평균한 값으로 본문 공식과 모순됐으나 — similarPattern 실패 시 본 2모델 재가중 fallback이
+  // 그 '58일'을 정당화하는 경로가 됨(3모델 전부면 74일/보통, similarPattern 제외 시 GBM+JD 50/50).
   const confidence = calculateRecoveryForecastConfidence(
-    RECOVERY_FORECAST_MODEL_KEYS.map((key) => models[key].medianRecoveryDays),
+    availableKeys.map((key) => models[key].medianRecoveryDays),
     options.confidenceThresholds,
   )
 
-  // 종합 회수일 = 세 모델(similarPattern/GBM/Jump-Diffusion) 중앙값의 가중평균(기본 40/30/30).
-  // 기획서 '원금회수 모델 설명서' §7-1 공식을 그대로 구현. 동 문서 §7-3 코칩 예시(58일/5%/신뢰 높음)는
-  // GBM+JD만 평균한 결과로 본문 공식과 모순됨 — 공식 적용 시 코칩류 입력은 약 74일/신뢰 보통 이 정확.
-  // (2026-07 합의: 공식(40/30/30) 준수 유지, 예시는 산술 오기로 간주. tests/recovery-forecast.test.mjs 도 74 명시.)
   const expectedRecoveryDaysRaw = weightedAverage(models, 'medianRecoveryDays', weights)
   if (!isFiniteNumber(expectedRecoveryDaysRaw)) {
     return buildUnavailableForecast('expected recovery days could not be calculated', models)
@@ -1042,11 +1042,16 @@ export function summarizeRecoveryForecast(modelResults, options = {}) {
   const recoveryProbabilityPct = roundTo(recoveryProbabilityPctRaw, options.probabilityDigits ?? 1)
   const status = confidence.level === 'low' ? 'low_confidence' : 'available'
 
+  const excludedKeys = RECOVERY_FORECAST_MODEL_KEYS.filter((key) => !availableKeys.includes(key))
+  const partialNote = excludedKeys.length > 0
+    ? `${excludedKeys.map((key) => MODEL_LABELS[key]).join(', ')} 모델이 데이터 부족으로 제외되어 남은 모델로 합의했어요.`
+    : null
+
   return {
     status,
     reason: status === 'low_confidence'
-      ? '세 모델의 회수 기간 차이가 커서 낮은 신뢰도로 표시합니다.'
-      : null,
+      ? (partialNote ?? '모델간 회수기간 편차가 커서 낮은 신뢰도로 표시합니다.')
+      : partialNote,
     models,
     consensus: {
       expectedRecoveryDays,
