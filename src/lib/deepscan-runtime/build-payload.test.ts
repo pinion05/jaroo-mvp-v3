@@ -433,3 +433,79 @@ test('KR DeepScan crawler proxy maps invalid upstream JSON to a typed gateway er
       && /invalid JSON/.test(error.message),
   )
 })
+
+test('buildKrDeepScanPayloadViaCrawler shapes crawler recoveryForecastRaw into a KR recoveryForecast block and strips the raw envelope', async () => {
+  const availableForecast = {
+    status: 'available',
+    reason: null,
+    models: {
+      similarPattern: { medianRecoveryDays: 96, recoveryProbabilityPct: 60.3, sampleSize: 63 },
+      gbm: { medianRecoveryDays: 57, recoveryProbabilityPct: 58.2 },
+      jumpDiffusion: { medianRecoveryDays: 60, recoveryProbabilityPct: 63.9 },
+    },
+    consensus: {
+      expectedRecoveryDays: 74,
+      recoveryProbabilityPct: 61.1,
+      confidence: { level: 'medium', deviationRatio: 0.549, averageMedianDays: 71, minMedianDays: 57, maxMedianDays: 96, reason: null },
+      weights: { similarPattern: 0.4, gbm: 0.3, jumpDiffusion: 0.3 },
+      disclaimer: '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.',
+    },
+  }
+  const crawlerPayload = {
+    recoveryForecastRaw: { forecast: availableForecast, currentPrice: 20050, targetPrice: 28000 },
+  }
+  const rawInput: DeepScanRawInput = {
+    instrument: { name: '코칩', code: '126730', market: 'KR', kind: 'stock' },
+    sourceContext: { from: 'holding' },
+  }
+
+  const payload = await buildKrDeepScanPayloadViaCrawler(
+    rawInput,
+    (async () => new Response(JSON.stringify(crawlerPayload), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch,
+    { fetchTimeoutMs: 1000 },
+  ) as Record<string, unknown>
+
+  assert.equal(payload.recoveryForecastRaw, undefined, 'raw envelope must be stripped after shaping')
+  const block = payload.recoveryForecast as Record<string, unknown>
+  assert.ok(block, 'shaped recoveryForecast block must be attached')
+  assert.equal(block.blockState, 'ok')
+  assert.equal(block.statusText, '원금회수 예측')
+  assert.equal(block.confidenceText, '보통')
+  assert.equal((block.modelRows as unknown[]).length, 3)
+  assert.match(String(block.summaryText), /74/)
+  assert.match(String(block.currentPriceText), /20/)
+  assert.match(String(block.drawdownText), /28\.4/)
+  assert.match(String(block.disclaimer), /투자 권유/)
+})
+
+test('buildKrDeepScanPayloadViaCrawler leaves payload without recoveryForecast when crawler raw envelope is unavailable', async () => {
+  const crawlerPayload = {
+    recoveryForecastRaw: {
+      forecast: { status: 'unavailable', reason: '과거 주가 데이터가 부족합니다.', models: {}, consensus: null },
+      currentPrice: 20050,
+      targetPrice: 28000,
+    },
+  }
+  const rawInput: DeepScanRawInput = {
+    instrument: { name: '코칩', code: '126730', market: 'KR', kind: 'stock' },
+    sourceContext: { from: 'holding' },
+  }
+
+  const payload = await buildKrDeepScanPayloadViaCrawler(
+    rawInput,
+    (async () => new Response(JSON.stringify(crawlerPayload), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch,
+    { fetchTimeoutMs: 1000 },
+  ) as Record<string, unknown>
+
+  assert.equal(payload.recoveryForecastRaw, undefined)
+  const block = payload.recoveryForecast as Record<string, unknown>
+  assert.ok(block, 'unavailable forecast still attaches a recovery block (consistent with US path)')
+  assert.equal(block.blockState, 'blocked')
+  assert.equal(block.statusText, '예측 보류')
+})

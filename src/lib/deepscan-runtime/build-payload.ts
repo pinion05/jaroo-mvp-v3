@@ -535,7 +535,12 @@ function buildRecoveryModelRows(forecast: unknown): JarooDeepScanRecoveryForecas
   })
 }
 
-export function buildDeepScanRecoveryForecastBlock(context: RecoveryForecastContext): JarooDeepScanRecoveryForecastBlock | null {
+export function runRecoveryForecast(context: RecoveryForecastContext): {
+  forecast: unknown
+  targetPrice: number
+  currentPrice: number
+  recoverySourceRefs: DeepScanSourceRef[]
+} | null {
   const targetPrice = parseNumberish(context.rawInput.holding?.averagePrice)
   const currentPrice = context.currentPrice
 
@@ -579,6 +584,18 @@ export function buildDeepScanRecoveryForecastBlock(context: RecoveryForecastCont
       },
     },
   )
+
+  return { forecast, targetPrice, currentPrice, recoverySourceRefs }
+}
+
+export function shapeRecoveryForecastBlock(args: {
+  forecast: unknown
+  targetPrice: number
+  currentPrice: number
+  currency: string | undefined
+  recoverySourceRefs: DeepScanSourceRef[]
+}): JarooDeepScanRecoveryForecastBlock {
+  const { forecast, targetPrice, currentPrice, currency, recoverySourceRefs } = args
   const forecastRecord = asRecord(forecast)
   const consensus = asRecord(forecastRecord?.consensus)
   const confidence = asRecord(consensus?.confidence)
@@ -602,16 +619,30 @@ export function buildDeepScanRecoveryForecastBlock(context: RecoveryForecastCont
       ? (error?.message ?? '원금회수 예측을 계산하지 못했어요.')
       : expectedRecoveryDays === 0
         ? '현재가가 이미 평단 이상이라 원금회수 목표에 도달한 상태입니다.'
-        : `평단 ${formatCurrency(targetPrice, context.currency)} 회복까지 약 ${formatRecoveryDays(expectedRecoveryDays)}로 추정돼요.`,
+        : `평단 ${formatCurrency(targetPrice, currency)} 회복까지 약 ${formatRecoveryDays(expectedRecoveryDays)}로 추정돼요.`,
     expectedRecoveryDaysText: formatRecoveryDays(expectedRecoveryDays),
     recoveryProbabilityText: formatProbability(recoveryProbabilityPct),
     confidenceText: confidenceLabel,
-    currentPriceText: formatCurrency(currentPrice, context.currency),
-    targetPriceText: formatCurrency(targetPrice, context.currency),
+    currentPriceText: formatCurrency(currentPrice, currency),
+    targetPriceText: formatCurrency(targetPrice, currency),
     drawdownText: formatDrawdownPct(currentPrice, targetPrice),
     modelRows: buildRecoveryModelRows(forecast),
     disclaimer: normalizeText(consensus?.disclaimer) ?? '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.',
   }
+}
+
+export function buildDeepScanRecoveryForecastBlock(context: RecoveryForecastContext): JarooDeepScanRecoveryForecastBlock | null {
+  const ran = runRecoveryForecast(context)
+  if (!ran) {
+    return null
+  }
+  return shapeRecoveryForecastBlock({
+    forecast: ran.forecast,
+    targetPrice: ran.targetPrice,
+    currentPrice: ran.currentPrice,
+    currency: context.currency,
+    recoverySourceRefs: ran.recoverySourceRefs,
+  })
 }
 
 function createSourceRef(type: DeepScanSourceRef['type'], id: string, label: string, note?: string): DeepScanSourceRef {
@@ -978,7 +1009,7 @@ export async function buildKrDeepScanPayloadViaCrawler(
     const payload = await readJsonPayload(response, 'crawler deepscan request')
 
     if (response.ok) {
-      return payload as JarooDeepScanPayload
+      return attachKrRecoveryForecast(payload as JarooDeepScanPayload)
     }
 
     if (isCrawlerBusyResponse(response, payload) && waitedMs < maxBusyWaitMs) {
@@ -995,6 +1026,30 @@ export async function buildKrDeepScanPayloadViaCrawler(
       response.status,
     )
   }
+}
+
+function attachKrRecoveryForecast(payload: JarooDeepScanPayload): JarooDeepScanPayload {
+  const record = payload as unknown as Record<string, unknown>
+  const raw = asRecord(record.recoveryForecastRaw)
+  const forecast = raw?.forecast
+  const currentPrice = asFiniteNumber(raw?.currentPrice)
+  const targetPrice = asFiniteNumber(raw?.targetPrice)
+  const { recoveryForecastRaw, ...rest } = record
+  if (forecast === undefined || currentPrice === null || targetPrice === null) {
+    return rest as JarooDeepScanPayload
+  }
+  const recoverySourceRefs = [
+    createSourceRef('holding', 'recovery-target-average-price', 'average price recovery target'),
+    createSourceRef('market', 'kr-relative-return-history', 'KR relative return price history'),
+  ]
+  const recoveryForecast = shapeRecoveryForecastBlock({
+    forecast,
+    currentPrice,
+    targetPrice,
+    currency: 'KRW',
+    recoverySourceRefs,
+  })
+  return { ...rest, recoveryForecast } as JarooDeepScanPayload
 }
 
 function buildInputValidityRaw(rawInput: DeepScanRawInput) {

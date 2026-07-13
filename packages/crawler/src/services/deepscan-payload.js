@@ -3,6 +3,7 @@ import { getCurrentQuotes } from '../crawlers/current-quotes.js';
 import { buildDartDisclosureDocumentDump, getDartDisclosures } from '../crawlers/dart-filings.js';
 import { fetchWiseReportEtfSnapshot } from '../crawlers/wisereport-etf.js';
 import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
+import { buildKrRecoveryForecast } from './recovery-forecast.js';
 import { scoreDeepScanKrEvidence, scoreDeepScanKrFromCommittee } from './deepscan-kr-score.js';
 import { invokeDeepScanKrPackage } from './deepscan-kr-package-adapter.js';
 import {
@@ -368,6 +369,7 @@ function createInputInvalidPayload(rawInput = {}) {
   return {
     input,
     ...blocks,
+    recoveryForecastRaw: { forecast: { status: 'unavailable', reason: '원금회수 예측 입력 정보가 없습니다.', models: {}, consensus: null }, currentPrice: null, targetPrice: null },
     metadata: {
       generatedAt,
       version: DEEP_SCAN_VERSION,
@@ -476,6 +478,7 @@ function createInternalErrorPayload(rawInput = {}) {
   return {
     input,
     ...blocks,
+    recoveryForecastRaw: { forecast: { status: 'unavailable', reason: '원금회수 예측 입력 정보가 없습니다.', models: {}, consensus: null }, currentPrice: null, targetPrice: null },
     metadata: {
       generatedAt,
       version: DEEP_SCAN_VERSION,
@@ -2410,6 +2413,13 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     const strategy = buildStrategy(input, evidence, scored);
     const sellNow = buildSellNow(evidence, scored);
     const portfolioSimulation = buildPortfolioSimulation(scored);
+    const recoveryForecastRaw = buildKrRecoveryForecast({
+      averagePrice: evidence.holding?.averagePrice ?? null,
+      currentPrice: evidence.currentQuote?.price ?? evidence.marketSnapshot?.currentPrice ?? null,
+      priceHistory: evidence.relativeReturnSnapshot?.priceHistory ?? [],
+      instrumentCode: evidence.instrument?.code ?? null,
+      instrumentName: evidence.instrument?.name ?? null,
+    });
     const heroBodyParts = [...evidence.topFacts];
 
     for (const risk of evidence.topRisks.slice(0, 2)) {
@@ -2535,6 +2545,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     const payload = {
       input,
       ...blocks,
+      recoveryForecastRaw,
       metadata: {
         generatedAt,
         version: DEEP_SCAN_VERSION,
