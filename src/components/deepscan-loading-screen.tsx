@@ -69,6 +69,8 @@ type DeepScanLoadingScreenProps = {
   onBack?: () => void
   backHref?: string
   inlineResults?: ReactNode
+  errorNotice?: { title: string; body: string } | null
+  onRetry?: () => void
 }
 
 type CommitteeMemberState = 'done' | 'active' | 'wait'
@@ -1567,7 +1569,10 @@ export function DeepScanLoadingScreen({
   onBack,
   backHref = '/home',
   inlineResults,
+  errorNotice,
+  onRetry,
 }: DeepScanLoadingScreenProps) {
+  const isError = Boolean(errorNotice)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [teamSummaries, setTeamSummaries] = useState<Partial<Record<LoadingStageKey, TeamSummaryState>>>({})
   const [expandedTeamSummaries, setExpandedTeamSummaries] = useState<ReadonlySet<LoadingStageKey>>(() => new Set())
@@ -1767,16 +1772,35 @@ export function DeepScanLoadingScreen({
             </p>
           </div>
         </div>
-        <div className={cn(styles.headerProgress, resultsReadyForDisplay ? styles.headerProgressDone : undefined)} aria-label={resultsReadyForDisplay ? '딥스캔 완료' : '딥스캔 진행 중'}>
-          <span className={styles.headerProgressText}>{progressLabel}</span>
+        <div className={cn(styles.headerProgress, isError ? styles.headerProgressError : resultsReadyForDisplay ? styles.headerProgressDone : undefined)} aria-label={isError ? '딥스캔 실패' : resultsReadyForDisplay ? '딥스캔 완료' : '딥스캔 진행 중'}>
+          <span className={styles.headerProgressText}>{isError ? '분석 요청에 실패했어요' : progressLabel}</span>
           <span className={styles.headerProgressTrack} aria-hidden='true'>
-            <span className={styles.headerProgressFill} style={{ width: `${progressPct}%` }} />
+            <span className={styles.headerProgressFill} style={{ width: `${isError ? 100 : progressPct}%` }} />
           </span>
-          <span className={styles.headerProgressTime}>{resultsReadyForDisplay ? '완료' : formatElapsedTime(elapsedSeconds)}</span>
+          <span className={styles.headerProgressTime}>{isError ? '실패' : resultsReadyForDisplay ? '완료' : formatElapsedTime(elapsedSeconds)}</span>
         </div>
       </header>
 
       <div className={styles.body}>
+        {isError ? (
+          <section className={styles.errorCard} aria-label='딥스캔 오류'>
+            <div className={styles.errorHead}>
+              <span className={styles.errorIcon} aria-hidden='true'>!</span>
+              <div>
+                <span className={styles.errorEyebrow}>분석 요청 실패</span>
+                <h2 className={styles.errorTitle}>{errorNotice?.title ?? 'DeepScan 데이터를 표시할 수 없어요'}</h2>
+              </div>
+            </div>
+            <p className={styles.errorBody}>{errorNotice?.body ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.'}</p>
+            <div className={styles.errorActions}>
+              {onRetry ? (
+                <button type='button' className={styles.errorRetryButton} onClick={onRetry}>다시 시도</button>
+              ) : null}
+              <Link href={backHref} className={styles.errorBackLink}>다른 종목 선택</Link>
+            </div>
+          </section>
+        ) : (
+          <>
         <section className={styles.intro} aria-label='딥스캔 안내'>
           <p className={styles.introGreet}>{new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date())}</p>
           <h2 className={styles.introTitle}>세 분석가가 {exchangeProduct ? 'ETF를' : '종목을'}<br />차례로 살펴보고 있어요</h2>
@@ -1956,6 +1980,8 @@ export function DeepScanLoadingScreen({
         </details>
 
         {resultsReadyForDisplay && inlineResults ? <div className={styles.inlineResultsSlot}>{inlineResults}</div> : null}
+          </>
+        )}
         <p className={styles.privacy}>분석 결과는 투자 권유가 아닌 참고 자료입니다.</p>
       </div>
     </div>
