@@ -75,26 +75,42 @@ test('summarizeRecoveryForecast returns low_confidence when model medians diverg
   assert.match(forecast.reason, /낮은 신뢰도/)
 })
 
-test('summarizeRecoveryForecast returns unavailable when a required model result is missing', () => {
+test('summarizeRecoveryForecast falls back to a 2-model consensus when one model is missing', () => {
   const forecast = summarizeRecoveryForecast({
     similarPattern: { medianRecoveryDays: 96, recoveryProbabilityPct: 60.3 },
+    gbm: { medianRecoveryDays: 57, recoveryProbabilityPct: 58.2 },
+    // jumpDiffusion 누락 — 2모델 재가중 fallback
+  })
+
+  assert.notEqual(forecast.status, 'unavailable')
+  assert.ok(forecast.consensus, '2개 이상 가용 모델이면 합의를 제공한다')
+  assert.match(forecast.reason ?? '', /Jump-Diffusion.*제외/)
+  // 재정규화 가중평균: (96*0.4 + 57*0.3)/(0.4+0.3) = 55.5/0.7 ≈ 79
+  assert.equal(forecast.consensus.expectedRecoveryDays, 79)
+  // 2모델 합의는 상호검증 부족으로 신뢰 '높음' 불가 → 보통 캡
+  assert.notEqual(forecast.consensus.confidence.level, 'high')
+})
+
+test('summarizeRecoveryForecast returns unavailable when fewer than 2 models are available', () => {
+  const forecast = summarizeRecoveryForecast({
     gbm: { medianRecoveryDays: 57, recoveryProbabilityPct: 58.2 },
   })
 
   assert.equal(forecast.status, 'unavailable')
   assert.equal(forecast.consensus, null)
-  assert.match(forecast.reason, /jumpDiffusion result is missing/)
 })
 
-test('summarizeRecoveryForecast rejects invalid recovery probabilities', () => {
+test('summarizeRecoveryForecast excludes a model with invalid probability and falls back to the remaining models', () => {
   const forecast = summarizeRecoveryForecast({
     similarPattern: { medianRecoveryDays: 96, recoveryProbabilityPct: 101 },
     gbm: { medianRecoveryDays: 57, recoveryProbabilityPct: 58.2 },
     jumpDiffusion: { medianRecoveryDays: 60, recoveryProbabilityPct: 63.9 },
   })
 
-  assert.equal(forecast.status, 'unavailable')
-  assert.match(forecast.reason, /between 0 and 100/)
+  // 101% 무효 확률을 가진 similarPattern 은 제외되고, gbm+jumpDiffusion 으로 2모델 fallback
+  assert.notEqual(forecast.status, 'unavailable')
+  assert.ok(forecast.consensus)
+  assert.match(forecast.reason ?? '', /유사 패턴.*제외/)
 })
 
 test('normalizeRecoveryPriceSeries sorts dated KRX-like rows ascending and parses formatted close values', () => {
