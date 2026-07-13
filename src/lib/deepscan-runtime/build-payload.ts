@@ -8,12 +8,15 @@ import type {
   JarooDeepScanInsightItem,
   JarooDeepScanPayload,
   JarooDeepScanPortfolioSimulationBlock,
+  JarooDeepScanRecoveryForecastBlock,
   JarooDeepScanSellNowBlock,
   JarooDeepScanStrategyBlock,
 } from '../../../packages/contracts/src/deepscan'
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 import { scoreUsCommitteeFromGeneratedDump, type UsMemberKey } from './llm-committee'
 import { decodeUsConsensusObservation } from './us-consensus'
+import { buildJarooDeepScanPayload as buildCrawlerDeepScanPayload } from '../../../packages/crawler/src/services/deepscan-payload.js'
+import { buildRecoveryForecastFromPriceSeries } from '../../../packages/deepscan-runtime-core/src/recovery-forecast.js'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -125,6 +128,16 @@ type RuntimeDumpFact<T = unknown> = {
   value?: T
   quality?: RuntimeDumpQuality
   notes?: string[]
+}
+
+type RecoveryForecastContext = {
+  rawInput: DeepScanRawInput
+  primarySeries: Array<Record<string, unknown>>
+  currentPrice?: number
+  currency?: string
+  sourceRefs: DeepScanSourceRef[]
+  sourceLabel: string
+  sourceId: string
 }
 
 type GeneratedDumpSignalSummary = {
@@ -383,6 +396,21 @@ export function summarizeGeneratedDumpSignals(runtimeShape: unknown): GeneratedD
   }
 }
 
+export function extractGeneratedOhlcSeries(runtimeShape: unknown) {
+  const members = asRecord(asRecord(runtimeShape)?.members)
+  const momentumDump = members?.momentum
+  const ohlcFact = readRuntimeDumpFact<Array<Record<string, unknown>>>(momentumDump, 'ohlcSeries')
+
+  return asArray(ohlcFact?.value)
+    .map((point) => asRecord(point))
+    .filter((point): point is UnknownRecord => point !== null)
+    .map((point) => ({
+      date: normalizeText(point.date) ?? normalizeText(point.tradeDate) ?? normalizeText(point.at),
+      close: asFiniteNumber(point.close) ?? asFiniteNumber(point.closePrice) ?? asFiniteNumber(point.price),
+    }))
+    .filter((point): point is { date: string | undefined; close: number } => typeof point.close === 'number')
+}
+
 function formatMomentumProviderLabel(primarySource: GeneratedMomentumPrimarySource) {
   switch (primarySource) {
     case 'polygon':
@@ -438,6 +466,152 @@ function formatCurrency(value?: number | null, currency = 'USD') {
   }
 
   return `${Math.round(value).toLocaleString('ko-KR')}원`
+}
+
+function formatRecoveryDays(value?: number | null) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 'N/A'
+  }
+
+  return value === 0 ? '이미 도달' : `${Math.round(value).toLocaleString('ko-KR')}거래일`
+}
+
+export function formatProbability(value?: number | null) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 'N/A'
+  }
+
+  return `${value.toFixed(1).replace(/\.0$/, '')}%`
+}
+
+function formatDrawdownPct(currentPrice: number, targetPrice: number) {
+  if (targetPrice <= 0) {
+    return 'N/A'
+  }
+
+  return `${(((targetPrice - currentPrice) / targetPrice) * 100).toFixed(1)}%`
+}
+
+function recoveryConfidenceLabel(level?: string | null) {
+  switch (level) {
+    case 'high':
+      return '높음'
+    case 'medium':
+      return '보통'
+    case 'low':
+      return '낮음'
+    default:
+      return 'N/A'
+  }
+}
+
+function recoveryStatusText(status?: string | null) {
+  switch (status) {
+    case 'available':
+      return '원금회수 예측'
+    case 'low_confidence':
+      return '낮은 신뢰도'
+    default:
+      return '예측 보류'
+  }
+}
+
+function buildRecoveryModelRows(forecast: unknown): JarooDeepScanRecoveryForecastBlock['modelRows'] {
+  const models = asRecord(asRecord(forecast)?.models)
+  return [
+    ['similarPattern', '유사 패턴'],
+    ['gbm', 'GBM'],
+    ['jumpDiffusion', 'Jump-Diffusion'],
+  ].map(([key, fallbackLabel]) => {
+    const model = asRecord(models?.[key])
+    const sampleSize = asFiniteNumber(model?.sampleSize)
+
+    return {
+      label: normalizeText(model?.label) ?? fallbackLabel,
+      recoveryDaysText: formatRecoveryDays(asFiniteNumber(model?.medianRecoveryDays)),
+      probabilityText: formatProbability(asFiniteNumber(model?.recoveryProbabilityPct)),
+      ...(sampleSize !== null ? { sampleText: `${sampleSize}건` } : {}),
+    }
+  })
+}
+
+export function buildDeepScanRecoveryForecastBlock(context: RecoveryForecastContext): JarooDeepScanRecoveryForecastBlock | null {
+  const targetPrice = parseNumberish(context.rawInput.holding?.averagePrice)
+  const currentPrice = context.currentPrice
+
+  if (
+    typeof targetPrice !== 'number'
+    || targetPrice <= 0
+    || typeof currentPrice !== 'number'
+    || currentPrice <= 0
+    || context.primarySeries.length < 3
+  ) {
+    return null
+  }
+
+  const recoverySourceRefs = [
+    ...context.sourceRefs,
+    createSourceRef('holding', 'recovery-target-average-price', 'average price recovery target'),
+    createSourceRef(
+      'market',
+      context.sourceId,
+      context.sourceLabel,
+      normalizeText(context.primarySeries.at(-1)?.date),
+    ),
+  ]
+  const forecast = buildRecoveryForecastFromPriceSeries(
+    {
+      primarySeries: context.primarySeries,
+      currentPrice,
+      targetPrice,
+    },
+    {
+      similarPattern: {
+        lookbackDays: 40,
+        tolerancePct: 12,
+        spacingDays: 20,
+        minSampleSize: 3,
+      },
+      simulation: {
+        horizonDays: 252,
+        pathCount: 5000,
+        seed: `deepscan-recovery:${context.rawInput.instrument.ticker ?? context.rawInput.instrument.code ?? context.rawInput.instrument.name}:${currentPrice}:${targetPrice}`,
+      },
+    },
+  )
+  const forecastRecord = asRecord(forecast)
+  const consensus = asRecord(forecastRecord?.consensus)
+  const confidence = asRecord(consensus?.confidence)
+  const status = normalizeText(forecastRecord?.status)
+  const expectedRecoveryDays = asFiniteNumber(consensus?.expectedRecoveryDays)
+  const recoveryProbabilityPct = asFiniteNumber(consensus?.recoveryProbabilityPct)
+  const confidenceLabel = recoveryConfidenceLabel(normalizeText(confidence?.level))
+  const isUnavailable = status === 'unavailable' || !consensus
+  const blockState: DeepScanBlockState = isUnavailable ? 'blocked' : 'ok'
+  const fallback = status === 'low_confidence'
+    ? createFallback('recovery-low-confidence', '모델간 회수기간 편차가 큽니다.')
+    : null
+  const error = isUnavailable
+    ? createError('recovery-forecast-unavailable', normalizeText(forecastRecord?.reason) ?? '원금회수 예측에 필요한 모델 결과가 부족합니다.', true)
+    : null
+
+  return {
+    ...createBlockMeta(blockState, recoverySourceRefs, { fallback, error }),
+    statusText: recoveryStatusText(status),
+    summaryText: isUnavailable
+      ? (error?.message ?? '원금회수 예측을 계산하지 못했어요.')
+      : expectedRecoveryDays === 0
+        ? '현재가가 이미 평단 이상이라 원금회수 목표에 도달한 상태입니다.'
+        : `평단 ${formatCurrency(targetPrice, context.currency)} 회복까지 약 ${formatRecoveryDays(expectedRecoveryDays)}로 추정돼요.`,
+    expectedRecoveryDaysText: formatRecoveryDays(expectedRecoveryDays),
+    recoveryProbabilityText: formatProbability(recoveryProbabilityPct),
+    confidenceText: confidenceLabel,
+    currentPriceText: formatCurrency(currentPrice, context.currency),
+    targetPriceText: formatCurrency(targetPrice, context.currency),
+    drawdownText: formatDrawdownPct(currentPrice, targetPrice),
+    modelRows: buildRecoveryModelRows(forecast),
+    disclaimer: normalizeText(consensus?.disclaimer) ?? '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.',
+  }
 }
 
 function createSourceRef(type: DeepScanSourceRef['type'], id: string, label: string, note?: string): DeepScanSourceRef {
@@ -1685,6 +1859,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
 
   let llmErrors: Array<{ member: string; error: string }> = []
   let generatedSignals: GeneratedDumpSignalSummary = { momentum: null, ownershipFlow: null }
+  let generatedOhlcSeries: Array<Record<string, unknown>> = []
 
   try {
     const llm = await scoreUsCommitteeFromGeneratedDump(rawInput, ticker)
@@ -1692,6 +1867,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
     llmDebugId = llm.artifacts.manifest.requestId
     llmErrors = llm.errors
     generatedSignals = summarizeGeneratedDumpSignals(llm.artifacts.runtimeShape)
+    generatedOhlcSeries = extractGeneratedOhlcSeries(llm.artifacts.runtimeShape)
 
     if (agentResults.length === 0) {
       throw new Error(llm.errors.map((entry) => `${entry.member}: ${entry.error}`).join(' | ') || 'US LLM runtime returned no successful members')
@@ -1724,6 +1900,17 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
   const strategy = buildUsStrategy(heroScore, facts, rawInput, usdKrwRate, exchangeProduct)
   const sellNow = buildUsSellNow(heroScore, facts, rawInput, usdKrwRate)
   const portfolioSimulation = buildUsPortfolioSimulation(heroScore, sellNow)
+  const recoveryForecast = buildDeepScanRecoveryForecastBlock({
+    rawInput,
+    primarySeries: generatedOhlcSeries,
+    currentPrice: facts.currentPrice ?? generatedSignals.momentum?.latestClose,
+    currency: facts.currency,
+    sourceRefs,
+    sourceId: `recovery-ohlc:${ticker}`,
+    sourceLabel: generatedSignals.momentum?.pointCount
+      ? `US OHLC ${generatedSignals.momentum.pointCount} bars for recovery forecast`
+      : 'US OHLC recovery forecast input',
+  })
   const degraded = agentResults.some((agent) => agent.confidence === 'low') || llmErrors.length > 0
   const sourceContextFrom = normalizeSourceFrom(rawInput.sourceContext.from)
   const momentumProvenance = generatedSignals.momentum
@@ -1785,6 +1972,7 @@ async function buildUsPayload(rawInput: DeepScanRawInput): Promise<JarooDeepScan
       ...insights,
     },
     strategy,
+    ...(recoveryForecast ? { recoveryForecast } : {}),
     sellNow,
     portfolioSimulation,
     metadata: {
