@@ -1034,7 +1034,8 @@ function attachKrRecoveryForecast(payload: JarooDeepScanPayload): JarooDeepScanP
   const forecast = raw?.forecast
   const currentPrice = asFiniteNumber(raw?.currentPrice)
   const targetPrice = asFiniteNumber(raw?.targetPrice)
-  const { recoveryForecastRaw, ...rest } = record
+  const rest = { ...record }
+  delete rest.recoveryForecastRaw
   if (forecast === undefined || currentPrice === null || targetPrice === null) {
     return rest as JarooDeepScanPayload
   }
