@@ -8,6 +8,7 @@ import type { DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import type { DeepScanTargetInput } from '@/lib/workflow-types'
 
 import { cn } from '@/lib/utils'
+import { DeepScanRecoveryForecastCard } from '@/components/deepscan-recovery-forecast-card'
 
 type DeepScanInlineResultsProps = {
   payload: JarooDeepScanPayload
@@ -192,6 +193,7 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
           ))}
         </div>
       </article>
+      <DeepScanRecoveryForecastCard payload={payload} />
       <p className='px-2 pb-2 text-center text-[10px] leading-4 text-[#97A0AE]'>AI 분석은 데이터 기반 참고 자료예요. 투자 권유나 수익 보장이 아닙니다.</p>
     </section>
   )
