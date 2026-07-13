@@ -47,6 +47,7 @@ next-env.d.ts
 .pi-subagents/
 .pi/
 .codex/
+.gjc/
 
 # supabase
 supabase/.temp/
