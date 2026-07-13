@@ -1028,6 +1028,10 @@ export function summarizeRecoveryForecast(modelResults, options = {}) {
     options.confidenceThresholds,
   )
 
+  // 종합 회수일 = 세 모델(similarPattern/GBM/Jump-Diffusion) 중앙값의 가중평균(기본 40/30/30).
+  // 기획서 '원금회수 모델 설명서' §7-1 공식을 그대로 구현. 동 문서 §7-3 코칩 예시(58일/5%/신뢰 높음)는
+  // GBM+JD만 평균한 결과로 본문 공식과 모순됨 — 공식 적용 시 코칩류 입력은 약 74일/신뢰 보통 이 정확.
+  // (2026-07 합의: 공식(40/30/30) 준수 유지, 예시는 산술 오기로 간주. tests/recovery-forecast.test.mjs 도 74 명시.)
   const expectedRecoveryDaysRaw = weightedAverage(models, 'medianRecoveryDays', weights)
   if (!isFiniteNumber(expectedRecoveryDaysRaw)) {
     return buildUnavailableForecast('expected recovery days could not be calculated', models)
