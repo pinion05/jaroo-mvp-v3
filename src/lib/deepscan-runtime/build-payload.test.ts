@@ -9,6 +9,7 @@ import {
   describeMomentumProvenance,
   extractGeneratedOhlcSeries,
   extractKrCodeFromTicker,
+  formatProbability,
   prepareDeepScanRawInputForBuilder,
   resolveDeepScanPayloadBuilderRoute,
   summarizeGeneratedDumpSignals,
@@ -121,6 +122,16 @@ test('extractGeneratedOhlcSeries normalizes runtime OHLC facts for recovery fore
     { date: '2026-04-20', close: 273.05 },
     { date: '2026-04-17', close: 270.23 },
   ])
+})
+
+test('formatProbability trims trailing .0 from integer probabilities without breaking decimals', () => {
+  assert.equal(formatProbability(100), '100%')
+  assert.equal(formatProbability(0), '0%')
+  assert.equal(formatProbability(61.1), '61.1%')
+  assert.equal(formatProbability(84.1), '84.1%')
+  assert.equal(formatProbability(null), 'N/A')
+  assert.equal(formatProbability(undefined), 'N/A')
+  assert.equal(formatProbability(Number.NaN), 'N/A')
 })
 
 test('buildDeepScanRecoveryForecastBlock returns a deepscan-ready 원금회수 block from holding and OHLC context', () => {

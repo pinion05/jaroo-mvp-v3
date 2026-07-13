@@ -476,12 +476,12 @@ function formatRecoveryDays(value?: number | null) {
   return value === 0 ? '이미 도달' : `${Math.round(value).toLocaleString('ko-KR')}거래일`
 }
 
-function formatProbability(value?: number | null) {
+export function formatProbability(value?: number | null) {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
     return 'N/A'
   }
 
-  return `${value.toFixed(1).replace(/\\.0$/, '')}%`
+  return `${value.toFixed(1).replace(/\.0$/, '')}%`
 }
 
 function formatDrawdownPct(currentPrice: number, targetPrice: number) {
