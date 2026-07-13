@@ -11,6 +11,7 @@ const TOP_LEVEL_KEYS = [
   'insights',
   'metadata',
   'portfolioSimulation',
+  'recoveryForecastRaw',
   'sellNow',
   'strategy',
 ];
