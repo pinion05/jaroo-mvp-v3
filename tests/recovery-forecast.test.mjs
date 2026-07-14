@@ -75,20 +75,18 @@ test('summarizeRecoveryForecast returns low_confidence when model medians diverg
   assert.match(forecast.reason, /낮은 신뢰도/)
 })
 
-test('summarizeRecoveryForecast falls back to a 2-model consensus when one model is missing', () => {
+test('summarizeRecoveryForecast keeps a 2-model fallback explicitly low-confidence', () => {
   const forecast = summarizeRecoveryForecast({
     similarPattern: { medianRecoveryDays: 96, recoveryProbabilityPct: 60.3 },
     gbm: { medianRecoveryDays: 57, recoveryProbabilityPct: 58.2 },
-    // jumpDiffusion 누락 — 2모델 재가중 fallback
+    // jumpDiffusion 누락 — 상관된 소수 모델의 fallback은 수치만 제공하고 신뢰도는 낮음
   })
 
-  assert.notEqual(forecast.status, 'unavailable')
+  assert.equal(forecast.status, 'low_confidence')
   assert.ok(forecast.consensus, '2개 이상 가용 모델이면 합의를 제공한다')
   assert.match(forecast.reason ?? '', /Jump-Diffusion.*제외/)
-  // 재정규화 가중평균: (96*0.4 + 57*0.3)/(0.4+0.3) = 55.5/0.7 ≈ 79
   assert.equal(forecast.consensus.expectedRecoveryDays, 79)
-  // 2모델 합의는 상호검증 부족으로 신뢰 '높음' 불가 → 보통 캡
-  assert.notEqual(forecast.consensus.confidence.level, 'high')
+  assert.equal(forecast.consensus.confidence.level, 'low')
 })
 
 test('summarizeRecoveryForecast returns unavailable when fewer than 2 models are available', () => {
@@ -176,6 +174,34 @@ test('deriveRecoveryReturnParameters estimates rise and jump/diffusion parameter
   closeTo(parameters.diffusionVolatilityLogReturn, 0)
   closeTo(parameters.jumpMeanLogReturn, 0.3)
   closeTo(parameters.jumpVolatilityLogReturn, 0)
+})
+
+test('deriveRecoveryReturnParameters can use the full observation window instead of selecting the post-low rebound', () => {
+  const parameters = deriveRecoveryReturnParameters([
+    { date: '2026-01-01', close: 100 },
+    { date: '2026-01-02', close: 50 },
+    { date: '2026-01-03', close: 60 },
+    { date: '2026-01-04', close: 55 },
+  ], { windowMode: 'full', minReturnCount: 2 })
+
+  assert.equal(parameters.status, 'available')
+  assert.equal(parameters.priceCount, 4)
+  assert.equal(parameters.returnCount, 3)
+  closeTo(parameters.riseMeanLogReturn, Math.log(55 / 100) / 3)
+})
+
+test('deriveRecoveryReturnParameters rejects monthly observations when daily cadence is required', () => {
+  const parameters = deriveRecoveryReturnParameters([
+    { date: '2026-01-01', close: 100 },
+    { date: '2026-02-01', close: 101 },
+    { date: '2026-03-01', close: 102 },
+    { date: '2026-04-01', close: 103 },
+  ], { windowMode: 'full', requireDailyCadence: true, minReturnCount: 2 })
+
+  assert.equal(parameters.status, 'unavailable')
+  assert.equal(parameters.cadence.status, 'non_daily')
+  assert.ok(parameters.cadence.medianGapDays >= 28)
+  assert.match(parameters.reason, /일봉/)
 })
 
 test('deriveRecoveryReturnParameters returns unavailable when rebound data is too short', () => {
@@ -305,6 +331,62 @@ test('calculateSimilarPatternRecovery samples independent drawdown matches and s
   assert.equal(result.recoveryDaysP25, 1.3)
   assert.equal(result.recoveryDaysP75, 1.8)
   assert.deepEqual(result.samples.map((sample) => sample.recoveryDays), [2, 1, null])
+})
+
+test('calculateSimilarPatternRecovery requires each historical sample to recover its own local peak', () => {
+  const result = calculateSimilarPatternRecovery(
+    {
+      primarySeries: [
+        { date: '2026-01-01', close: 200 },
+        { date: '2026-01-02', close: 100 },
+        { date: '2026-01-03', close: 150 },
+        { date: '2026-01-04', close: 160 },
+      ],
+      currentPrice: 60,
+      targetPrice: 120,
+    },
+    {
+      lookbackDays: 2,
+      tolerancePct: 1,
+      spacingDays: 1,
+      minSampleSize: 1,
+      horizonDays: 252,
+    },
+  )
+
+  assert.equal(result.sampleCount, 1)
+  assert.equal(result.recoveredSampleCount, 0)
+  assert.equal(result.recoveryProbabilityPct, 0)
+  assert.equal(result.medianRecoveryDays, null)
+  assert.equal(result.samples[0].peakClose, 200)
+  assert.equal(result.samples[0].recovered, false)
+})
+
+test('calculateSimilarPatternRecovery only counts recovery inside the configured horizon', () => {
+  const result = calculateSimilarPatternRecovery(
+    {
+      primarySeries: [
+        { date: '2026-01-01', close: 100 },
+        { date: '2026-01-02', close: 80 },
+        { date: '2026-01-03', close: 90 },
+        { date: '2026-01-04', close: 100 },
+      ],
+      currentPrice: 80,
+      targetPrice: 100,
+    },
+    {
+      lookbackDays: 2,
+      tolerancePct: 1,
+      spacingDays: 1,
+      minSampleSize: 1,
+      horizonDays: 1,
+    },
+  )
+
+  assert.equal(result.sampleCount, 1)
+  assert.equal(result.recoveredSampleCount, 0)
+  assert.equal(result.medianRecoveryDays, null)
+  assert.equal(result.horizonDays, 1)
 })
 
 test('calculateSimilarPatternRecovery marks sparse samples as low confidence', () => {

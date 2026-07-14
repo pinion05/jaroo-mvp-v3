@@ -162,7 +162,7 @@ test('buildDeepScanRecoveryForecastBlock returns a deepscan-ready 원금회수 b
 
   assert.ok(block)
   assert.equal(block.blockState, 'ok')
-  assert.match(block.summaryText, /평단 \$121\.00 회복/)
+  assert.match(block.summaryText, /도달한 사례만/)
   assert.match(block.expectedRecoveryDaysText, /거래일|이미 도달/)
   assert.notEqual(block.recoveryProbabilityText, 'N/A')
   assert.equal(block.currentPriceText, '$100.00')
@@ -477,10 +477,109 @@ test('buildKrDeepScanPayloadViaCrawler shapes crawler recoveryForecastRaw into a
   const modelRows = block.modelRows as Array<{ label: string }>
   assert.equal(modelRows.length, 3)
   assert.deepEqual(modelRows.map((row) => row.label), ['유사 패턴', '일반 주가 변동', '급등락 반영'])
+  assert.match(String(block.summaryText), /도달한 사례만/)
   assert.match(String(block.summaryText), /74/)
   assert.match(String(block.currentPriceText), /20/)
   assert.match(String(block.drawdownText), /28\.4/)
   assert.match(String(block.disclaimer), /투자 권유/)
+  assert.match(String(block.disclaimer), /예측 정확도나 회복 보장/)
+})
+
+test('buildKrDeepScanPayloadViaCrawler recomputes optimistic crawler recovery output from injected daily history', async () => {
+  const optimisticCrawlerPayload = {
+    recoveryForecastRaw: {
+      forecast: {
+        status: 'available',
+        models: {
+          gbm: { medianRecoveryDays: 15, recoveryProbabilityPct: 100 },
+          jumpDiffusion: { medianRecoveryDays: 13, recoveryProbabilityPct: 100 },
+        },
+        consensus: {
+          expectedRecoveryDays: 14,
+          recoveryProbabilityPct: 100,
+          confidence: { level: 'medium' },
+        },
+      },
+      currentPrice: 100,
+      targetPrice: 150,
+    },
+  }
+  const dailySeries = Array.from({ length: 260 }, (_, index) => ({
+    date: new Date(Date.UTC(2025, 0, index + 1)).toISOString().slice(0, 10),
+    close: 100 + Math.sin(index) * 2,
+  }))
+  const rawInput: DeepScanRawInput = {
+    instrument: { name: '테스트', code: '100840', market: 'KR', kind: 'stock' },
+    sourceContext: { from: 'holding' },
+  }
+  let loadedCode = ''
+
+  const payload = await buildKrDeepScanPayloadViaCrawler(
+    rawInput,
+    (async () => new Response(JSON.stringify(optimisticCrawlerPayload), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch,
+    {
+      fetchTimeoutMs: 1000,
+      recoveryPriceHistoryLoader: async (code) => {
+        loadedCode = code
+        return dailySeries
+      },
+    },
+  ) as Record<string, unknown>
+
+  assert.equal(loadedCode, '100840')
+  assert.equal(payload.recoveryForecastRaw, undefined)
+  const block = payload.recoveryForecast as Record<string, unknown>
+  const sourceRefs = block.sourceRefs as Array<Record<string, unknown>>
+  assert.ok(sourceRefs.some((source) => source.id === 'naver-daily-price-history'))
+  const rows = block.modelRows as Array<Record<string, unknown>>
+  assert.notEqual(rows[1]?.recoveryDaysText, '15일')
+  assert.notEqual(rows[1]?.probabilityText, '100%')
+})
+
+test('buildKrDeepScanPayloadViaCrawler blocks recovery output when daily history loading fails', async () => {
+  const optimisticCrawlerPayload = {
+    recoveryForecastRaw: {
+      forecast: {
+        status: 'available',
+        models: {
+          gbm: { medianRecoveryDays: 15, recoveryProbabilityPct: 100 },
+          jumpDiffusion: { medianRecoveryDays: 13, recoveryProbabilityPct: 100 },
+        },
+        consensus: {
+          expectedRecoveryDays: 14,
+          recoveryProbabilityPct: 100,
+          confidence: { level: 'medium' },
+        },
+      },
+      currentPrice: 25150,
+      targetPrice: 49256.7334,
+    },
+  }
+  const rawInput: DeepScanRawInput = {
+    instrument: { name: 'SNT에너지', code: '100840', market: 'KR', kind: 'stock' },
+    sourceContext: { from: 'holding' },
+  }
+
+  const payload = await buildKrDeepScanPayloadViaCrawler(
+    rawInput,
+    (async () => new Response(JSON.stringify(optimisticCrawlerPayload), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch,
+    {
+      fetchTimeoutMs: 1000,
+      recoveryPriceHistoryLoader: async () => {
+        throw new Error('Naver unavailable')
+      },
+    },
+  ) as Record<string, unknown>
+
+  const block = payload.recoveryForecast as Record<string, unknown>
+  assert.equal(block.blockState, 'blocked')
+  assert.match(String((block.error as Record<string, unknown>)?.message), /일봉/)
 })
 
 test('buildKrDeepScanPayloadViaCrawler preserves low-confidence similar-pattern evidence when recovery days are unavailable', async () => {
