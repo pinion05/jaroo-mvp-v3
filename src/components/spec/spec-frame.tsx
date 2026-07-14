@@ -41,7 +41,11 @@ export function SpecFrame({
     <div className='min-h-screen min-h-dvh bg-[#F5F6F8] sm:bg-[#e8e8e8] sm:px-6 sm:py-4' style={{ fontFamily: SPEC_FONT }}>
       <div
         className={cn(
-          'relative mx-auto flex min-h-screen min-h-dvh w-full flex-col overflow-hidden bg-[#F5F6F8] sm:min-h-[calc(100vh-2rem)] sm:max-w-[390px] sm:rounded-[32px] sm:shadow-[0_4px_24px_rgba(0,0,0,0.12)]',
+          // 고정 높이(h-screen/h-dvh)를 써야 <main>이 남은 공간만 차지하고
+          // 독립 스크롤 컨테이너로 동작한다. min-h 만 쓰면 frame 이 컨텐츠 길이에
+          // 따라 무한히 늘어나 문서 전체가 스크롤되고, AppBottomNav 의
+          // sticky 가 기준 스크롤 컨테이너에서 떨어져 하단 고정이 깨진다.
+          'relative mx-auto flex h-screen h-dvh w-full flex-col overflow-hidden bg-[#F5F6F8] sm:h-[calc(100vh-2rem)] sm:max-w-[390px] sm:rounded-[32px] sm:shadow-[0_4px_24px_rgba(0,0,0,0.12)]',
           frameClassName,
         )}
       >
@@ -64,7 +68,12 @@ export function SpecFrame({
 
         <main className={cn('flex flex-1 flex-col overflow-y-auto', contentClassName)}>{children}</main>
 
-        {showBottomNav ? <AppBottomNav /> : null}
+        {/* shrink-0: main 이 남은 공간을 모두 차지하고 nav 는 항상 frame 하단에 고정. */}
+        {showBottomNav ? (
+          <div className='shrink-0'>
+            <AppBottomNav />
+          </div>
+        ) : null}
       </div>
     </div>
   )
