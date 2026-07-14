@@ -372,33 +372,6 @@ export function extractRecoveryReboundWindow(priceSeries) {
   }
 }
 
-function analyzeRecoverySeriesCadence(priceSeries, options = {}) {
-  const points = normalizeRecoveryPriceSeries(priceSeries)
-  const maxMedianGapDays = isFiniteNumber(options.maxMedianGapDays) && options.maxMedianGapDays > 0
-    ? options.maxMedianGapDays
-    : 5
-  const gaps = []
-
-  for (let index = 1; index < points.length; index += 1) {
-    const previous = Date.parse(`${points[index - 1]?.date ?? ''}T00:00:00Z`)
-    const current = Date.parse(`${points[index]?.date ?? ''}T00:00:00Z`)
-    if (!Number.isFinite(previous) || !Number.isFinite(current) || current <= previous) {
-      continue
-    }
-    gaps.push((current - previous) / 86_400_000)
-  }
-
-  const medianGapDays = median(gaps)
-  return {
-    status: medianGapDays === null
-      ? 'unknown'
-      : medianGapDays <= maxMedianGapDays ? 'daily' : 'non_daily',
-    medianGapDays: roundTo(medianGapDays, 1),
-    maxGapDays: gaps.length > 0 ? Math.max(...gaps) : null,
-    datedPointCount: points.filter((point) => typeof point.date === 'string' && point.date.length > 0).length,
-  }
-}
-
 function mean(values) {
   const finiteValues = values.filter(isFiniteNumber)
   if (finiteValues.length === 0) {
@@ -499,35 +472,17 @@ export function deriveRecoveryReturnParameters(priceSeries, options = {}) {
   const minReturnCount = Number.isInteger(options.minReturnCount) && options.minReturnCount >= 1
     ? options.minReturnCount
     : DEFAULT_RECOVERY_RETURN_PARAMETER_OPTIONS.minReturnCount
-  const windowMode = options.windowMode === 'full' ? 'full' : 'rebound'
-  const normalizedPoints = normalizeRecoveryPriceSeries(priceSeries)
-  const reboundWindow = extractRecoveryReboundWindow(normalizedPoints)
-  const calibrationPoints = windowMode === 'full' ? normalizedPoints : reboundWindow.points
-  const cadence = analyzeRecoverySeriesCadence(normalizedPoints, options)
-  const logReturnPoints = calculateRecoveryLogReturns(calibrationPoints)
-  const logReturns = logReturnPoints.map((point) => point.logReturn)
 
-  if (options.requireDailyCadence === true && cadence.status !== 'daily') {
-    return {
-      status: 'unavailable',
-      reason: '거래일 단위 예측에는 날짜가 연속된 일봉 가격 데이터가 필요합니다.',
-      lowPoint: reboundWindow.lowPoint,
-      windowMode,
-      cadence,
-      priceCount: calibrationPoints.length,
-      returnCount: logReturns.length,
-      logReturns,
-    }
-  }
+  const reboundWindow = extractRecoveryReboundWindow(priceSeries)
+  const logReturnPoints = calculateRecoveryLogReturns(reboundWindow.points)
+  const logReturns = logReturnPoints.map((point) => point.logReturn)
 
   if (logReturns.length < minReturnCount) {
     return {
       status: 'unavailable',
-      reason: `${windowMode === 'full' ? '전체 구간' : '반등 구간'} 로그 수익률이 ${minReturnCount}개 미만입니다.`,
+      reason: `반등 구간 로그 수익률이 ${minReturnCount}개 미만입니다.`,
       lowPoint: reboundWindow.lowPoint,
-      windowMode,
-      cadence,
-      priceCount: calibrationPoints.length,
+      priceCount: reboundWindow.points.length,
       returnCount: logReturns.length,
       logReturns,
     }
@@ -551,9 +506,7 @@ export function deriveRecoveryReturnParameters(priceSeries, options = {}) {
     status: 'available',
     reason: null,
     lowPoint: reboundWindow.lowPoint,
-    windowMode,
-    cadence,
-    priceCount: calibrationPoints.length,
+    priceCount: reboundWindow.points.length,
     returnCount: logReturns.length,
     logReturns,
     riseMeanLogReturn,
@@ -787,9 +740,6 @@ function normalizeSimilarPatternOptions(options = {}) {
     minSampleSize: Number.isInteger(options.minSampleSize) && options.minSampleSize >= 1
       ? options.minSampleSize
       : DEFAULT_SIMILAR_PATTERN_OPTIONS.minSampleSize,
-    horizonDays: Number.isInteger(options.horizonDays) && options.horizonDays > 0
-      ? options.horizonDays
-      : DEFAULT_RECOVERY_SIMULATION_OPTIONS.horizonDays,
     recoveryDaysDigits: options.recoveryDaysDigits ?? 0,
     probabilityDigits: options.probabilityDigits ?? 1,
   }
@@ -858,9 +808,8 @@ function inferCurrentPrice(input, targetPrice) {
   return targetPrice * (1 - (explicitDrawdownPct / 100))
 }
 
-function findFirstRecoveryDay(points, startIndex, targetPrice, horizonDays) {
-  const endIndex = Math.min(points.length - 1, startIndex + horizonDays)
-  for (let index = startIndex + 1; index <= endIndex; index += 1) {
+function findFirstRecoveryDay(points, startIndex, targetPrice) {
+  for (let index = startIndex + 1; index < points.length; index += 1) {
     if (points[index].close >= targetPrice) {
       return index - startIndex
     }
@@ -886,7 +835,6 @@ export function calculateSimilarPatternRecovery(input, options = {}) {
       recoveredSampleCount: 0,
       recoveryDaysP25: null,
       recoveryDaysP75: null,
-      horizonDays: patternOptions.horizonDays,
       samples: [],
     }
   }
@@ -912,7 +860,7 @@ export function calculateSimilarPatternRecovery(input, options = {}) {
         continue
       }
 
-      const recoveryDays = findFirstRecoveryDay(points, index, peakClose, patternOptions.horizonDays)
+      const recoveryDays = findFirstRecoveryDay(points, index, targetPrice)
       samples.push({
         seriesLabel: label,
         index,
@@ -938,7 +886,6 @@ export function calculateSimilarPatternRecovery(input, options = {}) {
       recoveredSampleCount: 0,
       recoveryDaysP25: null,
       recoveryDaysP75: null,
-      horizonDays: patternOptions.horizonDays,
       samples,
     }
   }
@@ -961,7 +908,6 @@ export function calculateSimilarPatternRecovery(input, options = {}) {
     recoveryDaysP75: roundTo(percentile(recoveredDays, 75), patternOptions.recoveryDaysDigits),
     targetDrawdownPct: roundTo(targetDrawdownPct, 2),
     tolerancePct: patternOptions.tolerancePct,
-    horizonDays: patternOptions.horizonDays,
     samples,
   }
 }
@@ -1043,7 +989,7 @@ export function calculateRecoveryForecastConfidence(medianRecoveryDays, threshol
   let level = 'low'
   if (values.length >= 3 && deviationRatio < highMaxDeviationRatio) {
     level = 'high'
-  } else if (values.length >= 3 && deviationRatio <= mediumMaxDeviationRatio) {
+  } else if (deviationRatio <= mediumMaxDeviationRatio) {
     level = 'medium'
   }
 

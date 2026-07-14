@@ -13,7 +13,6 @@ import type {
   JarooDeepScanStrategyBlock,
 } from '../../../packages/contracts/src/deepscan'
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
-import { fetchKrDailyPriceHistory, type KrDailyPricePoint } from '@/lib/kr-daily-price-history'
 import { scoreUsCommitteeFromGeneratedDump, type UsMemberKey } from './llm-committee'
 import { decodeUsConsensusObservation } from './us-consensus'
 import { buildJarooDeepScanPayload as buildCrawlerDeepScanPayload } from '../../../packages/crawler/src/services/deepscan-payload.js'
@@ -625,7 +624,7 @@ export function shapeRecoveryForecastBlock(args: {
       ? (error?.message ?? '원금회수 예측을 계산하지 못했어요.')
       : expectedRecoveryDays === 0
         ? '현재가가 이미 평단 이상이라 원금회수 목표에 도달한 상태입니다.'
-        : `각 모델에서 목표에 도달한 사례만 기준으로 계산한 기간은 약 ${formatRecoveryDays(expectedRecoveryDays)}예요.`,
+        : `평단 ${formatCurrency(targetPrice, currency)} 회복까지 약 ${formatRecoveryDays(expectedRecoveryDays)}로 추정돼요.`,
     expectedRecoveryDaysText: formatRecoveryDays(expectedRecoveryDays),
     recoveryProbabilityText: formatProbability(recoveryProbabilityPct),
     confidenceText: confidenceLabel,
@@ -633,7 +632,7 @@ export function shapeRecoveryForecastBlock(args: {
     targetPriceText: formatCurrency(targetPrice, currency),
     drawdownText: formatDrawdownPct(currentPrice, targetPrice),
     modelRows: buildRecoveryModelRows(forecast),
-    disclaimer: `${normalizeText(consensus?.disclaimer) ?? '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.'} 1년 내 도달 비율은 유사 과거 표본과 5,000개 모의 경로가 252거래일 안에 각 회복 기준을 한 번 이상 터치한 비율을 종합한 값이며, 예측 정확도나 회복 보장이 아닙니다.`,
+    disclaimer: normalizeText(consensus?.disclaimer) ?? '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.',
   }
 }
 
@@ -910,7 +909,6 @@ type KrDeepScanCrawlerFetchOptions = {
   maxBusyWaitMs?: number
   fetchTimeoutMs?: number
   sleep?: (durationMs: number) => Promise<void>
-  recoveryPriceHistoryLoader?: (code: string) => Promise<KrDailyPricePoint[]>
 }
 
 function sleep(durationMs: number) {
@@ -1004,16 +1002,6 @@ export async function buildKrDeepScanPayloadViaCrawler(
   options: KrDeepScanCrawlerFetchOptions = {},
 ) {
   const upstreamUrl = buildKrDeepScanCrawlerCanonicalUrl(rawInput)
-  const preparedInput = prepareDeepScanRawInputForBuilder(rawInput)
-  const recoveryCode = preparedInput.instrument.code
-  const recoveryHistoryPromise = options.recoveryPriceHistoryLoader && recoveryCode
-    ? options.recoveryPriceHistoryLoader(recoveryCode)
-        .then((series) => ({ series, error: null }))
-        .catch((error: unknown) => ({
-          series: null,
-          error: error instanceof Error ? error.message : '일봉 가격 데이터 조회 실패',
-        }))
-    : null
   const maxBusyWaitMs = options.maxBusyWaitMs
     ?? parsePositiveInteger(process.env.DEEPSCAN_KR_BUSY_MAX_WAIT_MS, DEFAULT_KR_DEEPSCAN_BUSY_MAX_WAIT_MS)
   const wait = options.sleep ?? sleep
@@ -1026,11 +1014,7 @@ export async function buildKrDeepScanPayloadViaCrawler(
     const payload = await readJsonPayload(response, 'crawler deepscan request')
 
     if (response.ok) {
-      const recoveryHistory = recoveryHistoryPromise ? await recoveryHistoryPromise : null
-      const canonicalPayload = recoveryHistory
-        ? replaceKrRecoveryForecastWithDailyHistory(payload as JarooDeepScanPayload, recoveryHistory)
-        : payload as JarooDeepScanPayload
-      return attachKrRecoveryForecast(canonicalPayload)
+      return attachKrRecoveryForecast(payload as JarooDeepScanPayload)
     }
 
     if (isCrawlerBusyResponse(response, payload) && waitedMs < maxBusyWaitMs) {
@@ -1049,69 +1033,6 @@ export async function buildKrDeepScanPayloadViaCrawler(
   }
 }
 
-const KR_DAILY_RECOVERY_FORECAST_OPTIONS = {
-  returnParameters: {
-    windowMode: 'full',
-    requireDailyCadence: true,
-    minReturnCount: 252,
-  },
-  similarPattern: {
-    lookbackDays: 40,
-    tolerancePct: 12,
-    spacingDays: 20,
-    minSampleSize: 3,
-    horizonDays: 252,
-  },
-  simulation: {
-    horizonDays: 252,
-    pathCount: 5000,
-  },
-}
-
-type RecoveryHistoryLoadResult = {
-  series: KrDailyPricePoint[] | null
-  error: string | null
-}
-
-function replaceKrRecoveryForecastWithDailyHistory(
-  payload: JarooDeepScanPayload,
-  history: RecoveryHistoryLoadResult,
-): JarooDeepScanPayload {
-  const record = payload as unknown as Record<string, unknown>
-  const raw = asRecord(record.recoveryForecastRaw)
-  const currentPrice = asFiniteNumber(raw?.currentPrice)
-  const targetPrice = asFiniteNumber(raw?.targetPrice)
-  if (currentPrice === null || targetPrice === null) {
-    return payload
-  }
-
-  const forecast = history.series
-    ? buildRecoveryForecastFromPriceSeries(
-        {
-          primarySeries: history.series,
-          currentPrice,
-          targetPrice,
-        },
-        KR_DAILY_RECOVERY_FORECAST_OPTIONS,
-      )
-    : {
-        status: 'unavailable',
-        reason: `일봉 가격 데이터를 불러오지 못해 원금회수 모델을 차단했습니다.${history.error ? ` (${history.error})` : ''}`,
-        models: {},
-        consensus: null,
-      }
-
-  return {
-    ...record,
-    recoveryForecastRaw: {
-      ...raw,
-      forecast,
-      sourceId: 'naver-daily-price-history',
-      sourceLabel: 'Naver Finance daily price history',
-    },
-  } as unknown as JarooDeepScanPayload
-}
-
 function attachKrRecoveryForecast(payload: JarooDeepScanPayload): JarooDeepScanPayload {
   const record = payload as unknown as Record<string, unknown>
   const raw = asRecord(record.recoveryForecastRaw)
@@ -1125,11 +1046,7 @@ function attachKrRecoveryForecast(payload: JarooDeepScanPayload): JarooDeepScanP
   }
   const recoverySourceRefs = [
     createSourceRef('holding', 'recovery-target-average-price', 'average price recovery target'),
-    createSourceRef(
-      'market',
-      normalizeText(raw?.sourceId) ?? 'kr-relative-return-history',
-      normalizeText(raw?.sourceLabel) ?? 'KR relative return price history',
-    ),
+    createSourceRef('market', 'kr-relative-return-history', 'KR relative return price history'),
   ]
   const recoveryForecast = shapeRecoveryForecastBlock({
     forecast,
@@ -2155,9 +2072,7 @@ export async function buildDeepScanPayloadFromSearchParams(searchParams: URLSear
     return createInvalidInputPayload(rawInput)
   }
 
-  return buildKrDeepScanPayloadViaCrawler(rawInput, fetch, {
-    recoveryPriceHistoryLoader: fetchKrDailyPriceHistory,
-  })
+  return buildKrDeepScanPayloadViaCrawler(rawInput)
 }
 
 export { buildRawInputFromSearchParams }

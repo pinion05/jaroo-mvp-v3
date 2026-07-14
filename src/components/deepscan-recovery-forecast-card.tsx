@@ -45,7 +45,7 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
 
   const tone = confidenceTone(block.confidenceText)
   const facts: ReadonlyArray<readonly [string, string]> = [
-    ['1년 내 도달 비율', block.recoveryProbabilityText || '--'],
+    ['회복 확률', block.recoveryProbabilityText || '--'],
     ['현재가', block.currentPriceText || '--'],
     ['평단가', block.targetPriceText || '--'],
     ['손실률', block.drawdownText || '--'],
@@ -68,7 +68,7 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
       </div>
 
       <div className='px-4 py-5 text-center'>
-        <div className='text-[10px] text-[#97A0AE]'>도달 사례 기준 기간</div>
+        <div className='text-[10px] text-[#97A0AE]'>예상 회수 기간</div>
         <div className='mt-1 text-[28px] font-black leading-none text-[#0F1419]'>{block.expectedRecoveryDaysText || '--'}</div>
         <p className='mt-3 text-[12px] leading-5 text-[#5A6473]'>{block.summaryText}</p>
       </div>
@@ -87,7 +87,7 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
 
       {block.modelRows.length > 0 ? (
         <div className='border-t border-[#EFF1F4] px-4 py-4'>
-          <div className='mb-3 text-[10px] text-[#97A0AE]'>모델별 도달 기간·비율</div>
+          <div className='mb-3 text-[10px] text-[#97A0AE]'>모델별 회수 기간 비교</div>
           <div className='space-y-2'>
             {block.modelRows.map((row) => (
               <div key={row.label} className='flex items-center gap-2 text-[12px]'>

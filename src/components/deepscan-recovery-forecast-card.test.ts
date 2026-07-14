@@ -65,12 +65,9 @@ test('readRecoveryForecastForLoss hides the card when recoveryForecast is absent
 test('DeepScanRecoveryForecastCard renders the recovery forecast for a loss-making holding', () => {
   const markup = renderToStaticMarkup(createElement(DeepScanRecoveryForecastCard, { payload: payloadWithRecovery(baseRecoveryBlock()) }))
   assert.match(markup, /원금회수 예측/)
-  assert.match(markup, /도달 사례 기준 기간/)
   assert.match(markup, /약 74일/)
-  assert.match(markup, /1년 내 도달 비율/)
   assert.match(markup, /61\.1%/)
   assert.match(markup, /신뢰도 보통/)
-  assert.doesNotMatch(markup, /예상 회수 기간/)
   assert.match(markup, /유사 패턴/)
   assert.match(markup, /투자 권유/)
 })
