@@ -1290,26 +1290,26 @@ export default function DeepScanPage() {
         frameClassName='sm:max-w-[340px]'
         mainClassName='relative overflow-x-hidden bg-[#f4f8fb] px-4 pt-4 pb-6 before:pointer-events-none before:absolute before:inset-x-[-80px] before:top-[-160px] before:h-[320px] before:rounded-full before:bg-[radial-gradient(circle_at_50%_50%,rgba(24,95,165,0.18),rgba(24,95,165,0)_68%)]'
       >
-        <section className='relative overflow-hidden rounded-[30px] border border-white/80 bg-[#102f4e] p-5 text-white shadow-[0_22px_48px_rgba(16,47,78,0.24)]'>
-          <div className='pointer-events-none absolute -right-10 -top-12 size-40 rounded-full bg-[#5fb0ff]/20 blur-2xl' />
-          <div className='pointer-events-none absolute bottom-0 right-0 h-28 w-36 rounded-tl-[80px] bg-[linear-gradient(135deg,rgba(255,255,255,0.12),rgba(255,255,255,0))]' />
+        {/* 최신 DeepScan 테마: 밝은 흰 카드 + 상단 연한 블루 그라데이션 + --jaroo-* 토큰. 로딩/결과 화면(#f4f8fc→#fbfdff) 톤과 정렬. */}
+        <section className='relative overflow-hidden rounded-[28px] border border-[color:var(--jaroo-border)] bg-white p-5 shadow-[0_16px_36px_rgba(24,95,165,0.10)]'>
+          <div className='pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(135deg,#f4f8fc_0%,#e6f1fb_100%)]' />
 
           <div className='relative flex items-start justify-between gap-4'>
             <div>
-              <span className='inline-flex items-center gap-1.5 rounded-full border border-white/15 bg-white/10 px-3 py-1 text-[11px] font-semibold text-[#d6ecff] backdrop-blur'>
-                <span className='size-1.5 rounded-full bg-[#8ee6b8]' />
+              <span className='inline-flex items-center gap-1.5 rounded-full border border-[color:var(--jaroo-border)] bg-white px-3 py-1 text-[11px] font-semibold text-[color:var(--jaroo-primary)]'>
+                <span className='size-1.5 rounded-full bg-[color:var(--jaroo-primary)]' />
                 대기 화면
               </span>
-              <h1 className='mt-4 text-[26px] font-black leading-[1.12] tracking-[-0.04em]'>
+              <h1 className='mt-4 text-[24px] font-black leading-[1.15] tracking-[-0.03em] text-[color:var(--jaroo-ink)]'>
                 {missingTargetTitle}
               </h1>
             </div>
-            <div className='grid size-14 shrink-0 place-items-center rounded-2xl bg-white text-[#185fa5] shadow-[0_14px_28px_rgba(0,0,0,0.18)]'>
+            <div className='grid size-14 shrink-0 place-items-center rounded-2xl bg-[#e6f1fb] text-[color:var(--jaroo-primary)]'>
               <LineChart className='size-7' aria-hidden />
             </div>
           </div>
 
-          <p className='relative mt-4 max-w-[260px] text-sm leading-6 text-[#c8d8e8]'>
+          <p className='relative mt-4 max-w-[280px] text-sm leading-6 text-[color:var(--jaroo-muted)]'>
             홈에서 분석할 대상을 선택하면 가격 위치, 핵심 근거, 세 팀 판단을 한 흐름으로 보여드려요.
           </p>
 
@@ -1319,9 +1319,9 @@ export default function DeepScanPage() {
               ['핵심', '근거'],
               ['세 팀', '판단'],
             ].map(([top, bottom]) => (
-              <div key={top} className='rounded-2xl border border-white/10 bg-white/[0.08] px-3 py-3 backdrop-blur'>
-                <p className='text-[15px] font-black leading-none text-white'>{top}</p>
-                <p className='mt-1 text-[10px] font-semibold text-[#a9c9e8]'>{bottom}</p>
+              <div key={top} className='rounded-2xl border border-[color:var(--jaroo-border)] bg-[#f4f8fb] px-3 py-3'>
+                <p className='text-[15px] font-black leading-none text-[color:var(--jaroo-ink)]'>{top}</p>
+                <p className='mt-1 text-[10px] font-semibold text-[color:var(--jaroo-muted)]'>{bottom}</p>
               </div>
             ))}
           </div>
@@ -1340,10 +1340,10 @@ export default function DeepScanPage() {
               const Icon = step.icon
 
               return (
-                <div key={step.label} className='grid grid-cols-[42px_1fr] gap-3 rounded-2xl border border-[#e8eef5] bg-[#fbfdff] p-3'>
+                <div key={step.label} className='grid grid-cols-[42px_1fr] gap-3 rounded-2xl border border-[color:var(--jaroo-border)] bg-[#fbfdff] p-3'>
                   <div className='relative grid size-10 place-items-center rounded-2xl bg-[#e6f1fb] text-[color:var(--jaroo-primary)]'>
                     <Icon className='size-5' aria-hidden />
-                    <span className='absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-[#102f4e] text-[9px] font-black text-white'>
+                    <span className='absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-[color:var(--jaroo-ink)] text-[9px] font-black text-white'>
                       {index + 1}
                     </span>
                   </div>
@@ -1360,7 +1360,7 @@ export default function DeepScanPage() {
         <Link
           href='/home'
           className={buttonVariants({
-            className: 'mt-4 h-[52px] w-full rounded-[22px] bg-[#185fa5] text-[15px] font-black text-white shadow-[0_16px_28px_rgba(24,95,165,0.24)] hover:bg-[#0f4f8d]',
+            className: 'mt-4 h-[52px] w-full rounded-[22px] bg-[color:var(--jaroo-primary)] text-[15px] font-black text-white shadow-[0_16px_28px_rgba(24,95,165,0.24)] hover:bg-[color:var(--jaroo-primary-strong)]',
           })}
         >
           홈에서 종목 선택하기
