@@ -522,9 +522,9 @@ function buildRecoveryModelRows(forecast: unknown): JarooDeepScanRecoveryForecas
   const modelDetails = asRecord(forecastRecord?.modelDetails)
   return [
     ['similarPattern', '유사 패턴'],
-    ['gbm', 'GBM'],
-    ['jumpDiffusion', 'Jump-Diffusion'],
-  ].map(([key, fallbackLabel]) => {
+    ['gbm', '일반 주가 변동'],
+    ['jumpDiffusion', '급등락 반영'],
+  ].map(([key, displayLabel]) => {
     const model = asRecord(models?.[key])
     const detail = asRecord(modelDetails?.[key])
     const medianRecoveryDays = asFiniteNumber(model?.medianRecoveryDays) ?? asFiniteNumber(detail?.medianRecoveryDays)
@@ -532,7 +532,7 @@ function buildRecoveryModelRows(forecast: unknown): JarooDeepScanRecoveryForecas
     const sampleSize = asFiniteNumber(model?.sampleSize) ?? asFiniteNumber(detail?.sampleCount)
 
     return {
-      label: normalizeText(model?.label) ?? fallbackLabel,
+      label: displayLabel,
       recoveryDaysText: formatRecoveryDays(medianRecoveryDays),
       probabilityText: formatProbability(recoveryProbabilityPct),
       ...(sampleSize !== null ? { sampleText: `${sampleSize}건` } : {}),

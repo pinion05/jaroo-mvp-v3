@@ -439,9 +439,9 @@ test('buildKrDeepScanPayloadViaCrawler shapes crawler recoveryForecastRaw into a
     status: 'available',
     reason: null,
     models: {
-      similarPattern: { medianRecoveryDays: 96, recoveryProbabilityPct: 60.3, sampleSize: 63 },
-      gbm: { medianRecoveryDays: 57, recoveryProbabilityPct: 58.2 },
-      jumpDiffusion: { medianRecoveryDays: 60, recoveryProbabilityPct: 63.9 },
+      similarPattern: { label: '유사 패턴', medianRecoveryDays: 96, recoveryProbabilityPct: 60.3, sampleSize: 63 },
+      gbm: { label: 'GBM', medianRecoveryDays: 57, recoveryProbabilityPct: 58.2 },
+      jumpDiffusion: { label: 'Jump-Diffusion', medianRecoveryDays: 60, recoveryProbabilityPct: 63.9 },
     },
     consensus: {
       expectedRecoveryDays: 74,
@@ -474,7 +474,9 @@ test('buildKrDeepScanPayloadViaCrawler shapes crawler recoveryForecastRaw into a
   assert.equal(block.blockState, 'ok')
   assert.equal(block.statusText, '원금회수 예측')
   assert.equal(block.confidenceText, '보통')
-  assert.equal((block.modelRows as unknown[]).length, 3)
+  const modelRows = block.modelRows as Array<{ label: string }>
+  assert.equal(modelRows.length, 3)
+  assert.deepEqual(modelRows.map((row) => row.label), ['유사 패턴', '일반 주가 변동', '급등락 반영'])
   assert.match(String(block.summaryText), /74/)
   assert.match(String(block.currentPriceText), /20/)
   assert.match(String(block.drawdownText), /28\.4/)
