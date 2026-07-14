@@ -481,6 +481,61 @@ test('buildKrDeepScanPayloadViaCrawler shapes crawler recoveryForecastRaw into a
   assert.match(String(block.disclaimer), /투자 권유/)
 })
 
+test('buildKrDeepScanPayloadViaCrawler preserves low-confidence similar-pattern evidence when recovery days are unavailable', async () => {
+  const crawlerPayload = {
+    recoveryForecastRaw: {
+      forecast: {
+        status: 'low_confidence',
+        reason: '하나 이상의 하위 모델이 낮은 신뢰도로 계산되었습니다.',
+        models: {
+          gbm: { medianRecoveryDays: 15, recoveryProbabilityPct: 100 },
+          jumpDiffusion: { medianRecoveryDays: 13, recoveryProbabilityPct: 100 },
+        },
+        consensus: {
+          expectedRecoveryDays: 14,
+          recoveryProbabilityPct: 100,
+          confidence: { level: 'medium' },
+          disclaimer: '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.',
+        },
+        modelDetails: {
+          similarPattern: {
+            status: 'low_confidence',
+            reason: '유사 패턴 샘플 수가 충분하지 않습니다.',
+            medianRecoveryDays: null,
+            recoveryProbabilityPct: 0,
+            sampleCount: 1,
+            recoveredSampleCount: 0,
+          },
+        },
+      },
+      currentPrice: 25150,
+      targetPrice: 49256.7334,
+    },
+  }
+  const rawInput: DeepScanRawInput = {
+    instrument: { name: 'SNT에너지', code: '100840', market: 'KR', kind: 'stock' },
+    sourceContext: { from: 'holding' },
+  }
+
+  const payload = await buildKrDeepScanPayloadViaCrawler(
+    rawInput,
+    (async () => new Response(JSON.stringify(crawlerPayload), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch,
+    { fetchTimeoutMs: 1000 },
+  ) as Record<string, unknown>
+
+  const block = payload.recoveryForecast as Record<string, unknown>
+  const rows = block.modelRows as Array<Record<string, unknown>>
+  assert.deepEqual(rows[0], {
+    label: '유사 패턴',
+    recoveryDaysText: 'N/A',
+    probabilityText: '0%',
+    sampleText: '1건',
+  })
+})
+
 test('buildKrDeepScanPayloadViaCrawler leaves payload without recoveryForecast when crawler raw envelope is unavailable', async () => {
   const crawlerPayload = {
     recoveryForecastRaw: {

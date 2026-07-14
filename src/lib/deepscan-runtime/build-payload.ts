@@ -517,19 +517,24 @@ function recoveryStatusText(status?: string | null) {
 }
 
 function buildRecoveryModelRows(forecast: unknown): JarooDeepScanRecoveryForecastBlock['modelRows'] {
-  const models = asRecord(asRecord(forecast)?.models)
+  const forecastRecord = asRecord(forecast)
+  const models = asRecord(forecastRecord?.models)
+  const modelDetails = asRecord(forecastRecord?.modelDetails)
   return [
     ['similarPattern', '유사 패턴'],
     ['gbm', 'GBM'],
     ['jumpDiffusion', 'Jump-Diffusion'],
   ].map(([key, fallbackLabel]) => {
     const model = asRecord(models?.[key])
-    const sampleSize = asFiniteNumber(model?.sampleSize)
+    const detail = asRecord(modelDetails?.[key])
+    const medianRecoveryDays = asFiniteNumber(model?.medianRecoveryDays) ?? asFiniteNumber(detail?.medianRecoveryDays)
+    const recoveryProbabilityPct = asFiniteNumber(model?.recoveryProbabilityPct) ?? asFiniteNumber(detail?.recoveryProbabilityPct)
+    const sampleSize = asFiniteNumber(model?.sampleSize) ?? asFiniteNumber(detail?.sampleCount)
 
     return {
       label: normalizeText(model?.label) ?? fallbackLabel,
-      recoveryDaysText: formatRecoveryDays(asFiniteNumber(model?.medianRecoveryDays)),
-      probabilityText: formatProbability(asFiniteNumber(model?.recoveryProbabilityPct)),
+      recoveryDaysText: formatRecoveryDays(medianRecoveryDays),
+      probabilityText: formatProbability(recoveryProbabilityPct),
       ...(sampleSize !== null ? { sampleText: `${sampleSize}건` } : {}),
     }
   })
