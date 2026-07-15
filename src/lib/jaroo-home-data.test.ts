@@ -778,6 +778,50 @@ test('home market score renders partial OCI indicators when VKOSPI source is blo
   assert.equal(marketScore.details.some((detail) => detail.label === 'VKOSPI'), false)
 })
 
+test('DB 재접속과 DeepScan session이 촬영 당시 수익률을 live 수익률과 별도로 보존한다', () => {
+  const restoreWindow = installWindowMock()
+
+  try {
+    const [item] = buildPortfolioItemsFromAppliedHomePortfolioRows([
+      {
+        name: 'SOOP',
+        quantity: '3주',
+        profitRate: '',
+        evaluationAmount: '181,137원',
+        averagePrice: '64,800원',
+        resolvedName: 'SOOP',
+        resolvedCode: '067160',
+        resolvedMarket: 'KOSDAQ',
+        resolvedMarketTone: 'kosdaq',
+        resolvedKind: 'stock',
+      },
+    ])
+
+    assert.ok(item)
+    assert.equal(Number(item.snapshotProfitRate?.toFixed(1)), -6.8)
+
+    const [holding] = buildHomeHoldingsFromPortfolioItems([
+      {
+        ...item,
+        currentPrice: 47100,
+        currentPriceCurrency: 'KRW',
+        currentProfitRate: -27.3,
+      },
+    ])
+
+    assert.ok(holding)
+    assert.equal(Number(holding.snapshotProfitRate?.toFixed(1)), -6.8)
+    assert.equal(holding.change, '-27.3%')
+    assert.equal(persistDeepScanTarget(holding), true)
+
+    const session = resolveDeepScanTargetSession()
+    assert.equal(Number(session.holding.snapshotProfitRate?.toFixed(1)), -6.8)
+    assert.equal(session.holding.change, '-27.3%')
+  } finally {
+    restoreWindow()
+  }
+})
+
 test('home market score has loading, missing, and error fallback states', () => {
   const loadingScore = buildHomeMarketScore(homeHoldings, { marketSignalStatus: 'loading' })
   const missingScore = buildHomeMarketScore([], { marketSignalStatus: 'idle' })

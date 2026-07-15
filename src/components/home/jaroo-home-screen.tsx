@@ -57,6 +57,7 @@ type DeepScanLoadingTarget = {
   shares?: number
   averagePrice?: number
   averagePriceCurrency?: 'KRW' | 'USD'
+  snapshotProfitRate?: number
   currentPrice?: number
   currentPriceCurrency?: 'KRW' | 'USD'
   currentProfitRate?: number
@@ -911,6 +912,7 @@ export function JarooHomeScreen() {
       shares: item.quantity,
       averagePrice: item.averagePrice,
       averagePriceCurrency: item.averagePriceCurrency,
+      snapshotProfitRate: item.snapshotProfitRate,
       currentPrice: item.currentPrice,
       currentPriceCurrency: item.currentPriceCurrency,
       currentProfitRate: item.currentProfitRate,

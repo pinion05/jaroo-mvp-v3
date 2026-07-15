@@ -308,6 +308,7 @@ function buildDeepScanTargetInputFromSession(session: ReturnType<typeof resolveD
     name: holding.name,
     quantity,
     averagePrice,
+    snapshotProfitRate: holding.snapshotProfitRate,
     currentPrice: parseOcrNumber(holding.metrics.find((metric) => metric.label === '현재가')?.value ?? '') ?? undefined,
     currentProfitRate: parseOcrNumber(holding.change) ?? undefined,
     currentPriceCurrency: holding.marketTone === 'nasdaq' ? 'USD' : 'KRW',
