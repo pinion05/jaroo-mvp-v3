@@ -98,6 +98,7 @@ export type PortfolioNormalizedItem = {
   name: string
   quantity: number
   averagePrice: number
+  snapshotProfitRate?: number
   currentPrice?: number
   currentProfitRate?: number
   currentPriceCurrency?: WorkflowMoneyCurrency
@@ -116,6 +117,7 @@ export type DeepScanTargetInput = {
   name: string
   quantity: number
   averagePrice: number
+  snapshotProfitRate?: number
   currentPrice?: number
   currentProfitRate?: number
   currentPriceCurrency?: WorkflowMoneyCurrency
@@ -255,6 +257,30 @@ export function getApplicableConfirmedHoldings(rows: MergeRow[]): ConfirmedHoldi
   }))
 }
 
+export function deriveSnapshotProfitRate(input: {
+  quantity?: number
+  averagePrice?: number
+  evaluationAmount?: number
+}) {
+  const { quantity, averagePrice, evaluationAmount } = input
+
+  if (
+    typeof quantity !== 'number'
+    || !Number.isFinite(quantity)
+    || quantity <= 0
+    || typeof averagePrice !== 'number'
+    || !Number.isFinite(averagePrice)
+    || averagePrice <= 0
+    || typeof evaluationAmount !== 'number'
+    || !Number.isFinite(evaluationAmount)
+  ) {
+    return undefined
+  }
+
+  const costBasis = quantity * averagePrice
+  return costBasis > 0 ? ((evaluationAmount / costBasis) - 1) * 100 : undefined
+}
+
 export function toPortfolioNormalizedItem(holding: ConfirmedHolding): PortfolioNormalizedItem | null {
   if (
     !holding.displayName.trim()
@@ -273,6 +299,13 @@ export function toPortfolioNormalizedItem(holding: ConfirmedHolding): PortfolioN
     name: holding.displayName.trim(),
     quantity: holding.quantityValue,
     averagePrice: holding.averagePriceValue,
+    snapshotProfitRate: typeof holding.profitRateValue === 'number' && Number.isFinite(holding.profitRateValue)
+      ? holding.profitRateValue
+      : deriveSnapshotProfitRate({
+          quantity: holding.quantityValue,
+          averagePrice: holding.averagePriceValue,
+          evaluationAmount: holding.evaluationAmountValue,
+        }),
     evaluationAmount: holding.evaluationAmountValue,
     averagePriceCurrency: holding.averagePriceCurrency,
     identifierLabel: buildIdentifierLabel(holding.ticker, holding.code),
@@ -293,6 +326,7 @@ export function toDeepScanTargetInput(item: PortfolioNormalizedItem): DeepScanTa
     name: item.name,
     quantity: item.quantity,
     averagePrice: item.averagePrice,
+    snapshotProfitRate: item.snapshotProfitRate,
     currentPrice: item.currentPrice,
     currentProfitRate: item.currentProfitRate,
     currentPriceCurrency: item.currentPriceCurrency,
@@ -311,6 +345,7 @@ type DeepScanTargetKeyInput = Pick<
   | 'market'
   | 'quantity'
   | 'averagePrice'
+  | 'snapshotProfitRate'
   | 'evaluationAmount'
   | 'averagePriceCurrency'
   | 'currentPrice'
@@ -338,6 +373,7 @@ export function getDeepScanTargetKey(target: DeepScanTargetKeyInput) {
     ['market', normalizeDeepScanTargetKeyText(target.market)],
     ['quantity', normalizeDeepScanTargetKeyNumber(target.quantity)],
     ['averagePrice', normalizeDeepScanTargetKeyNumber(target.averagePrice)],
+    ['snapshotProfitRate', normalizeDeepScanTargetKeyNumber(target.snapshotProfitRate)],
     ['evaluationAmount', normalizeDeepScanTargetKeyNumber(target.evaluationAmount)],
     ['averagePriceCurrency', normalizeDeepScanTargetKeyText(target.averagePriceCurrency)],
     ['currentPrice', normalizeDeepScanTargetKeyNumber(target.currentPrice)],
