@@ -199,14 +199,14 @@
 
 .returnRateContext {
   margin-right: 4px;
-  font-weight: 500;
-  opacity: 0.72;
+  color: var(--ds-mid);
+  font-weight: 600;
 }
 
 .snapshotReturnRate {
   margin: 2px 0 0;
-  color: var(--ds-muted);
-  font-size: 10px;
+  color: var(--ds-mid);
+  font-size: 11px;
   line-height: 1.25;
   white-space: nowrap;
 }

@@ -1436,9 +1436,18 @@ export function buildPortfolioItemsFromAppliedHomePortfolioRows(rows: AppliedHom
       const marketTone = resolveHomeMarketTone(row.resolvedMarketTone, market, kind)
       const code = row.resolvedCode?.trim() || row.code?.trim() || undefined
       const ticker = row.resolvedTicker?.trim() || row.ticker?.trim() || undefined
+      const averagePriceCurrency = row.averagePriceCurrency
+        ?? inferCurrencyFromMoneyText(row.averagePrice)
+        ?? (marketTone === 'nasdaq' ? undefined : 'KRW')
       const evaluationAmount = parseOcrNumber(row.evaluationAmount ?? '') ?? undefined
+      const evaluationAmountCurrency = inferCurrencyFromMoneyText(row.evaluationAmount)
+      const canDeriveSnapshotProfitRate = marketTone !== 'nasdaq'
+        || averagePriceCurrency === 'KRW'
+        || (evaluationAmountCurrency !== undefined && evaluationAmountCurrency === averagePriceCurrency)
       const snapshotProfitRate = parseOcrProfitRate(row.profitRate ?? '')
-        ?? deriveSnapshotProfitRate({ quantity, averagePrice, evaluationAmount })
+        ?? (canDeriveSnapshotProfitRate
+          ? deriveSnapshotProfitRate({ quantity, averagePrice, evaluationAmount })
+          : undefined)
 
       return {
         code,
@@ -1450,9 +1459,7 @@ export function buildPortfolioItemsFromAppliedHomePortfolioRows(rows: AppliedHom
         quantity,
         averagePrice,
         ...(typeof snapshotProfitRate === 'number' ? { snapshotProfitRate } : {}),
-        averagePriceCurrency: row.averagePriceCurrency
-          ?? inferCurrencyFromMoneyText(row.averagePrice)
-          ?? (marketTone === 'nasdaq' ? undefined : 'KRW'),
+        averagePriceCurrency,
         evaluationAmount,
         currentPrice: row.currentPrice,
         currentPriceCurrency: row.currentPriceCurrency,
@@ -1495,12 +1502,15 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
     const currentPriceText = typeof inferredCurrentPrice === 'number'
       ? formatCurrencyValue(String(inferredCurrentPrice), currentPriceCurrency)
       : undefined
+    const canDeriveSnapshotProfitRate = marketTone !== 'nasdaq' || displayCurrency === 'KRW'
     const snapshotProfitRate = parseOcrProfitRate(row.profitRate ?? '')
-      ?? deriveSnapshotProfitRate({
-        quantity: quantityValue ?? undefined,
-        averagePrice: parseOcrNumber(averagePriceRaw) ?? undefined,
-        evaluationAmount: evaluationAmountRawValue ?? undefined,
-      })
+      ?? (canDeriveSnapshotProfitRate
+        ? deriveSnapshotProfitRate({
+            quantity: quantityValue ?? undefined,
+            averagePrice: parseOcrNumber(averagePriceRaw) ?? undefined,
+            evaluationAmount: evaluationAmountRawValue ?? undefined,
+          })
+        : undefined)
     const hasLiveProfitRate = typeof row.currentProfitRate === 'number' && Number.isFinite(row.currentProfitRate)
     const currentProfitRate = hasLiveProfitRate ? row.currentProfitRate ?? null : snapshotProfitRate ?? null
 

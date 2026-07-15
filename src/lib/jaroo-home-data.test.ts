@@ -822,6 +822,52 @@ test('DB 재접속과 DeepScan session이 촬영 당시 수익률을 live 수익
   }
 })
 
+test('통화를 증명할 수 없는 미국 DB 행은 촬영 수익률을 잘못 역산하지 않는다', () => {
+  const [ambiguousItem] = buildPortfolioItemsFromAppliedHomePortfolioRows([
+    {
+      name: '미국 종목',
+      quantity: '10주',
+      profitRate: '',
+      evaluationAmount: '1811370',
+      averagePrice: '195',
+      averagePriceCurrency: 'USD',
+      resolvedName: 'US Stock',
+      resolvedTicker: 'TEST',
+      resolvedMarket: 'NASDAQ',
+      resolvedMarketTone: 'nasdaq',
+      resolvedKind: 'stock',
+    },
+  ])
+  const [explicitItem] = buildPortfolioItemsFromAppliedHomePortfolioRows([
+    {
+      name: '미국 종목',
+      quantity: '10주',
+      profitRate: '-6.8%',
+      evaluationAmount: '1,811,370원',
+      averagePrice: '$195',
+      averagePriceCurrency: 'USD',
+      resolvedName: 'US Stock',
+      resolvedTicker: 'TEST',
+      resolvedMarket: 'NASDAQ',
+      resolvedMarketTone: 'nasdaq',
+      resolvedKind: 'stock',
+    },
+  ])
+
+  assert.equal(ambiguousItem?.snapshotProfitRate, undefined)
+  assert.equal(explicitItem?.snapshotProfitRate, -6.8)
+
+  const [ambiguousHolding] = buildHomeHoldingsFromPortfolioItems([
+    {
+      ...ambiguousItem,
+      currentPrice: 150,
+      currentPriceCurrency: 'USD',
+      currentProfitRate: -23.1,
+    },
+  ])
+  assert.equal(ambiguousHolding?.snapshotProfitRate, undefined)
+})
+
 test('home market score has loading, missing, and error fallback states', () => {
   const loadingScore = buildHomeMarketScore(homeHoldings, { marketSignalStatus: 'loading' })
   const missingScore = buildHomeMarketScore([], { marketSignalStatus: 'idle' })

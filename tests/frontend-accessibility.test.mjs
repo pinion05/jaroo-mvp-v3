@@ -6,6 +6,7 @@ const shellSource = readFileSync('src/components/jaroo-shell.tsx', 'utf8')
 const bottomNavSource = readFileSync('src/components/app-bottom-nav.tsx', 'utf8')
 const deepScanSource = readFileSync('src/app/deepscan/page.tsx', 'utf8')
 const deepScanLoadingSource = readFileSync('src/components/deepscan-loading-screen.tsx', 'utf8')
+const deepScanLoadingStyles = readFileSync('src/components/deepscan-loading-screen.module.css', 'utf8')
 const screenshotSource = readFileSync('src/app/screenshot/page.tsx', 'utf8')
 const ocrSource = readFileSync('src/app/ocr/page.tsx', 'utf8')
 
@@ -40,6 +41,8 @@ test('DeepScan labels live and broker snapshot return rates separately', () => {
   assert.match(deepScanLoadingSource, /현재가 기준/)
   assert.match(deepScanLoadingSource, /촬영 당시/)
   assert.match(deepScanLoadingSource, /snapshotProfitRate/)
+  assert.match(deepScanLoadingStyles, /\.returnRateContext\s*\{[^}]*color: var\(--ds-mid\)/s)
+  assert.match(deepScanLoadingStyles, /\.snapshotReturnRate\s*\{[^}]*color: var\(--ds-mid\)[^}]*font-size: 11px/s)
 })
 
 test('DeepScan collapsible sections expose expanded state and controlled panels', () => {
