@@ -200,6 +200,16 @@ export function normalizeOcrProfitAmount(value: string, combinedProfitText = '')
     }
   }
 
+  const normalizedValue = value.trim().replace(/[−–—]/g, '-')
+  const unsignedAmountMatch = normalizedValue.match(
+    /^[₩$€¥£]?\s*((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\.\d+)\s*(?:원|krw|usd)?$/i,
+  )
+  const explicitRateSign = [...combinedProfitText.trim().replace(/[−–—]/g, '-').matchAll(OCR_PERCENT_TEXT_PATTERN)].at(-1)?.[1]
+
+  if (unsignedAmountMatch?.[1] && explicitRateSign) {
+    return `${explicitRateSign}${unsignedAmountMatch[1].replaceAll(',', '')}`
+  }
+
   return ''
 }
 
@@ -221,13 +231,10 @@ export function normalizeOcrProfitRate(value: string, profitAmount = '') {
   const normalizedProfitAmount = normalizeOcrProfitAmount(profitAmount)
     || normalizeOcrProfitAmount('', normalizedValue)
   const parsedProfitAmount = parseOcrNumber(normalizedProfitAmount)
-  const isWrappedAccountingNegative = /^\(\s*[+-]?\s*(?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?\s*%\s*\)$/.test(normalizedValue)
   let sign = explicitSign
 
   if (parsedProfitAmount !== null && parsedProfitAmount !== 0) {
     sign = parsedProfitAmount < 0 ? '-' : '+'
-  } else if (!sign && isWrappedAccountingNegative) {
-    sign = '-'
   }
 
   return `${sign}${rateNumber}%`

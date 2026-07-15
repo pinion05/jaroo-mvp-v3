@@ -27,9 +27,11 @@ test('screenshot upload keeps escape and login controls visible for guests', () 
   assert.doesNotMatch(screenshotSource, /\{!isFirstPortfolio \|\| isPreparing \? \(/)
 })
 
-test('OCR manual review exposes profit amount and recomputes average price with it', () => {
+test('OCR manual review exposes and normalizes profit amount before recomputing average price', () => {
   assert.match(ocrSource, /평가손익/)
   assert.match(ocrSource, /field === 'profitAmount'/)
+  assert.match(ocrSource, /normalizeOcrProfitAmount\(rawProfitAmount, rawProfitRate\)/)
+  assert.match(ocrSource, /normalizeOcrProfitRate\(rawProfitRate, profitAmount\)/)
   assert.match(ocrSource, /nextRow\.profitAmount \?\? ''/)
 })
 

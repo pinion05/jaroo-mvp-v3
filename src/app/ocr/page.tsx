@@ -6,6 +6,8 @@ import {
   buildOcrSourceRows,
   clearPersistedScreenshotUploadSession,
   computeAveragePrice,
+  normalizeOcrProfitAmount,
+  normalizeOcrProfitRate,
   readPersistedScreenshotUploadSession,
   sanitizeOcrInstrumentCandidateLists,
   sanitizeOcrRows,
@@ -730,6 +732,11 @@ export default function OcrPage() {
     }
 
     const normalizedValue = value.trim()
+    const rawProfitAmount = field === 'profitAmount' ? value : currentRow.profitAmount ?? ''
+    const rawProfitRate = field === 'profitRate' ? value : currentRow.profitRate
+    const normalizedProfitAmount = normalizeOcrProfitAmount(rawProfitAmount, rawProfitRate)
+    const profitAmount = normalizedProfitAmount || rawProfitAmount
+    const profitRate = normalizeOcrProfitRate(rawProfitRate, profitAmount) || rawProfitRate
     const nextRow: OcrReviewRow = {
       ...currentRow,
       name: field === 'name' ? value : currentRow.name,
@@ -744,8 +751,8 @@ export default function OcrPage() {
             : undefined
           : currentRow.resolvedKind,
       quantity: field === 'quantity' ? value : currentRow.quantity,
-      profitAmount: field === 'profitAmount' ? value : currentRow.profitAmount,
-      profitRate: field === 'profitRate' ? value : currentRow.profitRate,
+      profitAmount,
+      profitRate,
       evaluationAmount: field === 'evaluationAmount' ? value : currentRow.evaluationAmount,
     }
 
