@@ -36,6 +36,7 @@ import {
   shouldDisplayDeepScanReadyResults,
   shouldShowDeepScanSummarySkeleton,
 } from '@/lib/deepscan-loading-behavior'
+import { buildDeepScanReturnRateDisplay } from '@/lib/deepscan-loading-metrics'
 import {
   buildConsensusFanGeometry,
   estimateDailyVolatility,
@@ -56,6 +57,7 @@ type DeepScanLoadingScreenProps = {
   usdKrwRate?: number | null
   tradingVolume?: string | number
   currentProfitRate?: string | number
+  snapshotProfitRate?: string | number
   briefingSnapshot?: LoadingBriefingSnapshot | null
   findingProgress?: Partial<Record<FindingKey, FindingProgress>>
   committeeAxes?: JarooDeepScanCommitteeAxis[]
@@ -1556,6 +1558,7 @@ export function DeepScanLoadingScreen({
   usdKrwRate,
   tradingVolume,
   currentProfitRate,
+  snapshotProfitRate,
   briefingSnapshot,
   findingProgress,
   committeeAxes,
@@ -1598,6 +1601,10 @@ export function DeepScanLoadingScreen({
     canCalculatePositionInOneCurrency ? calculateProfitAmount({ currentPrice: effectiveCurrentPrice, averagePrice, shares }) : null,
     currentPriceCurrency,
   )
+  const returnRateDisplay = buildDeepScanReturnRateDisplay({
+    currentProfitRate: profitRateText ?? undefined,
+    snapshotProfitRate,
+  })
   const displayQuickFacts = useMemo(() => quickFacts.filter(hasDisplayValue), [quickFacts])
   const standaloneQuickFacts = useMemo(
     () => displayQuickFacts.filter((fact) => !isHiddenLoadingQuickFact(fact)),
@@ -1768,8 +1775,14 @@ export function DeepScanLoadingScreen({
           <div className={styles.stockPriceBox}>
             <p className={styles.stockPrice}>{currentPriceText ?? '현재가 확인 중'}</p>
             <p className={cn(styles.stockChange, profitRateText && parseNumericValue(profitRateText) !== null && parseNumericValue(profitRateText)! < 0 ? styles.loss : styles.gain)}>
-              {profitRateText ? profitRateText : '계산 중'}
+              <span className={styles.returnRateContext}>현재가 기준</span>{' '}
+              {returnRateDisplay.current ?? '계산 중'}
             </p>
+            {returnRateDisplay.snapshot ? (
+              <p className={styles.snapshotReturnRate}>
+                촬영 당시 <strong>{returnRateDisplay.snapshot}</strong>
+              </p>
+            ) : null}
           </div>
         </div>
         <div className={cn(styles.headerProgress, isError ? styles.headerProgressError : resultsReadyForDisplay ? styles.headerProgressDone : undefined)} aria-label={isError ? '딥스캔 실패' : resultsReadyForDisplay ? '딥스캔 완료' : '딥스캔 진행 중'}>

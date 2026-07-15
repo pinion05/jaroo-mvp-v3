@@ -27,6 +27,30 @@ export function parseLoadingNumericValue(value: LoadingMetricValue) {
   return Number.isFinite(parsed) ? parsed : null
 }
 
+function formatLoadingSignedPercent(value: LoadingMetricValue) {
+  const numericValue = parseLoadingNumericValue(value)
+  if (numericValue === null) {
+    return null
+  }
+
+  const roundedValue = Number(numericValue.toFixed(1))
+  const sign = roundedValue > 0 ? '+' : ''
+  return `${sign}${roundedValue.toLocaleString('ko-KR', { maximumFractionDigits: 1 })}%`
+}
+
+export function buildDeepScanReturnRateDisplay({
+  currentProfitRate,
+  snapshotProfitRate,
+}: {
+  currentProfitRate?: LoadingMetricValue
+  snapshotProfitRate?: LoadingMetricValue
+}) {
+  return {
+    current: formatLoadingSignedPercent(currentProfitRate),
+    snapshot: formatLoadingSignedPercent(snapshotProfitRate),
+  }
+}
+
 export function calculateFallbackEvaluationAmount({
   evaluationAmount,
   currentPrice,

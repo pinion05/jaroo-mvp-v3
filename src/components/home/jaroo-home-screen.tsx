@@ -1131,6 +1131,7 @@ export function JarooHomeScreen() {
               currentPrice={deepScanLoadingTarget.currentPrice}
               currentPriceCurrency={deepScanLoadingTarget.currentPriceCurrency}
               currentProfitRate={deepScanLoadingTarget.currentProfitRate}
+              snapshotProfitRate={deepScanLoadingTarget.snapshotProfitRate}
               onBack={cancelDeepScanLoading}
             />
           </div>

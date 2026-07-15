@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 const shellSource = readFileSync('src/components/jaroo-shell.tsx', 'utf8')
 const bottomNavSource = readFileSync('src/components/app-bottom-nav.tsx', 'utf8')
 const deepScanSource = readFileSync('src/app/deepscan/page.tsx', 'utf8')
+const deepScanLoadingSource = readFileSync('src/components/deepscan-loading-screen.tsx', 'utf8')
 const screenshotSource = readFileSync('src/app/screenshot/page.tsx', 'utf8')
 const ocrSource = readFileSync('src/app/ocr/page.tsx', 'utf8')
 
@@ -33,6 +34,12 @@ test('OCR manual review exposes and normalizes profit amount before recomputing 
   assert.match(ocrSource, /normalizeOcrProfitAmount\(rawProfitAmount, rawProfitRate\)/)
   assert.match(ocrSource, /normalizeOcrProfitRate\(rawProfitRate, profitAmount\)/)
   assert.match(ocrSource, /nextRow\.profitAmount \?\? ''/)
+})
+
+test('DeepScan labels live and broker snapshot return rates separately', () => {
+  assert.match(deepScanLoadingSource, /현재가 기준/)
+  assert.match(deepScanLoadingSource, /촬영 당시/)
+  assert.match(deepScanLoadingSource, /snapshotProfitRate/)
 })
 
 test('DeepScan collapsible sections expose expanded state and controlled panels', () => {
