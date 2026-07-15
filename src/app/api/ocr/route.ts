@@ -15,7 +15,7 @@ type OpenRouterResponse = {
   }
 }
 
-const OCR_SCHEMA = {
+export const OCR_SCHEMA = {
   name: 'ocr_rows_response',
   strict: true,
   schema: {
@@ -30,12 +30,13 @@ const OCR_SCHEMA = {
           properties: {
             name: { type: 'string' },
             quantity: { type: 'string' },
+            profitAmount: { type: 'string' },
             profitRate: { type: 'string' },
             evaluationAmount: { type: 'string' },
             code: { type: 'string' },
             ticker: { type: 'string' },
           },
-          required: ['name', 'quantity', 'profitRate', 'evaluationAmount'],
+          required: ['name', 'quantity', 'profitAmount', 'profitRate', 'evaluationAmount'],
         },
       },
     },
@@ -58,20 +59,21 @@ type OpenRouterRequestBody = {
 }
 
 
-const SYSTEM_PROMPT = `You are an OCR extraction engine for Korean and English brokerage screenshots.
+export const OCR_SYSTEM_PROMPT = `You are an OCR extraction engine for Korean and English brokerage screenshots.
 Return ONLY valid JSON matching the provided schema.
 Never output markdown, prose, explanations, code fences, or extra keys.
 Top-level object must be exactly {"rows": [...]}.
-Every row must contain the 4 required string fields: name, quantity, profitRate, evaluationAmount.
+Every row must contain the 5 required string fields: name, quantity, profitAmount, profitRate, evaluationAmount.
 You may additionally include code and/or ticker when they are visibly shown in the same row.
 Do not add any other fields.
-If a value is unreadable, use an empty string.
+If a value is unreadable or not visible, use an empty string.
 If there are no holdings rows, return {"rows": []}.
 
 Field rules:
 - name: stock/security name as shown in the screenshot. Preserve Korean or English text.
 - quantity: holding quantity as shown. Keep units if visible, for example "12주", "5 shares", "1,000".
-- profitRate: profit/loss percentage as shown, for example "+12.4%", "-3.18%", "0%".
+- profitAmount: signed row-level profit/loss amount, not market value, for example "+262,740원", "-13,263원", "+$25.30".
+- profitRate: signed profit/loss percentage, for example "+12.4%", "-3.18%", "0%".
 - evaluationAmount: holding evaluation/market value as shown, for example "1,234,000원", "$845.12", "2,500".
 - code: local stock code/security code when visibly shown, for example "005930". Otherwise use "".
 - ticker: market ticker when visibly shown, for example "AAPL". Otherwise use "".
@@ -83,7 +85,12 @@ OCR guidance:
 - Ignore totals, headers, footers, tabs, buttons, timestamps, ads, and account summary text unless they are part of a row.
 - Do not infer hidden values. Use only what is visible.
 - Quantity must map to the user's holding count, not price or valuation.
-- profitRate must map to the return/percentage column, not profit amount.
+- profitAmount must map to the signed row-level profit/loss amount, not evaluationAmount.
+- profitRate must map to the row-level return percentage, not profitAmount.
+- Korean brokerage rows often show a signed profitAmount followed by an unsigned percentage in parentheses.
+  "-13,263 (6.8%)" means profitAmount "-13,263" and profitRate "-6.8%".
+  "+262,740 (12.7%)" means profitAmount "+262,740" and profitRate "+12.7%".
+- If the parenthesized percentage has no sign, inherit the sign from the visible profitAmount or the loss/profit color.
 - evaluationAmount must map to the row-level valuation/market value amount, not profit/loss amount, principal, or a totals summary.
 - If the same row appears twice due to sticky headers or repeated sections, keep one row only.`
 
@@ -188,7 +195,7 @@ function buildOpenRouterOcrBody(options: {
     messages: [
       {
         role: 'system',
-        content: SYSTEM_PROMPT,
+        content: OCR_SYSTEM_PROMPT,
       },
       {
         role: 'user',

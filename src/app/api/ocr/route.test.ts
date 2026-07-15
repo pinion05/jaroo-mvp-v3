@@ -1,7 +1,14 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { extractJsonObjectText, extractOpenRouterErrorMessage, extractOpenRouterErrorStatus, toPublicOcrErrorMessage } from './route'
+import {
+  OCR_SCHEMA,
+  OCR_SYSTEM_PROMPT,
+  extractJsonObjectText,
+  extractOpenRouterErrorMessage,
+  extractOpenRouterErrorStatus,
+  toPublicOcrErrorMessage,
+} from './route'
 
 test('OpenRouter가 HTTP 200으로 error payload를 내려도 메시지를 추출한다', () => {
   const message = extractOpenRouterErrorMessage({
@@ -48,4 +55,17 @@ test('OCR upstream key limit errors are not exposed verbatim', () => {
 test('extractJsonObjectText accepts fenced JSON from schema-free OCR models', () => {
   assert.equal(extractJsonObjectText('```json\n{"rows":[]}\n```'), '{"rows":[]}')
   assert.equal(extractJsonObjectText('prefix {"rows":[]} suffix'), '{"rows":[]}')
+})
+
+test('OCR schema requires signed row-level profitAmount', () => {
+  const rowSchema = OCR_SCHEMA.schema.properties.rows.items
+
+  assert.equal(rowSchema.properties.profitAmount.type, 'string')
+  assert.equal(rowSchema.required.includes('profitAmount'), true)
+})
+
+test('OCR prompt carries P/L amount sign into unsigned parenthesized return', () => {
+  assert.match(OCR_SYSTEM_PROMPT, /profitAmount/)
+  assert.match(OCR_SYSTEM_PROMPT, /-13,263[^\n]*\(6\.8%\)[\s\S]*-6\.8%/)
+  assert.match(OCR_SYSTEM_PROMPT, /\+262,740[^\n]*\(12\.7%\)[\s\S]*\+12\.7%/)
 })
