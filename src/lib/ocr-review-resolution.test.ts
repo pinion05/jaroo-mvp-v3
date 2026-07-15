@@ -43,6 +43,13 @@ function createCandidate(overrides: Partial<ResolveCandidate> = {}): ResolveCand
   }
 }
 
+test('review row raw payload preserves signed profitAmount', () => {
+  const row = toReviewRow(createSourceRow({ profitAmount: '-13263' }))
+
+  assert.equal(row.profitAmount, '-13263')
+  assert.equal(row.raw?.profitAmount, '-13263')
+})
+
 test('instrument resolution auto-applies the first candidate into the review row fields', () => {
   const unresolvedRow = toReviewRow(createSourceRow())
   const candidate = createCandidate()

@@ -138,6 +138,7 @@ export type AppliedHomePortfolioRow = Pick<
   | 'code'
   | 'ticker'
 > & {
+  profitAmount?: string
   averagePriceCurrency?: AveragePriceCurrency
   currentPrice?: number
   currentPriceCurrency?: AveragePriceCurrency
@@ -861,6 +862,7 @@ function resolveAppliedAveragePriceCurrency(
         readTrimmedString(item.profitRate) ?? '',
         readTrimmedString(item.evaluationAmount) ?? '',
         readTrimmedString(item.averagePrice) ?? '',
+        readTrimmedString(item.profitAmount) ?? '',
       )
 
     return averagePriceLooksComputedFromEvaluation ? evaluationAmountCurrency : undefined
@@ -895,6 +897,7 @@ function sanitizeAppliedHomePortfolioRows(input: unknown): AppliedHomePortfolioR
       const normalizedRow: AppliedHomePortfolioRow = {
         name: readTrimmedString(item.name) ?? '',
         quantity: readTrimmedString(item.quantity) ?? '',
+        profitAmount: readTrimmedString(item.profitAmount),
         profitRate: readTrimmedString(item.profitRate) ?? '',
         evaluationAmount: readTrimmedString(item.evaluationAmount) ?? '',
         averagePrice: readTrimmedString(item.averagePrice) ?? '',

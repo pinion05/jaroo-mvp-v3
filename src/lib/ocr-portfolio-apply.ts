@@ -25,7 +25,7 @@ export function isMissingAveragePrice(value: string) {
   return normalizedValue.toLowerCase().replace(/[./\s]/g, '') === 'na'
 }
 
-export function prepareMergeRowsForApply<T extends { averagePrice: string; quantity: string; profitRate: string; evaluationAmount: string }>(rows: T[]) {
+export function prepareMergeRowsForApply<T extends { averagePrice: string; quantity: string; profitAmount?: string; profitRate: string; evaluationAmount: string }>(rows: T[]) {
   return rows.map((row) => {
     if (!isMissingAveragePrice(row.averagePrice)) {
       return { ...row }
@@ -33,7 +33,7 @@ export function prepareMergeRowsForApply<T extends { averagePrice: string; quant
 
     return {
       ...row,
-      averagePrice: computeAveragePrice(row.quantity, row.profitRate, row.evaluationAmount),
+      averagePrice: computeAveragePrice(row.quantity, row.profitRate, row.evaluationAmount, row.profitAmount ?? ''),
     }
   })
 }
@@ -43,7 +43,7 @@ export function buildMergeRowsFromReviewRows(rows: OcrReviewRow[]): MergeRow[] {
     const preparedReviewRow = {
       ...row,
       averagePrice: isMissingAveragePrice(row.averagePrice)
-        ? computeAveragePrice(row.quantity, row.profitRate, row.evaluationAmount)
+        ? computeAveragePrice(row.quantity, row.profitRate, row.evaluationAmount, row.profitAmount ?? '')
         : row.averagePrice,
     }
     const confirmedHolding = toConfirmedHolding(preparedReviewRow)
@@ -80,6 +80,7 @@ export function buildAppliedHomePortfolioRowsFromConfirmedHoldings(holdings: Con
   return holdings.map((holding) => ({
     name: holding.displayName,
     quantity: holding.quantityText,
+    profitAmount: holding.profitAmountText,
     profitRate: holding.profitRateText,
     evaluationAmount: holding.evaluationAmountText,
     averagePrice: holding.averagePriceText,

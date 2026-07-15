@@ -20,6 +20,7 @@ export type ScreenshotUploadInput = {
 export type OcrExtractedRow = {
   name: string
   quantity: string
+  profitAmount?: string
   profitRate: string
   evaluationAmount: string
   averagePrice: string
@@ -68,6 +69,8 @@ export type ConfirmedHolding = {
   kind?: WorkflowInstrumentKind
   quantityText: string
   quantityValue?: number
+  profitAmountText?: string
+  profitAmountValue?: number
   profitRateText: string
   profitRateValue?: number
   evaluationAmountText: string
@@ -191,6 +194,7 @@ function inferAveragePriceCurrency(row: OcrReviewRow) {
       row.profitRate,
       row.evaluationAmount,
       row.averagePrice,
+      row.profitAmount ?? '',
     )
       ? evaluationAmountCurrency
       : undefined
@@ -211,6 +215,8 @@ export function toConfirmedHolding(row: OcrReviewRow): ConfirmedHolding {
     kind: row.resolvedKind,
     quantityText: row.quantity,
     quantityValue: parseOcrNumber(row.quantity) ?? undefined,
+    profitAmountText: row.profitAmount,
+    profitAmountValue: parseOcrNumber(row.profitAmount ?? '') ?? undefined,
     profitRateText: row.profitRate,
     profitRateValue: parseOcrProfitRate(row.profitRate) ?? undefined,
     evaluationAmountText: row.evaluationAmount,
@@ -236,6 +242,8 @@ export function getApplicableConfirmedHoldings(rows: MergeRow[]): ConfirmedHoldi
     kind: row.kind,
     quantityText: row.quantityText,
     quantityValue: row.quantityValue,
+    profitAmountText: row.profitAmountText,
+    profitAmountValue: row.profitAmountValue,
     profitRateText: row.profitRateText,
     profitRateValue: row.profitRateValue,
     evaluationAmountText: row.evaluationAmountText,
