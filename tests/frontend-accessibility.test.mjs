@@ -6,6 +6,7 @@ const shellSource = readFileSync('src/components/jaroo-shell.tsx', 'utf8')
 const bottomNavSource = readFileSync('src/components/app-bottom-nav.tsx', 'utf8')
 const deepScanSource = readFileSync('src/app/deepscan/page.tsx', 'utf8')
 const screenshotSource = readFileSync('src/app/screenshot/page.tsx', 'utf8')
+const ocrSource = readFileSync('src/app/ocr/page.tsx', 'utf8')
 
 test('Jaroo shell icon-only back link has an accessible label', () => {
   assert.match(shellSource, /aria-label='뒤로 가기'/)
@@ -24,6 +25,12 @@ test('screenshot upload keeps escape and login controls visible for guests', () 
   assert.match(screenshotSource, /href='\/login'/)
   assert.match(screenshotSource, /router\.push\('\/home'\)/)
   assert.doesNotMatch(screenshotSource, /\{!isFirstPortfolio \|\| isPreparing \? \(/)
+})
+
+test('OCR manual review exposes profit amount and recomputes average price with it', () => {
+  assert.match(ocrSource, /평가손익/)
+  assert.match(ocrSource, /field === 'profitAmount'/)
+  assert.match(ocrSource, /nextRow\.profitAmount \?\? ''/)
 })
 
 test('DeepScan collapsible sections expose expanded state and controlled panels', () => {

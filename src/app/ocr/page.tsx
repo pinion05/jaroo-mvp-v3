@@ -51,6 +51,7 @@ type ManualEditableField =
   | 'resolvedMarket'
   | 'resolvedKind'
   | 'quantity'
+  | 'profitAmount'
   | 'profitRate'
   | 'evaluationAmount'
 
@@ -743,12 +744,18 @@ export default function OcrPage() {
             : undefined
           : currentRow.resolvedKind,
       quantity: field === 'quantity' ? value : currentRow.quantity,
+      profitAmount: field === 'profitAmount' ? value : currentRow.profitAmount,
       profitRate: field === 'profitRate' ? value : currentRow.profitRate,
       evaluationAmount: field === 'evaluationAmount' ? value : currentRow.evaluationAmount,
     }
 
     nextRow.resolvedMarketTone = inferMarketTone(nextRow.resolvedMarket)
-    nextRow.averagePrice = computeAveragePrice(nextRow.quantity, nextRow.profitRate, nextRow.evaluationAmount) || nextRow.averagePrice
+    nextRow.averagePrice = computeAveragePrice(
+      nextRow.quantity,
+      nextRow.profitRate,
+      nextRow.evaluationAmount,
+      nextRow.profitAmount ?? '',
+    ) || nextRow.averagePrice
     nextRow.resolutionState = isManualRowComplete(nextRow) ? 'resolved' : 'manual-required'
     patchReviewRow(rowId, nextRow)
   }, [patchReviewRow, reviewRows])
@@ -961,6 +968,10 @@ export default function OcrPage() {
                                 <span>수익률</span>
                                 <input value={editableRow.profitRate} onChange={(event) => handleManualFieldChange(editableRowId, 'profitRate', event.target.value)} />
                               </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>평가손익</span>
+                                <input value={editableRow.profitAmount ?? ''} onChange={(event) => handleManualFieldChange(editableRowId, 'profitAmount', event.target.value)} />
+                              </label>
                               <label className='jaroo-ocr-edit-field full'>
                                 <span>평가 금액</span>
                                 <input value={editableRow.evaluationAmount} onChange={(event) => handleManualFieldChange(editableRowId, 'evaluationAmount', event.target.value)} />
@@ -1100,6 +1111,10 @@ export default function OcrPage() {
                               <label className='jaroo-ocr-edit-field'>
                                 <span>수익률</span>
                                 <input value={row.profitRate} onChange={(event) => handleManualFieldChange(row.id, 'profitRate', event.target.value)} />
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
+                                <span>평가손익</span>
+                                <input value={row.profitAmount ?? ''} onChange={(event) => handleManualFieldChange(row.id, 'profitAmount', event.target.value)} />
                               </label>
                               <label className='jaroo-ocr-edit-field full'>
                                 <span>평가 금액</span>
