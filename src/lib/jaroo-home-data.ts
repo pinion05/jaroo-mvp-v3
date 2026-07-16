@@ -1,5 +1,5 @@
 import { buildDeepScanTargetSession, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding, type DeepScanTargetSession } from '@/lib/deepscan-target'
-import { buildIdentifierLabel, type PortfolioNormalizedItem, type WorkflowAsyncStatus } from '@/lib/workflow-types'
+import { buildIdentifierLabel, deriveSnapshotProfitRate, type PortfolioNormalizedItem, type WorkflowAsyncStatus } from '@/lib/workflow-types'
 import { isAveragePriceComputedFromEvaluation, normalizeStockName, parseOcrNumber, parseOcrProfitRate, type OcrRow } from '@/lib/screenshot-ocr'
 
 export type HomeBadgeTone = 'amber' | 'red' | 'green'
@@ -79,6 +79,7 @@ export type HomeHolding = {
   shares: string
   averagePrice: string
   averagePriceCurrency?: AveragePriceCurrency
+  snapshotProfitRate?: number
   evaluationAmount?: string
   market: string
   marketTone: HomeMarketTone
@@ -138,6 +139,7 @@ export type AppliedHomePortfolioRow = Pick<
   | 'code'
   | 'ticker'
 > & {
+  profitAmount?: string
   averagePriceCurrency?: AveragePriceCurrency
   currentPrice?: number
   currentPriceCurrency?: AveragePriceCurrency
@@ -861,6 +863,7 @@ function resolveAppliedAveragePriceCurrency(
         readTrimmedString(item.profitRate) ?? '',
         readTrimmedString(item.evaluationAmount) ?? '',
         readTrimmedString(item.averagePrice) ?? '',
+        readTrimmedString(item.profitAmount) ?? '',
       )
 
     return averagePriceLooksComputedFromEvaluation ? evaluationAmountCurrency : undefined
@@ -895,6 +898,7 @@ function sanitizeAppliedHomePortfolioRows(input: unknown): AppliedHomePortfolioR
       const normalizedRow: AppliedHomePortfolioRow = {
         name: readTrimmedString(item.name) ?? '',
         quantity: readTrimmedString(item.quantity) ?? '',
+        profitAmount: readTrimmedString(item.profitAmount),
         profitRate: readTrimmedString(item.profitRate) ?? '',
         evaluationAmount: readTrimmedString(item.evaluationAmount) ?? '',
         averagePrice: readTrimmedString(item.averagePrice) ?? '',
@@ -1388,7 +1392,7 @@ function buildAppliedRowFromPortfolioItem(item: PortfolioNormalizedItem): Applie
   return {
     name: item.name,
     quantity: `${item.quantity}주`,
-    profitRate: typeof item.currentProfitRate === 'number' ? `${item.currentProfitRate.toFixed(1)}%` : '',
+    profitRate: typeof item.snapshotProfitRate === 'number' ? `${item.snapshotProfitRate}%` : '',
     evaluationAmount,
     averagePrice: formatAveragePriceFromPortfolioItem(item),
     averagePriceCurrency: item.averagePriceCurrency,
@@ -1432,6 +1436,18 @@ export function buildPortfolioItemsFromAppliedHomePortfolioRows(rows: AppliedHom
       const marketTone = resolveHomeMarketTone(row.resolvedMarketTone, market, kind)
       const code = row.resolvedCode?.trim() || row.code?.trim() || undefined
       const ticker = row.resolvedTicker?.trim() || row.ticker?.trim() || undefined
+      const averagePriceCurrency = row.averagePriceCurrency
+        ?? inferCurrencyFromMoneyText(row.averagePrice)
+        ?? (marketTone === 'nasdaq' ? undefined : 'KRW')
+      const evaluationAmount = parseOcrNumber(row.evaluationAmount ?? '') ?? undefined
+      const evaluationAmountCurrency = inferCurrencyFromMoneyText(row.evaluationAmount)
+      const canDeriveSnapshotProfitRate = marketTone !== 'nasdaq'
+        || averagePriceCurrency === 'KRW'
+        || (evaluationAmountCurrency !== undefined && evaluationAmountCurrency === averagePriceCurrency)
+      const snapshotProfitRate = parseOcrProfitRate(row.profitRate ?? '')
+        ?? (canDeriveSnapshotProfitRate
+          ? deriveSnapshotProfitRate({ quantity, averagePrice, evaluationAmount })
+          : undefined)
 
       return {
         code,
@@ -1442,10 +1458,9 @@ export function buildPortfolioItemsFromAppliedHomePortfolioRows(rows: AppliedHom
         name,
         quantity,
         averagePrice,
-        averagePriceCurrency: row.averagePriceCurrency
-          ?? inferCurrencyFromMoneyText(row.averagePrice)
-          ?? (marketTone === 'nasdaq' ? undefined : 'KRW'),
-        evaluationAmount: parseOcrNumber(row.evaluationAmount ?? '') ?? undefined,
+        ...(typeof snapshotProfitRate === 'number' ? { snapshotProfitRate } : {}),
+        averagePriceCurrency,
+        evaluationAmount,
         currentPrice: row.currentPrice,
         currentPriceCurrency: row.currentPriceCurrency,
         currentProfitRate: row.currentProfitRate ?? parseOcrProfitRate(row.profitRate ?? '') ?? undefined,
@@ -1487,8 +1502,17 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
     const currentPriceText = typeof inferredCurrentPrice === 'number'
       ? formatCurrencyValue(String(inferredCurrentPrice), currentPriceCurrency)
       : undefined
+    const canDeriveSnapshotProfitRate = marketTone !== 'nasdaq' || displayCurrency === 'KRW'
+    const snapshotProfitRate = parseOcrProfitRate(row.profitRate ?? '')
+      ?? (canDeriveSnapshotProfitRate
+        ? deriveSnapshotProfitRate({
+            quantity: quantityValue ?? undefined,
+            averagePrice: parseOcrNumber(averagePriceRaw) ?? undefined,
+            evaluationAmount: evaluationAmountRawValue ?? undefined,
+          })
+        : undefined)
     const hasLiveProfitRate = typeof row.currentProfitRate === 'number' && Number.isFinite(row.currentProfitRate)
-    const currentProfitRate = hasLiveProfitRate ? row.currentProfitRate ?? null : parseOcrProfitRate(row.profitRate ?? '') ?? null
+    const currentProfitRate = hasLiveProfitRate ? row.currentProfitRate ?? null : snapshotProfitRate ?? null
 
     return {
       row,
@@ -1498,6 +1522,7 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
       marketTone,
       averagePriceCurrency: displayCurrency,
       averagePrice: formatCurrencyValue(averagePriceRaw, displayCurrency),
+      snapshotProfitRate,
       currentPriceText,
       currentPriceValue: inferredCurrentPrice,
       currentPriceCurrency,
@@ -1511,7 +1536,7 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
   const weights = preparedRows.map((item) => item.baseAmountValue ?? 1)
   const totalWeight = weights.reduce((sum, value) => sum + value, 0) || sanitizedRows.length
 
-  return preparedRows.map(({ row, kind, displayName, market, marketTone, averagePriceCurrency, averagePrice, currentPriceText, currentPriceValue, currentPriceCurrency, currentProfitRate, hasLiveProfitRate, evaluationAmountRawValue, baseAmountValue }, index) => {
+  return preparedRows.map(({ row, kind, displayName, market, marketTone, averagePriceCurrency, averagePrice, snapshotProfitRate, currentPriceText, currentPriceValue, currentPriceCurrency, currentProfitRate, hasLiveProfitRate, evaluationAmountRawValue, baseAmountValue }, index) => {
     const tone = deriveHoldingTone(currentProfitRate)
     const shares = formatQuantityValue(row.quantity)
     const change = formatPercentValue(currentProfitRate)
@@ -1552,6 +1577,7 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
       shares,
       averagePrice,
       averagePriceCurrency,
+      snapshotProfitRate,
       evaluationAmount,
       market,
       marketTone,

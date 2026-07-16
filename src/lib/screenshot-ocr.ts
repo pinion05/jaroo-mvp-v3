@@ -5,6 +5,7 @@ export const MAX_SCREENSHOT_UPLOADS = 5
 export type OcrRow = {
   name: string
   quantity: string
+  profitAmount?: string
   profitRate: string
   evaluationAmount: string
   averagePrice: string
@@ -171,8 +172,76 @@ export function parseOcrNumber(value: string) {
   return isWrappedNegative ? -Math.abs(parsedValue) : parsedValue
 }
 
-export function parseOcrProfitRate(value: string) {
+const OCR_PERCENT_TEXT_PATTERN = /([+-]?)\s*((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\.\d+)\s*%/g
+const OCR_SIGNED_AMOUNT_PATTERN = /([+-])\s*[₩$€¥£]?\s*((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\.\d+)/g
+
+export function normalizeOcrProfitAmount(value: string, combinedProfitText = '') {
+  const candidates = [value, combinedProfitText]
+    .map((candidate) => candidate.trim().replace(/[−–—]/g, '-'))
+    .filter(Boolean)
+
+  for (const candidate of candidates) {
+    for (const match of candidate.matchAll(OCR_SIGNED_AMOUNT_PATTERN)) {
+      const matchEnd = (match.index ?? 0) + match[0].length
+      if (/^\s*%/.test(candidate.slice(matchEnd))) {
+        continue
+      }
+
+      const numericText = match[2]?.replaceAll(',', '')
+      const numericValue = Number(numericText)
+      if (numericText && Number.isFinite(numericValue)) {
+        return `${match[1]}${numericText}`
+      }
+    }
+
+    const zeroAmountMatch = candidate.match(/^[₩$€¥£]?\s*0(?:\.0+)?\s*(?:원|krw|usd)?$/i)
+    if (zeroAmountMatch) {
+      return '0'
+    }
+  }
+
   const normalizedValue = value.trim().replace(/[−–—]/g, '-')
+  const unsignedAmountMatch = normalizedValue.match(
+    /^[₩$€¥£]?\s*((?:\d{1,3}(?:,\d{3})+|\d+)(?:\.\d+)?|\.\d+)\s*(?:원|krw|usd)?$/i,
+  )
+  const explicitRateSign = [...combinedProfitText.trim().replace(/[−–—]/g, '-').matchAll(OCR_PERCENT_TEXT_PATTERN)].at(-1)?.[1]
+
+  if (unsignedAmountMatch?.[1] && explicitRateSign) {
+    return `${explicitRateSign}${unsignedAmountMatch[1].replaceAll(',', '')}`
+  }
+
+  return ''
+}
+
+export function normalizeOcrProfitRate(value: string, profitAmount = '') {
+  const normalizedValue = value.trim().replace(/[−–—]/g, '-')
+
+  if (!normalizedValue) {
+    return ''
+  }
+
+  const percentMatches = [...normalizedValue.matchAll(OCR_PERCENT_TEXT_PATTERN)]
+  const selectedMatch = percentMatches.at(-1)
+  if (!selectedMatch) {
+    return normalizedValue
+  }
+
+  const explicitSign = selectedMatch[1] ?? ''
+  const rateNumber = (selectedMatch[2] ?? '').replaceAll(',', '')
+  const normalizedProfitAmount = normalizeOcrProfitAmount(profitAmount)
+    || normalizeOcrProfitAmount('', normalizedValue)
+  const parsedProfitAmount = parseOcrNumber(normalizedProfitAmount)
+  let sign = explicitSign
+
+  if (parsedProfitAmount !== null && parsedProfitAmount !== 0) {
+    sign = parsedProfitAmount < 0 ? '-' : '+'
+  }
+
+  return `${sign}${rateNumber}%`
+}
+
+export function parseOcrProfitRate(value: string) {
+  const normalizedValue = normalizeOcrProfitRate(value)
 
   if (!normalizedValue) {
     return null
@@ -181,13 +250,7 @@ export function parseOcrProfitRate(value: string) {
   const percentMatch = normalizedValue.match(/([+-]?(?:\d+(?:[,.]\d+)*\.?\d*|\.\d+))\s*%/)
   if (percentMatch?.[1]) {
     const parsedPercent = Number(percentMatch[1].replaceAll(',', ''))
-    if (!Number.isFinite(parsedPercent)) {
-      return null
-    }
-
-    const hasExplicitPercentSign = /^[+-]/.test(percentMatch[1])
-    const inheritsNegativeSign = !hasExplicitPercentSign && normalizedValue.startsWith('-')
-    return inheritsNegativeSign ? -Math.abs(parsedPercent) : parsedPercent
+    return Number.isFinite(parsedPercent) ? parsedPercent : null
   }
 
   return parseOcrNumber(value)
@@ -206,30 +269,39 @@ export function formatComputedNumber(value: number) {
   })
 }
 
-export function computeAveragePrice(quantity: string, profitRate: string, evaluationAmount: string) {
+export function computeAveragePrice(
+  quantity: string,
+  profitRate: string,
+  evaluationAmount: string,
+  profitAmount = '',
+) {
   const parsedQuantity = parseOcrNumber(quantity)
-  const parsedProfitRate = parseOcrProfitRate(profitRate)
   const parsedEvaluationAmount = parseOcrNumber(evaluationAmount)
 
-  if (parsedQuantity === null || parsedProfitRate === null || parsedEvaluationAmount === null || parsedQuantity === 0) {
+  if (parsedQuantity === null || parsedEvaluationAmount === null || parsedQuantity === 0) {
     return ''
   }
 
-  const profitRateDecimal = parsedProfitRate / 100
-  const principalDivisor = 1 + profitRateDecimal
+  const parsedProfitAmount = parseOcrNumber(profitAmount)
+  if (parsedProfitAmount !== null) {
+    const principalFromAmount = parsedEvaluationAmount - parsedProfitAmount
+    if (Number.isFinite(principalFromAmount) && principalFromAmount > 0) {
+      return formatComputedNumber(principalFromAmount / parsedQuantity)
+    }
+  }
 
-  if (!Number.isFinite(principalDivisor) || principalDivisor === 0) {
+  const parsedProfitRate = parseOcrProfitRate(profitRate)
+  if (parsedProfitRate === null) {
     return ''
   }
 
-  const principal = parsedEvaluationAmount / principalDivisor
-  const averagePrice = principal / parsedQuantity
-
-  if (!Number.isFinite(averagePrice)) {
+  const principalDivisor = 1 + (parsedProfitRate / 100)
+  if (!Number.isFinite(principalDivisor) || principalDivisor <= 0) {
     return ''
   }
 
-  return formatComputedNumber(averagePrice)
+  const averagePrice = (parsedEvaluationAmount / principalDivisor) / parsedQuantity
+  return Number.isFinite(averagePrice) && averagePrice > 0 ? formatComputedNumber(averagePrice) : ''
 }
 
 export function isAveragePriceComputedFromEvaluation(
@@ -237,31 +309,14 @@ export function isAveragePriceComputedFromEvaluation(
   profitRate: string,
   evaluationAmount: string,
   averagePrice: string,
+  profitAmount = '',
 ) {
-  const parsedQuantity = parseOcrNumber(quantity)
-  const parsedProfitRate = parseOcrProfitRate(profitRate)
-  const parsedEvaluationAmount = parseOcrNumber(evaluationAmount)
   const parsedAveragePrice = parseOcrNumber(averagePrice)
+  const expectedAveragePrice = parseOcrNumber(
+    computeAveragePrice(quantity, profitRate, evaluationAmount, profitAmount),
+  )
 
-  if (
-    parsedQuantity === null
-    || parsedProfitRate === null
-    || parsedEvaluationAmount === null
-    || parsedAveragePrice === null
-    || parsedQuantity === 0
-  ) {
-    return false
-  }
-
-  const principalDivisor = 1 + (parsedProfitRate / 100)
-
-  if (!Number.isFinite(principalDivisor) || principalDivisor === 0) {
-    return false
-  }
-
-  const expectedAveragePrice = (parsedEvaluationAmount / principalDivisor) / parsedQuantity
-
-  if (!Number.isFinite(expectedAveragePrice) || expectedAveragePrice <= 0) {
+  if (parsedAveragePrice === null || expectedAveragePrice === null || expectedAveragePrice <= 0) {
     return false
   }
 
@@ -290,7 +345,10 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
     .map((item) => {
       const name = typeof item.name === 'string' ? item.name.trim() : ''
       const quantity = typeof item.quantity === 'string' ? item.quantity.trim() : ''
-      const profitRate = typeof item.profitRate === 'string' ? item.profitRate.trim() : ''
+      const rawProfitRate = typeof item.profitRate === 'string' ? item.profitRate.trim() : ''
+      const rawProfitAmount = typeof item.profitAmount === 'string' ? item.profitAmount.trim() : ''
+      const profitAmount = normalizeOcrProfitAmount(rawProfitAmount, rawProfitRate)
+      const profitRate = normalizeOcrProfitRate(rawProfitRate, profitAmount)
       const evaluationAmount = typeof item.evaluationAmount === 'string' ? item.evaluationAmount.trim() : ''
       const averagePrice = typeof item.averagePrice === 'string' ? item.averagePrice.trim() : ''
       const code = normalizeInstrumentCode(item.code)
@@ -308,9 +366,10 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
       return {
         name,
         quantity,
+        profitAmount,
         profitRate,
         evaluationAmount,
-        averagePrice: averagePrice || computeAveragePrice(quantity, profitRate, evaluationAmount),
+        averagePrice: averagePrice || computeAveragePrice(quantity, profitRate, evaluationAmount, profitAmount),
         code,
         ticker,
         resolvedName,
@@ -321,7 +380,7 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
         resolvedKind,
       }
     })
-    .filter((item) => item.name.length > 0 || item.quantity.length > 0 || item.profitRate.length > 0 || item.evaluationAmount.length > 0)
+    .filter((item) => item.name.length > 0 || item.quantity.length > 0 || Boolean(item.profitAmount) || item.profitRate.length > 0 || item.evaluationAmount.length > 0)
 }
 
 export function sanitizeOcrInstrumentCandidates(input: unknown): OcrInstrumentCandidate[] {

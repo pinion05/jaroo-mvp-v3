@@ -9,6 +9,7 @@ function row(overrides: Partial<OcrReviewRow>): OcrReviewRow {
     id: overrides.id ?? 'row-1',
     name: overrides.name ?? '삼성전자',
     quantity: overrides.quantity ?? '10',
+    profitAmount: overrides.profitAmount,
     profitRate: overrides.profitRate ?? '0%',
     evaluationAmount: overrides.evaluationAmount ?? '1,000',
     averagePrice: overrides.averagePrice ?? '100',
@@ -56,4 +57,15 @@ test('aggregateResolvedOcrReviewRows computes weighted average price from accoun
 
   assert.equal(aggregated?.quantity, '40')
   assert.equal(aggregated?.averagePrice, '175')
+})
+
+test('aggregateResolvedOcrReviewRows sums profitAmount and derives exact merged return', () => {
+  const [aggregated] = aggregateResolvedOcrReviewRows([
+    row({ id: 'a', quantity: '3', evaluationAmount: '181137', profitAmount: '-13263', averagePrice: '64800' }),
+    row({ id: 'b', quantity: '7', evaluationAmount: '124491', profitAmount: '-7459', averagePrice: '18850' }),
+  ])
+
+  assert.equal(aggregated?.profitAmount, '-20722')
+  assert.equal(aggregated?.evaluationAmount, '305,628')
+  assert.equal(aggregated?.profitRate, '-6.3496%')
 })

@@ -1,7 +1,22 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { calculateFallbackEvaluationAmount, calculateFallbackEvaluationMoney } from '@/lib/deepscan-loading-metrics'
+import {
+  buildDeepScanReturnRateDisplay,
+  calculateFallbackEvaluationAmount,
+  calculateFallbackEvaluationMoney,
+} from '@/lib/deepscan-loading-metrics'
+
+test('DeepScan return display keeps live and broker snapshot rates separate', () => {
+  assert.deepEqual(
+    buildDeepScanReturnRateDisplay({ currentProfitRate: -27.3, snapshotProfitRate: -6.8 }),
+    { current: '-27.3%', snapshot: '-6.8%' },
+  )
+  assert.deepEqual(
+    buildDeepScanReturnRateDisplay({ currentProfitRate: 12.7 }),
+    { current: '+12.7%', snapshot: null },
+  )
+})
 
 test('calculateFallbackEvaluationAmount prefers live current price times shares over stale OCR evaluation amount', () => {
   assert.equal(

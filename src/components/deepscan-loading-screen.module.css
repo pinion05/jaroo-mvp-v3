@@ -197,6 +197,25 @@
   color: var(--ds-green);
 }
 
+.returnRateContext {
+  margin-right: 4px;
+  color: var(--ds-mid);
+  font-weight: 600;
+}
+
+.snapshotReturnRate {
+  margin: 2px 0 0;
+  color: var(--ds-mid);
+  font-size: 11px;
+  line-height: 1.25;
+  white-space: nowrap;
+}
+
+.snapshotReturnRate strong {
+  color: var(--ds-ink);
+  font-weight: 600;
+}
+
 .stockMetaGrid {
   padding-top: 10px;
   border-top: 0.5px solid var(--ds-line);

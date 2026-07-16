@@ -44,6 +44,19 @@ test('prepareMergeRowsForApply는 averagePrice가 비어 있으면 apply 직전�
   assert.equal(rows[0]?.averagePrice, ' ')
 })
 
+test('prepareMergeRowsForApply는 평가손익 금액으로 정확한 평단을 보강한다', () => {
+  const [prepared] = prepareMergeRowsForApply([{
+    name: 'SOOP',
+    quantity: '3주',
+    profitAmount: '-13,263원',
+    profitRate: '6.8%',
+    evaluationAmount: '181,137원',
+    averagePrice: '',
+  }])
+
+  assert.equal(prepared?.averagePrice, '64,800')
+})
+
 test('prepareMergeRowsForApply는 dash/N-A placeholder averagePrice도 apply 직전에 1회 보강한다', () => {
   const dashRows = [{
     name: '삼성전자',

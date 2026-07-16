@@ -11,6 +11,7 @@ export type OcrReviewAccountDetail = {
   rowId: string
   sourceFileName?: string
   quantity: string
+  profitAmount?: string
   profitRate: string
   evaluationAmount: string
   averagePrice: string
@@ -44,7 +45,30 @@ function sumParsed(rows: OcrReviewRow[], field: 'quantity' | 'evaluationAmount')
     : null
 }
 
-function computeMergedProfitRate(rows: OcrReviewRow[], evaluationAmount: number) {
+function sumParsedProfitAmounts(rows: OcrReviewRow[]) {
+  const values = rows.map((row) => parseOcrNumber(row.profitAmount ?? ''))
+  return values.every((value): value is number => value !== null)
+    ? values.reduce((sum, value) => sum + value, 0)
+    : null
+}
+
+function formatSignedComputedNumber(value: number) {
+  const normalizedValue = Number(value.toFixed(4))
+  if (!Number.isFinite(normalizedValue)) {
+    return ''
+  }
+
+  return `${normalizedValue > 0 ? '+' : ''}${normalizedValue}`
+}
+
+function computeMergedProfitRate(rows: OcrReviewRow[], evaluationAmount: number, profitAmount: number | null) {
+  if (profitAmount !== null) {
+    const principal = evaluationAmount - profitAmount
+    if (Number.isFinite(principal) && principal > 0) {
+      return `${formatSignedComputedNumber((profitAmount / principal) * 100)}%`
+    }
+  }
+
   const principalValues = rows.map((row) => {
     const rowEvaluationAmount = parseOcrNumber(row.evaluationAmount)
     const rowProfitRate = parseOcrProfitRate(row.profitRate)
@@ -105,6 +129,7 @@ function toAccountDetail(row: OcrReviewRow): OcrReviewAccountDetail {
     rowId: row.id,
     sourceFileName: row.sourceFileName,
     quantity: row.quantity,
+    profitAmount: row.profitAmount,
     profitRate: row.profitRate,
     evaluationAmount: row.evaluationAmount,
     averagePrice: row.averagePrice,
@@ -131,12 +156,16 @@ function aggregateGroup(rows: OcrReviewRow[]): AggregatedOcrReviewRow {
 
   const quantity = sumParsed(orderedRows, 'quantity')
   const evaluationAmount = sumParsed(orderedRows, 'evaluationAmount')
+  const profitAmount = sumParsedProfitAmounts(orderedRows)
   const quantityText = quantity === null ? primary.quantity : formatComputedNumber(quantity)
   const evaluationAmountText = evaluationAmount === null ? primary.evaluationAmount : formatComputedNumber(evaluationAmount)
-  const profitRateText = evaluationAmount === null ? primary.profitRate : computeMergedProfitRate(orderedRows, evaluationAmount) || primary.profitRate
+  const profitAmountText = profitAmount === null ? primary.profitAmount : formatSignedComputedNumber(profitAmount)
+  const profitRateText = evaluationAmount === null
+    ? primary.profitRate
+    : computeMergedProfitRate(orderedRows, evaluationAmount, profitAmount) || primary.profitRate
   const averagePriceText =
     computeWeightedAveragePrice(orderedRows)
-    || computeAveragePrice(quantityText, profitRateText, evaluationAmountText)
+    || computeAveragePrice(quantityText, profitRateText, evaluationAmountText, profitAmountText ?? '')
     || primary.averagePrice
 
   return {
@@ -144,6 +173,7 @@ function aggregateGroup(rows: OcrReviewRow[]): AggregatedOcrReviewRow {
     id: `agg:${getAggregationKey(primary)}`,
     quantity: quantityText,
     evaluationAmount: evaluationAmountText,
+    profitAmount: profitAmountText,
     profitRate: profitRateText,
     averagePrice: averagePriceText,
     sourceRowIds: orderedRows.map((row) => row.id),

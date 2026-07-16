@@ -778,6 +778,96 @@ test('home market score renders partial OCI indicators when VKOSPI source is blo
   assert.equal(marketScore.details.some((detail) => detail.label === 'VKOSPI'), false)
 })
 
+test('DB 재접속과 DeepScan session이 촬영 당시 수익률을 live 수익률과 별도로 보존한다', () => {
+  const restoreWindow = installWindowMock()
+
+  try {
+    const [item] = buildPortfolioItemsFromAppliedHomePortfolioRows([
+      {
+        name: 'SOOP',
+        quantity: '3주',
+        profitRate: '',
+        evaluationAmount: '181,137원',
+        averagePrice: '64,800원',
+        resolvedName: 'SOOP',
+        resolvedCode: '067160',
+        resolvedMarket: 'KOSDAQ',
+        resolvedMarketTone: 'kosdaq',
+        resolvedKind: 'stock',
+      },
+    ])
+
+    assert.ok(item)
+    assert.equal(Number(item.snapshotProfitRate?.toFixed(1)), -6.8)
+
+    const [holding] = buildHomeHoldingsFromPortfolioItems([
+      {
+        ...item,
+        currentPrice: 47100,
+        currentPriceCurrency: 'KRW',
+        currentProfitRate: -27.3,
+      },
+    ])
+
+    assert.ok(holding)
+    assert.equal(Number(holding.snapshotProfitRate?.toFixed(1)), -6.8)
+    assert.equal(holding.change, '-27.3%')
+    assert.equal(persistDeepScanTarget(holding), true)
+
+    const session = resolveDeepScanTargetSession()
+    assert.equal(Number(session.holding.snapshotProfitRate?.toFixed(1)), -6.8)
+    assert.equal(session.holding.change, '-27.3%')
+  } finally {
+    restoreWindow()
+  }
+})
+
+test('통화를 증명할 수 없는 미국 DB 행은 촬영 수익률을 잘못 역산하지 않는다', () => {
+  const [ambiguousItem] = buildPortfolioItemsFromAppliedHomePortfolioRows([
+    {
+      name: '미국 종목',
+      quantity: '10주',
+      profitRate: '',
+      evaluationAmount: '1811370',
+      averagePrice: '195',
+      averagePriceCurrency: 'USD',
+      resolvedName: 'US Stock',
+      resolvedTicker: 'TEST',
+      resolvedMarket: 'NASDAQ',
+      resolvedMarketTone: 'nasdaq',
+      resolvedKind: 'stock',
+    },
+  ])
+  const [explicitItem] = buildPortfolioItemsFromAppliedHomePortfolioRows([
+    {
+      name: '미국 종목',
+      quantity: '10주',
+      profitRate: '-6.8%',
+      evaluationAmount: '1,811,370원',
+      averagePrice: '$195',
+      averagePriceCurrency: 'USD',
+      resolvedName: 'US Stock',
+      resolvedTicker: 'TEST',
+      resolvedMarket: 'NASDAQ',
+      resolvedMarketTone: 'nasdaq',
+      resolvedKind: 'stock',
+    },
+  ])
+
+  assert.equal(ambiguousItem?.snapshotProfitRate, undefined)
+  assert.equal(explicitItem?.snapshotProfitRate, -6.8)
+
+  const [ambiguousHolding] = buildHomeHoldingsFromPortfolioItems([
+    {
+      ...ambiguousItem,
+      currentPrice: 150,
+      currentPriceCurrency: 'USD',
+      currentProfitRate: -23.1,
+    },
+  ])
+  assert.equal(ambiguousHolding?.snapshotProfitRate, undefined)
+})
+
 test('home market score has loading, missing, and error fallback states', () => {
   const loadingScore = buildHomeMarketScore(homeHoldings, { marketSignalStatus: 'loading' })
   const missingScore = buildHomeMarketScore([], { marketSignalStatus: 'idle' })

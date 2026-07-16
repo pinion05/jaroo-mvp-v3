@@ -16,6 +16,7 @@ export function toReviewRow(row: OcrSourceRow): OcrReviewRow {
     raw: {
       name: row.name,
       quantity: row.quantity,
+      profitAmount: row.profitAmount,
       profitRate: row.profitRate,
       evaluationAmount: row.evaluationAmount,
       averagePrice: row.averagePrice,
