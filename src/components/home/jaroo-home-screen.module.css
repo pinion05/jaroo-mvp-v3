@@ -16,6 +16,8 @@
   width: min(100vw, 340px);
   height: min(100dvh - 48px, 760px);
   min-height: 620px;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
@@ -31,6 +33,7 @@
 .top {
   padding: 14px 16px 10px;
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   background: #f5f6f8;
@@ -80,7 +83,12 @@
 }
 
 .body {
+  flex: 1 0 auto;
   padding: 0 12px 14px;
+}
+
+.frame > nav {
+  flex: 0 0 auto;
 }
 
 .mainCard {
