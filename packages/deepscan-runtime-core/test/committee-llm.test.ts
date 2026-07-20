@@ -11,6 +11,74 @@ import {
   scoreCommitteeMembersProgressive,
 } from '../src/committee-llm.js'
 
+test('committee request, retry, success, and summary logs redact nested credential sentinels', async () => {
+  const originalFetch = global.fetch
+  const originalKey = process.env.OPENROUTER_API_KEY
+  const logDir = mkdtempSync(join(tmpdir(), 'committee-llm-safe-'))
+  const secret = 'core-log-secret-sentinel-195'
+  process.env.OPENROUTER_API_KEY = 'transport-secret-sentinel-195'
+  let attempt = 0
+
+  global.fetch = (async (_url: string | URL | Request, init?: RequestInit) => {
+    attempt += 1
+    const requestBody = String(init?.body ?? '')
+    assert.equal(requestBody.includes(secret), false)
+    if (attempt === 1) {
+      return new Response(JSON.stringify({
+        error: { message: `api_key=${secret}` },
+        access_token: secret,
+      }), { status: 500, headers: { 'Content-Type': 'application/json' } })
+    }
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({ score: 70, reason: '정상 응답입니다.', confidence: 'medium' }),
+        },
+      }],
+    }), { status: 200, headers: { 'Content-Type': 'application/json' } })
+  }) as typeof fetch
+
+  try {
+    const result = await scoreCommitteeMembers({
+      memberKeys: ['valuation'],
+      shared: {
+        ApiKey: secret,
+        nested: { authorization: `Bearer ${secret}`, url: `https://example.test/?token=${secret}` },
+      },
+      members: { valuation: { member: 'valuation', facts: { safe: true } } },
+      options: {
+        schemaName: 'jaroo_safe_log_test',
+        title: 'safe log test',
+        systemPrompt: () => 'test',
+        logDir,
+        retryCount: 1,
+        emptyResponseRetryDelayMs: 1,
+        summaryKey: 'safe-log',
+      },
+    })
+    assert.equal(result.results.valuation.score, 70)
+
+    const files = [
+      'request-valuation-attempt-1.json',
+      'valuation-attempt-1-failure.json',
+      'valuation.json',
+      '_summary-safe-log.json',
+    ]
+    for (const file of files) {
+      const contents = readFileSync(join(logDir, file), 'utf8')
+      assert.equal(contents.includes(secret), false, file)
+      assert.equal(contents.includes('transport-secret-sentinel-195'), false, file)
+    }
+    assert.match(readFileSync(join(logDir, 'request-valuation-attempt-1.json'), 'utf8'), /\[REDACTED\]/)
+    assert.match(readFileSync(join(logDir, 'valuation-attempt-1-failure.json'), 'utf8'), /\[REDACTED\]/)
+  } finally {
+    rmSync(logDir, { recursive: true, force: true })
+    global.fetch = originalFetch
+    if (originalKey === undefined) delete process.env.OPENROUTER_API_KEY
+    else process.env.OPENROUTER_API_KEY = originalKey
+  }
+})
+
 test('scoreCommitteeMember sends strict OpenRouter schema request and parses JSON response', async () => {
   const originalFetch = global.fetch
   const originalKey = process.env.OPENROUTER_API_KEY

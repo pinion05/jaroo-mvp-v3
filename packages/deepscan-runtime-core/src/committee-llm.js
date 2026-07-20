@@ -1,5 +1,6 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { safeJsonStringify, sanitizeForJson } from './safe-json.js'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
 export const DEFAULT_COMMITTEE_LLM_MODEL = 'deepseek/deepseek-v4-flash'
@@ -23,8 +24,12 @@ function ensureLogDir(logDir) {
 }
 
 function writeLog(logDir, filename, payload) {
-  ensureLogDir(logDir)
-  writeFileSync(join(logDir, filename), JSON.stringify(payload, null, 2))
+  try {
+    ensureLogDir(logDir)
+    writeFileSync(join(logDir, filename), safeJsonStringify(payload, 2))
+  } catch {
+    // Logging is diagnostic only and must not fail a committee request.
+  }
 }
 
 function delay(ms) {
@@ -118,7 +123,7 @@ function buildRequestBody(memberKey, dumps, runtimeOptions) {
       },
       {
         role: 'user',
-        content: `sharedContext=${JSON.stringify(dumps.shared)}\nmemberContext=${JSON.stringify(dumps.memberDump)}`,
+        content: `sharedContext=${JSON.stringify(sanitizeForJson(dumps.shared))}\nmemberContext=${JSON.stringify(sanitizeForJson(dumps.memberDump))}`,
       },
     ],
   }

@@ -1,5 +1,13 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { readFile } = require('node:fs/promises');
+const { join } = require('node:path');
+
+const DISCLOSURE_GOLD_FIXTURE = join(
+  __dirname,
+  'fixtures',
+  'kr-disclosure-classification-gold.v1.json',
+);
 
 test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nested input, slim pages, quotes aggregate, package result, and public API re-export', async () => {
   const service = await import('../src/services/deepscan-kr-evidence.js');
@@ -395,6 +403,51 @@ test('buildDeepScanKrEvidencePacket promotes OpenDART disclosures into structure
   ]);
 });
 
+test('buildDeepScanKrEvidencePacket uses canonical disclosure analysis without reclassification or reordering', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+  const canonicalAnalysis = {
+    state: 'truncated',
+    available: true,
+    source: 'opendart',
+    totalCount: 99,
+    count: 1,
+    filings: [{ rceptNo: 'selected-risk', reportName: '선택된 위험 공시', riskLevel: 'critical' }],
+    selectedFilings: [{ rceptNo: 'selected-risk', reportName: '선택된 위험 공시', riskLevel: 'critical' }],
+    latestFilings: [{ rceptNo: 'selected-risk', reportName: '선택된 위험 공시', riskLevel: 'critical' }],
+    categoryCounts: { 'high-risk': 1 },
+    riskCount: 1,
+    mediumRiskCount: 0,
+    correctionCount: 0,
+    dilutionCount: 0,
+    ownershipCount: 0,
+    periodicReportCount: 0,
+    materialEventCount: 0,
+    topReportTypes: [],
+    materialEvents: [],
+    risks: [],
+    summary: { providerTotalCount: 99, collectedCount: 20, selectedCount: 1 },
+  };
+  const packet = buildDeepScanKrEvidencePacket(
+    { instrument: { code: '230980', name: '비유테크놀러지', market: 'KR' } },
+    {
+      disclosures: {
+        filings: [{ rceptNo: 'unselected-clean', reportName: '일반 안내' }],
+        disclosurePipeline: {
+          schemaVersion: 'jaroo.deepscan.kr-disclosure-pipeline.v1',
+          analysis: canonicalAnalysis,
+        },
+      },
+    },
+  );
+
+  assert.equal(packet.disclosureAnalysis, canonicalAnalysis);
+  assert.equal(packet.disclosureAnalysis.count, 1);
+  assert.equal(packet.disclosureAnalysis.riskCount, 1);
+  assert.deepEqual(packet.disclosureAnalysis.filings.map((entry) => entry.rceptNo), ['selected-risk']);
+  assert.equal(packet.reportSignals.disclosureCount, 1);
+  assert.ok(packet.topFacts.includes('최근 OpenDART 공시 1건 / 주요 리스크 1건 확인'));
+});
+
 test('KR disclosure risk keyword database catches sampled delisting disclosure title variants', async () => {
   const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
   const {
@@ -402,43 +455,8 @@ test('KR disclosure risk keyword database catches sampled delisting disclosure t
     matchKrDisclosureRiskKeywords,
   } = await import('../src/services/deepscan-kr-disclosure-risk-keywords.js');
 
-  const sampledDelistingTitles = [
-    '주권매매거래정지해제 (상장폐지에 따른 정리매매 개시)',
-    '기타시장안내 (상장폐지 절차 진행 안내)',
-    '기타시장안내 (상장폐지결정 효력정지 등 가처분 신청 기각에 따른 정리매매절차 재개)',
-    '기타시장안내 (코스닥시장위원회 개최 결과 및 상장폐지 결정 안내)',
-    '기타시장안내 (상장폐지 절차 재개)',
-    '기타주요경영사항(자율공시) (상장폐지효력정지가처분 기각 결정에 대한 즉시항고장 제출)',
-    '주권매매거래정지 (자진상장폐지 신청)',
-    '투자유의안내 (상장폐지 우려 예고)',
-    '기타시장안내 (상장폐지 관련)',
-    '기타시장안내 (상장폐지사유 발생)',
-    '기타시장안내 (상장폐지 여부 결정일까지 개선기간 부여)',
-    '기타시장안내 (기업심사위원회 심의결과 안내)',
-    '기타시장안내 (상장적격성 실질심사 대상 결정)',
-    '기타시장안내 (개선기간 종료에 따른 상장폐지 여부 심의)',
-    '주권매매거래정지기간변경 (상장폐지 사유 발생)',
-    '감사보고서 제출 (감사의견 의견거절)',
-    '감사보고서 제출 (감사범위 제한 및 계속기업 존속능력 불확실성)',
-    '기타시장안내 (사업보고서 미제출에 따른 관리종목 지정)',
-    '기타시장안내 (관리종목 지정 후 사유 미해소)',
-    '기타시장안내 (상장예비심사 청구서 미제출)',
-    '기타시장안내 (발행한 어음의 최종부도)',
-    '회생절차개시신청',
-    '횡령ㆍ배임혐의발생',
-    '불성실공시법인지정',
-    '기타시장안내 (기업의 계속성 및 경영의 투명성 등을 종합적으로 고려)',
-    '기타시장안내 (지정자문인 선임계약 해지에 따른 상장폐지절차 안내)',
-    '주권매매거래정지 (지정자문인 계약해지)',
-    '반기검토의견부적정또는의견거절',
-    '회생절차폐지결정',
-    '회생절차폐지신청',
-    '기타시장안내 (상장공시위원회 심의결과 및 상장폐지 결정 안내)',
-    '기타시장안내 (투자주의 환기종목 지정사유 일부 해제 관련 시장조치 미진행)',
-    '기타시장안내 (회계처리기준 위반행위 관련 상장적격성 실질심사 절차 미진행 안내)',
-    '감사보고서 제출 (감사의견 거절 및 계속기업가정 불확실성)',
-    '주권매매거래정지기간변경 (주식의 병합, 분할 등 전자등록 변경, 말소)',
-  ];
+  const gold = JSON.parse(await readFile(DISCLOSURE_GOLD_FIXTURE, 'utf8'));
+  const sampledDelistingTitles = gold.riskCases.map((fixture) => fixture.reportName);
 
   assert.ok(KR_DELISTING_DISCLOSURE_KEYWORD_GROUPS.length >= 6);
   for (const title of sampledDelistingTitles) {

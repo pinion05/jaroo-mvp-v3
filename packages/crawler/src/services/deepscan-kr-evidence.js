@@ -1,8 +1,8 @@
 import { createRequire } from 'node:module';
 import {
-  hasKrDisclosureHighRiskSignal,
-  matchKrDisclosureRiskKeywords,
-} from './deepscan-kr-disclosure-risk-keywords.js';
+  buildKrDisclosurePipeline,
+  KR_DISCLOSURE_PIPELINE_SCHEMA_VERSION,
+} from './deepscan-kr-disclosure-pipeline.js';
 
 const require = createRequire(import.meta.url);
 const {
@@ -16,11 +16,6 @@ const V12_EXTRA_PAGE_IDS = Object.freeze(KNOWN_V12_PAGE_IDS.filter((pageId) => !
 const OCRISH_NUMBER_TEXT_PATTERN = /(shares?|share|stocks?|stock|주|원|krw|usd|eur|jpy|cny|aud|cad|hkd)/gi;
 const LABEL_PREFIX_PATTERN = /^(?:펼치기|접기)\s*/;
 const NO_DATA_TEXT_PATTERN = /^(?:[-—–]|n\/a|na|null|none|데[이]?타가\s*존재하지\s*않습니다\.?|데[이]?터가\s*존재하지\s*않습니다\.?|자료가\s*없습니다\.?|데[이]?터\s*없음|최근\s*3개월\s*이내에\s*제시된\s*의견이\s*없습니다\.?)$/i;
-const DISCLOSURE_CORRECTION_PATTERN = /(\[기재정정\]|기재정정|정정)/u;
-const DISCLOSURE_DILUTION_PATTERN = /(유상증자|무상증자|전환사채|신주인수권|교환사채|감자|자기주식처분|주식매수선택권|증권발행|주요사항보고서)/u;
-const DISCLOSURE_OWNERSHIP_PATTERN = /(임원ㆍ주요주주|임원·주요주주|주요주주|최대주주|대량보유|소유주식변동|주식등의대량보유|지분공시)/u;
-const DISCLOSURE_PERIODIC_PATTERN = /(사업보고서|반기보고서|분기보고서|기업지배구조보고서|감사보고서)/u;
-const DISCLOSURE_MATERIAL_EVENT_PATTERN = /(단일판매|공급계약|수주|투자판단|타법인|채무보증|담보제공|영업양수|영업양도|합병|분할|주식교환|자산양수|자산양도)/u;
 
 function asObject(value) {
   return value && typeof value === 'object' && !Array.isArray(value) ? value : {};
@@ -1199,99 +1194,6 @@ function extractBusinessCommentary(page) {
   };
 }
 
-function normalizeDisclosureCategoryCounts(filings) {
-  return filings.reduce((counts, filing) => {
-    for (const category of filing.categories) {
-      counts[category] = (counts[category] ?? 0) + 1;
-    }
-    return counts;
-  }, {});
-}
-
-function classifyDisclosureFiling(reportName, disclosureType) {
-  const name = normalizeText(reportName) ?? '';
-  const type = normalizeText(disclosureType);
-  const categories = [];
-  const riskKeywordMatch = matchKrDisclosureRiskKeywords(name);
-
-  if (hasKrDisclosureHighRiskSignal(name)) {
-    categories.push('high-risk');
-  }
-  if (DISCLOSURE_CORRECTION_PATTERN.test(name)) {
-    categories.push('correction');
-  }
-  if (DISCLOSURE_DILUTION_PATTERN.test(name)) {
-    categories.push('capital-change');
-  }
-  if (DISCLOSURE_OWNERSHIP_PATTERN.test(name) || type === 'D') {
-    categories.push('ownership');
-  }
-  if (DISCLOSURE_PERIODIC_PATTERN.test(name) || type === 'A') {
-    categories.push('periodic');
-  }
-  if (DISCLOSURE_MATERIAL_EVENT_PATTERN.test(name) || type === 'B') {
-    categories.push('material-event');
-  }
-
-  if (categories.length === 0) {
-    categories.push('other');
-  }
-
-  const riskLevel = categories.includes('high-risk')
-    ? 'high'
-    : categories.includes('capital-change') || categories.includes('correction') || categories.includes('material-event')
-      ? 'medium'
-      : 'low';
-  const riskLabel = riskLevel === 'high'
-    ? '중요 리스크'
-    : riskLevel === 'medium'
-      ? '확인 필요'
-      : categories.includes('ownership')
-        ? '지분 변동'
-        : '일반';
-
-  return {
-    categories,
-    riskLevel,
-    riskLabel,
-    riskKeywordGroups: riskKeywordMatch.groups,
-    riskKeywords: riskKeywordMatch.keywords,
-    riskKeywordSeverity: riskKeywordMatch.maxSeverity,
-  };
-}
-
-function normalizeDisclosureFiling(entry = {}) {
-  const filing = asObject(entry);
-  const reportName = normalizeText(filing.reportName ?? filing.report_nm) ?? '';
-  const disclosureType = normalizeText(filing.disclosureType ?? filing.pblntf_ty) ?? null;
-  const classification = classifyDisclosureFiling(reportName, disclosureType);
-
-  return {
-    rceptNo: normalizeText(filing.rceptNo ?? filing.rcept_no) ?? null,
-    reportName,
-    receiptDate: normalizeDate(filing.receiptDate ?? filing.rcept_dt ?? filing.reportDate) ?? null,
-    disclosureType,
-    disclosureTypeLabel: normalizeText(filing.disclosureTypeLabel ?? filing.pblntf_ty_label) ?? null,
-    filerName: normalizeText(filing.filerName ?? filing.flr_nm) ?? null,
-    remarks: normalizeText(filing.remarks ?? filing.rm) ?? null,
-    documentUrl: normalizeText(filing.documentUrl) ?? null,
-    ...classification,
-  };
-}
-
-function countByReportName(filings) {
-  const counts = new Map();
-  for (const filing of filings) {
-    const key = filing.reportName.replace(DISCLOSURE_CORRECTION_PATTERN, '').trim() || filing.reportName || '기타 공시';
-    counts.set(key, (counts.get(key) ?? 0) + 1);
-  }
-
-  return [...counts.entries()]
-    .map(([reportName, count]) => ({ reportName, count }))
-    .sort((left, right) => right.count - left.count)
-    .slice(0, 8);
-}
-
 function normalizeDisclosureAnalysis(rawDisclosures) {
   const hasArraySource = Array.isArray(rawDisclosures);
   const source = hasArraySource ? { filings: rawDisclosures } : asObject(rawDisclosures);
@@ -1299,43 +1201,42 @@ function normalizeDisclosureAnalysis(rawDisclosures) {
     return null;
   }
 
+  if (
+    source.disclosurePipeline?.schemaVersion === KR_DISCLOSURE_PIPELINE_SCHEMA_VERSION
+    && source.disclosurePipeline.analysis
+    && typeof source.disclosurePipeline.analysis === 'object'
+  ) {
+    return source.disclosurePipeline.analysis;
+  }
+
   const rawFilings = Array.isArray(source.filings)
     ? source.filings
     : Array.isArray(source.list)
       ? source.list
       : [];
-  const filings = rawFilings
-    .map((entry) => normalizeDisclosureFiling(entry))
-    .filter((filing) => filing.reportName || filing.rceptNo);
-  const summary = asObject(source.summary);
-  const requested = asObject(source.requested);
-  const categoryCounts = normalizeDisclosureCategoryCounts(filings);
-  const totalCount = normalizeNumber(summary.totalCount ?? summary.total_count) ?? filings.length;
-  const latestReceiptDate = normalizeDate(summary.latestReceiptDate ?? filings[0]?.receiptDate) ?? null;
-  const periodFrom = normalizeDate(requested.from ?? source.from ?? source.periodFrom) ?? null;
-  const periodTo = normalizeDate(requested.to ?? source.to ?? source.periodTo) ?? null;
-  const riskFilings = filings.filter((filing) => filing.riskLevel === 'high');
-  const mediumRiskFilings = filings.filter((filing) => filing.riskLevel === 'medium');
+  const pipeline = buildKrDisclosurePipeline({
+    ...source,
+    filings: rawFilings,
+  }, {
+    selectionLimit: Math.min(200, Math.max(1, rawFilings.length || 1)),
+  });
+  const canonical = pipeline.analysis;
+  const normalizeFilingDate = (filing) => ({
+    ...filing,
+    receiptDate: normalizeDate(filing.receiptDate) ?? filing.receiptDate ?? null,
+    reportDate: normalizeDate(filing.reportDate) ?? filing.reportDate ?? null,
+  });
+  const filings = canonical.filings.map(normalizeFilingDate);
+  const latestFilings = canonical.latestFilings.map(normalizeFilingDate);
 
   return {
-    available: true,
-    source: normalizeText(source.source) ?? 'opendart',
-    count: filings.length,
-    totalCount,
-    periodFrom,
-    periodTo,
-    latestReceiptDate,
-    topReportTypes: countByReportName(filings),
+    ...canonical,
+    periodFrom: normalizeDate(canonical.periodFrom) ?? canonical.periodFrom ?? null,
+    periodTo: normalizeDate(canonical.periodTo) ?? canonical.periodTo ?? null,
+    latestReceiptDate: normalizeDate(canonical.latestReceiptDate) ?? canonical.latestReceiptDate ?? null,
     filings,
-    latestFilings: filings.slice(0, 8),
-    riskCount: riskFilings.length,
-    mediumRiskCount: mediumRiskFilings.length,
-    correctionCount: categoryCounts.correction ?? 0,
-    dilutionCount: categoryCounts['capital-change'] ?? 0,
-    ownershipCount: categoryCounts.ownership ?? 0,
-    periodicReportCount: categoryCounts.periodic ?? 0,
-    materialEventCount: categoryCounts['material-event'] ?? 0,
-    categoryCounts,
+    selectedFilings: filings,
+    latestFilings,
   };
 }
 
@@ -1344,7 +1245,7 @@ function buildDisclosureFact(disclosureAnalysis) {
     return null;
   }
 
-  const count = disclosureAnalysis.totalCount ?? disclosureAnalysis.count ?? 0;
+  const count = disclosureAnalysis.count ?? disclosureAnalysis.totalCount ?? 0;
   if (count === 0) {
     return '최근 OpenDART 공시 없음';
   }
@@ -1366,7 +1267,7 @@ function buildDisclosureRisk(disclosureAnalysis) {
   }
 
   if (disclosureAnalysis.riskCount > 0) {
-    const firstRisk = disclosureAnalysis.filings.find((filing) => filing.riskLevel === 'high');
+    const firstRisk = disclosureAnalysis.filings.find((filing) => ['critical', 'high'].includes(filing.riskLevel));
     return `주의 공시 ${formatNumber(disclosureAnalysis.riskCount)}건${firstRisk?.reportName ? `: ${firstRisk.reportName}` : ''}`;
   }
 
@@ -1693,7 +1594,7 @@ export function buildDeepScanKrEvidencePacket(input = {}, sources = {}) {
     ...(hasDisclosureSource
       ? {
           disclosureAvailable: Boolean(disclosureAnalysis?.available),
-          disclosureCount: disclosureAnalysis?.totalCount ?? disclosureAnalysis?.count ?? 0,
+          disclosureCount: disclosureAnalysis?.count ?? disclosureAnalysis?.totalCount ?? 0,
           disclosureRiskCount: disclosureAnalysis?.riskCount ?? 0,
           disclosureCorrectionCount: disclosureAnalysis?.correctionCount ?? 0,
           disclosureOwnershipCount: disclosureAnalysis?.ownershipCount ?? 0,

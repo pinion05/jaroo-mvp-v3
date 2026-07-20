@@ -203,6 +203,110 @@ test('buildJarooDeepScanPayload returns input-invalid payload when code/ticker m
   }
 });
 
+test('buildJarooDeepScanPayload sanitizes raw input echoes on invalid and valid paths', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+  const secret = 'payload-secret-sentinel-195';
+  const circular = {
+    instrument: { name: '삼성전자' },
+    ApiKey: secret,
+    nested: {
+      authorization: `Bearer ${secret}`,
+      url: `https://example.test/?access_token=${secret}`,
+    },
+  };
+  circular.self = circular;
+
+  const payload = await buildJarooDeepScanPayload(circular);
+  const serialized = JSON.stringify(payload.metadata.inputValidity.raw);
+
+  assert.equal(serialized.includes(secret), false);
+  assert.match(serialized, /\[REDACTED\]/);
+  assert.match(serialized, /\[Circular\]/);
+
+  const validPayload = await buildJarooDeepScanPayload({
+    instrument: { name: '삼성전자', code: '005930', market: 'KR' },
+    selectedAt: '2026-06-01T00:00:00.000Z',
+    ApiKey: secret,
+    sources: {},
+  });
+  assert.equal(validPayload.metadata.inputValidity.valid, true);
+  assert.equal(JSON.stringify(validPayload.metadata.inputValidity.raw).includes(secret), false);
+});
+
+test('maybeResolveKrDisclosures attaches one canonical pipeline and a compatible dump alias', async () => {
+  const { maybeResolveKrDisclosures } = await import('../src/services/deepscan-payload.js');
+  const requestedReceipts = [];
+  const rawInput = {
+    invokeDisclosures: true,
+    disclosureOptions: {
+      apiKey: 'test-key',
+      from: '2026-05-01',
+      to: '2026-05-31',
+      selectionLimit: 10,
+      documentLimit: 2,
+      fetchImpl: async (url) => {
+        const parsed = new URL(String(url));
+        if (parsed.pathname.endsWith('/corpCode.xml')) {
+          return new Response(`<?xml version="1.0"?><result><list><corp_code>00126380</corp_code><corp_name>삼성전자</corp_name><stock_code>005930</stock_code><modify_date>20260101</modify_date></list></result>`, { status: 200 });
+        }
+        if (parsed.pathname.endsWith('/list.json')) {
+          return new Response(JSON.stringify({
+            status: '000',
+            page_no: 1,
+            page_count: 100,
+            total_count: 2,
+            total_page: 1,
+            list: [
+              { corp_code: '00126380', stock_code: '005930', corp_name: '삼성전자', flr_nm: '삼성전자', rcept_no: 'new', rcept_dt: '20260531', report_nm: '일반 안내', pblntf_ty: 'E' },
+              { corp_code: '00126380', stock_code: '005930', corp_name: '삼성전자', flr_nm: '삼성전자', rcept_no: 'risk', rcept_dt: '20260501', report_nm: '상장폐지 결정', pblntf_ty: 'I' },
+            ],
+          }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+        }
+        requestedReceipts.push(parsed.searchParams.get('rcept_no'));
+        return new Response('<document><section>상장폐지 관련 본문</section></document>', { status: 200 });
+      },
+    },
+  };
+  const input = {
+    instrument: { code: '005930', name: '삼성전자', market: 'KR' },
+    selectedAt: '2026-05-31T00:00:00.000Z',
+    sourceContext: {},
+  };
+  const resolved = await maybeResolveKrDisclosures(rawInput, input);
+
+  assert.equal(resolved.issue, null);
+  assert.equal(resolved.value.disclosurePipeline.schemaVersion, 'jaroo.deepscan.kr-disclosure-pipeline.v1');
+  assert.equal(resolved.value.disclosurePipeline.selected[0].rceptNo, 'risk');
+  assert.equal(resolved.value.documentDump, resolved.value.disclosurePipeline.llmDump);
+  assert.deepEqual(requestedReceipts, ['risk']);
+  assert.equal(resolved.value.summary.totalCount, 2);
+  assert.equal(resolved.value.summary.count, 2);
+});
+
+test('explicit disclosure invocation without a credential returns a non-blocking unavailable pipeline', async () => {
+  const { maybeResolveKrDisclosures } = await import('../src/services/deepscan-payload.js');
+  const keys = ['DART_KEY', 'DART_API_KEY', 'OPENDART_API_KEY', 'OPEN_DART_API_KEY', 'API_K_DART'];
+  const original = Object.fromEntries(keys.map((key) => [key, process.env[key]]));
+  keys.forEach((key) => delete process.env[key]);
+
+  try {
+    const resolved = await maybeResolveKrDisclosures(
+      { invokeDisclosures: true },
+      { instrument: { code: '005930', market: 'KR' }, sourceContext: {} },
+    );
+    assert.equal(resolved.issue, null);
+    assert.equal(resolved.value.disclosurePipeline.collection.state, 'unavailable');
+    assert.equal(resolved.value.disclosurePipeline.analysis.available, false);
+    assert.equal(resolved.value.disclosurePipeline.llmDump.state, 'unavailable');
+    assert.equal(resolved.value.disclosurePipeline.collection.issues[0].code, 'provider_unconfigured');
+  } finally {
+    for (const [key, value] of Object.entries(original)) {
+      if (value === undefined) delete process.env[key];
+      else process.env[key] = value;
+    }
+  }
+});
+
 test('buildJarooDeepScanPayload normalizes home-handoff sourceContext to holding', async () => {
   const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
 

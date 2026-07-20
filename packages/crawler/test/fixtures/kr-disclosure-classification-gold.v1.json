@@ -1,0 +1,395 @@
+{
+  "schemaVersion": "jaroo.deepscan.kr-disclosure-classification-gold.v1",
+  "classificationDatasetVersion": "jaroo.deepscan.kr-disclosure-classification-dataset.v1",
+  "curatedAt": "2026-07-20",
+  "sources": [
+    {
+      "id": "opendart-detail-filter-sample-20260720",
+      "description": "OpenDART 공시검색 API를 pblntf_detail_ty별로 조회해 수집한 실제 보고서명 표본",
+      "url": "https://opendart.fss.or.kr/guide/detail.do?apiGrpCd=DS001&apiId=2019001",
+      "range": { "from": "20260421", "to": "20260720" },
+      "queryCount": 61,
+      "observedSampleCount": 218
+    },
+    {
+      "id": "delisting-risk-sample-20260626",
+      "description": "최근 상장폐지 35개 발행사의 OpenDART/KIND 공시 100건에서 추출한 위험 제목 변형"
+    }
+  ],
+  "observedCases": [
+    {
+      "id": "periodic-business-report-correction",
+      "input": { "rceptNo": "20260716000688", "reportName": "[기재정정]사업보고서 (2025.12)" },
+      "provenance": { "detailType": "A001", "corpName": "환영철강공업" },
+      "expected": { "primaryCategory": "periodic", "materialityScore": 35, "riskLevel": "low", "dumpPolicy": "key_sections", "needsClassifier": false }
+    },
+    {
+      "id": "periodic-semiannual-report",
+      "input": { "rceptNo": "20260715000511", "reportName": "반기보고서 (2026.05)" },
+      "provenance": { "detailType": "A002", "corpName": "현대약품" },
+      "expected": { "primaryCategory": "periodic", "materialityScore": 35, "riskLevel": "low", "dumpPolicy": "key_sections", "needsClassifier": false }
+    },
+    {
+      "id": "periodic-quarterly-report-correction",
+      "input": { "rceptNo": "20260716000733", "reportName": "[기재정정]분기보고서 (2026.03)" },
+      "provenance": { "detailType": "A003", "corpName": "오픈놀" },
+      "expected": { "primaryCategory": "periodic", "materialityScore": 35, "riskLevel": "low", "dumpPolicy": "key_sections", "needsClassifier": false }
+    },
+    {
+      "id": "major-event-treasury-trust-termination",
+      "input": { "rceptNo": "20260720000105", "reportName": "주요사항보고서(자기주식취득신탁계약해지결정)" },
+      "provenance": { "detailType": "B001", "corpName": "대신정보통신" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "major-event-rights-offering-correction",
+      "input": { "rceptNo": "20260720000067", "reportName": "[기재정정]주요사항보고서(유상증자결정)" },
+      "provenance": { "detailType": "B001", "corpName": "한화솔루션" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "major-event-convertible-bond-correction",
+      "input": { "rceptNo": "20260720000049", "reportName": "[기재정정]주요사항보고서(전환사채권발행결정)" },
+      "provenance": { "detailType": "B001", "corpName": "레이저쎌" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "legacy-major-event-rights-offering",
+      "input": { "rceptNo": "20260716000817", "reportName": "유상증자결정", "remarks": "공" },
+      "provenance": { "detailType": "B002", "corpName": "에스피글로벌디벨롭먼트" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "legacy-major-event-noncurrent-asset-acquisition",
+      "input": { "rceptNo": "20260716000344", "reportName": "비유동자산취득결정", "remarks": "공" },
+      "provenance": { "detailType": "B002", "corpName": "경산기업" },
+      "expected": { "primaryCategory": "restructuring", "materialityScore": 85, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "legacy-major-event-debt-guarantee",
+      "input": { "rceptNo": "20260715000446", "reportName": "타인을위한채무보증결정", "remarks": "공" },
+      "provenance": { "detailType": "B002", "corpName": "글로벌세아" },
+      "expected": { "primaryCategory": "material-contract", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "merger-securities-report",
+      "input": { "rceptNo": "20260720000048", "reportName": "[기재정정]증권발행실적보고서(합병등)" },
+      "provenance": { "detailType": "C004", "corpName": "토비스" },
+      "expected": { "primaryCategory": "restructuring", "materialityScore": 85, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "beneficial-ownership-general",
+      "input": { "rceptNo": "20260720000082", "reportName": "주식등의대량보유상황보고서(일반)" },
+      "provenance": { "detailType": "D001", "corpName": "롯데에너지머티리얼즈" },
+      "expected": { "primaryCategory": "ownership", "materialityScore": 55, "riskLevel": "low", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "insider-ownership-report",
+      "input": { "rceptNo": "20260720000097", "reportName": "임원ㆍ주요주주특정증권등소유상황보고서" },
+      "provenance": { "detailType": "D002", "corpName": "LG이노텍" },
+      "expected": { "primaryCategory": "ownership", "materialityScore": 55, "riskLevel": "low", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "proxy-solicitation-correction",
+      "input": { "rceptNo": "20260720000027", "reportName": "[첨부정정]의결권대리행사권유참고서류" },
+      "provenance": { "detailType": "D003", "corpName": "엔지켐생명과학" },
+      "expected": { "primaryCategory": "governance", "materialityScore": 35, "riskLevel": "low", "dumpPolicy": "key_sections", "needsClassifier": false }
+    },
+    {
+      "id": "tender-offer-statement",
+      "input": { "rceptNo": "20260720000002", "reportName": "공개매수신고서" },
+      "provenance": { "detailType": "D004", "corpName": "가비아" },
+      "expected": { "primaryCategory": "corporate-action", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "insider-trading-plan-withdrawal",
+      "input": { "rceptNo": "20260716000803", "reportName": "임원ㆍ주요주주특정증권등거래계획철회보고서" },
+      "provenance": { "detailType": "D005", "corpName": "한울반도체" },
+      "expected": { "primaryCategory": "ownership", "materialityScore": 55, "riskLevel": "low", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "treasury-share-disposal-result",
+      "input": { "rceptNo": "20260716000796", "reportName": "자기주식처분결과보고서" },
+      "provenance": { "detailType": "E001", "corpName": "삼성전자" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "trust-contract-termination-result",
+      "input": { "rceptNo": "20260716000565", "reportName": "신탁계약해지결과보고서" },
+      "provenance": { "detailType": "E002", "corpName": "교촌에프앤비" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "asset-transfer-completion-report",
+      "input": { "rceptNo": "20260715000504", "reportName": "합병등종료보고서(자산양수도)" },
+      "provenance": { "detailType": "E003", "corpName": "이노에이엑스" },
+      "expected": { "primaryCategory": "restructuring", "materialityScore": 85, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "stock-option-grant-correction",
+      "input": { "rceptNo": "20260716000706", "reportName": "[기재정정]주식매수선택권부여에관한신고" },
+      "provenance": { "detailType": "E004", "corpName": "CS" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "outside-director-change",
+      "input": { "rceptNo": "20260716000412", "reportName": "사외이사의선임ㆍ해임또는중도퇴임에관한신고" },
+      "provenance": { "detailType": "E005", "corpName": "현대모비스" },
+      "expected": { "primaryCategory": "governance", "materialityScore": 35, "riskLevel": "low", "dumpPolicy": "key_sections", "needsClassifier": false }
+    },
+    {
+      "id": "shareholder-meeting-notice",
+      "input": { "rceptNo": "20260720000084", "reportName": "주주총회소집공고" },
+      "provenance": { "detailType": "E006", "corpName": "제이알글로벌리츠" },
+      "expected": { "primaryCategory": "governance", "materialityScore": 35, "riskLevel": "low", "dumpPolicy": "key_sections", "needsClassifier": false }
+    },
+    {
+      "id": "ordinary-audit-report-correction",
+      "input": { "rceptNo": "20260720000092", "reportName": "[기재정정]감사보고서 (2024.12)" },
+      "provenance": { "detailType": "F001", "corpName": "해성테크" },
+      "expected": { "primaryCategory": "audit", "materialityScore": 90, "riskLevel": "low", "dumpPolicy": "key_sections", "needsClassifier": false }
+    },
+    {
+      "id": "consolidated-audit-report",
+      "input": { "rceptNo": "20260716000787", "reportName": "연결감사보고서 (2025.12)" },
+      "provenance": { "detailType": "F002", "corpName": "의식주컴퍼니" },
+      "expected": { "primaryCategory": "audit", "materialityScore": 90, "riskLevel": "low", "dumpPolicy": "key_sections", "needsClassifier": false }
+    },
+    {
+      "id": "securitization-dissolution-event",
+      "input": { "rceptNo": "20260720000047", "reportName": "자산유동화관련중요사항발생등보고서(해산)" },
+      "provenance": { "detailType": "H005", "corpName": "더블유에이치2103유동화전문유한회사" },
+      "expected": { "primaryCategory": "insolvency", "materialityScore": 90, "riskLevel": "high", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "securitization-major-dissolution-event",
+      "input": { "rceptNo": "20260716000471", "reportName": "주요사항보고서(해산사유발생)" },
+      "provenance": { "detailType": "H006", "corpName": "케이카캐피탈제오차유동화전문유한회사" },
+      "expected": { "primaryCategory": "insolvency", "materialityScore": 90, "riskLevel": "high", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "record-date-correction",
+      "input": { "rceptNo": "20260720900250", "reportName": "[기재정정]주주명부폐쇄기간또는기준일설정", "remarks": "코" },
+      "provenance": { "detailType": "I001", "corpName": "알엔투테크놀로지" },
+      "expected": { "primaryCategory": "corporate-action", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "shareholder-meeting-resolution-correction",
+      "input": { "rceptNo": "20260720900247", "reportName": "[기재정정]주주총회소집결의 (임시주주총회)", "remarks": "코" },
+      "provenance": { "detailType": "I001", "corpName": "알엔투테크놀로지" },
+      "expected": { "primaryCategory": "governance", "materialityScore": 35, "riskLevel": "low", "dumpPolicy": "key_sections", "needsClassifier": false }
+    },
+    {
+      "id": "cash-dividend-correction",
+      "input": { "rceptNo": "20260720800260", "reportName": "[기재정정]현금ㆍ현물배당결정", "remarks": "유" },
+      "provenance": { "detailType": "I001", "corpName": "NI스틸" },
+      "expected": { "primaryCategory": "corporate-action", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "supply-contract-correction",
+      "input": { "rceptNo": "20260720800238", "reportName": "[기재정정]단일판매ㆍ공급계약체결", "remarks": "유" },
+      "provenance": { "detailType": "I001", "corpName": "GS건설" },
+      "expected": { "primaryCategory": "material-contract", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "securities-issuance-result",
+      "input": { "rceptNo": "20260720900248", "reportName": "증권발행결과(자율공시)", "remarks": "코" },
+      "provenance": { "detailType": "I001", "corpName": "형지I&C" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "preliminary-consolidated-earnings",
+      "input": { "rceptNo": "20260720800192", "reportName": "연결재무제표기준영업(잠정)실적(공정공시)", "remarks": "유" },
+      "provenance": { "detailType": "I002", "corpName": "가온전선" },
+      "expected": { "primaryCategory": "earnings", "materialityScore": 70, "riskLevel": "low", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "rights-offering-price-notice",
+      "input": { "rceptNo": "20260720800203", "reportName": "유상증자신주발행가액(안내공시)", "remarks": "유" },
+      "provenance": { "detailType": "I003", "corpName": "한화솔루션" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "convertible-price-adjustment",
+      "input": { "rceptNo": "20260720900275", "reportName": "전환가액의조정 (제1회차)", "remarks": "코" },
+      "provenance": { "detailType": "I001", "corpName": "파로스아이바이오" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "generic-exchange-market-notice",
+      "input": { "rceptNo": "20260720900021", "reportName": "기타시장안내(금일NXT경쟁매매대상종목지정으로인한KRX시간외단일가매매제외종목안내(코스닥시장))", "remarks": "코" },
+      "provenance": { "detailType": "I003", "corpName": "코스닥시장본부" },
+      "expected": { "primaryCategory": "trading-status", "materialityScore": 90, "riskLevel": "high", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "exchange-major-shareholder-change",
+      "input": { "rceptNo": "20260720800183", "reportName": "최대주주등소유주식변동신고서", "remarks": "유" },
+      "provenance": { "detailType": "I004", "corpName": "한독" },
+      "expected": { "primaryCategory": "ownership", "materialityScore": 55, "riskLevel": "low", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "related-party-gift",
+      "input": { "rceptNo": "20260720000074", "reportName": "특수관계인에대한증여", "remarks": "공" },
+      "provenance": { "detailType": "J001", "corpName": "씨제이리테일원" },
+      "expected": { "primaryCategory": "related-party", "materialityScore": 65, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "related-party-loan",
+      "input": { "rceptNo": "20260720000018", "reportName": "특수관계인에대한자금대여", "remarks": "공" },
+      "provenance": { "detailType": "J001", "corpName": "어센틱브랜즈홀딩스" },
+      "expected": { "primaryCategory": "material-contract", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "large-business-group-status",
+      "input": { "rceptNo": "20260716000808", "reportName": "[기재정정]대규모기업집단현황공시[연1회공시및1/4분기용(개별회사)]", "remarks": "공" },
+      "provenance": { "detailType": "J004", "corpName": "흥아프로퍼티그룹" },
+      "expected": { "primaryCategory": "governance", "materialityScore": 35, "riskLevel": "low", "dumpPolicy": "key_sections", "needsClassifier": false }
+    },
+    {
+      "id": "unlisted-major-shareholder-change",
+      "input": { "rceptNo": "20260720000009", "reportName": "[기재정정]주요주주의주식보유변동", "remarks": "공" },
+      "provenance": { "detailType": "J005", "corpName": "한국오션플랫폼" },
+      "expected": { "primaryCategory": "ownership", "materialityScore": 55, "riskLevel": "low", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "unlisted-rights-offering",
+      "input": { "rceptNo": "20260715000490", "reportName": "유상증자결정", "remarks": "공" },
+      "provenance": { "detailType": "J005", "corpName": "에이엠플러스자산개발" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "unlisted-noncurrent-asset-acquisition",
+      "input": { "rceptNo": "20260716000344-j", "reportName": "비유동자산취득결정", "remarks": "공" },
+      "provenance": { "detailType": "J005", "corpName": "경산기업" },
+      "expected": { "primaryCategory": "restructuring", "materialityScore": 85, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "public-interest-related-party-gift",
+      "input": { "rceptNo": "20260715000301", "reportName": "[기재정정]공시대상기업집단의특수관계인으로부터수증", "remarks": "공" },
+      "provenance": { "detailType": "J008", "corpName": "케이모빌리티브릿지재단" },
+      "expected": { "primaryCategory": "related-party", "materialityScore": 65, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "equity-securities-registration",
+      "input": { "rceptNo": "20260716000830", "reportName": "[기재정정]증권신고서(지분증권)" },
+      "provenance": { "detailType": "C001", "corpName": "한울반도체" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "derivative-securities-shelf-supplement",
+      "input": { "rceptNo": "20260720000107", "reportName": "일괄신고추가서류(파생결합증권-주가연계증권)" },
+      "provenance": { "detailType": "C003", "corpName": "NH투자증권" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "trust-acquisition-status",
+      "input": { "rceptNo": "20260715000171", "reportName": "신탁계약에의한취득상황보고서" },
+      "provenance": { "detailType": "E002", "corpName": "이노메트리" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "fund-prospectus-without-provider-code",
+      "input": { "rceptNo": "20260720000016", "reportName": "투자설명서(집합투자증권)" },
+      "provenance": { "detailType": "G001", "corpName": "삼성자산운용" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "asset-securitization-plan-registration",
+      "input": { "rceptNo": "20260716000360", "reportName": "[기재정정]자산유동화계획의등록신청서(유동화전문회사)" },
+      "provenance": { "detailType": "H001", "corpName": "케이비국민카드제십육차유동화전문유한회사" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "asset-backed-securities-registration",
+      "input": { "rceptNo": "20260715000336", "reportName": "증권신고서(유동화증권)" },
+      "provenance": { "detailType": "H003", "corpName": "티월드제일백이십오차유동화전문유한회사" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "bond-securitization-plan-registration",
+      "input": { "rceptNo": "20260713000390", "reportName": "[변경등록]채권유동화계획의등록신청서[한국주택금융공사]" },
+      "provenance": { "detailType": "H004", "corpName": "한국주택금융공사" },
+      "expected": { "primaryCategory": "capital-change", "materialityScore": 75, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "public-interest-affiliate-financial-transaction",
+      "input": { "rceptNo": "20260706000489", "reportName": "약관에의한금융거래시계열금융회사의거래상대방의공시", "remarks": "공" },
+      "provenance": { "detailType": "J008", "corpName": "나눔축산운동본부" },
+      "expected": { "primaryCategory": "related-party", "materialityScore": 65, "riskLevel": "medium", "dumpPolicy": "full_text", "needsClassifier": false }
+    },
+    {
+      "id": "subcontract-payment-condition-without-provider-code",
+      "input": { "rceptNo": "20260716000293", "reportName": "지급수단별ㆍ지급기간별지급금액및분쟁조정기구에관한사항", "remarks": "공" },
+      "provenance": { "detailType": "J009", "corpName": "아이언그레이" },
+      "expected": { "primaryCategory": "other", "materialityScore": 10, "riskLevel": "low", "dumpPolicy": "metadata_only", "needsClassifier": false }
+    }
+  ],
+  "ambiguousCases": [
+    {
+      "id": "generic-major-event-with-provider-code",
+      "input": { "reportName": "주요사항보고서", "disclosureType": "B", "disclosureDetailType": "B001" },
+      "expected": { "primaryCategory": "other", "needsClassifier": true, "classificationConfidence": "ambiguous" }
+    },
+    {
+      "id": "ir-meeting-market-notice",
+      "input": { "rceptNo": "20260720800210", "reportName": "기업설명회(IR)개최(안내공시)" },
+      "provenance": { "detailType": "I003", "corpName": "현대오토에버" },
+      "expected": { "primaryCategory": "other", "needsClassifier": true, "classificationConfidence": "ambiguous" }
+    },
+    {
+      "id": "securitization-other-event-with-provider-code",
+      "input": { "rceptNo": "20260716000401", "reportName": "자산유동화관련중요사항발생등보고서(기타)", "disclosureType": "H", "disclosureDetailType": "H005" },
+      "provenance": { "detailType": "H005", "corpName": "케이카캐피탈제오차유동화전문유한회사" },
+      "expected": { "primaryCategory": "other", "needsClassifier": true, "classificationConfidence": "ambiguous" }
+    },
+    {
+      "id": "bond-rumor-inquiry-with-provider-code",
+      "input": { "rceptNo": "20260630701438", "reportName": "조회공시요구(풍문또는보도등)에대한답변(미확정)", "disclosureType": "I", "disclosureDetailType": "I006" },
+      "provenance": { "detailType": "I006", "corpName": "애큐온캐피탈" },
+      "expected": { "primaryCategory": "other", "needsClassifier": true, "classificationConfidence": "ambiguous" }
+    },
+    {
+      "id": "domestic-affiliate-share-disposal-without-provider-code",
+      "input": { "rceptNo": "20260623000016", "reportName": "국내소속회사의주식처분", "remarks": "공" },
+      "provenance": { "detailType": "J008", "corpName": "푸른문화재단" },
+      "expected": { "primaryCategory": "other", "needsClassifier": true, "classificationConfidence": "ambiguous" }
+    }
+  ],
+  "riskCases": [
+    { "reportName": "주권매매거래정지해제 (상장폐지에 따른 정리매매 개시)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (상장폐지 절차 진행 안내)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (상장폐지결정 효력정지 등 가처분 신청 기각에 따른 정리매매절차 재개)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (코스닥시장위원회 개최 결과 및 상장폐지 결정 안내)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (상장폐지 절차 재개)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타주요경영사항(자율공시) (상장폐지효력정지가처분 기각 결정에 대한 즉시항고장 제출)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "주권매매거래정지 (자진상장폐지 신청)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "투자유의안내 (상장폐지 우려 예고)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (상장폐지 관련)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (상장폐지사유 발생)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (상장폐지 여부 결정일까지 개선기간 부여)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (기업심사위원회 심의결과 안내)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (상장적격성 실질심사 대상 결정)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (개선기간 종료에 따른 상장폐지 여부 심의)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "주권매매거래정지기간변경 (상장폐지 사유 발생)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "감사보고서 제출 (감사의견 의견거절)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "감사보고서 제출 (감사범위 제한 및 계속기업 존속능력 불확실성)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (사업보고서 미제출에 따른 관리종목 지정)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (관리종목 지정 후 사유 미해소)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (상장예비심사 청구서 미제출)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (발행한 어음의 최종부도)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "회생절차개시신청", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "횡령ㆍ배임혐의발생", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "불성실공시법인지정", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (기업의 계속성 및 경영의 투명성 등을 종합적으로 고려)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (지정자문인 선임계약 해지에 따른 상장폐지절차 안내)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "주권매매거래정지 (지정자문인 계약해지)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "반기검토의견부적정또는의견거절", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "회생절차폐지결정", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "회생절차폐지신청", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (상장공시위원회 심의결과 및 상장폐지 결정 안내)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (투자주의 환기종목 지정사유 일부 해제 관련 시장조치 미진행)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "기타시장안내 (회계처리기준 위반행위 관련 상장적격성 실질심사 절차 미진행 안내)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "감사보고서 제출 (감사의견 거절 및 계속기업가정 불확실성)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" },
+    { "reportName": "주권매매거래정지기간변경 (주식의 병합, 분할 등 전자등록 변경, 말소)", "expectedPrimaryCategory": "high-risk", "minimumRiskLevel": "high" }
+  ]
+}

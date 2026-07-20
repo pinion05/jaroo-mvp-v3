@@ -125,13 +125,38 @@ export {
   DART_CORP_CLASS_LABELS,
   DART_DISCLOSURE_TYPES,
   DartDisclosureError,
+  buildDartDisclosureDocumentDump,
   clearDartCaches,
+  collectDartDisclosures,
   extractFirstXmlFromZipBuffer,
   findDartCorporations,
   getDartCorpCodeList,
+  getDartDisclosureDocumentText,
   getDartDisclosures,
   parseDartCorpCodeXml,
 } from './crawlers/dart-filings.js';
+
+export {
+  attachKrDisclosureLlmDump,
+  buildKrDisclosureLlmDump,
+  buildKrDisclosurePipeline,
+  classifyDisclosureFiling,
+  createDisclosureDebugProjection,
+  normalizeDisclosureFiling,
+  KR_DISCLOSURE_PIPELINE_SCHEMA_VERSION,
+} from './services/deepscan-kr-disclosure-pipeline.js';
+
+export {
+  KR_DISCLOSURE_CATEGORY_CONFIG,
+  KR_DISCLOSURE_CATEGORY_ORDER,
+  KR_DISCLOSURE_CLASSIFICATION_DATASET,
+  KR_DISCLOSURE_CLASSIFICATION_DATASET_AS_OF,
+  KR_DISCLOSURE_CLASSIFICATION_DATASET_VERSION,
+  KR_DISCLOSURE_TITLE_RULES,
+  OPEN_DART_BROAD_TYPE_DEFAULTS,
+  OPEN_DART_DISCLOSURE_DETAIL_TYPES,
+  OPEN_DART_DISCLOSURE_TYPES,
+} from './data/kr-disclosure-classification-dataset.js';
 
 export {
   buildJarooDeepScanPayload,
