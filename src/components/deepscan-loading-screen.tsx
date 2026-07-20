@@ -36,6 +36,7 @@ import {
   shouldDisplayDeepScanReadyResults,
   shouldShowDeepScanSummarySkeleton,
 } from '@/lib/deepscan-loading-behavior'
+import { getFinancialValueTone, type FinancialValue } from '@/lib/financial-value-tone'
 import { buildDeepScanReturnRateDisplay } from '@/lib/deepscan-loading-metrics'
 import {
   buildConsensusFanGeometry,
@@ -961,12 +962,13 @@ function formatPercentValue(value: number | null | undefined) {
   return `${sign}${formatNumber(Math.abs(value))}%`
 }
 
-function pctToneClass(value: number | null | undefined) {
-  if (!isFiniteNumber(value) || value === 0) {
-    return styles.todayBlue
-  }
+function financialToneClass(value: FinancialValue) {
+  const tone = getFinancialValueTone(value)
+  return tone === 'profit' ? styles.gain : tone === 'loss' ? styles.loss : styles.financialNeutral
+}
 
-  return value > 0 ? styles.todayUp : styles.todayDown
+function pctToneClass(value: number | null | undefined) {
+  return financialToneClass(value)
 }
 
 function buildChartGeometry(rows: LoadingBriefingDailyRow[], averagePriceValue: number | null) {
@@ -1345,8 +1347,8 @@ function TodayBriefingCard({
             <div className={styles.todayPriceSub}>평단 {displayAveragePrice} · {displayShares} · 거래량 {tradingVolumeText ?? '확인 중'}</div>
           </div>
           <div className={styles.todayProfitBox}>
-            <div className={cn(styles.todayProfitRate, isFiniteNumber(calculatedProfitRate) && calculatedProfitRate < 0 ? styles.todayDown : styles.todayUp)}>{displayProfitRate}</div>
-            <div className={styles.todayProfitAmount}>{displayProfitAmount}</div>
+            <div className={cn(styles.todayProfitRate, financialToneClass(calculatedProfitRate ?? profitRateText))}>{displayProfitRate}</div>
+            <div className={cn(styles.todayProfitAmount, financialToneClass(calculatedProfitAmount ?? profitAmountText))}>{displayProfitAmount}</div>
           </div>
         </div>
       </div>
@@ -1374,7 +1376,7 @@ function TodayBriefingCard({
       <div className={styles.todayBriefList} ref={todayBriefListRef}>
         <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='🗓️' question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
         <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='📈' question='단기 흐름은요?' data={<span className={shortStreak.direction === 'up' ? styles.todayUp : shortStreak.direction === 'down' ? styles.todayDown : styles.todayBlue}>{streakLabel}</span>} meaning={shortStreak.direction === 'up' ? '짧게 봐도 흐름이 살아나고 있어요.' : shortStreak.direction === 'down' ? '단기적으로는 숨 고르기가 이어지고 있어요.' : '아직 한쪽 방향으로 강하게 기울지는 않았어요.'} />
-        <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='🎯' question='내 자리는 어디쯤일까요?' data={<span className={isFiniteNumber(positionPct) && positionPct < 0 ? styles.todayDown : styles.todayUp}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
+        <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='🎯' question='내 자리는 어디쯤일까요?' data={<span className={financialToneClass(positionPct)}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
         <TodayMarketBriefing
           at={briefStartSeconds[3]}
           elapsedSeconds={elapsedSeconds}
@@ -1774,13 +1776,13 @@ export function DeepScanLoadingScreen({
           </div>
           <div className={styles.stockPriceBox}>
             <p className={styles.stockPrice}>{currentPriceText ?? '현재가 확인 중'}</p>
-            <p className={cn(styles.stockChange, profitRateText && parseNumericValue(profitRateText) !== null && parseNumericValue(profitRateText)! < 0 ? styles.loss : styles.gain)}>
+            <p className={cn(styles.stockChange, financialToneClass(returnRateDisplay.current))}>
               <span className={styles.returnRateContext}>현재가 기준</span>{' '}
               {returnRateDisplay.current ?? '계산 중'}
             </p>
             {returnRateDisplay.snapshot ? (
               <p className={styles.snapshotReturnRate}>
-                촬영 당시 <strong>{returnRateDisplay.snapshot}</strong>
+                촬영 당시 <strong className={financialToneClass(returnRateDisplay.snapshot)}>{returnRateDisplay.snapshot}</strong>
               </p>
             ) : null}
           </div>

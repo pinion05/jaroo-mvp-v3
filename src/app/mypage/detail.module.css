@@ -168,10 +168,10 @@
   font-variant-numeric: tabular-nums;
 }
 .up {
-  color: #e5484d;
+  color: var(--jaroo-profit);
 }
 .down {
-  color: #2b6be6;
+  color: var(--jaroo-loss);
 }
 .mngDel {
   width: 26px;

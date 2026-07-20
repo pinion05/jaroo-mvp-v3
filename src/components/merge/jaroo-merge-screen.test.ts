@@ -167,4 +167,12 @@ test('MergeResultRowCard는 수익률 값을 한 번만 렌더링한다', () => 
   const markup = renderToStaticMarkup(createElement(MergeResultRowCard, { row: mergeRow, isLast: true }))
 
   assert.equal(markup.match(/-23\.4%/g)?.length, 1)
+  assert.match(markup, /text-\[color:var\(--jaroo-loss\)\]/)
+})
+
+test('MergeResultRowCard는 양수 수익률에 국내식 수익 색상을 적용한다', () => {
+  const [mergeRow] = buildMergeRowsFromReviewRows([createReviewRow({ profitRate: '+12.3%' })])
+  const markup = renderToStaticMarkup(createElement(MergeResultRowCard, { row: mergeRow, isLast: true }))
+
+  assert.match(markup, /text-\[color:var\(--jaroo-profit\)\]/)
 })

@@ -8,6 +8,7 @@ import { AuthHomeStatus } from '@/components/auth/auth-home-status'
 import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
 import { shouldUseDeepScanLoadingHandoff } from '@/lib/deepscan-navigation'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
+import { getFinancialValueTone } from '@/lib/financial-value-tone'
 import {
   applyCurrentQuotesToHomeHoldings,
   buildHomeCurrentQuoteQuery,
@@ -288,11 +289,8 @@ function formatSignedRate(value: number | null) {
 }
 
 function getToneClass(value: number | null) {
-  if (value === null) {
-    return undefined
-  }
-
-  return value < 0 ? styles.down : styles.up
+  const tone = getFinancialValueTone(value)
+  return tone === 'profit' ? styles.up : tone === 'loss' ? styles.down : undefined
 }
 
 function getStockTag(item: HomeHolding) {

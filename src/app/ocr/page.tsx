@@ -19,6 +19,7 @@ import {
 import { resolveIdentifierRowsWithRetry, type OcrIdentifierResolutionResult } from '@/lib/ocr-identifier-resolution'
 import { buildHomeCurrentQuoteQuery } from '@/lib/home-current-quotes'
 import { hydratePortfolioItemsWithCurrentQuotes } from '@/lib/home-quote-bootstrap'
+import { getFinancialValueTone } from '@/lib/financial-value-tone'
 import { aggregateResolvedOcrReviewRows, type AggregatedOcrReviewRow } from '@/lib/ocr-review-aggregation'
 import { buildMergeRowsFromReviewRows, persistAppliedPortfolioFromMergeRows } from '@/lib/ocr-portfolio-apply'
 import { syncPortfolioToServer } from '@/lib/portfolio-sync'
@@ -240,7 +241,7 @@ function OcrResultDesignStyles() {
       .jaroo-ocr-okr-right{text-align:right;flex-shrink:0}
       .jaroo-ocr-okr-amt{font-size:12.5px;font-weight:600;color:#0F1419;font-variant-numeric:tabular-nums;white-space:nowrap}
       .jaroo-ocr-okr-rate{font-size:11px;margin-top:1px;font-variant-numeric:tabular-nums}
-      .jaroo-ocr-okr-rate.up{color:#1A9D55}.jaroo-ocr-okr-rate.down{color:#E5484D}
+      .jaroo-ocr-okr-rate.up{color:var(--jaroo-profit)}.jaroo-ocr-okr-rate.down{color:var(--jaroo-loss)}
       .jaroo-ocr-okr-edit{font-size:10.5px;color:#2B6BE6;margin-top:3px;cursor:pointer;border:0;background:transparent}
       .jaroo-ocr-edit-panel{border-top:.5px solid #EFF1F4;background:#F8FAFD;padding:12px 14px}
       .jaroo-ocr-edit-title{font-size:11.5px;font-weight:700;color:#0F1419;margin-bottom:9px}
@@ -327,13 +328,8 @@ function getRowIdentifierMeta(row: OcrReviewRow | AggregatedOcrReviewRow) {
 }
 
 function getProfitRateClass(value: string) {
-  const trimmed = value.trim()
-
-  if (!trimmed || trimmed === '-') {
-    return ''
-  }
-
-  return !trimmed.startsWith('-') && !trimmed.startsWith('−') ? 'up' : 'down'
+  const tone = getFinancialValueTone(value)
+  return tone === 'profit' ? 'up' : tone === 'loss' ? 'down' : ''
 }
 
 export default function OcrPage() {

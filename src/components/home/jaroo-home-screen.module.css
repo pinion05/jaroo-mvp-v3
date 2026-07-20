@@ -122,11 +122,11 @@
 }
 
 .up {
-  color: #169b4f;
+  color: var(--jaroo-profit);
 }
 
 .down {
-  color: #ef4444;
+  color: var(--jaroo-loss);
 }
 
 .mcBadge,
@@ -146,16 +146,16 @@
 
 .profit,
 .dCenterBadgeGreen {
-  background: #eaf3de;
-  color: #3b6d11;
-  border-color: rgba(59, 109, 17, 0.18);
+  background: var(--jaroo-profit-soft);
+  color: var(--jaroo-profit);
+  border-color: rgba(216, 58, 66, 0.18);
 }
 
 .loss,
 .dCenterBadgeRed {
-  background: #fcebeb;
-  color: #a32d2d;
-  border-color: rgba(163, 45, 45, 0.18);
+  background: var(--jaroo-loss-soft);
+  color: var(--jaroo-loss);
+  border-color: rgba(43, 107, 230, 0.18);
 }
 
 .watch {
@@ -394,6 +394,14 @@
   font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
+}
+
+.stockAmt.up {
+  color: var(--jaroo-profit);
+}
+
+.stockAmt.down {
+  color: var(--jaroo-loss);
 }
 
 .stockDetail {

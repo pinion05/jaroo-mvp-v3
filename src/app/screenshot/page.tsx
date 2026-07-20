@@ -67,7 +67,7 @@ function UploadDesignStyles() {
       .jaroo-upload-exr-cnt{font-size:10px;color:#97A0AE;margin-top:1px}
       .jaroo-upload-exr-amt{font-size:12px;font-weight:600;color:#0F1419;font-variant-numeric:tabular-nums;text-align:right}
       .jaroo-upload-exr-rate{font-size:10px;margin-top:1px;font-variant-numeric:tabular-nums;text-align:right}
-      .jaroo-upload-exr-rate.up{color:#1A9D55}.jaroo-upload-exr-rate.down{color:#E5484D}
+      .jaroo-upload-exr-rate.up{color:var(--jaroo-profit)}.jaroo-upload-exr-rate.down{color:var(--jaroo-loss)}
       .jaroo-upload-ex-hint{font-size:11.5px;color:#5A6473;line-height:1.55;text-align:center}
       .jaroo-upload-ex-hint b{color:#2B6BE6;font-weight:600}
       .jaroo-upload-upzone{display:block;width:100%;background:#fff;border-radius:14px;border:1.5px dashed #B8C4D4;padding:26px 16px;text-align:center;cursor:pointer;margin-bottom:12px;appearance:none}

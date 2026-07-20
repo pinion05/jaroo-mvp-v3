@@ -85,6 +85,11 @@
   --jaroo-success: #2d7d46;
   --jaroo-success-soft: #d8efdf;
   --jaroo-success-ghost: #f4fbf6;
+  /* Korean market convention: profit/rise is red, loss/fall is blue. */
+  --jaroo-profit: #d83a42;
+  --jaroo-profit-soft: #fbe6e7;
+  --jaroo-loss: #2b6be6;
+  --jaroo-loss-soft: #e6f0fe;
   --jaroo-neutral-soft: #edf1f7;
 }
 

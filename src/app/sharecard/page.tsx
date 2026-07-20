@@ -7,7 +7,8 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { JarooShell } from '@/components/jaroo-shell'
-import type { ShareCardPerformanceTone, ShareCardStock, ShareCardWind } from '@/lib/jaroo-data'
+import { getFinancialValueTextClass, getFinancialValueTone } from '@/lib/financial-value-tone'
+import type { ShareCardStock, ShareCardWind } from '@/lib/jaroo-data'
 import { sharePortfolioCard, shareStockCards } from '@/lib/jaroo-data'
 import { cn } from '@/lib/utils'
 
@@ -24,26 +25,17 @@ const windClasses: Record<ShareCardWind, string> = {
   역풍: 'bg-[color:var(--jaroo-danger-soft)] text-[color:var(--jaroo-danger)]',
 }
 
-function performanceTextClass(tone: ShareCardPerformanceTone) {
-  switch (tone) {
-    case 'positive':
-      return 'text-[color:var(--jaroo-success)]'
-    case 'neutral':
-      return 'text-[color:var(--jaroo-muted)]'
-    default:
-      return 'text-[color:var(--jaroo-danger)]'
+function performanceBadgeClass(stock: ShareCardStock) {
+  if (stock.rate === '거래 정지') {
+    return 'bg-[color:var(--jaroo-danger-soft)] text-[color:var(--jaroo-danger)]'
   }
-}
 
-function performanceBadgeClass(tone: ShareCardPerformanceTone) {
-  switch (tone) {
-    case 'positive':
-      return 'bg-[color:var(--jaroo-success-ghost)] text-[color:var(--jaroo-success)]'
-    case 'neutral':
-      return 'bg-[color:var(--jaroo-secondary)] text-[color:var(--jaroo-muted)]'
-    default:
-      return 'bg-[color:var(--jaroo-danger-soft)] text-[color:var(--jaroo-danger)]'
-  }
+  const tone = getFinancialValueTone(stock.rate)
+  return tone === 'profit'
+    ? 'bg-[color:var(--jaroo-profit-soft)] text-[color:var(--jaroo-profit)]'
+    : tone === 'loss'
+      ? 'bg-[color:var(--jaroo-loss-soft)] text-[color:var(--jaroo-loss)]'
+      : 'bg-[color:var(--jaroo-secondary)] text-[color:var(--jaroo-muted)]'
 }
 
 function ShareActionsFooter() {
@@ -93,7 +85,7 @@ function PortfolioShareCard({ selected, onSelect }: { selected: boolean; onSelec
 
             <div className='mt-4'>
               <p className='text-[10px] text-[color:var(--jaroo-muted)]'>총 손익</p>
-              <p className='mt-1 text-[30px] leading-none font-bold text-[color:var(--jaroo-danger)]'>
+              <p className={cn('mt-1 text-[30px] leading-none font-bold', getFinancialValueTextClass(sharePortfolioCard.totalPnl))}>
                 {sharePortfolioCard.totalPnl}
               </p>
               <p className='mt-1 text-xs text-[color:var(--jaroo-muted)]'>{sharePortfolioCard.totalSummary}</p>
@@ -113,7 +105,7 @@ function PortfolioShareCard({ selected, onSelect }: { selected: boolean; onSelec
                     className={cn(
                       'min-w-[54px] text-right font-medium',
                       stock.rate === '거래 정지' ? 'text-[11px]' : 'text-xs',
-                      performanceTextClass(stock.performanceTone),
+                      getFinancialValueTextClass(stock.rate),
                     )}
                   >
                     {stock.rate}
@@ -151,17 +143,17 @@ function StockPreviewCard({ stock }: { stock: ShareCardStock }) {
             <span className='size-2 rounded-full' style={{ backgroundColor: stock.dot }} />
             <span className='text-base font-semibold text-[color:var(--jaroo-ink)]'>{stock.name}</span>
             <span className='text-[10px] text-[color:var(--jaroo-muted)]'>{stock.market}</span>
-            <Badge className={cn('ml-auto rounded-md px-2 py-0.5 text-[10px] font-medium', performanceBadgeClass(stock.performanceTone))}>
+            <Badge className={cn('ml-auto rounded-md px-2 py-0.5 text-[10px] font-medium', performanceBadgeClass(stock))}>
               {stock.status}
             </Badge>
           </div>
 
           <div className='mt-4'>
             <p className='text-[11px] text-[color:var(--jaroo-muted)]'>손익</p>
-            <p className={cn('mt-1 text-[30px] leading-none font-bold', performanceTextClass(stock.performanceTone))}>
+            <p className={cn('mt-1 text-[30px] leading-none font-bold', getFinancialValueTextClass(stock.amount))}>
               {stock.amount}
             </p>
-            <p className={cn('mt-1 text-sm font-medium', performanceTextClass(stock.performanceTone))}>{stock.rate}</p>
+            <p className={cn('mt-1 text-sm font-medium', getFinancialValueTextClass(stock.rate))}>{stock.rate}</p>
           </div>
 
           <div className='my-3 h-px bg-[color:var(--jaroo-border)]' />
@@ -281,7 +273,7 @@ export default function ShareCardPage() {
                         className={cn(
                           stock.rate === '거래 정지' ? 'text-[11px]' : 'text-[13px]',
                           'font-medium',
-                          performanceTextClass(stock.performanceTone),
+                          getFinancialValueTextClass(stock.rate),
                         )}
                       >
                         {stock.rate}
