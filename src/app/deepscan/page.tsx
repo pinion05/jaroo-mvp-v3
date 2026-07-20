@@ -21,6 +21,7 @@ import { fetchLoadingProxyJson } from '@/lib/loading-fetch-retry'
 import { resolveDeepScanPageCacheState } from '@/lib/deepscan-page-projection'
 import { resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
 import { isDeepScanInlineResultsReady } from '@/lib/deepscan-loading-behavior'
+import { resolveDeepScanHydratedTarget, shouldStartDeepScanRequestAfterHydration } from '@/lib/deepscan-target-hydration'
 import { resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
@@ -318,13 +319,6 @@ function buildDeepScanTargetInputFromSession(session: ReturnType<typeof resolveD
   }
 }
 
-
-function needsHydratedUsdKrwRate(target: DeepScanTargetInput) {
-  return target.marketTone === 'nasdaq'
-    && target.averagePriceCurrency === 'KRW'
-    && target.currentPriceCurrency === 'USD'
-    && !isFiniteNumber(target.usdKrwRate)
-}
 
 async function fetchHydrationUsdKrwRate() {
   try {
@@ -790,6 +784,7 @@ export default function DeepScanPage() {
   const [loadingSequence, setLoadingSequence] = useState<DeepScanLoadingSequenceState>(() => createDeepScanLoadingSequence(null))
   const [arrivedLoadingStages, setArrivedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
   const [displayedLoadingStages, setDisplayedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
+  const [hydratedTargetKey, setHydratedTargetKey] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -797,26 +792,24 @@ export default function DeepScanPage() {
       const sessionTarget = resolveDeepScanTargetSession()
       const hydratedTarget = buildDeepScanTargetInputFromSession(sessionTarget)
       if (!hydratedTarget) {
+        if (!cancelled) {
+          setHydratedTargetKey(target ? getDeepScanTargetKey(target) : null)
+        }
         return
       }
 
-      if (
-        target
-        && getDeepScanTargetKey(target) === getDeepScanTargetKey(hydratedTarget)
-        && Math.abs(target.quantity - hydratedTarget.quantity) < 1e-9
-      ) {
-        return
-      }
-
-      const usdKrwRate = needsHydratedUsdKrwRate(hydratedTarget)
-        ? await fetchHydrationUsdKrwRate()
-        : hydratedTarget.usdKrwRate
+      const nextTarget = await resolveDeepScanHydratedTarget({
+        currentTarget: target,
+        hydratedTarget,
+        loadUsdKrwRate: fetchHydrationUsdKrwRate,
+      })
 
       if (!cancelled) {
-        setDeepScanTarget({
-          ...hydratedTarget,
-          ...(usdKrwRate ? { usdKrwRate } : {}),
-        })
+        const nextTargetKey = getDeepScanTargetKey(nextTarget)
+        if (!target || getDeepScanTargetKey(target) !== nextTargetKey) {
+          setDeepScanTarget(nextTarget)
+        }
+        setHydratedTargetKey(nextTargetKey)
       }
     }
 
@@ -1003,12 +996,16 @@ export default function DeepScanPage() {
   }, [arrivedLoadingStages.stageKeys, arrivedLoadingStages.targetKey, displayedLoadingStages.stageKeys, displayedLoadingStages.targetKey, loadingSequence.visibleStageCount, targetKey])
 
   useEffect(() => {
-    if (!shouldStartRequest) {
+    if (!shouldStartDeepScanRequestAfterHydration({
+      shouldStartRequest,
+      targetKey,
+      hydratedTargetKey,
+    })) {
       return
     }
 
     startRequest()
-  }, [shouldStartRequest, startRequest])
+  }, [hydratedTargetKey, shouldStartRequest, startRequest, targetKey])
 
   useEffect(() => {
     const quickQuoteUrl = buildLoadingQuickQuoteUrl(target)
