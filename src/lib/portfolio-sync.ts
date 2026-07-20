@@ -72,6 +72,10 @@ export type PortfolioFetchResult =
   | { status: 'logged-out' }
   | { status: 'error' }
 
+export type PortfolioSyncResult =
+  | { ok: true; saved?: number }
+  | { ok: false; reason: 'logged-out' | 'error' }
+
 export async function parsePortfolioFetchResponse(response: Response): Promise<PortfolioFetchResult> {
   if (response.status === 401) {
     return { status: 'logged-out' }
@@ -90,6 +94,22 @@ export async function parsePortfolioFetchResponse(response: Response): Promise<P
   return { status: 'rows', rows: mapDbRowsToAppliedRows(rows) }
 }
 
+export function shouldUsePortfolioSessionFallback(result: PortfolioFetchResult) {
+  return result.status === 'logged-out' || result.status === 'error'
+}
+
+export async function parsePortfolioSyncResponse(response: Response): Promise<PortfolioSyncResult> {
+  if (response.status === 401) {
+    return { ok: false, reason: 'logged-out' }
+  }
+  if (!response.ok) {
+    return { ok: false, reason: 'error' }
+  }
+
+  const payload = (await response.json()) as { saved?: number }
+  return { ok: true, saved: payload.saved }
+}
+
 export async function fetchPortfolio(): Promise<PortfolioFetchResult> {
   try {
     const response = await fetch('/api/portfolio', {
@@ -102,7 +122,7 @@ export async function fetchPortfolio(): Promise<PortfolioFetchResult> {
   }
 }
 
-export async function syncPortfolioToServer(rows: AppliedHomePortfolioRow[]): Promise<{ ok: boolean; saved?: number }> {
+export async function syncPortfolioToServer(rows: AppliedHomePortfolioRow[]): Promise<PortfolioSyncResult> {
   try {
     const response = await fetch('/api/portfolio', {
       method: 'POST',
@@ -110,16 +130,8 @@ export async function syncPortfolioToServer(rows: AppliedHomePortfolioRow[]): Pr
       body: JSON.stringify({ rows: mapAppliedRowsToSaveRows(rows) }),
     })
 
-    if (response.status === 401) {
-      return { ok: false } // logged-out: silent no-op
-    }
-    if (!response.ok) {
-      return { ok: false }
-    }
-
-    const payload = (await response.json()) as { saved?: number }
-    return { ok: true, saved: payload.saved }
+    return await parsePortfolioSyncResponse(response)
   } catch {
-    return { ok: false }
+    return { ok: false, reason: 'error' }
   }
 }

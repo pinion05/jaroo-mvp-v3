@@ -470,6 +470,28 @@
   font-weight: 650;
 }
 
+.removeBtn {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 8px;
+  border: 0.5px solid #f0c9c6;
+  border-radius: 12px;
+  background: #fff;
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.removeBtn:hover {
+  background: #fff6f5;
+}
+
+.removeBtn:disabled {
+  cursor: wait;
+  opacity: 0.55;
+}
+
 .forecastCard {
   background: #fff;
   border-radius: 14px;
@@ -561,6 +583,107 @@
   position: relative;
   width: 100%;
   height: 100%;
+}
+
+.confirmLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  pointer-events: auto;
+}
+
+.confirmBackdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: rgba(15, 20, 25, 0.42);
+  cursor: default;
+}
+
+.confirmDialog {
+  position: relative;
+  width: min(calc(100vw - 40px), 308px);
+  border: 0.5px solid #e8eaee;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(15, 20, 25, 0.24);
+  padding: 20px;
+  color: #0f1419;
+}
+
+.confirmTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.confirmDescription {
+  margin: 8px 0 0;
+  color: #5b6573;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.confirmDescription strong {
+  color: #0f1419;
+}
+
+.confirmError {
+  margin: 10px 0 0;
+  border-radius: 10px;
+  background: #fff1f0;
+  padding: 9px 10px;
+  color: #b42318;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.confirmActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.confirmCancelBtn,
+.confirmRemoveBtn {
+  min-height: 42px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.confirmCancelBtn {
+  border: 0.5px solid #dfe3e8;
+  background: #fff;
+  color: #4b5563;
+}
+
+.confirmRemoveBtn {
+  border: 0;
+  background: #b42318;
+  color: #fff;
+}
+
+.confirmCancelBtn:disabled,
+.confirmRemoveBtn:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.removeBtn:focus-visible,
+.confirmBackdrop:focus-visible,
+.confirmCancelBtn:focus-visible,
+.confirmRemoveBtn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
 }
 
 .sheetOverlay {

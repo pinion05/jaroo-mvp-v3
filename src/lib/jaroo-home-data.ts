@@ -1411,12 +1411,16 @@ function buildAppliedRowFromPortfolioItem(item: PortfolioNormalizedItem): Applie
   }
 }
 
+export function buildAppliedHomePortfolioRowsFromPortfolioItems(items: PortfolioNormalizedItem[]) {
+  return items.map((item) => buildAppliedRowFromPortfolioItem(item))
+}
+
 export function buildHomeHoldingsFromPortfolioItems(items: PortfolioNormalizedItem[]): HomeHolding[] {
   if (items.length === 0) {
     return []
   }
 
-  return buildHomeHoldingsFromOcrRows(items.map((item) => buildAppliedRowFromPortfolioItem(item)))
+  return buildHomeHoldingsFromOcrRows(buildAppliedHomePortfolioRowsFromPortfolioItems(items))
 }
 
 export function buildPortfolioItemsFromAppliedHomePortfolioRows(rows: AppliedHomePortfolioRow[]): PortfolioNormalizedItem[] {

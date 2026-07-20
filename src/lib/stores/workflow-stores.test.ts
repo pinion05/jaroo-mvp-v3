@@ -16,7 +16,7 @@ import { useDeepScanStore, shouldReuseDeepScanLastSuccess } from './use-deepscan
 import { useMergeStore, selectMergeApplicableRows } from './use-merge-store'
 import { useOcrReviewStore } from './use-ocr-review-store'
 import { useOcrUploadStore } from './use-ocr-upload-store'
-import { usePortfolioStore } from './use-portfolio-store'
+import { removePortfolioItemFromList, usePortfolioStore } from './use-portfolio-store'
 
 function resetStores() {
   useOcrUploadStore.getState().clear()
@@ -325,6 +325,50 @@ test('portfolio store can normalize confirmed holdings and clear failed quote fi
   assert.equal(items[0]?.currentProfitRate, 10)
   assert.equal(items[1]?.currentPrice, undefined)
   assert.equal(items[1]?.currentProfitRate, undefined)
+})
+
+test('portfolio store removes only the requested holding and resets stale quote state', () => {
+  const first = toPortfolioNormalizedItem(toConfirmedHolding(createReviewRow({ id: 'review-1' })))
+  const second = toPortfolioNormalizedItem(
+    toConfirmedHolding(
+      createReviewRow({
+        id: 'review-2',
+        name: '엔비디아',
+        resolvedName: 'NVIDIA CORP',
+        resolvedTicker: 'NVDA',
+        resolvedCode: undefined,
+        evaluationAmount: '$4,000.00',
+        averagePrice: '$1,000.00',
+      }),
+    ),
+  )
+
+  assert.ok(first)
+  assert.ok(second)
+
+  usePortfolioStore.getState().replaceItems([first!, second!])
+  usePortfolioStore.getState().setQuoteStatus('success', null, 'tickers=MSFT,NVDA')
+
+  const preview = removePortfolioItemFromList(usePortfolioStore.getState().items, {
+    code: first!.code,
+    ticker: first!.ticker,
+    name: first!.name,
+    market: first!.market,
+  })
+  assert.deepEqual(preview, [second])
+
+  usePortfolioStore.getState().removeItem({
+    code: first!.code,
+    ticker: first!.ticker,
+    name: first!.name,
+    market: first!.market,
+  })
+
+  const state = usePortfolioStore.getState()
+  assert.deepEqual(state.items, [second])
+  assert.equal(state.quoteStatus, 'idle')
+  assert.equal(state.quoteErrorMessage, null)
+  assert.equal(state.quoteQueryKey, null)
 })
 
 test('portfolio store keeps quote status scoped to the current quote query key', () => {

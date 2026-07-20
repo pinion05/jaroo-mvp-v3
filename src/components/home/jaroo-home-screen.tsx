@@ -27,21 +27,23 @@ import {
   shouldSkipHomeQuoteHydration,
 } from '@/lib/home-quote-bootstrap'
 import {
+  buildAppliedHomePortfolioRowsFromPortfolioItems,
   buildHomeHoldingsFromPortfolioItems,
   buildPortfolioItemsFromAppliedHomePortfolioRows,
   homeForecast as defaultHomeForecast,
   momentumSignals as defaultMomentumSignals,
   momentumStages as defaultMomentumStages,
+  persistAppliedHomePortfolio,
   persistDeepScanTarget,
   readAppliedHomePortfolio,
   type HomeBadgeTone,
   type HomeHolding,
 } from '@/lib/jaroo-home-data'
-import { fetchPortfolio } from '@/lib/portfolio-sync'
+import { fetchPortfolio, shouldUsePortfolioSessionFallback, syncPortfolioToServer } from '@/lib/portfolio-sync'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { AppBottomNav } from '@/components/app-bottom-nav'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
-import { usePortfolioStore } from '@/lib/stores/use-portfolio-store'
+import { removePortfolioItemFromList, usePortfolioStore } from '@/lib/stores/use-portfolio-store'
 import { cn } from '@/lib/utils'
 import { toDeepScanTargetInput } from '@/lib/workflow-types'
 import styles from './jaroo-home-screen.module.css'
@@ -49,6 +51,11 @@ import styles from './jaroo-home-screen.module.css'
 type MomentumSignalItem = (typeof defaultMomentumSignals)[number]
 type ForecastCard = typeof defaultHomeForecast
 type PortfolioStoreItem = ReturnType<typeof usePortfolioStore.getState>['items'][number]
+
+type PortfolioRemovalTarget = {
+  item: PortfolioStoreItem
+  displayName: string
+}
 
 type DeepScanLoadingTarget = {
   name: string
@@ -492,11 +499,15 @@ function StockCard({
   open,
   onToggle,
   onAction,
+  onRemove,
+  removeDisabled,
 }: {
   item: HomeHolding
   open: boolean
   onToggle: () => void
   onAction: (item: HomeHolding, event: MouseEvent<HTMLAnchorElement>) => void
+  onRemove: (item: HomeHolding) => void
+  removeDisabled: boolean
 }) {
   const changeValue = getHoldingChangeValue(item)
   const evaluationAmount = getEvaluationAmount(item)
@@ -544,6 +555,15 @@ function StockCard({
             🔍 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
           </button>
         )}
+        <button
+          type='button'
+          className={styles.removeBtn}
+          onClick={() => onRemove(item)}
+          disabled={removeDisabled}
+          aria-label={`${item.name} 종목 제거`}
+        >
+          종목 제거
+        </button>
       </div>
     </article>
   )
@@ -560,6 +580,7 @@ export function JarooHomeScreen() {
   const quoteErrorMessage = usePortfolioStore((state) => state.quoteErrorMessage)
   const quoteQueryKey = usePortfolioStore((state) => state.quoteQueryKey)
   const replacePortfolioItems = usePortfolioStore((state) => state.replaceItems)
+  const removePortfolioStoreItem = usePortfolioStore((state) => state.removeItem)
   const setQuoteStatus = usePortfolioStore((state) => state.setQuoteStatus)
   const patchQuote = usePortfolioStore((state) => state.patchQuote)
   const clearItemQuote = usePortfolioStore((state) => state.clearItemQuote)
@@ -575,6 +596,9 @@ export function JarooHomeScreen() {
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [deepScanLoadingTarget, setDeepScanLoadingTarget] = useState<DeepScanLoadingTarget | null>(null)
   const [persistedPortfolioLoading, setPersistedPortfolioLoading] = useState(true)
+  const [portfolioRemovalTarget, setPortfolioRemovalTarget] = useState<PortfolioRemovalTarget | null>(null)
+  const [portfolioRemovalPending, setPortfolioRemovalPending] = useState(false)
+  const [portfolioRemovalError, setPortfolioRemovalError] = useState<string | null>(null)
 
 
   const portfolioBaseItems = useMemo(() => portfolioItems.map((item) => stripPortfolioQuoteFields(item)), [portfolioItems])
@@ -622,10 +646,15 @@ export function JarooHomeScreen() {
         return
       }
 
+      setPersistedPortfolioLoading(false)
+
+      if (!shouldUsePortfolioSessionFallback(result)) {
+        return
+      }
+
       // logged-out (401) or fetch error → session cache fallback (resilience), then empty.
       const sessionPortfolio = readAppliedHomePortfolio()
       const sessionItems = sessionPortfolio ? buildPortfolioItemsFromAppliedHomePortfolioRows(sessionPortfolio.rows) : []
-      setPersistedPortfolioLoading(false)
       if (sessionItems.length > 0) {
         replacePortfolioItems(sessionItems)
         return
@@ -651,6 +680,22 @@ export function JarooHomeScreen() {
   useEffect(() => {
     quoteQueryKeyRef.current = quoteQueryKey
   }, [quoteQueryKey])
+
+  useEffect(() => {
+    if (!portfolioRemovalTarget) {
+      return
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !portfolioRemovalPending) {
+        setPortfolioRemovalTarget(null)
+        setPortfolioRemovalError(null)
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [portfolioRemovalPending, portfolioRemovalTarget])
 
   useEffect(() => {
     if (!quoteSurfaceEnabled) {
@@ -945,6 +990,75 @@ export function JarooHomeScreen() {
     await navigateToDeepScanForHolding(item.id, item.actionHref)
   }, [navigateToDeepScanForHolding])
 
+  const requestHoldingRemoval = useCallback((holding: HomeHolding) => {
+    const item = portfolioItems[holding.id]
+
+    if (!item || portfolioRemovalPending) {
+      return
+    }
+
+    setOpenSheet(null)
+    setPortfolioRemovalError(null)
+    setPortfolioRemovalTarget({ item, displayName: holding.name })
+  }, [portfolioItems, portfolioRemovalPending])
+
+  const closeHoldingRemoval = useCallback(() => {
+    if (portfolioRemovalPending) {
+      return
+    }
+
+    setPortfolioRemovalTarget(null)
+    setPortfolioRemovalError(null)
+  }, [portfolioRemovalPending])
+
+  const confirmHoldingRemoval = useCallback(async () => {
+    if (!portfolioRemovalTarget || portfolioRemovalPending) {
+      return
+    }
+
+    const currentItems = usePortfolioStore.getState().items
+    const nextItems = removePortfolioItemFromList(currentItems, portfolioRemovalTarget.item)
+
+    if (nextItems.length === currentItems.length) {
+      setPortfolioRemovalTarget(null)
+      setPortfolioRemovalError(null)
+      return
+    }
+
+    const currentSession = readAppliedHomePortfolio()
+    const broker = currentSession?.broker ?? '홈 편집 포트폴리오'
+    const previousRows = buildAppliedHomePortfolioRowsFromPortfolioItems(currentItems)
+    const nextRows = buildAppliedHomePortfolioRowsFromPortfolioItems(nextItems)
+    const appliedAt = new Date().toISOString()
+
+    setPortfolioRemovalPending(true)
+    setPortfolioRemovalError(null)
+
+    try {
+      const persisted = persistAppliedHomePortfolio({ broker, rows: nextRows, appliedAt })
+      if (!persisted) {
+        setPortfolioRemovalError('기기 저장소에 변경 내용을 저장하지 못했어요. 다시 시도해주세요.')
+        return
+      }
+
+      const syncResult = await syncPortfolioToServer(nextRows)
+      if (!syncResult.ok && syncResult.reason === 'error') {
+        persistAppliedHomePortfolio({ broker, rows: previousRows, appliedAt: currentSession?.appliedAt })
+        setPortfolioRemovalError('저장된 포트폴리오를 변경하지 못했어요. 네트워크 상태를 확인한 뒤 다시 시도해주세요.')
+        return
+      }
+
+      setPersistedPortfolioLoading(false)
+      removePortfolioStoreItem(portfolioRemovalTarget.item)
+      setSelectedId(null)
+      setOpenCardId(null)
+      setPortfolioRemovalTarget(null)
+      setPortfolioRemovalError(null)
+    } finally {
+      setPortfolioRemovalPending(false)
+    }
+  }, [portfolioRemovalPending, portfolioRemovalTarget, removePortfolioStoreItem])
+
   if (!hasPortfolioItems) {
     if (persistedPortfolioLoading) {
       return (
@@ -1055,6 +1169,8 @@ export function JarooHomeScreen() {
                 open={openCardId === item.id}
                 onToggle={() => toggleCard(item.id)}
                 onAction={handleHoldingActionClick}
+                onRemove={requestHoldingRemoval}
+                removeDisabled={portfolioRemovalPending}
               />
             </div>
           ))}
@@ -1112,6 +1228,50 @@ export function JarooHomeScreen() {
               </div>
             ))}
           </div>
+          {portfolioRemovalTarget ? (
+            <div className={styles.confirmLayer}>
+              <button
+                type='button'
+                className={styles.confirmBackdrop}
+                onClick={closeHoldingRemoval}
+                disabled={portfolioRemovalPending}
+                aria-label='종목 제거 창 닫기'
+              />
+              <section
+                className={styles.confirmDialog}
+                role='dialog'
+                aria-modal='true'
+                aria-labelledby='portfolio-removal-title'
+                aria-describedby='portfolio-removal-description'
+              >
+                <h2 id='portfolio-removal-title' className={styles.confirmTitle}>종목을 제거할까요?</h2>
+                <p id='portfolio-removal-description' className={styles.confirmDescription}>
+                  <strong>{portfolioRemovalTarget.displayName}</strong> 종목이 홈과 저장된 포트폴리오에서 제거됩니다.
+                  {portfolioItems.length === 1 ? ' 마지막 종목을 제거하면 빈 포트폴리오 화면으로 전환됩니다.' : ''}
+                </p>
+                {portfolioRemovalError ? <p className={styles.confirmError} role='alert'>{portfolioRemovalError}</p> : null}
+                <div className={styles.confirmActions}>
+                  <button
+                    type='button'
+                    className={styles.confirmCancelBtn}
+                    onClick={closeHoldingRemoval}
+                    disabled={portfolioRemovalPending}
+                    autoFocus
+                  >
+                    취소
+                  </button>
+                  <button
+                    type='button'
+                    className={styles.confirmRemoveBtn}
+                    onClick={() => void confirmHoldingRemoval()}
+                    disabled={portfolioRemovalPending}
+                  >
+                    {portfolioRemovalPending ? '제거 중…' : '제거하기'}
+                  </button>
+                </div>
+              </section>
+            </div>
+          ) : null}
         </div>
       </div>
 
