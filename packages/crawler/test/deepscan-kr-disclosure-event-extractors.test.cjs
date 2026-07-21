@@ -1080,6 +1080,55 @@ test('iteration 8 semantic repair uses operative fields instead of purpose or fu
   assert.equal(results[3].actual.confidence, results[4].actual.confidence);
 });
 
+test('iteration 8 actuality repair rejects scheduled and historical evidence while accepting Korean perfective paraphrases', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const cases = [
+    {
+      id: 'trust-current-perfective-paraphrase-is-effective',
+      input: { reportName: '주요사항보고서(자기주식취득신탁계약체결결정)', filedAt: '2027-03-10', bodyText: '계약기간 | 시작일 | 2027-03-10 | 계약체결일 | 2027-03-10 | 금일 신탁 계약 체결 절차를 모두 마쳤습니다' },
+      expectedEvents: [canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities')],
+    },
+    {
+      id: 'cb-scheduled-actual-acquisition-label-stays-proposed',
+      input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '실제 사채 취득일 2027-04-10 예정 | 취득 대금은 당일 지급 예정' },
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+    },
+    {
+      id: 'cb-current-perfective-paraphrase-is-effective',
+      input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '지급일 2027-03-10 | 오늘 사채 대금을 모두 지급하고 채권을 넘겨받았습니다' },
+      expectedEvents: [canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities')],
+    },
+    {
+      id: 'cb-completed-acquisition-with-future-resale-remains-effective',
+      input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '지급일 2027-03-10 | 대금 지급 및 사채 취득 완료 | 취득 후 2027-04-10 재매각 예정' },
+      expectedEvents: [canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities')],
+    },
+    {
+      id: 'trust-historical-completion-stays-proposed',
+      input: { reportName: '주요사항보고서(자기주식취득신탁계약체결결정)', filedAt: '2027-03-10', bodyText: '계약기간 | 시작일 | 2027-03-10 | 계약체결 예정일자 | 2027-03-10 | 과거이력 | 2026년에는 신탁계약을 체결 완료하였음' },
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities')],
+    },
+    {
+      id: 'cb-historical-completion-stays-proposed',
+      input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '취득 결정일 2027-03-10 | 지급(예정)일 2027-04-10 | 과거내역 | 2026년에는 대금 지급 및 사채 취득 완료' },
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+    },
+  ];
+  const failures = cases.flatMap(({ id, input, expectedEvents }) => {
+    const actual = extractEventsGatedProjection(input);
+    const expected = eventSet(expectedEvents);
+    const observed = eventSet(actual.events);
+    const resolved = actual.events.length > 0 && actual.events.every((event) => event.type !== 'other');
+    return JSON.stringify(observed) === JSON.stringify(expected)
+      && actual.confidence === 'high'
+      && resolved
+      && actual.events.length === 1
+      ? []
+      : [{ id, expected, actual: observed, confidence: actual.confidence, resolved, cardinality: actual.events.length }];
+  });
+  assert.deepEqual(failures, []);
+});
+
 test('iteration 8 multi-intent accumulation is invariant to neutral distance', async () => {
   const { extractEventsGatedProjection } = await import(MODULE);
   const filler = (length) => '중립문장'.repeat(Math.ceil(length / 4)).slice(0, length);
@@ -1087,7 +1136,7 @@ test('iteration 8 multi-intent accumulation is invariant to neutral distance', a
     canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer'),
     canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities'),
   ];
-  const variants = [0, 301, 4096].map((length) => ({
+  const variants = [0, 301, 4096, 16384].map((length) => ({
     id: `terminal-then-schedule-neutral-${length}`,
     input: {
       reportName: '[기재정정]소송등의제기ㆍ신청',
