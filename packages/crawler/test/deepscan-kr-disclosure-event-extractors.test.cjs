@@ -169,7 +169,7 @@ test('v3 semantic regression fixture passes exact event sets and confidence cont
   }
 });
 
-test('J001 blank periodic loan tables abstain with low confidence', async () => {
+test('J001 zero-activity periodic loan tables preserve the communicative filing event', async () => {
   const { extractEventsGatedProjection } = await import(MODULE);
   const actual = extractEventsGatedProjection({
     rceptNo: '20260714000419',
@@ -177,8 +177,14 @@ test('J001 blank periodic loan tables abstain with low confidence', async () => 
     disclosureDetailType: 'J001',
     bodyText: '거래상대방 | - | 거래일자 | - | 대여종류 | - | 거래금액 | - | 실제 인수금액은 없었습니다.',
   });
-  assert.deepEqual(actual.events, []);
-  assert.equal(actual.confidence, 'low');
+  assert.deepEqual(actual.events, [{
+    type: 'related-party',
+    action: 'reported',
+    state: 'effective',
+    cause: 'related-party-lending',
+    subjectType: 'contract',
+  }]);
+  assert.equal(actual.confidence, 'medium');
 });
 
 test('J001 body-dependent disclosures abstain when the body is unavailable', async () => {
@@ -250,6 +256,74 @@ test('Q1-promoted semantic families use generalized lifecycle and object rules',
   ]);
 });
 
+test('iteration 5 gates cover Q4 lifecycle, fallback, polarity, and object taxonomies', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const cases = [
+    {
+      id: 'contract-termination-polarity',
+      input: { reportName: '단일판매ㆍ공급계약해지', bodyText: '계약 해지일자 | 2025.11.20 | 해지 주요사유 | 상호 합의' },
+      expected: [{ type: 'material-contract', action: 'terminated', state: 'effective', cause: 'supply-contract', subjectType: 'contract' }],
+    },
+    {
+      id: 'generic-collateral-rescue',
+      input: { reportName: '타인에대한담보제공결정', bodyText: '담보제공 결정 | 담보자산 | 공장 설비' },
+      expected: [{ type: 'material-contract', action: 'provided', state: 'effective', cause: 'collateral-provision', subjectType: 'asset' }],
+    },
+    {
+      id: 'compliance-program-multi-event',
+      input: { reportName: '공정거래자율준수프로그램운영현황(안내공시)', bodyText: '운영현황 보고 | 차기 교육 예정' },
+      expected: [
+        { type: 'legal-regulatory', action: 'reported', state: 'effective', cause: 'compliance-program', subjectType: 'issuer' },
+        { type: 'legal-regulatory', action: 'scheduled', state: 'pending', cause: 'compliance-program', subjectType: 'issuer' },
+      ],
+    },
+    {
+      id: 'facility-correction-remains-pending',
+      input: { reportName: '[기재정정]신규시설투자등(자율공시)', bodyText: '정정사유 | 투자기간 종료일 변경 | 정정후 종료일 | 2027.02.28' },
+      expected: [{ type: 'capital-expenditure', action: 'updated', state: 'pending', cause: 'facility-investment', subjectType: 'asset' }],
+    },
+    {
+      id: 'serious-accident-independent-work-stop',
+      input: { reportName: '중대재해발생', bodyText: '사고 발생 | 관계기관의 작업중지명령에 따라 해당 공정 작업 중지' },
+      expected: [
+        { type: 'legal-regulatory', action: 'occurred', state: null, cause: 'serious-industrial-accident', subjectType: 'issuer' },
+        { type: 'operating-status', action: 'halted', state: 'effective', cause: 'regulatory-work-stop', subjectType: 'business' },
+      ],
+    },
+    {
+      id: 'related-party-security-borrowing-object',
+      input: { reportName: '계열금융회사의약관에의한금융거래-[장단기차입]', disclosureDetailType: 'J001', bodyText: '거래상품 | 기업어음(CP) | 차입 실행 완료' },
+      expected: [{ type: 'related-party', action: 'borrowed', state: 'effective', cause: 'securities-borrowing', subjectType: 'securities' }],
+    },
+    {
+      id: 'loan-correction-terminal-date',
+      input: { reportName: '[기재정정]금전대여결정', bodyText: '정정사유 | 대여기간 종료일 변경 | 정정후 종료일 | 2025.11.20' },
+      expected: [{ type: 'material-contract', action: 'terminated', state: 'effective', cause: 'loan', subjectType: 'contract' }],
+    },
+    {
+      id: 'generic-production-termination-rescue',
+      input: { reportName: '기타안내사항(안내공시)', bodyText: '제목 | 생산 설비 가동중단 관련 진행사항 | 해당 생산을 종료하였고 재개 계획은 없음' },
+      expected: [{ type: 'operating-status', action: 'terminated', state: 'effective', cause: 'production-suspension', subjectType: 'business' }],
+    },
+    {
+      id: 'service-contract-semantic-title-without-issuer-literal',
+      input: { reportName: '어플리케이션운영서비스계약체결', bodyText: '계약 체결 | 운영서비스 제공' },
+      expected: [{ type: 'material-contract', action: 'contracted', state: 'effective', cause: 'service-contract', subjectType: 'contract' }],
+    },
+  ];
+
+  for (const fixtureCase of cases) {
+    const actual = extractEventsGatedProjection(fixtureCase.input);
+    assert.deepEqual(eventSet(actual.events), eventSet(fixtureCase.expected), fixtureCase.id);
+  }
+
+  const serviceNearNegative = extractEventsGatedProjection({
+    reportName: '기타경영사항(자율공시)',
+    bodyText: '어플리케이션 운영서비스 품질 점검 결과를 안내합니다.',
+  });
+  assert.ok(serviceNearNegative.events.every((event) => event.cause !== 'service-contract'));
+});
+
 test('semantic gate benchmark enforces exact-set accuracy, coverage, and high-confidence precision', () => {
   const output = execFileSync(process.execPath, [
     SEMANTIC_GATE_BENCHMARK,
@@ -264,6 +338,7 @@ test('semantic gate benchmark enforces exact-set accuracy, coverage, and high-co
   assert.equal(report.metrics.highConfidenceExactPrecision, 1);
   assert.ok(report.metrics.exactSetWilsonLower > 0.75);
   assert.ok(report.metrics.highConfidenceWilsonLower > 0.7);
+  assert.ok(report.metrics.highConfidenceCoverage >= 0.35);
 });
 
 test('semantic gate metrics reject abstain, other, missing, extra, all-low, and duplicate-template gaming', async () => {
