@@ -1136,15 +1136,24 @@ test('iteration 8 multi-intent accumulation is invariant to neutral distance', a
     canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer'),
     canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities'),
   ];
-  const variants = [0, 301, 4096, 16384].map((length) => ({
-    id: `terminal-then-schedule-neutral-${length}`,
+  const variants = [0, 301, 4096, 16384].flatMap((length) => [
+    {
+      id: `terminal-then-schedule-neutral-${length}`,
+      bodyText: `3. 정정사항 | 현재 소송을 취하하고 철회함 | ${filler(length)} | [공통정정] 일정변경 | 정정 전 | 주금납입일 2027-03-20 | 정정 후 | 주금납입일 2027-04-20`,
+    },
+    {
+      id: `schedule-then-terminal-neutral-${length}`,
+      bodyText: `3. 정정사항 | [공통정정] 일정변경 | 정정 전 | 주금납입일 2027-03-20 | 정정 후 | 주금납입일 2027-04-20 | ${filler(length)} | 현재 소송을 취하하고 철회함`,
+    },
+  ].map(({ id, bodyText }) => ({
+    id,
     input: {
       reportName: '[기재정정]소송등의제기ㆍ신청',
       disclosureDetailType: 'C001',
       filedAt: '2027-03-10',
-      bodyText: `3. 정정사항 | 현재 소송을 취하하고 철회함 | ${filler(length)} | [공통정정] 일정변경 | 정정 전 | 주금납입일 2027-03-20 | 정정 후 | 주금납입일 2027-04-20`,
+      bodyText,
     },
-  }));
+  })));
   const failures = variants.flatMap(({ id, input }) => {
     const actual = extractEventsGatedProjection(input);
     return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents)) && actual.events.length === 2
@@ -1176,6 +1185,7 @@ test('iteration 8 semantic metamorphisms preserve tuple confidence resolution an
     ['distance-zero-vs-301', terminalFirst(0), terminalFirst(301)],
     ['order-terminal-vs-schedule-first-zero', terminalFirst(0), scheduleFirst(0)],
     ['order-terminal-vs-schedule-first-4096', terminalFirst(4096), scheduleFirst(4096)],
+    ['order-terminal-vs-schedule-first-16384', terminalFirst(16384), scheduleFirst(16384)],
   ];
   const failures = comparisons.flatMap(([id, left, right]) => {
     const leftProjection = project(left);
