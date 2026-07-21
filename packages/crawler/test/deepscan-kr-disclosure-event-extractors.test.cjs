@@ -860,6 +860,174 @@ test('iteration 7b generalized near misses keep current scope, cause, relation, 
   assert.deepEqual(failures, []);
 });
 
+test('iteration 8 accumulates scoped lifecycle repairs without losing sibling intent', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const cases = [
+    {
+      id: 'offering-milestones-rescheduled',
+      input: {
+        reportName: '[기재정정]증권신고서(지분증권)',
+        disclosureDetailType: 'C001',
+        filedAt: '2027-03-10',
+        bodyText: '3. 정정사항 | [공통정정] 일정변경 | 정정 전 | 주금납입일 2027-03-20 | 정정 후 | 주금납입일 2027-04-20 | 신주상장 예정일 2027-05-02',
+      },
+      expectedEvents: [canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities')],
+    },
+    {
+      id: 'demerger-registration-rescheduled',
+      input: {
+        reportName: '[기재정정]주요사항보고서(회사분할결정)',
+        filedAt: '2027-03-10',
+        bodyText: '3. 정정사항 | 일정변경으로 인한 정정 | 정정 전 | 분할등기예정일자 2027-03-20 | 정정 후 | 분할등기예정일자 2027-04-20',
+      },
+      expectedEvents: [canonicalEvent('restructuring', 'rescheduled', 'pending', 'demerger', 'issuer')],
+    },
+    {
+      id: 'blank-final-terms-stay-pending',
+      input: {
+        reportName: '[기재정정]주요사항보고서(신주인수권부사채권발행결정)',
+        filedAt: '2027-03-10',
+        bodyText: '3. 정정사항 | 사채만기일 | 일정변경에 따른 기재정정 | 정정 전 | 행사가액 확정 예정 | 정정 후 | 행사가액은 청약 후 확정될 예정 | 납입일 2027-04-20',
+      },
+      expectedEvents: [canonicalEvent('capital-change', 'updated', 'pending', 'bond-with-warrants', 'securities')],
+    },
+    {
+      id: 'ownership-not-yet-effective',
+      input: {
+        reportName: '[기재정정]최대주주변경을수반하는주식양수도계약체결',
+        filedAt: '2027-03-10',
+        bodyText: '3. 정정사항 | 정정 전 | 변경예정일 2027-03-20 | 정정 후 | 변경예정일 2027-04-20 | 현재 소유권 변경은 미발생',
+      },
+      expectedEvents: [canonicalEvent('ownership-change', 'updated', 'pending', 'controlling-shareholder', 'ownership')],
+    },
+    {
+      id: 'dual-sibling-different-stage-accumulator',
+      input: {
+        reportName: '[기재정정]소송등의제기ㆍ신청(자본거래 일정변경)',
+        disclosureDetailType: 'C001',
+        filedAt: '2027-03-10',
+        bodyText: '3. 정정사항 | 현재 소송을 취하하고 철회함 | [공통정정] 일정변경 | 정정 전 | 주금납입일 2027-03-20 | 정정 후 | 주금납입일 2027-04-20',
+      },
+      expectedEvents: [
+        canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer'),
+        canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities'),
+      ],
+    },
+    {
+      id: 'existing-guarantee-extended-effective',
+      input: {
+        reportName: '타인에대한채무보증결정',
+        filedAt: '2027-03-10',
+        bodyText: '기존 채무보증 기간 연장 | 채무보증기간 시작일 2027-03-10 | 종료일 2029-03-10',
+      },
+      expectedEvents: [canonicalEvent('material-contract', 'extended', 'effective', 'debt-guarantee', 'contract')],
+    },
+    {
+      id: 'aircraft-lease-extended-pending',
+      input: {
+        reportName: '특수관계인과의리스거래',
+        disclosureDetailType: 'J001',
+        filedAt: '2027-03-10',
+        bodyText: '기존 항공기 리스 계약기간 연장 | 각 계약별 세부내역 | 리스물건 항공기 | 변경계약 시작일 2027-04-10',
+      },
+      expectedEvents: [canonicalEvent('related-party', 'extended', 'pending', 'aircraft-lease', 'asset')],
+    },
+    {
+      id: 'new-fund-optional-extension-control',
+      input: {
+        reportName: '특수관계인과의수익증권거래',
+        disclosureDetailType: 'J001',
+        filedAt: '2027-03-10',
+        bodyText: '거래일자 2027-04-10 | 신규 수익증권 설정 예정 | 편입물 만기 미도래 또는 연장시 연장 가능',
+      },
+      expectedEvents: [canonicalEvent('related-party', 'decided', 'proposed', 'fund-security-investment', 'securities')],
+    },
+    {
+      id: 'bond-purchase-already-effective',
+      input: {
+        reportName: '특수관계인으로부터채권매수',
+        disclosureDetailType: 'J001',
+        filedAt: '2027-03-10',
+        bodyText: '매수일자 2027-03-09 | 발행일 2027-03-09 | 만기일 2027-09-09 | 단기자금 운용 목적으로 채권을 매입한 거래',
+      },
+      expectedEvents: [canonicalEvent('related-party', 'purchased', 'effective', 'bond-transactions', 'securities')],
+    },
+    {
+      id: 'corrected-business-disposal-completed',
+      input: {
+        reportName: '[기재정정]영업양도결정(자율공시)(종속회사의주요경영사항)',
+        filedAt: '2027-03-10',
+        bodyText: '정정사유 거래 종결 및 양수인 변경에 따른 정정공시 | 양도대금 전액 수령 완료',
+      },
+      expectedEvents: [canonicalEvent('restructuring', 'completed', 'effective', 'business-disposal', 'business')],
+    },
+    {
+      id: 'future-equity-disposal-remains-proposed',
+      input: {
+        reportName: '타법인주식및출자증권양도결정(자회사의 주요경영사항)',
+        filedAt: '2027-03-10',
+        bodyText: '계약금 2027-03-10 | 잔금 12,000,000,000원 (2027-04-10 예정) | 거래종결일은 선행조건 충족 여부에 따라 변동 가능',
+      },
+      expectedEvents: [canonicalEvent('restructuring', 'decided', 'proposed', 'equity-disposal', 'securities')],
+    },
+    {
+      id: 'trust-contract-started-on-filing-date',
+      input: {
+        reportName: '주요사항보고서(자기주식취득신탁계약체결결정)',
+        filedAt: '2027-03-10',
+        bodyText: '신탁계약기간 시작일 2027-03-10 | 종료일 2028-03-09 | 계약체결 예정일자 2027-03-10 | 계약목적 임직원 성과보상 재원 확보',
+      },
+      expectedEvents: [canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities')],
+    },
+    {
+      id: 'future-convertible-bond-purchase-remains-proposed',
+      input: {
+        reportName: '주요사항보고서(자기전환사채만기전취득결정)',
+        filedAt: '2027-03-10',
+        bodyText: '지급(예정)일 2027-04-10 | 향후처리계획 취득 후 소각 | 보유현금을 활용하여 상기 사채를 상환할 예정',
+      },
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+    },
+    {
+      id: 'future-related-party-debt-assumption',
+      input: {
+        reportName: '특수관계인으로부터채무인수',
+        disclosureDetailType: 'J001',
+        filedAt: '2027-03-10',
+        bodyText: '채무인수 예정일 2027-04-10 | 수익권매매계약 체결에 따라 담보대출을 인수하는 건',
+      },
+      expectedEvents: [canonicalEvent('related-party', 'decided', 'proposed', 'debt-assumption', 'contract')],
+    },
+    {
+      id: 'future-related-party-technology-transfer',
+      input: {
+        reportName: '특수관계인으로부터기술이전',
+        disclosureDetailType: 'J001',
+        filedAt: '2027-03-10',
+        bodyText: '계약기간 2027-04-10 ~ 2027-05-10 | 계약체결일 2027-04-10 | 거래종결일(기술이전일)은 향후 일정에 따라 변경될 수 있음',
+      },
+      expectedEvents: [canonicalEvent('related-party', 'decided', 'proposed', 'technology-transfer', 'contract-right')],
+    },
+    {
+      id: 'real-estate-collateral-already-provided',
+      input: {
+        reportName: '특수관계인에대한담보제공',
+        disclosureDetailType: 'J001',
+        filedAt: '2027-03-10',
+        bodyText: '담보제공일자 2027-03-10 | 담보물 부동산(담보신탁 우선수익권) | 기존 약정을 종료하고 신규 약정을 체결함에 따라 담보 제공되는 건',
+      },
+      expectedEvents: [canonicalEvent('related-party', 'provided', 'effective', 'collateral-provision', 'real-estate')],
+    },
+  ];
+  const failures = cases.flatMap((fixtureCase) => {
+    const actual = extractEventsGatedProjection(fixtureCase.input);
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(fixtureCase.expectedEvents))
+      ? []
+      : [{ id: fixtureCase.id, expected: eventSet(fixtureCase.expectedEvents), actual: eventSet(actual.events) }];
+  });
+  assert.deepEqual(failures, []);
+});
+
 test('semantic gate benchmark enforces exact-set accuracy, coverage, and high-confidence precision', () => {
   const output = execFileSync(process.execPath, [
     SEMANTIC_GATE_BENCHMARK,
