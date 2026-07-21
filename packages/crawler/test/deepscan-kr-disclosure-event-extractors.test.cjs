@@ -324,6 +324,103 @@ test('iteration 5 gates cover Q4 lifecycle, fallback, polarity, and object taxon
   assert.ok(serviceNearNegative.events.every((event) => event.cause !== 'service-contract'));
 });
 
+test('iteration 6 gates require field-scoped evidence and calibrate unsupported corrections', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const cases = [
+    {
+      id: 'bodyless-fund-correction-abstains-on-state',
+      input: {
+        reportName: '[기재정정]증권신고서(집합투자증권-회사형)',
+        disclosureDetailType: 'G002',
+      },
+      expected: { type: 'capital-change', action: 'updated', state: null, cause: 'fund-securities', subjectType: 'securities' },
+      confidence: 'medium',
+    },
+    {
+      id: 'conversion-price-application-date',
+      input: {
+        reportName: '전환가액ㆍ신주인수권행사가액ㆍ교환가액의조정(안내공시)',
+        filedAt: '2025-12-23',
+        bodyText: '조정전 가액 | 675 | 조정후 가액 | 848 | 조정가액 적용일 | 2025-12-23',
+      },
+      expected: { type: 'capital-change', action: 'adjusted', state: 'effective', cause: 'convertible-price', subjectType: 'securities' },
+    },
+    {
+      id: 'supply-contract-execution-date',
+      input: {
+        reportName: '단일판매ㆍ공급계약체결',
+        filedAt: '2025-12-31',
+        bodyText: '계약기간 | 시작일 | 2025-03-03 | 종료일 | 2028-09-11 | 계약(수주)일자 | 2025-12-31',
+      },
+      expected: { type: 'material-contract', action: 'contracted', state: 'effective', cause: 'supply-contract', subjectType: 'contract' },
+    },
+    {
+      id: 'anchored-securities-borrowing-synonym',
+      input: {
+        reportName: '계열금융회사의약관에의한금융거래-[장단기차입]',
+        disclosureDetailType: 'J001',
+        bodyText: '거래일자 | 2025-07-01 | 종류 | 지분증권 | 거래목적 | ETF 설정용 차입',
+      },
+      expected: { type: 'related-party', action: 'borrowed', state: 'effective', cause: 'securities-borrowing', subjectType: 'securities' },
+    },
+    {
+      id: 'anchored-warrant-exercise-subtype',
+      input: {
+        reportName: '전환청구권ㆍ신주인수권ㆍ교환청구권행사',
+        bodyText: '1. 구분 | 신주인수권부사채권의 신주인수권 행사 | 행사주식수 | 69,385',
+      },
+      expected: { type: 'capital-change', action: 'exercised', state: 'effective', cause: 'warrant-bond', subjectType: 'securities' },
+    },
+    {
+      id: 'value-up-implementation-report',
+      input: {
+        reportName: '기업가치제고계획(자율공시)',
+        bodyText: '1. 계획서 명칭 | 2025년 기업가치 제고 계획 (이행현황) | 2. 주요 내용 | 이행평가 및 실행 현황',
+      },
+      expected: { type: 'corporate-event', action: 'reported', state: 'effective', cause: 'value-up-plan', subjectType: 'issuer' },
+    },
+    {
+      id: 'existing-stock-option-grant-correction',
+      input: {
+        reportName: '[기재정정]주식매수선택권부여에관한신고',
+        disclosureDetailType: 'E004',
+        bodyText: '정정대상 공시서류 | 주식매수선택권 부여에 관한 신고 | 최초제출일 | 2025-03-18 | 정정사항 | 공정가치 산정 가정 기재오류',
+      },
+      expected: { type: 'capital-change', action: 'updated', state: 'effective', cause: 'stock-option', subjectType: 'securities' },
+    },
+    {
+      id: 'corrected-related-party-loan-future-period',
+      input: {
+        reportName: '[기재정정]특수관계인에대한자금대여',
+        disclosureDetailType: 'J001',
+        bodyText: '정정후 거래일자 | 2026년 1분기 중 필요시 자금대여 | 향후 대여 예정',
+      },
+      expected: { type: 'related-party', action: 'updated', state: 'pending', cause: 'related-party-loan', subjectType: 'contract' },
+      confidence: 'medium',
+    },
+  ];
+
+  for (const fixtureCase of cases) {
+    const actual = extractEventsGatedProjection(fixtureCase.input);
+    assert.deepEqual(actual.events, [fixtureCase.expected], fixtureCase.id);
+    if (fixtureCase.confidence) assert.equal(actual.confidence, fixtureCase.confidence, fixtureCase.id);
+  }
+
+  const continuingContract = extractEventsGatedProjection({
+    reportName: '단일판매ㆍ공급계약체결',
+    filedAt: '2025-10-23',
+    bodyText: '계약기간 | 시작일 | 2023-01-02 | 계약(수주)일자 | 2025-10-23 | 일부계약 진행 후 수행중이었음',
+  });
+  assert.equal(continuingContract.events[0].state, null);
+
+  const earlierDirectorChange = extractEventsGatedProjection({
+    reportName: '사외이사의선임ㆍ해임또는중도퇴임에관한신고',
+    filedAt: '2025-12-31',
+    bodyText: '사외이사 변경 발생일 | 2025-12-30 | 신규 선임 | 임기시작일 | -',
+  });
+  assert.equal(earlierDirectorChange.events[0].state, null);
+});
+
 test('semantic gate benchmark enforces exact-set accuracy, coverage, and high-confidence precision', () => {
   const output = execFileSync(process.execPath, [
     SEMANTIC_GATE_BENCHMARK,
