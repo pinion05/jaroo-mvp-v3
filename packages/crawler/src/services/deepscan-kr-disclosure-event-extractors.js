@@ -735,20 +735,39 @@ function semanticEvent(type, action, state, cause, subjectType) {
   return createEvent({ type, action, state, cause, subjectType });
 }
 
-function currentFactScope(rawText, startPattern = null) {
-  const text = compactText(rawText);
-  const start = startPattern ? text.search(startPattern) : 0;
-  const scoped = start >= 0 ? text.slice(start) : text;
-  const excludedSection = scoped.search(/(?:^|\|)(?:참고자료|참고사항|과거(?:이력|내역|사례|신청|거래)|위험(?:요소|문단)|투자위험|유의사항)(?:\||$)/u);
-  return excludedSection >= 0 ? scoped.slice(0, excludedSection) : scoped;
-}
-
 function currentCorrectionScope(input, bodyFacts) {
   if (input.wrapperKind !== 'correction') return '';
   const text = bodyFacts.fullText;
   const numberedStart = text.search(/(?:^|\|)3\.?정정(?:사유|사항)/u);
   const start = numberedStart >= 0 ? numberedStart : text.search(/정정(?:사유|사항)/u);
-  return start < 0 ? '' : text.slice(start, start + 1800);
+  if (start < 0) return '';
+  const scope = text.slice(start);
+  const sectionBoundary = scope.slice(1).search(/(?:^|\|)(?:4\.?)?(?:참고자료|과거(?:이력|내역)|투자위험|위험요소)(?:\||$)/u);
+  const seenNotes = new Set();
+  let detailBoundary = -1;
+  for (const match of scope.matchAll(/(?:^|\|)\(주(\d+)\)정정전/gu)) {
+    if (seenNotes.has(match[1])) {
+      detailBoundary = match.index;
+      break;
+    }
+    seenNotes.add(match[1]);
+  }
+  const boundaries = [sectionBoundary, detailBoundary].filter((index) => index >= 0);
+  return boundaries.length === 0 ? scope : scope.slice(0, Math.min(...boundaries));
+}
+
+function currentDisclosureScope(bodyFacts) {
+  const body = bodyFacts.fullText;
+  const boundary = body.search(/(?:^|\|)(?:과거(?:이력|내역)|참고자료|투자위험|위험요소|경쟁제품)(?:\||$)/u);
+  return boundary < 0 ? body : body.slice(0, boundary);
+}
+
+function hasAffirmativeRelatedPartyEvidence(input, bodyFacts) {
+  if (input.disclosureDetailType === 'J001') return true;
+  const body = bodyFacts.fullText;
+  if (/(?:특수관계|계열관계).{0,20}(?:없|아님)|독립제3자|비특수관계/u.test(body)) return false;
+  return /(?:(?:거래|차입|대여)상대방(?:과의)?관계|회사와의관계).{0,80}(?:특수관계인|계열회사|관계회사|자회사|종속회사)/u.test(body)
+    || /(?:금전대여|대여금).{0,100}(?:계열회사간거래|지분.{0,30}보유한자회사)/u.test(body);
 }
 
 function replaceMatchedIntents(events, predicate, replacements) {
@@ -767,14 +786,9 @@ function applyFinalTermsRule(input, events, bodyFacts) {
     && !/최종발행가액확정/u.test(correctionScope);
   const unrelatedVoluntaryCorrection = /(?:기재사항추가|보고서제출|위험요소).{0,80}(?:자진)?정정|자진정정.{0,80}(?:기재사항|위험요소)/u.test(correctionLead)
     || /자진정정/u.test(correctionScope.slice(0, 900));
-  const supplementalStart = correctionScope.search(/(?:^|\|)(?:참고자료|참고사항|과거(?:이력|내역|사례|신청|거래))(?:\||$)/u);
-  const priceEvidence = /(?:공모가액|모집가액|발행가액|신주발행가액|행사가액).{0,30}확정|확정.{0,30}(?:공모가액|모집가액|발행가액|신주발행가액|행사가액)/u;
-  const supplementalPriceOnly = supplementalStart >= 0
-    && !priceEvidence.test(correctionScope.slice(0, supplementalStart));
   const explicitlyFinalPrice = !decisionOnly
     && !unrelatedVoluntaryCorrection
-    && !supplementalPriceOnly
-    && priceEvidence.test(correctionScope);
+    && /(?:공모가액|모집가액|발행가액|신주발행가액|행사가액).{0,30}확정|확정.{0,30}(?:공모가액|모집가액|발행가액|신주발행가액|행사가액)/u.test(correctionScope);
   const firstPriceDecision = /1차발행가액결정/u.test(correctionScope);
   const representationOnly = /(?:원화표시|환산금액|환율적용).{0,80}(?:기재|변경)|(?:기재|변경).{0,80}(?:원화표시|환산금액|환율적용)/u.test(correctionScope);
   const completionWins = events.some((event) => event.action === 'completed')
@@ -809,7 +823,7 @@ function applyTerminalPolarityRule(input, events, bodyFacts) {
   const body = bodyFacts.fullText;
   const correctionScope = currentCorrectionScope(input, bodyFacts);
   const currentScope = input.wrapperKind === 'correction' ? correctionScope : body;
-  const currentBodyScope = currentFactScope(input.bodyText);
+  const currentSubjectScope = input.wrapperKind === 'correction' ? correctionScope : currentDisclosureScope(bodyFacts);
 
   if (/유형자산(?:처분|양도|취득|양수)결정/u.test(title)
     && /정정사유.{0,80}(?:계약해제합의|계약취소)|(?:계약해제합의|계약취소).{0,80}(?:정정공시|정정사항)|(?:전항목|주요항목).{0,40}(?:철회|삭제)/u.test(currentScope)) {
@@ -854,18 +868,9 @@ function applyTerminalPolarityRule(input, events, bodyFacts) {
   }
 
   if (/투자판단관련주요경영사항/u.test(title)
-    && /품목허가.{0,40}승인.{0,40}(?:통지|수령|완료)|승인.{0,40}(?:통지|수령|완료).{0,40}품목/u.test(currentBodyScope)) {
-    return replaceMatchedIntents(
-      events,
-      (event) => ['other', 'regulatory-product'].includes(event.type),
-      [semanticEvent('regulatory-product', 'approved', 'effective', 'fda-approval', 'product')],
-    );
-  }
-
-  if (/투자판단관련주요경영사항/u.test(title)
-    && /품목허가.{0,40}신청/u.test(currentBodyScope)
-    && /(?:자진)?취하/u.test(currentBodyScope)
-    && /(?:제목.{0,160}품목허가신청.{0,30}자진취하|자진취하일|취하공문발송일|자진철회하기로결정|취하.{0,30}(?:접수|완료))/u.test(currentBodyScope)) {
+    && /품목허가.{0,40}신청/u.test(currentSubjectScope)
+    && /(?:자진)?취하/u.test(currentSubjectScope)
+    && /(?:제목.{0,160}품목허가신청.{0,30}자진취하|자진취하일|취하공문발송일|자진철회하기로결정|취하.{0,30}(?:접수|완료))/u.test(currentSubjectScope)) {
     return replaceMatchedIntents(
       events,
       (event) => ['other', 'regulatory-product'].includes(event.type),
@@ -936,13 +941,17 @@ function applyActualityRule(input, events, bodyFacts) {
     }
   }
 
-  const completedIssueCause = causeFromText(currentScope);
+  const completedIssueCause = /무상증자/u.test(currentScope)
+    ? 'bonus-issue'
+    : /유상증자/u.test(currentScope)
+      ? 'rights-offering'
+      : null;
   if ((/유상증자결정/u.test(title) || /기타경영사항/u.test(title))
-    && ['rights-offering', 'bonus-issue'].includes(completedIssueCause)
+    && completedIssueCause
     && /(?:증자가완료|증자완료|출자금납입완료|납입금전액수령.{0,80}(?:신주발행및)?증자.{0,20}완료)/u.test(currentScope)) {
     return replaceMatchedIntents(
       events,
-      (event) => event.type === 'capital-change' && ['rights-offering', 'bonus-issue'].includes(event.cause),
+      (event) => event.type === 'capital-change',
       [semanticEvent('capital-change', 'completed', 'effective', completedIssueCause, 'securities')],
     );
   }
@@ -1005,7 +1014,7 @@ function applyCorrectionLifecycleDeltaRule(input, events, bodyFacts) {
   const title = compactText(input.reportName);
   const body = bodyFacts.fullText;
   const corrected = input.wrapperKind === 'correction';
-  const currentScope = corrected ? currentFactScope(currentCorrectionScope(input, bodyFacts)) : body;
+  const currentScope = corrected ? currentCorrectionScope(input, bodyFacts) : body;
   const filed = filingDate(input);
   const relationAfterLabel = (labelPattern, preferLast = corrected) => relationToFiling(
     firstDateAfterLabel(bodyFacts.rawText, labelPattern, preferLast),
@@ -1160,18 +1169,15 @@ function applyRoleAwareTemporalRule(input, events, bodyFacts) {
   if (!corrected && /금전대여결정/u.test(title)
     && /(?:기금전대여건|기존금전대여|금회대여).{0,60}기간연장|대여기간연장내용/u.test(body)) {
     const extensionStart = relationAfterLabel('변경계약시작일|대여기간.{0,30}시작일');
-    const explicitlyUnrelated = /특수관계(?:가)?(?:없|아님)|독립(?:된)?제3자/u.test(body);
-    const explicitlyRelated = input.disclosureDetailType === 'J001'
-      || (!explicitlyUnrelated
-        && /(?:거래상대방관계|회사와의관계|대여상대방|차입상대방).{0,80}(?:특수관계인|계열회사|관계회사|자회사)/u.test(body));
+    const relatedParty = hasAffirmativeRelatedPartyEvidence(input, bodyFacts);
     return replaceMatchedIntents(
       events,
       (event) => ['related-party', 'material-contract'].includes(event.type),
       [semanticEvent(
-        explicitlyRelated ? 'related-party' : 'material-contract',
+        relatedParty ? 'related-party' : 'material-contract',
         'extended',
         extensionStart === 'future' ? 'pending' : 'effective',
-        explicitlyRelated ? 'related-party-loan' : 'loan',
+        relatedParty ? 'related-party-loan' : 'loan',
         'contract',
       )],
     );
@@ -1419,6 +1425,17 @@ function applyMultiIntentRule(input, events, bodyFacts) {
   const corrected = input.wrapperKind === 'correction';
   const currentScope = corrected ? currentCorrectionScope(input, bodyFacts) : body;
 
+  if (/중대재해발생/u.test(`${title}${body}`) && /작업중지(?:명령|조치)|작업정지(?:명령|조치)/u.test(body)) {
+    return replaceMatchedIntents(
+      events,
+      (event) => ['legal-regulatory', 'operating-status'].includes(event.type),
+      [
+        semanticEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer'),
+        semanticEvent('operating-status', 'halted', 'effective', 'regulatory-work-stop', 'business'),
+      ],
+    );
+  }
+
   if (corrected
     && input.disclosureDetailType === 'J001'
     && /특수관계인에대한증여/u.test(title)
@@ -1460,22 +1477,6 @@ function applyMultiIntentRule(input, events, bodyFacts) {
   return null;
 }
 
-function enumerateStructuredSiblingIntents(input, events, bodyFacts) {
-  const enumerated = [...events];
-  const rawBody = normalizeText(input.bodyText);
-  const hasEnumeratedSupplyContract = /(?:^|\|)\s*(?:\d+[.)]|[-•])\s*단일판매[ㆍ·ᆞ]?공급계약(?:체결)?/u.test(rawBody);
-  if (hasEnumeratedSupplyContract) {
-    addEvent(enumerated, semanticEvent(
-      'material-contract',
-      'contracted',
-      ['past', 'same-day'].includes(bodyFacts.contractDateRelation) ? 'effective' : 'pending',
-      'supply-contract',
-      'contract',
-    ));
-  }
-  return sortEvents(enumerated);
-}
-
 /**
  * Iteration 5 semantic repair gate.
  *
@@ -1490,33 +1491,32 @@ function applyGeneralizedSemanticGates(input, events) {
   const body = facts.fullText;
   const corrected = input.wrapperKind === 'correction';
   const replace = (...next) => sortEvents(next);
-  const intentFirstEvents = enumerateStructuredSiblingIntents(input, events, facts);
 
-  const terminalPolarity = applyTerminalPolarityRule(input, intentFirstEvents, facts);
+  const multiIntent = applyMultiIntentRule(input, events, facts);
+  const scopedEvents = multiIntent ?? events;
+
+  const terminalPolarity = applyTerminalPolarityRule(input, scopedEvents, facts);
   if (terminalPolarity) return terminalPolarity;
 
-  const actuality = applyActualityRule(input, intentFirstEvents, facts);
+  const actuality = applyActualityRule(input, scopedEvents, facts);
   if (actuality) return actuality;
 
-  const correctionLifecycle = applyCorrectionLifecycleDeltaRule(input, intentFirstEvents, facts);
+  const correctionLifecycle = applyCorrectionLifecycleDeltaRule(input, scopedEvents, facts);
   if (correctionLifecycle) return correctionLifecycle;
 
-  const roleAwareTemporal = applyRoleAwareTemporalRule(input, intentFirstEvents, facts);
+  const roleAwareTemporal = applyRoleAwareTemporalRule(input, scopedEvents, facts);
   if (roleAwareTemporal) return roleAwareTemporal;
 
-  const bodyFamily = applyUnresolvedBodyFamilyRule(input, intentFirstEvents, facts);
+  const bodyFamily = applyUnresolvedBodyFamilyRule(input, scopedEvents, facts);
   if (bodyFamily) return bodyFamily;
 
-  const objectSpecificity = applyObjectSpecificityRule(input, intentFirstEvents, facts);
+  const objectSpecificity = applyObjectSpecificityRule(input, scopedEvents, facts);
   if (objectSpecificity) return objectSpecificity;
 
-  const multiIntent = applyMultiIntentRule(input, intentFirstEvents, facts);
   if (multiIntent) return multiIntent;
 
-  const finalTerms = applyFinalTermsRule(input, intentFirstEvents, facts);
+  const finalTerms = applyFinalTermsRule(input, scopedEvents, facts);
   if (finalTerms) return finalTerms;
-
-  if (intentFirstEvents.length !== events.length) return intentFirstEvents;
 
   // Negative/terminal polarity must win over a generic positive contract noun.
   if (/단일판매[ㆍ·ᆞ]?공급계약해지/u.test(title)) {
@@ -1666,8 +1666,25 @@ function applyGeneralizedSemanticGates(input, events) {
     return replace(semanticEvent('related-party', 'decided', 'proposed', 'related-party-borrowing', 'contract'));
   }
   if (/금전대여결정/u.test(title) && !corrected) {
-    if (/만기.{0,60}연장|연장.{0,60}만기/u.test(body)) return replace(semanticEvent('related-party', 'extended', 'pending', 'related-party-loan', 'contract'));
-    if (['past', 'same-day'].includes(facts.operationalDateRelation)) return replace(semanticEvent('related-party', 'lent', 'effective', 'related-party-loan', 'contract'));
+    const relatedParty = hasAffirmativeRelatedPartyEvidence(input, facts);
+    if (/만기.{0,60}연장|연장.{0,60}만기/u.test(body)) {
+      return replace(semanticEvent(
+        relatedParty ? 'related-party' : 'material-contract',
+        'extended',
+        'pending',
+        relatedParty ? 'related-party-loan' : 'loan',
+        'contract',
+      ));
+    }
+    if (['past', 'same-day'].includes(facts.operationalDateRelation)) {
+      return replace(semanticEvent(
+        relatedParty ? 'related-party' : 'material-contract',
+        'lent',
+        'effective',
+        relatedParty ? 'related-party-loan' : 'loan',
+        'contract',
+      ));
+    }
   }
   if (corrected && /금전대여결정/u.test(title) && /해지|종료|조기상환|대여금회수|채권회수/u.test(body)) {
     return replace(semanticEvent('material-contract', 'terminated', 'effective', 'loan', 'contract'));
