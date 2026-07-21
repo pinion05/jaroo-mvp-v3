@@ -166,6 +166,18 @@ test('v3 semantic regression fixture passes exact event sets and confidence cont
   }
 });
 
+test('J001 blank periodic loan tables abstain with low confidence', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const actual = extractEventsGatedProjection({
+    rceptNo: '20260714000419',
+    reportName: '계열금융회사의약관에의한금융거래-[장단기대여]',
+    disclosureDetailType: 'J001',
+    bodyText: '거래상대방 | - | 거래일자 | - | 대여종류 | - | 거래금액 | - | 실제 인수금액은 없었습니다.',
+  });
+  assert.deepEqual(actual.events, []);
+  assert.equal(actual.confidence, 'low');
+});
+
 test('semantic gate benchmark enforces exact-set accuracy, coverage, and high-confidence precision', () => {
   const output = execFileSync(process.execPath, [
     SEMANTIC_GATE_BENCHMARK,
