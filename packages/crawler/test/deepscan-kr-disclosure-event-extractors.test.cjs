@@ -977,7 +977,7 @@ test('iteration 8 accumulates scoped lifecycle repairs without losing sibling in
         filedAt: '2027-03-10',
         bodyText: '신탁계약기간 시작일 2027-03-10 | 종료일 2028-03-09 | 계약체결 예정일자 2027-03-10 | 계약목적 임직원 성과보상 재원 확보',
       },
-      expectedEvents: [canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities')],
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities')],
     },
     {
       id: 'future-convertible-bond-purchase-remains-proposed',
@@ -1024,6 +1024,116 @@ test('iteration 8 accumulates scoped lifecycle repairs without losing sibling in
     return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(fixtureCase.expectedEvents))
       ? []
       : [{ id: fixtureCase.id, expected: eventSet(fixtureCase.expectedEvents), actual: eventSet(actual.events) }];
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('iteration 8 semantic repair uses operative fields instead of purpose or funding prose', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const cases = [
+    {
+      id: 'trust-same-day-exact-purpose-stays-proposed',
+      input: { reportName: '주요사항보고서(자기주식취득신탁계약체결결정)', filedAt: '2027-03-10', bodyText: '계약기간 | 시작일 | 2027-03-10 | 종료일 | 2028-03-09 | 계약체결 예정일자 | 2027-03-10 | 계약목적 | 임직원 성과보상재원 확보' },
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities')],
+    },
+    {
+      id: 'trust-same-day-purpose-paraphrase-stays-proposed',
+      input: { reportName: '주요사항보고서(자기주식취득신탁계약체결결정)', filedAt: '2027-03-10', bodyText: '계약기간 | 시작일 | 2027-03-10 | 종료일 | 2028-03-09 | 계약체결 예정일자 | 2027-03-10 | 계약목적 | 임직원 보상을 위한 재원 마련' },
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities')],
+    },
+    {
+      id: 'trust-current-perfective-contract-is-effective',
+      input: { reportName: '주요사항보고서(자기주식취득신탁계약체결결정)', filedAt: '2027-03-10', bodyText: '계약기간 | 시작일 | 2027-03-10 | 계약체결일 | 2027-03-10 | 금일 신탁계약을 체결 완료하였음' },
+      expectedEvents: [canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities')],
+    },
+    {
+      id: 'cb-future-payment-exact-cash-source-stays-proposed',
+      input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '취득 결정일 2027-03-10 | 지급(예정)일 2027-04-10 | 취득 후 소각 | 보유현금을 활용하여 상기 사채를 상환할 예정' },
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+    },
+    {
+      id: 'cb-future-payment-paraphrase-stays-proposed',
+      input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '취득 결정일 2027-03-10 | 지급(예정)일 2027-04-10 | 취득 후 소각 | 회사 자금으로 해당 사채 대금을 지급할 계획' },
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+    },
+    {
+      id: 'cb-deposit-now-balance-and-transfer-future-stays-proposed',
+      input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '지급(예정)일 2027-03-10 | 계약금은 금일 지급 | 잔금은 2027-04-10 지급 예정 | 대금 전액 지급 완료 즉시 사채를 수령할 예정' },
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+    },
+    {
+      id: 'cb-actual-same-day-acquisition-is-effective',
+      input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '지급일 2027-03-10 | 실제 사채 취득일 2027-03-10 | 대금 지급 및 사채 취득 완료' },
+      expectedEvents: [canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities')],
+    },
+  ];
+  const results = cases.map((fixtureCase) => ({ fixtureCase, actual: extractEventsGatedProjection(fixtureCase.input) }));
+  const failures = results.flatMap(({ fixtureCase, actual }) => {
+    const expected = eventSet(fixtureCase.expectedEvents);
+    const observed = eventSet(actual.events);
+    return JSON.stringify(observed) === JSON.stringify(expected) && actual.events.length === 1
+      ? []
+      : [{ id: fixtureCase.id, expected, actual: observed, cardinality: actual.events.length }];
+  });
+  assert.deepEqual(failures, []);
+  assert.equal(results[0].actual.confidence, results[1].actual.confidence);
+  assert.equal(results[3].actual.confidence, results[4].actual.confidence);
+});
+
+test('iteration 8 multi-intent accumulation is invariant to neutral distance', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const filler = (length) => '중립문장'.repeat(Math.ceil(length / 4)).slice(0, length);
+  const expectedEvents = [
+    canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer'),
+    canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities'),
+  ];
+  const variants = [0, 301, 4096].map((length) => ({
+    id: `terminal-then-schedule-neutral-${length}`,
+    input: {
+      reportName: '[기재정정]소송등의제기ㆍ신청',
+      disclosureDetailType: 'C001',
+      filedAt: '2027-03-10',
+      bodyText: `3. 정정사항 | 현재 소송을 취하하고 철회함 | ${filler(length)} | [공통정정] 일정변경 | 정정 전 | 주금납입일 2027-03-20 | 정정 후 | 주금납입일 2027-04-20`,
+    },
+  }));
+  const failures = variants.flatMap(({ id, input }) => {
+    const actual = extractEventsGatedProjection(input);
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents)) && actual.events.length === 2
+      ? []
+      : [{ id, expected: eventSet(expectedEvents), actual: eventSet(actual.events), cardinality: actual.events.length }];
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('iteration 8 semantic metamorphisms preserve tuple confidence resolution and sibling cardinality', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const filler = (length) => '중립문장'.repeat(Math.ceil(length / 4)).slice(0, length);
+  const project = (input) => {
+    const actual = extractEventsGatedProjection(input);
+    return {
+      events: eventSet(actual.events),
+      confidence: actual.confidence,
+      resolved: actual.events.length > 0 && actual.events.every((event) => event.type !== 'other'),
+      cardinality: actual.events.length,
+    };
+  };
+  const trust = (purpose) => ({ reportName: '주요사항보고서(자기주식취득신탁계약체결결정)', filedAt: '2027-03-10', bodyText: `계약기간 | 시작일 | 2027-03-10 | 종료일 | 2028-03-09 | 계약체결 예정일자 | 2027-03-10 | 계약목적 | ${purpose}` });
+  const cb = (funding) => ({ reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: `취득 결정일 2027-03-10 | 지급(예정)일 2027-04-10 | 취득 후 소각 | ${funding}` });
+  const terminalFirst = (length) => ({ reportName: '[기재정정]소송등의제기ㆍ신청', disclosureDetailType: 'C001', filedAt: '2027-03-10', bodyText: `3. 정정사항 | 현재 소송을 취하하고 철회함 | ${filler(length)} | [공통정정] 일정변경 | 정정 전 | 주금납입일 2027-03-20 | 정정 후 | 주금납입일 2027-04-20` });
+  const scheduleFirst = (length) => ({ reportName: '[기재정정]소송등의제기ㆍ신청', disclosureDetailType: 'C001', filedAt: '2027-03-10', bodyText: `3. 정정사항 | [공통정정] 일정변경 | 정정 전 | 주금납입일 2027-03-20 | 정정 후 | 주금납입일 2027-04-20 | ${filler(length)} | 현재 소송을 취하하고 철회함` });
+  const comparisons = [
+    ['trust-purpose-exact-vs-paraphrase', trust('임직원 성과보상재원 확보'), trust('임직원 보상을 위한 재원 마련')],
+    ['cb-funding-exact-vs-paraphrase', cb('보유현금을 활용하여 상기 사채를 상환할 예정'), cb('회사 자금으로 해당 사채 대금을 지급할 계획')],
+    ['distance-zero-vs-301', terminalFirst(0), terminalFirst(301)],
+    ['order-terminal-vs-schedule-first-zero', terminalFirst(0), scheduleFirst(0)],
+    ['order-terminal-vs-schedule-first-4096', terminalFirst(4096), scheduleFirst(4096)],
+  ];
+  const failures = comparisons.flatMap(([id, left, right]) => {
+    const leftProjection = project(left);
+    const rightProjection = project(right);
+    return JSON.stringify(leftProjection) === JSON.stringify(rightProjection)
+      ? []
+      : [{ id, left: leftProjection, right: rightProjection }];
   });
   assert.deepEqual(failures, []);
 });
