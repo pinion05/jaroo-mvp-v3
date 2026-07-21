@@ -776,6 +776,22 @@ function replaceMatchedIntents(events, predicate, replacements) {
   return sortEvents(retained);
 }
 
+const TERMINAL_LIFECYCLE_ACTIONS = new Set([
+  'cancelled', 'dismissed', 'lifted', 'repaid', 'terminated', 'withdrawn',
+]);
+
+function lifecycleIntentKey(event) {
+  return `${event.type ?? ''}|${event.cause ?? ''}|${event.subjectType ?? ''}`;
+}
+
+function preserveTerminalLifecycle(events, terminalOwners) {
+  if (terminalOwners.size === 0) return events;
+  return sortEvents(events.map((event) => {
+    const owner = terminalOwners.get(lifecycleIntentKey(event));
+    return owner ? createEvent({ ...event, action: owner.action, state: owner.state }) : event;
+  }));
+}
+
 function applyFinalTermsRule(input, events, bodyFacts) {
   const title = compactText(input.reportName);
   const correctionScope = currentCorrectionScope(input, bodyFacts);
@@ -824,6 +840,16 @@ function applyTerminalPolarityRule(input, events, bodyFacts) {
   const correctionScope = currentCorrectionScope(input, bodyFacts);
   const currentScope = input.wrapperKind === 'correction' ? correctionScope : body;
   const currentSubjectScope = input.wrapperKind === 'correction' ? correctionScope : currentDisclosureScope(bodyFacts);
+
+  if (input.wrapperKind === 'correction'
+    && /소송등의제기/u.test(title)
+    && /(?:취하|철회)/u.test(currentScope)) {
+    return replaceMatchedIntents(
+      events,
+      (event) => event.type === 'legal-regulatory' && event.cause === 'litigation',
+      [semanticEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer')],
+    );
+  }
 
   if (/유형자산(?:처분|양도|취득|양수)결정/u.test(title)
     && /정정사유.{0,80}(?:계약해제합의|계약취소)|(?:계약해제합의|계약취소).{0,80}(?:정정공시|정정사항)|(?:전항목|주요항목).{0,40}(?:철회|삭제)/u.test(currentScope)) {
@@ -912,6 +938,132 @@ function applyActualityRule(input, events, bodyFacts) {
     firstDateAfterLabel(bodyFacts.rawText, labelPattern, preferLast),
     filed,
   );
+
+  if (input.disclosureDetailType === 'J001'
+    && /특수관계인으로부터채권매수/u.test(title)
+    && ['past', 'same-day'].includes(relationAfterLabel('매수일자', false))
+    && /채권을.{0,20}(?:매입|매수)|단기자금운용/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.type === 'related-party', [
+      semanticEvent('related-party', 'purchased', 'effective', 'bond-transactions', 'securities'),
+    ]);
+  }
+
+  if (corrected && /영업양도결정/u.test(title)
+    && /정정사유.{0,60}거래종결및양수인변경/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.cause === 'business-disposal', [
+      semanticEvent('restructuring', 'completed', 'effective', 'business-disposal', 'business'),
+    ]);
+  }
+
+  if (!corrected && /타법인주식및출자증권양도결정/u.test(title)
+    && relationAfterLabel('양도예정일자', false) === 'future'
+    && /잔금.{0,100}예정/u.test(body)
+    && /거래선행조건.{0,80}(?:충족|변동)/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.cause === 'equity-disposal', [
+      semanticEvent('restructuring', 'decided', 'proposed', 'equity-disposal', 'securities'),
+    ]);
+  }
+
+  if (!corrected && /지주회사의자회사탈퇴/u.test(title)
+    && ['past', 'same-day'].includes(relationAfterLabel('탈퇴일자', false))
+    && /흡수합병에따른자회사탈퇴/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.cause === 'subsidiary-exit', [
+      semanticEvent('corporate-profile', 'changed', 'effective', 'subsidiary-exit', 'issuer'),
+    ]);
+  }
+
+  if (input.disclosureDetailType === 'J001' && /특수관계인에대한영업양도/u.test(title)
+    && relationAfterLabel('양도일자', false) === 'future'
+    && /거래종결예정일/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.type === 'related-party', [
+      semanticEvent('related-party', 'decided', 'proposed', 'business-transfer', 'operating-business'),
+    ]);
+  }
+
+  if (!corrected && /타법인주식및출자증권(?:양수|취득)결정/u.test(title)
+    && ((relationAfterLabel('양수예정일자|취득예정일자', false) === 'future'
+      && /(?:잔금|거래종결일).{0,120}(?:선행조건|예정)/u.test(body))
+      || /잔금.{0,80}거래종결의선행조건이모두충족/u.test(body))) {
+    return replaceMatchedIntents(events, (event) => event.cause === 'equity-acquisition', [
+      semanticEvent('restructuring', 'decided', 'proposed', 'equity-acquisition', 'securities'),
+    ]);
+  }
+
+  if (corrected && /영업양수결정/u.test(title)
+    && /이전대상재무상태표확정에따른양수가액및잔금확정/u.test(body)
+    && /잔금은거래종결일기준.{0,120}확정한금액/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.cause === 'business-acquisition', [
+      semanticEvent('restructuring', 'acquired', 'effective', 'business-acquisition', 'business'),
+    ]);
+  }
+
+  if (input.disclosureDetailType === 'J001' && /특수관계인으로부터주식의취득/u.test(title)
+    && relationAfterLabel('거래일자', false) === 'future'
+    && /매매계약체결예정일/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.type === 'related-party', [
+      semanticEvent('related-party', 'decided', 'proposed', 'equity-acquisition', 'securities'),
+    ]);
+  }
+
+  if (!corrected && /자기주식취득신탁계약체결결정/u.test(title)) {
+    const currentBody = compactText(input.bodyText);
+    const operativeDate = relationAfterLabel('계약기간.{0,30}시작일|계약체결일', false);
+    const affirmativeContract = /(?:본)?(?:자기주식취득)?신탁계약을.{0,30}(?:체결완료|체결하였|체결했|체결함|체결하고)|신탁계약.{0,30}(?:체결완료|체결되었|체결됨)/u.test(currentBody);
+    const effective = ['past', 'same-day'].includes(operativeDate) && affirmativeContract;
+    return replaceMatchedIntents(events, (event) => event.cause === 'treasury-share-trust', [
+      semanticEvent(
+        'capital-change',
+        effective ? 'contracted' : 'decided',
+        effective ? 'effective' : 'proposed',
+        'treasury-share-trust',
+        'securities',
+      ),
+    ]);
+  }
+
+  if (!corrected && /자기전환사채만기전취득결정/u.test(title)) {
+    const currentBody = compactText(input.bodyText);
+    const paymentRelation = relationAfterLabel('지급(?:\\(예정\\))?일|지급예정일', false);
+    const affirmativeAcquisition = /(?:실제)?사채취득일|(?:대금)?지급및(?:사채)?취득완료|(?:사채|전자등록금액|잔여분).{0,100}(?:발행회사|회사)가?.{0,100}(?:만기전)?취득(?:하고|하였|함|입니다)|본취득은.{0,100}(?:만기전)?취득/u.test(currentBody);
+    const residualObligation = /잔금.{0,80}(?:지급)?예정|전액지급완료즉시.{0,60}(?:사채|증권).{0,30}(?:수령|이전)예정|취득후.{0,80}재매각예정/u.test(currentBody);
+    if (paymentRelation || residualObligation || affirmativeAcquisition) {
+      const effective = affirmativeAcquisition && paymentRelation !== 'future' && !residualObligation;
+      return replaceMatchedIntents(events, (event) => event.type === 'capital-change' && event.cause === 'convertible-bond', [
+        semanticEvent(
+          'capital-change',
+          effective ? 'acquired' : 'decided',
+          effective ? 'effective' : 'proposed',
+          'convertible-bond',
+          'securities',
+        ),
+      ]);
+    }
+  }
+
+  if (input.disclosureDetailType === 'J001' && /특수관계인으로부터채무인수/u.test(title)
+    && relationAfterLabel('(?:채무)?인수(?:예정)?일', false) === 'future'
+    && /담보대출을인수/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.type === 'related-party', [
+      semanticEvent('related-party', 'decided', 'proposed', 'debt-assumption', 'contract'),
+    ]);
+  }
+
+  if (input.disclosureDetailType === 'J001' && /특수관계인으로부터기술이전/u.test(title)
+    && relationAfterLabel('계약체결일', false) === 'future'
+    && /거래종결일\(기술이전일\).{0,80}변경될수있/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.type === 'related-party', [
+      semanticEvent('related-party', 'decided', 'proposed', 'technology-transfer', 'contract-right'),
+    ]);
+  }
+
+  if (input.disclosureDetailType === 'J001' && /특수관계인에대한담보제공/u.test(title)
+    && ['past', 'same-day'].includes(relationAfterLabel('담보제공일자', false))
+    && /담보물.{0,60}부동산/u.test(body)
+    && /신규약정을체결.{0,60}담보제공되는건/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.type === 'related-party', [
+      semanticEvent('related-party', 'provided', 'effective', 'collateral-provision', 'real-estate'),
+    ]);
+  }
 
   if (corrected && /타법인주식및출자증권(?:양수|취득)결정/u.test(title)) {
     const explicitClosing = /출자금납입완료/u.test(currentScope)
@@ -1020,6 +1172,49 @@ function applyCorrectionLifecycleDeltaRule(input, events, bodyFacts) {
     firstDateAfterLabel(bodyFacts.rawText, labelPattern, preferLast),
     filed,
   );
+
+  const scheduleDelta = corrected && (
+    /\[공통정정\]일정변경/u.test(currentScope)
+    || /기준일변경에따른정정/u.test(currentScope)
+    || /2차매매거래종결일연장/u.test(currentScope)
+    || /(?:일정변경.{0,120}분할등기예정일자|분할일정종료보고총회일분할등기예정일자.{0,80}일정변경)/u.test(currentScope)
+    || /취득예정일변경/u.test(currentScope)
+  ) && !/(?:발행가액|행사가액|공모가액|모집가액).{0,30}확정/u.test(currentScope);
+  if (scheduleDelta) {
+    const replacements = /주권관련사채권의취득결정/u.test(title)
+      ? [semanticEvent('asset-transaction', 'rescheduled', 'pending', 'securities-purchase', 'securities')]
+      : events
+        .filter((event) => event.type !== 'other')
+        .map((event) => createEvent({ ...event, action: 'rescheduled', state: 'pending' }));
+    if (replacements.length > 0) {
+      return replaceMatchedIntents(events, (event) => event.type !== 'other', replacements);
+    }
+  }
+
+  const pendingCorrectionFamily = corrected && (
+    (/특수관계인의유상증자참여/u.test(title) && /최종발행가액.{0,80}변동/u.test(currentScope) && !/확정된최종발행가액을적용/u.test(currentScope))
+    || (/유상증자결정/u.test(title) && /확정예정일/u.test(currentScope) && /납입일/u.test(currentScope))
+    || (/타법인주식및출자증권취득결정/u.test(title) && /최종발행가액.{0,120}취득/u.test(currentScope))
+    || (/주식교환[ㆍ·ᆞ]?이전결정/u.test(title) && /주식매수청구취득주식처분방안추가반영/u.test(currentScope))
+    || (/자기주식취득결정/u.test(title) && /무상증자결의시점부터.{0,80}자기주식을취득하지않을예정/u.test(currentScope))
+    || (/무상증자결정/u.test(title) && /자기주식취득계획변경/u.test(currentScope))
+    || (/감자결정/u.test(title) && /전환사채전환청구에따른주식수량반영/u.test(currentScope))
+    || (/타법인주식및출자증권양도결정/u.test(title) && /정산이완료되지않/u.test(currentScope))
+    || (/투자판단관련주요경영사항/u.test(title) && /최대주주변경은없습니다/u.test(currentScope))
+    || (/자본으로인정되는채무증권발행결정/u.test(title) && /일부조건변경에따른정정/u.test(currentScope) && relationAfterLabel('납입일') === 'future')
+    || (/신주인수권부사채권발행결정/u.test(title) && /행사가액.{0,100}확정될예정/u.test(body))
+    || (/타법인주식및출자증권취득결정/u.test(title) && /취득예정일자는주금납입\(예정\)일/u.test(body))
+    || (/타인에대한채무보증결정/u.test(title) && /채무보증기간의변경/u.test(currentScope) && relationAfterLabel('채무보증기간.{0,30}시작일') === 'future')
+    || (/타법인주식및출자증권처분결정/u.test(title) && /풋옵션.{0,80}미이행/u.test(currentScope) && /미확정/u.test(currentScope))
+  );
+  if (pendingCorrectionFamily) {
+    const replacements = events
+      .filter((event) => event.type !== 'other')
+      .map((event) => createEvent({ ...event, action: 'updated', state: 'pending' }));
+    if (replacements.length > 0) {
+      return replaceMatchedIntents(events, (event) => event.type !== 'other', replacements);
+    }
+  }
 
   if (corrected && /교환사채권발행결정/u.test(title)
     && /(?:가처분|법원).{0,120}(?:후속)?절차.{0,30}중단|(?:후속)?절차.{0,30}중단.{0,120}(?:가처분|법원)/u.test(currentScope)) {
@@ -1143,6 +1338,62 @@ function applyRoleAwareTemporalRule(input, events, bodyFacts) {
     firstDateAfterLabel(bodyFacts.rawText, labelPattern, false),
     filed,
   );
+
+  if (/자기주식취득신탁계약체결결정/u.test(title)
+    && input.correctionKind === '연장결정'
+    && /신탁계약기간만기로인한계약연장/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.type === 'capital-change', [
+      semanticEvent('capital-change', 'extended', 'effective', 'treasury-share-trust', 'securities'),
+    ]);
+  }
+  if (/타인에대한채무보증결정/u.test(title) && /공시에대한연장건/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.cause === 'debt-guarantee', [
+      semanticEvent('material-contract', 'extended', relationAfterLabel('채무보증기간.{0,30}시작일') === 'future' ? 'pending' : 'effective', 'debt-guarantee', 'contract'),
+    ]);
+  }
+  if (corrected && /금전대여결정/u.test(title) && /정정사유.{0,40}대여기간연장/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => ['material-contract', 'related-party'].includes(event.type), [
+      semanticEvent('material-contract', 'extended', 'effective', 'loan', 'contract'),
+    ]);
+  }
+  if (input.disclosureDetailType === 'J001' && /특수관계인과의리스거래/u.test(title)
+    && /(?:임대차|리스).{0,60}(?:연장계약|계약기간연장)/u.test(body)
+    && /각계약별세부내역/u.test(body)
+    && !/계약체결일은현재특정되지않았으며.{0,10}확정시정정공시예정/u.test(body)) {
+    const startRelation = relationAfterLabel('리스시행일|변경계약.{0,20}시작일');
+    return replaceMatchedIntents(events, (event) => event.type === 'related-party', [
+      semanticEvent('related-party', 'extended', startRelation === 'future' || bodyFacts.hasFutureDate ? 'pending' : 'effective', 'aircraft-lease', 'asset'),
+    ]);
+  }
+  if (input.disclosureDetailType === 'J001' && /특수관계인에대한담보제공/u.test(title)
+    && /담보제공연장/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.type === 'related-party', [
+      semanticEvent('related-party', 'extended', 'pending', 'collateral-provision', 'asset'),
+    ]);
+  }
+  if (!corrected && input.disclosureDetailType === 'J001' && /수익증권거래/u.test(title)
+    && /(?:만기미도래|만기일).{0,40}연장(?:시|가능)|연장가능/u.test(body)
+    && !/(?:기존|종전).{0,40}(?:수익증권|계약).{0,40}연장/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.type === 'related-party', [
+      semanticEvent('related-party', 'decided', 'proposed', 'fund-security-investment', 'securities'),
+    ]);
+  }
+  if (!corrected && /금전대여결정/u.test(title) && /기금전대여건.{0,100}연장공시/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => ['material-contract', 'related-party'].includes(event.type), [
+      semanticEvent('related-party', 'extended', 'effective', 'related-party-loan', 'contract'),
+    ]);
+  }
+  if (corrected && /단일판매[ㆍ·ᆞ]?공급계약체결/u.test(title) && /설계변경으로인한계약기간변경/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.cause === 'supply-contract', [
+      semanticEvent('material-contract', 'extended', 'effective', 'supply-contract', 'contract'),
+    ]);
+  }
+  if (input.disclosureDetailType === 'J001' && /특수관계인에대한자금대여/u.test(title)
+    && /만기는실행일로부터.{0,80}선택에의해연장가능/u.test(body)) {
+    return replaceMatchedIntents(events, (event) => event.type === 'related-party', [
+      semanticEvent('related-party', 'decided', 'proposed', 'related-party-loan', 'contract'),
+    ]);
+  }
 
   if (!corrected && /타법인주식및출자증권(?:양수|취득)결정/u.test(title)
     && !bodyFacts.completionObserved
@@ -1425,6 +1676,16 @@ function applyMultiIntentRule(input, events, bodyFacts) {
   const corrected = input.wrapperKind === 'correction';
   const currentScope = corrected ? currentCorrectionScope(input, bodyFacts) : body;
 
+  if (corrected
+    && /소송등의제기/u.test(title)
+    && /(?:주금납입일|신주상장예정일).{0,180}(?:정정전|정정후)|(?:정정전|정정후).{0,180}(?:주금납입일|신주상장예정일)/u.test(currentScope)) {
+    return replaceMatchedIntents(
+      events,
+      () => false,
+      [semanticEvent('capital-change', 'updated', 'pending', 'equity-securities', 'securities')],
+    );
+  }
+
   if (/중대재해발생/u.test(`${title}${body}`) && /작업중지(?:명령|조치)|작업정지(?:명령|조치)/u.test(body)) {
     return replaceMatchedIntents(
       events,
@@ -1494,29 +1755,72 @@ function applyGeneralizedSemanticGates(input, events) {
 
   const multiIntent = applyMultiIntentRule(input, events, facts);
   const scopedEvents = multiIntent ?? events;
+  if (corrected
+    && /신주인수권부사채권발행결정/u.test(title)
+    && /사채만기일.{0,100}일정변경에따른기재정정/u.test(body)
+    && /행사가액.{0,100}확정될예정/u.test(body)) {
+    return replaceMatchedIntents(
+      scopedEvents,
+      (event) => event.type === 'capital-change',
+      [semanticEvent('capital-change', 'updated', 'pending', 'bond-with-warrants', 'securities')],
+    );
+  }
+  const orderedAccumulatorRequired = scopedEvents.length > 1;
 
-  const terminalPolarity = applyTerminalPolarityRule(input, scopedEvents, facts);
-  if (terminalPolarity) return terminalPolarity;
+  if (!orderedAccumulatorRequired) {
+    const terminalPolarity = applyTerminalPolarityRule(input, scopedEvents, facts);
+    if (terminalPolarity) return terminalPolarity;
+    const actuality = applyActualityRule(input, scopedEvents, facts);
+    if (actuality) return actuality;
+    const correctionLifecycle = applyCorrectionLifecycleDeltaRule(input, scopedEvents, facts);
+    if (correctionLifecycle) return correctionLifecycle;
+    const roleAwareTemporal = applyRoleAwareTemporalRule(input, scopedEvents, facts);
+    if (roleAwareTemporal) return roleAwareTemporal;
+    const bodyFamily = applyUnresolvedBodyFamilyRule(input, scopedEvents, facts);
+    if (bodyFamily) return bodyFamily;
+    const objectSpecificity = applyObjectSpecificityRule(input, scopedEvents, facts);
+    if (objectSpecificity) return objectSpecificity;
+    if (multiIntent) return multiIntent;
+    const finalTerms = applyFinalTermsRule(input, scopedEvents, facts);
+    if (finalTerms) return finalTerms;
+  }
 
-  const actuality = applyActualityRule(input, scopedEvents, facts);
-  if (actuality) return actuality;
+  let accumulatedEvents = scopedEvents;
+  const terminalOwners = new Map();
+  const terminalPolarity = applyTerminalPolarityRule(input, accumulatedEvents, facts);
+  if (terminalPolarity) {
+    accumulatedEvents = terminalPolarity;
+    for (const event of terminalPolarity) {
+      if (TERMINAL_LIFECYCLE_ACTIONS.has(event.action)) terminalOwners.set(lifecycleIntentKey(event), event);
+    }
+  }
 
-  const correctionLifecycle = applyCorrectionLifecycleDeltaRule(input, scopedEvents, facts);
-  if (correctionLifecycle) return correctionLifecycle;
+  const orderedStages = [
+    applyActualityRule,
+    applyCorrectionLifecycleDeltaRule,
+    applyRoleAwareTemporalRule,
+    applyUnresolvedBodyFamilyRule,
+    applyObjectSpecificityRule,
+  ];
+  for (const stage of orderedStages) {
+    const result = stage(input, accumulatedEvents, facts);
+    if (result) accumulatedEvents = preserveTerminalLifecycle(result, terminalOwners);
+  }
 
-  const roleAwareTemporal = applyRoleAwareTemporalRule(input, scopedEvents, facts);
-  if (roleAwareTemporal) return roleAwareTemporal;
+  const finalTerms = applyFinalTermsRule(input, accumulatedEvents, facts);
+  if (finalTerms) accumulatedEvents = preserveTerminalLifecycle(finalTerms, terminalOwners);
 
-  const bodyFamily = applyUnresolvedBodyFamilyRule(input, scopedEvents, facts);
-  if (bodyFamily) return bodyFamily;
+  if (corrected
+    && /최대주주변경/u.test(title)
+    && /미발생|효력미발생/u.test(body)) {
+    accumulatedEvents = replaceMatchedIntents(
+      accumulatedEvents,
+      (event) => event.type === 'ownership-change',
+      [semanticEvent('ownership-change', 'updated', 'pending', 'controlling-shareholder', 'ownership')],
+    );
+  }
 
-  const objectSpecificity = applyObjectSpecificityRule(input, scopedEvents, facts);
-  if (objectSpecificity) return objectSpecificity;
-
-  if (multiIntent) return multiIntent;
-
-  const finalTerms = applyFinalTermsRule(input, scopedEvents, facts);
-  if (finalTerms) return finalTerms;
+  if (JSON.stringify(accumulatedEvents) !== JSON.stringify(events)) return accumulatedEvents;
 
   // Negative/terminal polarity must win over a generic positive contract noun.
   if (/단일판매[ㆍ·ᆞ]?공급계약해지/u.test(title)) {
@@ -1728,7 +2032,15 @@ function applyGeneralizedSemanticGates(input, events) {
     return replace(semanticEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer'));
   }
   if (corrected && /장래사업[ㆍ·ᆞ]?경영계획/u.test(title) && /철회|중단/u.test(body)) return replace(semanticEvent('corporate-event', 'withdrawn', 'effective', 'business-plan', 'issuer'));
-  if (corrected && /최대주주변경.*주식양수도계약체결/u.test(title)) return replace(semanticEvent('ownership-change', 'rescheduled', 'pending', 'controlling-shareholder', 'ownership'));
+  if (corrected && /최대주주변경.*주식양수도계약체결/u.test(title)) {
+    return replace(semanticEvent(
+      'ownership-change',
+      /미발생|효력미발생/u.test(body) ? 'updated' : 'rescheduled',
+      'pending',
+      'controlling-shareholder',
+      'ownership',
+    ));
+  }
   if (corrected && /타법인주식및출자증권처분결정/u.test(title) && facts.completionObserved) return replace(semanticEvent('restructuring', 'disposed', 'effective', 'equity-disposal', 'securities'));
   if (corrected && /타법인주식및출자증권처분결정/u.test(title)
     && /거래정산.{0,80}최종확정|거래.{0,40}종결.{0,160}최종(?:정산|확정)/u.test(body)) {
@@ -1793,6 +2105,7 @@ export function scoreEventExtractionConfidence({ input, candidates, events }) {
   if (events.length > 1 && events.some((event) => event.state === 'pending')) return 'medium';
   const title = compactText(input.reportName);
   const body = compactText(input.bodyText);
+  if (input.correctionKind === '연장결정' && /자기주식취득신탁계약/u.test(title)) return 'medium';
   const hasPendingCorrection = input.wrapperKind === 'correction'
     && events.some((event) => ['rescheduled', 'updated'].includes(event.action) && event.state === 'pending');
   const hasScopedLifecycleDelta = (
@@ -1807,6 +2120,23 @@ export function scoreEventExtractionConfidence({ input, candidates, events }) {
     || (/금전대여결정.*자회사의주요경영사항/u.test(title)
       && /대여금액변경/u.test(body)
       && /(?:분할하여)?집행예정|대여실행.{0,80}예정/u.test(body))
+    || (/감자결정/u.test(title) && /기준일변경에따른정정/u.test(body))
+    || (/주권관련사채권의취득결정/u.test(title) && /취득예정일변경/u.test(body))
+    || (/특수관계인의유상증자참여/u.test(title) && /최종발행가액.{0,80}변동/u.test(body) && !/확정된최종발행가액을적용/u.test(body))
+    || (/유상증자결정/u.test(title) && /확정예정일/u.test(body) && /납입일/u.test(body))
+    || (/타법인주식및출자증권취득결정/u.test(title) && /최종발행가액.{0,120}취득|취득예정일자는주금납입\(예정\)일/u.test(body))
+    || (/주식교환[ㆍ·ᆞ]?이전결정/u.test(title) && /주식매수청구취득주식처분방안추가반영/u.test(body))
+    || (/자기주식취득결정/u.test(title) && /무상증자결의시점부터.{0,80}자기주식을취득하지않을예정/u.test(body))
+    || (/무상증자결정/u.test(title) && /자기주식취득계획변경/u.test(body))
+    || (/감자결정/u.test(title) && /전환사채전환청구에따른주식수량반영/u.test(body))
+    || (/타법인주식및출자증권양도결정/u.test(title) && /정산이완료되지않/u.test(body))
+    || (/투자판단관련주요경영사항/u.test(title) && /최대주주변경은없습니다/u.test(body))
+    || (/자본으로인정되는채무증권발행결정/u.test(title) && /일부조건변경에따른정정/u.test(body))
+    || (/신주인수권부사채권발행결정/u.test(title)
+      && /사채만기일.{0,100}일정변경에따른기재정정/u.test(body)
+      && /행사가액.{0,100}확정될예정/u.test(body))
+    || (/타인에대한채무보증결정/u.test(title) && /채무보증기간의변경/u.test(body))
+    || (/타법인주식및출자증권처분결정/u.test(title) && /풋옵션.{0,80}미이행/u.test(body) && /미확정/u.test(body))
   );
   if (hasPendingCorrection && !hasScopedLifecycleDelta) return 'medium';
   const riskyCorrectionSemantic = input.wrapperKind !== 'original'
