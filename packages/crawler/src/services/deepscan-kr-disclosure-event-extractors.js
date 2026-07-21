@@ -762,6 +762,18 @@ function currentDisclosureScope(bodyFacts) {
   return boundary < 0 ? body : body.slice(0, boundary);
 }
 
+function hasCompletedTrustContract(scope) {
+  return /신탁계약.{0,60}(?:체결(?:을)?완료(?:하였|했|함|되었|됨)?|체결(?:하였|했|함|되었|됨)|체결절차(?:를)?(?:모두)?(?:마쳤|완료(?:하였|했|함)?))/u.test(scope);
+}
+
+function hasCompletedConvertibleBondAcquisition(scope) {
+  const combinedCompletion = /(?:대금)?지급.{0,20}(?:사채|채권|증권).{0,20}(?:취득|인수|수령)(?:을)?완료/u.test(scope);
+  const paymentCompleted = /(?:사채|채권|증권)?대금.{0,50}(?:전액|모두)?.{0,20}(?:지급(?:을)?완료|지급(?:하였|했|함|하고|되었습니다|됐습니다))/u.test(scope)
+    || /대금지급(?:을)?완료/u.test(scope);
+  const securityReceived = /(?:사채|채권|증권).{0,60}(?:취득(?:을)?완료|취득(?:하였|했|함|했습니다)|인수(?:하였|했|함|했습니다)|수령(?:하였|했|함|했습니다)|넘겨받(?:았|았습니다|음))/u.test(scope);
+  return combinedCompletion || (paymentCompleted && securityReceived);
+}
+
 function hasAffirmativeRelatedPartyEvidence(input, bodyFacts) {
   if (input.disclosureDetailType === 'J001') return true;
   const body = bodyFacts.fullText;
@@ -1006,9 +1018,9 @@ function applyActualityRule(input, events, bodyFacts) {
   }
 
   if (!corrected && /자기주식취득신탁계약체결결정/u.test(title)) {
-    const currentBody = compactText(input.bodyText);
+    const currentBody = currentDisclosureScope(bodyFacts);
     const operativeDate = relationAfterLabel('계약기간.{0,30}시작일|계약체결일', false);
-    const affirmativeContract = /(?:본)?(?:자기주식취득)?신탁계약을.{0,30}(?:체결완료|체결하였|체결했|체결함|체결하고)|신탁계약.{0,30}(?:체결완료|체결되었|체결됨)/u.test(currentBody);
+    const affirmativeContract = hasCompletedTrustContract(currentBody);
     const effective = ['past', 'same-day'].includes(operativeDate) && affirmativeContract;
     return replaceMatchedIntents(events, (event) => event.cause === 'treasury-share-trust', [
       semanticEvent(
@@ -1022,12 +1034,16 @@ function applyActualityRule(input, events, bodyFacts) {
   }
 
   if (!corrected && /자기전환사채만기전취득결정/u.test(title)) {
-    const currentBody = compactText(input.bodyText);
+    const currentBody = currentDisclosureScope(bodyFacts);
     const paymentRelation = relationAfterLabel('지급(?:\\(예정\\))?일|지급예정일', false);
-    const affirmativeAcquisition = /(?:실제)?사채취득일|(?:대금)?지급및(?:사채)?취득완료|(?:사채|전자등록금액|잔여분).{0,100}(?:발행회사|회사)가?.{0,100}(?:만기전)?취득(?:하고|하였|함|입니다)|본취득은.{0,100}(?:만기전)?취득/u.test(currentBody);
-    const residualObligation = /잔금.{0,80}(?:지급)?예정|전액지급완료즉시.{0,60}(?:사채|증권).{0,30}(?:수령|이전)예정|취득후.{0,80}재매각예정/u.test(currentBody);
-    if (paymentRelation || residualObligation || affirmativeAcquisition) {
-      const effective = affirmativeAcquisition && paymentRelation !== 'future' && !residualObligation;
+    const acquisitionRelation = relationAfterLabel('(?:실제)?사채취득일|취득예정일', false);
+    const affirmativeAcquisition = hasCompletedConvertibleBondAcquisition(currentBody);
+    const residualObligation = /잔금.{0,80}(?:지급)?예정|전액지급완료즉시.{0,60}(?:사채|증권).{0,30}(?:수령|이전)예정/u.test(currentBody);
+    if (paymentRelation || acquisitionRelation || residualObligation || affirmativeAcquisition) {
+      const effective = affirmativeAcquisition
+        && paymentRelation !== 'future'
+        && acquisitionRelation !== 'future'
+        && !residualObligation;
       return replaceMatchedIntents(events, (event) => event.type === 'capital-change' && event.cause === 'convertible-bond', [
         semanticEvent(
           'capital-change',
