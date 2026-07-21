@@ -57,7 +57,10 @@ test('all extractor candidates are deterministic and emit the canonical event sh
       const first = extractor(fixtureCase.input);
       const second = extractor(fixtureCase.input);
       assert.deepEqual(first, second, `${name}:${fixtureCase.id}`);
-      assert.ok(first.events.length > 0, `${name}:${fixtureCase.id}`);
+      const gatedBodyDependentAbstention = name === 'gated'
+        && fixtureCase.input.disclosureDetailType === 'J001'
+        && !fixtureCase.input.bodyText;
+      assert.ok(first.events.length > 0 || gatedBodyDependentAbstention, `${name}:${fixtureCase.id}`);
       for (const event of first.events) {
         assert.deepEqual(Object.keys(event), ['type', 'action', 'state', 'cause', 'subjectType'], `${name}:${fixtureCase.id}`);
       }
@@ -173,6 +176,16 @@ test('J001 blank periodic loan tables abstain with low confidence', async () => 
     reportName: '계열금융회사의약관에의한금융거래-[장단기대여]',
     disclosureDetailType: 'J001',
     bodyText: '거래상대방 | - | 거래일자 | - | 대여종류 | - | 거래금액 | - | 실제 인수금액은 없었습니다.',
+  });
+  assert.deepEqual(actual.events, []);
+  assert.equal(actual.confidence, 'low');
+});
+
+test('J001 body-dependent disclosures abstain when the body is unavailable', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const actual = extractEventsGatedProjection({
+    reportName: '약관에의한금융거래시계열금융회사의거래상대방의공시',
+    disclosureDetailType: 'J001',
   });
   assert.deepEqual(actual.events, []);
   assert.equal(actual.confidence, 'low');
