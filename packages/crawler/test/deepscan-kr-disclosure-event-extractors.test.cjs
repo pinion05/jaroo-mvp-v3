@@ -28,6 +28,336 @@ function eventSet(events) {
   return events.map(normalizeEvent).map(JSON.stringify).sort();
 }
 
+function canonicalEvent(type, action, state, cause, subjectType) {
+  return { type, action, state, cause, subjectType };
+}
+
+const ITERATION_7_SYNTHETIC_CASES = [
+  // F1: final price/terms must be current and field-scoped.
+  {
+    id: 'i7-f1-positive-final-offering-price', family: 'F1', kind: 'positive',
+    input: { reportName: '[기재정정]투자설명서', disclosureDetailType: 'C001', bodyText: '정정사유 | 공모가액 확정에 따른 정정 | 정정 전 | 예정 모집가액 | 정정 후 | 확정 모집가액' },
+    expectedEvents: [canonicalEvent('capital-change', 'price-set', 'effective', 'equity-securities', 'securities')],
+  },
+  {
+    id: 'i7-f1-positive-fund-first-price', family: 'F1', kind: 'positive',
+    input: { reportName: '[기재정정]증권신고서(집합투자증권-회사형)', disclosureDetailType: 'G002', bodyText: '정정사항 | 정정사유 | 1차 발행가액 결정 | 정정 전 | 예정 모집가액 | 정정 후 | 모집가액' },
+    expectedEvents: [canonicalEvent('capital-change', 'price-set', 'effective', 'fund-securities', 'securities')],
+  },
+  {
+    id: 'i7-f1-positive-warrant-exercise-price', family: 'F1', kind: 'positive',
+    input: { reportName: '[기재정정]주요사항보고서(신주인수권부사채권발행결정)', disclosureDetailType: 'B001', bodyText: '정정사항 | 정정사유 | 행사가액 확정에 따른 정정 | 정정 전 | 확정 예정 | 정정 후 | 신주인수권의 행사가액은 확정되었습니다' },
+    expectedEvents: [canonicalEvent('capital-change', 'price-set', 'effective', 'bond-with-warrants', 'securities')],
+  },
+  {
+    id: 'i7-f1-control-provisional-price', family: 'F1', kind: 'control',
+    input: { reportName: '[기재정정]투자설명서', disclosureDetailType: 'C001', bodyText: '정정사항 | 설명 보완 | 모집가액은 예정이며 수요예측 후 향후 확정될 예정' },
+    expectedEvents: [canonicalEvent('capital-change', 'updated', 'effective', 'equity-securities', 'securities')],
+  },
+  {
+    id: 'i7-f1-control-risk-price-language', family: 'F1', kind: 'control',
+    input: { reportName: '[기재정정]투자설명서', disclosureDetailType: 'C001', bodyText: '정정사항 | 위험요소 설명 보완 | 시장 상황에 따라 모집가격이 변동될 위험이 있습니다' },
+    expectedEvents: [canonicalEvent('capital-change', 'updated', 'effective', 'equity-securities', 'securities')],
+  },
+  {
+    id: 'i7-f1-control-historical-price-row', family: 'F1', kind: 'control',
+    input: { reportName: '투자설명서', disclosureDetailType: 'C001', bodyText: '과거 발행 내역 | 발행가액 확정 | 현재 모집 증권 | 지분증권 | 이번 가격은 예정' },
+    expectedEvents: [canonicalEvent('capital-change', 'published', null, 'equity-securities', 'securities')],
+  },
+
+  // F2: terminal predicates are actor/object specific and cannot be inferred from end dates.
+  {
+    id: 'i7-f2-positive-asset-disposal-cancelled', family: 'F2', kind: 'positive',
+    input: { reportName: '[기재정정]유형자산처분결정', disclosureDetailType: 'I001', bodyText: '정정사항 | 정정사유 | 거래상대방과 부동산 처분계약 합의 해제 | 정정 후 | 처분 관련 전 항목 삭제' },
+    expectedEvents: [canonicalEvent('asset-transaction', 'cancelled', 'effective', 'tangible-asset-disposal', 'real-estate')],
+  },
+  {
+    id: 'i7-f2-positive-financing-repaid', family: 'F2', kind: 'positive',
+    input: { reportName: '[기재정정]부동산투자회사자금차입', disclosureDetailType: 'I001', bodyText: '정정사항 | 정정사유 | 차입금 전액 조기 상환 완료 | 정정 후 | 차입잔액 없음' },
+    expectedEvents: [canonicalEvent('material-contract', 'repaid', 'effective', 'financing', 'contract')],
+  },
+  {
+    id: 'i7-f2-positive-guarantee-terminated', family: 'F2', kind: 'positive',
+    input: { reportName: '[기재정정]타인에대한채무보증결정', disclosureDetailType: 'I001', bodyText: '정정사항 | 정정사유 | 채무자의 원리금 전액 상환으로 채무보증 종료 | 보증잔액 | 없음' },
+    expectedEvents: [canonicalEvent('material-contract', 'terminated', 'effective', 'debt-guarantee', 'contract')],
+  },
+  {
+    id: 'i7-f2-positive-product-approval-withdrawn', family: 'F2', kind: 'positive',
+    input: { reportName: '투자판단관련주요경영사항', disclosureDetailType: 'I001', bodyText: '품목허가 신청 | 회사는 심사 중인 품목허가 신청을 자진 취하하였습니다 | 취하 접수 완료' },
+    expectedEvents: [canonicalEvent('regulatory-product', 'withdrawn', 'cancelled', 'product-approval', 'product')],
+  },
+  {
+    id: 'i7-f2-positive-fund-investment-withdrawn', family: 'F2', kind: 'positive',
+    input: { reportName: '[기재정정]특수관계인과의수익증권거래', disclosureDetailType: 'J001', bodyText: '정정사항 | 위탁운용사 미선정으로 출자를 철회하고 내부거래를 취소함 | 거래금액 | 없음' },
+    expectedEvents: [canonicalEvent('related-party', 'withdrawn', 'cancelled', 'fund-security-investment', 'securities')],
+  },
+  {
+    id: 'i7-f2-control-future-loan-maturity', family: 'F2', kind: 'control',
+    input: { reportName: '부동산투자회사자금차입', disclosureDetailType: 'I001', filedAt: '2027-01-10', bodyText: '차입일 | 2027-01-10 | 만기일 | 2029-01-10 | 차입 실행 완료' },
+    expectedEvents: [canonicalEvent('material-contract', 'borrowed', 'effective', 'financing', 'contract')],
+  },
+  {
+    id: 'i7-f2-control-repayment-plan', family: 'F2', kind: 'control',
+    input: { reportName: '[기재정정]부동산투자회사자금차입', disclosureDetailType: 'I001', bodyText: '정정사항 | 상환계획 기재 | 차입금은 향후 일시 상환 예정이며 아직 상환되지 않음' },
+    expectedEvents: [canonicalEvent('material-contract', 'updated', 'effective', 'financing', 'contract')],
+  },
+  {
+    id: 'i7-f2-control-contract-end-date', family: 'F2', kind: 'control',
+    input: { reportName: '단일판매ㆍ공급계약체결', filedAt: '2027-02-03', bodyText: '계약(수주)일자 | 2027-02-03 | 계약기간 시작일 | 2027-02-03 | 종료일 | 2030-12-31' },
+    expectedEvents: [canonicalEvent('material-contract', 'contracted', 'effective', 'supply-contract', 'contract')],
+  },
+  {
+    id: 'i7-f2-control-risk-cancellation', family: 'F2', kind: 'control',
+    input: { reportName: '유형자산취득결정', filedAt: '2027-02-03', bodyText: '취득대상 | 토지 | 취득 예정일 | 2027-08-01 | 위험요소 | 인허가 실패 시 계약이 취소될 가능성이 있음' },
+    expectedEvents: [canonicalEvent('asset-transaction', 'decided', 'proposed', 'tangible-asset-acquisition', 'real-estate')],
+  },
+  {
+    id: 'i7-f2-control-historical-cancelled-row', family: 'F2', kind: 'control',
+    input: { reportName: '유형자산처분결정', filedAt: '2027-02-03', bodyText: '처분대상 | 토지 | 현재 처분 예정일 | 2027-08-01 | 과거 거래내역 | 전년도 계약 취소 완료' },
+    expectedEvents: [canonicalEvent('asset-transaction', 'decided', 'proposed', 'tangible-asset-disposal', 'real-estate')],
+  },
+
+  // F3: actuality needs a same-intent completion predicate, not a nearby date.
+  {
+    id: 'i7-f3-positive-equity-closing', family: 'F3', kind: 'positive',
+    input: { reportName: '[기재정정]타법인주식및출자증권양수결정', disclosureDetailType: 'B001', bodyText: '정정사항 | 거래종결 확인 | 잔금 전액 지급 완료 | 주식 소유권 이전 완료' },
+    expectedEvents: [canonicalEvent('restructuring', 'acquired', 'effective', 'equity-acquisition', 'securities')],
+  },
+  {
+    id: 'i7-f3-positive-property-acquired', family: 'F3', kind: 'positive',
+    input: { reportName: '[기재정정]부동산투자회사부동산취득', disclosureDetailType: 'I001', bodyText: '정정사항 | 잔금 지급 완료 | 매매대금 전액 지급으로 부동산 취득이 종결되었습니다' },
+    expectedEvents: [canonicalEvent('asset-transaction', 'acquired', 'effective', 'tangible-asset-acquisition', 'real-estate')],
+  },
+  {
+    id: 'i7-f3-positive-rights-offering-completed', family: 'F3', kind: 'positive',
+    input: { reportName: '기타경영사항(자율공시)', disclosureDetailType: 'I001', bodyText: '자회사 유상증자 | 납입금 전액 수령 | 신주 발행 및 증자가 완료되었습니다' },
+    expectedEvents: [canonicalEvent('capital-change', 'completed', 'effective', 'rights-offering', 'securities')],
+  },
+  {
+    id: 'i7-f3-positive-after-the-fact-service-report', family: 'F3', kind: 'positive',
+    input: { reportName: '동일인등출자계열회사와의상품ㆍ용역거래', disclosureDetailType: 'J001', filedAt: '2027-04-01', bodyText: '거래기간 | 2026년 4분기 | 이사회 의결일이 아닌 거래실적 사후 보고일 | 상품ㆍ용역 거래 실적' },
+    expectedEvents: [canonicalEvent('related-party', 'reported', 'effective', 'internal-goods-services', 'contract')],
+  },
+  {
+    id: 'i7-f3-control-same-day-decision', family: 'F3', kind: 'control',
+    input: { reportName: '타법인주식및출자증권양수결정', disclosureDetailType: 'I001', filedAt: '2027-04-01', bodyText: '이사회 결의일 | 2027-04-01 | 계약체결일 | 2027-04-01 | 잔금 지급과 소유권 이전은 추후 진행' },
+    expectedEvents: [canonicalEvent('restructuring', 'decided', 'proposed', 'equity-acquisition', 'securities')],
+  },
+  {
+    id: 'i7-f3-control-partial-payment-future-closing', family: 'F3', kind: 'control',
+    input: { reportName: '[기재정정]부동산투자회사부동산취득', filedAt: '2027-04-01', bodyText: '정정사항 | 계약금 일부 지급 | 정정 후 잔금일 | 2027-05-15 | 잔금 납입 후 취득 종결 예정' },
+    expectedEvents: [canonicalEvent('asset-transaction', 'rescheduled', 'pending', 'tangible-asset-acquisition', 'real-estate')],
+  },
+  {
+    id: 'i7-f3-control-current-contract-future-maturity', family: 'F3', kind: 'control',
+    input: { reportName: '단일판매ㆍ공급계약체결', filedAt: '2027-04-01', bodyText: '계약(수주)일자 | 2027-04-01 | 계약기간 시작일 | 2027-04-01 | 계약기간 종료일 | 2029-04-01' },
+    expectedEvents: [canonicalEvent('material-contract', 'contracted', 'effective', 'supply-contract', 'contract')],
+  },
+  {
+    id: 'i7-f3-control-risk-historical-completion', family: 'F3', kind: 'control',
+    input: { reportName: '타법인주식및출자증권취득결정', filedAt: '2027-04-01', bodyText: '취득예정일 | 2027-06-30 | 투자위험 | 과거 유사 거래는 잔금 지급 후 완료되었음' },
+    expectedEvents: [canonicalEvent('restructuring', 'decided', 'proposed', 'equity-acquisition', 'securities')],
+  },
+
+  // F4: current before/after deltas select lifecycle without confusing maturity with termination.
+  {
+    id: 'i7-f4-positive-loan-extension', family: 'F4', kind: 'positive',
+    input: { reportName: '[기재정정]금전대여결정', filedAt: '2027-05-01', bodyText: '정정사항 | 대여기간 종료일 변경 | 정정 전 | 2028-05-01 | 정정 후 | 2029-05-01 | 기존 대여는 실행 중' },
+    expectedEvents: [canonicalEvent('material-contract', 'extended', 'effective', 'loan', 'contract')],
+  },
+  {
+    id: 'i7-f4-positive-partial-sale-rescheduled', family: 'F4', kind: 'positive',
+    input: { reportName: '[기재정정]자기전환사채매도결정', filedAt: '2027-05-01', bodyText: '정정사항 | 잔금일 변경 | 일부 대금 수령 | 정정 후 잔금일 | 2027-06-15 | 잔금 지급 후 매도 완료 예정' },
+    expectedEvents: [canonicalEvent('capital-change', 'rescheduled', 'pending', 'convertible-bond', 'securities')],
+    expectedConfidence: 'high',
+  },
+  {
+    id: 'i7-f4-positive-court-deferred-suspension', family: 'F4', kind: 'positive',
+    input: { reportName: '[기재정정]주요사항보고서(영업정지)', disclosureDetailType: 'B001', bodyText: '정정사항 | 법원이 행정처분 집행정지를 인용하여 영업정지 효력이 판결 시까지 유예됨' },
+    expectedEvents: [canonicalEvent('operating-status', 'halted', 'deferred', 'business-suspension', 'business')],
+  },
+  {
+    id: 'i7-f4-positive-buyer-change-pending-closing', family: 'F4', kind: 'positive',
+    input: { reportName: '[기재정정]타법인주식및출자증권처분결정', filedAt: '2027-05-01', bodyText: '정정사항 | 매수인 지위 및 권리의무 이전 | 거래종결은 관계기관 승인 이후 진행 예정 | 아직 지분 이전 전' },
+    expectedEvents: [canonicalEvent('restructuring', 'updated', 'pending', 'equity-disposal', 'securities')],
+    expectedConfidence: 'high',
+  },
+  {
+    id: 'i7-f4-control-simple-typo', family: 'F4', kind: 'control',
+    input: { reportName: '[기재정정]감사보고서', disclosureDetailType: 'F001', bodyText: '정정사항 | 단순 기재오류 수정 | 감사보고서 재발행' },
+    expectedEvents: [canonicalEvent('audit', 'updated', 'effective', 'audit-report', 'audit-opinion')],
+  },
+  {
+    id: 'i7-f4-control-description-update', family: 'F4', kind: 'control',
+    input: { reportName: '[기재정정]대규모기업집단현황공시', disclosureDetailType: 'I001', bodyText: '정정사항 | 설명 문구 보완 | 거래 일정 변경 없음' },
+    expectedEvents: [canonicalEvent('governance', 'updated', 'effective', 'business-group-status', 'governance')],
+  },
+  {
+    id: 'i7-f4-control-risk-delay', family: 'F4', kind: 'control',
+    input: { reportName: '[기재정정]주요사항보고서(자산양수결정)', bodyText: '정정사항 | 위험요소 문구 보완 | 인허가 상황에 따라 거래가 지연될 가능성이 있음' },
+    expectedEvents: [canonicalEvent('restructuring', 'updated', 'effective', 'asset-acquisition', 'asset')],
+  },
+  {
+    id: 'i7-f4-control-business-suspension-date-only', family: 'F4', kind: 'control',
+    input: { reportName: '[기재정정]주요사항보고서(영업정지)', bodyText: '정정 신고 | 정정사항 | 영업정지일자 변경 | 정정 전 | 2027-05-01 | 정정 후 | 2027-06-01' },
+    expectedEvents: [canonicalEvent('operating-status', 'halted', 'proposed', 'business-suspension', 'business')],
+  },
+
+  // F5: temporal roles keep current contracts effective and future execution proposed/pending.
+  {
+    id: 'i7-f5-positive-future-bond-sale', family: 'F5', kind: 'positive',
+    input: { reportName: '특수관계인에대한채권매도', disclosureDetailType: 'J001', filedAt: '2027-06-01', bodyText: '매도일 | 2027-07-01 | 채권 발행 및 매도는 수요예측 후 진행 예정 | 아직 인수 전' },
+    expectedEvents: [canonicalEvent('related-party', 'decided', 'proposed', 'bond-sale', 'securities')],
+  },
+  {
+    id: 'i7-f5-positive-existing-loan-extended-future', family: 'F5', kind: 'positive',
+    input: { reportName: '금전대여결정', filedAt: '2027-06-01', bodyText: '기존 금전대여 기간 연장 | 변경계약 시작일 | 2027-06-02 | 연장된 대여기간 | 2027-06-02부터' },
+    expectedEvents: [canonicalEvent('related-party', 'extended', 'pending', 'related-party-loan', 'contract')],
+  },
+  {
+    id: 'i7-f5-positive-collateral-receipt-future', family: 'F5', kind: 'positive',
+    input: { reportName: '특수관계인으로부터받은담보', disclosureDetailType: 'J001', filedAt: '2027-06-01', bodyText: '담보물 | 토지 및 건물 | 담보받은 일자 | 2027-07-01 | 신탁계약 체결 시 우선수익권을 제공받을 예정' },
+    expectedEvents: [canonicalEvent('related-party', 'decided', 'proposed', 'collateral-received', 'real-estate')],
+  },
+  {
+    id: 'i7-f5-control-future-lockup-release', family: 'F5', kind: 'control',
+    input: { reportName: '기타안내사항(안내공시)', filedAt: '2027-06-01', bodyText: '| 1. 제목 | | 보통주 의무보유 기간 만료 안내 | | 의무보유 해제일 | 2027-06-30 | 해제 예정 |' },
+    expectedEvents: [canonicalEvent('capital-change', 'scheduled', 'pending', 'lockup', 'securities')],
+  },
+  {
+    id: 'i7-f5-control-active-contract-future-end', family: 'F5', kind: 'control',
+    input: { reportName: '단일판매ㆍ공급계약체결', filedAt: '2027-06-01', bodyText: '계약(수주)일자 | 2027-06-01 | 계약기간 시작일 | 2027-06-01 | 계약기간 종료일 | 2030-06-01' },
+    expectedEvents: [canonicalEvent('material-contract', 'contracted', 'effective', 'supply-contract', 'contract')],
+  },
+  {
+    id: 'i7-f5-control-collateral-received-current', family: 'F5', kind: 'control',
+    input: { reportName: '특수관계인으로부터받은담보', disclosureDetailType: 'J001', filedAt: '2027-06-01', bodyText: '담보자산은 계열회사의 주식이며 담보 수령일 | 2027-06-01 | 담보 수령 완료' },
+    expectedEvents: [canonicalEvent('related-party', 'received', 'effective', 'collateral-received', 'securities')],
+  },
+
+  // F6: the body router is limited to unresolved/incomplete tuples with structured anchors.
+  {
+    id: 'i7-f6-positive-payment-default', family: 'F6', kind: 'positive',
+    input: { reportName: '주요사항보고서(부도발생)', disclosureDetailType: 'B001', bodyText: '부도발생 | 만기어음 | 지급제한으로 결제되지 않아 부도 처리됨 | 부도발생일 | 제출일' },
+    expectedEvents: [canonicalEvent('insolvency', 'defaulted', 'effective', 'payment-default', 'issuer')],
+  },
+  {
+    id: 'i7-f6-positive-patent-acquired', family: 'F6', kind: 'positive',
+    input: { reportName: '[기재정정]투자판단관련주요경영사항(특허권취득)', disclosureDetailType: 'I001', bodyText: '정정사항 | 해외 특허 등록료 납부 완료 | 납부 확인 시 특허권 법적 효력 발생' },
+    expectedEvents: [canonicalEvent('asset-transaction', 'acquired', 'effective', 'patent', 'intellectual-property')],
+  },
+  {
+    id: 'i7-f6-positive-contractor-selected', family: 'F6', kind: 'positive',
+    input: { reportName: '투자판단관련주요경영사항', disclosureDetailType: 'I001', bodyText: '공시 제목 | 정비사업 시공자 선정 | 회사가 우선협상대상자로 선정되었음을 통지받음 | 본계약은 추후 체결' },
+    expectedEvents: [canonicalEvent('material-contract', 'selected', 'effective', 'construction-project', 'contract')],
+  },
+  {
+    id: 'i7-f6-positive-regulatory-fine', family: 'F6', kind: 'positive',
+    input: { reportName: '벌금등의부과(자회사의주요경영사항)', disclosureDetailType: 'I001', bodyText: '부과기관 | 감독기관 | 처분내용 | 과징금 부과 | 통지서 수령 완료 | 납부기한은 추후' },
+    expectedEvents: [canonicalEvent('legal-regulatory', 'imposed', 'effective', 'regulatory-fine', 'issuer')],
+  },
+  {
+    id: 'i7-f6-control-promotional-construction', family: 'F6', kind: 'control',
+    input: { reportName: '기타경영사항(자율공시)', disclosureDetailType: 'I001', bodyText: '당사는 다양한 건설 프로젝트에서 우수한 시공 역량을 보유하고 있습니다' },
+    expectedEvents: [canonicalEvent('other', null, null, null, null)],
+  },
+  {
+    id: 'i7-f6-control-specific-prior-preserved', family: 'F6', kind: 'control',
+    input: { reportName: '단일판매ㆍ공급계약체결', filedAt: '2027-07-01', bodyText: '계약(수주)일자 | 2027-07-01 | 계약기간 시작일 | 2027-07-01 | 위험요소 | 규제 과징금이 부과될 가능성' },
+    expectedEvents: [canonicalEvent('material-contract', 'contracted', 'effective', 'supply-contract', 'contract')],
+  },
+
+  // F7: structured objects refine cause/subject without rewriting action/state.
+  {
+    id: 'i7-f7-positive-demerger-object', family: 'F7', kind: 'positive',
+    input: { reportName: '투자설명서', disclosureDetailType: 'C004', bodyText: '분할회사 | 분할존속회사 | 분할신설회사 | 분할승인 주주총회 예정 | 분할기일 예정' },
+    expectedEvents: [canonicalEvent('restructuring', 'decided', 'proposed', 'demerger', 'issuer')],
+  },
+  {
+    id: 'i7-f7-positive-aircraft-lease', family: 'F7', kind: 'positive',
+    input: { reportName: '특수관계인과의리스거래', disclosureDetailType: 'J001', filedAt: '2027-08-01', bodyText: '리스회사 | 계열회사 | 리스계약일 | 2027-09-01 | 리스시행일 | 2027-09-15 | 리스물건 | 항공기 1대 | 신규 전대차' },
+    expectedEvents: [canonicalEvent('related-party', 'decided', 'proposed', 'aircraft-lease', 'asset')],
+  },
+  {
+    id: 'i7-f7-positive-exchangeable-bond-result', family: 'F7', kind: 'positive',
+    input: { reportName: '유상증자또는주식관련사채등의발행결과(자율공시)', disclosureDetailType: 'I001', bodyText: '증권의 종류 | 무보증 사모 교환사채 | 발행방법 | 교환사채 발행 | 실제발행금액 | 납입 완료' },
+    expectedEvents: [canonicalEvent('capital-change', 'completed', 'effective', 'exchangeable-bond', 'securities')],
+  },
+  {
+    id: 'i7-f7-control-specific-share-exchange', family: 'F7', kind: 'control',
+    input: { reportName: '투자설명서', disclosureDetailType: 'C004', bodyText: '지분증권 투자설명서 | 주식의 포괄적 교환 및 이전 결정' },
+    expectedEvents: [canonicalEvent('restructuring', 'decided', 'proposed', 'share-exchange', 'issuer')],
+  },
+  {
+    id: 'i7-f7-control-generic-contract-right', family: 'F7', kind: 'control',
+    input: { reportName: '특수관계인과의계약권리의무승계', disclosureDetailType: 'J001', bodyText: '계약상 권리와 의무를 승계함' },
+    expectedEvents: [canonicalEvent('related-party', 'updated', 'effective', 'related-party-contract-right-updated', 'contract-right')],
+  },
+
+  // F8: enumerate sibling intents before transforms and deduplicate only exact tuples.
+  {
+    id: 'i7-f8-positive-cash-and-securities-donation', family: 'F8', kind: 'positive',
+    input: { reportName: '[기재정정]특수관계인에대한증여', disclosureDetailType: 'J001', bodyText: '정정사항 | 출연 완료에 따른 확정 공시 | 증여목적물 1 | 현금 출연 | 증여목적물 2 | 보통주 출연 | 증여 이행 완료' },
+    expectedEvents: [
+      canonicalEvent('related-party', 'donated', 'effective', 'cash-donation', 'cash'),
+      canonicalEvent('related-party', 'donated', 'effective', 'securities-donation', 'securities'),
+    ],
+  },
+  {
+    id: 'i7-f8-positive-three-plan-withdrawals', family: 'F8', kind: 'positive',
+    input: { reportName: '[기재정정]수시공시의무관련사항(공정공시)', disclosureDetailType: 'I002', bodyText: '정정사유 | 자기주식 활용계획 전면 철회 | 계획 1 자기주식 소각 | 계획 2 교환사채 발행 | 계획 3 사내근로복지기금 주식 출연 | 세 계획을 모두 철회하기로 결정' },
+    expectedEvents: [
+      canonicalEvent('corporate-action', 'withdrawn', 'effective', 'share-cancellation', 'securities'),
+      canonicalEvent('capital-change', 'withdrawn', 'effective', 'exchangeable-bond', 'securities'),
+      canonicalEvent('related-party', 'withdrawn', 'effective', 'employee-welfare-fund-contribution', 'securities'),
+    ],
+  },
+  {
+    id: 'i7-f8-control-identical-donation-deduped', family: 'F8', kind: 'control',
+    input: { reportName: '단일판매ㆍ공급계약체결', filedAt: '2027-09-01', bodyText: '계약(수주)일자 | 2027-09-01 | 계약기간 시작일 | 2027-09-01 | 동일 공급계약 설명 | 동일 공급계약 설명' },
+    expectedEvents: [canonicalEvent('material-contract', 'contracted', 'effective', 'supply-contract', 'contract')],
+  },
+  {
+    id: 'i7-f8-control-existing-independent-siblings', family: 'F8', kind: 'control',
+    input: { reportName: '중대재해발생', bodyText: '사고 발생 | 관계기관의 작업중지명령에 따라 해당 공정 작업 중지' },
+    expectedEvents: [
+      canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer'),
+      canonicalEvent('operating-status', 'halted', 'effective', 'regulatory-work-stop', 'business'),
+    ],
+  },
+
+  // Reconciled protected controls: these exact action/state pairs may not move.
+  {
+    id: 'i7-protected-302', family: 'protected', kind: 'protected',
+    input: { reportName: '타법인주식및출자증권양수결정', disclosureDetailType: 'I001', filedAt: '2027-10-01', bodyText: '이사회 결의일 | 2027-10-01 | 계약체결일 | 2027-10-01 | 잔금 지급 및 지분권리 이전은 선행조건 충족 후 진행' },
+    expectedEvents: [canonicalEvent('restructuring', 'decided', 'proposed', 'equity-acquisition', 'securities')],
+    expectedConfidence: 'high',
+  },
+  {
+    id: 'i7-protected-385', family: 'protected', kind: 'protected',
+    input: { reportName: '기타안내사항(안내공시)', filedAt: '2027-10-01', bodyText: '| 1. 제목 | | 보통주 의무보유 기간 만료 안내 | | 의무보유 해제일 | 2027-10-30 | 해제 예정 |' },
+    expectedEvents: [canonicalEvent('capital-change', 'scheduled', 'pending', 'lockup', 'securities')],
+    expectedConfidence: 'high',
+  },
+
+  // Audit-corrected tuples 65/70/86 are explicit contrast rows.
+  {
+    id: 'i7-corrected-65-loan-extension', family: 'corrected', kind: 'corrected',
+    input: { reportName: '[기재정정]금전대여결정', filedAt: '2027-11-01', bodyText: '정정사항 | 대여 종료일 연장 | 대여 실행일 | 2027-09-01 | 정정 전 종료일 | 2028-09-01 | 정정 후 종료일 | 2029-09-01' },
+    expectedEvents: [canonicalEvent('material-contract', 'extended', 'effective', 'loan', 'contract')],
+  },
+  {
+    id: 'i7-corrected-70-related-loan-extension', family: 'corrected', kind: 'corrected',
+    input: { reportName: '[기재정정]기타경영사항(자율공시)', disclosureDetailType: 'I001', filedAt: '2027-11-01', bodyText: '정정사항 | 계열회사 차입계약 기간 연장 | 차입상대방 | 계열회사 | 변경계약 시작일 | 2027-11-20 | 기존 차입 만기 연장' },
+    expectedEvents: [canonicalEvent('related-party', 'extended', 'pending', 'related-party-loan', 'contract')],
+  },
+  {
+    id: 'i7-corrected-86-contractor-selected', family: 'corrected', kind: 'corrected',
+    input: { reportName: '투자판단관련주요경영사항', disclosureDetailType: 'I001', bodyText: '공시 제목 | 도시정비사업 시공자 선정 | 우선협상대상자로 선정 통지 수령 | 본계약은 향후 체결 예정' },
+    expectedEvents: [canonicalEvent('material-contract', 'selected', 'effective', 'construction-project', 'contract')],
+  },
+];
+
 async function loadFixture() {
   return JSON.parse(await readFile(FIXTURE, 'utf8'));
 }
@@ -296,9 +626,9 @@ test('iteration 5 gates cover Q4 lifecycle, fallback, polarity, and object taxon
       expected: [{ type: 'related-party', action: 'borrowed', state: 'effective', cause: 'securities-borrowing', subjectType: 'securities' }],
     },
     {
-      id: 'loan-correction-terminal-date',
+      id: 'loan-correction-end-date-extension',
       input: { reportName: '[기재정정]금전대여결정', bodyText: '정정사유 | 대여기간 종료일 변경 | 정정후 종료일 | 2025.11.20' },
-      expected: [{ type: 'material-contract', action: 'terminated', state: 'effective', cause: 'loan', subjectType: 'contract' }],
+      expected: [{ type: 'material-contract', action: 'extended', state: 'effective', cause: 'loan', subjectType: 'contract' }],
     },
     {
       id: 'generic-production-termination-rescue',
@@ -419,6 +749,51 @@ test('iteration 6 gates require field-scoped evidence and calibrate unsupported 
     bodyText: '사외이사 변경 발생일 | 2025-12-30 | 신규 선임 | 임기시작일 | -',
   });
   assert.equal(earlierDirectorChange.events[0].state, null);
+});
+
+test('iteration 7 semantic families preserve scoped intent, polarity, lifecycle, and cardinality', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const familyCounts = Object.fromEntries(
+    [...new Set(ITERATION_7_SYNTHETIC_CASES.map((fixtureCase) => fixtureCase.family))]
+      .map((family) => [family, ITERATION_7_SYNTHETIC_CASES.filter((fixtureCase) => fixtureCase.family === family).length]),
+  );
+
+  assert.equal(ITERATION_7_SYNTHETIC_CASES.length, 58);
+  assert.deepEqual(familyCounts, {
+    F1: 6,
+    F2: 10,
+    F3: 8,
+    F4: 8,
+    F5: 6,
+    F6: 6,
+    F7: 5,
+    F8: 4,
+    protected: 2,
+    corrected: 3,
+  });
+
+  const failures = [];
+  for (const fixtureCase of ITERATION_7_SYNTHETIC_CASES) {
+    const actual = extractEventsGatedProjection(fixtureCase.input);
+    if (JSON.stringify(eventSet(actual.events)) !== JSON.stringify(eventSet(fixtureCase.expectedEvents))) {
+      failures.push({
+        id: fixtureCase.id,
+        family: fixtureCase.family,
+        kind: fixtureCase.kind,
+        expected: eventSet(fixtureCase.expectedEvents),
+        actual: eventSet(actual.events),
+      });
+    } else if (fixtureCase.expectedConfidence && actual.confidence !== fixtureCase.expectedConfidence) {
+      failures.push({
+        id: fixtureCase.id,
+        family: fixtureCase.family,
+        kind: fixtureCase.kind,
+        expectedConfidence: fixtureCase.expectedConfidence,
+        actualConfidence: actual.confidence,
+      });
+    }
+  }
+  assert.deepEqual(failures, []);
 });
 
 test('semantic gate benchmark enforces exact-set accuracy, coverage, and high-confidence precision', () => {
