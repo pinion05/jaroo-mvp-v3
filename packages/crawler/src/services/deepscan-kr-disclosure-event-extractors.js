@@ -762,6 +762,23 @@ function currentDisclosureScope(bodyFacts) {
   return boundary < 0 ? body : body.slice(0, boundary);
 }
 
+function hasCompletedTrustContract(scope) {
+  return /신탁계약.{0,60}(?:체결(?:을)?완료(?:하였|했|함|되었|됨)?|체결(?:하였|했|함|되었|됨)|체결절차(?:를)?(?:모두)?(?:마쳤|완료(?:하였|했|함)?))/u.test(scope);
+}
+
+function hasCompletedConvertibleBondAcquisition(scope) {
+  const combinedCompletion = /(?:대금)?지급.{0,20}(?:사채|채권|증권).{0,20}(?:취득|인수|수령)(?:을)?완료/u.test(scope);
+  const affirmativeAcquisition = /(?:사채|전자등록금액|잔여분).{0,100}(?:만기전)?취득(?:하고|하였|했|함|했습니다|입니다)|본취득은.{0,100}(?:만기전)?취득입니다/u.test(scope);
+  const scheduledAcquisitionDate = /(?:실제)?(?:사채|채권|증권).{0,10}취득일(?:자)?.{0,20}예정|(?:사채|채권|증권).{0,10}취득예정일/u.test(scope);
+  const actualAcquisitionDateRole = !scheduledAcquisitionDate
+    && /(?:대금)?지급(?:\(예정\))?일|결제일/u.test(scope)
+    && /(?:실제(?:로)?)?(?:사채|채권|증권).{0,20}(?:취득|인수|수령).{0,10}(?:일|날).{0,12}(?:임|입니다|에해당|로확정)|(?:사채|채권|증권).{0,20}(?:실제로)?넘겨받은날.{0,12}(?:임|입니다|에해당)/u.test(scope);
+  const paymentCompleted = /(?:사채|채권|증권)?대금.{0,50}(?:전액|모두)?.{0,20}(?:지급(?:을)?완료|지급(?:하였|했|함|하고|되었습니다|됐습니다))/u.test(scope)
+    || /대금지급(?:을)?완료/u.test(scope);
+  const securityReceived = /(?:사채|채권|증권).{0,60}(?:취득(?:을)?완료|취득(?:하였|했|함|했습니다)|인수(?:하였|했|함|했습니다)|수령(?:하였|했|함|했습니다)|넘겨받(?:았|았습니다|음))/u.test(scope);
+  return combinedCompletion || affirmativeAcquisition || actualAcquisitionDateRole || (paymentCompleted && securityReceived);
+}
+
 function hasAffirmativeRelatedPartyEvidence(input, bodyFacts) {
   if (input.disclosureDetailType === 'J001') return true;
   const body = bodyFacts.fullText;
@@ -781,7 +798,7 @@ const TERMINAL_LIFECYCLE_ACTIONS = new Set([
 ]);
 
 function lifecycleIntentKey(event) {
-  return `${event.type ?? ''}|${event.cause ?? ''}`;
+  return `${event.type ?? ''}|${event.cause ?? ''}|${event.subjectType ?? ''}`;
 }
 
 function preserveTerminalLifecycle(events, terminalOwners) {
@@ -843,7 +860,7 @@ function applyTerminalPolarityRule(input, events, bodyFacts) {
 
   if (input.wrapperKind === 'correction'
     && /소송등의제기/u.test(title)
-    && /정정(?:사유|사항).{0,240}(?:취하|철회)|(?:취하|철회).{0,120}정정/u.test(currentScope)) {
+    && /(?:취하|철회)/u.test(currentScope)) {
     return replaceMatchedIntents(
       events,
       (event) => event.type === 'legal-regulatory' && event.cause === 'litigation',
@@ -1005,21 +1022,43 @@ function applyActualityRule(input, events, bodyFacts) {
     ]);
   }
 
-  if (!corrected && /자기주식취득신탁계약체결결정/u.test(title)
-    && ['past', 'same-day'].includes(relationAfterLabel('계약기간.{0,30}시작일', false))
-    && ['past', 'same-day'].includes(relationAfterLabel('계약체결예정일자', false))
-    && /임직원성과보상재원확보/u.test(body)) {
+  if (!corrected && /자기주식취득신탁계약체결결정/u.test(title)) {
+    const currentBody = currentDisclosureScope(bodyFacts);
+    const operativeDate = relationAfterLabel('계약기간.{0,30}시작일|계약체결일', false);
+    const affirmativeContract = hasCompletedTrustContract(currentBody);
+    const effective = ['past', 'same-day'].includes(operativeDate) && affirmativeContract;
     return replaceMatchedIntents(events, (event) => event.cause === 'treasury-share-trust', [
-      semanticEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities'),
+      semanticEvent(
+        'capital-change',
+        effective ? 'contracted' : 'decided',
+        effective ? 'effective' : 'proposed',
+        'treasury-share-trust',
+        'securities',
+      ),
     ]);
   }
 
-  if (!corrected && /자기전환사채만기전취득결정/u.test(title)
-    && relationAfterLabel('지급.{0,10}예정.{0,10}일', false) === 'future'
-    && /보유현금을활용.{0,40}상환할예정/u.test(body)) {
-    return replaceMatchedIntents(events, (event) => event.type === 'capital-change', [
-      semanticEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities'),
-    ]);
+  if (!corrected && /자기전환사채만기전취득결정/u.test(title)) {
+    const currentBody = currentDisclosureScope(bodyFacts);
+    const paymentRelation = relationAfterLabel('지급(?:\\(예정\\))?일|지급예정일', false);
+    const acquisitionRelation = relationAfterLabel('(?:실제)?사채취득일|취득예정일', false);
+    const affirmativeAcquisition = hasCompletedConvertibleBondAcquisition(currentBody);
+    const residualObligation = /잔금.{0,80}(?:지급)?예정|전액지급완료즉시.{0,60}(?:사채|증권).{0,30}(?:수령|이전)예정/u.test(currentBody);
+    if (paymentRelation || acquisitionRelation || residualObligation || affirmativeAcquisition) {
+      const effective = affirmativeAcquisition
+        && paymentRelation !== 'future'
+        && acquisitionRelation !== 'future'
+        && !residualObligation;
+      return replaceMatchedIntents(events, (event) => event.type === 'capital-change' && event.cause === 'convertible-bond', [
+        semanticEvent(
+          'capital-change',
+          effective ? 'acquired' : 'decided',
+          effective ? 'effective' : 'proposed',
+          'convertible-bond',
+          'securities',
+        ),
+      ]);
+    }
   }
 
   if (input.disclosureDetailType === 'J001' && /특수관계인으로부터채무인수/u.test(title)
@@ -1747,8 +1786,7 @@ function applyGeneralizedSemanticGates(input, events) {
       [semanticEvent('capital-change', 'updated', 'pending', 'bond-with-warrants', 'securities')],
     );
   }
-  const orderedAccumulatorRequired = scopedEvents.length > 1
-    && /(?:취하|철회|취소|종료|상환).{0,300}(?:일정변경|예정일(?:자)?변경)|(?:일정변경|예정일(?:자)?변경).{0,300}(?:취하|철회|취소|종료|상환)/u.test(body);
+  const orderedAccumulatorRequired = scopedEvents.length > 1;
 
   if (!orderedAccumulatorRequired) {
     const terminalPolarity = applyTerminalPolarityRule(input, scopedEvents, facts);
