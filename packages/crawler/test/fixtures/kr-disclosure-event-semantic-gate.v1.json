@@ -1329,6 +1329,299 @@
         "precedence-regression"
       ],
       "templateKey": "unrelated-initiated-state-remains-null"
+    },
+    {
+      "id": "q1-report-deadline-extension",
+      "family": "explicit-event-family",
+      "input": {
+        "reportName": "사업보고서제출기한연장신고서 (2025.12)",
+        "disclosureDetailType": "A001",
+        "filedAt": "2026-03-23",
+        "bodyText": "변경된 제출기한 | 2026.04.07 | 제출 기한 연장 사유 | 감사보고서 제출 지연"
+      },
+      "expectedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "extended",
+          "state": "pending",
+          "cause": "annual-report-deadline",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "explicit-family"
+      ],
+      "templateKey": "report-deadline-extension"
+    },
+    {
+      "id": "q1-exchangeable-bond-issuance",
+      "family": "explicit-event-family",
+      "input": {
+        "reportName": "주요사항보고서(교환사채권발행결정)",
+        "filedAt": "2026-03-31",
+        "bodyText": "교환사채권 발행결정 | 이사회결의일 2026.03.31"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "explicit-family"
+      ],
+      "templateKey": "exchangeable-bond"
+    },
+    {
+      "id": "q1-warrant-bond-sale-rescheduled",
+      "family": "correction-lifecycle",
+      "input": {
+        "reportName": "[기재정정]주요사항보고서(자기신주인수권부사채매도결정)",
+        "filedAt": "2026-03-26",
+        "bodyText": "정정사항 | 정정사유 | 매도대금 수령(예정)일 변경 | 정정 전 2026.03.27 | 정정 후 2026.06.26"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "rescheduled",
+          "state": "pending",
+          "cause": "warrant-bond-sale",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "q1-promoted",
+        "correction"
+      ],
+      "templateKey": "warrant-bond-sale"
+    },
+    {
+      "id": "q1-company-demerger-decision",
+      "family": "explicit-event-family",
+      "input": {
+        "reportName": "주요사항보고서(회사분할결정)",
+        "filedAt": "2026-03-26",
+        "bodyText": "회사분할 결정 | 분할기일 2026.06.01"
+      },
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "demerger",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "explicit-family"
+      ],
+      "templateKey": "company-demerger"
+    },
+    {
+      "id": "q1-convertible-call-option-exercise",
+      "family": "explicit-event-family",
+      "input": {
+        "reportName": "주요사항보고서(제3자의전환사채매수선택권행사)",
+        "filedAt": "2026-03-26",
+        "bodyText": "매수선택권 행사 통지 완료"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "exercised",
+          "state": "effective",
+          "cause": "convertible-bond-call-option",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "explicit-family"
+      ],
+      "templateKey": "convertible-call-option"
+    },
+    {
+      "id": "q1-convertible-call-option-designation",
+      "family": "explicit-event-family",
+      "input": {
+        "reportName": "주요사항보고서(전환사채매수선택권행사자지정)",
+        "filedAt": "2026-03-26",
+        "bodyText": "매수선택권 행사자를 지정함"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "designated",
+          "state": "effective",
+          "cause": "convertible-bond-call-option",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "explicit-family"
+      ],
+      "templateKey": "convertible-call-option"
+    },
+    {
+      "id": "q1-business-disposal-completed",
+      "family": "correction-lifecycle",
+      "input": {
+        "reportName": "[기재정정]주요사항보고서(영업양도결정)",
+        "filedAt": "2026-03-19",
+        "bodyText": "정정신고 | 정정사항 | 거래종결일 2025.12.01 이후 예치금정산 | 최종양수도금액 확정"
+      },
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "correction"
+      ],
+      "templateKey": "business-disposal"
+    },
+    {
+      "id": "q1-split-merger-completed",
+      "family": "restructuring-subtype",
+      "input": {
+        "reportName": "증권발행실적보고서(합병등)",
+        "disclosureDetailType": "C004",
+        "filedAt": "2026-02-25",
+        "bodyText": "증권발행 결과보고서 | 분할합병 일정 완료"
+      },
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "split-merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "restructuring"
+      ],
+      "templateKey": "split-merger"
+    },
+    {
+      "id": "q1-correction-creditor-management-predicate",
+      "family": "correction-predicate-preservation",
+      "input": {
+        "reportName": "[기재정정]주요사항보고서(채권은행등의관리절차개시)",
+        "bodyText": "정정 신고 | 정정사항 | 관리범위 및 내용 | 금융채권자협의회 결의사항 추가"
+      },
+      "expectedEvents": [
+        {
+          "type": "insolvency",
+          "action": "initiated",
+          "state": "effective",
+          "cause": "creditor-bank-management",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "correction",
+        "predicate-preservation"
+      ],
+      "templateKey": "creditor-management-correction"
+    },
+    {
+      "id": "q1-correction-business-suspension-predicate",
+      "family": "correction-predicate-preservation",
+      "input": {
+        "reportName": "[기재정정]주요사항보고서(영업정지)",
+        "filedAt": "2026-03-16",
+        "bodyText": "정정 신고 | 정정사항 | 영업정지일자 | 연장영업 | 정정 전 2026.03.17 | 정정 후 2026.04.16"
+      },
+      "expectedEvents": [
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "proposed",
+          "cause": "business-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "correction",
+        "predicate-preservation"
+      ],
+      "templateKey": "business-suspension-correction"
+    },
+    {
+      "id": "q1-correction-proxy-solicitation-predicate",
+      "family": "correction-predicate-preservation",
+      "input": {
+        "reportName": "[기재정정]의결권대리행사권유참고서류",
+        "bodyText": "정정 신고 | 정정사항 | 단순오기재 | 주주총회 목적사항"
+      },
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "solicited",
+          "state": "effective",
+          "cause": "proxy-solicitation",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "correction",
+        "predicate-preservation"
+      ],
+      "templateKey": "proxy-solicitation-correction"
+    },
+    {
+      "id": "q1-related-party-business-transfer-update",
+      "family": "related-party-object-semantics",
+      "input": {
+        "reportName": "특수관계인에대한영업양도",
+        "filedAt": "2026-03-11",
+        "disclosureDetailType": "J001",
+        "bodyText": "영업양수도계약 변경합의서 체결을 이사회에서 승인 | 양도일자 2026.03.11 | 양도목적물 콘텐츠 사업부문"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "effective",
+          "cause": "business-transfer",
+          "subjectType": "operating-business"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "related-party",
+        "object-semantics"
+      ],
+      "templateKey": "related-party-business-transfer"
     }
   ]
 }

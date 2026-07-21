@@ -191,6 +191,65 @@ test('J001 body-dependent disclosures abstain when the body is unavailable', asy
   assert.equal(actual.confidence, 'low');
 });
 
+test('Q1-promoted semantic families use generalized lifecycle and object rules', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const cases = [
+    {
+      id: 'corrected-audit-reissue',
+      input: {
+        reportName: '[기재정정]감사보고서',
+        disclosureDetailType: 'F001',
+        filedAt: '2026-03-17',
+        bodyText: '정정신고 | 정정사유 | 재무제표 수정에 따른 감사보고서 재발행',
+      },
+      expected: { type: 'audit', action: 'updated', state: 'effective', cause: 'audit-report', subjectType: 'audit-opinion' },
+    },
+    {
+      id: 'corrected-offering-price',
+      input: {
+        reportName: '[기재정정]투자설명서(집합투자증권)',
+        disclosureDetailType: 'G002',
+        filedAt: '2026-03-10',
+        bodyText: '정정신고 | 정정사유 | 1차 발행가액 확정 | 예정 모집가액 3000원 | 확정 발행가액 3055원',
+      },
+      expected: { type: 'capital-change', action: 'price-set', state: 'effective', cause: 'fund-securities', subjectType: 'securities' },
+    },
+    {
+      id: 'chief-executive-change',
+      input: { reportName: '대표이사(대표집행임원)변경(안내공시)', bodyText: '대표이사 신규 선임' },
+      expected: { type: 'governance', action: 'changed', state: 'effective', cause: 'chief-executive-change', subjectType: 'governance' },
+    },
+    {
+      id: 'related-party-collateral-received',
+      input: { reportName: '특수관계인으로부터받은담보', disclosureDetailType: 'J001', filedAt: '2026-03-01', bodyText: '담보물 | 계열회사 주식 | 담보 수령일 | 2026.03.01' },
+      expected: { type: 'related-party', action: 'received', state: 'effective', cause: 'collateral-received', subjectType: 'securities' },
+    },
+    {
+      id: 'related-party-deposit-effective',
+      input: { reportName: '특수관계인과의예ㆍ적금거래', disclosureDetailType: 'J001', filedAt: '2026-02-27', bodyText: '예ㆍ적금일 | 2026.02.27 | 예ㆍ적금의 종류 | USD RP | 상품가입 완료' },
+      expected: { type: 'related-party', action: 'deposited', state: 'effective', cause: 'deposit-investment', subjectType: 'securities' },
+    },
+    {
+      id: 'related-party-donation-planned',
+      input: { reportName: '특수관계인에대한증여', disclosureDetailType: 'J001', filedAt: '2026-03-01', bodyText: '현금 출연은 분기별 출연 예정이며 이사회에서 의결하였다' },
+      expected: { type: 'related-party', action: 'decided', state: 'proposed', cause: 'cash-donation', subjectType: 'cash' },
+    },
+  ];
+
+  for (const fixtureCase of cases) {
+    assert.deepEqual(extractEventsGatedProjection(fixtureCase.input).events, [fixtureCase.expected], fixtureCase.id);
+  }
+
+  assert.deepEqual(extractEventsGatedProjection({
+    reportName: '매매거래정지및정지해제(중요내용공시)',
+    filedAt: '2026-03-26',
+    bodyText: '매매거래정지일시 | 2026.03.26 17:05 | 매매거래정지해제일시 | 2026.03.27 09:00 | 주식소각 결정',
+  }).events, [
+    { type: 'trading-status', action: 'halted', state: 'effective', cause: 'share-cancellation', subjectType: 'listed-shares' },
+    { type: 'trading-status', action: 'lifted', state: 'pending', cause: 'share-cancellation', subjectType: 'listed-shares' },
+  ]);
+});
+
 test('semantic gate benchmark enforces exact-set accuracy, coverage, and high-confidence precision', () => {
   const output = execFileSync(process.execPath, [
     SEMANTIC_GATE_BENCHMARK,
