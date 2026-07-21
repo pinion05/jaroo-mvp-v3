@@ -768,11 +768,15 @@ function hasCompletedTrustContract(scope) {
 
 function hasCompletedConvertibleBondAcquisition(scope) {
   const combinedCompletion = /(?:대금)?지급.{0,20}(?:사채|채권|증권).{0,20}(?:취득|인수|수령)(?:을)?완료/u.test(scope);
-  const affirmativeAcquisition = /(?:사채|전자등록금액|잔여분).{0,100}(?:만기전)?취득(?:하고|하였|했|함|했습니다|입니다)|본취득은.{0,100}(?:만기전)?취득입니다|지급(?:\(예정\))?일은실제사채취득일입니다/u.test(scope);
+  const affirmativeAcquisition = /(?:사채|전자등록금액|잔여분).{0,100}(?:만기전)?취득(?:하고|하였|했|함|했습니다|입니다)|본취득은.{0,100}(?:만기전)?취득입니다/u.test(scope);
+  const scheduledAcquisitionDate = /(?:실제)?(?:사채|채권|증권).{0,10}취득일(?:자)?.{0,20}예정|(?:사채|채권|증권).{0,10}취득예정일/u.test(scope);
+  const actualAcquisitionDateRole = !scheduledAcquisitionDate
+    && /(?:대금)?지급(?:\(예정\))?일|결제일/u.test(scope)
+    && /(?:실제(?:로)?)?(?:사채|채권|증권).{0,20}(?:취득|인수|수령).{0,10}(?:일|날).{0,12}(?:임|입니다|에해당|로확정)|(?:사채|채권|증권).{0,20}(?:실제로)?넘겨받은날.{0,12}(?:임|입니다|에해당)/u.test(scope);
   const paymentCompleted = /(?:사채|채권|증권)?대금.{0,50}(?:전액|모두)?.{0,20}(?:지급(?:을)?완료|지급(?:하였|했|함|하고|되었습니다|됐습니다))/u.test(scope)
     || /대금지급(?:을)?완료/u.test(scope);
   const securityReceived = /(?:사채|채권|증권).{0,60}(?:취득(?:을)?완료|취득(?:하였|했|함|했습니다)|인수(?:하였|했|함|했습니다)|수령(?:하였|했|함|했습니다)|넘겨받(?:았|았습니다|음))/u.test(scope);
-  return combinedCompletion || affirmativeAcquisition || (paymentCompleted && securityReceived);
+  return combinedCompletion || affirmativeAcquisition || actualAcquisitionDateRole || (paymentCompleted && securityReceived);
 }
 
 function hasAffirmativeRelatedPartyEvidence(input, bodyFacts) {

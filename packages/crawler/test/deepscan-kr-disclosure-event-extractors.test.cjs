@@ -1094,8 +1094,18 @@ test('iteration 8 actuality repair rejects scheduled and historical evidence whi
       expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
     },
     {
+      id: 'cb-payment-date-mapped-to-scheduled-acquisition-stays-proposed',
+      input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '지급(예정)일 2027-03-10 | 지급 예정일은 실제 사채 취득일로 예정되어 있습니다' },
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+    },
+    {
       id: 'cb-current-perfective-paraphrase-is-effective',
       input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '지급일 2027-03-10 | 오늘 사채 대금을 모두 지급하고 채권을 넘겨받았습니다' },
+      expectedEvents: [canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities')],
+    },
+    {
+      id: 'cb-current-actual-acquisition-date-role-paraphrase-is-effective',
+      input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '대금 지급일 2027-03-10 | 대금 지급일은 채권을 실제로 넘겨받은 날에 해당합니다' },
       expectedEvents: [canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities')],
     },
     {
