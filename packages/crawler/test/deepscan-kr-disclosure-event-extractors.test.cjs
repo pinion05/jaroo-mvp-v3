@@ -1249,6 +1249,996 @@ test('semantic gate metrics reject abstain, other, missing, extra, all-low, and 
   assert.equal(macroGate.passed, false);
 });
 
+test('current correction scope distinguishes completed litigation withdrawal from active proceedings', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
+  const active = canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
+  const cases = [
+    {
+      id: 'formal-withdrawal-under-correction-content-heading',
+      bodyText: '정정 내용 | 당사는 이 사건 청구를 철회하였으며 법원 접수가 완료됐습니다',
+      expectedEvents: [withdrawn],
+    },
+    {
+      id: 'withdrawal-intent-does-not-end-current-proceeding',
+      bodyText: '정정 내용 | 다음 기일 뒤 취하를 검토할 예정이며 현재 재판은 계속 진행합니다',
+      expectedEvents: [active],
+    },
+    {
+      id: 'rejected-withdrawal-remains-active',
+      bodyText: '정정 내용 | 취하 신청을 냈으나 재판부가 기각하여 사건은 계속됩니다',
+      expectedEvents: [active],
+    },
+    {
+      id: 'issuer-clause-wins-over-counterparty-denial',
+      bodyText: '정정 내용 | 상대방이 본소를 철회한 것은 아니지만 당사는 반소를 취하했고 접수를 마쳤습니다',
+      expectedEvents: [withdrawn],
+    },
+    {
+      id: 'natural-language-withdrawal-perfective',
+      bodyText: '소송 정정 | 회사는 다툼 중인 신청을 거두어들였고 그 부분의 심리는 종료됐습니다',
+      expectedEvents: [withdrawn],
+    },
+    {
+      id: 'negated-reversal-preserves-completed-withdrawal',
+      bodyText: '정정 내용 | 당사는 취하 결정을 번복하지 않고 예정대로 철회했으며 접수도 완료했습니다',
+      expectedEvents: [withdrawn],
+    },
+    {
+      id: 'counterparty-withdrawal-does-not-end-issuer-claim',
+      bodyText: '정정 내용 | 당사는 본안 청구를 유지합니다 | 상대방은 반소를 취하했고 법원 접수를 마쳤습니다',
+      expectedEvents: [active],
+    },
+    {
+      id: 'natural-language-withdrawal-negation-stays-active',
+      bodyText: '정정 내용 | 회사는 이 신청을 거두어들이지 않기로 확정했습니다',
+      expectedEvents: [active],
+    },
+    {
+      id: 'natural-language-withdrawal-plan-stays-active',
+      bodyText: '정정 내용 | 당사는 향후 이 청구를 거두어들일 계획입니다',
+      expectedEvents: [active],
+    },
+    {
+      id: 'withdrawal-deliberation-without-proof-stays-active',
+      bodyText: '정정 내용 | 당사는 취하 여부를 협의 중이며 아직 아무 결정도 내리지 않았습니다',
+      expectedEvents: [active],
+    },
+    {
+      id: 'withdrawal-request-retraction-keeps-claim-active',
+      bodyText: '정정 내용 | 당사는 취하 요청을 철회하고 본안 청구를 유지하기로 했습니다',
+      expectedEvents: [active],
+    },
+    {
+      id: 'historical-litigation-section-does-not-overwrite-current',
+      bodyText: '정정 내용 | 당사는 현재 청구를 유지합니다 | 과거 소송 내역 | 당사는 별개의 예전 소송을 취하했습니다',
+      expectedEvents: [active],
+    },
+    {
+      id: 'counterparty-company-claim-does-not-invalidate-issuer-completion',
+      bodyText: '정정 내용 | 당사는 청구를 취하해 접수를 완료했습니다 | 상대방 회사는 취하가 무효라고 주장했습니다',
+      expectedEvents: [withdrawn],
+    },
+  ];
+  const failures = cases.flatMap(({ id, bodyText, expectedEvents }) => {
+    const actual = extractEventsGatedProjection({
+      reportName: '[기재정정]소송 등의 제기·신청',
+      disclosureDetailType: 'C001',
+      filedAt: '2028-06-03',
+      bodyText,
+    });
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents))
+      ? []
+      : [{ id, expected: eventSet(expectedEvents), actual: eventSet(actual.events) }];
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('actuality roles combine current signature, settlement, and transfer evidence without historical leakage', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const contracted = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
+  const trustProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities');
+  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
+  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities');
+  const cases = [
+    {
+      id: 'trust-seal-completed-on-contract-date',
+      input: {
+        reportName: '주요사항보고서(자기주식취득신탁계약체결결정)',
+        filedAt: '2028-06-03',
+        bodyText: '계약일 | 2028-06-03 | 수탁사와 계약서 서명과 날인을 모두 마쳐 즉시 효력이 발생합니다',
+      },
+      expectedEvents: [contracted],
+    },
+    {
+      id: 'current-trust-section-excludes-later-history',
+      input: {
+        reportName: '주요사항보고서(자기주식취득신탁계약체결결정)',
+        filedAt: '2028-06-03',
+        bodyText: '금번 신탁계약 | 2028-06-03 은행과 서명 절차를 끝냈습니다 | 지난 계약 참고 | 2027-05-01 종료 예정',
+      },
+      expectedEvents: [contracted],
+    },
+    {
+      id: 'historical-trust-completion-does-not-cross-current-heading',
+      input: {
+        reportName: '주요사항보고서(자기주식취득신탁계약체결결정)',
+        filedAt: '2028-06-03',
+        bodyText: '종전 계약 현황 | 2027-05-01 날인을 완료 | 금번 계약 현황 | 계약 예정일 2028-07-01 | 현재 협의 중',
+      },
+      expectedEvents: [trustProposed],
+    },
+    {
+      id: 'same-day-trust-completion-plan-stays-proposed',
+      input: {
+        reportName: '주요사항보고서(자기주식취득신탁계약체결결정)',
+        filedAt: '2028-06-03',
+        bodyText: '계약일 | 2028-06-03 | 계약서 서명과 날인을 오늘 완료할 예정입니다',
+      },
+      expectedEvents: [trustProposed],
+    },
+    {
+      id: 'negated-trust-seal-stays-proposed',
+      input: {
+        reportName: '주요사항보고서(자기주식취득신탁계약체결결정)',
+        filedAt: '2028-06-03',
+        bodyText: '계약일 | 2028-06-03 | 계약서 날인을 완료하지 못했고 현재 협의 중입니다',
+      },
+      expectedEvents: [trustProposed],
+    },
+    {
+      id: 'unrelated-minutes-signature-stays-proposed',
+      input: {
+        reportName: '주요사항보고서(자기주식취득신탁계약체결결정)',
+        filedAt: '2028-06-03',
+        bodyText: '계약일 | 2028-06-03 | 이사회 의사록 서명을 완료했으나 신탁계약은 아직 협의 중입니다',
+      },
+      expectedEvents: [trustProposed],
+    },
+    {
+      id: 'historical-trust-heading-stays-proposed',
+      input: {
+        reportName: '주요사항보고서(자기주식취득신탁계약체결결정)',
+        filedAt: '2028-06-03',
+        bodyText: '금번 신탁계약 | 계약 예정일 2028-06-03 | 현재 협의 중 | 과거 신탁계약 내역 | 2027-05-01 계약서 날인 완료',
+      },
+      expectedEvents: [trustProposed],
+    },
+    {
+      id: 'later-writing-example-does-not-poison-real-trust-completion',
+      input: {
+        reportName: '주요사항보고서(자기주식취득신탁계약체결결정)',
+        filedAt: '2028-06-03',
+        bodyText: '계약일 | 2028-06-03 | 은행과 신탁계약 체결을 완료하였습니다 | 작성예시 | 계약서 서명 완료',
+      },
+      expectedEvents: [contracted],
+    },
+    {
+      id: 'bond-transfer-before-final-settlement',
+      input: {
+        reportName: '주요사항보고서(자기전환사채만기전취득결정)',
+        filedAt: '2028-06-03',
+        bodyText: '실제 취득일 | 2028-06-03 | 전환사채를 인도받은 후 잔금 전액 정산도 끝냈습니다',
+      },
+      expectedEvents: [acquired],
+    },
+    {
+      id: 'bond-current-completion-excludes-future-history',
+      input: {
+        reportName: '주요사항보고서(자기전환사채만기전취득결정)',
+        filedAt: '2028-06-03',
+        bodyText: '이번 거래 | 2028-06-03 대금을 전액 결제하고 사채 전부를 인수 완료 | 과거 검토자료 | 2029-01-01 지급 예정 사례',
+      },
+      expectedEvents: [acquired],
+    },
+    {
+      id: 'bond-payment-only-retains-proposed-state',
+      input: {
+        reportName: '주요사항보고서(자기전환사채만기전취득결정)',
+        filedAt: '2028-06-03',
+        bodyText: '결제일 | 2028-06-03 | 대금은 전액 정산했지만 채권 인도는 다음 주 예정입니다',
+      },
+      expectedEvents: [bondProposed],
+    },
+    {
+      id: 'same-day-bond-completion-plan-stays-proposed',
+      input: {
+        reportName: '주요사항보고서(자기전환사채만기전취득결정)',
+        filedAt: '2028-06-03',
+        bodyText: '결제일 | 2028-06-03 | 대금 결제 완료 및 채권 인수 완료 예정',
+      },
+      expectedEvents: [bondProposed],
+    },
+    {
+      id: 'partial-bond-settlement-and-transfer-stay-proposed',
+      input: {
+        reportName: '주요사항보고서(자기전환사채만기전취득결정)',
+        filedAt: '2028-06-03',
+        bodyText: '결제일 | 2028-06-03 | 대금 일부 결제를 완료하고 채권 일부를 인수 완료',
+      },
+      expectedEvents: [bondProposed],
+    },
+    {
+      id: 'bond-payment-incomplete-stays-proposed',
+      input: {
+        reportName: '주요사항보고서(자기전환사채만기전취득결정)',
+        filedAt: '2028-06-03',
+        bodyText: '실제 취득일 | 2028-06-03 | 대금 지급은 아직 완료되지 않았으나 전환사채 인수 완료',
+      },
+      expectedEvents: [bondProposed],
+    },
+    {
+      id: 'bond-unpaid-after-transfer-stays-proposed',
+      input: {
+        reportName: '주요사항보고서(자기전환사채만기전취득결정)',
+        filedAt: '2028-06-03',
+        bodyText: '취득일 | 2028-06-03 | 전환사채를 취득하였으나 대금 전액은 미지급 상태입니다',
+      },
+      expectedEvents: [bondProposed],
+    },
+    {
+      id: 'historical-bond-heading-does-not-complete-current-trade',
+      input: {
+        reportName: '주요사항보고서(자기전환사채만기전취득결정)',
+        filedAt: '2028-06-03',
+        bodyText: '이번 거래 | 2028-06-03 현재 대금 지급 및 사채 이전을 협의 중 | 과거 사채 거래 내역 | 2027-01-01 대금 결제 완료 후 사채 인수 완료',
+      },
+      expectedEvents: [bondProposed],
+    },
+    {
+      id: 'unrelated-future-board-date-does-not-block-bond-completion',
+      input: {
+        reportName: '주요사항보고서(자기전환사채만기전취득결정)',
+        filedAt: '2028-06-03',
+        bodyText: '향후 이사회 예정일 2028-07-01 | 결제일 2028-06-03 | 대금 전액 결제 완료 후 전환사채 전부 인수 완료',
+      },
+      expectedEvents: [acquired],
+    },
+  ];
+  const failures = cases.flatMap(({ id, input, expectedEvents }) => {
+    const actual = extractEventsGatedProjection(input);
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents))
+      ? []
+      : [{ id, expected: eventSet(expectedEvents), actual: eventSet(actual.events) }];
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('litigation corrections accumulate independent equity schedule changes before lifecycle repair', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const equity = canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities');
+  const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
+  const active = canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
+  const filler = '중립설명'.repeat(900);
+  const cases = [
+    {
+      id: 'terminal-before-generalized-schedule-labels',
+      bodyText: '정정 내용 | 당사 소송을 철회하고 접수를 마침 | 유상증자 일정 변경 | 변경 전 납입일 2028-07-01 | 변경 후 납입일 2028-07-20',
+      litigation: withdrawn,
+    },
+    {
+      id: 'schedule-before-active-litigation',
+      bodyText: '주식 발행 일정 변경 | 종전 납입일 2028-07-01 | 새 납입일 2028-07-20 | 정정 내용 | 취하 신청이 반려되어 소송을 계속 진행합니다',
+      litigation: active,
+    },
+    {
+      id: 'neutral-distance-does-not-remove-second-intent',
+      bodyText: `소송 정정 | 청구를 철회 완료 | ${filler} | 자금조달 정정 | 납입일을 2028-07-01에서 2028-07-30으로 변경`,
+      litigation: withdrawn,
+    },
+  ];
+  const failures = cases.flatMap(({ id, bodyText, litigation }) => {
+    const expectedEvents = [equity, litigation];
+    const actual = extractEventsGatedProjection({
+      reportName: '[기재정정]소송등의제기ㆍ신청',
+      disclosureDetailType: 'C001',
+      filedAt: '2028-06-03',
+      bodyText,
+    });
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents)) && actual.events.length === 2
+      ? []
+      : [{ id, expected: eventSet(expectedEvents), actual: eventSet(actual.events), cardinality: actual.events.length }];
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('historical equity schedule references do not create a second current event', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const expectedEvents = [canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer')];
+  const variants = [
+    '정정 내용 | 당사는 청구를 철회하고 법원 접수를 완료 | 참고자료 | 과거 유상증자 일정 변경 | 종전 납입일 2027-01-01 | 변경 납입일 2027-02-01',
+    '정정 내용 | 당사는 청구를 철회하고 법원 접수를 완료 | 과거 증자 검토 자료 | 유상증자 일정 변경 | 변경 전 납입일 2027-01-01 | 변경 후 납입일 2027-02-01',
+    '정정 내용 | 당사는 청구 취하 접수를 완료했습니다 | 유상증자 일정 변경 가능성을 검토 중 | 과거 증자 예시 | 변경 전 납입일 2027-01-01 | 변경 후 납입일 2027-02-01',
+  ];
+  for (const bodyText of variants) {
+    const actual = extractEventsGatedProjection({
+      reportName: '[기재정정]소송등의제기ㆍ신청',
+      disclosureDetailType: 'C001',
+      filedAt: '2028-06-03',
+      bodyText,
+    });
+    assert.deepEqual(eventSet(actual.events), eventSet(expectedEvents));
+    assert.equal(actual.events.length, 1);
+  }
+});
+
+test('equity schedule synonym still accumulates as an independent current event', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const expectedEvents = [
+    canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer'),
+    canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities'),
+  ];
+  const actual = extractEventsGatedProjection({
+    reportName: '[기재정정]소송등의제기ㆍ신청',
+    disclosureDetailType: 'C001',
+    filedAt: '2028-06-03',
+    bodyText: '정정 내용 | 당사는 청구 취하 접수를 완료했습니다 | 유상증자의 납입기일을 2028-07-01에서 2028-07-20으로 바꾸었습니다',
+  });
+  assert.deepEqual(eventSet(actual.events), eventSet(expectedEvents));
+  assert.equal(actual.events.length, 2);
+});
+
+test('regulatory product withdrawal accepts approval synonyms and explicit retraction proof', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const expectedEvents = [canonicalEvent('regulatory-product', 'withdrawn', 'cancelled', 'product-approval', 'product')];
+  const cases = [
+    {
+      id: 'medicine-approval-title-with-agency-receipt',
+      input: {
+        reportName: '투자판단 관련 주요경영사항 (의약품 허가신청 자진 철회)',
+        filedAt: '2028-06-03',
+        bodyText: '철회 확정일 2028-06-03 | 관계기관 접수 완료',
+      },
+    },
+    {
+      id: 'product-approval-retraction-in-remarks',
+      input: {
+        reportName: '투자판단 관련 주요경영사항',
+        remarks: '신약 품목허가 신청을 자진 철회하기로 확정',
+        filedAt: '2028-06-03',
+        bodyText: '기관 제출일 2028-06-03',
+      },
+    },
+    {
+      id: 'new-drug-approval-withdrawal-accepted-by-agency',
+      input: {
+        reportName: '투자판단 관련 주요경영사항',
+        filedAt: '2028-06-03',
+        bodyText: '신약 허가 신청 철회서를 식약처가 2028-06-03 수리하여 신청 절차가 종료됐습니다',
+      },
+    },
+    {
+      id: 'product-withdrawal-form-accepted-by-agency',
+      input: {
+        reportName: '투자판단 관련 주요경영사항',
+        filedAt: '2028-06-03',
+        bodyText: '품목허가 신청을 철회하였고 식약처가 철회서를 수리했습니다',
+      },
+    },
+  ];
+  const failures = cases.flatMap(({ id, input }) => {
+    const actual = extractEventsGatedProjection(input);
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents))
+      ? []
+      : [{ id, expected: eventSet(expectedEvents), actual: eventSet(actual.events) }];
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('regulatory product withdrawal requires current affirmative terminal proof', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const cases = [
+    {
+      id: 'future-review',
+      bodyText: '품목허가 신청 자진 철회를 검토 중 | 철회 공문 기관 제출일 2028-07-01 예정',
+    },
+    {
+      id: 'explicit-negation',
+      bodyText: '품목허가 신청은 자진 철회하지 않기로 결정 | 기관 제출일 2028-06-03은 기존 보완자료 제출일입니다',
+    },
+    {
+      id: 'rejected-request',
+      bodyText: '품목허가 신청의 자진 철회 요청이 관계기관에서 반려됨 | 기관 제출일 2028-06-03',
+    },
+    {
+      id: 'reversed-decision',
+      bodyText: '품목허가 신청을 자진 철회하기로 결정했으나 결정을 번복하고 허가 절차를 유지합니다 | 기관 제출일 2028-06-03',
+    },
+    {
+      id: 'historical-withdrawal',
+      bodyText: '현재 품목허가 신청 절차는 유지 중입니다 | 과거 제품 이력 | 이전 품목허가 신청은 자진 철회 완료',
+    },
+  ];
+  const failures = cases.flatMap(({ id, bodyText }) => {
+    const actual = extractEventsGatedProjection({
+      reportName: '투자판단 관련 주요경영사항',
+      filedAt: '2028-06-03',
+      bodyText,
+    });
+    return actual.events.some((event) => event.type === 'regulatory-product' && event.action === 'withdrawn')
+      ? [{ id, actual: eventSet(actual.events) }]
+      : [];
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('round 2 independent semantic audit preserves current actors, actuality roles, and sibling cardinality', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const litigation = (action, state) => canonicalEvent('legal-regulatory', action, state, 'litigation', 'issuer');
+  const trust = (action, state) => canonicalEvent('capital-change', action, state, 'treasury-share-trust', 'securities');
+  const bond = (action, state) => canonicalEvent('capital-change', action, state, 'convertible-bond', 'securities');
+  const equity = canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities');
+  const product = canonicalEvent('regulatory-product', 'withdrawn', 'cancelled', 'product-approval', 'product');
+  const litigationInput = (bodyText) => ({
+    reportName: '[기재정정]소송등의제기ㆍ신청',
+    disclosureDetailType: 'C001',
+    filedAt: '2031-09-18',
+    bodyText,
+  });
+  const trustInput = (bodyText) => ({
+    reportName: '주요사항보고서(자기주식취득신탁계약체결결정)',
+    filedAt: '2031-09-18',
+    bodyText,
+  });
+  const bondInput = (bodyText) => ({
+    reportName: '주요사항보고서(자기전환사채만기전취득결정)',
+    filedAt: '2031-09-18',
+    bodyText,
+  });
+  const productInput = (bodyText) => ({
+    reportName: '투자판단 관련 주요경영사항',
+    filedAt: '2031-09-18',
+    bodyText,
+  });
+  const withdrawn = litigation('withdrawn', 'effective');
+  const active = litigation('updated', 'active');
+  const cases = [
+    ['litigation-completion-morphology', litigationInput('3. 정정사항 | 원고인 당사는 신청 전부를 취하하여 전자소송 기록에 반영되었습니다'), [withdrawn]],
+    ['litigation-history-heading', litigationInput('3. 정정사항 | 당사는 현 사건의 청구취지를 유지하고 있습니다 | 별건 처리 연혁 | 2029년 당사가 제기한 다른 사건은 소를 취하했습니다'), [active]],
+    ['litigation-final-positive-wins', litigationInput('3. 정정사항 | 당사는 취하하지 않겠다는 종전 입장을 폐기하고 금일 본소를 취하했습니다'), [withdrawn]],
+    ['trust-electronic-agreement', trustInput('계약일 | 2031-09-18 | 수탁은행과 전자약정 체결을 종결하여 그 시점부터 효력이 생겼습니다'), [trust('contracted', 'effective')]],
+    ['trust-history-performance', trustInput('이번 안건 | 계약 예정일 2031-09-18 | 약정 조건을 협상하고 있습니다 | 종전 집행 실적 | 2030-04-02 은행과 계약서 날인을 완료했습니다'), [trust('decided', 'proposed')]],
+    ['trust-template-after-current', trustInput('계약일 | 2031-09-18 | 수탁은행과 계약서 날인 절차를 끝냈습니다 | 별첨 기재 견본 | 서명 완료 예정이라고 작성할 수 있음'), [trust('contracted', 'effective')]],
+    ['trust-unrelated-bank-document', trustInput('계약일 | 2031-09-18 | 은행 제출용 잔액확인서 날인을 완료했습니다 | 신탁 약정서는 양측 미서명 상태입니다'), [trust('decided', 'proposed')]],
+    ['bond-full-payment-and-rights-transfer', bondInput('거래일 | 2031-09-18 | 매매대금을 완납했고 전자등록 사채의 권리를 넘겨받아 명의가 이전되었습니다'), [bond('acquired', 'effective')]],
+    ['bond-old-round-history', bondInput('이번 안건 | 취득결정일 2031-09-18 | 실제 인수와 지급은 2031-10-20에 실행할 계획입니다 | 직전 회차 거래 요약 | 2030-08-01 대금 지급 완료 및 사채 인수 완료'), [bond('decided', 'proposed')]],
+    ['bond-half-quantity', bondInput('결제일 | 2031-09-18 | 대금 결제를 완료했고 채권의 절반만 인수했습니다'), [bond('decided', 'proposed')]],
+    ['bond-reversed-evidence-order', bondInput('결제일 | 2031-09-18 | 채권 인수를 마친 뒤 매매대금 전액을 결제했습니다'), [bond('acquired', 'effective')]],
+    ['multi-payment-deadline', litigationInput('3. 정정사항 | 당사는 본소를 취하해 사건 종결 통지를 받았습니다 | 유상증자 자금 납부기한을 2031-10-02에서 2031-10-27로 옮겼습니다'), [equity, withdrawn]],
+    ['multi-adjusted-label-pair', litigationInput('3. 정정사항 | 당사는 이 청구를 계속 수행합니다 | 주식발행 일정 조정 | 당초 주금 납입기일 2031-10-02 | 조정 주금 납입기일 2031-10-27'), [equity, active]],
+    ['multi-current-two-actions', litigationInput('3. 정정사항 | 자금조달 납입일을 2031-10-02에서 2031-10-30으로 조정했습니다 | 당사는 본소를 취하하여 사건번호에서 말소되었습니다'), [equity, withdrawn]],
+    ['multi-archived-schedule', litigationInput('3. 정정사항 | 회사는 현 청구를 계속 유지합니다 | 부록: 전년도 자금조달 변경 기록 | 유상증자 납입일을 2030-05-01에서 2030-05-21로 변경했습니다'), [active]],
+    ['multi-hypothetical-scenario', litigationInput('3. 정정사항 | 당사는 청구를 취하했고 법원의 종결 안내를 수령했습니다 | 내부 시나리오: 유상증자 납입일을 2031-10-02에서 2031-11-01로 변경할 수도 있음'), [withdrawn]],
+    ['multi-original-revised-labels', litigationInput('3. 정정사항 | 당사의 소송 취하 처리가 확정되었습니다 | 유상증자 일정 개편 | 당초 납입일 2031-10-02 | 개정 납입일 2031-10-25'), [equity, withdrawn]],
+    ['product-agency-processed', productInput('의약품 품목허가 신청 취하 신고가 규제기관에서 처리되어 해당 심사 건이 종결되었습니다'), [product]],
+    ['product-abandonment-form', productInput('신약 품목허가 신청 포기서를 규제기관에 제출했고 수리 통보를 받았습니다'), [product]],
+  ];
+  const mustNotEmit = [
+    ['product-sent-then-recalled', productInput('품목허가 신청 철회서를 기관에 발송했고 같은 날 제출을 취소하여 서류를 회수했습니다 | 심사는 계속됩니다')],
+    ['product-closed-project-history', productInput('현재 신약 허가 신청은 보완자료 검토 단계입니다 | 종료된 개발과제 | 2028년 다른 품목허가 신청은 자진 철회를 완료했습니다')],
+    ['product-training-example', productInput('현재 품목허가 신청은 심사관 질의에 답변 중입니다 | 교육용 문구 | 품목허가 신청 철회 완료라고 기재하는 사례')],
+  ];
+
+  const failures = cases.flatMap(([id, input, expectedEvents]) => {
+    const actual = extractEventsGatedProjection(input);
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents))
+      ? []
+      : [{ id, expected: eventSet(expectedEvents), actual: eventSet(actual.events) }];
+  });
+  for (const [id, input] of mustNotEmit) {
+    const actual = extractEventsGatedProjection(input);
+    if (actual.events.some((event) => event.type === product.type && event.action === product.action)) {
+      failures.push({ id, expected: 'no regulatory-product withdrawal', actual: eventSet(actual.events) });
+    }
+  }
+  assert.deepEqual(failures, []);
+});
+
+test('round 3 independent semantic audit re-enters current spans and merges intent lifecycles', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
+  const contracted = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
+  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
+  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities');
+  const equity = canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities');
+  const accident = canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer');
+  const cases = [
+    {
+      id: 'litigation-current-span-after-history',
+      input: { reportName: '[기재정정]소송등의제기ㆍ신청', bodyText: '3. 정정내용 | 과거 사건 이력 | 당시에는 청구를 유지하고 심리를 계속함 | 이번 안건 | 당사는 이번 청구를 취하했고 재판부의 종결 처리를 확인함' },
+      expectedEvents: [withdrawn],
+    },
+    {
+      id: 'litigation-invalidation-double-negative',
+      input: { reportName: '[기재정정]소송등의제기ㆍ신청', bodyText: '3. 정정사항 | 당사는 청구 취하를 완료했습니다. 해당 취하가 무효로 된 것은 아니고 법원의 종국 안내까지 도달했습니다.' },
+      expectedEvents: [withdrawn],
+    },
+    {
+      id: 'trust-attributive-completion',
+      input: { reportName: '주요사항보고서(자기주식취득신탁계약체결결정)', filedAt: '2027-06-11', bodyText: '계약일 | 2027.06.10 | 신탁계약서에는 당사와 수탁은행의 인감 날인을 모두 마친 상태입니다.' },
+      expectedEvents: [contracted],
+    },
+    {
+      id: 'trust-current-span-after-history',
+      input: { reportName: '주요사항보고서(자기주식취득신탁계약체결결정)', filedAt: '2027-06-11', bodyText: '과거 계약 내역 | 2025년 계약은 서명 없이 종료 | 금번 신탁계약 현황 | 계약체결일 2027.06.11 | 신탁약정서를 수탁사와 날인까지 끝냈습니다' },
+      expectedEvents: [contracted],
+    },
+    {
+      id: 'bond-account-transfer-and-completion',
+      input: { reportName: '자기전환사채만기전취득결정', filedAt: '2027-06-11', bodyText: '대금 지급일 | 2027.06.11 | 매매대금을 전부 결제하였고 대상 전환사채는 당사 증권계좌로 대체되어 취득을 마쳤습니다.' },
+      expectedEvents: [acquired],
+    },
+    {
+      id: 'bond-passive-rights-transfer-before-payment',
+      input: { reportName: '자기전환사채만기전취득결정', filedAt: '2027-06-11', bodyText: '실제 사채 취득일 | 2027.06.10 | 전환사채 권리와 명의가 먼저 당사로 이전되었습니다 | 이어서 2027.06.11 매매대금을 전액 완납했습니다.' },
+      expectedEvents: [acquired],
+    },
+    {
+      id: 'bond-relative-future-balance',
+      input: { reportName: '자기전환사채만기전취득결정', filedAt: '2027-06-11', bodyText: '사채 취득일 | 2027.06.11 | 전환사채 실물은 인도받았으나 매매대금 잔액은 다음 주에 지급하기로 했습니다.' },
+      expectedEvents: [bondProposed],
+    },
+    {
+      id: 'multi-replaces-generic-capital-lifecycle',
+      input: { reportName: '[기재정정]소송등의제기ㆍ신청(유상증자 일정)', disclosureDetailType: 'C001', filedAt: '2027-06-11', bodyText: '3. 정정내용 | 당사가 소취하 접수를 마치고 사건 종결 통지를 받음 | 유상증자 일정에서 자금 납입기일을 2027.06.28에서 2027.07.30으로 옮겼음' },
+      expectedEvents: [equity, withdrawn],
+    },
+    {
+      id: 'accident-jurisdictional-agency-order',
+      input: { reportName: '중대재해발생(자율공시)', bodyText: '현장 사고가 발생했습니다 | 관할청이 해당 라인에 작업정지 명령을 내려 즉시 가동을 멈췄습니다.' },
+      expectedEvents: [accident, canonicalEvent('operating-status', 'halted', 'effective', 'regulatory-work-stop', 'business')],
+    },
+    {
+      id: 'accident-labor-authority-order-dedupes',
+      input: { reportName: '중대재해발생(자율공시)', bodyText: '사고 발생을 확인함 | 고용당국이 공정 A에 작업중지 조치를 통보함 | 같은 명령에 따라 인접 공정도 작업정지 조치를 이행함' },
+      expectedEvents: [accident, canonicalEvent('operating-status', 'halted', 'effective', 'regulatory-work-stop', 'business')],
+    },
+    {
+      id: 'accident-voluntary-stop-is-not-regulatory-order',
+      input: { reportName: '중대재해발생(자율공시)', bodyText: '사고 사실을 확인했습니다 | 회사는 자체 안전점검을 위해 설비를 잠시 세웠으나 행정기관의 작업정지 명령은 없습니다.' },
+      expectedEvents: [accident],
+    },
+    {
+      id: 'accident-current-denial-excludes-historical-order',
+      input: { reportName: '중대재해발생(자율공시)', bodyText: '이번 안건 | 금일 사고가 발생했고 관계기관 조사는 진행 중이나 작업정지 명령은 아직 없음 | 과거 참고 자료 | 전년도 사고 때 작업중지 조치를 받은 바 있음' },
+      expectedEvents: [accident],
+    },
+  ];
+  const failures = cases.flatMap(({ id, input, expectedEvents }) => {
+    const actual = extractEventsGatedProjection(input);
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents))
+      ? []
+      : [{ id, expected: eventSet(expectedEvents), actual: eventSet(actual.events) }];
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('round 4 independent semantic audit binds actors, objects, ordered polarity, and current islands', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
+  const active = canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
+  const contracted = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
+  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
+  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities');
+  const equity = canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities');
+  const accident = canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer');
+  const workStop = canonicalEvent('operating-status', 'halted', 'effective', 'regulatory-work-stop', 'business');
+  const cases = [
+    ['litigation-counterparty-continuation', { reportName: '[기재정정] 소송등의제기', filedAt: '20260720', bodyText: '3. 정정사유 | 이번 안건 | 당사는 청구를 철회하여 법원 기록에 반영됐습니다. 상대방 회사는 별도 반소를 계속합니다.' }, [withdrawn]],
+    ['litigation-withdrawal-request-retracted', { reportName: '[기재정정] 소송등의제기', filedAt: '20260720', bodyText: '3. 정정사항 | 이번 안건 | 당사는 법원에 보낸 취하 요청을 다시 철회했고 본안 절차를 이어가기로 했습니다.' }, [active]],
+    ['trust-old-negative-then-current-complete', { reportName: '자기주식취득신탁계약체결결정', filedAt: '20260720', bodyText: '이번 계약 | 계약체결일 2026년 7월 19일 | 당초 초안은 미날인이었으나 현재 전자약정 체결 절차를 모두 끝냈습니다. | 직전 계약 기록 | 당시에는 계약 예정이었습니다.' }, [contracted]],
+    ['trust-current-island-carries-date', { reportName: '자기주식취득신탁계약체결결정', filedAt: '20260720', bodyText: '금번 계약 | 계약기간 시작일 2026년 7월 20일 | 문서 초안에는 미서명으로 표시됐습니다. | 현재 계약 | 수탁기관과 당사는 전자약정을 체결하였고 효력이 발생했습니다.' }, [contracted]],
+    ['trust-history-between-current-islands', { reportName: '자기주식취득신탁계약체결결정', filedAt: '20260720', bodyText: '금번 계약 | 계약일 2026년 7월 20일 | 당사와 수탁기관은 서명 일정을 논의 중입니다. | 과거 계약 내역 | 양측 날인 완료. | 이번 계약 | 전자계약서에 양측 서명을 마치고 계약 효력이 생겼습니다.' }, [contracted]],
+    ['bond-third-party-roles-do-not-bind-issuer', { reportName: '자기전환사채만기전취득결정', filedAt: '20260720', bodyText: '현재 거래 | 지급일 2026년 7월 20일 | 관계회사가 매도인에게 대금을 완납했고 관계회사 명의로 채권을 넘겨받았습니다. 당사는 아직 인수하지 않았습니다.' }, [bondProposed]],
+    ['bond-old-nonpayment-then-complete', { reportName: '자기전환사채만기전취득결정', filedAt: '20260720', bodyText: '금번 거래 | 지급일 2026년 7월 20일 | 오전 초안에는 미지급으로 기재됐으나 오후에 잔금까지 완납했고 전환사채를 모두 넘겨받았습니다.' }, [acquired]],
+    ['bond-passive-payment-and-ownership', { reportName: '자기전환사채만기전취득결정', filedAt: '20260720', bodyText: '현재 거래 | 정산일 2026년 7월 20일 | 매매대금이 전액 완납되었고 전환사채의 소유권이 당사에 귀속되었습니다.' }, [acquired]],
+    ['multi-current-islands-with-schedule', { reportName: '[기재정정] 소송등의제기', filedAt: '20260720', bodyText: '3. 정정내용 | 현재 거래 | 당사는 소송 절차를 계속합니다. | 과거 이력 | 유상증자 납부기한 2025년 3월 2일에서 2025년 3월 22일로 조정. | 이번 안건 | 유상증자 자금 납부기한을 원래 2026년 7월 26일에서 새 기한 2026년 9월 3일로 개편했습니다.' }, [equity, active]],
+    ['work-stop-review-without-order', { reportName: '중대재해발생', filedAt: '20260720', bodyText: '현재 사고 | 감독기관이 작업정지 조치를 검토하고 있으나 아직 발령하거나 통보한 사실은 없습니다.' }, [accident]],
+    ['work-stop-order-cancelled', { reportName: '중대재해발생', filedAt: '20260720', bodyText: '금번 사고 | 고용당국의 작업중지 명령을 처음 통보받았지만 재검토 결과 당일 그 명령이 취소되어 효력이 없습니다.' }, [accident]],
+    ['work-stop-later-order-wins', { reportName: '중대재해발생', filedAt: '20260720', bodyText: '이번 사고 | 오전에는 작업정지 명령이 없다고 안내됐으나 오후에 고용노동부가 당사 공정에 작업중지 명령을 발령했습니다.' }, [accident, workStop]],
+    ['work-stop-third-party-target', { reportName: '중대재해발생', filedAt: '20260720', bodyText: '현재 사고 | 인접 협력업체 공장에는 관계기관의 작업정지 명령이 부과됐지만 당사 사업장에는 어떠한 명령도 없었습니다.' }, [accident]],
+  ];
+  const failures = cases.flatMap(([id, input, expectedEvents]) => {
+    const actual = extractEventsGatedProjection(input);
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents))
+      ? []
+      : [{ id, expected: eventSet(expectedEvents), actual: eventSet(actual.events) }];
+  });
+  const productObjectMismatch = extractEventsGatedProjection({
+    reportName: '투자판단 관련 주요경영사항',
+    filedAt: '20260720',
+    bodyText: '이번 개발과제 | 당사는 임상시험계획 신청을 철회했지만 품목허가 신청은 그대로 유지하고 있습니다.',
+  });
+  if (productObjectMismatch.events.some((event) => event.type === 'regulatory-product' && event.action === 'withdrawn')) {
+    failures.push({ id: 'product-withdrawal-object-mismatch', actual: eventSet(productObjectMismatch.events) });
+  }
+  assert.deepEqual(failures, []);
+});
+
+test('round 5 independent semantic audit separates aliases, follow-up plans, and regulatory actors', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
+  const active = canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
+  const equity = canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities');
+  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
+  const accident = canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer');
+  const workStop = canonicalEvent('operating-status', 'halted', 'effective', 'regulatory-work-stop', 'business');
+  const cases = [
+    {
+      id: 'equity-schedule-replaces-rights-offering-alias-after-withdrawal',
+      input: {
+        reportName: '[기재정정]소송등의제기 및 유상증자결정',
+        filedAt: '2026-07-23',
+        bodyText: '3. 정정사유 | 당사는 본건 소송을 취하하였고 법원 접수 완료를 확인했습니다. | 유상증자 일정 | 변경전 주금납입일 2026년 8월 10일 | 변경후 주금납입일 2026년 8월 26일 | 납입 일정을 변경 확정했습니다.',
+      },
+      expectedEvents: [equity, withdrawn],
+    },
+    {
+      id: 'equity-schedule-replaces-rights-offering-alias-during-active-case',
+      input: {
+        reportName: '[기재정정]소송등의제기 및 유상증자결정',
+        filedAt: '2026-07-23',
+        bodyText: '3. 정정내용 | 상대방은 반소를 철회하여 접수했습니다. | 당사는 본안 청구를 계속 진행합니다. | 유상증자 일정 | 변경전 주금납입일 2026년 8월 10일 | 변경후 주금납입일 2026년 8월 26일 | 납입 일정을 변경 확정했습니다.',
+      },
+      expectedEvents: [equity, active],
+    },
+    {
+      id: 'completed-bond-acquisition-survives-later-disposal-plan',
+      input: {
+        reportName: '자기전환사채만기전취득결정',
+        filedAt: '2026-07-23',
+        bodyText: '대금 지급일 | 2026년 7월 20일 | 대금 지급을 완료하고 전환사채를 인수했습니다. | 취득 완료 후 일부를 다음 달 재매각할 계획입니다.',
+      },
+      expectedEvents: [acquired],
+    },
+    {
+      id: 'affiliate-order-release-does-not-release-issuer-order',
+      input: {
+        reportName: '중대재해발생',
+        filedAt: '2026-07-23',
+        bodyText: '중대재해가 발생했습니다. | 고용노동부는 당사 생산라인에 작업중지 명령을 발령했습니다. | 관계회사에 내려졌던 별도 작업정지 조치는 해제되었습니다.',
+      },
+      expectedEvents: [accident, workStop],
+    },
+  ];
+
+  const failures = cases.flatMap(({ id, input, expectedEvents }) => {
+    const actual = extractEventsGatedProjection(input);
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents))
+      ? []
+      : [{ id, expected: eventSet(expectedEvents), actual: eventSet(actual.events) }];
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('round 6 independent semantic audit supports heading-free corrections and sentence-bound actors', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
+  const active = canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
+  const trust = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
+  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
+  const equity = canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities');
+  const accident = canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer');
+  const workStop = canonicalEvent('operating-status', 'halted', 'effective', 'regulatory-work-stop', 'business');
+  const cases = [
+    {
+      id: 'heading-free-litigation-current-island',
+      input: { reportName: '[기재정정] 소송등의제기ㆍ신청(경영권분쟁소송)', bodyText: '종전 공시 | 당사는 화해 가능성을 검토하며 취하할 계획이었습니다. | 금번 사건 | 당사는 청구를 유지하고 심리를 계속 수행하고 있습니다.' },
+      expectedEvents: [active],
+    },
+    {
+      id: 'heading-free-litigation-counterclaim',
+      input: { reportName: '[기재정정] 소송등의제기ㆍ신청(경영권분쟁소송)', bodyText: '이번 사건 | 당사는 주위적 청구를 취하하여 접수가 완료되었습니다. 상대방은 별도의 반소 청구를 계속 유지하고 있습니다.' },
+      expectedEvents: [withdrawn],
+    },
+    {
+      id: 'heading-free-litigation-reentry-after-before-section',
+      input: { reportName: '[기재정정] 소송등의제기ㆍ신청(경영권분쟁소송)', bodyText: '정정 전 | 상대방이 취하 의사를 밝혔습니다. | 이번 사건 | 당사는 청구 취하서를 제출했고 법원이 이를 접수하여 종결 처리했습니다.' },
+      expectedEvents: [withdrawn],
+    },
+    {
+      id: 'trust-final-contract-particle',
+      input: { reportName: '자기주식취득 신탁계약 체결 결정', filedAt: '2026-07-23', bodyText: '종전 초안 | 수탁기관 날인 누락. | 현재 계약 | 2026년 7월 23일 양 당사자의 날인이 끝나 최종 계약서 체결이 완료되었습니다.' },
+      expectedEvents: [trust],
+    },
+    {
+      id: 'trust-original-exchange-completion',
+      input: { reportName: '자기주식취득 신탁계약 체결 결정', filedAt: '2026-07-23', bodyText: '계약체결일 | 2026년 7월 21일 | 양측 서명과 원본 교환을 마쳐 신탁계약 체결 절차가 종료되었습니다.' },
+      expectedEvents: [trust],
+    },
+    {
+      id: 'trust-company-and-trustee-electronic-signature',
+      input: { reportName: '자기주식취득 신탁계약 체결 결정', filedAt: '2026-07-23', bodyText: '현재 안건 | 계약체결일 2026년 7월 23일. | 과거 참고 | 초안은 미서명 상태였습니다. | 금번 계약 | 회사와 신탁사는 전자서명을 끝내 계약 체결을 완료했습니다.' },
+      expectedEvents: [trust],
+    },
+    {
+      id: 'bond-account-transfer-before-resale-plan',
+      input: { reportName: '자기전환사채 만기전 취득 결정', filedAt: '2026-07-23', bodyText: '취득일 | 2026년 7월 23일 | 당사는 매매대금을 전액 지급했고 전환사채가 당사 증권계좌로 대체되었습니다. 취득 후 다음 달 재매각할 계획입니다.' },
+      expectedEvents: [acquired],
+    },
+    {
+      id: 'bond-settlement-and-rights-transfer-complete',
+      input: { reportName: '자기전환사채 만기전 취득 결정', filedAt: '2026-07-23', bodyText: '실제 취득일 | 2026-07-22 | 잔금 정산과 사채 권리 이전이 모두 끝났습니다. 취득 완료 뒤 해당 사채를 소각할 예정입니다.' },
+      expectedEvents: [acquired],
+    },
+    {
+      id: 'bond-future-partial-disposal-is-not-partial-acquisition',
+      input: { reportName: '자기전환사채 만기전 취득 결정', filedAt: '2026-07-23', bodyText: '정산일 | 2026년 7월 22일 | 당사는 대금 정산을 마쳤고 실물 사채 전부를 인도받았습니다. 향후 일부를 소각하는 방안을 검토합니다.' },
+      expectedEvents: [acquired],
+    },
+    {
+      id: 'inline-old-new-equity-schedule',
+      input: { reportName: '[기재정정] 소송등의제기ㆍ신청', bodyText: '현재 사항 | 당사는 청구 취하서를 제출했고 법원 접수로 종결되었습니다. 주식발행 주금 납입기일은 종전 2026-08-05, 변경 후 2026-08-12입니다.' },
+      expectedEvents: [equity, withdrawn],
+    },
+    {
+      id: 'colon-separated-equity-schedule',
+      input: { reportName: '[기재정정] 소송등의제기ㆍ신청', bodyText: '현재 사건 | 당사의 취하 요청은 반려되어 소송이 계속됩니다. 유상증자 납입일: 기존 2026년 8월 1일 / 수정 납입일: 2026년 8월 9일.' },
+      expectedEvents: [equity, active],
+    },
+    {
+      id: 'labor-office-work-stop',
+      input: { reportName: '중대재해발생', bodyText: '당사 사업장에서 사고가 발생했습니다. 관할 노동관서는 당사의 혼합공정에 작업중지 명령을 내렸고 즉시 효력이 발생했습니다.' },
+      expectedEvents: [accident, workStop],
+    },
+    {
+      id: 'authority-negative-then-positive-work-stop',
+      input: { reportName: '중대재해 발생', bodyText: '당사 물류센터에서 중대재해가 발생했습니다. 관계당국은 초기에 명령을 내리지 않았으나 현장 조사 후 당사 작업장에 작업중지 명령을 발령했습니다.' },
+      expectedEvents: [accident, workStop],
+    },
+    {
+      id: 'outsourcing-company-only-work-stop',
+      input: { reportName: '중대재해발생', bodyText: '당사 현장에서 사고가 발생했습니다. 고용노동부는 인접한 외주업체 새길건설의 공정에만 작업중지 명령을 발령했으며 당사 공정은 대상이 아닙니다.' },
+      expectedEvents: [accident],
+    },
+  ];
+
+  const failures = cases.flatMap(({ id, input, expectedEvents }) => {
+    const actual = extractEventsGatedProjection(input);
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents))
+      ? []
+      : [{ id, expected: eventSet(expectedEvents), actual: eventSet(actual.events) }];
+  });
+  const thirdPartyProductWithdrawal = extractEventsGatedProjection({
+    reportName: '투자판단 관련 주요경영사항',
+    bodyText: '공동개발사 별빛바이오가 자기 명의의 품목허가 신청을 취하했습니다. 당사 명의의 신약허가 신청은 유지 중입니다.',
+  });
+  if (thirdPartyProductWithdrawal.events.some((event) => event.type === 'regulatory-product' && event.action === 'withdrawn')) {
+    failures.push({ id: 'third-party-product-withdrawal', actual: eventSet(thirdPartyProductWithdrawal.events) });
+  }
+  assert.deepEqual(failures, []);
+});
+
+test('round 7 valid semantic contract accumulates explicit body intents under generic titles', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const active = canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
+  const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
+  const trustProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities');
+  const trustEffective = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
+  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities');
+  const bondEffective = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
+  const product = canonicalEvent('regulatory-product', 'withdrawn', 'cancelled', 'product-approval', 'product');
+  const accident = canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer');
+  const workStop = canonicalEvent('operating-status', 'halted', 'effective', 'regulatory-work-stop', 'business');
+  const equity = canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities');
+  const cases = [
+    ['suffix-correction-litigation-active', { reportName: '소송 등의 제기·신청(정정)', bodyText: '[과거 경과] 2025년 제기한 물품대금 청구는 같은 해 취하했습니다. [금번 사건] 당사는 별도의 손해배상 청구를 제기했고 현재 변론기일을 기다리고 있습니다.' }, [active]],
+    ['suffix-correction-litigation-withdrawn', { reportName: '소송 등의 제기·신청(정정)', bodyText: '[금번 정정] 당사는 법원에 소취하서를 제출하여 해당 손해배상 청구를 전부 취하하였습니다.' }, [withdrawn]],
+    ['direct-trust-effective', { reportName: '자기주식취득 신탁계약 체결', filedAt: '2026-07-23', bodyText: '당사는 2026년 7월 23일 한국투자증권과 자기주식취득 신탁계약에 서명하고 계약 효력을 발생시켰습니다.' }, [trustEffective]],
+    ['direct-trust-correction-effective', { reportName: '자기주식취득 신탁계약 체결(정정)', bodyText: '[종전 초안] 날인이 되지 않아 계약이 성립하지 않았습니다. [금번 계약] 양사는 오늘 전자서명을 완료했고 자기주식취득 신탁계약이 즉시 발효되었습니다.' }, [trustEffective]],
+    ['direct-bond-effective', { reportName: '자기 전환사채 취득', filedAt: '2026-07-23', bodyText: '당사는 보유자로부터 자기 전환사채를 매수하여 대금을 전액 지급했고 사채권도 2026년 7월 23일 당사에 귀속되었습니다.' }, [bondEffective]],
+    ['direct-bond-correction-effective', { reportName: '자기 전환사채 취득(정정)', bodyText: '[종전] 잔금 미지급으로 소유권이 이전되지 않았습니다. [금번] 오늘 잔금을 전액 완납했고 전환사채의 모든 권리가 당사에 이전되었습니다.' }, [bondEffective]],
+    ['direct-product-withdrawal', { reportName: '의약품 품목허가 신청 취하', bodyText: '당사는 식품의약품안전처에 제출한 신약 품목허가 신청을 전부 취하했으며 접수 취소 처리가 완료되었습니다.' }, [product]],
+    ['partial-indication-product-withdrawal', { reportName: '의약품 품목허가 신청 일부 취하', bodyText: '두 개 적응증 중 A 적응증에 대한 품목허가 신청은 취하 완료했고, B 적응증 신청은 유지합니다.' }, [product]],
+    ['generic-trust-and-bond', { reportName: '기타 주요경영사항(자율공시)', bodyText: '[자기주식] 당사는 증권사와 자기주식취득 신탁계약의 서명과 날인을 완료해 계약이 발효되었습니다. [전환사채] 별도 보유자에게 취득대금을 전액 지급하고 자기 전환사채의 권리를 넘겨받았습니다.' }, [trustEffective, bondEffective]],
+    ['generic-litigation-and-trust-proposal', { reportName: '기타 주요경영사항(자율공시)', bodyText: '[소송] 당사가 피고인 손해배상 사건은 현재 계속 중입니다. [자기주식] 이사회는 자기주식취득 신탁계약을 다음 달 체결하기로 결정했으며 아직 서명 전입니다.' }, [active, trustProposed]],
+    ['generic-product-and-accident', { reportName: '주요 경영사항 공시', bodyText: '[의약품] 당사는 식약처 품목허가 신청을 전부 취하했고 취하 처리가 완료되었습니다. [안전사고] 오늘 당사 사업장에서 사망자 1명이 발생한 중대산업재해가 발생했습니다.' }, [product, accident]],
+    ['generic-work-stop-and-equity-schedule', { reportName: '주요사항보고서(정정)', bodyText: '[행정처분] 관할 고용노동청이 당사 제2공장에 작업중지명령을 발령하여 즉시 효력이 발생했습니다. [유상증자] 납입일을 2026년 8월 1일에서 8월 20일로 변경했습니다.' }, [workStop, equity]],
+    ['generic-three-independent-intents', { reportName: '기타 주요경영사항(자율공시)', bodyText: '[신탁] 증권사와 자기주식취득 신탁계약을 체결하고 효력을 발생시켰습니다. [전환사채] 이사회는 자기 전환사채 취득을 결정했으나 대금은 다음 달 지급합니다. [소송] 당사가 제기한 부당이득 반환 청구는 현재 심리 중입니다.' }, [trustEffective, bondProposed, active]],
+    ['generic-product-object-mismatch-and-bond', { reportName: '기타 주요경영사항(자율공시)', bodyText: '[임상시험] 임상시험계획 승인 신청은 취하했지만 의약품 품목허가 신청은 그대로 유지합니다. [전환사채] 자기 전환사채 취득대금 전액 지급 및 권리 이전을 완료했습니다.' }, [bondEffective]],
+    ['generic-third-party-trust-and-issuer-litigation', { reportName: '기타 주요경영사항(자율공시)', bodyText: '[관계회사] 관계회사가 자기주식취득 신탁계약을 체결했고 당사는 당사자가 아닙니다. [당사 소송] 당사는 오늘 기존 손해배상 청구를 전부 취하했습니다.' }, [withdrawn]],
+    ['generic-history-current-trust-and-accident', { reportName: '주요 경영사항 공시', bodyText: '[과거 참고] 당사는 2021년 자기 전환사채를 취득했습니다. [금번 신탁] 오늘 자기주식취득 신탁계약 서명을 완료했습니다. [금번 사고] 당사 공장에서 사망 사고가 발생하여 중대산업재해로 조사 중입니다.' }, [trustEffective, accident]],
+    ['generic-trust-and-bond-followups', { reportName: '기타 주요경영사항(자율공시)', bodyText: '[금번 안건] 이사회가 자기주식취득 신탁계약을 의결했습니다. [금번 후속] 오후에 증권사와 전자서명을 완료했습니다. [별도 안건] 자기 전환사채 잔금을 완납하고 권리 이전도 마쳤습니다.' }, [trustEffective, bondEffective]],
+    ['generic-cancelled-work-stop-and-litigation', { reportName: '주요 경영사항 공시(정정)', bodyText: '[작업중지] 관할청이 오전에 작업중지명령을 발령했으나 같은 날 이를 직권 취소하여 현재 효력이 없습니다. [소송] 당사가 피고인 손해배상 청구는 현재 계속 중입니다.' }, [active]],
+    ['generic-product-third-party-bond-and-trust', { reportName: '기타 주요경영사항(자율공시)', bodyText: '[의약품] 당사는 의약품 품목허가 신청을 취하하여 절차가 종료되었습니다. [관계회사 CB] 관계회사가 전환사채를 취득했고 당사는 취득하지 않았습니다. [당사 신탁] 이사회는 자기주식취득 신탁계약을 체결하기로 결정했으며 계약은 다음 달 예정입니다.' }, [product, trustProposed]],
+    ['generic-two-litigation-lifecycles-and-product', { reportName: '주요 경영사항 공시', bodyText: '[본소] 당사는 기존 본소를 전부 취하했습니다. [반소] 상대방의 반소는 당사를 상대로 현재 계속 중입니다. [품목허가] 별도 의약품 품목허가 신청은 오늘 취하 완료했습니다.' }, [withdrawn, active, product]],
+  ];
+
+  const failures = cases.flatMap(([id, input, expectedEvents]) => {
+    const actual = extractEventsGatedProjection(input);
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents))
+      ? []
+      : [{ id, expected: eventSet(expectedEvents), actual: eventSet(actual.events) }];
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('round 8 natural prose keeps independent event lifecycles separate', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const active = canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
+  const filed = canonicalEvent('legal-regulatory', 'filed', null, 'litigation', 'issuer');
+  const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
+  const trustProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities');
+  const trustEffective = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
+  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities');
+  const bondEffective = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
+  const product = canonicalEvent('regulatory-product', 'withdrawn', 'cancelled', 'product-approval', 'product');
+  const cases = [
+    ['generic-active-arbitration', {
+      reportName: '기타 주요경영사항(자율공시)',
+      bodyText: '당사가 2025년 11월 싱가포르국제중재센터에 제기한 공급계약 관련 중재사건은 현재 서면심리가 진행되고 있습니다. 2026년 7월 22일 중재판정부가 추가 자료 제출 일정을 지정하였으며 아직 판정이나 취하의 효력은 발생하지 않았습니다.',
+    }, [active]],
+    ['withdrawal-title-confirms-effective-withdrawal', {
+      reportName: '소송 등의 제기ㆍ신청(일정금액 이상의 청구)(취하)',
+      bodyText: '당사가 원고로 제기했던 대여금 청구소송에 관하여 법원에 소취하서를 제출하였고, 피고의 동의서가 접수되어 같은 날 소취하의 효력이 발생하였습니다. 이에 해당 사건은 종료되었습니다.',
+    }, [withdrawn]],
+    ['reversed-withdrawal-decision-keeps-litigation-active', {
+      reportName: '[기재정정]소송등의제기ㆍ신청',
+      bodyText: '정정 내용 | 앞서 취하하기로 했던 결정을 번복하여 소송을 계속 수행하기로 확정했습니다.',
+    }, [active]],
+    ['generic-withdrawn-and-newly-filed-lawsuits', {
+      reportName: '주요경영사항공시',
+      bodyText: '첫째, 당사가 2025년 제기한 사건은 상대방 동의를 얻은 소취하가 확정되어 종료되었습니다. 둘째, 별개의 하도급 정산분쟁에 대해서는 당사가 서울서부지방법원에 새 소장을 제출하여 접수번호를 부여받았습니다.',
+    }, [withdrawn, filed]],
+    ['unexecuted-trust-correction-stays-proposed', {
+      reportName: '주요사항보고서(자기주식취득신탁계약체결결정)(정정)',
+      bodyText: '이사회가 결의한 자기주식취득 신탁계약의 예정금액과 예정기관을 정정합니다. 계약 예정일은 7월 29일이며 아직 실제 계약은 체결되지 않았습니다.',
+    }, [trustProposed]],
+    ['generic-independent-trusts-preserve-both-states', {
+      reportName: '기타 주요경영사항(자율공시)',
+      bodyText: '제1호 신탁은 당사 이사회가 20억원 규모로 체결하기로 의결했으나 계약서 서명 전입니다. 별개의 제2호 자기주식취득 신탁은 같은 날 누리증권과 35억원 규모 계약을 체결하여 즉시 효력이 발생했습니다.',
+    }, [trustProposed, trustEffective]],
+    ['alternate-own-convertible-bond-title-confirms-completion', {
+      reportName: '전환사채(해외전환사채 포함) 발행 후 만기 전 사채 취득',
+      bodyText: '당사는 당사 발행 제5회 전환사채 취득대금을 지급하고 사채권을 인도받았습니다. 해당 취득은 같은 날 효력이 발생했으며 취득 절차가 완료되었습니다.',
+    }, [bondEffective]],
+    ['generic-independent-bonds-preserve-both-states', {
+      reportName: '주요경영사항공시',
+      bodyText: '당사 발행 제9회 전환사채는 대금 지급과 권리 이전을 마쳐 취득이 완료되었습니다. 이와 별개인 제10회 전환사채에 대해서는 이사회가 만기 전 취득을 결의했으며 실제 취득 예정일은 다음 달입니다.',
+    }, [bondEffective, bondProposed]],
+    ['generic-new-lawsuit-and-trust-decision', {
+      reportName: '기타 주요경영사항(자율공시)',
+      bodyText: '당사는 거래처의 계약위반에 대해 서울중앙지방법원에 손해배상 소장을 제출하여 접수를 마쳤습니다. 이와 독립하여 같은 날 이사회는 자기주식취득 신탁계약을 체결하기로 결의했으며 계약서 서명은 다음 주 예정입니다.',
+    }, [filed, trustProposed]],
+    ['issuer-bond-excludes-third-party-product-withdrawal', {
+      reportName: '기타 주요경영사항(자율공시)',
+      bodyText: '당사는 당사 발행 전환사채를 만기 전에 취득하여 대금 지급과 권리 이전을 끝냈습니다. 별도로 비연결 관계회사가 자사 명의의 품목허가 신청을 취하했으나, 당사는 그 신청의 신청인이나 제품 보유자가 아닙니다.',
+    }, [bondEffective]],
+    ['one-product-withdrawal-is-not-cancelled-by-other-product-plans', {
+      reportName: '기타 주요경영사항(자율공시)',
+      bodyText: '제품 JRB-631의 품목허가 신청은 당사가 자진취하서를 제출하여 규제기관 접수와 심사 취소가 완료되었습니다. 별개 제품 JRB-632는 취하 계획이 없고 심사가 계속되며, JRB-633은 향후 취하 여부를 검토할 뿐 아직 결정되지 않았습니다.',
+    }, [product]],
+  ];
+
+  const failures = cases.flatMap(([id, input, expectedEvents]) => {
+    const actual = extractEventsGatedProjection(input);
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents))
+      ? []
+      : [{ id, expected: eventSet(expectedEvents), actual: eventSet(actual.events) }];
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('round 9 semantic subjects separate lifecycle, actor, and independent objects', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const active = canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
+  const filed = canonicalEvent('legal-regulatory', 'filed', null, 'litigation', 'issuer');
+  const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
+  const trustEffective = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
+  const trustProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities');
+  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities');
+  const bondEffective = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
+  const product = canonicalEvent('regulatory-product', 'withdrawn', 'cancelled', 'product-approval', 'product');
+  const positiveCases = [
+    ['active-litigation-status-title', {
+      reportName: '소송등의 진행상황',
+      bodyText: '당사가 피고인 계약금 반환 사건은 현재 변론기일이 진행되었고 원고는 청구를 유지하고 있어 본건은 계속 중입니다.',
+    }, [active]],
+    ['newly-filed-lawsuit-does-not-duplicate-active-lifecycle', {
+      reportName: '소송등의제기ㆍ신청',
+      bodyText: '당사는 손해를 회복하기 위해 거래처를 상대로 손해배상청구 소를 제기하였습니다. 법원이 같은 날 소장을 접수했습니다.',
+    }, [filed]],
+    ['effective-litigation-withdrawal-title', {
+      reportName: '소송 등의 취하',
+      bodyText: '원고가 당사를 상대로 낸 소송 전부를 취하했고 법원은 취하서를 유효하게 접수했습니다. 피고인 당사는 취하에 동의하여 사건이 종결되었습니다.',
+    }, [withdrawn]],
+    ['effective-trust-extension-contract', {
+      reportName: '자기주식취득 신탁계약 연장 체결',
+      bodyText: '기존 자기주식 신탁의 만기를 1년 연장하는 변경계약을 새 수탁사와 오늘 체결했습니다. 양 당사자 서명이 완료되어 변경계약은 체결일로부터 유효합니다.',
+    }, [trustEffective]],
+    ['planned-trust-is-effective-after-current-signature', {
+      reportName: '자기주식취득 신탁계약 체결',
+      bodyText: '어제까지는 계약 예정이었으나 오늘 수탁사와 최종 계약서 교환 및 전자서명을 마쳤습니다. 자기주식 취득 신탁은 오늘부터 효력이 있습니다.',
+    }, [trustEffective]],
+    ['future-own-bond-decision', {
+      reportName: '자기 전환사채 취득 결정',
+      bodyText: '이사회는 회사가 발행한 전환사채 전액을 다음 달 매수하기로 결정했습니다. 매매대금 지급과 권리 이전은 아직이므로 현재는 취득 결정 단계입니다.',
+    }, [bondProposed]],
+    ['completed-own-bond-settlement', {
+      reportName: '자기 전환사채 매입 종결',
+      bodyText: '발행회사인 당사는 사채권자 전원에게 약정 매수가액을 지급했고 채권 인도를 완료했습니다. 외부 잔액은 0원으로 실제 자기 전환사채 취득이 종결되었습니다.',
+    }, [bondEffective]],
+    ['partial-own-bond-acquisition-with-external-balance-stays-proposed', {
+      reportName: '자기 전환사채 일부 취득',
+      bodyText: '전환사채 중 40%는 오늘 회사가 매입했으나 60%가 외부에 잔존하고 추가 정산이 필요합니다. 전체 취득 완료가 아니라 잔여분 취득 결정 단계입니다.',
+    }, [bondProposed]],
+    ['independent-own-bond-rounds', {
+      reportName: '자기 전환사채 취득 현황',
+      bodyText: '서로 다른 회차를 함께 보고합니다. 제4회 전환사채는 대금 지급과 권리 이전을 끝내 전액 취득했습니다. 제6회는 외부 잔액이 남아 다음 달 매입하기로만 결정했고 아직 결제하지 않았습니다.',
+    }, [bondEffective, bondProposed]],
+    ['one-of-two-product-approvals-withdrawn', {
+      reportName: '복수 품목 허가 진행 변경',
+      bodyText: '당사가 신청한 두 제품은 독립적입니다. 진통제 A의 품목허가 신청은 재추진 없이 전부 취하되어 심사가 종료됐고, 진단키트 B의 신청은 취하하지 않아 심사 중입니다.',
+    }, [product]],
+    ['four-independent-body-events', {
+      reportName: '복수 주요사항 종합공시',
+      bodyText: '서로 독립인 네 건입니다. 새 원고의 공사대금 소장이 당사를 상대로 법원에 접수됐습니다. 당사는 증권사와 자기주식취득 신탁계약을 서명해 효력이 생겼습니다. 자기 전환사채 전액은 대금 지급과 이전을 마쳐 회사가 취득했습니다. 당사 신약 품목허가 신청도 최종 자진취하되어 심사가 취소됐습니다.',
+    }, [filed, trustEffective, bondEffective, product]],
+    ['withdrawn-lawsuit-and-unexecuted-trust-decision', {
+      reportName: '소송 취하 및 자기주식 신탁 추진',
+      bodyText: '원고가 당사 상대 소송 전부를 취하했고 법원이 유효하게 접수했습니다. 같은 날 이사회는 자기주식취득 신탁계약 추진을 결의했으나 수탁사 서명은 다음 주 예정입니다.',
+    }, [withdrawn, trustProposed]],
+    ['current-trust-contract-excludes-following-historical-summary', {
+      reportName: '자기주식 신탁계약 및 과거 사건 참고',
+      bodyText: '당사는 오늘 은행과 자기주식취득 신탁계약에 최종 서명했고 즉시 효력이 발생했습니다. 2020년 종료된 소송, 2022년 취득한 전환사채, 2023년 취하한 품목은 단순 연혁입니다.',
+    }, [trustEffective]],
+    ['effective-trust-and-own-bond-remain-independent', {
+      reportName: '신탁계약 체결 및 자기 전환사채 취득',
+      bodyText: '당사는 은행과 자기주식취득 신탁계약에 전자서명하여 오늘 효력을 개시했습니다. 별도로 자기 전환사채 전액의 결제와 권리 이전을 완료해 외부 잔액이 없습니다.',
+    }, [trustEffective, bondEffective]],
+    ['active-litigation-with-unrelated-object-noise', {
+      reportName: '진행 소송 및 기타 거래 안내',
+      bodyText: '당사가 피고인 부당이득반환 소송은 현재 변론이 계속되고 청구도 유지됩니다. 같은 문서의 자기주식은 신탁 없는 직접매수이고, 전환사채 매수인은 제3자 펀드이며, 허가 관련 내용은 임상시험계획 보완입니다.',
+    }, [active]],
+  ];
+
+  const failures = positiveCases.flatMap(([id, input, expectedEvents]) => {
+    const actual = extractEventsGatedProjection(input);
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expectedEvents))
+      ? []
+      : [{ id, expected: eventSet(expectedEvents), actual: eventSet(actual.events) }];
+  });
+  const forbiddenCases = [
+    ['third-party-bond-purchase', {
+      reportName: '전환사채 거래 관련 안내',
+      bodyText: '관계회사가 당사가 발행한 전환사채 일부를 기존 투자자로부터 매수했습니다. 매수인은 발행회사인 당사가 아니며 당사의 자기 전환사채 취득도 아닙니다.',
+    }, (event) => event.cause === 'convertible-bond'],
+    ['withdrawn-bond-decision', {
+      reportName: '자기 전환사채 취득 결정 철회',
+      bodyText: '당초 예정했던 전환사채 매수는 합의가 무산되어 오늘 전면 철회되었습니다. 회사가 실제로 취득한 물량은 없고 향후 취득 의무도 없습니다.',
+    }, (event) => event.cause === 'convertible-bond'],
+    ['historical-own-bond-disposition-plan-is-not-current-acquisition', {
+      reportName: '자기 전환사채 처분 계획',
+      bodyText: '당사는 과거에 이미 취득해 보유 중인 자기 전환사채를 다음 분기에 재매각할 계획입니다. 이번 공시에서 새로 취득하거나 취득을 결정한 사실은 없습니다.',
+    }, (event) => event.cause === 'convertible-bond'],
+    ['product-reapplication-is-not-fda-crl', {
+      reportName: '품목허가 보완 후 재신청',
+      bodyText: '지난달 형식상 취하했던 품목허가 신청은 자료 보완을 마쳐 오늘 같은 품목으로 재신청했고 당국 심사가 진행 중입니다.',
+    }, (event) => event.cause === 'fda-crl'],
+    ['third-party-product-withdrawal-is-not-fda-crl', {
+      reportName: '종속회사 품목허가 취하',
+      bodyText: '종속회사가 별도 법인 및 신청인으로서 품목허가 신청을 취하했습니다. 모회사인 당사가 낸 신청은 유지되고 있습니다.',
+    }, (event) => event.cause === 'fda-crl'],
+    ['product-withdrawal-rumor-is-not-fda-crl', {
+      reportName: '품목허가 취하설 해명',
+      bodyText: '시장에 퍼진 당사의 품목허가 신청 취하설은 사실무근입니다. 신청은 철회되지 않았고 규제기관의 본심사가 정상적으로 계속되고 있습니다.',
+    }, (event) => event.cause === 'fda-crl'],
+    ['final-judgment-is-not-active-litigation', {
+      reportName: '소송 등의 판결ㆍ결정',
+      bodyText: '당사가 피고였던 침해 사건은 대법원의 상고기각 판결이 송달되어 확정되었습니다. 추가 심리나 계속 중인 절차는 없으며 해당 소송은 종결되었습니다.',
+    }, (event) => event.cause === 'litigation' && event.state === 'active'],
+    ['product-withdrawal-denial-is-not-withdrawal-or-litigation', {
+      reportName: '해명공시',
+      bodyText: '당사가 품목허가 신청을 취하했다는 보도는 사실이 아닙니다. 신청은 정상적으로 심사 중이며 당사는 취하서를 제출하거나 취하 의사를 규제기관에 통보한 바 없습니다.',
+    }, (event) => (event.cause === 'product-approval' && event.action === 'withdrawn') || event.cause === 'litigation'],
+  ];
+  for (const [id, input, forbidden] of forbiddenCases) {
+    const actual = extractEventsGatedProjection(input);
+    if (actual.events.some(forbidden)) failures.push({ id, actual: eventSet(actual.events) });
+  }
+  assert.deepEqual(failures, []);
+});
+
 test('semantic gate source contains no receipt or corporation literal branches', async () => {
   const source = await readFile(join(__dirname, '..', 'src', 'services', 'deepscan-kr-disclosure-event-extractors.js'), 'utf8');
   assert.doesNotMatch(source, /20\d{12}/u);

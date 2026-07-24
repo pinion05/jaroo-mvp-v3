@@ -80,14 +80,16 @@ function normalizeInput(entry = {}) {
   const reportName = normalizeText(entry.reportName ?? entry.report_nm ?? entry.report_name);
   const remarks = normalizeText(entry.remarks ?? entry.rm);
   const correctionMatch = reportName.match(/^\[(기재정정|첨부정정|첨부추가|변경등록|연장결정|발행조건확정|정정제출요구)\]/u);
+  const correctionKind = correctionMatch?.[1]
+    ?? (/\(정정\)$/u.test(compactText(reportName)) ? '기재정정' : null);
   const bodyText = normalizeText(entry.bodyText ?? entry.documentText ?? entry.body_text);
   return {
     reportName,
     remarks,
     text: `${reportName} ${remarks}`.trim(),
     compact: compactText(`${reportName} ${remarks}`),
-    correctionKind: correctionMatch?.[1] ?? null,
-    filingState: FILING_STATE_BY_PREFIX[correctionMatch?.[1]] ?? null,
+    correctionKind,
+    filingState: FILING_STATE_BY_PREFIX[correctionKind] ?? null,
     bodyText,
     receiptNumber: normalizeText(entry.rceptNo ?? entry.rcept_no ?? entry.receiptNumber) || null,
     filedAt: normalizeText(entry.filedAt ?? entry.rceptDt ?? entry.rcept_dt) || null,
@@ -735,14 +737,24 @@ function semanticEvent(type, action, state, cause, subjectType) {
   return createEvent({ type, action, state, cause, subjectType });
 }
 
+function lastMatchEnd(text, pattern) {
+  let end = -1;
+  for (const match of text.matchAll(pattern)) end = Math.max(end, match.index + match[0].length);
+  return end;
+}
+
+const NONCURRENT_SECTION_BOUNDARY = /(?:^|\|)(?:4\.?)?(?:과거[^|]{0,24}(?:이력|내역|자료|예시|사건|계약|거래|참고)|지난[^|]{0,20}(?:참고|이력|내역)|종전[^|]{0,24}(?:실적|현황|이력|내역|공시|초안)|이전[^|]{0,20}(?:사례|이력|내역|경과)|별건[^|]{0,20}(?:연혁|이력|내역)|직전(?:회차|거래|계약)[^|]{0,24}(?:요약|기록|이력|내역)|부록[:：]?[^|]{0,36}(?:전년도|과거|이전|종전)[^|]{0,36}(?:기록|실적|이력|내역)|종료된(?:개발)?과제|참고(?:자료|사항)|작성(?:안내|예시)|별첨(?:기재)?(?:견본|예시|양식)|교육용(?:문구|예시|자료)|유의사항(?:및위험고지)?|위험고지|투자위험|위험요소|경쟁제품)(?:\||$)/u;
+const CURRENT_SECTION_HEADING = /^(?:(?:금번|이번)(?:(?:신탁)?(?:계약|거래)(?:현황)?|안건|사건|소송|사고|사항|개발과제)|현재(?:계약|거래|안건|사건|소송|사고|사항|개발과제))$/u;
+
 function currentCorrectionScope(input, bodyFacts) {
   if (input.wrapperKind !== 'correction') return '';
   const text = bodyFacts.fullText;
-  const numberedStart = text.search(/(?:^|\|)3\.?정정(?:사유|사항)/u);
-  const start = numberedStart >= 0 ? numberedStart : text.search(/정정(?:사유|사항)/u);
-  if (start < 0) return '';
-  const scope = text.slice(start);
-  const sectionBoundary = scope.slice(1).search(/(?:^|\|)(?:4\.?)?(?:참고자료|과거(?:이력|내역)|투자위험|위험요소)(?:\||$)/u);
+  const numberedStart = text.search(/(?:^|\|)3\.?정정(?:사유|사항|내용)/u);
+  const start = numberedStart >= 0
+    ? numberedStart
+    : text.search(/정정(?:사유|사항|내용)|(?:소송|자금조달)정정/u);
+  if (start < 0) return currentDisclosureScope(bodyFacts);
+  const scope = currentDisclosureScope(bodyFacts, text.slice(start));
   const seenNotes = new Set();
   let detailBoundary = -1;
   for (const match of scope.matchAll(/(?:^|\|)\(주(\d+)\)정정전/gu)) {
@@ -752,31 +764,602 @@ function currentCorrectionScope(input, bodyFacts) {
     }
     seenNotes.add(match[1]);
   }
-  const boundaries = [sectionBoundary, detailBoundary].filter((index) => index >= 0);
-  return boundaries.length === 0 ? scope : scope.slice(0, Math.min(...boundaries));
+  return detailBoundary < 0 ? scope : scope.slice(0, detailBoundary);
 }
 
-function currentDisclosureScope(bodyFacts) {
-  const body = bodyFacts.fullText;
-  const boundary = body.search(/(?:^|\|)(?:과거(?:이력|내역)|참고자료|투자위험|위험요소|경쟁제품)(?:\||$)/u);
-  return boundary < 0 ? body : body.slice(0, boundary);
+function currentDisclosureScope(bodyFacts, sourceText = bodyFacts.fullText) {
+  const body = sourceText || bodyFacts.fullText;
+  const selected = [];
+  let include = true;
+  for (const clause of body.split('|').filter(Boolean)) {
+    if (NONCURRENT_SECTION_BOUNDARY.test(`|${clause}|`)) {
+      include = false;
+      continue;
+    }
+    if (CURRENT_SECTION_HEADING.test(clause)) include = true;
+    if (include) selected.push(clause);
+  }
+  return selected.join('|');
 }
 
 function hasCompletedTrustContract(scope) {
-  return /신탁계약.{0,60}(?:체결(?:을)?완료(?:하였|했|함|되었|됨)?|체결(?:하였|했|함|되었|됨)|체결절차(?:를)?(?:모두)?(?:마쳤|완료(?:하였|했|함)?))/u.test(scope);
+  const clauses = scope.split('|').filter(Boolean);
+  let completed = false;
+  for (let index = 0; index < clauses.length; index += 1) {
+    const clause = clauses[index];
+    const previous = clauses[index - 1] ?? '';
+    const adjacentTrustContext = /(?:신탁(?:계약|약정)|전자약정|계약서|약정서)/u.test(previous)
+      && !/(?:이사회|의사록|결의서|잔액확인서|확인서|보고서|공문)/u.test(clause);
+    const directTrustContext = /(?:신탁(?:계약|약정)|전자약정|계약서|약정서)/u.test(clause);
+    const roleBoundSignature = /(?:양당사자|양측|수탁(?:사|은행|기관)|신탁(?:사|업자)|증권사|회사와신탁사).{0,100}(?:전자서명|서명(?:과|및)날인|서명|날인)/u.test(clause);
+    if (!directTrustContext && !adjacentTrustContext && !roleBoundSignature) continue;
+
+    const incompleteEnd = Math.max(
+      lastMatchEnd(clause, /(?:미서명|미날인|미체결|성립전|조율중|협상중|협의중|완료하지못|완료되지않|체결(?:하지않|되지않)|서명(?:하지않|되지않)|날인(?:하지않|되지않)|성립하지않|효력.{0,20}발생하지않|이뤄지지않|이루어지지않)/gu),
+      lastMatchEnd(clause, /(?:서명|날인|체결).{0,60}(?:예정|계획|방침|추후|향후)/gu),
+    );
+    const completionEnd = Math.max(
+      lastMatchEnd(clause, /(?:신탁(?:계약|약정)|전자약정|계약서|약정서).{0,100}(?:(?:체결|약정)(?:절차)?(?:이|가|을|를)?(?:모두)?(?:완료|종결|종료|마쳤|마친|끝냈|끝낸|끝났|완료한|확정)|(?:체결|약정)(?:하였|했|함|되었습니다|됐습니다)|(?:성립|효력(?:발생|이생겼)))/gu),
+      lastMatchEnd(clause, /(?:전자서명|서명(?:과|및)날인|서명|날인)(?:이|가|을|를)?(?:절차)?(?:를|을)?(?:까지|도|은|는)?(?:이날)?(?:모두)?.{0,40}(?:완료|마쳤|마친|마쳐|끝내|끝냈|끝낸|끝났|완료한)/gu),
+      lastMatchEnd(clause, /신탁계약.{0,100}(?:전자서명|서명|날인).{0,60}(?:완료|마쳤|끝내|효력(?:이|가|을|를)?발생|발효)/gu),
+      lastMatchEnd(clause, /신탁계약.{0,100}체결(?:하고|하여|해).{0,60}(?:효력(?:이|가|을|를)?발생|발효)/gu),
+      lastMatchEnd(clause, /신탁계약.{0,100}(?:즉시)?발효/gu),
+      roleBoundSignature
+        ? lastMatchEnd(clause, /(?:계약|약정).{0,40}(?:체결)(?:절차)?(?:이|가|을|를)?.{0,30}(?:완료|종결|종료|마쳤|끝내|끝났)/gu)
+        : -1,
+    );
+    if (completionEnd >= 0 || incompleteEnd >= 0) completed = completionEnd > incompleteEnd;
+  }
+  return completed;
 }
 
 function hasCompletedConvertibleBondAcquisition(scope) {
-  const combinedCompletion = /(?:대금)?지급.{0,20}(?:사채|채권|증권).{0,20}(?:취득|인수|수령)(?:을)?완료/u.test(scope);
-  const affirmativeAcquisition = /(?:사채|전자등록금액|잔여분).{0,100}(?:만기전)?취득(?:하고|하였|했|함|했습니다|입니다)|본취득은.{0,100}(?:만기전)?취득입니다/u.test(scope);
+  const combinedCompletion = /(?:대금)?(?:지급|결제|정산).{0,80}(?:사채|채권|증권).{0,80}(?:취득|인수|수령|인도|넘겨받)(?:을|를)?(?:모두)?(?:완료|마침)/u.test(scope)
+    || /(?:사채|채권|증권).{0,100}(?:취득|인수|수령|인도|넘겨받).{0,100}(?:대금|잔금).{0,60}(?:지급|결제|정산)(?:을|를|도|까지)?(?:완료|하였|했|함|했습니다|마쳤|끝냈)/u.test(scope)
+    || /(?:대금|잔금).{0,40}(?:지급|결제|정산).{0,100}(?:사채|채권|증권).{0,80}(?:권리|명의|소유권).{0,40}(?:이전|귀속).{0,40}(?:모두)?(?:완료|끝났|마쳤)/u.test(scope)
+    || /(?:전환사채|사채권|채권).{0,100}(?:대금|잔금).{0,50}(?:전액)?(?:지급|완납|정산).{0,100}(?:권리|명의|소유권).{0,60}(?:이전|귀속|넘겨받|명의개서)(?:이|가|을|를|도)?.{0,30}(?:완료|마쳤|되었|됐|되었습니다)?/u.test(scope)
+    || /(?:대금|잔금).{0,40}(?:전액)?(?:지급|완납|정산).{0,100}(?:전환사채|사채권|채권).{0,60}(?:권리이전|명의개서|소유권이전).{0,40}(?:모두)?(?:완료|마쳤|끝냈)/u.test(scope);
   const scheduledAcquisitionDate = /(?:실제)?(?:사채|채권|증권).{0,10}취득일(?:자)?.{0,20}예정|(?:사채|채권|증권).{0,10}취득예정일/u.test(scope);
   const actualAcquisitionDateRole = !scheduledAcquisitionDate
-    && /(?:대금)?지급(?:\(예정\))?일|결제일/u.test(scope)
+    && /(?:대금)?지급(?:\(예정\))?일|결제일|정산일/u.test(scope)
     && /(?:실제(?:로)?)?(?:사채|채권|증권).{0,20}(?:취득|인수|수령).{0,10}(?:일|날).{0,12}(?:임|입니다|에해당|로확정)|(?:사채|채권|증권).{0,20}(?:실제로)?넘겨받은날.{0,12}(?:임|입니다|에해당)/u.test(scope);
-  const paymentCompleted = /(?:사채|채권|증권)?대금.{0,50}(?:전액|모두)?.{0,20}(?:지급(?:을)?완료|지급(?:하였|했|함|하고|되었습니다|됐습니다))/u.test(scope)
-    || /대금지급(?:을)?완료/u.test(scope);
-  const securityReceived = /(?:사채|채권|증권).{0,60}(?:취득(?:을)?완료|취득(?:하였|했|함|했습니다)|인수(?:하였|했|함|했습니다)|수령(?:하였|했|함|했습니다)|넘겨받(?:았|았습니다|음))/u.test(scope);
-  return combinedCompletion || affirmativeAcquisition || actualAcquisitionDateRole || (paymentCompleted && securityReceived);
+  const paymentCompleted = /(?:대금|잔금).{0,60}(?:전액|모두)?.{0,30}(?:지급|결제|정산)(?:을|를|도|까지)?(?:완료|하였|했|함|하고|됐|마쳤|끝냈)/u.test(scope)
+    || /(?:전액|모두).{0,10}(?:결제|정산)(?:을|를)?(?:완료|하였|했|함|됐|마쳤|끝냈)/u.test(scope)
+    || /(?:결제일|정산일).{0,80}(?:전액|모두)?(?:결제|정산)(?:을|를)?(?:완료|하였|했|함|됐|마쳤|끝냈)/u.test(scope)
+    || /(?:매매)?(?:대금|잔금)(?:이|가|은|는|을|를|까지)?(?:전액|모두|전부)?.{0,16}완납(?:되었|됐|되었습니다|하였|했|함|했습니다)?/u.test(scope)
+    || /대금지급(?:을|를)?완료/u.test(scope);
+  const securityReceived = /(?:사채|채권|증권).{0,120}(?:소유권|권리|명의)?.{0,40}(?:취득(?:을|를)?(?:모두)?(?:완료|마쳤|마친|끝냈|끝낸)|취득(?:하였|했|함|했습니다)|인수(?:를|을)?(?:모두)?(?:완료|마침|마쳤|마친|끝냈)|인수(?:하였|했|한|함|했습니다)|수령(?:완료|하였|했|함|했습니다)|인도(?:완료|받(?:았|았습니다|음))|넘겨받(?:아|아서|았|았습니다|음)|명의(?:가)?(?:이전|개서).{0,20}(?:완료|마쳤)?|(?:당사)?(?:증권)?계좌.{0,24}(?:대체|입고)(?:되었|됐|되었습니다|완료)?)/u.test(scope);
+  const passiveRightsTransferred = /(?:사채|채권|증권|사채권).{0,120}(?:권리|명의|소유권|권).{0,100}(?:이전(?:되었|됐|되었습니다|완료|도마쳤)|귀속(?:되었|됐|되었습니다)|넘어(?:왔|왔습니다)|명의개서.{0,20}(?:완료|마쳤))/u.test(scope);
+  return combinedCompletion || actualAcquisitionDateRole || (paymentCompleted && (securityReceived || passiveRightsTransferred));
+}
+
+function relationToFilingWithinScope(scope, filed, labelPattern = null, fallbackToFirstDate = false) {
+  const labeledDate = labelPattern ? firstDateAfterLabel(scope, labelPattern, false) : null;
+  const date = labeledDate ?? (fallbackToFirstDate ? semanticDates(scope)[0] : null);
+  return relationToFiling(date, filed);
+}
+
+function issuerLitigationClauses(scope) {
+  const clauses = scope.split('|')
+    .flatMap((clause) => clause.split(/(?:[!?。]+|(?<!\d)\.(?!\d))/u))
+    .filter(Boolean);
+  const explicitIssuerClauses = clauses.flatMap((clause) => {
+    const companyMatches = [...clause.matchAll(/회사(?:는|가)?/gu)]
+      .filter((match) => !clause.slice(Math.max(0, match.index - 4), match.index).endsWith('상대방'));
+    const issuerIndexes = [clause.lastIndexOf('당사'), companyMatches.at(-1)?.index ?? -1]
+      .filter((index) => index >= 0);
+    return issuerIndexes.length === 0 ? [] : [clause.slice(Math.max(...issuerIndexes))];
+  });
+  if (explicitIssuerClauses.length > 0) return explicitIssuerClauses;
+  return clauses.filter((clause) => !/^정정(?:사유|사항|내용)$/u.test(clause)
+    && !/^(?:상대방|상대측|피고측|원고측)/u.test(clause));
+}
+
+function classifyLitigationClause(clause) {
+  const withdrawal = /(?:취하|철회|거두어들)/u.test(clause);
+  const continuing = /(?:본안)?청구.{0,50}(?:유지|계속|제기|심리중|변론기일)|(?:소송|중재|재판|절차|사건|본소|반소|심리|변론).{0,60}(?:유지|계속|진행(?:중|되고|되며)|그대로진행|계속진행|계속수행|심리중|변론기일)|(?:소장|청구).{0,30}(?:제기|제출)/u.test(clause);
+  const continuingDenied = /(?:추가)?(?:심리|절차|소송|사건).{0,60}(?:계속중인)?(?:사항|절차)?(?:이|가|은|는)?(?:없|아니|종결|종료)|계속중인(?:심리|절차|소송|사건).{0,30}(?:이|가|은|는)?(?:없|아니)/u.test(clause);
+  if (!withdrawal) {
+    return continuing && !continuingDenied
+      ? semanticEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer')
+      : null;
+  }
+
+  const completedEnd = Math.max(
+    lastMatchEnd(clause, /(?:취하|철회)(?:처리|절차|신청)?(?:가|이|를|을)?(?:하였|했|함|해(?:서|여)?|하여|했고|하고|되었|됐|완료|확정)/gu),
+    lastMatchEnd(clause, /(?:취하|철회).{0,36}(?:접수|기록반영|사건번호.{0,12}말소|종결(?:통지|안내)?).{0,24}(?:완료|마쳤|끝|확인|받|수령|되었|됐)?/gu),
+    lastMatchEnd(clause, /(?:소)?취하(?:서)?.{0,140}(?:접수|수리|동의).{0,100}(?:취하)?(?:의)?효력(?:이|가)?발생/gu),
+    lastMatchEnd(clause, /(?:소)?취하(?:의)?효력(?:이|가)?발생/gu),
+    lastMatchEnd(clause, /(?:소)?취하(?:가|는|를|을|처리가|절차가)?(?:확정|완료|되어(?:종료|종결))/gu),
+    lastMatchEnd(clause, /거두어들(?:였|였고|임|여|여서)/gu),
+  );
+  const negatedEnd = Math.max(
+    lastMatchEnd(clause, /(?:취하|철회)(?:를|을|는|가)?(?:하지(?:는)?않|하지못|아니|없)/gu),
+    lastMatchEnd(clause, /거두어들(?:이지않|이지못|지않|지못)/gu),
+  );
+  const prospectiveEnd = Math.max(
+    lastMatchEnd(clause, /(?:취하|철회|거두어들).{0,48}(?:예정(?!대로)|계획|방침|검토|협의|의향|추후|향후|다음|여부|미정|조건|경우|할수있)/gu),
+    lastMatchEnd(clause, /(?:예정(?!대로)|계획|방침|검토|협의|의향|추후|향후|조건|경우).{0,48}(?:취하|철회|거두어들)/gu),
+  );
+  const requestRetractedEnd = lastMatchEnd(clause, /취하요청.{0,20}철회(?:하였|했|함|해|했고|하고|되었|됐|완료)?/gu);
+  const invalidationNegated = /(?:반려|기각|무효)(?:로)?(?:되지않|된것이아니|된것은아니)|번복(?:하지않|한것이아니|한것은아니)/u.test(clause);
+  const invalidatedEnd = invalidationNegated ? -1 : Math.max(
+    lastMatchEnd(clause, /(?:취하|철회).{0,72}(?:반려|기각|번복|무효|효력.{0,20}(?:발생하지않|없))/gu),
+    lastMatchEnd(clause, /(?:반려|기각|번복|무효).{0,72}(?:취하|철회)/gu),
+  );
+  const continuingEnd = Math.max(
+    lastMatchEnd(clause, /(?:본안)?청구.{0,50}(?:유지|계속|제기|심리중|변론기일)/gu),
+    lastMatchEnd(clause, /(?:소송|중재|재판|절차|사건|본소|반소|심리|변론).{0,60}(?:유지|계속|진행(?:중|되고|되며)|그대로진행|계속진행|계속수행|심리중|변론기일)/gu),
+    lastMatchEnd(clause, /(?:소장|청구).{0,30}(?:제기|제출)/gu),
+  );
+  const blockingEnd = Math.max(negatedEnd, prospectiveEnd, requestRetractedEnd, invalidatedEnd, continuingEnd);
+  if (completedEnd > blockingEnd) {
+    return semanticEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
+  }
+  if (blockingEnd >= 0) {
+    return semanticEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
+  }
+
+  return semanticEvent(
+    'legal-regulatory',
+    completedEnd >= 0 ? 'withdrawn' : 'updated',
+    completedEnd >= 0 ? 'effective' : 'active',
+    'litigation',
+    'issuer',
+  );
+}
+
+function litigationLifecycleEvent(scope) {
+  const decisions = issuerLitigationClauses(scope).map(classifyLitigationClause).filter(Boolean);
+  return decisions.at(-1) ?? null;
+}
+
+function hasTerminalProductWithdrawal(scope) {
+  const namedApprovalApplication = /(?:품목허가|의약품허가|신약허가).{0,50}신청/u.test(scope)
+    && /(?:품목허가|의약품허가|신약허가).{0,50}신청.{0,100}(?:취하|철회|포기)/u.test(scope);
+  const productScopedRetraction = /제품.{0,80}(?:자진)?(?:취하|철회|포기)(?:서)?.{0,100}(?:규제기관|식품의약품안전처|식약처).{0,80}(?:접수|수리|심사취소|심사종료)/u.test(scope);
+  if (!namedApprovalApplication && !productScopedRetraction) return false;
+  const thirdPartyWithdrawal = /(?:공동개발사|관계회사|계열회사|파트너사|제휴사|타사|제3자).{0,100}(?:품목허가|의약품허가|신약허가).{0,50}신청.{0,80}(?:취하|철회|포기)/u.test(scope);
+  const issuerWithdrawal = /(?:당사|우리회사)(?:가|는|명의(?:로|의)?).{0,100}(?:품목허가|의약품허가|신약허가).{0,50}신청.{0,80}(?:취하|철회|포기)/u.test(scope)
+    || /(?:^|\|)회사(?:가|는).{0,100}(?:품목허가|의약품허가|신약허가).{0,50}신청.{0,80}(?:취하|철회|포기)/u.test(scope);
+  if (thirdPartyWithdrawal && !issuerWithdrawal) return false;
+
+  const terminalEnd = Math.max(
+    lastMatchEnd(scope, /(?:취하|철회|포기)(?:신고|처리|절차)?(?:가|이|를|을)?(?:하였|하여|해|했|함|완료|확정|되어|되었|됐)/gu),
+    lastMatchEnd(scope, /(?:취하|철회|포기)확정일/gu),
+    lastMatchEnd(scope, /(?:취하|철회|포기)(?:서|공문|신고|신청서)?.{0,100}(?:식품의약품안전처|식약처|규제기관|관계기관|담당기관|기관).{0,60}(?:(?<!불)수리|접수|처리).{0,40}(?:완료|끝|통보|종결|되었|됐)?/gu),
+    lastMatchEnd(scope, /(?:식품의약품안전처|식약처|규제기관|관계기관|담당기관|기관).{0,100}(?:취하|철회|포기)(?:서|공문|신고|신청서)?.{0,40}(?:(?<!불)수리|접수|처리)/gu),
+    lastMatchEnd(scope, /(?:취하|철회|포기).{0,60}(?:심사|신청|절차|건).{0,40}(?:종결|종료)/gu),
+    lastMatchEnd(scope, /자진(?:취하|철회|포기)(?:하기로)?(?:결정|확정)/gu),
+  );
+  const negatedEnd = Math.max(
+    lastMatchEnd(scope, /(?:취하|철회|포기)(?:를|을|는|가)?(?:하지(?:는)?않|하지못|아니)/gu),
+    lastMatchEnd(scope, /(?:취하|철회|포기)의사.{0,24}(?:전혀)?없/gu),
+  );
+  const prospectiveEnd = Math.max(
+    lastMatchEnd(scope, /(?:취하|철회|포기).{0,48}(?:검토중|검토예정|예정|계획|방침|협의중|가능성|경우|조건)/gu),
+    lastMatchEnd(scope, /(?:검토중|검토예정|예정|계획|방침|협의중|경우|조건).{0,48}(?:취하|철회|포기)/gu),
+  );
+  const invalidatedEnd = Math.max(
+    lastMatchEnd(scope, /(?:취하|철회|포기).{0,100}(?:요청|신고|제출|결정)?.{0,30}(?:불수리|반려|기각|번복|무효|제출(?:을|를)?취소|서류(?:를|을)?회수)/gu),
+    lastMatchEnd(scope, /(?:불수리|반려|기각|번복|무효|제출(?:을|를)?취소|서류(?:를|을)?회수).{0,100}(?:취하|철회|포기)/gu),
+  );
+  const independentTrialContinuation = /(?:별개(?:의)?|별도(?:의)?)?임상시험.{0,50}(?:유지|계속|진행|수행)/u.test(scope);
+  const continuingEnd = Math.max(
+    lastMatchEnd(scope, /(?:허가|신청|심사)절차.{0,40}(?:유지|계속|진행중|그대로남)/gu),
+    independentTrialContinuation
+      ? -1
+      : lastMatchEnd(scope, /(?:품목허가|의약품허가|신약허가).{0,50}신청.{0,40}(?:유지|계속|진행중|그대로남)/gu),
+    lastMatchEnd(scope, /(?:심사|질의|보완자료).{0,50}(?:계속|진행중|답변중|회신중|검토단계|준비중)/gu),
+  );
+  const partialProductWithdrawal = /(?:일부취하|일부철회|일부포기)|(?:복수(?:제품)?|두개|두제품|둘이상|독립(?:적)?인.{0,20}제품|적응증).{0,140}(?:품목허가|의약품허가|신약허가).{0,100}(?:취하|철회|포기).{0,140}(?:다른|나머지|별도|[A-Z](?:제품|적응증)|진단키트).{0,80}(?:유지|계속|심사중|취하하지않)/u.test(scope);
+  const laterIndependentProduct = terminalEnd >= 0
+    && /(?:별개(?:의)?|별도(?:의)?|다른|나머지|(?:진단키트|제품|의약품|신약)[A-Z0-9-]*|[A-Z](?:제품|적응증)?)(?:의)?(?:품목허가)?신청.{0,100}(?:취하하지않|철회하지않|포기하지않|유지|계속|심사중)/u.test(scope.slice(terminalEnd));
+  const independentPartialWithdrawal = partialProductWithdrawal || laterIndependentProduct;
+  const blockingEnd = independentPartialWithdrawal
+    ? invalidatedEnd
+    : Math.max(negatedEnd, prospectiveEnd, invalidatedEnd, continuingEnd);
+  return terminalEnd >= 0 && terminalEnd > blockingEnd;
+}
+
+function hasAffirmativeRegulatoryWorkStop(scope) {
+  let effective = false;
+  for (const clause of scope.split(/(?:\||[!?。]+|(?<!\d)\.(?!\d))/u).filter(Boolean)) {
+    const workStop = /(?:작업중지|작업정지)(?:명령|조치)/u.test(clause);
+    const referencedOrder = effective && /(?:그|해당|같은)명령/u.test(clause);
+    if (!workStop && !referencedOrder) continue;
+
+    const thirdPartyTarget = /(?:인접)?(?:협력업체|외주업체|관계회사|계열회사|타사|제3자).{0,80}(?:공장|사업장|공정|라인)?.{0,100}(?:작업중지|작업정지)(?:명령|조치)/u.test(clause);
+    const issuerTargetMention = /(?:당사|우리회사).{0,80}(?:공장|사업장|공정|라인)?.{0,100}(?:작업중지|작업정지)(?:명령|조치)/u.test(clause)
+      || /(?:작업중지|작업정지)(?:명령|조치).{0,100}(?:당사|우리회사)(?:의|가|는|사업장|공정|라인)/u.test(clause);
+    const issuerExclusion = /(?:당사|우리회사)(?:의)?(?:공정|사업장|라인)?.{0,60}(?:명령|조치)?(?:의)?대상(?:이|은|에는|에는)?(?:아니|아님|아닙|제외)|(?:당사|우리회사)(?:의)?(?:공정|사업장|라인)?.{0,60}(?:명령|조치).{0,30}적용되지않/u.test(clause);
+    const issuerTarget = issuerTargetMention && !issuerExclusion;
+    const issuerDenial = issuerExclusion
+      || /(?:당사|우리회사)(?:공정|사업장|라인)?.{0,80}(?:어떠한)?명령(?:도|은|는|이|가)?(?:없|받지않)/u.test(clause);
+    if (thirdPartyTarget && !issuerTarget && !issuerDenial) continue;
+
+    const positiveEnd = thirdPartyTarget && !issuerTarget ? -1 : Math.max(
+      lastMatchEnd(clause, /(?:관계기관|관계당국|행정기관|감독기관|관할청|관할고용노동청|고용노동청|관할노동관서|노동관서|고용당국|고용노동부).{0,100}(?:작업중지|작업정지)(?:명령|조치)/gu),
+      lastMatchEnd(clause, /(?:작업중지|작업정지)(?:명령|조치).{0,80}(?:관계기관|관계당국|행정기관|감독기관|관할청|관할고용노동청|고용노동청|관할노동관서|노동관서|고용당국|고용노동부).{0,40}(?:발령|통보|부과|명령)/gu),
+    );
+    const negativeEnd = Math.max(
+      lastMatchEnd(clause, /(?:작업중지|작업정지)(?:명령|조치).{0,120}(?:아직)?(?:없|내려지지않|발령되지않|통보되지않|받지않|검토중|검토하고있)/gu),
+      lastMatchEnd(clause, /(?:발령|통보|부과).{0,40}(?:사실|내역)?.{0,20}(?:없|아니)/gu),
+      lastMatchEnd(clause, /(?:(?:작업중지|작업정지)(?:명령|조치)|(?:그|해당|같은)명령).{0,120}(?:취소|철회|해제|무효|효력.{0,20}없)/gu),
+      issuerDenial ? clause.length : -1,
+    );
+    if (positiveEnd >= 0 || negativeEnd >= 0) effective = positiveEnd > negativeEnd;
+  }
+  return effective;
+}
+
+function explicitSectionFamily(scope) {
+  if (/(?:자기주식(?:취득)?신탁|신탁계약|제\d+호신탁|신탁은|신탁을|신탁의)/u.test(scope)) return 'trust';
+  if (/전환사채|사채권|(?:^|[^A-Z])CB(?:[^A-Z]|$)/u.test(scope)) return 'bond';
+  if (/품목허가|의약품허가|신약허가|허가신청|임상시험|제품.{0,40}(?:허가|취하|심사)/u.test(scope)) return 'product';
+  if (/작업중지|작업정지|행정처분/u.test(scope)) return 'work-stop';
+  if (/유상증자|주식발행|자금조달/u.test(scope)) return 'equity';
+  if (/중대산업재해|중대재해|안전사고|사망사고|금번사고/u.test(scope)) return 'accident';
+  if (/소송|중재(?:사건|절차|판정부|센터)?|본소|반소장?|손해배상|청구(?:소송|사건)?|소장|소취하|취하서|심리|재판|판결|상고|항소|법적분쟁/u.test(scope)) return 'litigation';
+  return null;
+}
+
+function isIndependentNaturalSection(scope) {
+  return /^(?:첫째|둘째|셋째|넷째|다섯째|이와(?:는)?(?:별도로|독립하여|별개(?:인|의|로)?)|별개(?:인|의|로)?|별도(?:로|의)?|한편|또한|제\d+(?:호|회(?:전환사채|사채권)?)|[A-Z]사건)/u.test(scope)
+    || /^당사.{0,50}(?:별개로|별도로)/u.test(scope)
+    || /^다른.{0,50}(?:별개|별도)/u.test(scope);
+}
+
+function appendExplicitSection(sections, section) {
+  const previous = sections.at(-1);
+  if (!previous) {
+    sections.push(section);
+    return;
+  }
+  if (!section.family || (section.family === previous.family && !section.independent)) {
+    previous.text = `${previous.text}|${section.label}|${section.text}`;
+    return;
+  }
+  sections.push(section);
+}
+
+function explicitBodySections(bodyText) {
+  const body = compactText(bodyText);
+  const headings = [...body.matchAll(/\[([^\]]{1,50})\]/gu)];
+  const sections = [];
+
+  if (headings.length > 0) {
+    let previousFamily = null;
+    for (let index = 0; index < headings.length; index += 1) {
+      const heading = headings[index];
+      const label = heading[1];
+      const text = body.slice(heading.index + heading[0].length, headings[index + 1]?.index ?? body.length);
+      if (/^(?:과거|종전|이전|지난|참고)/u.test(label)) continue;
+      const inferredFamily = explicitSectionFamily(`${label}|${text}`);
+      const continuation = /(?:후속|최종|확인)/u.test(label);
+      const family = inferredFamily ?? (continuation ? previousFamily : null);
+      if (family) previousFamily = family;
+      appendExplicitSection(sections, {
+        label,
+        text,
+        family,
+        independent: !continuation,
+      });
+    }
+    return sections;
+  }
+
+  const currentBody = body.includes('|') ? currentDisclosureScope({ fullText: body }, body) : body;
+  const naturalSections = currentBody
+    .split(/(?:[!?。]+|(?:(?<!\d)\.|\.(?!\d))|(?=(?:둘째|셋째|넷째|다섯째|이와(?:는)?(?:별도로|독립하여|별개(?:인|의|로)?)|한편|또한|제\d+회(?:전환사채|사채권)),?))/u)
+    .filter(Boolean);
+  let previousNaturalFamily = null;
+  for (const text of naturalSections) {
+    const historicalLead = /^(?:과거|종전|이전|지난해|참고로)/u.test(text);
+    const currentLifecycle = /(?:공시일)?현재|금번|이번|계속|진행(?:중|되고|되며)|유지/u.test(text);
+    const historicalSummary = /(?:단순연혁|단순참고|참고사항(?:입니다)?|과거이력(?:입니다)?)/u.test(text);
+    if ((historicalLead || historicalSummary) && !currentLifecycle) continue;
+    const inferredFamily = explicitSectionFamily(text);
+    const productContinuation = previousNaturalFamily === 'product'
+      && /(?:허가)?신청|심사|규제기관|식약처|취하서|취하의사/u.test(text)
+      && !/(?:소송|법원|원고|피고|청구|소장|중재|재판)/u.test(text);
+    const numberedFamily = (previousNaturalFamily === 'bond' && /^제\d+회/u.test(text))
+      || (previousNaturalFamily === 'trust' && /^제\d+호/u.test(text))
+      ? previousNaturalFamily
+      : null;
+    const family = productContinuation ? 'product' : inferredFamily ?? numberedFamily;
+    if (family) previousNaturalFamily = family;
+    appendExplicitSection(sections, {
+      label: '',
+      text,
+      family,
+      independent: isIndependentNaturalSection(text),
+    });
+  }
+  return sections;
+}
+
+function joinExplicitSections(sections, family) {
+  return sections
+    .filter((section) => section.family === family)
+    .map((section) => `${section.label}|${section.text}`)
+    .join('|');
+}
+
+function hasExplicitEquityScheduleDelta(scope) {
+  if (!/(?:유상증자|주식발행|자금조달)/u.test(scope)
+    || !/(?:주금|자금)?(?:납입(?:일|기일)|납부(?:일|기한))/u.test(scope)) return false;
+  return /(?:주금|자금)?(?:납입(?:일|기일)|납부(?:일|기한)).{0,120}에서.{0,100}(?:변경|정정|조정|수정|개정|바꿨|옮겼|개편)/u.test(scope)
+    || /(?:변경전|정정전|종전|기존|당초|원래).{0,100}(?:변경후|정정후|변경|새|조정|개정|수정)/u.test(scope);
+}
+
+function explicitTrustEvent(scope) {
+  if (!scope) return null;
+  const trustIndex = scope.search(/(?:자기주식(?:취득)?신탁|신탁계약|제\d+호신탁|신탁은|신탁을)/u);
+  const actorScope = trustIndex >= 0 ? scope.slice(0, trustIndex + 20) : scope;
+  const issuerActorEnd = lastMatchEnd(actorScope, /(?:당사|우리회사)(?:가|는|이사회가|이사회는)/gu);
+  const thirdPartyActorEnd = lastMatchEnd(actorScope, /(?:관계회사|계열회사|종속회사|자회사|제3자|타사)(?:가|는|의)?/gu);
+  const issuerDisclaimed = /당사.{0,100}(?:당사자|위탁자|수익자).{0,40}(?:아니|아님|아닙)/u.test(scope);
+  if (issuerDisclaimed || thirdPartyActorEnd > issuerActorEnd) return null;
+
+  const cancelled = /(?:신탁)?계약(?:체결)?(?:결의|결정).{0,80}(?:철회|취소|번복)|(?:철회|취소|번복).{0,80}(?:자기주식(?:취득)?신탁|신탁계약)/u.test(scope);
+  const falseReport = /(?:보도|소문|풍문).{0,80}(?:사실과다르|사실이아니)|(?:신탁계약|계약체결).{0,80}(?:사실과다르|사실이아니)/u.test(scope);
+  if (cancelled || falseReport) return null;
+
+  const completionEnd = Math.max(
+    lastMatchEnd(scope, /(?:자기주식(?:취득)?신탁|신탁계약|제\d+호신탁).{0,180}(?:체결(?:하였|했|함|하여|해|완료)|서명(?:하였|했|함|하고|하여|해|완료|마쳐|마쳤)|날인(?:하였|했|함|하고|하여|해|완료|마쳐|마쳤)).{0,100}(?:효력(?:이|가|을|를)?(?:발생|개시)|유효|발효|완료|마쳤|끝냈)?/gu),
+    lastMatchEnd(scope, /(?:자기주식(?:취득)?신탁|신탁계약).{0,140}(?:즉시)?(?:효력(?:이|가|을|를)?(?:발생|개시)|유효|발효)/gu),
+  );
+  const incompleteEnd = Math.max(
+    lastMatchEnd(scope, /(?:계약|체결|서명|날인).{0,60}(?:예정|서명전|미서명|미날인|미체결|아직.{0,30}(?:되지않|하지않)|이루어진바없|전혀없)/gu),
+    lastMatchEnd(scope, /효력.{0,40}(?:발생하지않|없)/gu),
+  );
+  const completed = hasCompletedTrustContract(scope) || completionEnd > incompleteEnd;
+  if (completed) {
+    return semanticEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
+  }
+
+  const decided = /(?:이사회|당사).{0,120}(?:자기주식(?:취득)?신탁|신탁계약|계약).{0,100}(?:체결하기로)?(?:결정|의결|결의|승인)/u.test(scope)
+    || /(?:이사회|당사).{0,80}(?:결정|의결|결의|승인).{0,100}(?:자기주식(?:취득)?신탁|신탁계약)/u.test(scope)
+    || /(?:자기주식(?:취득)?신탁|신탁계약|제\d+호신탁).{0,140}(?:체결하기로)?(?:결정|의결|결의|승인)/u.test(scope);
+  const decisionNegated = /(?:이사회)?(?:결정|의결|결의|승인).{0,50}(?:없|하지않|되지않|이루어진바없)|(?:검토자료|초안)만.{0,60}(?:작성|준비)/u.test(scope);
+  const executionPending = /(?:신탁계약|계약|계약서|서명|체결).{0,80}(?:예정|다음|향후|추후|서명전|미서명|미체결|아직.{0,30}(?:되지않|하지않))/u.test(scope);
+  if ((decided && !decisionNegated)
+    || (executionPending && !decisionNegated && /(?:자기주식(?:취득)?신탁|신탁계약|제\d+호신탁)/u.test(scope))) {
+    return semanticEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities');
+  }
+  return null;
+}
+
+function explicitConvertibleBondEvent(scope) {
+  if (!scope) return null;
+  const bondIndex = scope.search(/(?:전환사채|사채권)/u);
+  const actorScope = bondIndex >= 0 ? scope.slice(0, bondIndex + 20) : scope;
+  const issuerActorEnd = lastMatchEnd(actorScope, /(?:당사|우리회사)(?:가|는|발행)/gu);
+  const thirdPartyActorEnd = lastMatchEnd(actorScope, /(?:관계회사|계열회사|종속회사|자회사|제3자|타사)(?:가|는|의)?/gu);
+  const thirdPartyAcquisition = /(?:관계회사|계열회사|종속회사|자회사|제3자|타사).{0,120}(?:전환사채|사채권).{0,100}(?:취득|인수|수령|매수|매입|권리이전)/u.test(scope);
+  const issuerDenial = /당사.{0,100}(?:전환사채|사채권).{0,60}(?:취득|인수|수령|매수|매입).{0,30}(?:하지않|하지못|없)/u.test(scope)
+    || /당사.{0,50}(?:취득|인수|수령|매수|매입)(?:하지않|하지못|없)/u.test(scope)
+    || /(?:매수인|취득자|양수인).{0,50}(?:당사|발행회사).{0,30}(?:아니|아님|아닙)/u.test(scope)
+    || /(?:새로|이번공시에서).{0,70}(?:취득|인수|매수|매입).{0,50}(?:사실(?:이|은|도)?없|하지않)/u.test(scope);
+  if (issuerDenial || (thirdPartyAcquisition && thirdPartyActorEnd > issuerActorEnd)) return null;
+
+  const cancelled = /(?:전환사채|사채권).{0,100}(?:취득|인수|매수|매입)(?:결의|결정)?.{0,60}(?:취소|철회|번복)|(?:취소|철회|번복).{0,80}(?:전환사채|사채권).{0,60}(?:취득|인수|매수|매입)/u.test(scope);
+  if (cancelled) return null;
+
+  const outstanding = /(?:나머지|잔여분?|잔금|대금잔액|외부잔액|잔액).{0,100}(?:지급|결제|정산|취득|인수|매수|매입|이전|인도|수령).{0,40}(?:예정|추후|향후|다음)/u.test(scope)
+    || /(?:일부|부분|1차|절반|반만|\d+%|\d+분의\d+).{0,50}(?:취득|인수|매수|매입|대금|사채|채권).{0,100}(?:나머지|잔여).{0,60}(?:예정|추후|향후|다음)/u.test(scope)
+    || /(?:\d+%|일부|부분|잔여분?).{0,100}(?:외부|사채권자).{0,50}(?:잔존|남아|보유중)|(?:외부|사채권자).{0,80}(?:잔액|잔여|\d+%).{0,40}(?:잔존|남아|보유중)/u.test(scope);
+  const executionIncomplete = /(?:대금|잔금).{0,30}(?:지급|결제|정산).{0,60}(?:아직|미지급|미결제|미정산|되지않|하지않|완료되지않)/u.test(scope)
+    || /(?:권리(?:의)?이전|사채권인도).{0,40}(?:아직|미완료|되지않|하지않|완료되지않)/u.test(scope)
+    || /(?:대금지급|결제|정산|권리(?:의)?이전|사채권인도)(?:전|이전)(?:이므로|입니다|임)?/u.test(scope)
+    || /(?:아직|미지급|미결제|미정산).{0,60}(?:대금|잔금|결제|정산|권리(?:의)?이전|사채권인도|취득)/u.test(scope)
+    || /(?:조건|동의).{0,80}(?:성취|확정|완료).{0,40}(?:전|되지않)/u.test(scope);
+  const scopedCompletion = /(?:대금|잔금).{0,80}(?:지급|완납|결제|정산).{0,120}(?:사채권|권리|명의|소유권).{0,60}(?:인도|이전|귀속|대체).{0,60}(?:완료|마쳐|마쳤|끝냈|효력(?:이|가)?발생)/u.test(scope)
+    || /(?:전환사채|사채권).{0,140}(?:취득|인수|매입).{0,80}(?:완료|마쳐|마쳤|끝냈|종결|효력(?:이|가)?발생)/u.test(scope)
+    || /(?:전환사채|사채권).{0,120}(?:전액)?(?:결제|대금.{0,20}지급).{0,100}(?:사채권|채권|권리).{0,50}(?:인도|이전).{0,40}(?:완료|마쳐|마쳤|끝냈)/u.test(scope)
+    || /(?:자기|당사발행)?전환사채.{0,80}(?:전액)?.{0,80}(?:대금.{0,20}지급|결제|정산).{0,80}(?:권리)?이전(?:을|를)?(?:마쳐|마쳤|완료|끝내|끝냈).{0,60}(?:당사|회사)(?:가|는)?(?:취득|인수)/u.test(scope);
+  const completionNegated = /(?:전체|전액)?취득(?:이|은|는)?완료(?:가|이)?(?:아니|되지않)|취득완료가아니/u.test(scope);
+  if ((hasCompletedConvertibleBondAcquisition(scope) || scopedCompletion)
+    && !outstanding
+    && !executionIncomplete
+    && !completionNegated) {
+    return semanticEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
+  }
+  const decided = /(?:이사회|대표이사|당사).{0,120}(?:자기|당사발행|제\d+회)?전환사채.{0,100}(?:만기전)?(?:취득|인수|매수|매입).{0,60}(?:결정|결의|의결|승인)/u.test(scope)
+    || /(?:전환사채|사채권).{0,100}(?:만기전)?(?:취득|인수|매수|매입).{0,60}(?:결정|결의|의결|승인)/u.test(scope);
+  const decisionNegated = /(?:결정|결의|의결|승인)(?:한바|된바|한사실|된사실|사항)?(?:이|가|을|를|은|는)?(?:없|하지않|되지않)|(?:협의|검토|가능성).{0,80}(?:확정되지않|결정되지않)/u.test(scope);
+  const partialExecution = outstanding && (/(?:일부|부분|1차|절반|반만|\d+%|\d+분의\d+).{0,100}(?:대금)?(?:지급|결제|정산|취득|인수|매수|매입)|(?:대금|잔금).{0,80}(?:일부|부분|1차|절반|반만).{0,40}(?:지급|결제|정산)/u.test(scope)
+    || /(?:부분취득|전체취득완료가아니|잔여분취득결정)/u.test(scope));
+  if (partialExecution || (decided && !decisionNegated)) {
+    return semanticEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities');
+  }
+  return null;
+}
+
+function explicitFiledLitigationEvent(clause) {
+  const negated = /(?:소장|반소장|청구서|중재신청서).{0,50}(?:제출|접수|신청).{0,30}(?:하지않|하지못|없)|(?:제기|제출|신청).{0,30}(?:사실이없|사실이아니)/u.test(clause);
+  if (negated) return null;
+  const filed = /(?:소장|반소장|청구소장|청구서|중재신청서).{0,60}(?:제출|송달받).{0,100}(?:접수|접수번호|사건번호|부여받|접수확인|접수를마쳤|접수됐|접수되었)/u.test(clause)
+    || /(?:소장|반소장|청구소장|청구서|중재신청서).{0,60}(?:접수|사건번호|접수번호).{0,60}(?:부여받|확인|마쳤|됐|되었)/u.test(clause)
+    || /(?:소장|반소장|청구소장|청구서|중재신청서).{0,100}(?:법원|중재기관|중재센터).{0,40}접수(?:됐|되었|완료|되었습니다)/u.test(clause)
+    || /당사.{0,120}(?:소장|반소장|청구소장|청구서|중재신청서).{0,50}(?:제출하였|제출했|제출했습니다|접수하였|접수했)/u.test(clause);
+  return filed ? semanticEvent('legal-regulatory', 'filed', null, 'litigation', 'issuer') : null;
+}
+
+function isThirdPartyOnlyLitigation(scope) {
+  const thirdPartyActor = /(?:관계회사|계열회사|종속회사|자회사|제3자|타사).{0,140}(?:소송|중재|소장|청구).{0,80}(?:제기|제출|신청|진행)/u.test(scope);
+  const issuerDisclaimed = /당사.{0,100}(?:원고|피고|당사자|참가인|신청인).{0,50}(?:아니|아님|아닙)/u.test(scope);
+  return thirdPartyActor && issuerDisclaimed;
+}
+
+function isFalseLitigationReport(scope) {
+  return /(?:풍문|소문|보도).{0,100}(?:사실이아니|사실과다르)/u.test(scope)
+    || /(?:소장|반소장|청구서|중재신청서).{0,60}(?:제출|접수|신청).{0,30}(?:되지않|하지않|사실이없)/u.test(scope);
+}
+
+function isConcludedLitigationWithoutWithdrawal(scope) {
+  if (/(?:취하|철회|거두어들)/u.test(scope)) return false;
+  const concluded = /(?:상고|항소)?(?:기각)?판결.{0,80}(?:확정|송달)|(?:소송|사건).{0,100}(?:종결|종료)|(?:종결|종료).{0,100}(?:소송|사건)/u.test(scope);
+  const noContinuation = /(?:추가)?(?:심리|절차|소송|사건).{0,80}(?:계속중인)?(?:사항|절차)?(?:이|가|은|는)?(?:없|아니|종결|종료)|계속중인(?:심리|절차|소송|사건).{0,30}(?:이|가|은|는)?(?:없|아니)/u.test(scope);
+  return concluded && noContinuation;
+}
+
+function applyExplicitBodyIntentRule(input, events) {
+  const title = compactText(input.reportName);
+  const sections = explicitBodySections(input.bodyText);
+  const fullCurrentScope = sections.map((section) => `${section.label}|${section.text}`).join('|');
+  const bodyFamilies = new Set(sections.map((section) => section.family).filter(Boolean));
+  const genericTitle = /^(?:기타주요경영사항(?:\(자율공시\))?|주요경영사항공시(?:\(정정\))?|주요사항보고서\(정정\))$/u.test(title);
+  const titleFamilyCount = [
+    /(?:소송|항소|중재)/u,
+    /자기주식(?:취득)?신탁/u,
+    /(?:전환사채|사채권)/u,
+    /(?:품목허가|의약품허가|신약허가)/u,
+  ].filter((pattern) => pattern.test(title)).length;
+  const bodyDrivenMulti = bodyFamilies.size >= 2
+    && (titleFamilyCount >= 2 || /(?:주요|복수|종합|현안|사건|진행|현황|안내|공시|거래|계약)/u.test(title));
+  const explanatoryTitle = bodyFamilies.size >= 1 && /^(?:해명공시|조회공시(?:요구)?(?:에대한)?답변?)$/u.test(title);
+  const accumulateBodyIntents = genericTitle || bodyDrivenMulti || explanatoryTitle;
+  const litigationCorrection = input.wrapperKind === 'correction' && /소송등의제기/u.test(title);
+  const litigationWithdrawalTitle = /소송등의제기.{0,60}(?:취하|철회)/u.test(title);
+  const litigationTitle = /(?:소송|항소|중재)/u.test(title);
+  const trustTitle = /자기주식(?:취득)?신탁(?:계약)?/u.test(title) && !/(?:철회|해지)/u.test(title);
+  const bondTitle = /(?:전환사채|사채권)/u.test(title);
+  const productTitle = /(?:품목허가|의약품허가|신약허가)/u.test(title);
+  if (!accumulateBodyIntents
+    && !litigationCorrection
+    && !litigationWithdrawalTitle
+    && !litigationTitle
+    && !trustTitle
+    && !bondTitle
+    && !productTitle) return null;
+
+  const familyScopes = (family) => sections
+    .filter((section) => section.family === family)
+    .map((section) => `${section.label}|${section.text}`);
+  let resolved = accumulateBodyIntents ? [] : events.filter((event) => event.type !== 'other');
+  let matchedSemanticEvidence = accumulateBodyIntents;
+  let suppressedBaseIntent = false;
+
+  if (accumulateBodyIntents || litigationCorrection || litigationWithdrawalTitle || litigationTitle) {
+    const litigationSections = sections.filter((section) => section.family === 'litigation');
+    const litigationEvents = [];
+    let concludedLitigation = false;
+    for (const section of litigationSections) {
+      const sectionScope = `${section.label}|${section.text}`;
+      if (isThirdPartyOnlyLitigation(sectionScope) || isFalseLitigationReport(sectionScope)) continue;
+      if (isConcludedLitigationWithoutWithdrawal(sectionScope)) {
+        concludedLitigation = true;
+        continue;
+      }
+      const sectionEvents = [];
+      const sectionFiledEvent = explicitFiledLitigationEvent(sectionScope);
+      if (sectionFiledEvent) addEvent(sectionEvents, sectionFiledEvent);
+      for (const clause of issuerLitigationClauses(sectionScope)) {
+        const lifecycleEvent = classifyLitigationClause(clause);
+        const event = lifecycleEvent?.action === 'withdrawn'
+          ? lifecycleEvent
+          : explicitFiledLitigationEvent(clause) ?? lifecycleEvent;
+        if (event) addEvent(sectionEvents, event);
+      }
+      if (/반소/u.test(section.label)
+        && /당사.{0,80}(?:상대로|피고|계속|심리)/u.test(section.text)
+        && /(?:계속|심리중|진행중)/u.test(section.text)) {
+        addEvent(sectionEvents, semanticEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer'));
+      }
+      const dominantAction = sectionEvents.some((event) => event.action === 'withdrawn')
+        ? 'withdrawn'
+        : sectionEvents.some((event) => event.action === 'filed') ? 'filed' : null;
+      for (const event of sectionEvents) {
+        if (!dominantAction || event.action === dominantAction) addEvent(litigationEvents, event);
+      }
+    }
+    if (litigationEvents.length > 0) {
+      resolved = resolved.filter((event) => !(event.type === 'legal-regulatory' && event.cause === 'litigation'));
+      for (const event of litigationEvents) addEvent(resolved, event);
+      matchedSemanticEvidence = true;
+    } else if (concludedLitigation) {
+      resolved = resolved.filter((event) => !(event.type === 'legal-regulatory' && event.cause === 'litigation'));
+      suppressedBaseIntent = true;
+      matchedSemanticEvidence = true;
+    }
+  }
+
+  if (accumulateBodyIntents || trustTitle) {
+    const scopedTrustSections = familyScopes('trust');
+    const trustScopes = trustTitle && scopedTrustSections.length === 1
+      ? [fullCurrentScope]
+      : scopedTrustSections.length > 0 ? scopedTrustSections : [fullCurrentScope];
+    const trustEvents = trustScopes.map(explicitTrustEvent).filter(Boolean);
+    if (trustEvents.length > 0) {
+      resolved = resolved.filter((event) => event.cause !== 'treasury-share-trust');
+      for (const event of trustEvents) addEvent(resolved, event);
+      matchedSemanticEvidence = true;
+    } else if (trustTitle && trustScopes.some((scope) => /(?:철회|취소|번복).{0,100}(?:신탁|계약)|(?:신탁|계약).{0,100}(?:사실이아니|사실무근)|(?:결정|의결|결의).{0,50}(?:없|하지않)|당사.{0,100}(?:당사자|위탁자|수익자).{0,40}(?:아니|아님|아닙)/u.test(scope))) {
+      const previousLength = resolved.length;
+      resolved = resolved.filter((event) => event.cause !== 'treasury-share-trust');
+      suppressedBaseIntent ||= previousLength !== resolved.length;
+      matchedSemanticEvidence = true;
+    }
+  }
+
+  if (accumulateBodyIntents || bondTitle) {
+    const scopedBondSections = familyScopes('bond').map((scope) => (
+      /(?:전환사채|사채권)/u.test(scope) ? scope : `전환사채|${scope}`
+    ));
+    const bondScopes = scopedBondSections.length > 0 ? scopedBondSections : [fullCurrentScope];
+    const bondEvents = bondScopes.map(explicitConvertibleBondEvent).filter(Boolean);
+    if (bondEvents.length > 0) {
+      resolved = resolved.filter((event) => !(event.type === 'capital-change' && event.cause === 'convertible-bond'));
+      for (const event of bondEvents) addEvent(resolved, event);
+      matchedSemanticEvidence = true;
+    } else if (bondTitle && bondScopes.some((scope) => /(?:관계회사|계열회사|종속회사|자회사|제3자|타사).{0,140}(?:전환사채|사채권).{0,100}(?:취득|인수|매수|매입)|(?:매수인|취득자|양수인).{0,50}(?:당사|발행회사).{0,30}(?:아니|아님|아닙)|(?:취득|인수|매수|매입)(?:결의|결정)?.{0,80}(?:취소|철회|번복)|(?:재매각|재처분|매도).{0,140}(?:새로|이번공시).{0,80}(?:취득|인수|매수|매입).{0,50}(?:사실(?:이|은|도)?없|하지않)|(?:새로|이번공시에서).{0,70}(?:취득|인수|매수|매입).{0,50}(?:사실(?:이|은|도)?없|하지않)/u.test(scope))) {
+      const previousLength = resolved.length;
+      resolved = resolved.filter((event) => !(event.type === 'capital-change' && event.cause === 'convertible-bond'));
+      suppressedBaseIntent ||= previousLength !== resolved.length;
+      matchedSemanticEvidence = true;
+    }
+  }
+
+  if (accumulateBodyIntents || productTitle) {
+    const scopedProductSections = familyScopes('product');
+    const productScopes = scopedProductSections.length > 0 ? scopedProductSections : [fullCurrentScope];
+    if (productScopes.some(hasTerminalProductWithdrawal)) {
+      resolved = resolved.filter((event) => event.type !== 'regulatory-product');
+      addEvent(resolved, semanticEvent('regulatory-product', 'withdrawn', 'cancelled', 'product-approval', 'product'));
+      matchedSemanticEvidence = true;
+    } else if (productTitle && productScopes.some((scope) => /(?:품목허가|의약품허가|신약허가).{0,80}(?:승인|획득|허가완료)|(?:승인|획득).{0,80}(?:품목허가|의약품허가|신약허가)/u.test(scope))) {
+      resolved = resolved.filter((event) => event.type !== 'regulatory-product');
+      addEvent(resolved, semanticEvent('regulatory-product', 'approved', 'effective', 'product-approval', 'product'));
+      matchedSemanticEvidence = true;
+    } else if (productTitle && !/(?:FDA|CRL|보완요구서한)/u.test(title + fullCurrentScope)) {
+      const previousLength = resolved.length;
+      resolved = resolved.filter((event) => !(event.type === 'regulatory-product' && event.cause === 'fda-crl'));
+      suppressedBaseIntent ||= previousLength !== resolved.length;
+      matchedSemanticEvidence = true;
+    }
+  }
+
+  if (accumulateBodyIntents) {
+    const accidentScope = joinExplicitSections(sections, 'accident');
+    if (/(?:중대산업재해|중대재해|사망(?:자\d+명)?(?:이)?발생|사망사고).{0,80}(?:발생|조사중)|(?:발생|조사중).{0,80}(?:중대산업재해|중대재해|사망사고)/u.test(accidentScope)) {
+      addEvent(resolved, semanticEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer'));
+    }
+    const workStopScope = joinExplicitSections(sections, 'work-stop');
+    if (hasAffirmativeRegulatoryWorkStop(workStopScope)) {
+      addEvent(resolved, semanticEvent('operating-status', 'halted', 'effective', 'regulatory-work-stop', 'business'));
+    }
+    const equityScope = joinExplicitSections(sections, 'equity');
+    if (hasExplicitEquityScheduleDelta(equityScope)) {
+      addEvent(resolved, semanticEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities'));
+    }
+  }
+
+  if ((accumulateBodyIntents || suppressedBaseIntent) && resolved.length === 0) {
+    addEvent(resolved, semanticEvent('other', null, null, null, null));
+  }
+  return matchedSemanticEvidence ? sortEvents(resolved) : null;
 }
 
 function hasAffirmativeRelatedPartyEvidence(input, bodyFacts) {
@@ -858,13 +1441,15 @@ function applyTerminalPolarityRule(input, events, bodyFacts) {
   const currentScope = input.wrapperKind === 'correction' ? correctionScope : body;
   const currentSubjectScope = input.wrapperKind === 'correction' ? correctionScope : currentDisclosureScope(bodyFacts);
 
-  if (input.wrapperKind === 'correction'
-    && /소송등의제기/u.test(title)
-    && /(?:취하|철회)/u.test(currentScope)) {
+  const litigationLifecycle = input.wrapperKind === 'correction' && /소송등의제기/u.test(title)
+    ? litigationLifecycleEvent(currentScope)
+    : null;
+  const existingLitigationLifecycles = events.filter((event) => event.type === 'legal-regulatory' && event.cause === 'litigation');
+  if (litigationLifecycle && existingLitigationLifecycles.length <= 1) {
     return replaceMatchedIntents(
       events,
       (event) => event.type === 'legal-regulatory' && event.cause === 'litigation',
-      [semanticEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer')],
+      [litigationLifecycle],
     );
   }
 
@@ -910,10 +1495,9 @@ function applyTerminalPolarityRule(input, events, bodyFacts) {
     );
   }
 
-  if (/투자판단관련주요경영사항/u.test(title)
-    && /품목허가.{0,40}신청/u.test(currentSubjectScope)
-    && /(?:자진)?취하/u.test(currentSubjectScope)
-    && /(?:제목.{0,160}품목허가신청.{0,30}자진취하|자진취하일|취하공문발송일|자진철회하기로결정|취하.{0,30}(?:접수|완료))/u.test(currentSubjectScope)) {
+  if ((/투자판단관련주요경영사항/u.test(title)
+      || /(?:품목허가|의약품허가|신약허가).{0,40}(?:신청)?.{0,20}(?:취하|철회|포기)/u.test(title))
+    && hasTerminalProductWithdrawal(currentSubjectScope)) {
     return replaceMatchedIntents(
       events,
       (event) => ['other', 'regulatory-product'].includes(event.type),
@@ -1023,8 +1607,13 @@ function applyActualityRule(input, events, bodyFacts) {
   }
 
   if (!corrected && /자기주식취득신탁계약체결결정/u.test(title)) {
-    const currentBody = currentDisclosureScope(bodyFacts);
-    const operativeDate = relationAfterLabel('계약기간.{0,30}시작일|계약체결일', false);
+    const currentBody = currentDisclosureScope(bodyFacts, compactText(input.bodyText));
+    const operativeDate = relationToFilingWithinScope(
+      currentBody,
+      filed,
+      '계약기간.{0,30}시작일|계약체결일|계약일',
+      true,
+    );
     const affirmativeContract = hasCompletedTrustContract(currentBody);
     const effective = ['past', 'same-day'].includes(operativeDate) && affirmativeContract;
     return replaceMatchedIntents(events, (event) => event.cause === 'treasury-share-trust', [
@@ -1039,16 +1628,66 @@ function applyActualityRule(input, events, bodyFacts) {
   }
 
   if (!corrected && /자기전환사채만기전취득결정/u.test(title)) {
-    const currentBody = currentDisclosureScope(bodyFacts);
-    const paymentRelation = relationAfterLabel('지급(?:\\(예정\\))?일|지급예정일', false);
-    const acquisitionRelation = relationAfterLabel('(?:실제)?사채취득일|취득예정일', false);
+    const currentBody = currentDisclosureScope(bodyFacts, compactText(input.bodyText));
+    const paymentRelation = relationToFilingWithinScope(
+      currentBody,
+      filed,
+      '(?:대금)?지급(?:\\(예정\\))?일|지급예정일|결제일|정산일',
+    );
+    const acquisitionRelation = relationToFilingWithinScope(
+      currentBody,
+      filed,
+      '(?:실제)?(?:사채|채권)?취득일|취득예정일',
+    );
+    const operativeRelation = paymentRelation || acquisitionRelation
+      ? null
+      : relationToFilingWithinScope(currentBody, filed, null, true);
     const affirmativeAcquisition = hasCompletedConvertibleBondAcquisition(currentBody);
-    const residualObligation = /잔금.{0,80}(?:지급)?예정|전액지급완료즉시.{0,60}(?:사채|증권).{0,30}(?:수령|이전)예정/u.test(currentBody);
-    if (paymentRelation || acquisitionRelation || residualObligation || affirmativeAcquisition) {
+    const acquisitionClauses = currentBody
+      .split(/(?:\||[!?。]+|(?<!\d)\.(?!\d))/u)
+      .filter(Boolean);
+    const balanceOutstanding = acquisitionClauses.some((clause) => (
+      /(?:잔금|대금잔액|매매대금잔액|잔여(?:사채|채권)).{0,100}(?:지급|결제|정산|취득|인수|이전|인도|수령).{0,30}(?:예정|추후|향후|하기로)/u.test(clause)
+      || /(?:잔금|대금잔액|매매대금잔액|잔여(?:사채|채권)).{0,80}(?:다음주|익일|후일|추후|향후).{0,40}(?:지급|결제|정산|취득|인수|이전|인도|수령)/u.test(clause)
+    ));
+    const securityTransferPending = acquisitionClauses.some((clause) => (
+      /(?:사채|채권|증권).{0,30}(?:취득|인수|권리이전|명의이전|계좌대체|인도|수령).{0,50}(?:예정|추후|향후|아직.{0,20}(?:이뤄지지않|완료되지않))/u.test(clause)
+      && !/(?:취득|인수|수령|인도).{0,30}(?:후|뒤|완료).{0,60}(?:재매각|재처분|매도|소각)/u.test(clause)
+    ));
+    const deferredPayment = acquisitionClauses.some((clause) => /대금.{0,40}(?:추후|향후).{0,20}(?:지급|납부)/u.test(clause));
+    const completionConditional = acquisitionClauses.some((clause) => /전액지급완료즉시.{0,60}(?:사채|증권).{0,30}(?:수령|이전)예정/u.test(clause));
+    const residualObligation = balanceOutstanding || securityTransferPending || deferredPayment || completionConditional;
+    const prospectiveExecution = /(?:지급|결제|정산|취득|인수|이전|인도|수령|실행)(?:을|를)?(?:완료|완료할|마칠|진행할)?(?:예정|계획|방침)/u.test(currentBody)
+      || /(?:지급|결제|정산|취득|인수|이전|인도|수령|실행)하기로(?:하였|했|함|했습니다)/u.test(currentBody);
+    const partialExecution = acquisitionClauses.some((clause) => {
+        const followUpDisposition = /(?:취득|인수|수령|인도).{0,30}(?:완료)?(?:후|뒤).{0,50}(?:일부|부분|절반|\d+분의\d+).{0,50}(?:재매각|재처분|매도|소각)/u.test(clause);
+        const executionRole = /(?:대금|잔금|사채|채권|증권).{0,40}(?:지급|결제|정산|취득|인수|수령|인도)|(?:지급|결제|정산|취득|인수|수령|인도).{0,40}(?:대금|잔금|사채|채권|증권)/u.test(clause);
+        const partialQuantity = /(?:일부|부분|1차|절반|반만|\d+분의\d+).{0,30}(?:대금|잔금|사채|채권|증권|지급|결제|정산|취득|인수|수령)|(?:대금|잔금|사채|채권|증권|지급|결제|정산|취득|인수|수령).{0,30}(?:일부|부분|1차|절반|반만|\d+분의\d+)/u.test(clause);
+        return executionRole && partialQuantity && !followUpDisposition;
+      });
+    const paymentCompletionEnd = Math.max(
+      lastMatchEnd(currentBody, /(?:대금|잔금).{0,80}(?:지급|결제|정산)(?:이|가|은|는|을|를|도|까지)?(?:완료|하였|했|함|됐|마쳤|끝냈)/gu),
+      lastMatchEnd(currentBody, /(?:대금|잔금).{0,40}완납(?:되었|됐|되었습니다|하였|했|함|했습니다)?/gu),
+    );
+    const paymentIncompleteEnd = Math.max(
+      lastMatchEnd(currentBody, /(?:대금|잔금).{0,50}(?:지급|결제|정산).{0,40}(?:아직)?(?:완료되지않|완료하지못|미완료|미지급|미납)/gu),
+      lastMatchEnd(currentBody, /(?:대금|잔금).{0,30}(?:미지급|미결제|미정산|미납)/gu),
+    );
+    const paymentIncomplete = paymentIncompleteEnd > paymentCompletionEnd;
+    const issuerCompletionEnd = lastMatchEnd(currentBody, /당사.{0,100}(?:사채|채권|증권).{0,80}(?:취득|인수|수령|넘겨받|귀속|명의이전)/gu);
+    const issuerDenialEnd = lastMatchEnd(currentBody, /당사.{0,80}(?:아직)?(?:취득|인수|수령|넘겨받).{0,30}(?:하지않|하지못|못했|전단계)/gu);
+    const thirdPartyAcquisition = /(?:관계회사|계열회사|자회사|제3자|타사)(?:가|는|명의).{0,140}(?:사채|채권|증권).{0,100}(?:취득|인수|수령|넘겨받|귀속|명의이전)/u.test(currentBody);
+    const actorMismatch = issuerDenialEnd > issuerCompletionEnd || (thirdPartyAcquisition && issuerCompletionEnd < 0);
+    if (paymentRelation || acquisitionRelation || operativeRelation || residualObligation || affirmativeAcquisition) {
       const effective = affirmativeAcquisition
         && paymentRelation !== 'future'
         && acquisitionRelation !== 'future'
-        && !residualObligation;
+        && operativeRelation !== 'future'
+        && !residualObligation
+        && !prospectiveExecution
+        && !partialExecution
+        && !paymentIncomplete
+        && !actorMismatch;
       return replaceMatchedIntents(events, (event) => event.type === 'capital-change' && event.cause === 'convertible-bond', [
         semanticEvent(
           'capital-change',
@@ -1696,18 +2335,35 @@ function applyMultiIntentRule(input, events, bodyFacts) {
   const body = bodyFacts.fullText;
   const corrected = input.wrapperKind === 'correction';
   const currentScope = corrected ? currentCorrectionScope(input, bodyFacts) : body;
+  const currentDocument = currentDisclosureScope(bodyFacts, compactText(input.bodyText));
 
+  const legacyEquityScheduleDelta = /(?:주금납입일|신주상장예정일).{0,180}(?:정정전|정정후)|(?:정정전|정정후).{0,180}(?:주금납입일|신주상장예정일)/u.test(currentScope);
+  const scheduleHypothetical = /(?:내부)?(?:시나리오|가정|예시|검토안).{0,120}(?:유상증자|주식발행|자금조달).{0,80}(?:일정|(?:주금|자금)?(?:납입(?:일|기일)|납부(?:일|기한)))/u.test(currentDocument)
+    || /(?:일정|(?:주금|자금)?(?:납입(?:일|기일)|납부(?:일|기한))).{0,100}(?:변경할수(?:도)?있|조정할수(?:도)?있|가능성|검토중|가정|예시)/u.test(currentDocument);
+  const scheduleFamily = /(?:유상증자|주식발행|자금조달).{0,80}(?:일정|(?:주금|자금)?(?:납입(?:일|기일)|납부(?:일|기한)))/u.test(currentDocument);
+  const scheduleAction = /(?:변경|정정|조정|수정|개정|바꾸|바꿨|옮기|옮겼|개편)/u.test(currentDocument);
+  const pairedScheduleLabels = /(?:변경전|정정전|종전|기존|당초|원래).{0,50}(?:주금|자금)?(?:납입(?:일|기일)|납부(?:일|기한))/u.test(currentDocument)
+    && /(?:변경후|정정후|변경|새|조정|개정|수정).{0,50}(?:주금|자금)?(?:납입(?:일|기일)|납부(?:일|기한))/u.test(currentDocument);
+  const inlinePairedScheduleValues = /(?:주금|자금)?(?:납입(?:일|기일)|납부(?:일|기한)).{0,80}(?:변경전|정정전|종전|기존|당초|원래).{0,100}(?:변경후|정정후|변경|새|조정|개정|수정).{0,80}(?:주금|자금)?(?:납입(?:일|기일)|납부(?:일|기한))?/u.test(currentDocument);
+  const fromToScheduleDelta = /(?:주금|자금)?(?:납입(?:일|기일)|납부(?:일|기한)).{0,100}에서.{0,100}(?:으로|로)?(?:변경|조정|바꾸|바꿨|옮기|옮겼|개편)/u.test(currentDocument);
+  const generalizedEquityScheduleDelta = scheduleFamily
+    && scheduleAction
+    && !scheduleHypothetical
+    && semanticDates(currentDocument).length >= 2
+    && (pairedScheduleLabels || inlinePairedScheduleValues || fromToScheduleDelta);
   if (corrected
     && /소송등의제기/u.test(title)
-    && /(?:주금납입일|신주상장예정일).{0,180}(?:정정전|정정후)|(?:정정전|정정후).{0,180}(?:주금납입일|신주상장예정일)/u.test(currentScope)) {
+    && (legacyEquityScheduleDelta || generalizedEquityScheduleDelta)) {
     return replaceMatchedIntents(
       events,
-      () => false,
-      [semanticEvent('capital-change', 'updated', 'pending', 'equity-securities', 'securities')],
+      (event) => event.type === 'capital-change'
+        && ['equity-securities', 'rights-offering'].includes(event.cause)
+        && event.subjectType === 'securities',
+      [semanticEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities')],
     );
   }
 
-  if (/중대재해발생/u.test(`${title}${body}`) && /작업중지(?:명령|조치)|작업정지(?:명령|조치)/u.test(body)) {
+  if (/중대재해발생/u.test(`${title}${body}`) && hasAffirmativeRegulatoryWorkStop(currentDocument)) {
     return replaceMatchedIntents(
       events,
       (event) => ['legal-regulatory', 'operating-status'].includes(event.type),
@@ -1774,8 +2430,10 @@ function applyGeneralizedSemanticGates(input, events) {
   const corrected = input.wrapperKind === 'correction';
   const replace = (...next) => sortEvents(next);
 
-  const multiIntent = applyMultiIntentRule(input, events, facts);
-  const scopedEvents = multiIntent ?? events;
+  const explicitBodyIntents = applyExplicitBodyIntentRule(input, events);
+  const semanticBaseEvents = explicitBodyIntents ?? events;
+  const multiIntent = applyMultiIntentRule(input, semanticBaseEvents, facts);
+  const scopedEvents = multiIntent ?? semanticBaseEvents;
   if (corrected
     && /신주인수권부사채권발행결정/u.test(title)
     && /사채만기일.{0,100}일정변경에따른기재정정/u.test(body)
@@ -1841,7 +2499,7 @@ function applyGeneralizedSemanticGates(input, events) {
     );
   }
 
-  if (JSON.stringify(accumulatedEvents) !== JSON.stringify(events)) return accumulatedEvents;
+  if (explicitBodyIntents || JSON.stringify(accumulatedEvents) !== JSON.stringify(events)) return accumulatedEvents;
 
   // Negative/terminal polarity must win over a generic positive contract noun.
   if (/단일판매[ㆍ·ᆞ]?공급계약해지/u.test(title)) {
@@ -1977,7 +2635,8 @@ function applyGeneralizedSemanticGates(input, events) {
     && /탈퇴일자는?주권인도일/u.test(body)) {
     return replace(semanticEvent('corporate-profile', 'changed', 'effective', 'subsidiary-exit', 'issuer'));
   }
-  if (/중대재해발생/u.test(title) && /작업중지(?:명령|조치)|작업정지(?:명령|조치)/u.test(body)) {
+  if (/중대재해발생/u.test(title)
+    && hasAffirmativeRegulatoryWorkStop(currentDisclosureScope(facts, compactText(input.bodyText)))) {
     return replace(
       semanticEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer'),
       semanticEvent('operating-status', 'halted', 'effective', 'regulatory-work-stop', 'business'),

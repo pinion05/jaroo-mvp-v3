@@ -10,6 +10,7 @@ const OPEN_DART_LIST_URL = 'https://opendart.fss.or.kr/api/list.json';
 const DEFAULT_SAMPLE_COUNT = 5;
 const MAX_SAMPLE_COUNT = 100;
 const DEFAULT_CONCURRENCY = 5;
+const OPEN_DART_CORP_CLASSES = new Set(['Y', 'K', 'N', 'E']);
 
 function parseArgs(argv) {
   return Object.fromEntries(argv.map((argument) => {
@@ -71,7 +72,7 @@ async function mapConcurrent(values, concurrency, mapper) {
   return output;
 }
 
-async function fetchDetailSamples(detail, { apiKey, from, to, sampleCount }) {
+async function fetchDetailSamples(detail, { apiKey, from, to, sampleCount, corpClass }) {
   const url = new URL(OPEN_DART_LIST_URL);
   const params = {
     crtfc_key: apiKey,
@@ -84,6 +85,7 @@ async function fetchDetailSamples(detail, { apiKey, from, to, sampleCount }) {
     page_no: '1',
     page_count: String(sampleCount),
   };
+  if (corpClass) params.corp_cls = corpClass;
   for (const [key, value] of Object.entries(params)) url.searchParams.set(key, value);
 
   const response = await fetch(url, { signal: AbortSignal.timeout(15_000) });
@@ -122,6 +124,7 @@ async function fetchDetailSamples(detail, { apiKey, from, to, sampleCount }) {
       reportName: classified.reportName,
       corpName: classified.corpName,
       stockCode: classified.stockCode,
+      corpClass: baseInput.corpCls ?? null,
       remarks: classified.remarks,
       disclosureType: classified.disclosureType,
       disclosureDetailType: classified.disclosureDetailType,
@@ -180,6 +183,10 @@ if (rangeDays > 92) throw new Error('OpenDART global disclosure search range mus
 
 const sampleCount = positiveInteger(args['per-type'], DEFAULT_SAMPLE_COUNT, MAX_SAMPLE_COUNT);
 const concurrency = positiveInteger(args.concurrency, DEFAULT_CONCURRENCY, 10);
+const corpClass = String(args['corp-class'] ?? '').trim().toUpperCase() || null;
+if (corpClass && !OPEN_DART_CORP_CLASSES.has(corpClass)) {
+  throw new Error('corp-class must be one of Y, K, N, E');
+}
 const generatedAt = new Date().toISOString();
 const defaultOutput = `.omx/context/dart-classification-audit-${generatedAt.replaceAll(/[:.]/g, '-')}.json`;
 const outputPath = resolve(args.out ?? defaultOutput);
@@ -187,7 +194,13 @@ const outputPath = resolve(args.out ?? defaultOutput);
 const results = await mapConcurrent(
   OPEN_DART_DISCLOSURE_DETAIL_TYPES,
   concurrency,
-  (detail) => fetchDetailSamples(detail, { apiKey, from, to, sampleCount }),
+  (detail) => fetchDetailSamples(detail, {
+    apiKey,
+    from,
+    to,
+    sampleCount,
+    corpClass,
+  }),
 );
 const samples = results.flatMap((result) => result.samples);
 const providerLabeledAmbiguous = samples.filter((sample) => sample.needsClassifier);
@@ -230,7 +243,13 @@ const artifact = {
   schemaVersion: 'jaroo.deepscan.kr-disclosure-classification-audit.v1',
   classificationDatasetVersion: KR_DISCLOSURE_CLASSIFICATION_DATASET_VERSION,
   generatedAt,
-  query: { from, to, sampleCountPerDetailType: sampleCount, concurrency },
+  query: {
+    from,
+    to,
+    sampleCountPerDetailType: sampleCount,
+    concurrency,
+    corpClass,
+  },
   summary,
   results,
 };

@@ -1,0 +1,218 @@
+{
+  "schemaVersion": "jaroo.kr-disclosure-event-benchmark.v1",
+  "cases": [
+    {
+      "id": "p0-posco-not-designated-deferred",
+      "tags": ["p0", "contrast", "negation"],
+      "input": { "reportName": "불성실공시법인미지정 (지정유예)", "disclosureType": "I", "disclosureDetailType": "I003" },
+      "expectedEvents": [{ "type": "legal-regulatory", "action": "not-designated", "state": "deferred", "cause": "disclosure-compliance", "subjectType": "issuer" }]
+    },
+    {
+      "id": "p0-alteogen-trading-halt-bonus-issue",
+      "tags": ["p0", "contrast", "multi-event"],
+      "input": { "reportName": "주권매매거래정지 (무상증자)", "disclosureType": "I", "disclosureDetailType": "I003" },
+      "expectedEvents": [
+        { "type": "capital-change", "action": "announced", "cause": "bonus-issue", "subjectType": "securities" },
+        { "type": "trading-status", "action": "halted", "state": "effective", "cause": "bonus-issue", "subjectType": "listed-shares" }
+      ]
+    },
+    {
+      "id": "p0-hlb-english-name-market-notice",
+      "tags": ["p0", "contrast", "wrapper"],
+      "input": { "reportName": "기타시장안내(약명및영문명) (영문상호)", "disclosureType": "I", "disclosureDetailType": "I003" },
+      "expectedEvents": [{ "type": "corporate-profile", "action": "name-changed", "state": "effective", "subjectType": "issuer" }]
+    },
+    {
+      "id": "p0-hlb-fda-crl",
+      "tags": ["p0", "contrast", "regulatory-product"],
+      "input": { "reportName": "기타경영사항(자율공시) (HLB 간암 1차 치료제 FDA로부터 보완요구서한(CRL, Complete Response Letter)수령)", "disclosureType": "I", "disclosureDetailType": "I001" },
+      "expectedEvents": [{ "type": "regulatory-product", "action": "received", "state": "effective", "cause": "fda-crl", "subjectType": "product" }]
+    },
+    {
+      "id": "contrast-trading-halt-delisting",
+      "tags": ["contrast", "trading-status"],
+      "input": { "reportName": "주권매매거래정지 (상장폐지 사유 발생)", "disclosureType": "I", "disclosureDetailType": "I003" },
+      "expectedEvents": [{ "type": "trading-status", "action": "halted", "state": "effective", "cause": "delisting", "subjectType": "listed-shares" }]
+    },
+    {
+      "id": "contrast-trading-halt-lifted",
+      "tags": ["contrast", "trading-status"],
+      "input": { "reportName": "주권매매거래정지해제", "disclosureType": "I", "disclosureDetailType": "I003" },
+      "expectedEvents": [{ "type": "trading-status", "action": "lifted", "state": "lifted", "subjectType": "listed-shares" }]
+    },
+    {
+      "id": "contrast-nxt-market-scope",
+      "tags": ["contrast", "wrapper"],
+      "input": { "reportName": "기타시장안내(금일 NXT 경쟁매매대상종목 지정으로 인한 KRX 시간외단일가매매 제외종목 안내)", "disclosureType": "I", "disclosureDetailType": "I003" },
+      "expectedEvents": [{ "type": "trading-status", "action": "scope-changed", "state": "effective", "cause": "nxt-trading", "subjectType": "listed-shares" }]
+    },
+    {
+      "id": "contrast-disclosure-designated",
+      "tags": ["contrast", "legal-regulatory"],
+      "input": { "reportName": "불성실공시법인지정", "disclosureType": "I", "disclosureDetailType": "I003" },
+      "expectedEvents": [{ "type": "legal-regulatory", "action": "designated", "state": "effective", "cause": "disclosure-compliance", "subjectType": "issuer" }]
+    },
+    {
+      "id": "contrast-disclosure-designation-lifted",
+      "tags": ["contrast", "legal-regulatory"],
+      "input": { "reportName": "불성실공시법인지정해제", "disclosureType": "I", "disclosureDetailType": "I003" },
+      "expectedEvents": [{ "type": "legal-regulatory", "action": "designation-lifted", "state": "lifted", "cause": "disclosure-compliance", "subjectType": "issuer" }]
+    },
+    {
+      "id": "detail-annual-report-generic-title",
+      "tags": ["provider-detail"],
+      "input": { "reportName": "정기공시", "disclosureType": "A", "disclosureDetailType": "A001" },
+      "expectedEvents": [{ "type": "periodic-report", "action": "filed", "cause": "annual-report", "subjectType": "issuer" }]
+    },
+    {
+      "id": "detail-ownership-generic-title",
+      "tags": ["provider-detail"],
+      "input": { "reportName": "지분공시", "disclosureType": "D", "disclosureDetailType": "D001" },
+      "expectedEvents": [{ "type": "ownership-change", "action": "reported", "cause": "large-shareholding", "subjectType": "ownership" }]
+    },
+    {
+      "id": "detail-audit-generic-title",
+      "tags": ["provider-detail"],
+      "input": { "reportName": "외부감사관련 공시", "disclosureType": "F", "disclosureDetailType": "F001" },
+      "expectedEvents": [{ "type": "audit", "action": "submitted", "cause": "audit-report", "subjectType": "audit-opinion" }]
+    },
+    {
+      "id": "detail-equity-registration-generic-title",
+      "tags": ["provider-detail"],
+      "input": { "reportName": "발행공시", "disclosureType": "C", "disclosureDetailType": "C001" },
+      "expectedEvents": [{ "type": "capital-change", "action": "filed", "cause": "equity-securities", "subjectType": "securities" }]
+    },
+    {
+      "id": "detail-related-party-generic-title",
+      "tags": ["provider-detail"],
+      "input": { "reportName": "대규모내부거래관련", "disclosureType": "J", "disclosureDetailType": "J001" },
+      "expectedEvents": [{ "type": "related-party", "action": "reported", "cause": "internal-transaction", "subjectType": "issuer" }]
+    },
+    {
+      "id": "rights-offering-correction",
+      "tags": ["capital-change", "correction"],
+      "input": { "reportName": "[기재정정]주요사항보고서(유상증자결정)", "disclosureType": "B", "disclosureDetailType": "B001" },
+      "expectedEvents": [{ "type": "capital-change", "action": "decided", "state": "corrected", "cause": "rights-offering", "subjectType": "securities" }]
+    },
+    {
+      "id": "convertible-bond-correction",
+      "tags": ["capital-change", "correction"],
+      "input": { "reportName": "[기재정정]주요사항보고서(전환사채권발행결정)", "disclosureType": "B", "disclosureDetailType": "B001" },
+      "expectedEvents": [{ "type": "capital-change", "action": "decided", "state": "corrected", "cause": "convertible-bond", "subjectType": "securities" }]
+    },
+    {
+      "id": "treasury-trust-termination",
+      "tags": ["capital-change"],
+      "input": { "reportName": "주요사항보고서(자기주식취득신탁계약해지결정)", "disclosureType": "E", "disclosureDetailType": "E002" },
+      "expectedEvents": [{ "type": "capital-change", "action": "terminated", "cause": "treasury-share-trust", "subjectType": "securities" }]
+    },
+    {
+      "id": "noncurrent-asset-acquisition",
+      "tags": ["restructuring"],
+      "input": { "reportName": "비유동자산취득결정", "disclosureType": "B", "disclosureDetailType": "B001" },
+      "expectedEvents": [{ "type": "restructuring", "action": "acquired", "cause": "asset-acquisition", "subjectType": "asset" }]
+    },
+    {
+      "id": "debt-guarantee",
+      "tags": ["material-contract"],
+      "input": { "reportName": "타인을위한채무보증결정", "disclosureType": "B", "disclosureDetailType": "B001" },
+      "expectedEvents": [{ "type": "material-contract", "action": "guaranteed", "cause": "debt-guarantee", "subjectType": "contract" }]
+    },
+    {
+      "id": "merger-completion",
+      "tags": ["restructuring"],
+      "input": { "reportName": "합병등종료보고서(합병)", "disclosureType": "E", "disclosureDetailType": "E003" },
+      "expectedEvents": [{ "type": "restructuring", "action": "completed", "cause": "merger", "subjectType": "issuer" }]
+    },
+    {
+      "id": "large-shareholding-report",
+      "tags": ["ownership"],
+      "input": { "reportName": "주식등의대량보유상황보고서(일반)", "disclosureType": "D", "disclosureDetailType": "D001" },
+      "expectedEvents": [{ "type": "ownership-change", "action": "reported", "cause": "large-shareholding", "subjectType": "ownership" }]
+    },
+    {
+      "id": "insider-plan-withdrawal",
+      "tags": ["ownership", "negation"],
+      "input": { "reportName": "임원ㆍ주요주주특정증권등거래계획철회보고서", "disclosureType": "D", "disclosureDetailType": "D005" },
+      "expectedEvents": [{ "type": "ownership-change", "action": "withdrawn", "cause": "insider-trading-plan", "subjectType": "ownership" }]
+    },
+    {
+      "id": "tender-offer",
+      "tags": ["corporate-action"],
+      "input": { "reportName": "공개매수신고서", "disclosureType": "D", "disclosureDetailType": "D004" },
+      "expectedEvents": [{ "type": "corporate-action", "action": "announced", "cause": "tender-offer", "subjectType": "securities" }]
+    },
+    {
+      "id": "stock-option-correction",
+      "tags": ["capital-change", "correction"],
+      "input": { "reportName": "[기재정정]주식매수선택권부여에관한신고", "disclosureType": "E", "disclosureDetailType": "E004" },
+      "expectedEvents": [{ "type": "capital-change", "action": "granted", "state": "corrected", "cause": "stock-option", "subjectType": "securities" }]
+    },
+    {
+      "id": "outside-director-change",
+      "tags": ["governance"],
+      "input": { "reportName": "사외이사의선임ㆍ해임또는중도퇴임에관한신고", "disclosureType": "E", "disclosureDetailType": "E005" },
+      "expectedEvents": [{ "type": "governance", "action": "changed", "cause": "outside-director", "subjectType": "governance" }]
+    },
+    {
+      "id": "shareholder-meeting",
+      "tags": ["governance"],
+      "input": { "reportName": "주주총회소집공고", "disclosureType": "E", "disclosureDetailType": "E006" },
+      "expectedEvents": [{ "type": "governance", "action": "convened", "cause": "shareholder-meeting", "subjectType": "governance" }]
+    },
+    {
+      "id": "audit-disclaimer",
+      "tags": ["audit", "critical"],
+      "input": { "reportName": "감사보고서 제출 (감사의견 의견거절)", "disclosureType": "F", "disclosureDetailType": "F001" },
+      "expectedEvents": [{ "type": "audit", "action": "submitted", "cause": "disclaimer-of-opinion", "subjectType": "audit-opinion" }]
+    },
+    {
+      "id": "dissolution",
+      "tags": ["insolvency", "critical"],
+      "input": { "reportName": "주요사항보고서(해산사유발생)", "disclosureType": "B", "disclosureDetailType": "B001" },
+      "expectedEvents": [{ "type": "insolvency", "action": "dissolved", "cause": "dissolution", "subjectType": "issuer" }]
+    },
+    {
+      "id": "cash-dividend-correction",
+      "tags": ["corporate-action", "correction"],
+      "input": { "reportName": "[기재정정]현금ㆍ현물배당결정", "disclosureType": "I", "disclosureDetailType": "I001" },
+      "expectedEvents": [{ "type": "corporate-action", "action": "decided", "state": "corrected", "cause": "cash-dividend", "subjectType": "securities" }]
+    },
+    {
+      "id": "supply-contract-correction",
+      "tags": ["material-contract", "correction"],
+      "input": { "reportName": "[기재정정]단일판매ㆍ공급계약체결", "disclosureType": "I", "disclosureDetailType": "I001" },
+      "expectedEvents": [{ "type": "material-contract", "action": "contracted", "state": "corrected", "cause": "supply-contract", "subjectType": "contract" }]
+    },
+    {
+      "id": "preliminary-earnings",
+      "tags": ["earnings"],
+      "input": { "reportName": "연결재무제표기준영업(잠정)실적(공정공시)", "disclosureType": "I", "disclosureDetailType": "I002" },
+      "expectedEvents": [{ "type": "earnings", "action": "announced", "state": "preliminary", "cause": "operating-results", "subjectType": "financials" }]
+    },
+    {
+      "id": "convertible-price-adjustment",
+      "tags": ["capital-change"],
+      "input": { "reportName": "전환가액의조정 (제1회차)", "disclosureType": "I", "disclosureDetailType": "I001" },
+      "expectedEvents": [{ "type": "capital-change", "action": "adjusted", "cause": "convertible-price", "subjectType": "securities" }]
+    },
+    {
+      "id": "rumor-inquiry-unconfirmed",
+      "tags": ["ambiguous", "state"],
+      "input": { "reportName": "조회공시요구(풍문또는보도등)에대한답변(미확정)", "disclosureType": "I", "disclosureDetailType": "I006" },
+      "expectedEvents": [{ "type": "disclosure-inquiry", "action": "responded", "state": "uncertain", "cause": "rumor-inquiry", "subjectType": "issuer" }]
+    },
+    {
+      "id": "ir-meeting-scheduled",
+      "tags": ["corporate-event"],
+      "input": { "reportName": "기업설명회(IR)개최(안내공시)", "disclosureType": "I", "disclosureDetailType": "I001" },
+      "expectedEvents": [{ "type": "corporate-event", "action": "scheduled", "cause": "investor-relations", "subjectType": "issuer" }]
+    },
+    {
+      "id": "fda-approval",
+      "tags": ["regulatory-product", "contrast"],
+      "input": { "reportName": "FDA 품목허가 승인 수령", "disclosureType": "I", "disclosureDetailType": "I001" },
+      "expectedEvents": [{ "type": "regulatory-product", "action": "approved", "state": "effective", "cause": "fda-approval", "subjectType": "product" }]
+    }
+  ]
+}
