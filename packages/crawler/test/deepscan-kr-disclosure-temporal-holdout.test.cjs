@@ -27,6 +27,16 @@ const REAL_RFC3161_CANDIDATE = join(
   'archive',
   'kr-disclosure-event-candidate-freeze.2026-07-29-n60.superseded.v2.json',
 );
+const ACTIVE_RFC3161_CANDIDATE = join(
+  __dirname,
+  'artifacts',
+  'kr-disclosure-event-candidate-freeze.v2.json',
+);
+const ACTIVE_RFC3161_STATUS = join(
+  __dirname,
+  'artifacts',
+  'kr-disclosure-event-candidate-freeze.status.v1.json',
+);
 const DIGICERT_ROOT = join(__dirname, '..', 'config', 'rfc3161', 'digicert-assured-id-root-ca.crt');
 const DIGICERT_CHAIN = join(__dirname, '..', 'config', 'rfc3161', 'digicert-timestamp-2025-chain.crt');
 const FREETSA_ROOT = join(__dirname, '..', 'config', 'rfc3161', 'freetsa-root-ca.crt');
@@ -1695,6 +1705,37 @@ test('pinned RFC3161 trust chains verify a captured dual-authority receipt and r
     ),
     /RFC3161 verification failed|does not match DER response/,
   );
+});
+
+test('active N=400 temporal candidate is repository-anchored and awaiting its future window', async () => {
+  const protocol = await import(pathToFileURL(PROTOCOL));
+  const collector = await import(pathToFileURL(COLLECTOR));
+  const candidateBytes = readFileSync(ACTIVE_RFC3161_CANDIDATE);
+  const candidate = JSON.parse(candidateBytes);
+  const status = JSON.parse(readFileSync(ACTIVE_RFC3161_STATUS, 'utf8'));
+  const exclusion = await collector.readExclusionManifest(
+    EXCLUSION_MANIFEST,
+    { verifySources: true },
+  );
+  const validated = protocol.validateTemporalCandidateFreeze(candidate, {
+    exclusion,
+    verifyCurrentCandidate: true,
+    verifyRepositoryAnchor: true,
+    verifyExternalTimestamps: true,
+    now: new Date('2026-07-27T07:00:00.000Z'),
+  });
+
+  assert.equal(validated.precommit.experimentId, status.experimentId);
+  assert.equal(validated.precommit.collectionPlan.limit, 400);
+  assert.equal(validated.precommit.collectionPlan.minIssuers, 100);
+  assert.deepEqual(validated.collectionWindow, { from: '20260729', to: '20260804' });
+  assert.equal(validated.timestamp.receipts.length, 2);
+  assert.equal(status.status, 'frozen-awaiting-collection-window');
+  assert.equal(status.seedEscrow.committed, false);
+  assert.equal(status.dataCollected, false);
+  assert.equal(status.predictionsGenerated, false);
+  assert.equal(status.labelsInspected, false);
+  assert.equal(status.candidateFreezeFileSha256, sha256(candidateBytes));
 });
 
 test('candidate fingerprint includes extractor and collector transitive dependencies', async () => {

@@ -1,0 +1,36 @@
+{
+  "schemaVersion": "jaroo.kr-disclosure-event-candidate-attempt-status.v1",
+  "experimentId": "kospi-canonical-events-temporal-2026-07-27-n400-v2",
+  "candidateFreezePath": "kr-disclosure-event-candidate-freeze.v2.json",
+  "candidateFreezeFileSha256": "5d5f493eb12b43412e6d7ce236f4cc46f662451ee895b02820cad43bebaed016",
+  "status": "frozen-awaiting-collection-window",
+  "recordedAt": "2026-07-27T06:33:29.814Z",
+  "collectionWindow": {
+    "from": "20260729",
+    "to": "20260804"
+  },
+  "collectionPlan": {
+    "schemaVersion": "jaroo.kr-disclosure-temporal-collection-plan.v1",
+    "startOffsetDays": 0,
+    "windowDays": 7,
+    "limit": 400,
+    "minIssuers": 100,
+    "retainedBodyChars": 60000,
+    "provider": "opendart",
+    "corpClass": "Y",
+    "lastReportOnly": false,
+    "sort": "date",
+    "sortDirection": "asc",
+    "pageCount": 100,
+    "stoppingRule": "fixed-window-fixed-limit-no-backfill.v1"
+  },
+  "seedEscrow": {
+    "committed": false,
+    "fileHint": "~/.local/state/jaroo-temporal-holdout/kospi-canonical-events-temporal-2026-07-27-n400-v2.seed",
+    "mode": "0600"
+  },
+  "dataCollected": false,
+  "predictionsGenerated": false,
+  "labelsInspected": false,
+  "nextEligibleAction": "collect-and-timestamp-after-window-end"
+}
