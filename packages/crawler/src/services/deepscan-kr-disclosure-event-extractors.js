@@ -902,14 +902,14 @@ function hasStructuredCorrectionDelta(clauses, operativeIndex) {
   if (beforeIndex >= 0 && afterIndex > beforeIndex) {
     const beforeValue = window.slice(beforeIndex + 1, afterIndex).find(Boolean) ?? '';
     const afterValue = window.slice(afterIndex + 1).find(Boolean) ?? '';
-    if (beforeValue && afterValue) {
-      if (beforeValue === afterValue) return false;
-      const operativeClauseIsComparedValue = operativeWindowIndex === beforeIndex + 1
-        || operativeWindowIndex === afterIndex + 1;
-      if (!operativeClauseIsComparedValue) return true;
-    }
+    if (!beforeValue || !afterValue || beforeValue === afterValue) return false;
+
+    const operativeClauseLabelsComparison = operativeWindowIndex === beforeIndex - 1;
+    const operativeClauseIsComparedValue = operativeWindowIndex === beforeIndex + 1
+      || operativeWindowIndex === afterIndex + 1;
+    return operativeClauseLabelsComparison || operativeClauseIsComparedValue;
   }
-  return !EXCHANGEABLE_BOND_NONOPERATIVE_DELTA.test(context);
+  return false;
 }
 
 function hasOperativeExchangeableBondCorrection(input, bodyFacts) {
@@ -917,6 +917,7 @@ function hasOperativeExchangeableBondCorrection(input, bodyFacts) {
   const clauses = scope.split('|').filter(Boolean);
   return clauses.some((clause, index) => {
     if (!EXCHANGEABLE_BOND_OPERATIVE_FIELD.test(clause)) return false;
+    if (EXCHANGEABLE_BOND_NONOPERATIVE_DELTA.test(clause)) return false;
     const lexicalContext = clauses.slice(Math.max(0, index - 1), index + 2).join('|');
     const hasStructuredDelta = hasStructuredCorrectionDelta(clauses, index);
     return hasStructuredDelta || (
