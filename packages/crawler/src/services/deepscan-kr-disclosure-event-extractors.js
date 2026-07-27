@@ -889,6 +889,16 @@ function currentCorrectionScope(input, bodyFacts) {
 const EXCHANGEABLE_BOND_OPERATIVE_FIELD = /(?:납입(?:일|기일)|발행(?:일|가액|금액|총액|조건|방법)|교환(?:가액|가격|비율|대상|청구기간|조건)|사채(?:만기일|권면총액)|만기(?:일|이자율|보장수익률)|표면이자율|이자(?:율|지급방법)|수익률|상환(?:일|기일|방법|조건|금액)|조기상환|풋옵션|콜옵션|매도청구권|청약일|권면(?:전자등록)?총액|발행대상자|자금조달목적|이사회결의일)/u;
 const EXCHANGEABLE_BOND_OPERATIVE_DELTA = /(?:변경|조정|연기|확정|수정|증액|감액|교체|삭제|추가|신설|해제|부여|연장|단축|취소|철회)/u;
 const EXCHANGEABLE_BOND_NONOPERATIVE_DELTA = /(?:변경|조정|수정)(?:가능성|여부|검토|예정|계획)|(?:변경|조정|수정)(?:하지않|하지아니|되지않)|(?:변경|조정|수정)(?:은|이)?없|설명(?:만|을|을만)?(?:추가|보완)|(?:가능성|설명).{0,40}(?:추가|보완)/u;
+const EXCHANGEABLE_BOND_EXPLICIT_NO_CHANGE = /(?:(?:변경|조정|수정|변동)(?:은|이|을|를)?(?:하지않|하지아니|되지않|없)|(?:기존|종전)(?:과|와)?(?:동일|같)|(?:그대로|동일하게)유지)/u;
+
+function hasExplicitNoChangeForOperativeField(window, operativeClause) {
+  const operativeField = operativeClause.match(EXCHANGEABLE_BOND_OPERATIVE_FIELD)?.[0];
+  if (!operativeField) return false;
+  return window.some((clause) => (
+    clause.includes(operativeField)
+    && EXCHANGEABLE_BOND_EXPLICIT_NO_CHANGE.test(clause)
+  ));
+}
 
 function hasStructuredCorrectionDelta(clauses, operativeIndex) {
   const windowStart = Math.max(0, operativeIndex - 2);
@@ -900,6 +910,9 @@ function hasStructuredCorrectionDelta(clauses, operativeIndex) {
   const beforeIndex = window.findIndex((clause) => /^(?:정정전|변경전)$/u.test(clause));
   const afterIndex = window.findIndex((clause) => /^(?:정정후|변경후)$/u.test(clause));
   if (beforeIndex >= 0 && afterIndex > beforeIndex) {
+    const operativeClause = window[operativeWindowIndex] ?? '';
+    if (hasExplicitNoChangeForOperativeField(window, operativeClause)) return false;
+
     const beforeValue = window.slice(beforeIndex + 1, afterIndex).find(Boolean) ?? '';
     const afterValue = window.slice(afterIndex + 1).find(Boolean) ?? '';
     if (!beforeValue || !afterValue || beforeValue === afterValue) return false;

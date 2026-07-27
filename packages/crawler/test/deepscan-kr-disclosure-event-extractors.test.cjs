@@ -3336,6 +3336,24 @@ test('iteration 8 separated gates preserve wrapper authority, intent identity, l
       expected: [e('capital-change', 'decided', 'proposed', 'exchangeable-bond', 'securities')],
     },
     {
+      id: 'exchangeable-bond-compared-risk-cells-yield-to-explicit-price-no-change',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '3. 정정사항 | 정정 전 | 교환가액 관련 위험 설명 A | 정정 후 | 교환가액 관련 위험 설명 B | 실제 교환가액 변경 없음',
+      },
+      expected: [e('capital-change', 'decided', 'proposed', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'exchangeable-bond-compared-risk-cells-yield-to-explicit-interest-no-change',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '3. 정정사항 | 정정 전 | 표면이자율 관련 주의 문구 A | 정정 후 | 표면이자율 관련 주의 문구 B | 실제 표면이자율은 변경하지 않았습니다',
+      },
+      expected: [e('capital-change', 'decided', 'proposed', 'exchangeable-bond', 'securities')],
+    },
+    {
       id: 'exchangeable-bond-redemption-change-possibility-only-remains-decided',
       input: {
         reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
