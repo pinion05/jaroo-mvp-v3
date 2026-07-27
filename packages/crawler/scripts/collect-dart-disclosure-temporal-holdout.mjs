@@ -1,21 +1,31 @@
-import { createHash } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { realpathSync } from 'node:fs';
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { link, mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
+import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { getDartDisclosureDocumentText } from '../src/crawlers/dart-filings.js';
 import {
+  buildTemporalRawCorpusPayload,
   createCandidateFreezeEnvelope,
+  createTemporalRawCorpusEnvelope,
+  dedupeFilings,
+  issueRfc3161ReceiptSet,
+  normalizeTitleTemplate,
+  selectStratifiedFilings,
   selectionSeedCommitment,
   validateCandidateFreezeEnvelope,
 } from '../src/services/deepscan-kr-disclosure-temporal-protocol.js';
 
-export { selectionSeedCommitment };
+export {
+  dedupeFilings,
+  normalizeTitleTemplate,
+  selectStratifiedFilings,
+  selectionSeedCommitment,
+};
 
 const OPEN_DART_LIST_URL = 'https://opendart.fss.or.kr/api/list.json';
 const CRAWLER_ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const PAGE_COUNT = 100;
-const DEFAULT_BODY_CHARS = 60_000;
 const DEFAULT_CONCURRENCY = 4;
 const DEFAULT_TIMEOUT_MS = 20_000;
 const MAX_DATE_RANGE_DAYS = 92;
@@ -68,26 +78,27 @@ function requiredInteger(value, name, { minimum = 1, maximum = Number.MAX_SAFE_I
 }
 
 export function validateOptions(input) {
-  for (const name of ['from', 'to', 'out', 'selection-seed', 'candidate-freeze', 'exclude-manifest']) {
+  for (const name of ['out', 'selection-seed', 'candidate-freeze', 'exclude-manifest']) {
     if (input[name] === undefined || String(input[name]).trim() === '') {
       throw new Error(`--${name} is required`);
     }
   }
 
-  const from = normalizeDate(input.from, 'from');
-  const to = normalizeDate(input.to, 'to');
-  if (from > to) throw new Error('--from must be on or before --to');
-  if (dateDistanceDays(from, to) > MAX_DATE_RANGE_DAYS) {
+  const from = input.from === undefined ? null : normalizeDate(input.from, 'from');
+  const to = input.to === undefined ? null : normalizeDate(input.to, 'to');
+  if ((from === null) !== (to === null)) throw new Error('--from and --to must be provided together');
+  if (from !== null && from > to) throw new Error('--from must be on or before --to');
+  if (from !== null && dateDistanceDays(from, to) > MAX_DATE_RANGE_DAYS) {
     throw new Error(`OpenDART global list ranges cannot exceed ${MAX_DATE_RANGE_DAYS} days`);
   }
 
   const limit = input.limit === undefined
     ? null
-    : requiredInteger(input.limit, 'limit', { minimum: 40, maximum: 100_000 });
+    : requiredInteger(input.limit, 'limit', { minimum: 1, maximum: 100_000 });
   const minIssuers = input['min-issuers'] === undefined
-    ? 1
+    ? null
     : requiredInteger(input['min-issuers'], 'min-issuers', { maximum: 100_000 });
-  if (limit !== null && minIssuers > limit) throw new Error('--min-issuers cannot exceed --limit');
+  if (limit !== null && minIssuers !== null && minIssuers > limit) throw new Error('--min-issuers cannot exceed --limit');
 
   return {
     from,
@@ -100,7 +111,7 @@ export function validateOptions(input) {
     candidateFreezePath: resolve(String(input['candidate-freeze'])),
     exclusionManifestPath: resolve(String(input['exclude-manifest'])),
     bodyChars: input['body-chars'] === undefined
-      ? DEFAULT_BODY_CHARS
+      ? null
       : requiredInteger(input['body-chars'], 'body-chars', { maximum: 500_000 }),
     concurrency: input.concurrency === undefined
       ? DEFAULT_CONCURRENCY
@@ -109,15 +120,6 @@ export function validateOptions(input) {
       ? DEFAULT_TIMEOUT_MS
       : requiredInteger(input['timeout-ms'], 'timeout-ms', { minimum: 1_000, maximum: 120_000 }),
   };
-}
-
-export function normalizeTitleTemplate(value) {
-  return String(value ?? '')
-    .normalize('NFKC')
-    .replace(/^\[(?:기재정정|첨부정정|첨부추가|변경등록|연장결정|발행조건확정|정정제출요구)\]/u, '')
-    .replace(/\s*\(20\d{2}\.\d{2}\)\s*$/u, '')
-    .replaceAll(/\s+/gu, '')
-    .trim();
 }
 
 function stableHash(value) {
@@ -135,15 +137,25 @@ export async function readCandidateFreeze(path) {
   return createCandidateFreezeEnvelope(manifest, bytes);
 }
 
-export function bindOptionsToCandidateFreeze(options, candidateFreeze, exclusion) {
+export function bindOptionsToCandidateFreeze(options, candidateFreeze, exclusion, validationOptions = {}) {
   const manifest = validateCandidateFreezeEnvelope(candidateFreeze, {
     selectionSeed: options.selectionSeed,
     exclusion,
+    ...validationOptions,
   });
-  if (options.from < manifest.firstEligibleFilingDate || options.to < manifest.firstEligibleFilingDate) {
-    throw new Error('--from and --to must be on or after candidate freeze firstEligibleFilingDate');
+  const expected = {
+    from: manifest.collectionWindow.from,
+    to: manifest.collectionWindow.to,
+    limit: manifest.collectionPlan.limit,
+    minIssuers: manifest.collectionPlan.minIssuers,
+    bodyChars: manifest.collectionPlan.retainedBodyChars,
+  };
+  for (const [field, value] of Object.entries(expected)) {
+    if (options[field] !== null && options[field] !== value) {
+      throw new Error(`--${field.replace(/[A-Z]/gu, (letter) => `-${letter.toLowerCase()}`)} must match the candidate collection plan`);
+    }
   }
-  return Object.freeze({ ...options, cutoff: manifest.cutoff, candidateFreeze });
+  return Object.freeze({ ...options, ...expected, cutoff: manifest.cutoff, candidateFreeze });
 }
 
 export function receiptNumbersFromExclusionManifest(manifest) {
@@ -161,6 +173,7 @@ export function receiptNumbersFromExclusionManifest(manifest) {
         : entry?.rceptNo ?? entry?.receiptNumber ?? entry?.input?.rceptNo ?? '',
     ).trim();
     if (!receipt) throw new Error(`exclusion manifest entry ${index} has no receipt number`);
+    if (!/^\d{14}$/u.test(receipt)) throw new Error(`exclusion manifest entry ${index} is not a 14-digit OpenDART receipt`);
     if (receipts.has(receipt)) throw new Error(`exclusion manifest contains duplicate receipt number ${receipt}`);
     receipts.add(receipt);
   }
@@ -175,7 +188,7 @@ function collectNestedReceiptNumbers(value, receipts) {
   if (!value || typeof value !== 'object') return;
   for (const key of ['rceptNo', 'rcept_no', 'receiptNumber']) {
     const receipt = String(value[key] ?? '').trim();
-    if (receipt) receipts.add(receipt);
+    if (/^\d{14}$/u.test(receipt)) receipts.add(receipt);
   }
   for (const nested of Object.values(value)) collectNestedReceiptNumbers(nested, receipts);
 }
@@ -220,8 +233,10 @@ export async function readExclusionManifest(path, { verifySources = false } = {}
   if (verifySources) {
     const sourceReceipts = new Set();
     for (const [index, source] of manifest.sources.entries()) {
-      const absolutePath = realpathSync(resolve(CRAWLER_ROOT, source.path));
-      if (!absolutePath.startsWith(`${realpathSync(CRAWLER_ROOT)}/`)) {
+      const crawlerRootRealPath = realpathSync(CRAWLER_ROOT);
+      const absolutePath = realpathSync(resolve(crawlerRootRealPath, source.path));
+      const pathFromRoot = relative(crawlerRootRealPath, absolutePath);
+      if (pathFromRoot.startsWith('..') || isAbsolute(pathFromRoot)) {
         throw new Error(`temporal exclusion manifest sources[${index}] escapes the crawler root`);
       }
       const sourceBytes = await readFile(absolutePath);
@@ -243,99 +258,8 @@ export async function readExclusionManifest(path, { verifySources = false } = {}
   return { receipts, sha256: createHash('sha256').update(bytes).digest('hex') };
 }
 
-function canonicalCompare(left, right) {
-  return String(left.receiptDate ?? '').localeCompare(String(right.receiptDate ?? ''))
-    || String(left.rceptNo ?? '').localeCompare(String(right.rceptNo ?? ''));
-}
-
-export function dedupeFilings(filings) {
-  const byReceipt = new Map();
-  for (const filing of Array.isArray(filings) ? filings : []) {
-    const rceptNo = String(filing?.rceptNo ?? filing?.rcept_no ?? '').trim();
-    if (rceptNo && !byReceipt.has(rceptNo)) byReceipt.set(rceptNo, { ...filing, rceptNo });
-  }
-  return [...byReceipt.values()].sort(canonicalCompare);
-}
-
 function issuerKey(filing) {
   return String(filing.corpCode ?? '').trim();
-}
-
-function stratumKey(filing) {
-  return `${issuerKey(filing)}|${normalizeTitleTemplate(filing.reportName)}`;
-}
-
-export function selectStratifiedFilings(filings, {
-  limit = null,
-  minIssuers = 1,
-  selectionSeed,
-  excludedReceipts = new Set(),
-} = {}) {
-  const seedCommitment = selectionSeedCommitment(selectionSeed);
-  const exclusions = excludedReceipts instanceof Set ? excludedReceipts : new Set(excludedReceipts);
-  const candidates = dedupeFilings(filings)
-    .filter((filing) => issuerKey(filing) && !exclusions.has(filing.rceptNo));
-  const issuerGroups = new Map();
-  for (const candidate of candidates) {
-    const key = issuerKey(candidate);
-    if (!key) continue;
-    if (!issuerGroups.has(key)) issuerGroups.set(key, []);
-    issuerGroups.get(key).push(candidate);
-  }
-  if (issuerGroups.size < minIssuers) {
-    throw new Error(`only ${issuerGroups.size} issuers are available; --min-issuers requires ${minIssuers}`);
-  }
-  if (limit !== null && candidates.length < limit) {
-    throw new Error(`only ${candidates.length} non-excluded filings are available; --limit requires ${limit}`);
-  }
-  if (limit === null || candidates.length <= limit) return candidates;
-
-  const selected = [];
-  const selectedReceipts = new Set();
-  const add = (candidate) => {
-    if (!candidate || selectedReceipts.has(candidate.rceptNo) || selected.length >= limit) return false;
-    selected.push(candidate);
-    selectedReceipts.add(candidate.rceptNo);
-    return true;
-  };
-
-  const orderedIssuers = [...issuerGroups.entries()].sort((left, right) => (
-    stableHash(`${seedCommitment}|issuer|${left[0]}`).localeCompare(stableHash(`${seedCommitment}|issuer|${right[0]}`))
-      || left[0].localeCompare(right[0])
-  ));
-  for (const [, group] of orderedIssuers.slice(0, Math.min(limit, orderedIssuers.length))) {
-    add([...group].sort((left, right) => (
-      stableHash(`${seedCommitment}|stratum|${stratumKey(left)}`).localeCompare(stableHash(`${seedCommitment}|stratum|${stratumKey(right)}`))
-      || canonicalCompare(left, right)
-    ))[0]);
-  }
-
-  const strata = new Map();
-  for (const candidate of candidates) {
-    const key = stratumKey(candidate);
-    if (!strata.has(key)) strata.set(key, []);
-    strata.get(key).push(candidate);
-  }
-  const queues = [...strata.entries()]
-    .sort((left, right) => (
-      stableHash(`${seedCommitment}|queue|${left[0]}`).localeCompare(stableHash(`${seedCommitment}|queue|${right[0]}`))
-      || left[0].localeCompare(right[0])
-    ))
-    .map(([, group]) => group.sort(canonicalCompare));
-  let depth = 0;
-  while (selected.length < limit) {
-    let hasCandidateAtDepth = false;
-    for (const queue of queues) {
-      if (queue[depth]) {
-        hasCandidateAtDepth = true;
-        add(queue[depth]);
-      }
-      if (selected.length >= limit) break;
-    }
-    if (!hasCandidateAtDepth) break;
-    depth += 1;
-  }
-  return selected.sort(canonicalCompare);
 }
 
 function getApiKey() {
@@ -499,6 +423,17 @@ async function fetchCase(filing, options, apiKey) {
   }
 }
 
+export async function writeImmutableArtifact(outputPath, bytes) {
+  await mkdir(dirname(outputPath), { recursive: true });
+  const temporaryPath = `${outputPath}.${process.pid}.${randomUUID()}.tmp`;
+  try {
+    await writeFile(temporaryPath, bytes, { flag: 'wx' });
+    await link(temporaryPath, outputPath);
+  } finally {
+    await unlink(temporaryPath).catch(() => {});
+  }
+}
+
 export async function main(argv = process.argv.slice(2)) {
   const parsedOptions = validateOptions(parseArgs(argv));
   const candidateFreeze = await readCandidateFreeze(parsedOptions.candidateFreezePath);
@@ -509,29 +444,28 @@ export async function main(argv = process.argv.slice(2)) {
 
   const listed = await collectList(options, apiKey);
   const deduped = dedupeFilings(listed.filings);
-  const eligibleCount = deduped.filter((filing) => (
+  const population = deduped.filter((filing) => (
     issuerKey(filing) && !exclusion.receipts.has(filing.rceptNo)
-  )).length;
-  const reserveLimit = options.limit === null
-    ? null
-    : Math.min(eligibleCount, options.limit + Math.max(10, Math.ceil(options.limit * 0.25)));
+  ));
+  const eligibleCount = population.length;
   const selectionOptions = {
-    ...options,
+    limit: options.limit,
+    minIssuers: options.minIssuers,
     selectionSeed: options.selectionSeed,
-    excludedReceipts: exclusion.receipts,
   };
-  const fetchCandidates = selectStratifiedFilings(deduped, { ...selectionOptions, limit: reserveLimit });
+  // Selection happens exactly once against the complete eligible population.
+  // Failed document fetches invalidate the cohort rather than allowing an
+  // outcome-dependent replacement that would change the sealed sample.
+  const selected = selectStratifiedFilings(population, selectionOptions);
   const fetched = await mapConcurrent(
-    fetchCandidates,
+    selected,
     options.concurrency,
     (filing) => fetchCase(filing, options, apiKey),
   );
-  const availableFilings = fetchCandidates.filter((_, index) => fetched[index].case);
   const failures = fetched.flatMap((result) => result.failure ? [result.failure] : []);
-  if (options.limit !== null && availableFilings.length < options.limit) {
-    throw new Error(`only ${availableFilings.length} documents were usable; --limit requires ${options.limit} successful cases`);
+  if (failures.length > 0) {
+    throw new Error(`sealed selection failed closed because ${failures.length} selected documents were unusable: ${failures.map((entry) => entry.rceptNo).join(', ')}`);
   }
-  const selected = selectStratifiedFilings(availableFilings, selectionOptions);
   const caseByReceipt = new Map(fetched.flatMap((result) => result.case
     ? [[result.case.input.rceptNo, result.case]]
     : []));
@@ -543,60 +477,69 @@ export async function main(argv = process.argv.slice(2)) {
   const overlap = cases.map((entry) => entry.input.rceptNo).filter((receipt) => exclusion.receipts.has(receipt));
   if (overlap.length > 0) throw new Error(`selected cases overlap exclusion manifest: ${overlap.join(', ')}`);
 
-  const artifact = {
-    schemaVersion: 'jaroo.kr-disclosure-temporal-holdout-corpus.v1',
-    generatedAt: new Date().toISOString(),
-    corpusKind: 'temporal-holdout',
-    labelStatus: 'unlabeled',
-    candidateFreeze,
-    query: {
-      from: options.from,
-      to: options.to,
-      cutoff: options.cutoff,
-      corpClass: 'Y',
-      sort: 'date',
-      sortDirection: 'asc',
-      pageCount: PAGE_COUNT,
-      limit: options.limit,
-      minIssuers: options.minIssuers,
-      sampling: options.limit === null ? 'all-deduplicated-filings' : 'deterministic-issuer-title-template-stratified',
-      selectionSeedCommitment: selectionSeedCommitment(options.selectionSeed),
-      exclusionManifestSha256: exclusion.sha256,
-      excludedReceiptCount: exclusion.receipts.size,
-      excludedReceiptsSha256: candidateFreeze.manifest.sampling.excludedReceiptsSha256,
-      retainedBodyChars: options.bodyChars,
-      concurrency: options.concurrency,
-      timeoutMs: options.timeoutMs,
-    },
-    source: {
-      provider: 'opendart',
-      listApiPath: '/api/list.json',
-      documentApiPath: '/api/document.xml',
-      market: 'KR',
-    },
-    summary: {
-      providerTotalCount: listed.expectedTotalCount,
-      listedCount: listed.filings.length,
-      pagesFetched: listed.pagesFetched,
-      deduplicatedCount: deduped.length,
-      eligibleCount,
-      duplicateCount: listed.filings.length - deduped.length,
-      fetchCandidateCount: fetchCandidates.length,
-      selectedCount: selected.length,
-      caseCount: cases.length,
-      documentFailureCount: failures.length,
-      uniqueIssuerCount: successfulIssuerCount,
-      uniqueTitleTemplateCount: new Set(cases.map((entry) => normalizeTitleTemplate(entry.input.title))).size,
-      truncatedBodyCount: cases.filter((entry) => entry.source.truncated).length,
-      retainedBodyCharCount: cases.reduce((total, entry) => total + entry.source.retainedCharCount, 0),
-    },
-    failures,
-    cases,
+  const query = {
+    from: options.from,
+    to: options.to,
+    cutoff: options.cutoff,
+    corpClass: 'Y',
+    lastReportOnly: false,
+    sort: 'date',
+    sortDirection: 'asc',
+    pageCount: PAGE_COUNT,
+    limit: options.limit,
+    minIssuers: options.minIssuers,
+    sampling: options.limit === null ? 'all-deduplicated-filings' : 'deterministic-issuer-title-template-stratified',
+    stoppingRule: candidateFreeze.manifest.precommit.collectionPlan.stoppingRule,
+    selectionSeedReveal: options.selectionSeed,
+    selectionSeedCommitment: selectionSeedCommitment(options.selectionSeed),
+    exclusionManifestSha256: exclusion.sha256,
+    excludedReceiptCount: exclusion.receipts.size,
+    excludedReceiptsSha256: candidateFreeze.manifest.precommit.sampling.excludedReceiptsSha256,
+    retainedBodyChars: options.bodyChars,
+    concurrency: options.concurrency,
+    timeoutMs: options.timeoutMs,
   };
+  const source = {
+    provider: 'opendart',
+    listApiPath: '/api/list.json',
+    documentApiPath: '/api/document.xml',
+    market: 'KR',
+  };
+  const capture = {
+    providerTotalCount: listed.expectedTotalCount,
+    listedCount: listed.filings.length,
+    pagesFetched: listed.pagesFetched,
+    deduplicatedCount: deduped.length,
+    eligibleCount,
+    duplicateCount: listed.filings.length - deduped.length,
+    excludedInWindowCount: deduped.length - eligibleCount,
+    selectedCount: selected.length,
+    caseCount: cases.length,
+    documentFailureCount: 0,
+    uniqueIssuerCount: successfulIssuerCount,
+    uniqueTitleTemplateCount: new Set(cases.map((entry) => normalizeTitleTemplate(entry.input.title))).size,
+    truncatedBodyCount: cases.filter((entry) => entry.source.truncated).length,
+    retainedBodyCharCount: cases.reduce((total, entry) => total + entry.source.retainedCharCount, 0),
+  };
+  const payload = buildTemporalRawCorpusPayload({
+    candidateFreeze,
+    query,
+    source,
+    capture,
+    listedFilings: listed.filings,
+    population,
+    cases,
+  });
+  const timestampReceipts = await issueRfc3161ReceiptSet(payload);
+  const artifact = createTemporalRawCorpusEnvelope(payload, timestampReceipts);
 
-  await mkdir(dirname(options.outputPath), { recursive: true });
-  await writeFile(options.outputPath, `${JSON.stringify(artifact, null, 2)}\n`, 'utf8');
-  console.log(JSON.stringify({ outputPath: options.outputPath, ...artifact.summary }, null, 2));
+  await writeImmutableArtifact(options.outputPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  console.log(JSON.stringify({
+    outputPath: options.outputPath,
+    ...capture,
+    payloadCanonicalSha256: artifact.payloadCanonicalSha256,
+    timestampAuthorities: timestampReceipts.map((receipt) => receipt.authorityId),
+  }, null, 2));
   return artifact;
 }
 

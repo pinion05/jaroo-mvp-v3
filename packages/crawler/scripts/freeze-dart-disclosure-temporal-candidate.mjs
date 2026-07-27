@@ -5,9 +5,13 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   buildTemporalCandidateFreeze,
+  buildTemporalCandidatePrecommit,
   canonicalJsonSha256,
   currentTemporalRepositoryAnchor,
+  issueRfc3161ReceiptSet,
+  KR_DISCLOSURE_TEMPORAL_DEFAULT_COLLECTION_PLAN,
   KR_DISCLOSURE_TEMPORAL_STRICT_THRESHOLDS,
+  normalizeTemporalCollectionPlan,
   validateTemporalCandidateFreeze,
 } from '../src/services/deepscan-kr-disclosure-temporal-protocol.js';
 import { readExclusionManifest } from './collect-dart-disclosure-temporal-holdout.mjs';
@@ -36,32 +40,56 @@ function required(value, name) {
   return normalized;
 }
 
-export async function main(argv = process.argv.slice(2), { now = new Date() } = {}) {
-  const options = parseArgs(argv);
-  const outputPath = resolve(required(options.out, 'out'));
-  const selectionSeed = required(options['selection-seed'], 'selection-seed');
-  const exclusionManifestPath = resolve(required(options['exclude-manifest'], 'exclude-manifest'));
+function integerOption(value, name, fallback) {
+  if (value === undefined) return fallback;
+  const parsed = Number(value);
+  if (!Number.isInteger(parsed)) throw new Error(`--${name} must be an integer`);
+  return parsed;
+}
+
+export async function main(argv = process.argv.slice(2), options = {}) {
+  const parsed = parseArgs(argv);
+  const outputPath = resolve(required(parsed.out, 'out'));
+  const experimentId = required(parsed['experiment-id'], 'experiment-id');
+  const selectionSeed = required(parsed['selection-seed'], 'selection-seed');
+  const exclusionManifestPath = resolve(required(parsed['exclude-manifest'], 'exclude-manifest'));
+  const collectionPlan = normalizeTemporalCollectionPlan({
+    ...KR_DISCLOSURE_TEMPORAL_DEFAULT_COLLECTION_PLAN,
+    startOffsetDays: integerOption(parsed['start-offset-days'], 'start-offset-days', KR_DISCLOSURE_TEMPORAL_DEFAULT_COLLECTION_PLAN.startOffsetDays),
+    windowDays: integerOption(parsed['window-days'], 'window-days', KR_DISCLOSURE_TEMPORAL_DEFAULT_COLLECTION_PLAN.windowDays),
+    limit: integerOption(parsed.limit, 'limit', KR_DISCLOSURE_TEMPORAL_DEFAULT_COLLECTION_PLAN.limit),
+    minIssuers: integerOption(parsed['min-issuers'], 'min-issuers', KR_DISCLOSURE_TEMPORAL_DEFAULT_COLLECTION_PLAN.minIssuers),
+    retainedBodyChars: integerOption(parsed['body-chars'], 'body-chars', KR_DISCLOSURE_TEMPORAL_DEFAULT_COLLECTION_PLAN.retainedBodyChars),
+  });
   const exclusion = await readExclusionManifest(exclusionManifestPath, { verifySources: true });
-  const manifest = buildTemporalCandidateFreeze({
-    createdAt: now,
+  const precommit = buildTemporalCandidatePrecommit({
+    experimentId,
     selectionSeed,
     exclusionManifestSha256: exclusion.sha256,
-    excludedReceiptCount: exclusion.receipts.size,
-    excludedReceiptsSha256: canonicalJsonSha256([...exclusion.receipts].sort()),
+    excludedReceipts: exclusion.receipts,
+    collectionPlan,
     thresholds: KR_DISCLOSURE_TEMPORAL_STRICT_THRESHOLDS,
     repository: currentTemporalRepositoryAnchor(),
   });
-  validateTemporalCandidateFreeze(manifest, { selectionSeed, exclusion, now });
+  const timestampReceipts = await issueRfc3161ReceiptSet(precommit, options);
+  const manifest = buildTemporalCandidateFreeze({ precommit, timestampReceipts });
+  validateTemporalCandidateFreeze(manifest, { selectionSeed, exclusion });
   const bytes = `${JSON.stringify(manifest, null, 2)}\n`;
   await mkdir(dirname(outputPath), { recursive: true });
   await writeFile(outputPath, bytes, { encoding: 'utf8', flag: 'wx' });
   process.stdout.write(`${JSON.stringify({
     outputPath,
-    createdAt: manifest.createdAt,
-    cutoff: manifest.cutoff,
-    firstEligibleFilingDate: manifest.firstEligibleFilingDate,
+    experimentId: precommit.experimentId,
+    formalAccuracyBoundVerified: manifest.temporalBoundary.formalAccuracyBoundVerified,
+    independentClaimEligible: false,
+    operationalNotBefore: manifest.temporalBoundary.operationalNotBefore,
+    cutoff: manifest.temporalBoundary.cutoff,
+    firstEligibleFilingDate: manifest.temporalBoundary.firstEligibleFilingDate,
+    collectionWindow: manifest.temporalBoundary.collectionWindow,
+    collectionPlan: precommit.collectionPlan,
+    timestampAuthorities: timestampReceipts.map((receipt) => receipt.authorityId),
     manifestCanonicalSha256: canonicalJsonSha256(manifest),
-    candidateBundleSha256: manifest.candidate.bundleSha256,
+    candidateBundleSha256: precommit.candidate.bundleSha256,
   }, null, 2)}\n`);
   return manifest;
 }

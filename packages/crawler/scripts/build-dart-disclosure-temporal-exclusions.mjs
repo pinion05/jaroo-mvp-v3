@@ -45,7 +45,7 @@ function collectReceiptNumbers(value, receipts) {
   if (!value || typeof value !== 'object') return;
   for (const key of ['rceptNo', 'rcept_no', 'receiptNumber']) {
     const receipt = String(value[key] ?? '').trim();
-    if (receipt) receipts.add(receipt);
+    if (/^\d{14}$/u.test(receipt)) receipts.add(receipt);
   }
   for (const nested of Object.values(value)) collectReceiptNumbers(nested, receipts);
 }

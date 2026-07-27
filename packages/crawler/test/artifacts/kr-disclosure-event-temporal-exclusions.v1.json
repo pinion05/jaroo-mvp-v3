@@ -9,7 +9,7 @@
     {
       "path": "test/fixtures/kr-disclosure-classification-gold.v1.json",
       "sha256": "c81247d4106d7820b86e3bbbbea32ebdbe5794b3b230645f685fc2c3e9f3f513",
-      "receiptCount": 55
+      "receiptCount": 54
     },
     {
       "path": "test/fixtures/kr-disclosure-event-body-reviewed.v1.json",
@@ -73,7 +73,6 @@
     "20260716000293",
     "20260716000336",
     "20260716000344",
-    "20260716000344-j",
     "20260716000360",
     "20260716000401",
     "20260716000412",
@@ -201,6 +200,6 @@
   ],
   "summary": {
     "sourceCount": 5,
-    "uniqueReceiptCount": 170
+    "uniqueReceiptCount": 169
   }
 }

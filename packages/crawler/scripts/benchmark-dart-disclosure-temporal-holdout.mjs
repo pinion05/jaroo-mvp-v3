@@ -2,7 +2,7 @@
 import { createHash } from 'node:crypto';
 import { realpathSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extractEventsGatedProjection } from '../src/services/deepscan-kr-disclosure-event-extractors.js';
 import {
@@ -12,8 +12,14 @@ import {
   KR_DISCLOSURE_EVENT_ONTOLOGY_VERSION,
 } from '../src/services/deepscan-kr-disclosure-event-ontology.js';
 import {
+  canonicalJsonSha256,
   KR_DISCLOSURE_TEMPORAL_STRICT_THRESHOLDS,
+  temporalCorpusCaseProjection,
+  temporalCorpusCaseSha256,
+  temporalDomainSha256,
   validateCandidateFreezeEnvelope,
+  validateDetachedTimestampEnvelope,
+  validateTemporalRawCorpusEnvelope,
 } from '../src/services/deepscan-kr-disclosure-temporal-protocol.js';
 import { normalizeTitleTemplate } from './collect-dart-disclosure-temporal-holdout.mjs';
 
@@ -25,6 +31,12 @@ export const CANONICAL_EVENT_FIELDS = CANONICAL_DISCLOSURE_EVENT_FIELDS;
 export const CONFIDENCE_PROBABILITIES = Object.freeze({ low: 0.1, medium: 0.75, high: 0.95 });
 export const MAX_EVENTS_PER_CASE = 20;
 export const STRICT_THRESHOLDS = KR_DISCLOSURE_TEMPORAL_STRICT_THRESHOLDS;
+export const TEMPORAL_EXTERNAL_INDEPENDENCE_REQUIREMENTS = Object.freeze([
+  'contract-tsa-formal-accuracy-bound',
+  'provider-population-authenticity-witness',
+  'signed-independent-annotation-identities',
+  'append-only-cohort-burn-ledger',
+]);
 
 export class TemporalHoldoutFixtureError extends Error {
   constructor(message) {
@@ -147,10 +159,69 @@ export function wilsonLowerBound(successes, total, z = 1.959963984540054) {
   return Math.max(0, (centre - margin) / denominator);
 }
 
-export function validateTemporalHoldoutFixture(fixture, { allowBurned = false } = {}) {
-  if (fixture?.schemaVersion !== 'jaroo.kr-disclosure-event-temporal-holdout.v1') fail('invalid temporal holdout fixture schemaVersion');
+function canonicalEventArray(events = []) {
+  return events.map(canonicalEvent).sort((left, right) => JSON.stringify(left).localeCompare(JSON.stringify(right)));
+}
+
+export function buildTemporalAnnotationPayload(fixture, {
+  rawCorpusFileSha256,
+  rawCorpus,
+} = {}) {
+  if (!rawCorpus?.payload?.selection) fail('raw corpus selection is required for the annotation payload');
+  return {
+    schemaVersion: 'jaroo.kr-disclosure-event-annotation-manifest.v2',
+    rawCorpusFileSha256,
+    rawCorpusPayloadCanonicalSha256: rawCorpus.envelope.payloadCanonicalSha256,
+    selectedReceiptsSha256: rawCorpus.payload.selection.selectedReceiptsSha256,
+    selectedCasesSha256: rawCorpus.payload.selection.selectedCasesSha256,
+    ontologyVersion: fixture.ontologyVersion,
+    ontologyHash: fixture.ontologyHash,
+    predictionsHiddenUntilAdjudication: fixture.audit?.predictionsHiddenUntilAdjudication,
+    cases: fixture.cases.map((fixtureCase, index) => ({
+      id: fixtureCase.id,
+      rceptNo: valueFrom(fixtureCase, ['rceptNo', 'receiptNumber'], ['rceptNo', 'receiptNumber']),
+      caseContentSha256: rawCorpus.payload.selection.selectedCaseDigests[index],
+      expectedEvents: canonicalEventArray(fixtureCase.expectedEvents),
+      annotations: fixtureCase.annotations.map((annotation) => ({
+        annotator: annotation.annotator,
+        blindedToPrediction: annotation.blindedToPrediction,
+        confidenceInLabel: annotation.confidenceInLabel,
+        expectedEvents: canonicalEventArray(annotation.expectedEvents),
+      })),
+      adjudication: {
+        adjudicator: fixtureCase.adjudication.adjudicator,
+        decision: fixtureCase.adjudication.decision,
+        blindedToPrediction: fixtureCase.adjudication.blindedToPrediction,
+        rationale: fixtureCase.adjudication.rationale,
+        resolutionTier: fixtureCase.adjudication.resolutionTier ?? null,
+        expectedEvents: canonicalEventArray(fixtureCase.adjudication.expectedEvents),
+      },
+    })),
+  };
+}
+
+export function validateTemporalHoldoutFixture(fixture, {
+  allowBurned = false,
+  allowLegacySealedForTesting = false,
+  rawCorpusEnvelope = null,
+  rawCorpusFileBytes = null,
+  verifyExternalTimestamps = true,
+  verifyCurrentCandidate = true,
+  verifyRepositoryAnchor = true,
+  now = new Date(),
+} = {}) {
   if (!['sealed-temporal-holdout', 'burned-temporal-development'].includes(fixture.role)) {
     fail('temporal holdout fixture role must be sealed-temporal-holdout or burned-temporal-development');
+  }
+  const sealedV2 = fixture.role === 'sealed-temporal-holdout'
+    && fixture.schemaVersion === 'jaroo.kr-disclosure-event-temporal-holdout.v2';
+  const legacyV1 = fixture.schemaVersion === 'jaroo.kr-disclosure-event-temporal-holdout.v1';
+  if (fixture.role === 'sealed-temporal-holdout' && !sealedV2
+    && !(allowLegacySealedForTesting && legacyV1)) {
+    fail('sealed temporal holdout must use the provenance-bound v2 schema');
+  }
+  if (fixture.role === 'burned-temporal-development' && !legacyV1) {
+    fail('burned temporal development fixture must use the archived v1 schema');
   }
   if (fixture.role === 'burned-temporal-development') {
     if (!allowBurned) fail('burned temporal development fixtures cannot be used by the strict holdout gate');
@@ -166,8 +237,11 @@ export function validateTemporalHoldoutFixture(fixture, { allowBurned = false } 
       }
     }
   } else {
-    if (fixture.audit?.independentClaimEligible !== true) {
-      fail('sealed temporal holdout must set audit.independentClaimEligible=true');
+    if (sealedV2 && Object.hasOwn(fixture.audit ?? {}, 'independentClaimEligible')) {
+      fail('sealed v2 eligibility is derived from verified provenance and must not be self-attested');
+    }
+    if (!sealedV2 && fixture.audit?.independentClaimEligible !== true) {
+      fail('legacy sealed temporal holdout must set audit.independentClaimEligible=true');
     }
     if (fixture.audit?.predictionsHiddenUntilAdjudication !== true) {
       fail('sealed temporal holdout must attest audit.predictionsHiddenUntilAdjudication=true');
@@ -190,11 +264,72 @@ export function validateTemporalHoldoutFixture(fixture, { allowBurned = false } 
   const queryFrom = normalizedDate(fixture.query.from, 'query.from');
   const queryTo = normalizedDate(fixture.query.to, 'query.to');
   let candidateFreeze = null;
+  let rawCorpus = null;
+  let rawCorpusFileSha256 = null;
   if (fixture.role === 'sealed-temporal-holdout') {
-    try {
-      candidateFreeze = validateCandidateFreezeEnvelope(fixture.candidateFreeze);
-    } catch (error) {
-      fail(error.message);
+    if (sealedV2) {
+      if (!rawCorpusEnvelope || !rawCorpusFileBytes) {
+        fail('sealed v2 fixture requires the exact timestamped raw corpus artifact');
+      }
+      rawCorpusFileSha256 = createHash('sha256').update(rawCorpusFileBytes).digest('hex');
+      if (fixture.provenance?.rawCorpusFileSha256 !== rawCorpusFileSha256
+        || fixture.audit?.unlabeledCorpusSha256 !== rawCorpusFileSha256) {
+        fail('sealed v2 raw corpus file hash mismatch');
+      }
+      try {
+        rawCorpus = validateTemporalRawCorpusEnvelope(rawCorpusEnvelope, {
+          verifyExternalTimestamps,
+          verifyCurrentCandidate,
+          verifyRepositoryAnchor,
+          now,
+        });
+      } catch (error) {
+        fail(error.message);
+      }
+      candidateFreeze = rawCorpus.freeze;
+      if (canonicalJsonSha256(fixture.candidateFreeze)
+        !== canonicalJsonSha256(rawCorpus.payload.candidateFreeze)) {
+        fail('fixture candidate freeze must equal the raw corpus candidate freeze');
+      }
+      if (fixture.provenance?.rawCorpusPayloadCanonicalSha256
+        !== rawCorpus.envelope.payloadCanonicalSha256) {
+        fail('sealed v2 raw corpus payload canonical hash mismatch');
+      }
+      for (const field of [
+        'from', 'to', 'cutoff', 'corpClass', 'limit', 'minIssuers',
+        'selectionSeedCommitment', 'exclusionManifestSha256',
+        'excludedReceiptCount', 'excludedReceiptsSha256',
+      ]) {
+        if (fixture.query[field] !== rawCorpus.payload.query[field]) {
+          fail(`fixture query.${field} must equal the timestamped raw corpus query`);
+        }
+      }
+    } else if (allowLegacySealedForTesting) {
+      const legacy = fixture.candidateFreeze?.manifest;
+      const legacySampling = legacy?.sampling ?? legacy?.precommit?.sampling;
+      const legacyCutoff = legacy?.cutoff ?? legacy?.temporalBoundary?.cutoff;
+      const legacyFirstEligible = legacy?.firstEligibleFilingDate
+        ?? legacy?.temporalBoundary?.firstEligibleFilingDate;
+      if (!legacySampling || !legacyCutoff || !legacyFirstEligible) {
+        fail('legacy test fixture candidate freeze is incomplete');
+      }
+      candidateFreeze = {
+        ...legacy,
+        sampling: legacySampling,
+        cutoff: legacyCutoff,
+        firstEligibleFilingDate: legacyFirstEligible,
+      };
+    } else {
+      try {
+        candidateFreeze = validateCandidateFreezeEnvelope(fixture.candidateFreeze, {
+          verifyExternalTimestamps,
+          verifyCurrentCandidate,
+          verifyRepositoryAnchor,
+          now,
+        });
+      } catch (error) {
+        fail(error.message);
+      }
     }
     if (candidateFreeze.cutoff !== cutoff) fail('candidate freeze cutoff must equal fixture cutoff');
     if (queryFrom < candidateFreeze.firstEligibleFilingDate) {
@@ -226,6 +361,9 @@ export function validateTemporalHoldoutFixture(fixture, { allowBurned = false } 
   if (fixture.query.corpClass !== 'Y') fail('query.corpClass must be Y');
   if (fixture.labelStatus !== 'adjudicated') fail('fixture labelStatus must be adjudicated');
   if (!Array.isArray(fixture.cases) || fixture.cases.length === 0) fail('temporal holdout fixture must contain cases');
+  if (rawCorpus && fixture.cases.length !== rawCorpus.replay.length) {
+    fail('sealed v2 fixture case count must equal the deterministic raw corpus selection');
+  }
   const receipts = new Set();
   const ids = new Set();
   for (const [index, fixtureCase] of fixture.cases.entries()) {
@@ -235,20 +373,49 @@ export function validateTemporalHoldoutFixture(fixture, { allowBurned = false } 
     if (ids.has(fixtureCase.id)) fail(`${label} has duplicate case id ${fixtureCase.id}`);
     ids.add(fixtureCase.id);
     if (fixtureCase.labelStatus !== 'adjudicated') fail(`${label}.labelStatus must be adjudicated`);
-    const corpClass = valueFrom(fixtureCase, ['corpClass']) ?? sourceValue(fixtureCase, ['corpClass']);
+    let immutableProjection = null;
+    if (rawCorpus) {
+      for (const forbidden of [
+        'rceptNo', 'receiptNumber', 'filedAt', 'filingDate', 'reportName', 'title',
+        'bodyText', 'body', 'corpClass', 'bodySha256', 'bodyTextSha256',
+      ]) {
+        if (Object.hasOwn(fixtureCase, forbidden)) fail(`${label} contains forbidden post-capture alias ${forbidden}`);
+      }
+      try {
+        immutableProjection = temporalCorpusCaseProjection(fixtureCase);
+      } catch (error) {
+        fail(`${label} immutable raw content is invalid: ${error.message}`);
+      }
+    }
+    const corpClass = immutableProjection?.corpClass
+      ?? valueFrom(fixtureCase, ['corpClass'])
+      ?? sourceValue(fixtureCase, ['corpClass']);
     if (corpClass !== 'Y') fail(`${label} must have KOSPI corpClass Y`);
-    const receipt = valueFrom(fixtureCase, ['rceptNo', 'receiptNumber'], ['rceptNo', 'receiptNumber']);
+    const receipt = immutableProjection?.rceptNo
+      ?? valueFrom(fixtureCase, ['rceptNo', 'receiptNumber'], ['rceptNo', 'receiptNumber']);
     if (typeof receipt !== 'string' || receipt.length === 0) fail(`${label} must have a receipt number`);
     if (receipts.has(receipt)) fail(`${label} has duplicate receipt number ${receipt}`);
     receipts.add(receipt);
-    const filedAt = valueFrom(fixtureCase, ['filedAt', 'filingDate'], ['filedAt', 'filingDate', 'receiptDate']);
+    if (rawCorpus) {
+      if (receipt !== rawCorpus.replay[index]) {
+        fail(`${label} receipt does not equal the deterministic raw corpus selection`);
+      }
+      const caseDigest = temporalCorpusCaseSha256(fixtureCase);
+      if (caseDigest !== rawCorpus.payload.selection.selectedCaseDigests[index]) {
+        fail(`${label} immutable content differs from the timestamped raw corpus`);
+      }
+    }
+    const filedAt = immutableProjection?.receiptDate
+      ?? valueFrom(fixtureCase, ['filedAt', 'filingDate'], ['filedAt', 'filingDate', 'receiptDate']);
     const filingDate = normalizedDate(filedAt, `${label}.filedAt`);
     if (filingDate <= cutoff) fail(`${label} filing date must be strictly after cutoff`);
     if (candidateFreeze && filingDate < candidateFreeze.firstEligibleFilingDate) {
       fail(`${label} filing date must be on or after candidate freeze firstEligibleFilingDate`);
     }
     if (filingDate < queryFrom || filingDate > queryTo) fail(`${label} filing date must be within query.from and query.to`);
-    const bodyText = valueFrom(fixtureCase, ['bodyText'], ['bodyText', 'body']);
+    const bodyText = rawCorpus
+      ? fixtureCase.input.body
+      : valueFrom(fixtureCase, ['bodyText'], ['bodyText', 'body']);
     if (typeof bodyText !== 'string' || bodyText.length === 0) fail(`${label} must have nonempty bodyText`);
     const suppliedHash = fixtureCase.bodySha256
       ?? fixtureCase.bodyTextSha256
@@ -257,7 +424,8 @@ export function validateTemporalHoldoutFixture(fixture, { allowBurned = false } 
     const actualHash = createHash('sha256').update(bodyText).digest('hex');
     if (suppliedHash !== actualHash) fail(`${label} body SHA-256 mismatch`);
     if (typeof fixtureCase.templateKey !== 'string' || fixtureCase.templateKey.length === 0) fail(`${label}.templateKey must be nonempty`);
-    const title = valueFrom(fixtureCase, ['reportName', 'title'], ['reportName', 'title']);
+    const title = immutableProjection?.reportName
+      ?? valueFrom(fixtureCase, ['reportName', 'title'], ['reportName', 'title']);
     if (fixtureCase.templateKey !== normalizeTitleTemplate(title)) {
       fail(`${label}.templateKey must equal the normalized disclosure title`);
     }
@@ -362,6 +530,29 @@ export function validateTemporalHoldoutFixture(fixture, { allowBurned = false } 
   }
   for (const [key, actual] of Object.entries(recomputed)) {
     if (summary[key] !== actual) fail(`summary.${key} must equal recomputed value ${actual}`);
+  }
+  if (rawCorpus) {
+    const annotationPayload = buildTemporalAnnotationPayload(fixture, {
+      rawCorpusFileSha256,
+      rawCorpus,
+    });
+    const annotationManifestSha256 = temporalDomainSha256('annotation-manifest', annotationPayload);
+    if (fixture.audit.annotationManifestSha256 !== annotationManifestSha256) {
+      fail('sealed v2 annotationManifestSha256 does not match the actual labels and adjudication');
+    }
+    let annotationTimestamp;
+    try {
+      annotationTimestamp = validateDetachedTimestampEnvelope(
+        annotationPayload,
+        fixture.provenance?.annotationFreeze,
+        { verifyCrypto: verifyExternalTimestamps, now },
+      );
+    } catch (error) {
+      fail(error.message);
+    }
+    if (new Date(annotationTimestamp.earliestGenTime) <= new Date(rawCorpus.timestamp.operationalNotBefore)) {
+      fail('annotation RFC3161 receipts must postdate the raw corpus trusted upper boundary');
+    }
   }
   return fixture;
 }
@@ -498,17 +689,23 @@ export function evaluateTemporalHoldoutFixture(
   fixture,
   predictor = extractEventsGatedProjection,
   thresholds = STRICT_THRESHOLDS,
-  { allowBurned = false } = {},
+  validationOptions = {},
 ) {
-  const validated = validateTemporalHoldoutFixture(fixture, { allowBurned });
+  const { allowBurned = false } = validationOptions;
+  const validated = validateTemporalHoldoutFixture(fixture, validationOptions);
   const evaluations = validated.cases.map((fixtureCase) => {
     const input = fixtureCase.input ?? {};
     const extractorInput = {
-      ...input,
-      filedAt: input.filedAt ?? input.receiptDate,
-      reportName: input.reportName ?? input.title,
-      bodyText: input.bodyText ?? input.body,
-      corpName: input.corpName ?? input.issuer,
+      rceptNo: input.rceptNo,
+      receiptDate: input.receiptDate,
+      filedAt: input.receiptDate,
+      reportName: input.title,
+      title: input.title,
+      bodyText: input.body,
+      body: input.body,
+      corpName: input.issuer,
+      issuer: input.issuer,
+      stockCode: input.stockCode,
     };
     return evaluateTemporalHoldoutCase(
       fixtureCase,
@@ -517,12 +714,37 @@ export function evaluateTemporalHoldoutFixture(
     );
   });
   const assessment = assessTemporalHoldoutThresholds(evaluations, thresholds);
-  return Object.freeze({ evaluations: Object.freeze(evaluations), assessment });
+  return Object.freeze({
+    evaluations: Object.freeze(evaluations),
+    assessment,
+    provenanceVerified: validated.role === 'sealed-temporal-holdout'
+      && validated.schemaVersion === 'jaroo.kr-disclosure-event-temporal-holdout.v2'
+      && validationOptions.verifyExternalTimestamps !== false
+      && validationOptions.verifyCurrentCandidate !== false
+      && validationOptions.verifyRepositoryAnchor !== false
+      && validationOptions.allowLegacySealedForTesting !== true,
+  });
 }
 
-export async function runTemporalHoldoutBenchmark({ fixturePath = DEFAULT_FIXTURE, gateMode = 'strict' } = {}) {
+export async function runTemporalHoldoutBenchmark({
+  fixturePath = DEFAULT_FIXTURE,
+  gateMode = 'strict',
+  verifyExternalTimestamps = true,
+  verifyCurrentCandidate = true,
+  verifyRepositoryAnchor = true,
+  allowLegacySealedForTesting = false,
+  now = new Date(),
+} = {}) {
   if (!['strict', 'diagnostic'].includes(gateMode)) {
     throw new TemporalHoldoutFixtureError('gateMode must be strict or diagnostic');
+  }
+  if (gateMode === 'strict' && (
+    !verifyExternalTimestamps
+    || !verifyCurrentCandidate
+    || !verifyRepositoryAnchor
+    || allowLegacySealedForTesting
+  )) {
+    throw new TemporalHoldoutFixtureError('strict gate forbids provenance verification bypasses');
   }
   const absoluteFixture = resolve(fixturePath);
   const fixtureBytes = await readFile(absoluteFixture);
@@ -530,20 +752,57 @@ export async function runTemporalHoldoutBenchmark({ fixturePath = DEFAULT_FIXTUR
   if (gateMode === 'diagnostic' && fixture.role !== 'burned-temporal-development') {
     throw new TemporalHoldoutFixtureError('diagnostic gate mode is reserved for burned temporal development fixtures');
   }
-  const { evaluations, assessment } = evaluateTemporalHoldoutFixture(
+  let rawCorpusEnvelope = null;
+  let rawCorpusFileBytes = null;
+  let rawCorpusPath = null;
+  if (fixture.role === 'sealed-temporal-holdout'
+    && fixture.schemaVersion === 'jaroo.kr-disclosure-event-temporal-holdout.v2') {
+    if (typeof fixture.provenance?.rawCorpusPath !== 'string' || !fixture.provenance.rawCorpusPath) {
+      throw new TemporalHoldoutFixtureError('sealed v2 fixture provenance.rawCorpusPath is required');
+    }
+    rawCorpusPath = resolve(dirname(absoluteFixture), fixture.provenance.rawCorpusPath);
+    rawCorpusFileBytes = await readFile(rawCorpusPath);
+    rawCorpusEnvelope = JSON.parse(rawCorpusFileBytes.toString('utf8'));
+  }
+  const { evaluations, assessment, provenanceVerified } = evaluateTemporalHoldoutFixture(
     fixture,
     extractEventsGatedProjection,
     gateMode === 'strict' ? STRICT_THRESHOLDS : {},
-    { allowBurned: gateMode === 'diagnostic' },
+    {
+      allowBurned: gateMode === 'diagnostic',
+      allowLegacySealedForTesting,
+      rawCorpusEnvelope,
+      rawCorpusFileBytes,
+      verifyExternalTimestamps,
+      verifyCurrentCandidate,
+      verifyRepositoryAnchor,
+      now,
+    },
   );
-  const fixtureIndependentClaimEligible = fixture.role === 'sealed-temporal-holdout'
-    && fixture.audit?.independentClaimEligible === true;
+  // RFC3161 and the content-addressed chain prove existence, ordering, and
+  // internal immutability. They do not prove that OpenDART returned the entire
+  // population, that human labelers were prediction-blind, or that a cohort
+  // has never been burned elsewhere. Keep the independent claim fail-closed
+  // until dedicated external witness/signature/ledger verifiers are added.
+  const externalIndependence = Object.freeze({
+    contractTsaFormalAccuracyBoundVerified: false,
+    providerPopulationAuthenticityWitnessVerified: false,
+    signedIndependentAnnotationIdentitiesVerified: false,
+    appendOnlyCohortBurnLedgerVerified: false,
+    passed: false,
+    failures: TEMPORAL_EXTERNAL_INDEPENDENCE_REQUIREMENTS,
+  });
+  const fixtureIndependentClaimEligible = provenanceVerified && externalIndependence.passed;
+  const gatePassed = assessment.passed
+    && (gateMode !== 'strict' || fixtureIndependentClaimEligible);
   return {
-    schemaVersion: 'jaroo.kr-disclosure-event-temporal-holdout-result.v1',
+    schemaVersion: 'jaroo.kr-disclosure-event-temporal-holdout-result.v2',
     fixture: absoluteFixture,
     fixtureRole: fixture.role,
     fixtureIndependentClaimEligible,
-    independentClaimEligible: gateMode === 'strict' && assessment.passed && fixtureIndependentClaimEligible,
+    independentClaimEligible: gateMode === 'strict' && gatePassed && fixtureIndependentClaimEligible,
+    cryptographicChainVerified: provenanceVerified,
+    externalIndependence,
     developmentReAdjudicationCount: fixture.summary?.developmentReAdjudicationCount ?? 0,
     hashes: {
       fixtureSha256: createHash('sha256').update(fixtureBytes).digest('hex'),
@@ -552,12 +811,24 @@ export async function runTemporalHoldoutBenchmark({ fixturePath = DEFAULT_FIXTUR
       ontologyManifestSha256: KR_DISCLOSURE_EVENT_ONTOLOGY_HASH,
       thresholdsSha256: createHash('sha256').update(JSON.stringify(STRICT_THRESHOLDS)).digest('hex'),
       candidateFreezeManifestSha256: fixture.candidateFreeze?.manifestFileSha256 ?? null,
+      rawCorpusFileSha256: rawCorpusFileBytes
+        ? createHash('sha256').update(rawCorpusFileBytes).digest('hex')
+        : null,
+      annotationManifestSha256: fixture.audit?.annotationManifestSha256 ?? null,
     },
     ontologyVersion: KR_DISCLOSURE_EVENT_ONTOLOGY_VERSION,
     cutoff: fixture.cutoff ?? fixture.query?.cutoff,
+    rawCorpus: rawCorpusPath,
     metrics: assessment.metrics,
     failures: evaluations.filter((item) => !item.exact),
-    gate: { mode: gateMode, passed: assessment.passed, failures: assessment.failures },
+    performanceGate: { passed: assessment.passed, failures: assessment.failures },
+    gate: {
+      mode: gateMode,
+      passed: gatePassed,
+      failures: gateMode === 'strict'
+        ? [...assessment.failures, ...externalIndependence.failures.map((requirement) => ({ requirement }))]
+        : assessment.failures,
+    },
   };
 }
 
