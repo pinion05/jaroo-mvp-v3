@@ -1,0 +1,28 @@
+{
+  "schemaVersion": "jaroo.kr-disclosure-event-candidate-freeze.v1",
+  "createdAt": "2026-07-27T02:50:38.471Z",
+  "timeZone": "Asia/Seoul",
+  "cutoff": "20260727",
+  "firstEligibleFilingDate": "20260728",
+  "sampling": {
+    "selectionSeedCommitment": "301d7b55257b22993728d2aa4d1b6f1dbf9a051fe219f848c4bd2b2f223cd184",
+    "exclusionManifestSha256": "66b33a6f8c621141bbc2673988dee532e6aaef40198fce8396cdcc825108fe48",
+    "excludedReceiptCount": 170,
+    "excludedReceiptsSha256": "6cd2de4b06e03626d641b4393196ce5d10febc08faa0a546b3bcd5e99a61ea4f"
+  },
+  "candidate": {
+    "extractorSha256": "1469c217eb383b1b45ed3d24e749d219b0cd365f234f0a3c688a1dfbb010a5cb",
+    "ontologySourceSha256": "77c4ab7e6ac8c4fa6ab1d3046f947ec2fa82f7a0857f866f2579a951bce2c6da",
+    "protocolSha256": "543dde8dc1995b193e0ec98d55571b1e0f083d22bbe7d5263967774238c7d0aa",
+    "collectorSha256": "6b86ffdc91acf1beff03700f680794fef1fa3c0f4e46bfa43e794d4a3bfd2814",
+    "ontologyVersion": "jaroo.kr-disclosure-event-ontology.v1",
+    "ontologyManifestSha256": "9546959673fb62c9264af038e59ad52a8dbb3fea3fc0f1f2c77f05169dbf7237",
+    "evaluatorSha256": "70fba66890ca0c670a39f0226bebf56190f5069beace60dff47ca652f530fad7",
+    "thresholdsSha256": "0a27d06a72a19119962200c7a4de67fe28621e57326e8a1adcda271afc755901",
+    "bundleSha256": "eb146433f1320334e76a8f8067a2c1ee2e54595fa79cdfb8e2813ba767afd444"
+  },
+  "repository": {
+    "gitHead": "1cef7f38d3aed41ccb1c31a352a82764d8c8d0f2",
+    "gitCommittedAt": "2026-07-27T02:50:32.000Z"
+  }
+}
