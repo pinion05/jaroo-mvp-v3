@@ -891,7 +891,9 @@ const EXCHANGEABLE_BOND_OPERATIVE_DELTA = /(?:변경|조정|연기|확정|수정
 const EXCHANGEABLE_BOND_NONOPERATIVE_DELTA = /(?:변경|조정|수정)(?:가능성|여부|검토|예정|계획)|(?:변경|조정|수정)(?:하지않|하지아니|되지않)|(?:변경|조정|수정)(?:은|이)?없|설명(?:만|을|을만)?(?:추가|보완)|(?:가능성|설명).{0,40}(?:추가|보완)/u;
 
 function hasStructuredCorrectionDelta(clauses, operativeIndex) {
-  const window = clauses.slice(Math.max(0, operativeIndex - 2), operativeIndex + 7);
+  const windowStart = Math.max(0, operativeIndex - 2);
+  const window = clauses.slice(windowStart, operativeIndex + 7);
+  const operativeWindowIndex = operativeIndex - windowStart;
   const context = window.join('|');
   if (!/(?:정정전.*정정후|변경전.*변경후)/u.test(context)) return false;
 
@@ -900,7 +902,12 @@ function hasStructuredCorrectionDelta(clauses, operativeIndex) {
   if (beforeIndex >= 0 && afterIndex > beforeIndex) {
     const beforeValue = window.slice(beforeIndex + 1, afterIndex).find(Boolean) ?? '';
     const afterValue = window.slice(afterIndex + 1).find(Boolean) ?? '';
-    if (beforeValue && afterValue) return beforeValue !== afterValue;
+    if (beforeValue && afterValue) {
+      if (beforeValue === afterValue) return false;
+      const operativeClauseIsComparedValue = operativeWindowIndex === beforeIndex + 1
+        || operativeWindowIndex === afterIndex + 1;
+      if (!operativeClauseIsComparedValue) return true;
+    }
   }
   return !EXCHANGEABLE_BOND_NONOPERATIVE_DELTA.test(context);
 }

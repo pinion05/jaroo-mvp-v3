@@ -3309,6 +3309,15 @@ test('iteration 8 separated gates preserve wrapper authority, intent identity, l
       expected: [e('capital-change', 'decided', 'proposed', 'exchangeable-bond', 'securities')],
     },
     {
+      id: 'exchangeable-bond-structured-description-change-remains-decided',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '3. 정정사항 | 19. 기타 투자판단에 참고할 사항 | 기재보완에 따른 정정 | 정정 전 | 교환가액 변경 가능성 설명 없음 | 정정 후 | 교환가액 변경 가능성에 대한 위험 설명 추가 | 실제 교환가액은 변경하지 않았습니다',
+      },
+      expected: [e('capital-change', 'decided', 'proposed', 'exchangeable-bond', 'securities')],
+    },
+    {
       id: 'exchangeable-bond-redemption-change-possibility-only-remains-decided',
       input: {
         reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
