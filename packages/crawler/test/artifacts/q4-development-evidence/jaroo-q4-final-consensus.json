@@ -1,0 +1,1405 @@
+[
+  {
+    "packet": 1,
+    "index": 18,
+    "rceptNo": "20251020000309",
+    "a": {
+      "index": 18,
+      "rceptNo": "20251020000309",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "ordered",
+          "state": "correction-requested",
+          "cause": "disclosure-correction",
+          "subjectType": "issuer"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-b",
+      "rationale": "문서 표제의 정정명령부과가 이 접수의 신규 규제 사건이다. 재현된 자기주식 처분 원문은 정정 요구의 대상일 뿐이며, correction wrapper와 원 사업 사건을 중복 산입하지 않는다.",
+      "ambiguities": [
+        "본문에 정정명령의 상세 사유가 없지만 reportName이 명령 부과 사실과 대상 공시를 명시한다."
+      ]
+    },
+    "b": {
+      "index": 18,
+      "rceptNo": "20251020000309",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "ordered",
+          "state": "correction-requested",
+          "cause": "disclosure-correction",
+          "subjectType": "issuer"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-b",
+      "rationale": "보고서명은 금융당국의 정정명령 부과를 명시한다. ontology의 correction-requested는 바로 권한기관이 정정을 요구했으나 실질 사건의 상태는 추론하지 않는 경우이므로, 재현된 자기주식 처분 원문을 별도 신규 처분 사건으로 중복 계상하지 않는다.",
+      "ambiguities": [
+        "본문에 명령 상세가 없지만 reportName 자체가 정정명령 부과라는 규제 사건을 확립한다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "legal-regulatory",
+        "action": "ordered",
+        "state": "correction-requested",
+        "cause": "disclosure-correction",
+        "subjectType": "issuer"
+      }
+    ]
+  },
+  {
+    "packet": 1,
+    "index": 32,
+    "rceptNo": "20251031000581",
+    "a": {
+      "index": 32,
+      "rceptNo": "20251031000581",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "추가서류는 회차와 조건이 서로 다른 8개 ELS를 일반공모로 모집하며 각 청약 시작일과 납입일이 제출일 이후다. 단순 filing보다 투자자 모집을 개시한 solicited가 문서의 실질 행위를 잘 나타내고, 상품별 derivative-linked-securities 원인을 보존한다.",
+      "ambiguities": [
+        "제출 시점에는 청약 개시 전이므로 각 모집의 lifecycle은 pending이며, 동일 tuple 8개는 독립 회차 cardinality를 나타낸다."
+      ]
+    },
+    "b": {
+      "index": 32,
+      "rceptNo": "20251031000581",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "제출일에 8개 독립 ELS 회차의 청약공고와 모집조건을 제시했고 청약·납입은 미래다. filed는 문서 제출 행위를, securities-offering은 일반 원인을 나타내지만, 실질 사건은 파생결합증권별 모집 권유이므로 solicited/pending과 더 구체적인 derivative-linked-securities를 택한다. ontology의 cardinality 규칙에 따라 동일 tuple 8개를 유지한다.",
+      "ambiguities": [
+        "청약 접수는 11월 3일 시작하지만 10월 31일 청약공고로 모집 권유는 이미 성립했다.",
+        "각 회차의 조건과 기초자산이 달라 문서 수준의 단일 사건으로 병합하지 않는다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      }
+    ]
+  },
+  {
+    "packet": 1,
+    "index": 87,
+    "rceptNo": "20251031800586",
+    "a": {
+      "index": 87,
+      "rceptNo": "20251031800586",
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "2025년 1~9월 잠정 결산실적을 2025-11-07에 공시할 예정이라는 일정 예고다. 수치가 아직 발표되지 않았으므로 preliminary 실적 발표가 아니라 pending 일정이며, earnings canonical cause는 operating-results다.",
+      "ambiguities": [
+        "향후 발표 수치가 잠정치라는 설명은 현재 시점에 측정값이 공개되었다는 뜻이 아니다."
+      ]
+    },
+    "b": {
+      "index": 87,
+      "rceptNo": "20251031800586",
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "현재 문서는 결산실적 수치가 아니라 11월 7일 발표 일정을 공지하므로 scheduled/pending이다. earnings 문맥에서 earnings-release는 ontology alias에 의해 operating-results로 정규화되므로 candidate A의 canonical cause를 사용한다.",
+      "ambiguities": [
+        "미래 발표치가 잠정치라는 설명은 아직 공개되지 않은 결과의 성격일 뿐 현재 사건의 state를 preliminary로 만들지 않는다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "earnings",
+        "action": "scheduled",
+        "state": "pending",
+        "cause": "operating-results",
+        "subjectType": "financials"
+      }
+    ]
+  },
+  {
+    "packet": 1,
+    "index": 203,
+    "rceptNo": "20251118000007",
+    "a": {
+      "index": 203,
+      "rceptNo": "20251118000007",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "공개매수기간이 제출일인 2025-11-18에 시작되어 12-07까지 실제로 진행 중이다. 결제는 미래지만 공개매수 자체는 이미 개시되어 active이므로 solicited/pending보다 initiated/active가 정확하다.",
+      "ambiguities": [
+        "복수 펀드와 운용주체가 공동 매수자이지만 동일 대상·가격·기간으로 수행하는 하나의 공개매수다."
+      ]
+    },
+    "b": {
+      "index": 203,
+      "rceptNo": "20251118000007",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "공개매수기간은 제출일인 11월 18일 당일부터 시작되므로 공개매수는 단순 미래 권유가 아니라 이미 개시되어 진행 중이다. 결제와 최종 취득 수량이 미확정이라는 사실은 공개매수 자체의 active 상태를 pending으로 바꾸지 않는다.",
+      "ambiguities": [
+        "공동 공개매수자가 여러 법적 주체로 구성되지만 동일 대상·가격·기간 아래 공동 수행하는 하나의 공개매수다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "corporate-action",
+        "action": "initiated",
+        "state": "active",
+        "cause": "tender-offer",
+        "subjectType": "listed-shares"
+      }
+    ]
+  },
+  {
+    "packet": 1,
+    "index": 219,
+    "rceptNo": "20251128801291",
+    "a": {
+      "index": 219,
+      "rceptNo": "20251128801291",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-borrowing",
+          "subjectType": "cash"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-b",
+      "rationale": "자회사 메가박스중앙의 160억원 단기차입은 계열사 간 금전대차로 명시되고 공정위 신고대상에도 해당한다. 따라서 일반 short-term-borrowing보다 관계자 거래를 보존하는 related-party-borrowing이 우선하며, 이사회 결정 후 실행일이 확립되지 않아 proposed다.",
+      "ambiguities": [
+        "차입 후 총액은 제시되지만 실제 자금 실행일이나 완료 사실은 원문에 없다."
+      ]
+    },
+    "b": {
+      "index": 219,
+      "rceptNo": "20251128801291",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-borrowing",
+          "subjectType": "cash"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-b",
+      "rationale": "차입형태가 계열사 간 금전대차로 명시되므로 일반적인 자본변동보다 related-party라는 관계적 genus와 related-party-borrowing이라는 구체적 cause가 우선한다. 이사회 결정은 있었으나 실행일은 확립되지 않아 decided/proposed이며, 거래 객체는 issuer가 아니라 cash다.",
+      "ambiguities": [
+        "차입 후 총액이 제시되지만 실제 자금 이전 완료일은 없어 borrowed/effective로 올리지 않는다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "related-party",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "related-party-borrowing",
+        "subjectType": "cash"
+      }
+    ]
+  },
+  {
+    "packet": 1,
+    "index": 345,
+    "rceptNo": "20251231800801",
+    "a": {
+      "index": 345,
+      "rceptNo": "20251231800801",
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "under-review",
+          "state": "pending",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-b",
+      "rationale": "종전 계약 종료일은 도래했지만 정정 후 종료일을 삭제하고 계약상대와 변경 협의 중이며 확정 후 재공시한다고 밝혔다. 서명된 연장이나 확정된 종료를 추론하지 않고 계약 변경 검토 결과가 남은 pending으로 판정한다.",
+      "ambiguities": [
+        "정정사유에 계약기간 종료가 함께 적혀 있어 terminated 해석 여지가 있으나, 문서는 최종 종료 상태 대신 계속되는 변경 협의와 미정 종료일을 제시한다."
+      ]
+    },
+    "b": {
+      "index": 345,
+      "rceptNo": "20251231800801",
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "under-review",
+          "state": "pending",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-b",
+      "rationale": "정정은 종전 종료일을 삭제하고 계약상대와 변경 협의 중이며 확정 후 다시 공시한다고 한다. review와 장래 확정이 명시되므로 under-review/pending이고, issuer가 사실관계를 알 수 없다고 답한 것이 아니어서 uncertain은 부적절하다. correction wrapper 자체도 별도 corrected state가 아니다.",
+      "ambiguities": [
+        "정정사유에 계약기간 종료가 언급되지만 종료일을 삭제했고 해지·종료를 확정 사건으로 공시하지 않아 terminated/cancelled를 추가하지 않는다.",
+        "협의 결과가 연장인지 다른 조건 변경인지 아직 확립되지 않았다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "material-contract",
+        "action": "under-review",
+        "state": "pending",
+        "cause": "supply-contract",
+        "subjectType": "contract"
+      }
+    ]
+  },
+  {
+    "packet": 2,
+    "index": 6,
+    "rceptNo": "20251031000533",
+    "a": {
+      "index": 6,
+      "rceptNo": "20251031000533",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "under-review",
+          "state": "deferred",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "정정은 교환사채 발행 여부와 구체적 계획의 최종결정을 2025년 11월로 연기하고 재검토 중임을 알린다.",
+      "ambiguities": [
+        "정정 문구에 '자기주식 처분 관련 검토'가 섞여 있지만 정정대상 문서는 교환사채 발행결정이며 두 거래가 결합되어 있다."
+      ]
+    },
+    "b": {
+      "index": 6,
+      "rceptNo": "20251031000533",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "under-review",
+          "state": "deferred",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "정정은 교환사채 발행 여부와 구체적 계획의 최종결정을 2025년 11월로 연기하고 재검토 중임을 알린다.",
+      "ambiguities": [
+        "정정 문구에 '자기주식 처분 관련 검토'가 섞여 있지만 정정대상 문서는 교환사채 발행결정이며 두 거래가 결합되어 있다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "under-review",
+        "state": "deferred",
+        "cause": "exchangeable-bond",
+        "subjectType": "securities"
+      }
+    ]
+  },
+  {
+    "packet": 2,
+    "index": 19,
+    "rceptNo": "20251020000303",
+    "a": {
+      "index": 19,
+      "rceptNo": "20251020000303",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "ordered",
+          "state": "correction-requested",
+          "cause": "disclosure-correction",
+          "subjectType": "issuer"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-b",
+      "rationale": "교환사채 발행결정 공시에 정정명령이 부과되어 발행인에게 공시 정정이 요구된 규제 사건이다.",
+      "ambiguities": [
+        "본문의 교환사채 발행결정은 정정 대상 원문이므로 별도 신규 발행 사건으로 세지 않았다."
+      ]
+    },
+    "b": {
+      "index": 19,
+      "rceptNo": "20251020000303",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "ordered",
+          "state": "correction-requested",
+          "cause": "disclosure-correction",
+          "subjectType": "issuer"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-b",
+      "rationale": "교환사채 발행결정 공시에 정정명령이 부과되어 발행인에게 공시 정정이 요구된 규제 사건이다.",
+      "ambiguities": [
+        "본문의 교환사채 발행결정은 정정 대상 원문이므로 별도 신규 발행 사건으로 세지 않았다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "legal-regulatory",
+        "action": "ordered",
+        "state": "correction-requested",
+        "cause": "disclosure-correction",
+        "subjectType": "issuer"
+      }
+    ]
+  },
+  {
+    "packet": 2,
+    "index": 34,
+    "rceptNo": "20251030000222",
+    "a": {
+      "index": 34,
+      "rceptNo": "20251030000222",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-a",
+      "rationale": "현대차증권 제127~129회 기타파생결합증권 3개 회차를 각 500억원씩 모집하고 청약·납입은 미래다. 별도 회차 3건을 보존한다.",
+      "ambiguities": [
+        "일괄신고 추가서류 제출을 단순 filed 래퍼로 보지 않고 실질적인 증권 모집으로 판정했다."
+      ]
+    },
+    "b": {
+      "index": 34,
+      "rceptNo": "20251030000222",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-a",
+      "rationale": "현대차증권 제127~129회 기타파생결합증권 3개 회차를 각 500억원씩 모집하고 청약·납입은 미래다. 별도 회차 3건을 보존한다.",
+      "ambiguities": [
+        "일괄신고 추가서류 제출을 단순 filed 래퍼로 보지 않고 실질적인 증권 모집으로 판정했다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-securities",
+        "subjectType": "securities"
+      }
+    ]
+  },
+  {
+    "packet": 2,
+    "index": 90,
+    "rceptNo": "20251031800377",
+    "a": {
+      "index": 90,
+      "rceptNo": "20251031800377",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": "active",
+          "cause": "compliance-program",
+          "subjectType": "governance"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-a",
+      "rationale": "기아가 2025년 3분기 공정거래 자율준수 프로그램 운영실적과 4분기 계획을 함께 보고하며 프로그램이 계속 운영 중임을 나타낸다.",
+      "ambiguities": [
+        "완료된 세부 교육·평가와 미래 계획이 다수이나 하나의 CP 운영현황 문서로 집계했다."
+      ]
+    },
+    "b": {
+      "index": 90,
+      "rceptNo": "20251031800377",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": "active",
+          "cause": "compliance-program",
+          "subjectType": "governance"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-a",
+      "rationale": "기아가 2025년 3분기 공정거래 자율준수 프로그램 운영실적과 4분기 계획을 함께 보고하며 프로그램이 계속 운영 중임을 나타낸다.",
+      "ambiguities": [
+        "완료된 세부 교육·평가와 미래 계획이 다수이나 하나의 CP 운영현황 문서로 집계했다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "governance",
+        "action": "reported",
+        "state": "active",
+        "cause": "compliance-program",
+        "subjectType": "governance"
+      }
+    ]
+  },
+  {
+    "packet": 2,
+    "index": 138,
+    "rceptNo": "20251031000262",
+    "a": {
+      "index": 138,
+      "rceptNo": "20251031000262",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-b",
+      "rationale": "SK네트웍스가 계열회사 SK스퀘어와 인크로스 주식 전량의 양수도계약을 체결했다. 계약은 성립했지만 공시가 취득 진행상황에 따른 변동 가능성을 명시하므로 종결 전 pending으로 판정한다.",
+      "ambiguities": [
+        "거래일자가 계약체결일과 같아 acquired/effective로 볼 여지가 있으나, 원문은 취득 진행 중임을 명시한다."
+      ]
+    },
+    "b": {
+      "index": 138,
+      "rceptNo": "20251031000262",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-b",
+      "rationale": "SK네트웍스가 계열회사 SK스퀘어와 인크로스 주식 전량의 양수도계약을 체결했다. 계약은 성립했지만 공시가 취득 진행상황에 따른 변동 가능성을 명시하므로 종결 전 pending으로 판정한다.",
+      "ambiguities": [
+        "거래일자가 계약체결일과 같아 acquired/effective로 볼 여지가 있으나, 원문은 취득 진행 중임을 명시한다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "related-party",
+        "action": "contracted",
+        "state": "pending",
+        "cause": "equity-acquisition",
+        "subjectType": "securities"
+      }
+    ]
+  },
+  {
+    "packet": 2,
+    "index": 204,
+    "rceptNo": "20251118000006",
+    "a": {
+      "index": 204,
+      "rceptNo": "20251118000006",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "공개매수신고서는 에이플러스에셋 보통주에 대한 동일 공개매수를 2025-11-18부터 개시했음을 확정한다. 매수 기간이 진행 중이므로 active인 공개매수 1건이다.",
+      "ambiguities": [
+        "설명서와 신고서는 별도 문서이지만 각 문서를 독립 adjudication하므로 이 문서에도 동일 실질 사건 1건을 둔다."
+      ]
+    },
+    "b": {
+      "index": 204,
+      "rceptNo": "20251118000006",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "공개매수신고서는 에이플러스에셋 보통주에 대한 동일 공개매수를 2025-11-18부터 개시했음을 확정한다. 매수 기간이 진행 중이므로 active인 공개매수 1건이다.",
+      "ambiguities": [
+        "설명서와 신고서는 별도 문서이지만 각 문서를 독립 adjudication하므로 이 문서에도 동일 실질 사건 1건을 둔다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "corporate-action",
+        "action": "initiated",
+        "state": "active",
+        "cause": "tender-offer",
+        "subjectType": "listed-shares"
+      }
+    ]
+  },
+  {
+    "packet": 2,
+    "index": 293,
+    "rceptNo": "20251231000590",
+    "a": {
+      "index": 293,
+      "rceptNo": "20251231000590",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bond-sale",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-a",
+      "rationale": "회사가 보유한 자기 전환사채 10억원의 재매각을 결정했다. 수령 예정일은 당일이지만 실제 수령·매도 완료 문구가 없어 결정된 채권 매각으로 유지한다.",
+      "ambiguities": [
+        "매도대금 수령 예정일이 공시일과 같아 effective로 볼 여지가 있으나 완료 사실은 명시되지 않았다."
+      ]
+    },
+    "b": {
+      "index": 293,
+      "rceptNo": "20251231000590",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bond-sale",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-a",
+      "rationale": "회사가 보유한 자기 전환사채 10억원의 재매각을 결정했다. 수령 예정일은 당일이지만 실제 수령·매도 완료 문구가 없어 결정된 채권 매각으로 유지한다.",
+      "ambiguities": [
+        "매도대금 수령 예정일이 공시일과 같아 effective로 볼 여지가 있으나 완료 사실은 명시되지 않았다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "asset-transaction",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "bond-sale",
+        "subjectType": "securities"
+      }
+    ]
+  },
+  {
+    "packet": 2,
+    "index": 357,
+    "rceptNo": "20251231800437",
+    "a": {
+      "index": 357,
+      "rceptNo": "20251231800437",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "finalized",
+          "cause": "collateral-provision",
+          "subjectType": "asset"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-a",
+      "rationale": "자회사 차입에 대한 주식 담보제공의 인출일이 확정되어 제공기간 시작·종료일을 확정했다. 기존 담보제공 결정을 반복하지 않고 조건 확정 업데이트로 판정한다.",
+      "ambiguities": [
+        "action enum에 finalized가 없어 updated와 state=finalized 조합을 사용했다."
+      ]
+    },
+    "b": {
+      "index": 357,
+      "rceptNo": "20251231800437",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "finalized",
+          "cause": "collateral-provision",
+          "subjectType": "asset"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-a",
+      "rationale": "자회사 차입에 대한 주식 담보제공의 인출일이 확정되어 제공기간 시작·종료일을 확정했다. 기존 담보제공 결정을 반복하지 않고 조건 확정 업데이트로 판정한다.",
+      "ambiguities": [
+        "action enum에 finalized가 없어 updated와 state=finalized 조합을 사용했다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "related-party",
+        "action": "updated",
+        "state": "finalized",
+        "cause": "collateral-provision",
+        "subjectType": "asset"
+      }
+    ]
+  },
+  {
+    "packet": 2,
+    "index": 395,
+    "rceptNo": "20251223000481",
+    "a": {
+      "index": 395,
+      "rceptNo": "20251223000481",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "collateral-received",
+          "subjectType": "asset"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-b",
+      "rationale": "회사 차입을 위해 100% 자회사 소유 부두·배후부지 담보를 제공받는 안건이 이사회에서 의결됐지만, 기재된 담보받은 일자는 실제 실행일이 아니라 의결일이고 일정·조건은 변경 가능하다.",
+      "ambiguities": [
+        "보고서 제목은 과거형이나 본문이 실행일을 확립하지 않아 received/effective가 아니라 decided/proposed로 판정했다."
+      ]
+    },
+    "b": {
+      "index": 395,
+      "rceptNo": "20251223000481",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "collateral-received",
+          "subjectType": "asset"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-b",
+      "rationale": "회사 차입을 위해 100% 자회사 소유 부두·배후부지 담보를 제공받는 안건이 이사회에서 의결됐지만, 기재된 담보받은 일자는 실제 실행일이 아니라 의결일이고 일정·조건은 변경 가능하다.",
+      "ambiguities": [
+        "보고서 제목은 과거형이나 본문이 실행일을 확립하지 않아 received/effective가 아니라 decided/proposed로 판정했다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "related-party",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "collateral-received",
+        "subjectType": "asset"
+      }
+    ]
+  },
+  {
+    "packet": 3,
+    "index": 20,
+    "rceptNo": "20251020000273",
+    "a": {
+      "index": 20,
+      "rceptNo": "20251020000273",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "real-estate-purchase",
+          "subjectType": "real-estate"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "정정으로 거래상대방의 이사회 결의와 광화문 토지·건물 매매계약 체결이 완료됐음이 확정됐다. 그러나 잔금 지급, 양수기준일, 등기는 2025-12-31 예정이므로 부동산 매입계약은 아직 종결 전이다.",
+      "ambiguities": [
+        "최초 양수 결정은 2025-10-17이지만 이번 정정에서 새로 확정된 실질 내용은 2025-10-20 계약 체결이다."
+      ]
+    },
+    "b": {
+      "index": 20,
+      "rceptNo": "20251020000273",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "real-estate-purchase",
+          "subjectType": "real-estate"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "정정으로 상대방 이사회 결의와 부동산 매매계약 체결이 완료되었음이 확정되었다. 계약은 현재 성립했지만 잔금 지급, 양수기준일 및 등기는 2025-12-31 예정이므로 계약 행위와 자산 이전의 미완료 상태를 contracted/pending으로 구분한다.",
+      "ambiguities": [
+        "정정은 기존 양수 결정과 동일한 occurrence를 갱신하지만, 이번 문서가 계약 체결이라는 실질 lifecycle 전이를 직접 확정한다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "asset-transaction",
+        "action": "contracted",
+        "state": "pending",
+        "cause": "real-estate-purchase",
+        "subjectType": "real-estate"
+      }
+    ]
+  },
+  {
+    "packet": 3,
+    "index": 39,
+    "rceptNo": "20251031000592",
+    "a": {
+      "index": 39,
+      "rceptNo": "20251031000592",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "비등기임원이 주식매수선택권 행사로 보통주 1,129주를 취득해 보유량이 2,631주에서 3,760주로 증가한 현재의 임원 특정증권 소유변동을 보고했다.",
+      "ambiguities": [
+        "주식매수선택권 행사는 변동 원인이지만 문서 수준 canonical 사건은 임원의 특정증권 소유상황 보고다."
+      ]
+    },
+    "b": {
+      "index": 39,
+      "rceptNo": "20251031000592",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-a",
+      "rationale": "비등기임원이 주식매수선택권 행사로 보통주 1,129주를 취득하여 소유량이 2,631주에서 3,760주로 증가한 현재의 내부자 소유변동을 보고한다. 문서 수준 사건은 옵션 행사가 아니라 유효해진 임원 특정증권 소유변동이다.",
+      "ambiguities": [
+        "ontology에 insider-ownership과 insider-holdings가 별도 alias 없이 함께 존재해 어휘 경계가 중첩되지만, 소유변동 사건의 원인으로 insider-ownership을 정규화해 선택했다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "ownership-change",
+        "action": "reported",
+        "state": "effective",
+        "cause": "insider-ownership",
+        "subjectType": "ownership"
+      }
+    ]
+  },
+  {
+    "packet": 3,
+    "index": 99,
+    "rceptNo": "20251030800831",
+    "a": {
+      "index": 99,
+      "rceptNo": "20251030800831",
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "occurred",
+          "state": "effective",
+          "cause": "serious-industrial-accident",
+          "subjectType": "operations"
+        },
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "active",
+          "cause": "work-stop",
+          "subjectType": "operating-business"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "울산 1공장에서 감전 사망 1명의 중대재해가 발생했고, 다음 날 노동청이 현장 일부 생산라인에 작업중지 명령을 내렸다. 사고 발생과 현재 유효한 운영 제한은 행위자·시점·효과가 다른 두 사건이므로 모두 보존한다.",
+      "ambiguities": [
+        "부분 작업중지 명령의 종료 또는 해제 사실이 없어 active로 둔다."
+      ]
+    },
+    "b": {
+      "index": 99,
+      "rceptNo": "20251030800831",
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "occurred",
+          "state": "effective",
+          "cause": "serious-industrial-accident",
+          "subjectType": "operations"
+        },
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "active",
+          "cause": "work-stop",
+          "subjectType": "operating-business"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "감전 사망사고는 규제처분 자체가 아니라 사업장 운영에서 실제 발생한 중대재해이므로 corporate-event다. 이후 노동청의 부분 작업중지 명령은 행위자와 효과가 다른 독립 사건이며, 해제 사실이 없어 active 운영제한으로 보존한다.",
+      "ambiguities": [
+        "작업중지의 범위는 현장 일부 생산라인으로 제한되며 종료일은 제시되지 않았다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "corporate-event",
+        "action": "occurred",
+        "state": "effective",
+        "cause": "serious-industrial-accident",
+        "subjectType": "operations"
+      },
+      {
+        "type": "operating-status",
+        "action": "halted",
+        "state": "active",
+        "cause": "work-stop",
+        "subjectType": "operating-business"
+      }
+    ]
+  },
+  {
+    "packet": 3,
+    "index": 164,
+    "rceptNo": "20251128001922",
+    "a": {
+      "index": 164,
+      "rceptNo": "20251128001922",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-b",
+      "rationale": "삼화페인트는 교환사채의 교환대상으로 자기주식 1,008,642주를 처분하기로 결정했다. 실제 주식 처분은 향후 교환권 행사 시 확정되므로 현재는 제안·결정 단계의 자기주식 corporate action이다.",
+      "ambiguities": [
+        "별도 시간외대량매매 예정분 1,380,000주는 별도 공시 대상이라고 명시되어 이 문서의 사건 수에 포함하지 않는다."
+      ]
+    },
+    "b": {
+      "index": 164,
+      "rceptNo": "20251128001922",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-b",
+      "rationale": "이사회가 교환사채의 교환대상으로 자기주식 1,008,642주를 처분하기로 결정했다. 자기주식 처분은 발행자 증권에 대한 corporate action이며 발행자본 자체의 증감으로 단정할 수 없다. 실제 주식 처분은 향후 교환권 행사에 좌우되므로 proposed다.",
+      "ambiguities": [
+        "별도 시간외대량매매 예정분 1,380,000주는 별도 공시 대상이라고 명시되어 이 문서의 사건 수에 포함하지 않았다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "corporate-action",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "treasury-share-disposal",
+        "subjectType": "listed-shares"
+      }
+    ]
+  },
+  {
+    "packet": 3,
+    "index": 201,
+    "rceptNo": "20251128002159",
+    "a": {
+      "index": 201,
+      "rceptNo": "20251128002159",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "대표이사이자 사실상 지배주주인 보고자가 두 차례 장내매수로 31,775주를 추가 취득해 보유량이 3,309,327주로 증가한 현재의 임원·주요주주 특정증권 소유변동을 보고했다.",
+      "ambiguities": [
+        "세부 매수는 두 건이지만 이 서식은 한 보고자의 합산 소유상황 변동을 문서 단위로 보고하므로 canonical 사건은 한 건이다."
+      ]
+    },
+    "b": {
+      "index": 201,
+      "rceptNo": "20251128002159",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-a",
+      "rationale": "대표이사이자 사실상 지배주주의 두 차례 장내매수 결과를 합산해 보유주식이 31,775주 증가한 현재의 임원·주요주주 소유상황 변동을 보고한다. 개별 체결 두 건보다 보고자 단위의 문서 수준 소유변동 한 건이 canonical occurrence다.",
+      "ambiguities": [
+        "ontology의 insider-ownership과 insider-holdings가 의미상 중첩되지만, 소유변동 보고의 원인으로 insider-ownership을 일관되게 선택했다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "ownership-change",
+        "action": "reported",
+        "state": "effective",
+        "cause": "insider-ownership",
+        "subjectType": "ownership"
+      }
+    ]
+  },
+  {
+    "packet": 3,
+    "index": 216,
+    "rceptNo": "20251128801335",
+    "a": {
+      "index": 216,
+      "rceptNo": "20251128801335",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "rescheduled",
+          "state": "deferred",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "계약 당사자 합의로 자기 전환사채 취득대금 지급일과 사채만기일을 2025-11-28에서 2026-01-30으로 미뤘고 금액도 조정했다. 기존 예정 전환이 명시적으로 연기됐으므로 rescheduled와 deferred의 결합이 현재 lifecycle을 정확히 나타낸다.",
+      "ambiguities": [
+        "취득 후 전량 소각은 후속 계획일 뿐 현재 발생하거나 완료된 독립 사건이 아니다."
+      ]
+    },
+    "b": {
+      "index": 216,
+      "rceptNo": "20251128801335",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "rescheduled",
+          "state": "deferred",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "기존 자기 전환사채 취득의 만기일과 대금 지급일을 2025-11-28에서 2026-01-30으로 명시적으로 연기했다. ontology에서 deferred는 예상 전이가 연기된 상태이므로 단순 미완료를 뜻하는 pending보다 정확하며, rescheduled와 함께 일정 변경 lifecycle을 표현한다.",
+      "ambiguities": [
+        "취득금액도 이자 반영으로 조정됐지만 독립 occurrence가 아니라 동일 취득 사건의 일정·조건 변경이다.",
+        "취득 후 전량 소각은 미래 처리계획이므로 별도 사건으로 세지 않았다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "rescheduled",
+        "state": "deferred",
+        "cause": "convertible-bond-acquisition",
+        "subjectType": "securities"
+      }
+    ]
+  },
+  {
+    "packet": 3,
+    "index": 255,
+    "rceptNo": "20251124800598",
+    "a": {
+      "index": 255,
+      "rceptNo": "20251124800598",
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "withdrawn",
+          "state": "cancelled",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "한화솔루션 이사회가 경제성 저하를 이유로 고순도 크레졸 시설 신규 투자 결정을 최종 철회했다. 원문의 명시적 행위가 철회이므로 action은 withdrawn이고, 기존 투자계획의 lifecycle은 cancelled다.",
+      "ambiguities": []
+    },
+    "b": {
+      "index": 255,
+      "rceptNo": "20251124800598",
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "withdrawn",
+          "state": "cancelled",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "이사회는 고순도 크레졸 시설 신규 투자 결정을 최종 철회했다. source가 행위를 철회로 명시하므로 action은 withdrawn이고, 기존 투자계획이 더 이상 진행되지 않는 lifecycle 결과는 cancelled다. 정정 wrapper나 경제성 악화 배경을 별도 사건으로 만들지 않는다.",
+      "ambiguities": []
+    },
+    "expectedEvents": [
+      {
+        "type": "capital-expenditure",
+        "action": "withdrawn",
+        "state": "cancelled",
+        "cause": "facility-investment",
+        "subjectType": "asset"
+      }
+    ]
+  },
+  {
+    "packet": 3,
+    "index": 329,
+    "rceptNo": "20251231000603",
+    "a": {
+      "index": 329,
+      "rceptNo": "20251231000603",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "high",
+      "decision": "candidate-a",
+      "rationale": "비등기임원이 장내매수한 보통주 270주의 신규 특정증권 소유상황을 보고했으며, 보고 기준일 현재 해당 소유변동은 유효하다.",
+      "ambiguities": []
+    },
+    "b": {
+      "index": 329,
+      "rceptNo": "20251231000603",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "medium",
+      "decision": "candidate-a",
+      "rationale": "비등기임원이 장내매수로 보통주 270주를 신규 보유하게 된 현재의 임원 특정증권 소유상황을 보고한다. 매수가 이미 결제 기준 변동일에 발생했으므로 소유변동은 effective다.",
+      "ambiguities": [
+        "ontology의 insider-ownership과 insider-holdings가 별도 alias 없이 중첩되지만, 문서 수준 소유변동의 원인으로 insider-ownership을 선택했다."
+      ]
+    },
+    "expectedEvents": [
+      {
+        "type": "ownership-change",
+        "action": "reported",
+        "state": "effective",
+        "cause": "insider-ownership",
+        "subjectType": "ownership"
+      }
+    ]
+  }
+]

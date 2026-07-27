@@ -1,0 +1,73 @@
+[
+  {
+    "index": 34,
+    "rceptNo": "20251030000222",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-securities",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "접수일 현재 제127·128·129회 기타파생결합증권 각각에 대해 일반공모 청약을 모집하는 추가서류이며, 청약·납입·발행일은 모두 미래이므로 세 건의 독립적인 증권 모집 이벤트가 pending 상태이다. 상품 규제 승인이나 허가 접수가 아니므로 regulatory-product/filed보다 capital-change/solicited가 문서의 실질을 더 정확히 나타낸다.",
+    "ambiguities": [
+      "일괄신고추가서류라는 제출 형식 때문에 filed로 읽을 여지는 있으나, 실질 행위는 세 종목의 투자자 청약 모집이다."
+    ]
+  },
+  {
+    "index": 242,
+    "rceptNo": "20251128800665",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "material-contract",
+        "action": "updated",
+        "state": "effective",
+        "cause": "real-estate-lease",
+        "subjectType": "real-estate"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "기재정정은 기존 임대계약의 월임대료·기간을 변경계약으로 갱신한 공시이다. 부동산 자체의 취득·처분이나 자산 상태 변경이 아니라 임대 계약조건의 업데이트이며, 이사회 결의일과 정정일이 접수일 당일로 확정되어 있다. 정정 wrapper는 별도 이벤트로 추가하지 않는다.",
+    "ambiguities": [
+      "변경된 임대 시작일은 미래이지만 변경계약의 결정·공시는 접수일에 성립해 계약 업데이트 자체는 effective로 판단했다."
+    ]
+  },
+  {
+    "index": 161,
+    "rceptNo": "20251125000685",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "asset-transaction",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "tangible-asset-acquisition",
+        "subjectType": "real-estate"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "이사회가 호텔 토지·건물 양수를 결정했지만 접수일 현재 임시주주총회 승인, 관계기관 승인, 책임임대차계약 등 선행조건과 2026년 거래종결이 남아 있으므로 proposed인 유형자산 취득 결정이다. 첨부추가 wrapper는 별도 이벤트가 아니며 본문이 확립한 양수결정 한 건만 보존한다.",
+    "ambiguities": [
+      "계약체결일 표기가 2025년 1월 5일로 본문 시계열과 어긋나 보이지만, 접수일 이후 승인·종결 조건이 명시되어 완료로 추론하지 않았다."
+    ]
+  }
+]

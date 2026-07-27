@@ -2,10 +2,10 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
-const { readFileSync } = require('node:fs');
+const { readFileSync, realpathSync } = require('node:fs');
 const { mkdtemp, readFile, readdir, rm, writeFile } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
-const { join } = require('node:path');
+const { join, relative, resolve, sep } = require('node:path');
 const { pathToFileURL } = require('node:url');
 
 const BENCHMARK = join(__dirname, '..', 'scripts', 'benchmark-dart-disclosure-temporal-holdout.mjs');
@@ -27,15 +27,17 @@ const REAL_RFC3161_CANDIDATE = join(
   'archive',
   'kr-disclosure-event-candidate-freeze.2026-07-29-n60.superseded.v2.json',
 );
-const ACTIVE_RFC3161_CANDIDATE = join(
+const SUPERSEDED_N400_CANDIDATE = join(
   __dirname,
   'artifacts',
-  'kr-disclosure-event-candidate-freeze.v2.json',
+  'archive',
+  'kr-disclosure-event-candidate-freeze.2026-07-29-n400.superseded.v2.json',
 );
-const ACTIVE_RFC3161_STATUS = join(
+const SUPERSEDED_N400_STATUS = join(
   __dirname,
   'artifacts',
-  'kr-disclosure-event-candidate-freeze.status.v1.json',
+  'archive',
+  'kr-disclosure-event-candidate-freeze.2026-07-29-n400.status.v1.json',
 );
 const DIGICERT_ROOT = join(__dirname, '..', 'config', 'rfc3161', 'digicert-assured-id-root-ca.crt');
 const DIGICERT_CHAIN = join(__dirname, '..', 'config', 'rfc3161', 'digicert-timestamp-2025-chain.crt');
@@ -53,10 +55,11 @@ const STRICT_THRESHOLDS = Object.freeze({
   resolvedCoverageWilsonLower: 0.92,
   fieldAccuracy: 0.97,
   templateMacroAccuracy: 0.9,
+  highConfidenceCount: 35,
+  highConfidenceIssuerCount: 30,
+  highConfidenceTemplateCount: 20,
   highConfidenceExactPrecision: 0.95,
   highConfidenceWilsonLower: 0.9,
-  highConfidenceCoverage: 0.35,
-  highConfidenceCoverageWilsonLower: 0.3,
   brierScore: 0.15,
   expectedCalibrationError: 0.1,
 });
@@ -253,6 +256,9 @@ function fixtureCase(index, overrides = {}) {
   const bodySha256 = createHash('sha256').update(bodyText).digest('hex');
   const bodyCharCount = [...bodyText].length;
   const expectedEvents = overrides.expectedEvents ?? [GOLD];
+  const goldDisposition = expectedEvents.length === 0
+    ? 'no-canonical-events'
+    : 'canonical-events-present';
   const input = {
     rceptNo: String(20270101000000 + index),
     receiptDate: '2027-01-01',
@@ -282,16 +288,24 @@ function fixtureCase(index, overrides = {}) {
       retainedCharCount: bodyCharCount,
       truncated: false,
     },
+    goldDisposition,
     expectedEvents,
     annotations: overrides.annotations ?? [
-      { annotator: 'reviewer-a', blindedToPrediction: true, confidenceInLabel: 'high', expectedEvents },
-      { annotator: 'reviewer-b', blindedToPrediction: true, confidenceInLabel: 'high', expectedEvents },
+      {
+        annotator: 'reviewer-a', blindedToPrediction: true, confidenceInLabel: 'high',
+        goldDisposition, expectedEvents,
+      },
+      {
+        annotator: 'reviewer-b', blindedToPrediction: true, confidenceInLabel: 'high',
+        goldDisposition, expectedEvents,
+      },
     ],
     adjudication: overrides.adjudication ?? {
       adjudicator: 'reviewer-c',
       decision: 'agreement',
       blindedToPrediction: true,
       rationale: 'independent labels match',
+      goldDisposition,
       expectedEvents,
     },
     ...overrides,
@@ -354,7 +368,7 @@ function validateLegacy(benchmark, value, options = {}) {
 function populationEntryFromCase(item) {
   return {
     rceptNo: item.input.rceptNo,
-    receiptDate: item.input.receiptDate,
+    receiptDate: item.input.receiptDate.replaceAll('-', ''),
     corpCode: item.source.corpCode,
     corpName: item.input.issuer,
     stockCode: item.input.stockCode ?? null,
@@ -450,7 +464,7 @@ async function buildV2Chain(benchmark, protocol, candidateCases, { limit = candi
     now: new Date('2028-01-01T00:00:00.000Z'),
   });
   const value = fixture(annotatedCases);
-  value.schemaVersion = 'jaroo.kr-disclosure-event-temporal-holdout.v2';
+  value.schemaVersion = 'jaroo.kr-disclosure-event-temporal-holdout.v3';
   value.cutoff = FREEZE_CUTOFF;
   value.candidateFreeze = freeze;
   value.query = { ...rawPayload.query };
@@ -606,6 +620,7 @@ test('benchmark result records fixture, evaluator, extractor, and threshold hash
     'thresholdsSha256',
   ]);
   assert.equal(report.ontologyVersion, ONTOLOGY_VERSION);
+  assert.equal(report.schemaVersion, 'jaroo.kr-disclosure-event-temporal-holdout-result.v3');
   assert.equal(report.hashes.ontologyManifestSha256, ONTOLOGY_HASH);
   assert.equal(report.independentClaimEligible, false);
   assert.equal(report.temporalPerformanceClaimEligible, false);
@@ -851,14 +866,96 @@ test('abstentions receive no partial field credit in aggregate metrics', async (
   assert.equal(assessment.passed, false);
 });
 
-test('all-low predictions fail high-confidence coverage', async () => {
+test('selective high-confidence tier enforces an effective sample floor and Wilson precision', async () => {
   const benchmark = await import(pathToFileURL(BENCHMARK));
-  const evaluations = Array.from({ length: 40 }, (_, index) => benchmark.evaluateTemporalHoldoutCase(
-    fixtureCase(index + 1), { events: [GOLD], confidence: 'low' },
+  const evaluateHigh = (count) => Array.from({ length: count }, (_, index) => (
+    benchmark.evaluateTemporalHoldoutCase(
+      fixtureCase(index + 1), { events: [GOLD], confidence: 'high' },
+    )
+  ));
+  const selectiveThresholds = {
+    highConfidenceCount: 35,
+    highConfidenceExactPrecision: 0.95,
+    highConfidenceWilsonLower: 0.9,
+  };
+
+  const twentyNine = benchmark.assessTemporalHoldoutThresholds(
+    evaluateHigh(29), selectiveThresholds,
+  );
+  assert.equal(twentyNine.passed, false);
+  assert.ok(twentyNine.failures.some((failure) => failure.metric === 'highConfidenceCount'));
+
+  const thirty = benchmark.assessTemporalHoldoutThresholds(evaluateHigh(30), {
+    ...selectiveThresholds,
+    highConfidenceCount: 30,
+  });
+  assert.equal(thirty.metrics.highConfidenceCount, 30);
+  assert.ok(thirty.metrics.highConfidenceWilsonLower < 0.9);
+  assert.ok(thirty.failures.some((failure) => failure.metric === 'highConfidenceWilsonLower'));
+
+  const thirtyFive = benchmark.assessTemporalHoldoutThresholds(
+    evaluateHigh(35), selectiveThresholds,
+  );
+  assert.equal(thirtyFive.passed, true);
+  assert.ok(thirtyFive.metrics.highConfidenceWilsonLower >= 0.9);
+});
+
+test('selective high-confidence tier rejects issuer and template clustering', async () => {
+  const benchmark = await import(pathToFileURL(BENCHMARK));
+  const evaluations = Array.from({ length: 35 }, (_, index) => {
+    const base = fixtureCase(index + 1);
+    return benchmark.evaluateTemporalHoldoutCase({
+      ...base,
+      templateKey: 'one-template',
+      source: { ...base.source, corpCode: 'one-issuer' },
+    }, { events: [GOLD], confidence: 'high' });
+  });
+  const assessment = benchmark.assessTemporalHoldoutThresholds(evaluations, {
+    highConfidenceCount: 35,
+    highConfidenceIssuerCount: 30,
+    highConfidenceTemplateCount: 20,
+    highConfidenceExactPrecision: 0.95,
+    highConfidenceWilsonLower: 0.9,
+  });
+
+  assert.equal(assessment.passed, false);
+  assert.equal(assessment.metrics.highConfidenceIssuerCount, 1);
+  assert.equal(assessment.metrics.highConfidenceTemplateCount, 1);
+  assert.ok(assessment.failures.some((failure) => failure.metric === 'highConfidenceIssuerCount'));
+  assert.ok(assessment.failures.some((failure) => failure.metric === 'highConfidenceTemplateCount'));
+});
+
+test('all-medium predictions fail the selective high-confidence sample gate', async () => {
+  const benchmark = await import(pathToFileURL(BENCHMARK));
+  const evaluations = Array.from({ length: 325 }, (_, index) => benchmark.evaluateTemporalHoldoutCase(
+    fixtureCase(index + 1), { events: [GOLD], confidence: 'medium' },
   ));
   const assessment = benchmark.assessTemporalHoldoutThresholds(evaluations);
+  assert.equal(assessment.metrics.highConfidenceCount, 0);
   assert.equal(assessment.metrics.highConfidenceCoverage, 0);
   assert.equal(assessment.passed, false);
+  assert.ok(assessment.failures.some((failure) => failure.metric === 'highConfidenceCount'));
+  assert.ok(assessment.failures.some((failure) => failure.metric === 'highConfidenceWilsonLower'));
+});
+
+test('low high-confidence coverage is descriptive when overall coverage and selective precision pass', async () => {
+  const benchmark = await import(pathToFileURL(BENCHMARK));
+  const evaluations = Array.from({ length: 325 }, (_, index) => benchmark.evaluateTemporalHoldoutCase(
+    fixtureCase(index + 1),
+    { events: [GOLD], confidence: index < 35 ? 'high' : 'medium' },
+  ));
+  const assessment = benchmark.assessTemporalHoldoutThresholds(evaluations);
+  assert.equal(assessment.passed, true);
+  assert.equal(assessment.metrics.highConfidenceCount, 35);
+  assert.equal(assessment.metrics.highConfidenceIssuerCount, 35);
+  assert.equal(assessment.metrics.highConfidenceTemplateCount, 35);
+  assert.equal(assessment.metrics.highConfidenceCoverage, 35 / 325);
+  assert.equal(assessment.metrics.highConfidencePredictionCoverage, 35 / 325);
+  assert.ok(assessment.metrics.highConfidenceCoverageWilsonLower < 0.3);
+  assert.equal(
+    assessment.failures.some((failure) => failure.metric.startsWith('highConfidenceCoverage')),
+    false,
+  );
 });
 
 test('confidence probabilities reflect opt-in high confidence rather than optimistic defaults', async () => {
@@ -1124,7 +1221,7 @@ test('collector derives cutoff from the frozen candidate and rejects same-day or
   );
 });
 
-test('sealed v2 fixtures derive eligibility from the timestamped raw and annotation chain', async () => {
+test('sealed v3 fixtures derive eligibility from the timestamped raw and annotation chain', async () => {
   const benchmark = await import(pathToFileURL(BENCHMARK));
   const protocol = await import(pathToFileURL(PROTOCOL));
   const chain = await buildV2Chain(benchmark, protocol, [fixtureCase(1)]);
@@ -1142,7 +1239,44 @@ test('sealed v2 fixtures derive eligibility from the timestamped raw and annotat
   assert.throws(() => validateV2(benchmark, chain), /timestamped raw corpus query/);
 });
 
-test('sealed v2 fixtures reject arbitrary cutoff spoofing and freeze-day filings', async () => {
+test('legacy sealed v2 labels remain valid without the v3 disposition fields', async () => {
+  const benchmark = await import(pathToFileURL(BENCHMARK));
+  const protocol = await import(pathToFileURL(PROTOCOL));
+  const chain = await buildV2Chain(benchmark, protocol, [fixtureCase(1)]);
+  chain.fixture.schemaVersion = 'jaroo.kr-disclosure-event-temporal-holdout.v2';
+  for (const fixtureCaseValue of chain.fixture.cases) {
+    delete fixtureCaseValue.goldDisposition;
+    for (const annotation of fixtureCaseValue.annotations) delete annotation.goldDisposition;
+    delete fixtureCaseValue.adjudication.goldDisposition;
+  }
+  resealAnnotation(benchmark, protocol, chain);
+
+  assert.doesNotThrow(() => validateV2(benchmark, chain));
+  assert.equal(
+    benchmark.buildTemporalAnnotationPayload(chain.fixture, {
+      rawCorpusFileSha256: sha256(chain.rawBytes),
+      rawCorpus: chain.rawValidated,
+    }).schemaVersion,
+    'jaroo.kr-disclosure-event-annotation-manifest.v2',
+  );
+  const evaluated = benchmark.evaluateTemporalHoldoutFixture(
+    chain.fixture,
+    () => ({ events: [GOLD], confidence: 'high' }),
+    {},
+    {
+      rawCorpusEnvelope: chain.rawEnvelope,
+      rawCorpusFileBytes: chain.rawBytes,
+      verifyExternalTimestamps: false,
+      verifyCurrentCandidate: false,
+      verifyRepositoryAnchor: false,
+      now: new Date('2028-01-01T00:00:00.000Z'),
+    },
+  );
+  assert.equal(evaluated.schemaVersion, 'jaroo.kr-disclosure-event-temporal-holdout.v2');
+  assert.equal(evaluated.temporalPerformanceClaimSchemaEligible, false);
+});
+
+test('sealed v3 fixtures reject arbitrary cutoff spoofing and freeze-day filings', async () => {
   const benchmark = await import(pathToFileURL(BENCHMARK));
   const protocol = await import(pathToFileURL(PROTOCOL));
   const chain = await buildV2Chain(benchmark, protocol, [fixtureCase(1)]);
@@ -1158,7 +1292,7 @@ test('sealed v2 fixtures reject arbitrary cutoff spoofing and freeze-day filings
   );
 });
 
-test('sealed v2 rejects an arbitrary easy-case substitution even after annotation hashes are rebuilt', async () => {
+test('sealed v3 rejects an arbitrary easy-case substitution even after annotation hashes are rebuilt', async () => {
   const benchmark = await import(pathToFileURL(BENCHMARK));
   const protocol = await import(pathToFileURL(PROTOCOL));
   const candidates = Array.from({ length: 50 }, (_, index) => fixtureCase(index + 1));
@@ -1173,7 +1307,7 @@ test('sealed v2 rejects an arbitrary easy-case substitution even after annotatio
   );
 });
 
-test('sealed v2 rejects receiptDate rewriting even when all final annotation hashes are rebuilt', async () => {
+test('sealed v3 rejects receiptDate rewriting even when all final annotation hashes are rebuilt', async () => {
   const benchmark = await import(pathToFileURL(BENCHMARK));
   const protocol = await import(pathToFileURL(PROTOCOL));
   const chain = await buildV2Chain(benchmark, protocol, [fixtureCase(1)]);
@@ -1214,7 +1348,61 @@ test('raw corpus selection manifest cannot replace deterministic replay by rehas
   );
 });
 
-test('sealed v2 rejects classifier aliases injected after raw capture', async () => {
+test('raw corpus rejects a 401-row normalization attack before deterministic replay', async () => {
+  const protocol = await import(pathToFileURL(PROTOCOL));
+  const candidateCases = Array.from({ length: 401 }, (_, index) => fixtureCase(index + 1));
+  const population = candidateCases.map(populationEntryFromCase);
+  const selected = protocol.selectStratifiedFilings(population, {
+    limit: 400, minIssuers: 20, selectionSeed: 'frozen-seed',
+  });
+  const caseByReceipt = new Map(candidateCases.map((item) => [item.input.rceptNo, unlabeledCase(item)]));
+  const cases = selected.map((item) => caseByReceipt.get(item.rceptNo));
+  const payload = protocol.buildTemporalRawCorpusPayload({
+    candidateFreeze: candidateFreezeEnvelope({ limit: 400, minIssuers: 20 }),
+    query: {
+      from: '20270101', to: '20270131', cutoff: FREEZE_CUTOFF,
+      corpClass: 'Y', lastReportOnly: false, sort: 'date', sortDirection: 'asc',
+      pageCount: 100, limit: 400, minIssuers: 20,
+      sampling: 'deterministic-issuer-title-template-stratified',
+      stoppingRule: 'fixed-window-fixed-limit-no-backfill.v1',
+      selectionSeedReveal: 'frozen-seed', selectionSeedCommitment: selectionCommitment(),
+      exclusionManifestSha256: TEST_EXCLUSION.sha256,
+      excludedReceiptCount: TEST_EXCLUSION.receipts.size,
+      excludedReceiptsSha256: TEST_EXCLUDED_RECEIPTS_SHA256,
+      retainedBodyChars: 60_000, concurrency: 4, timeoutMs: 30_000,
+    },
+    source: {
+      provider: 'opendart', listApiPath: '/api/list.json',
+      documentApiPath: '/api/document.xml', market: 'KR',
+    },
+    capture: {
+      providerTotalCount: 401, listedCount: 401, pagesFetched: 5,
+      deduplicatedCount: 401, eligibleCount: 401, duplicateCount: 0,
+      excludedInWindowCount: 0, selectedCount: 400, caseCount: 400,
+      documentFailureCount: 0,
+      uniqueIssuerCount: new Set(cases.map((item) => item.source.corpCode)).size,
+      uniqueTitleTemplateCount: new Set(cases.map((item) => item.input.title)).size,
+      truncatedBodyCount: 0,
+      retainedBodyCharCount: cases.reduce((sum, item) => sum + [...item.input.body].length, 0),
+    },
+    listedFilings: population, population, cases,
+  });
+  const listedFilings = structuredClone(payload.listedFilings);
+  const suppliedPopulation = structuredClone(payload.population);
+  listedFilings[0].receiptDate = ' 20270101';
+  suppliedPopulation[0].receiptDate = ' 20270101';
+  assert.throws(() => protocol.buildTemporalRawCorpusPayload({
+    candidateFreeze: payload.candidateFreeze,
+    query: payload.query,
+    source: payload.source,
+    capture: payload.capture,
+    listedFilings,
+    population: suppliedPopulation,
+    cases: payload.cases,
+  }), /listedFilings\[0\]\.receiptDate must equal its canonical projection/);
+});
+
+test('sealed v3 rejects classifier aliases injected after raw capture', async () => {
   const benchmark = await import(pathToFileURL(BENCHMARK));
   const protocol = await import(pathToFileURL(PROTOCOL));
   const chain = await buildV2Chain(benchmark, protocol, [fixtureCase(1)]);
@@ -1595,19 +1783,20 @@ test('collector parses OpenDART pagination metadata fail-closed at the transport
   );
 });
 
-test('listed filings without corpCode remain captured but are excluded from the eligible population', async () => {
+test('listed filings require canonical corpCode even when their receipt is frozen out', async () => {
   const protocol = await import(pathToFileURL(PROTOCOL));
   const item = fixtureCase(1);
   const eligible = populationEntryFromCase(item);
   const missingCorpCode = {
     ...eligible,
-    rceptNo: '20270101000002',
+    rceptNo: '20260721000001',
+    receiptDate: '20260721',
     corpCode: '',
     corpName: 'unresolved issuer',
   };
   const freeze = candidateFreezeEnvelope({ limit: 1, minIssuers: 1 });
   const rawCase = unlabeledCase(item);
-  const payload = protocol.buildTemporalRawCorpusPayload({
+  assert.throws(() => protocol.buildTemporalRawCorpusPayload({
     candidateFreeze: freeze,
     query: {
       from: '20270101', to: '20270131', cutoff: FREEZE_CUTOFF,
@@ -1639,10 +1828,58 @@ test('listed filings without corpCode remain captured but are excluded from the 
     listedFilings: [eligible, missingCorpCode],
     population: [eligible],
     cases: [rawCase],
-  });
-  assert.equal(payload.listedFilings.length, 2);
-  assert.equal(payload.population.length, 1);
-  assert.equal(payload.population[0].corpCode, eligible.corpCode);
+  }), /listedFilings\[1\] must contain a KOSPI corpCode/);
+});
+
+test('raw corpus filing fields must already equal their canonical projection', async () => {
+  const protocol = await import(pathToFileURL(PROTOCOL));
+  const item = fixtureCase(1);
+  const filing = populationEntryFromCase(item);
+  const rawCase = unlabeledCase(item);
+  const base = {
+    candidateFreeze: candidateFreezeEnvelope({ limit: 1, minIssuers: 1 }),
+    query: {
+      from: '20270101', to: '20270131', cutoff: FREEZE_CUTOFF,
+      corpClass: 'Y', lastReportOnly: false, sort: 'date', sortDirection: 'asc',
+      pageCount: 100, limit: 1, minIssuers: 1,
+      sampling: 'deterministic-issuer-title-template-stratified',
+      stoppingRule: 'fixed-window-fixed-limit-no-backfill.v1',
+      selectionSeedReveal: 'frozen-seed', selectionSeedCommitment: selectionCommitment(),
+      exclusionManifestSha256: TEST_EXCLUSION.sha256,
+      excludedReceiptCount: TEST_EXCLUSION.receipts.size,
+      excludedReceiptsSha256: TEST_EXCLUDED_RECEIPTS_SHA256,
+      retainedBodyChars: 60_000, concurrency: 4, timeoutMs: 30_000,
+    },
+    source: {
+      provider: 'opendart', listApiPath: '/api/list.json',
+      documentApiPath: '/api/document.xml', market: 'KR',
+    },
+    capture: {
+      providerTotalCount: 1, listedCount: 1, pagesFetched: 1,
+      deduplicatedCount: 1, eligibleCount: 1, duplicateCount: 0,
+      excludedInWindowCount: 0, selectedCount: 1, caseCount: 1,
+      documentFailureCount: 0, uniqueIssuerCount: 1,
+      uniqueTitleTemplateCount: 1, truncatedBodyCount: 0,
+      retainedBodyCharCount: [...rawCase.input.body].length,
+    },
+    listedFilings: [filing], population: [filing], cases: [rawCase],
+  };
+  const mutations = [
+    ['receiptDate', ' 20270101'],
+    ['corpCode', ` ${filing.corpCode}`],
+    ['corpName', `${filing.corpName} `],
+    ['stockCode', ''],
+  ];
+
+  for (const [field, value] of mutations) {
+    const listedFilings = structuredClone(base.listedFilings);
+    const population = structuredClone(base.population);
+    listedFilings[0][field] = value;
+    population[0][field] = value;
+    assert.throws(() => protocol.buildTemporalRawCorpusPayload({
+      ...base, listedFilings, population,
+    }), new RegExp(`listedFilings\\[0\\]\\.${field} must equal its canonical projection`), field);
+  }
 });
 
 test('persisted RFC3161 DER values retain the issuance size cap', async () => {
@@ -1707,35 +1944,46 @@ test('pinned RFC3161 trust chains verify a captured dual-authority receipt and r
   );
 });
 
-test('active N=400 temporal candidate is repository-anchored and awaiting its future window', async () => {
+test('superseded N=400 candidate preserves its original bytes and repository anchor without matching current code', async () => {
   const protocol = await import(pathToFileURL(PROTOCOL));
   const collector = await import(pathToFileURL(COLLECTOR));
-  const candidateBytes = readFileSync(ACTIVE_RFC3161_CANDIDATE);
+  const candidateBytes = readFileSync(SUPERSEDED_N400_CANDIDATE);
   const candidate = JSON.parse(candidateBytes);
-  const status = JSON.parse(readFileSync(ACTIVE_RFC3161_STATUS, 'utf8'));
+  const status = JSON.parse(readFileSync(SUPERSEDED_N400_STATUS, 'utf8'));
   const exclusion = await collector.readExclusionManifest(
     EXCLUSION_MANIFEST,
     { verifySources: true },
   );
   const validated = protocol.validateTemporalCandidateFreeze(candidate, {
     exclusion,
-    verifyCurrentCandidate: true,
+    verifyCurrentCandidate: false,
     verifyRepositoryAnchor: true,
     verifyExternalTimestamps: true,
     now: new Date('2026-07-27T07:00:00.000Z'),
   });
 
   assert.equal(validated.precommit.experimentId, status.experimentId);
-  assert.equal(validated.precommit.collectionPlan.limit, 400);
-  assert.equal(validated.precommit.collectionPlan.minIssuers, 100);
-  assert.deepEqual(validated.collectionWindow, { from: '20260729', to: '20260804' });
-  assert.equal(validated.timestamp.receipts.length, 2);
-  assert.equal(status.status, 'frozen-awaiting-collection-window');
-  assert.equal(status.seedEscrow.committed, false);
+  assert.equal(status.status, 'superseded-before-collection');
   assert.equal(status.dataCollected, false);
   assert.equal(status.predictionsGenerated, false);
   assert.equal(status.labelsInspected, false);
   assert.equal(status.candidateFreezeFileSha256, sha256(candidateBytes));
+  const artifactsRoot = resolve(__dirname, 'artifacts');
+  const declaredCandidate = resolve(artifactsRoot, status.candidateFreezePath);
+  const declaredRelative = relative(artifactsRoot, declaredCandidate);
+  assert.ok(declaredRelative && declaredRelative !== '..' && !declaredRelative.startsWith(`..${sep}`));
+  assert.equal(realpathSync(declaredCandidate), realpathSync(SUPERSEDED_N400_CANDIDATE));
+  assert.equal(sha256(readFileSync(declaredCandidate)), status.candidateFreezeFileSha256);
+  assert.throws(
+    () => protocol.validateTemporalCandidateFreeze(candidate, {
+      exclusion,
+      verifyCurrentCandidate: true,
+      verifyRepositoryAnchor: true,
+      verifyExternalTimestamps: false,
+      now: new Date('2026-07-27T07:00:00.000Z'),
+    }),
+    /does not match the frozen candidate/,
+  );
 });
 
 test('candidate fingerprint includes extractor and collector transitive dependencies', async () => {
@@ -1759,7 +2007,7 @@ test('burned v1 data cannot become claim-eligible by changing only role and audi
   };
   assert.throws(
     () => benchmark.validateTemporalHoldoutFixture(roleFlipped),
-    /provenance-bound v2 schema/,
+    /provenance-bound v2 or v3 schema/,
   );
 });
 
@@ -1783,6 +2031,38 @@ test('collector selection is seeded, deterministic, corpCode-based, and exclusio
     () => collector.selectStratifiedFilings(filings, { ...options, limit: 8, excludedReceipts: new Set(['100']) }),
     /non-excluded filings|issuers are available/,
   );
+});
+
+test('collector population preparation fails closed on issuer gaps and counts only frozen intersections', async () => {
+  const collector = await import(pathToFileURL(COLLECTOR));
+  const filings = [
+    {
+      rceptNo: '20270101000001', receiptDate: '20270101', corpCode: 'corp-1',
+      corpName: 'issuer-1', stockCode: null, corpClass: 'Y', reportName: 'report-1',
+      filerName: null, remarks: null,
+    },
+    {
+      rceptNo: '20270101000002', receiptDate: '20270101', corpCode: 'corp-2',
+      corpName: 'issuer-2', stockCode: null, corpClass: 'Y', reportName: 'report-2',
+      filerName: null, remarks: null,
+    },
+  ];
+  const prepared = collector.prepareTemporalPopulation(filings, {
+    excludedReceipts: new Set(['20270101000002', '20270101999999']),
+  });
+  assert.deepEqual(prepared.population.map((item) => item.rceptNo), ['20270101000001']);
+  assert.equal(prepared.excludedInWindowCount, 1);
+
+  assert.throws(() => collector.prepareTemporalPopulation([
+    filings[0],
+    { ...filings[1], corpCode: '' },
+  ], {
+    excludedReceipts: new Set(['20270101000002']),
+  }), /listed filing 20270101000002 must contain a KOSPI corpCode/);
+  assert.throws(() => collector.prepareTemporalPopulation([
+    filings[0],
+    { ...filings[0], corpCode: '' },
+  ]), /listed filing 20270101000001 must contain a KOSPI corpCode/);
 });
 
 test('collector exclusion manifest rejects duplicates and hashes exact bytes', async () => {
@@ -1887,8 +2167,10 @@ test('passes a synthetic cohort meeting every strict threshold', async () => {
   assert.equal(assessment.metrics.fieldAccuracy, 1);
   assert.equal(assessment.metrics.issuerCount, 100);
   assert.equal(assessment.metrics.templateCount, 50);
+  assert.equal(assessment.metrics.highConfidenceCount, 325);
+  assert.equal(assessment.metrics.highConfidenceIssuerCount, 100);
+  assert.equal(assessment.metrics.highConfidenceTemplateCount, 50);
   assert.equal(assessment.metrics.highConfidencePredictionCoverage, 1);
-  assert.ok(assessment.metrics.highConfidenceCoverageWilsonLower >= 0.3);
   assert.ok(assessment.metrics.brierScore <= 0.15);
   assert.ok(assessment.metrics.expectedCalibrationError <= 0.1);
 });

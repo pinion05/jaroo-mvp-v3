@@ -1,0 +1,211 @@
+[
+  {
+    "index": 3,
+    "rceptNo": "20251031000576",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {"type":"capital-change","action":"decided","state":"proposed","cause":"contingent-capital-securities","subjectType":"securities"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "2025-10-31 이사회가 1,000억원 규모의 자본인정 후순위 전환사채 발행을 결정했고 청약·납입은 2025-12-03으로 예정되어 있어, 자본변동 관련 발행 결정이 존재하되 아직 실행 전이다.",
+    "ambiguities": ["증권의 법적 형식은 후순위 전환사채이지만 공시 양식과 경제적 성격은 자본으로 인정되는 신종자본성 채무증권이다."]
+  },
+  {
+    "index": 6,
+    "rceptNo": "20251031000533",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {"type":"capital-change","action":"under-review","state":"deferred","cause":"exchangeable-bond","subjectType":"securities"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "정정 본문은 2025-10-31 이사회가 자기주식 처분 및 교환사채 발행에 추가 논의가 필요하다고 판단해 11월 내 최종결정을 목표로 재검토하기로 했음을 명시한다. 따라서 발행은 확정·실행된 것이 아니라 검토가 연기된 상태다.",
+    "ambiguities": ["본문에 과거 발행결정 양식과 잠정 조건이 남아 있으나, 최신 정정사항이 그 발행 여부가 미확정임을 우선적으로 확정한다."]
+  },
+  {
+    "index": 19,
+    "rceptNo": "20251020000303",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {"type":"legal-regulatory","action":"ordered","state":"correction-requested","cause":"disclosure-correction","subjectType":"issuer"}
+    ],
+    "labelConfidence": "medium",
+    "rationale": "보고서명 자체가 금융당국의 정정명령 부과를 식별하며, 이는 교환사채 발행의 완료를 새로 확정하는 공시가 아니라 발행인에게 공시 정정을 요구한 규제 조치다.",
+    "ambiguities": ["수집된 bodyText에는 정정명령 주문문이 별도로 보이지 않고 기초 교환사채 발행결정 양식이 주로 담겨 있어, 정정명령 사실은 reportName에 의존한다."]
+  },
+  {
+    "index": 34,
+    "rceptNo": "20251030000222",
+    "decision": "synthesized",
+    "expectedEvents": [
+      {"type":"regulatory-product","action":"filed","state":"pending","cause":"derivative-securities","subjectType":"product"},
+      {"type":"regulatory-product","action":"filed","state":"pending","cause":"derivative-securities","subjectType":"product"},
+      {"type":"regulatory-product","action":"filed","state":"pending","cause":"derivative-securities","subjectType":"product"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "추가서류는 서로 다른 제127·128·129회 기타파생결합증권 세 종목을 각각 500억원씩 모집하기 위해 제출되었고, 청약은 2025-11-03부터라 접수일 현재 모두 pending이다. 기초자산은 국고채 3개월 금리이므로 equity-linked가 아니라 일반 derivative-securities이며 세 종목의 multiplicity를 보존한다.",
+    "ambiguities": ["공시 한 건에 세 상품이 함께 포함되므로 동일 canonical tuple이 세 번 반복된다."]
+  },
+  {
+    "index": 67,
+    "rceptNo": "20251031800858",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {"type":"asset-transaction","action":"decided","state":"proposed","cause":"convertible-bond-acquisition","subjectType":"securities"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "효성이 계열사 효성화학 발행 제5회 후순위 전환사채 1,000억원을 현금 취득하기로 2025-10-31 결정했으며 취득예정일은 2025-12-03이다. 발행 자체가 아니라 타사 전환사채의 취득 결정이다.",
+    "ambiguities": []
+  },
+  {
+    "index": 90,
+    "rceptNo": "20251031800377",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {"type":"governance","action":"reported","state":"active","cause":"compliance-program","subjectType":"governance"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "기아는 공정거래 자율준수 프로그램의 2025년 3분기 운영 실적과 계속 수행 중인 활동 및 4분기 계획을 보고했다. 프로그램이 실제 운영 중임이 명시되므로 active 상태가 성립한다.",
+    "ambiguities": ["일부 항목은 향후 계획이지만 공시 대상인 CP 프로그램 전체는 이미 운영 중이다."]
+  },
+  {
+    "index": 110,
+    "rceptNo": "20251030800620",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {"type":"corporate-action","action":"decided","state":"pending","cause":"record-date","subjectType":"ownership"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "이사회는 분기배당을 받을 권리주주를 확정하기 위한 2025-11-14 기준일을 결정했다. 접수일에는 기준일 도래 전이므로 pending이고, 직접 대상은 증권 자체가 아니라 주주의 권리·소유자 확정이다.",
+    "ambiguities": []
+  },
+  {
+    "index": 156,
+    "rceptNo": "20251015000340",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {"type":"governance","action":"updated","state":"effective","cause":"business-group-status","subjectType":"governance"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "대규모기업집단 현황공시에서 재무위원회 의안 누락을 정정해 기존 기업집단·지배구조 현황을 갱신했으며, 그 정정은 제출 즉시 유효하다.",
+    "ambiguities": ["정정은 누락된 이사회 안건 보완으로, 별도의 신규 이사회 사건을 추가로 생성하지 않는다."]
+  },
+  {
+    "index": 163,
+    "rceptNo": "20251128002061",
+    "decision": "synthesized",
+    "expectedEvents": [
+      {"type":"capital-change","action":"decided","state":"proposed","cause":"convertible-bond-acquisition","subjectType":"securities"}
+    ],
+    "labelConfidence": "medium",
+    "rationale": "발행인은 자기 전환사채 2억원을 만기 전에 장외 매수하기로 2025-11-28 결정했다. 지급예정일도 같은 날이지만 본 공시는 취득결정 공시이고 실제 결제 완료를 명시하지 않으므로 acquired/effective보다 decided/proposed가 보수적으로 맞다.",
+    "ambiguities": ["결정일과 지급예정일이 같아 당일 완료 가능성은 있으나, 본문은 결제 완료를 확인하지 않는다."]
+  },
+  {
+    "index": 167,
+    "rceptNo": "20251128001766",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {"type":"capital-change","action":"decided","state":"proposed","cause":"rights-offering","subjectType":"securities"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "윌비스가 제3자배정 방식으로 기타주식 350만주를 발행하는 유상증자를 결정했으며, 접수 시점에는 신주 발행과 납입이 예정된 단계다.",
+    "ambiguities": ["cause 명칭 rights-offering은 주주배정만을 연상시킬 수 있으나 ontology 내 유상증자 계열의 사용 가능한 표준 cause다."]
+  },
+  {
+    "index": 175,
+    "rceptNo": "20251120000031",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {"type":"asset-transaction","action":"decided","state":"proposed","cause":"equity-acquisition","subjectType":"securities"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "정정은 총자산·자기자본 기준 수치만 보완하며, 카카오헬스케어 지분 양수 결정과 2025-12-23 예정 거래라는 본질은 유지된다. 정정 wrapper를 별도 사건으로 세지 않고 동일한 미완료 지분취득 결정을 한 건으로 보존한다.",
+    "ambiguities": ["기재정정 자체는 즉시 유효하지만 substantive 거래의 lifecycle은 여전히 proposed다."]
+  },
+  {
+    "index": 195,
+    "rceptNo": "20251128000481",
+    "decision": "unscorable",
+    "expectedEvents": [],
+    "labelConfidence": "low",
+    "rationale": "입력에 투자설명서 reportName만 있고 bodyText가 null이라, 어떤 합병·재편 또는 상품을 설명하는지와 접수일 현재 lifecycle을 판정할 근거가 없다.",
+    "ambiguities": ["제목만으로는 투자설명서의 대상 거래와 사건 수를 식별할 수 없다."]
+  },
+  {
+    "index": 204,
+    "rceptNo": "20251118000006",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {"type":"corporate-action","action":"initiated","state":"active","cause":"tender-offer","subjectType":"listed-shares"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "공개매수 신고일인 2025-11-18이 공개매수 시작일이며 종료일은 2025-12-07이다. 따라서 단순 발표가 아니라 상장 보통주를 대상으로 한 공개매수가 이미 개시되어 active 상태다.",
+    "ambiguities": []
+  },
+  {
+    "index": 239,
+    "rceptNo": "20251128800765",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {"type":"asset-transaction","action":"disposed","state":"effective","cause":"equity-disposal","subjectType":"securities"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "정정사유가 거래 종결이며, 처분예정일을 2025-11-28 거래 완료일로 바꾸고 십일번가 보유주식 전량 처분이 완료됐음을 확정한다.",
+    "ambiguities": ["양식 필드명은 여전히 처분예정일자이지만 정정 설명이 해당 날짜를 거래 완료일이라고 명시한다."]
+  },
+  {
+    "index": 255,
+    "rceptNo": "20251124800598",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {"type":"capital-expenditure","action":"withdrawn","state":"cancelled","cause":"facility-investment","subjectType":"asset"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "한화솔루션 이사회가 경제성 저하를 이유로 고순도 크레졸 시설 신규 투자 결정을 2025-11-24 최종 철회했다. 이는 사업계획 일반 업데이트가 아니라 특정 설비투자의 취소다.",
+    "ambiguities": []
+  },
+  {
+    "index": 299,
+    "rceptNo": "20251230000620",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {"type":"capital-change","action":"rescheduled","state":"deferred","cause":"convertible-bond","subjectType":"securities"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "정정은 전환사채 납입일을 2025-12-31에서 2026-06-30으로, 만기와 전환청구기간도 함께 뒤로 미룬다. 발행 조건의 일반 갱신이 아니라 실행 일정 연기다.",
+    "ambiguities": []
+  },
+  {
+    "index": 306,
+    "rceptNo": "20251224000451",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {"type":"capital-change","action":"decided","state":"proposed","cause":"exchangeable-bond","subjectType":"securities"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "정정은 자금조달 비교, 주주영향, 재매각 우려 등 설명을 보완할 뿐 2025-12-18 교환사채 발행결정과 2025-12-29 납입 예정이라는 substantive 사건은 바꾸지 않는다. 따라서 동일한 미실행 발행결정 한 건을 보존한다.",
+    "ambiguities": ["정정된 설명은 즉시 유효하지만 이를 별도의 business event로 추가하지 않는다."]
+  },
+  {
+    "index": 346,
+    "rceptNo": "20251231800773",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {"type":"legal-regulatory","action":"dismissed","state":"effective","cause":"litigation","subjectType":"issuer"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "서울행정법원이 금융위 행정처분에 대한 롯데손해보험의 집행정지 신청을 2025-12-31 기각했고, 그 결과 기존 이자지급 정지 효력이 그대로 유지된다.",
+    "ambiguities": ["기각 대상은 본안소송이 아니라 행정처분 집행정지 신청이다."]
+  },
+  {
+    "index": 364,
+    "rceptNo": "20251230801246",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {"type":"related-party","action":"decided","state":"proposed","cause":"bond-purchase","subjectType":"securities"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "CJ CGV가 종속회사 CJ 4DPLEX 발행 신종자본증권 500억원을 인수하기로 결정했고 발행예정일은 다음 날인 2025-12-31이다. 특수관계 종속회사 채권 매입 결정이므로 아직 proposed 상태다.",
+    "ambiguities": ["형식상 신종자본증권 인수이지만 관련공시와 당사자 관계상 related-party bond-purchase가 문서 수준 사건을 가장 직접적으로 표현한다."]
+  }
+]

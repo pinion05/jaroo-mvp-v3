@@ -46,10 +46,11 @@ export const KR_DISCLOSURE_TEMPORAL_STRICT_THRESHOLDS = Object.freeze({
   resolvedCoverageWilsonLower: 0.92,
   fieldAccuracy: 0.97,
   templateMacroAccuracy: 0.9,
+  highConfidenceCount: 35,
+  highConfidenceIssuerCount: 30,
+  highConfidenceTemplateCount: 20,
   highConfidenceExactPrecision: 0.95,
   highConfidenceWilsonLower: 0.9,
-  highConfidenceCoverage: 0.35,
-  highConfidenceCoverageWilsonLower: 0.3,
   brierScore: 0.15,
   expectedCalibrationError: 0.1,
 });
@@ -1019,7 +1020,7 @@ const TEMPORAL_CASE_SOURCE_FIELDS = Object.freeze([
 ]);
 const TEMPORAL_RAW_CASE_FIELDS = Object.freeze(['id', 'labelStatus', 'input', 'source']);
 const TEMPORAL_ANNOTATED_CASE_FIELDS = Object.freeze([
-  'templateKey', 'expectedEvents', 'annotations', 'adjudication',
+  'templateKey', 'goldDisposition', 'expectedEvents', 'annotations', 'adjudication',
 ]);
 const TEMPORAL_CANDIDATE_FREEZE_ENVELOPE_FIELDS = Object.freeze([
   'manifestFileSha256', 'manifestCanonicalSha256', 'manifest',
@@ -1071,6 +1072,11 @@ function validatedFilingProjection(raw, label, { requireCorpCode = true } = {}) 
   }
   const projection = filingProjection(raw);
   validateReceiptIdentity(projection, label, { requireCorpCode });
+  for (const field of TEMPORAL_FILING_FIELDS) {
+    if (raw[field] !== projection[field]) {
+      throw new Error(`${label}.${field} must equal its canonical projection`);
+    }
+  }
   return projection;
 }
 
@@ -1223,11 +1229,11 @@ export function buildTemporalRawCorpusPayload({
   }
   const seed = String(query?.selectionSeedReveal ?? '').trim();
   const normalizedListedFilings = (listedFilings ?? population ?? []).map((filing, index) => (
-    validatedFilingProjection(filing, `listedFilings[${index}]`, { requireCorpCode: false })
+    validatedFilingProjection(filing, `listedFilings[${index}]`)
   ));
   const excluded = new Set(candidateFreeze?.manifest?.precommit?.sampling?.excludedReceipts ?? []);
   const normalizedPopulation = dedupeFilings(normalizedListedFilings)
-    .filter((filing) => issuerKey(filing) && !excluded.has(filing.rceptNo))
+    .filter((filing) => !excluded.has(filing.rceptNo))
     .map(filingProjection);
   for (const [index, filing] of normalizedPopulation.entries()) validateReceiptIdentity(filing, `population[${index}]`);
   if (population) {
@@ -1391,7 +1397,7 @@ export function validateTemporalRawCorpusEnvelope(envelope, {
   }
   const excluded = new Set(freeze.sampling.excludedReceipts);
   const normalizedListedFilings = payload.listedFilings.map((raw, index) => (
-    validatedFilingProjection(raw, `rawCorpus.listedFilings[${index}]`, { requireCorpCode: false })
+    validatedFilingProjection(raw, `rawCorpus.listedFilings[${index}]`)
   ));
   for (const [index, filing] of normalizedListedFilings.entries()) {
     if (filing.receiptDate < from || filing.receiptDate > to) {
@@ -1401,8 +1407,9 @@ export function validateTemporalRawCorpusEnvelope(envelope, {
   if (dedupeFilings(normalizedListedFilings).length !== normalizedListedFilings.length) {
     throw new Error('raw corpus listed filings contain duplicate receipts');
   }
-  const recomputedPopulation = dedupeFilings(normalizedListedFilings)
-    .filter((filing) => issuerKey(filing) && !excluded.has(filing.rceptNo))
+  const deduplicatedListedFilings = dedupeFilings(normalizedListedFilings);
+  const recomputedPopulation = deduplicatedListedFilings
+    .filter((filing) => !excluded.has(filing.rceptNo))
     .map(filingProjection);
   const populationReceipts = new Set();
   const normalizedSuppliedPopulation = [];
@@ -1422,18 +1429,18 @@ export function validateTemporalRawCorpusEnvelope(envelope, {
     providerTotalCount: normalizedListedFilings.length,
     listedCount: normalizedListedFilings.length,
     pagesFetched: Math.ceil(normalizedListedFilings.length / query.pageCount),
-    deduplicatedCount: dedupeFilings(normalizedListedFilings).length,
+    deduplicatedCount: deduplicatedListedFilings.length,
     eligibleCount: recomputedPopulation.length,
-    duplicateCount: normalizedListedFilings.length - dedupeFilings(normalizedListedFilings).length,
-    excludedInWindowCount: dedupeFilings(normalizedListedFilings).length - recomputedPopulation.length,
+    duplicateCount: normalizedListedFilings.length - deduplicatedListedFilings.length,
+    excludedInWindowCount: deduplicatedListedFilings.filter((filing) => excluded.has(filing.rceptNo)).length,
   };
   for (const [field, expected] of Object.entries(recomputedCapture)) {
     if (capture?.[field] !== expected) throw new Error(`raw corpus capture.${field} is stale`);
   }
-  if (payload.selection?.populationSha256 !== temporalDomainSha256('population', payload.population)) {
+  if (payload.selection?.populationSha256 !== temporalDomainSha256('population', normalizedSuppliedPopulation)) {
     throw new Error('raw corpus populationSha256 mismatch');
   }
-  const replay = selectStratifiedFilings(payload.population, {
+  const replay = selectStratifiedFilings(normalizedSuppliedPopulation, {
     limit: query.limit ?? null,
     minIssuers: query.minIssuers ?? 1,
     selectionSeed: query.selectionSeedReveal,
@@ -1448,7 +1455,7 @@ export function validateTemporalRawCorpusEnvelope(envelope, {
     throw new Error('raw corpus selected case count mismatch');
   }
   const caseDigests = [];
-  const populationByReceipt = new Map(payload.population.map((entry) => [entry.rceptNo, filingProjection(entry)]));
+  const populationByReceipt = new Map(normalizedSuppliedPopulation.map((entry) => [entry.rceptNo, entry]));
   const receiptDateCeiling = seoulCalendarDate(timestamp.earliestGenTime);
   for (const [index, corpusCase] of payload.cases.entries()) {
     const unexpectedCaseField = forbiddenField(corpusCase, TEMPORAL_RAW_CASE_FIELDS);

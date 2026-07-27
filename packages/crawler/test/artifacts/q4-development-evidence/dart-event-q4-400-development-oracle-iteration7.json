@@ -1,0 +1,6330 @@
+{
+  "schemaVersion": "jaroo.kr-disclosure-event-development-oracle.v7",
+  "generatedAt": "2026-07-27T00:00:00.000Z",
+  "developmentOnly": true,
+  "sourceCommit": "36f51c1560fc298db5c082fa3d553a280be5fec0",
+  "sourceCorpusSha256": "37472b36b474c60280da57928da1c647161c839e4e16c8318f8668999956dc4c",
+  "predecessorOracleSha256": "32524f90b0ba2c50ffe68de697e735303210d817a482c54ad26ba76f960672ea",
+  "adjudicationEvidenceSha256": "b34b8d0161c0424387c756cb320ff153d4f65f45bf7af5c40f2e7ecda87d62fb",
+  "ontologyVersion": "jaroo.kr-disclosure-event-ontology.v1",
+  "ontologyManifestSha256": "b3b29e0918060d7cfbaa1586703a2ac3e2ca5d5198c3c4d5d8b1325d199976f9",
+  "sourceReports": [
+    {
+      "path": ".omx/handoff/dart-event-iteration5-independent/qualitative-0-133.json",
+      "sha256": "4144b0aea9e6d616f0336fb4b3dfbe151bec5951fcc9784d005dda3048fa91b8"
+    },
+    {
+      "path": ".omx/handoff/dart-event-iteration5-independent/qualitative-134-266.json",
+      "sha256": "6498d0201c42096167f60300b17029f7eff23732f9e4ab522dfd9379ec8c560f"
+    },
+    {
+      "path": ".omx/handoff/dart-event-iteration5-independent/qualitative-267-399.json",
+      "sha256": "4a2106d0dbe50619cc142ca3f47b07f9badbc02a771c91d0c53f0b3266b7d110"
+    },
+    "q4-77-independent-adjudication-v1"
+  ],
+  "summary": {
+    "caseCount": 400,
+    "independentlyReAdjudicatedCount": 77
+  },
+  "cases": [
+    {
+      "index": 0,
+      "expectedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "updated",
+          "state": "effective",
+          "cause": "annual-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 1,
+      "expectedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "semiannual-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 2,
+      "expectedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "quarterly-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 3,
+      "rceptNo": "20251031000576",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 4,
+      "rceptNo": "20251031000547",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 5,
+      "rceptNo": "20251031000537",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "under-review",
+          "state": "deferred",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "independent-tiebreak"
+    },
+    {
+      "index": 6,
+      "rceptNo": "20251031000533",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "under-review",
+          "state": "deferred",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 7,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 8,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 9,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "share-exchange",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 10,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 11,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 12,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "proposed",
+          "cause": "capital-reduction",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 13,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 14,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 15,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 16,
+      "rceptNo": "20251022000196",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "independent-tiebreak"
+    },
+    {
+      "index": 17,
+      "expectedEvents": [
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "pending",
+          "cause": "business-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 18,
+      "rceptNo": "20251020000309",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "ordered",
+          "state": "correction-requested",
+          "cause": "disclosure-correction",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 19,
+      "rceptNo": "20251020000303",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "ordered",
+          "state": "correction-requested",
+          "cause": "disclosure-correction",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 20,
+      "rceptNo": "20251020000273",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "real-estate-purchase",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 21,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": null,
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 22,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "price-set",
+          "state": "effective",
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 23,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 24,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 25,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 26,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 27,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 28,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 29,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "price-set",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 30,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 31,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 32,
+      "rceptNo": "20251031000581",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 33,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 34,
+      "rceptNo": "20251030000222",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 35,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "filed",
+          "state": null,
+          "cause": "share-exchange",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 36,
+      "rceptNo": "20251015000124",
+      "expectedEvents": [],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 37,
+      "rceptNo": "20251031000599",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 38,
+      "rceptNo": "20251031000294",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 39,
+      "rceptNo": "20251031000592",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 40,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "proxy-solicitation",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 41,
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "completed",
+          "state": "effective",
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 42,
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "opinion-filed",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 43,
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 44,
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 45,
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "insider-trading-plan",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 46,
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "withdrawn",
+          "state": "effective",
+          "cause": "insider-trading-plan",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 47,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 48,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 49,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 50,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "reported",
+          "state": null,
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 51,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 52,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "cancelled",
+          "state": "effective",
+          "cause": "stock-option",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 53,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "changed",
+          "state": null,
+          "cause": "outside-director",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 54,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": "pending",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 55,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "fund-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 56,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "price-set",
+          "state": "effective",
+          "cause": "fund-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 57,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": null,
+          "cause": "fund-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 58,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "contracted",
+          "state": null,
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 59,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 60,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "updated",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 61,
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "filed",
+          "state": null,
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 62,
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "changed",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 63,
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "period-ended",
+          "state": "effective",
+          "cause": "listing-improvement-period",
+          "subjectType": "issuer"
+        },
+        {
+          "type": "trading-status",
+          "action": "halted",
+          "state": "effective",
+          "cause": "delisting-review",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 64,
+      "rceptNo": "20251031800937",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 65,
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "updated",
+          "state": "alleged",
+          "cause": "embezzlement-breach-of-trust",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 66,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "changed",
+          "state": "pending",
+          "cause": "chief-executive-change",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 67,
+      "rceptNo": "20251031800858",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 68,
+      "rceptNo": "20251031800886",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 69,
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "tangible-asset-disposal",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 70,
+      "expectedEvents": [
+        {
+          "type": "disclosure-inquiry",
+          "action": "responded",
+          "state": "uncertain",
+          "cause": "rumor-inquiry",
+          "subjectType": "issuer"
+        },
+        {
+          "type": "ownership-change",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 71,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "disposed",
+          "state": "effective",
+          "cause": "equity-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 72,
+      "rceptNo": "20251031800833",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "price-set",
+          "state": "finalized",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 73,
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 74,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "exercised",
+          "state": "effective",
+          "cause": "exchangeable-bond-exchange",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 75,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "debt-guarantee",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 76,
+      "rceptNo": "20251031800794",
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "extended",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 77,
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "updated",
+          "state": "pending",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 78,
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "updated",
+          "state": "pending",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 79,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "held",
+          "state": "effective",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 80,
+      "expectedEvents": [
+        {
+          "type": "disclosure-inquiry",
+          "action": "responded",
+          "state": "uncertain",
+          "cause": "rumor-inquiry",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 81,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "provided",
+          "state": "effective",
+          "cause": "collateral-provision",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 82,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "guaranteed",
+          "state": "effective",
+          "cause": "debt-guarantee",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 83,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": "pending",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 84,
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "updated",
+          "state": "pending",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 85,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "provided",
+          "state": "effective",
+          "cause": "collateral-provision",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 86,
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "cash-dividend",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 87,
+      "rceptNo": "20251031800586",
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 88,
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "updated",
+          "state": "pending",
+          "cause": "tangible-asset-disposal",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 89,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "changed",
+          "state": "effective",
+          "cause": "asset-management-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 90,
+      "rceptNo": "20251031800377",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": "active",
+          "cause": "compliance-program",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 91,
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "updated",
+          "state": "pending",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 92,
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "share-cancellation",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 93,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "contracted",
+          "state": "effective",
+          "cause": "research-license-agreement",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 94,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "completed",
+          "state": "effective",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 95,
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "record-date",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 96,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "milestone-earned",
+          "state": "effective",
+          "cause": "licensing-milestone",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 97,
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "reported",
+          "state": "effective",
+          "cause": "value-up-plan",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 98,
+      "rceptNo": "20251031800001",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 99,
+      "rceptNo": "20251030800831",
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "occurred",
+          "state": "effective",
+          "cause": "serious-industrial-accident",
+          "subjectType": "operations"
+        },
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "active",
+          "cause": "work-stop",
+          "subjectType": "operating-business"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 100,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "updated",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 101,
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "disclosure-compliance",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 102,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "loan",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 103,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "loan",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 104,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "asset-custody-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 105,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "changed",
+          "state": "pending",
+          "cause": "asset-custody-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 106,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "borrowed",
+          "state": "effective",
+          "cause": "financing",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 107,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 108,
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "reported",
+          "state": "effective",
+          "cause": "value-up-plan",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 109,
+      "expectedEvents": [
+        {
+          "type": "operating-status",
+          "action": "resumed",
+          "state": "effective",
+          "cause": "production-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 110,
+      "rceptNo": "20251030800620",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "pending",
+          "cause": "record-date",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 111,
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 112,
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 113,
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 114,
+      "rceptNo": "20251030800094",
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "updated",
+          "state": "projected",
+          "cause": "earnings-guidance",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "independent-tiebreak"
+    },
+    {
+      "index": 115,
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "announced",
+          "state": "proposed",
+          "cause": "dividend-policy",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 116,
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "updated",
+          "state": "projected",
+          "cause": "earnings-guidance",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 117,
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "investor-relations",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 118,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "adjusted",
+          "state": "effective",
+          "cause": "convertible-price",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 119,
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "designated",
+          "state": "pending",
+          "cause": "disclosure-compliance",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 120,
+      "expectedEvents": [
+        {
+          "type": "trading-status",
+          "action": "halted",
+          "state": "effective",
+          "cause": "business-disposal",
+          "subjectType": "listed-shares"
+        },
+        {
+          "type": "trading-status",
+          "action": "lifted",
+          "state": "pending",
+          "cause": "business-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 121,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 122,
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "changed",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 123,
+      "rceptNo": "20251031800845",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 124,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bond-purchase",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 125,
+      "rceptNo": "20251031000598",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "collateral-received",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 126,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "internal-lease",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 127,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "asset-acquisition",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 128,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "changed",
+          "state": "effective",
+          "cause": "internal-goods-services",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 129,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 130,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "asset-disposal",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 131,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "collateral-provision",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 132,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "sold",
+          "state": "effective",
+          "cause": "bond-sale",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 133,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "internal-goods-services",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-0-133.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 134,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "affiliate-equity-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 135,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "extended",
+          "state": "effective",
+          "cause": "fund-security-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 136,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "extended",
+          "state": "effective",
+          "cause": "related-party-loan",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 137,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 138,
+      "rceptNo": "20251031000262",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 139,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "affiliate-financial-transactions",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 140,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "retirement-pension",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 141,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "purchased",
+          "state": "effective",
+          "cause": "securities-purchase",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 142,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "cash-donation",
+          "subjectType": "cash"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 143,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-real-estate-leased-out",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 144,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-real-estate-leased-in",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 145,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "real-estate-sale",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 146,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "securities-sale",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 147,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "securities-borrowing",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 148,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "real-estate-purchase",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 149,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "reported",
+          "state": "effective",
+          "cause": "derivative-swap-transactions",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 150,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "borrowed",
+          "state": "effective",
+          "cause": "securities-borrowing",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 151,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "reported",
+          "state": "effective",
+          "cause": "bond-transactions",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 152,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "reported",
+          "state": "effective",
+          "cause": "other-securities-transactions",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 153,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "reported",
+          "state": "effective",
+          "cause": "fund-security-transactions",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 154,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "reported",
+          "state": "effective",
+          "cause": "retirement-pension-transactions",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 155,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "reported",
+          "state": "effective",
+          "cause": "related-party-lending",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 156,
+      "rceptNo": "20251015000340",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": "effective",
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 157,
+      "rceptNo": "20251013000158",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": "effective",
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 158,
+      "expectedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "annual-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 159,
+      "expectedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "semiannual-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 160,
+      "expectedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "quarterly-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 161,
+      "rceptNo": "20251125000685",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 162,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 163,
+      "rceptNo": "20251128002061",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "acquired",
+          "state": "effective",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 164,
+      "rceptNo": "20251128001922",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 165,
+      "rceptNo": "20251128001918",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 166,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": "pending",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 167,
+      "rceptNo": "20251128001766",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 168,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 169,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": "pending",
+          "cause": "demerger",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 170,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 171,
+      "rceptNo": "20251124000330",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "withdrawn",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        },
+        {
+          "type": "capital-change",
+          "action": "withdrawn",
+          "state": "cancelled",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "withdrawn",
+          "state": "cancelled",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "independent-tiebreak"
+    },
+    {
+      "index": 172,
+      "rceptNo": "20251124000287",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 173,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "pending",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 174,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 175,
+      "rceptNo": "20251120000031",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 176,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 177,
+      "rceptNo": "20251107000383",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "warrant-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 178,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 179,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 180,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 181,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 182,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 183,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 184,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 185,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": null,
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 186,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "price-set",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 187,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 188,
+      "rceptNo": "20251128002139",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 189,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 190,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 191,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 192,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 193,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 194,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 195,
+      "rceptNo": "20251128000481",
+      "expectedEvents": [],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "low",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 196,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "filed",
+          "state": null,
+          "cause": "merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 197,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": null,
+          "cause": "share-exchange",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 198,
+      "rceptNo": "20251113000532",
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "demerger",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "independent-tiebreak"
+    },
+    {
+      "index": 199,
+      "rceptNo": "20251128002150",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 200,
+      "rceptNo": "20251127000025",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 201,
+      "rceptNo": "20251128002159",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 202,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "proxy-solicitation",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 203,
+      "rceptNo": "20251118000007",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 204,
+      "rceptNo": "20251118000006",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 205,
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "insider-trading-plan",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 206,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 207,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 208,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "reported",
+          "state": null,
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 209,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 210,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 211,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "granted",
+          "state": null,
+          "cause": "stock-option",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 212,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "changed",
+          "state": "effective",
+          "cause": "outside-director",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 213,
+      "rceptNo": "20251127001306",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "convened",
+          "state": "pending",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 214,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "contracted",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 215,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "contracted",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 216,
+      "rceptNo": "20251128801335",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "rescheduled",
+          "state": "deferred",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 217,
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "occurred",
+          "state": null,
+          "cause": "serious-industrial-accident",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 218,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "guaranteed",
+          "state": "effective",
+          "cause": "debt-guarantee",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 219,
+      "rceptNo": "20251128801291",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-borrowing",
+          "subjectType": "cash"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 220,
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "record-date",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 221,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 222,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "changed",
+          "state": "effective",
+          "cause": "chief-executive-change",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 223,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "guaranteed",
+          "state": "effective",
+          "cause": "debt-guarantee",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 224,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "lent",
+          "state": "effective",
+          "cause": "related-party-loan",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 225,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "rescheduled",
+          "state": "pending",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 226,
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "disclosure-compliance",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 227,
+      "expectedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "published",
+          "state": "effective",
+          "cause": "quarterly-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 228,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "financing",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 229,
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 230,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "borrowed",
+          "state": "effective",
+          "cause": "financing",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 231,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "completed",
+          "state": "effective",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 232,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "held",
+          "state": "effective",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 233,
+      "expectedEvents": [
+        {
+          "type": "disclosure-inquiry",
+          "action": "received",
+          "state": "pending",
+          "cause": "market-movement-inquiry",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 234,
+      "expectedEvents": [
+        {
+          "type": "corporate-profile",
+          "action": "changed",
+          "state": "effective",
+          "cause": "subsidiary-exit",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 235,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "exercised",
+          "state": "effective",
+          "cause": "warrant-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 236,
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "rescheduled",
+          "state": "pending",
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 237,
+      "expectedEvents": [
+        {
+          "type": "operating-status",
+          "action": "lifted",
+          "state": "lifted",
+          "cause": "production-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 238,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 239,
+      "rceptNo": "20251128800765",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "disposed",
+          "state": "effective",
+          "cause": "equity-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 240,
+      "expectedEvents": [
+        {
+          "type": "disclosure-inquiry",
+          "action": "responded",
+          "state": "uncertain",
+          "cause": "rumor-inquiry",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 241,
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "updated",
+          "state": "pending",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 242,
+      "rceptNo": "20251128800665",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "changed",
+          "state": "effective",
+          "cause": "real-estate-lease",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "independent-tiebreak"
+    },
+    {
+      "index": 243,
+      "rceptNo": "20251128800672",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 244,
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "cash-dividend",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 245,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "contracted",
+          "state": "effective",
+          "cause": "service-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 246,
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "reported",
+          "state": "effective",
+          "cause": "value-up-plan",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 247,
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "announced",
+          "state": "proposed",
+          "cause": "value-up-plan",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 248,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "established",
+          "state": "effective",
+          "cause": "board-committee",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 249,
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "reported",
+          "state": "effective",
+          "cause": "value-up-plan",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 250,
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "appealed",
+          "state": "active",
+          "cause": "regulatory-fine",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 251,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 252,
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "rescheduled",
+          "state": "pending",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 253,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 254,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": "pending",
+          "cause": "demerger",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 255,
+      "rceptNo": "20251124800598",
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "withdrawn",
+          "state": "cancelled",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 256,
+      "rceptNo": "20251124800231",
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "independent-tiebreak"
+    },
+    {
+      "index": 257,
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 258,
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 259,
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 260,
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "announced",
+          "state": "proposed",
+          "cause": "dividend-policy",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 261,
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "updated",
+          "state": "projected",
+          "cause": "earnings-guidance",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 262,
+      "expectedEvents": [
+        {
+          "type": "operating-status",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "production-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 263,
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "investor-relations",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 264,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "adjusted",
+          "state": "effective",
+          "cause": "convertible-price",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 265,
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "designated",
+          "state": "pending",
+          "cause": "disclosure-compliance",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 266,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-134-266.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 267,
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "changed",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 268,
+      "rceptNo": "20251128801261",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 269,
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "changed",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 270,
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "designated",
+          "state": "effective",
+          "cause": "disclosure-compliance",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 271,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "halted",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 272,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "internal-goods-services",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 273,
+      "rceptNo": "20251128002043",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "affiliate-equity-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 274,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "effective",
+          "cause": "retirement-pension",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 275,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "extended",
+          "state": "effective",
+          "cause": "related-party-loan",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 276,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "pending",
+          "cause": "fund-security-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 277,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "extended",
+          "state": "effective",
+          "cause": "related-party-contract-updated",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 278,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-real-estate-leased-in",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 279,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-real-estate-leased-out",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 280,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 281,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "changed",
+          "state": "effective",
+          "cause": "internal-goods-services",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 282,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "purchased",
+          "state": "effective",
+          "cause": "securities-purchase",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 283,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 284,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "real-estate-purchase",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 285,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "affiliate-financial-transactions",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 286,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 287,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "collateral-received",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 288,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": null,
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 289,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": null,
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 290,
+      "expectedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "annual-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 291,
+      "expectedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "semiannual-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 292,
+      "expectedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "quarterly-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 293,
+      "rceptNo": "20251231000590",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bond-sale",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 294,
+      "rceptNo": "20251231000232",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 295,
+      "expectedEvents": [
+        {
+          "type": "insolvency",
+          "action": "initiated",
+          "state": "effective",
+          "cause": "creditor-bank-management",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 296,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "acquired",
+          "state": "effective",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 297,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": "pending",
+          "cause": "equity-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 298,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 299,
+      "rceptNo": "20251230000620",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "rescheduled",
+          "state": "deferred",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 300,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 301,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": "pending",
+          "cause": "merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 302,
+      "rceptNo": "20251226000514",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 303,
+      "rceptNo": "20251226000462",
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "extended",
+          "state": "effective",
+          "cause": "contract-right",
+          "subjectType": "contract-right"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 304,
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 305,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 306,
+      "rceptNo": "20251224000451",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 307,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 308,
+      "expectedEvents": [
+        {
+          "type": "insolvency",
+          "action": "updated",
+          "state": "effective",
+          "cause": "rehabilitation",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 309,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bonus-issue",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 310,
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "updated",
+          "state": "proposed",
+          "cause": "tangible-asset-disposal",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 311,
+      "expectedEvents": [
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "pending",
+          "cause": "business-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 312,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 313,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 314,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 315,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 316,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 317,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 318,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 319,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 320,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 321,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 322,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 323,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 324,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": null,
+          "cause": "merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 325,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "share-exchange",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 326,
+      "rceptNo": "20251216000005",
+      "expectedEvents": [],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 327,
+      "rceptNo": "20251231000637",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 328,
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 329,
+      "rceptNo": "20251231000603",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 330,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": "pending",
+          "cause": "proxy-solicitation",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 331,
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "completed",
+          "state": "effective",
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 332,
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 333,
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 334,
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "insider-trading-plan",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 335,
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "withdrawn",
+          "state": "effective",
+          "cause": "insider-trading-plan",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 336,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 337,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 338,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 339,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "reported",
+          "state": null,
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 340,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 341,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 342,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "stock-option",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 343,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "changed",
+          "state": null,
+          "cause": "outside-director",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 344,
+      "rceptNo": "20251231000035",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "convened",
+          "state": "pending",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 345,
+      "rceptNo": "20251231800801",
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "under-review",
+          "state": "pending",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 346,
+      "rceptNo": "20251231800773",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 347,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "updated",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 348,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 349,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": "effective",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 350,
+      "expectedEvents": [
+        {
+          "type": "corporate-profile",
+          "action": "changed",
+          "state": null,
+          "cause": "subsidiary-exit",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 351,
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "updated",
+          "state": "effective",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 352,
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "updated",
+          "state": "effective",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 353,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "contracted",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 354,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "changed",
+          "state": "effective",
+          "cause": "chief-executive-change",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 355,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "extended",
+          "state": "pending",
+          "cause": "related-party-loan",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 356,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "held",
+          "state": "effective",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 357,
+      "rceptNo": "20251231800437",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "finalized",
+          "cause": "collateral-provision",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 358,
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "updated",
+          "state": "pending",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 359,
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "updated",
+          "state": "active",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 360,
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "updated",
+          "state": "pending",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 361,
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 362,
+      "expectedEvents": [
+        {
+          "type": "disclosure-inquiry",
+          "action": "responded",
+          "state": "uncertain",
+          "cause": "rumor-inquiry",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 363,
+      "rceptNo": "20251230801257",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 364,
+      "rceptNo": "20251230801246",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bond-purchase",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 365,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "effective",
+          "cause": "collateral-provision",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 366,
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 367,
+      "rceptNo": "20251231800491",
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "adjusted",
+          "state": "effective",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        },
+        {
+          "type": "corporate-event",
+          "action": "cancelled",
+          "state": "cancelled",
+          "cause": "business-plan",
+          "subjectType": "business"
+        },
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "independent-tiebreak"
+    },
+    {
+      "index": 368,
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "forecasted",
+          "state": null,
+          "cause": "earnings-guidance",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 369,
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "announced",
+          "state": "proposed",
+          "cause": "dividend-policy",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 370,
+      "rceptNo": "20251222800083",
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "independent-tiebreak"
+    },
+    {
+      "index": 371,
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 372,
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 373,
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "forecasted",
+          "state": null,
+          "cause": "earnings-guidance",
+          "subjectType": "financials"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 374,
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "investor-relations",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 375,
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "announced",
+          "state": "pending",
+          "cause": "record-date",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 376,
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "designated",
+          "state": "pending",
+          "cause": "disclosure-compliance",
+          "subjectType": "issuer"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 377,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 378,
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "adjusted",
+          "state": "effective",
+          "cause": "convertible-price",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 379,
+      "expectedEvents": [
+        {
+          "type": "trading-status",
+          "action": "halted",
+          "state": "effective",
+          "cause": "bonus-issue",
+          "subjectType": "listed-shares"
+        },
+        {
+          "type": "trading-status",
+          "action": "lifted",
+          "state": "lifted",
+          "cause": "bonus-issue",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 380,
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "changed",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 381,
+      "rceptNo": "20251231800763",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 382,
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "changed",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 383,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "internal-goods-services",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 384,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "changed",
+          "state": "effective",
+          "cause": "internal-goods-services",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 385,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bond-transactions",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 386,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "reported",
+          "state": "effective",
+          "cause": "brand-license-fee",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 387,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "retirement-pension",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 388,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "pending",
+          "cause": "related-party-loan",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": false,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 389,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "fund-security-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 390,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "affiliate-financial-transactions",
+          "subjectType": "contract"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 391,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "securities-donation",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 392,
+      "rceptNo": "20251224000174",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "affiliate-equity-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus"
+    },
+    {
+      "index": 393,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-real-estate-leased-in",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 394,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-real-estate-leased-out",
+          "subjectType": "real-estate"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 395,
+      "rceptNo": "20251223000481",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "collateral-received",
+          "subjectType": "asset"
+        }
+      ],
+      "sourceReport": "q4-77-independent-adjudication-v1",
+      "sourceStrictCorrect": null,
+      "sourceConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus"
+    },
+    {
+      "index": 396,
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "medium"
+    },
+    {
+      "index": 397,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": null,
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 398,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": null,
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    },
+    {
+      "index": 399,
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": null,
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "sourceReport": "qualitative-267-399.json",
+      "sourceStrictCorrect": true,
+      "sourceConfidence": "high"
+    }
+  ]
+}

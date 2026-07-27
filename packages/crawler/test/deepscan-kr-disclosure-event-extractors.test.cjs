@@ -537,7 +537,7 @@ test('document baseline remains separate while the gated candidate exposes all p
   const input = { rceptNo: '20260713800438', reportName: '기타안내사항(안내공시)', bodyText: '| 1. 제목 | | 의무보유 기간 만료 안내 | | 해제일 | 2026.07.16 |' };
   assert.equal(extractorModule.extractEventsDocumentAwareProjection(input).strategy, 'document-aware-hierarchical-projection');
   const gated = extractorModule.extractEventsGatedProjection(input);
-  assert.equal(gated.strategy, 'semantic-gate-v5');
+  assert.equal(gated.strategy, 'semantic-gate-v7');
   assert.match(gated.ontologyVersion, /^jaroo\.kr-disclosure-event-ontology\.v\d+$/u);
   assert.match(gated.ontologyHash, /^[a-f0-9]{64}$/u);
   assert.equal(extractorModule.normalizeDisclosureEventGateInput({ reportName: '[첨부추가] 공시' }).wrapperKind, 'attachment-added');
@@ -567,6 +567,261 @@ test('independent same-tuple sections preserve event cardinality', async () => {
 
   assert.deepEqual(eventSet(actual.events), eventSet([filed, filed]));
   assert.equal(actual.events.length, 2);
+});
+
+test('title identity repair preserves unrelated body-derived sibling events', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const actual = extractEventsGatedProjection({
+    reportName: '타법인주식및출자증권취득결정',
+    receiptDate: '2026-07-24',
+    bodyText: '취득예정일 2026년 8월 30일 | 당사는 손해배상 청구 소장을 법원에 제출했고 접수번호를 부여받았습니다.',
+  });
+
+  assert.deepEqual(eventSet(actual.events), eventSet([
+    canonicalEvent('asset-transaction', 'decided', 'proposed', 'equity-acquisition', 'securities'),
+    canonicalEvent('legal-regulatory', 'filed', 'active', 'litigation', 'issuer'),
+  ]));
+});
+
+test('identity repair preserves duplicate target cardinality and unrelated siblings', async () => {
+  const extractorModule = await import(MODULE);
+  const input = extractorModule.normalizeDisclosureEventGateInput({
+    reportName: '타법인주식및출자증권취득결정',
+    receiptDate: '2026-07-24',
+  });
+  const facts = extractorModule.extractStructuredBodyFacts(input);
+  const target = canonicalEvent('asset-transaction', 'announced', 'pending', 'equity-acquisition', 'securities');
+  const secondOccurrence = canonicalEvent(
+    'asset-transaction', 'contracted', 'effective', 'equity-acquisition', 'securities',
+  );
+  const sibling = canonicalEvent('legal-regulatory', 'filed', 'active', 'litigation', 'issuer');
+  const decision = extractorModule.resolveCanonicalIntentIdentity(
+    input,
+    [target, secondOccurrence, sibling],
+    facts,
+  );
+
+  assert.equal(decision.events.length, 3);
+  assert.deepEqual(eventSet(decision.events), eventSet([
+    canonicalEvent('asset-transaction', 'announced', 'pending', 'equity-acquisition', 'securities'),
+    secondOccurrence,
+    sibling,
+  ]));
+});
+
+test('title identity repair replaces one compatible occurrence without deleting cross-cause siblings', async () => {
+  const extractorModule = await import(MODULE);
+  const input = extractorModule.normalizeDisclosureEventGateInput({
+    reportName: '자기전환사채만기전취득결정',
+    receiptDate: '2026-07-24',
+  });
+  const facts = extractorModule.extractStructuredBodyFacts(input);
+  const realEstate = canonicalEvent(
+    'asset-transaction', 'acquired', 'effective', 'real-estate-purchase', 'real-estate',
+  );
+  const litigation = canonicalEvent('legal-regulatory', 'filed', 'active', 'litigation', 'issuer');
+  const decision = extractorModule.resolveCanonicalIntentIdentity(input, [
+    canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities'),
+    realEstate,
+    litigation,
+  ], facts);
+
+  assert.deepEqual(eventSet(decision.events), eventSet([
+    canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities'),
+    realEstate,
+    litigation,
+  ]));
+});
+
+test('warrant identity repair preserves an independent equity issuance sibling', async () => {
+  const extractorModule = await import(MODULE);
+  const input = extractorModule.normalizeDisclosureEventGateInput({
+    reportName: '신주인수권부사채권발행결정',
+    receiptDate: '2026-07-24',
+  });
+  const facts = extractorModule.extractStructuredBodyFacts(input);
+  const equity = canonicalEvent('capital-change', 'completed', 'effective', 'equity-securities', 'securities');
+  const decision = extractorModule.resolveCanonicalIntentIdentity(input, [
+    canonicalEvent('capital-change', 'decided', 'proposed', 'bond-with-warrants', 'securities'),
+    equity,
+  ], facts);
+
+  assert.deepEqual(eventSet(decision.events), eventSet([
+    canonicalEvent('capital-change', 'decided', 'proposed', 'warrant-bond', 'securities'),
+    equity,
+  ]));
+});
+
+test('warrant identity repair selects the lifecycle-compatible alias independent of input order', async () => {
+  const extractorModule = await import(MODULE);
+  const input = extractorModule.normalizeDisclosureEventGateInput({
+    reportName: '신주인수권부사채권발행결정',
+    receiptDate: '2026-07-24',
+  });
+  const facts = extractorModule.extractStructuredBodyFacts(input);
+  const decided = canonicalEvent(
+    'capital-change', 'decided', 'proposed', 'bond-with-warrants', 'securities',
+  );
+  const completed = canonicalEvent(
+    'capital-change', 'completed', 'effective', 'bond-with-warrants', 'securities',
+  );
+  const expected = eventSet([
+    canonicalEvent('capital-change', 'decided', 'proposed', 'warrant-bond', 'securities'),
+    completed,
+  ]);
+
+  for (const events of [[decided, completed], [completed, decided]]) {
+    const decision = extractorModule.resolveCanonicalIntentIdentity(input, events, facts);
+    assert.deepEqual(eventSet(decision.events), expected);
+  }
+});
+
+test('exchangeable-bond identity does not consume an independent warrant-bond sibling', async () => {
+  const extractorModule = await import(MODULE);
+  const input = extractorModule.normalizeDisclosureEventGateInput({
+    reportName: '교환사채권발행결정',
+    receiptDate: '2026-07-24',
+  });
+  const facts = extractorModule.extractStructuredBodyFacts(input);
+  const warrantSibling = canonicalEvent(
+    'capital-change', 'completed', 'effective', 'bond-with-warrants', 'securities',
+  );
+  const decision = extractorModule.resolveCanonicalIntentIdentity(input, [warrantSibling], facts);
+
+  assert.deepEqual(eventSet(decision.events), eventSet([
+    canonicalEvent('capital-change', 'decided', 'proposed', 'exchangeable-bond', 'securities'),
+    warrantSibling,
+  ]));
+});
+
+test('exchangeable-bond review lifecycle preserves an identical independent warrant sibling', async () => {
+  const extractorModule = await import(MODULE);
+  const input = extractorModule.normalizeDisclosureEventGateInput({
+    reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+    receiptDate: '2025-10-31',
+    bodyText: '추가적인 논의가 필요하여 재검토하기로 하였고 발행 여부는 최종결정 후 재공시할 예정입니다.',
+  });
+  const facts = extractorModule.extractStructuredBodyFacts(input);
+  const legacyPriceAlias = canonicalEvent(
+    'capital-change', 'price-set', 'effective', 'bond-with-warrants', 'securities',
+  );
+  const exchangeableBaseline = canonicalEvent(
+    'capital-change', 'price-set', 'effective', 'exchangeable-bond', 'securities',
+  );
+  const decision = extractorModule.applyLifecyclePrecedence(
+    input,
+    [legacyPriceAlias, exchangeableBaseline],
+    facts,
+  );
+
+  assert.deepEqual(eventSet(decision.events), eventSet([
+    canonicalEvent('capital-change', 'under-review', 'deferred', 'exchangeable-bond', 'securities'),
+    legacyPriceAlias,
+  ]));
+});
+
+test('specialized issuance results consume the generic title baseline only', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const cases = [
+    ['교환사채', 'exchangeable-bond'],
+    ['신주인수권부사채', 'bond-with-warrants'],
+  ];
+
+  for (const [instrument, cause] of cases) {
+    const actual = extractEventsGatedProjection({
+      reportName: '유상증자또는주식관련사채등의발행결과(자율공시)',
+      disclosureDetailType: 'I001',
+      bodyText: `${instrument} | 실제발행금액 | 납입 완료`,
+    });
+    assert.deepEqual(eventSet(actual.events), eventSet([
+      canonicalEvent('capital-change', 'completed', 'effective', cause, 'securities'),
+    ]));
+  }
+});
+
+test('identity repair is order-independent and does not mutate a different type sharing the same cause', async () => {
+  const extractorModule = await import(MODULE);
+  const input = extractorModule.normalizeDisclosureEventGateInput({
+    reportName: '타법인주식및출자증권취득결정',
+    receiptDate: '2026-07-24',
+  });
+  const facts = extractorModule.extractStructuredBodyFacts(input);
+  const relatedParty = canonicalEvent(
+    'related-party', 'acquired', 'effective', 'equity-acquisition', 'securities',
+  );
+  const titleOccurrence = canonicalEvent(
+    'asset-transaction', 'decided', 'proposed', 'equity-acquisition', 'securities',
+  );
+  const expected = eventSet([relatedParty, titleOccurrence]);
+
+  for (const events of [
+    [relatedParty],
+    [relatedParty, titleOccurrence],
+    [titleOccurrence, relatedParty],
+  ]) {
+    const decision = extractorModule.resolveCanonicalIntentIdentity(input, events, facts);
+    assert.deepEqual(eventSet(decision.events), expected);
+  }
+});
+
+test('non-litigation titles preserve explicit active and withdrawn litigation siblings', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const acquisition = canonicalEvent(
+    'asset-transaction', 'decided', 'proposed', 'equity-acquisition', 'securities',
+  );
+  const cases = [
+    {
+      bodyText: '취득예정일 2026년 8월 30일 | [소송] 당사가 피고인 손해배상 사건은 현재 계속 중입니다.',
+      litigation: canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer'),
+    },
+    {
+      bodyText: '취득예정일 2026년 8월 30일 | [소송] 당사는 기존 본소를 전부 취하했고 법원 접수가 완료되었습니다.',
+      litigation: canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer'),
+    },
+  ];
+
+  for (const { bodyText, litigation } of cases) {
+    const actual = extractEventsGatedProjection({
+      reportName: '타법인주식및출자증권취득결정',
+      receiptDate: '2026-07-24',
+      bodyText,
+    });
+    assert.deepEqual(eventSet(actual.events), eventSet([acquisition, litigation]));
+    assert.equal(actual.confidence, 'medium');
+  }
+});
+
+test('non-litigation titles preserve issuer-bound heading-free litigation siblings', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const actual = extractEventsGatedProjection({
+    reportName: '타법인주식및출자증권취득결정',
+    receiptDate: '2026-07-24',
+    bodyText: '취득예정일 2026년 8월 30일. 별도로 당사가 피고인 손해배상 사건은 현재 계속 중입니다. 한편 당사는 기존 본소를 전부 취하했고 법원 접수가 완료되었습니다.',
+  });
+
+  assert.deepEqual(eventSet(actual.events), eventSet([
+    canonicalEvent('asset-transaction', 'decided', 'proposed', 'equity-acquisition', 'securities'),
+    canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer'),
+    canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer'),
+  ]));
+  assert.equal(actual.confidence, 'medium');
+});
+
+test('shareholder appraisal-right boilerplate is not an independent litigation event', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const actual = extractEventsGatedProjection({
+    reportName: '주요사항보고서(영업양도결정)',
+    receiptDate: '2025-10-28',
+    bodyText: [
+      '양도기준일 2026년 1월 1일',
+      '주식매수청구권을 행사하려는 주주는 회사에 서면으로 매수를 청구할 수 있습니다.',
+      '한편 협의가 이루어지지 않고 매수가격에 반대하는 경우 법원에 매수가격의 결정을 청구할 수 있습니다.',
+    ].join(' | '),
+  });
+
+  assert.deepEqual(eventSet(actual.events), eventSet([
+    canonicalEvent('restructuring', 'decided', 'proposed', 'business-disposal', 'business'),
+  ]));
 });
 
 test('body-derived multi-event projections expose auditable evidence and conservative confidence', async () => {
@@ -599,7 +854,14 @@ test('high confidence is opt-in to audited stable original disclosure families',
     receiptDate: '2026-07-24',
     bodyText: '편입사유 | 지분 취득 | 편입일자 | 2026년 7월 24일 | 편입 후 자회사 총수 | 8',
   });
-  assert.equal(genericDerived.confidence, 'high');
+  assert.equal(genericDerived.confidence, 'medium');
+
+  const negatedGenericDerived = extractEventsGatedProjection({
+    reportName: '지주회사의 자회사 편입',
+    receiptDate: '2026-07-24',
+    bodyText: '참고자료이며 실제 편입 사실은 없습니다.',
+  });
+  assert.equal(negatedGenericDerived.confidence, 'medium');
 
   const correctedStableTitle = extractEventsGatedProjection({
     reportName: '[기재정정] 기업설명회(IR)개최(안내공시)',
@@ -779,6 +1041,20 @@ test('J001 body-dependent disclosures abstain when the body is unavailable', asy
     disclosureDetailType: 'J001',
   });
   assert.deepEqual(actual.events, []);
+  assert.equal(actual.confidence, 'low');
+});
+
+test('bodyless generic investment prospectus remains unresolved when source retrieval failed', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const actual = extractEventsGatedProjection({
+    reportName: '투자설명서',
+    disclosureDetailType: 'C004',
+  });
+
+  assert.deepEqual(actual.events, []);
+  assert.equal(actual.disposition, 'unresolved');
+  assert.equal(actual.resolved, false);
+  assert.equal(actual.abstained, true);
   assert.equal(actual.confidence, 'low');
 });
 
@@ -1319,6 +1595,7 @@ test('iteration 8 actuality repair rejects scheduled and historical evidence whi
       id: 'trust-historical-completion-stays-proposed',
       input: { reportName: '주요사항보고서(자기주식취득신탁계약체결결정)', filedAt: '2027-03-10', bodyText: '계약기간 | 시작일 | 2027-03-10 | 계약체결 예정일자 | 2027-03-10 | 과거이력 | 2026년에는 신탁계약을 체결 완료하였음' },
       expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities')],
+      expectedConfidence: 'medium',
     },
     {
       id: 'cb-historical-completion-stays-proposed',
@@ -2945,6 +3222,123 @@ test('iteration 8 separated gates preserve wrapper authority, intent identity, l
       expected: [e('capital-change', 'under-review', 'deferred', 'exchangeable-bond', 'securities')],
     },
     {
+      id: 'narrative-only-exchangeable-bond-supplement-preserves-decision-lifecycle',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        receiptDate: '20251224',
+        bodyText: '3. 정정사항 | 항목 | 정정사유 | 정정 전 | 정정 후 | 19. 기타 투자판단에 참고할 사항 | 기재보완에 따른 정정 | (주1) 정정 전 | (주1) 정정 후 | 교환사채 발행을 결정하였습니다 | 발행일 2025년 12월 29일',
+      },
+      expected: [e('capital-change', 'decided', 'proposed', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'operative-exchangeable-bond-field-correction-remains-updated',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        receiptDate: '20251224',
+        bodyText: '3. 정정사항 | 항목 | 정정사유 | 정정 전 | 정정 후 | 11. 납입일 | 기재보완에 따른 정정 | 2025년 12월 29일 | 2026년 1월 15일',
+      },
+      expected: [e('capital-change', 'updated', 'pending', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'operative-exchangeable-bond-parenthesized-field-correction-remains-updated',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        receiptDate: '20251224',
+        bodyText: '3. 정정사항 | 11) 납입일 | 기재보완에 따른 정정 | 2025년 12월 29일 | 2026년 1월 15일',
+      },
+      expected: [e('capital-change', 'updated', 'pending', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'operative-exchangeable-bond-article-field-correction-remains-updated',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        receiptDate: '20251224',
+        bodyText: '3. 정정사항 | 제11항 납입일 | 기재보완에 따른 정정 | 2025년 12월 29일 | 2026년 1월 15일',
+      },
+      expected: [e('capital-change', 'updated', 'pending', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'numberless-operative-exchangeable-bond-correction-remains-updated',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        receiptDate: '20251224',
+        bodyText: '3. 정정사항 | 기재보완에 따른 정정 | 납입일을 2025년 12월 29일에서 2026년 1월 15일로 변경 | 19. 기타 투자판단에 참고할 사항',
+      },
+      expected: [e('capital-change', 'updated', 'pending', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'numberless-table-operative-exchangeable-bond-correction-remains-updated',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        receiptDate: '20251224',
+        bodyText: '3. 정정사항 | 19. 기타 투자판단에 참고할 사항 | 기재보완에 따른 정정 | 납입일 | 정정 전 | 2025년 12월 29일 | 정정 후 | 2026년 1월 15일',
+      },
+      expected: [e('capital-change', 'updated', 'pending', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'exchangeable-bond-price-change-possibility-only-remains-decided',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '3. 정정사항 | 19. 기타 투자판단에 참고할 사항 | 교환가액 변경 가능성에 대한 설명을 추가했으나 실제 교환가액은 변경하지 않았습니다',
+      },
+      expected: [e('capital-change', 'decided', 'proposed', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'exchangeable-bond-redemption-change-possibility-only-remains-decided',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '3. 정정사항 | 19. 기타 투자판단에 참고할 사항 | 조기상환 조건의 변경 가능성에 대한 설명만 추가했으며 조건 자체는 변경하지 않았습니다',
+      },
+      expected: [e('capital-change', 'decided', 'proposed', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'exchangeable-bond-interest-rate-no-change-remains-decided',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '3. 정정사항 | 19. 기타 투자판단에 참고할 사항 | 표면이자율 변경은 없으며 관련 설명만 추가했습니다',
+      },
+      expected: [e('capital-change', 'decided', 'proposed', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'exchangeable-bond-interest-rate-change-remains-updated',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        receiptDate: '20251224',
+        bodyText: '3. 정정사항 | 19. 기타 투자판단에 참고할 사항 | 기재보완에 따른 정정 | 표면이자율을 0%에서 2%로 변경',
+      },
+      expected: [e('capital-change', 'updated', 'pending', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'exchangeable-bond-yield-change-remains-updated',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        receiptDate: '20251224',
+        bodyText: '3. 정정사항 | 19. 기타 투자판단에 참고할 사항 | 기재보완에 따른 정정 | 만기보장수익률을 1%에서 3%로 변경',
+      },
+      expected: [e('capital-change', 'updated', 'pending', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'exchangeable-bond-redemption-option-removal-remains-updated',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        receiptDate: '20251224',
+        bodyText: '3. 정정사항 | 19. 기타 투자판단에 참고할 사항 | 기재보완에 따른 정정 | 조기상환 조건을 삭제',
+      },
+      expected: [e('capital-change', 'updated', 'pending', 'exchangeable-bond', 'securities')],
+    },
+    {
       id: 'correction-rescheduled-convertible-bond',
       input: {
         reportName: '[기재정정]주요사항보고서(전환사채권발행결정)',
@@ -3100,6 +3494,32 @@ test('iteration 8 separated gates preserve wrapper authority, intent identity, l
       : [{ id, expected: eventSet(expected), actual: eventSet(actual.events) }];
   });
   assert.deepEqual(failures, []);
+});
+
+test('narrative exchangeable-bond lifecycle repair is occurrence- and order-stable', async () => {
+  const extractorModule = await import(MODULE);
+  const input = extractorModule.normalizeDisclosureEventGateInput({
+    reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+    disclosureDetailType: 'B001',
+    receiptDate: '20251224',
+    bodyText: '3. 정정사항 | 19. 기타 투자판단에 참고할 사항 | 기재보완에 따른 정정 | (주1) 정정 전 | (주1) 정정 후',
+  });
+  const facts = extractorModule.extractStructuredBodyFacts(input);
+  const genericUpdate = canonicalEvent(
+    'capital-change', 'updated', 'pending', 'exchangeable-bond', 'securities',
+  );
+  const completed = canonicalEvent(
+    'capital-change', 'completed', 'effective', 'exchangeable-bond', 'securities',
+  );
+  const expected = eventSet([
+    canonicalEvent('capital-change', 'decided', 'proposed', 'exchangeable-bond', 'securities'),
+    completed,
+  ]);
+
+  for (const events of [[genericUpdate, completed], [completed, genericUpdate]]) {
+    const decision = extractorModule.applyLifecyclePrecedence(input, events, facts);
+    assert.deepEqual(eventSet(decision.events), expected);
+  }
 });
 
 test('iteration 8 occurrence gate preserves C003 product multiplicity and security family', async () => {

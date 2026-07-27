@@ -1,0 +1,171 @@
+{
+  "schemaVersion": "jaroo.kr-disclosure-event-q4-development-evidence-manifest.v1",
+  "developmentOnly": true,
+  "claimEligible": false,
+  "predictionBlind": false,
+  "sourceCorpusSha256": "37472b36b474c60280da57928da1c647161c839e4e16c8318f8668999956dc4c",
+  "files": [
+    {
+      "id": "dart-event-q4-400-adjudication-77-v1",
+      "path": "q4-development-evidence/dart-event-q4-400-adjudication-77-v1.json",
+      "sha256": "b34b8d0161c0424387c756cb320ff153d4f65f45bf7af5c40f2e7ecda87d62fb",
+      "role": "initial-adjudication-report"
+    },
+    {
+      "id": "dart-event-q4-400-development-oracle-iteration6",
+      "path": "q4-development-evidence/dart-event-q4-400-development-oracle-iteration6.json",
+      "sha256": "32524f90b0ba2c50ffe68de697e735303210d817a482c54ad26ba76f960672ea",
+      "role": "predecessor-oracle"
+    },
+    {
+      "id": "dart-event-q4-400-development-oracle-iteration7",
+      "path": "q4-development-evidence/dart-event-q4-400-development-oracle-iteration7.json",
+      "sha256": "f62bda2d2c998582f22cc133fbb283608651f60a92340014059c36025778735d",
+      "role": "predecessor-oracle"
+    },
+    {
+      "id": "dart-event-q4-400-development-oracle-iteration8",
+      "path": "q4-development-evidence/dart-event-q4-400-development-oracle-iteration8.json",
+      "sha256": "a7d4a328e572b217d1b2217730f1debc8905fa59cf70f88555ecc819f620ca8b",
+      "role": "predecessor-oracle"
+    },
+    {
+      "id": "dart-event-q4-400-predictions-iteration5",
+      "path": "q4-development-evidence/dart-event-q4-400-predictions-iteration5.json",
+      "sha256": "07f5546a3784324d59958b88bed823af00298c733746853e2896c73cc3de190b",
+      "role": "reviewed-predictions"
+    },
+    {
+      "id": "dart-event-q4-400-residual-adjudication-iteration8",
+      "path": "q4-development-evidence/dart-event-q4-400-residual-adjudication-iteration8.json",
+      "sha256": "99d5b5caa7f7a68533be83288bfe4d2f329369261c9b1650d9c5103e857b95f9",
+      "role": "residual-adjudication-report"
+    },
+    {
+      "id": "deepscan-kr-disclosure-event-extractors.iteration5",
+      "path": "q4-development-evidence/deepscan-kr-disclosure-event-extractors.iteration5.js",
+      "sha256": "3f7737bf0bea2d2fd72bb832cbb34192c5f7bd566e1f6d8b08113afde2421003",
+      "role": "reviewed-extractor-snapshot"
+    },
+    {
+      "id": "jaroo-q4-adjudication-consensus",
+      "path": "q4-development-evidence/jaroo-q4-adjudication-consensus.json",
+      "sha256": "46a924de9e4d32b4ea730c075fbee8ee2f8cb589dfea43d773f11816692cd1a0",
+      "role": "initial-adjudicator-output"
+    },
+    {
+      "id": "jaroo-q4-final-consensus",
+      "path": "q4-development-evidence/jaroo-q4-final-consensus.json",
+      "sha256": "e7d2309b97a15172b5a4c8702b33a2c438eb8d96616667117dacb2ab3be0f884",
+      "role": "initial-adjudicator-output"
+    },
+    {
+      "id": "jaroo-q4-residual-result-p1-a",
+      "path": "q4-development-evidence/jaroo-q4-residual-result-p1-a.json",
+      "sha256": "4926e20ad729a285a21a73a7809e0bc89c72d747849b45ce1dc99abc846826c4",
+      "role": "residual-adjudicator-output"
+    },
+    {
+      "id": "jaroo-q4-residual-result-p1-b",
+      "path": "q4-development-evidence/jaroo-q4-residual-result-p1-b.json",
+      "sha256": "6f221198b2a79133fe414ed6e62f16753a24df6d586ae0f4e836d99012721416",
+      "role": "residual-adjudicator-output"
+    },
+    {
+      "id": "jaroo-q4-residual-result-p2-a",
+      "path": "q4-development-evidence/jaroo-q4-residual-result-p2-a.json",
+      "sha256": "852fca9d12efac9657b02d0b2e72daf841bcd47c92fb18416e2551e11a6e1c59",
+      "role": "residual-adjudicator-output"
+    },
+    {
+      "id": "jaroo-q4-residual-result-p2-b",
+      "path": "q4-development-evidence/jaroo-q4-residual-result-p2-b.json",
+      "sha256": "4ee5fa20b948980c62c0690bb5519bf4175b00aaf60829aef169d8423d16b001",
+      "role": "residual-adjudicator-output"
+    },
+    {
+      "id": "jaroo-q4-residual-result-p3-a",
+      "path": "q4-development-evidence/jaroo-q4-residual-result-p3-a.json",
+      "sha256": "a9a8f48da2251ef059140a50e19a4c96241976964b5252ae81e763787523e3e6",
+      "role": "residual-adjudicator-output"
+    },
+    {
+      "id": "jaroo-q4-residual-result-p3-b",
+      "path": "q4-development-evidence/jaroo-q4-residual-result-p3-b.json",
+      "sha256": "50c1b92a5d067f0ab9c6863e6406c35cb17eb64caaac20bc40514ed7f14259f2",
+      "role": "residual-adjudicator-output"
+    },
+    {
+      "id": "jaroo-q4-residual-tiebreak-result-1",
+      "path": "q4-development-evidence/jaroo-q4-residual-tiebreak-result-1.json",
+      "sha256": "04c2488708504136d53f518d3c3b983d953f4255ce82a25214946168a7ff3e0f",
+      "role": "residual-tiebreak-output"
+    },
+    {
+      "id": "jaroo-q4-residual-tiebreak-result-2",
+      "path": "q4-development-evidence/jaroo-q4-residual-tiebreak-result-2.json",
+      "sha256": "29009f6dc4c9a83ff5ad4166b00863ebb4d1d16ef7e4b75710d255e368d7f169",
+      "role": "residual-tiebreak-output"
+    },
+    {
+      "id": "jaroo-q4-residual-tiebreak-result-3",
+      "path": "q4-development-evidence/jaroo-q4-residual-tiebreak-result-3.json",
+      "sha256": "7a8bcf141e233f3c6cb548e71646080b1bd2106730eab86aeda29f09db67d062",
+      "role": "residual-tiebreak-output"
+    },
+    {
+      "id": "jaroo-q4-tiebreak-result-1",
+      "path": "q4-development-evidence/jaroo-q4-tiebreak-result-1.json",
+      "sha256": "3dd775ccfbd8e2eceef4863fb7a03a8478e7bc13c84448090c11229612b851e4",
+      "role": "initial-tiebreak-output"
+    },
+    {
+      "id": "jaroo-q4-tiebreak-result-2",
+      "path": "q4-development-evidence/jaroo-q4-tiebreak-result-2.json",
+      "sha256": "a19107d45e2ff0645b67e74bb46223898b1bbbc20de30749387036e5d378a1ad",
+      "role": "initial-tiebreak-output"
+    },
+    {
+      "id": "jaroo-q4-tiebreak-result-3",
+      "path": "q4-development-evidence/jaroo-q4-tiebreak-result-3.json",
+      "sha256": "bdcb519c2fca050d0f622b9bc2a43c0f9a6ab7cc1af6567f9b565129115196bc",
+      "role": "initial-tiebreak-output"
+    },
+    {
+      "id": "qualitative-0-133",
+      "path": "q4-development-evidence/qualitative-0-133.json",
+      "sha256": "4144b0aea9e6d616f0336fb4b3dfbe151bec5951fcc9784d005dda3048fa91b8",
+      "role": "initial-qualitative-review"
+    },
+    {
+      "id": "qualitative-134-266",
+      "path": "q4-development-evidence/qualitative-134-266.json",
+      "sha256": "6498d0201c42096167f60300b17029f7eff23732f9e4ab522dfd9379ec8c560f",
+      "role": "initial-qualitative-review"
+    },
+    {
+      "id": "qualitative-267-399",
+      "path": "q4-development-evidence/qualitative-267-399.json",
+      "sha256": "4a2106d0dbe50619cc142ca3f47b07f9badbc02a771c91d0c53f0b3266b7d110",
+      "role": "initial-qualitative-review"
+    },
+    {
+      "id": "dart-event-q4-400-residual-adjudication-iteration9",
+      "path": "dart-event-q4-400-residual-adjudication-iteration9.json",
+      "sha256": "b83bc9744a70dfada8f5e972a0f9b81b5043f4fb589b9e7e885f5b5bd1081ada",
+      "role": "final-adjudication-report"
+    },
+    {
+      "id": "kr-disclosure-event-q4-development-oracle.v10",
+      "path": "kr-disclosure-event-q4-development-oracle.v10.json",
+      "sha256": "7b2d53e1689bb02326cda16bd621ab11598ae56b2e82af61350d7e76e981ac40",
+      "role": "final-oracle"
+    },
+    {
+      "id": "deepscan-kr-disclosure-event-extractors.oracle-source",
+      "path": "q4-development-evidence/deepscan-kr-disclosure-event-extractors.oracle-source.js",
+      "sha256": "9ef360169f4c02b9ecc8c856be7c2603d8a5d28df0d37a904f4d0ae20c7ae1bf",
+      "role": "oracle-source-extractor"
+    }
+  ]
+}

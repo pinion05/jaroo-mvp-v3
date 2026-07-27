@@ -1,10 +1,10 @@
 {
   "schemaVersion": "jaroo.kr-disclosure-event-candidate-attempt-status.v1",
   "experimentId": "kospi-canonical-events-temporal-2026-07-27-n400-v2",
-  "candidateFreezePath": "kr-disclosure-event-candidate-freeze.v2.json",
+  "candidateFreezePath": "archive/kr-disclosure-event-candidate-freeze.2026-07-29-n400.superseded.v2.json",
   "candidateFreezeFileSha256": "5d5f493eb12b43412e6d7ce236f4cc46f662451ee895b02820cad43bebaed016",
-  "status": "frozen-awaiting-collection-window",
-  "recordedAt": "2026-07-27T06:33:29.814Z",
+  "status": "superseded-before-collection",
+  "recordedAt": "2026-07-27T07:35:24Z",
   "collectionWindow": {
     "from": "20260729",
     "to": "20260804"
@@ -24,13 +24,9 @@
     "pageCount": 100,
     "stoppingRule": "fixed-window-fixed-limit-no-backfill.v1"
   },
-  "seedEscrow": {
-    "committed": false,
-    "fileHint": "~/.local/state/jaroo-temporal-holdout/kospi-canonical-events-temporal-2026-07-27-n400-v2.seed",
-    "mode": "0600"
-  },
   "dataCollected": false,
   "predictionsGenerated": false,
   "labelsInspected": false,
-  "nextEligibleAction": "collect-and-timestamp-after-window-end"
+  "reason": "The precommitted candidate was superseded before collection because review-driven extractor correctness, population-integrity, no-event scoring, and selective-confidence threshold changes altered the frozen candidate fingerprint.",
+  "automationDisposition": "launch-agent-unloaded-and-seed-quarantined"
 }

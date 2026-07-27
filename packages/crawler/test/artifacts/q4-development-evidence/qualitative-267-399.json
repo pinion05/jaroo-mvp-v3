@@ -1,0 +1,2814 @@
+{
+  "schemaVersion": "jaroo.dart-event-independent-qualitative.v1",
+  "generatedAt": "2026-07-21T10:55:38.729622+00:00",
+  "evaluation": {
+    "iteration": 5,
+    "range": {
+      "start": 267,
+      "endInclusive": 399
+    },
+    "strictRule": "Exact multiset equality over event count and type/action/state/cause/subjectType.",
+    "unresolvedOtherEmptyPolicy": "strict-wrong",
+    "confidencePolicy": "Prediction confidence preserved without relabeling."
+  },
+  "independence": {
+    "priorAnswerFilesRead": false,
+    "statement": "기존 qualitative-*.json, development oracle, failure taxonomy 및 2025Q3 자료를 읽지 않았다.",
+    "inputsRead": [
+      ".omx/handoff/dart-event-final-2025q4/sealed/corpus.json",
+      ".omx/handoff/dart-event-q4-400-predictions-iteration5.json"
+    ],
+    "canonicalOntologyReferenceRead": "packages/crawler/src/services/deepscan-kr-disclosure-event-extractors.js"
+  },
+  "inputSha256": {
+    "corpus": "37472b36b474c60280da57928da1c647161c839e4e16c8318f8668999956dc4c",
+    "predictions": "07f5546a3784324d59958b88bed823af00298c733746853e2896c73cc3de190b"
+  },
+  "summary": {
+    "range": {
+      "start": 267,
+      "endInclusive": 399
+    },
+    "total": 133,
+    "strictCorrect": 120,
+    "resolved": 131,
+    "high": 88,
+    "highCorrect": 84,
+    "strictAccuracy": 0.9022556390977443,
+    "resolvedCoverage": 0.9849624060150376,
+    "highPrecision": 0.9545454545454546
+  },
+  "cases": [
+    {
+      "index": 267,
+      "key": "2025-11/20251117800608",
+      "reportName": "최대주주인명목회사의최대주주변경",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "changed",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 controlling-shareholder 사건의 changed/null와 대상 ownership을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 268,
+      "key": "2025-11/20251128801261",
+      "reportName": "최대주주등소유주식변동신고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 controlling-shareholder 사건의 reported/null와 대상 ownership을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 269,
+      "key": "2025-11/20251124800311",
+      "reportName": "최대주주등소유주식변동신고서(최대주주변경시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "changed",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 controlling-shareholder 사건의 changed/null와 대상 ownership을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 270,
+      "key": "2025-11/20251107700868",
+      "reportName": "채권상장법인불성실공시",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "designated",
+          "state": "effective",
+          "cause": "disclosure-compliance",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 disclosure-compliance 사건의 designated/effective와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 271,
+      "key": "2025-11/20251107700835",
+      "reportName": "상장채권관련기타주요사항",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "halted",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 debt-securities 사건의 halted/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 272,
+      "key": "2025-11/20251128002163",
+      "reportName": "동일인등출자계열회사와의상품ㆍ용역거래",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "internal-goods-services",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 internal-goods-services 사건의 decided/proposed와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 273,
+      "key": "2025-11/20251128002043",
+      "reportName": "특수관계인에대한출자",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "fund-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 fund-investment 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 274,
+      "key": "2025-11/20251128002020",
+      "reportName": "[기재정정]특수관계인과의보험거래",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "effective",
+          "cause": "retirement-pension",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 retirement-pension 사건의 updated/effective와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 275,
+      "key": "2025-11/20251128001873",
+      "reportName": "특수관계인에대한자금대여",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "extended",
+          "state": "effective",
+          "cause": "related-party-loan",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 related-party-loan 사건의 extended/effective와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 276,
+      "key": "2025-11/20251128001774",
+      "reportName": "[기재정정]특수관계인과의수익증권거래",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "pending",
+          "cause": "fund-security-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 fund-security-investment 사건의 updated/pending와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 277,
+      "key": "2025-11/20251128000873",
+      "reportName": "특수관계인과의내부거래",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "extended",
+          "state": "effective",
+          "cause": "related-party-contract-updated",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 related-party-contract-updated 사건의 extended/effective와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 278,
+      "key": "2025-11/20251127001409",
+      "reportName": "특수관계인으로부터부동산임차",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-real-estate-leased-in",
+          "subjectType": "real-estate"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 related-party-real-estate-leased-in 사건의 decided/proposed와 대상 real-estate을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 279,
+      "key": "2025-11/20251127001301",
+      "reportName": "특수관계인에대한부동산임대",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-real-estate-leased-out",
+          "subjectType": "real-estate"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 related-party-real-estate-leased-out 사건의 decided/proposed와 대상 real-estate을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 280,
+      "key": "2025-11/20251127000871",
+      "reportName": "특수관계인에대한주식의처분",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 equity-disposal 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 281,
+      "key": "2025-11/20251126000668",
+      "reportName": "동일인등출자계열회사와의상품ㆍ용역거래변경",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "changed",
+          "state": "effective",
+          "cause": "internal-goods-services",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 internal-goods-services 사건의 changed/effective와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 282,
+      "key": "2025-11/20251126000574",
+      "reportName": "특수관계인으로부터기타유가증권매수",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "purchased",
+          "state": "effective",
+          "cause": "securities-purchase",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 securities-purchase 사건의 purchased/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 283,
+      "key": "2025-11/20251126000485",
+      "reportName": "특수관계인으로부터자산양수",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 tangible-asset-acquisition 사건의 decided/proposed와 대상 asset을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 284,
+      "key": "2025-11/20251125000696",
+      "reportName": "특수관계인으로부터부동산매수",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "real-estate-purchase",
+          "subjectType": "real-estate"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 real-estate-purchase 사건의 decided/proposed와 대상 real-estate을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 285,
+      "key": "2025-11/20251125000652",
+      "reportName": "약관에의한금융거래시계열금융회사의거래상대방의공시",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "affiliate-financial-transactions",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 affiliate-financial-transactions 사건의 decided/proposed와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 286,
+      "key": "2025-11/20251124000321",
+      "reportName": "특수관계인으로부터주식의취득",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 equity-acquisition 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 287,
+      "key": "2025-11/20251121000496",
+      "reportName": "특수관계인으로부터받은담보",
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "received",
+          "state": "effective",
+          "cause": "collateral-received",
+          "subjectType": "real-estate"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "collateral-received",
+          "subjectType": "real-estate"
+        }
+      ],
+      "rationale": "담보물은 공장 부지·건물이지만 '담보받은 일자'가 '-'이고 구체 조건 협의·실행도 위임되어 있다. 실제 수령 완료가 아니므로 received/effective가 아니라 decided/proposed가 맞다."
+    },
+    {
+      "index": 288,
+      "key": "2025-11/20251128002158",
+      "reportName": "대규모기업집단현황공시[분기별공시(개별회사용)]",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": null,
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 business-group-status 사건의 reported/null와 대상 governance을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 289,
+      "key": "2025-11/20251128001674",
+      "reportName": "대규모기업집단현황공시[분기별공시(대표회사용)]",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": null,
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 business-group-status 사건의 reported/null와 대상 governance을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 290,
+      "key": "2025-12/20251222000124",
+      "reportName": "사업보고서 (2025.09)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "annual-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 annual-report 사건의 filed/null와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 291,
+      "key": "2025-12/20251215000412",
+      "reportName": "반기보고서 (2025.10)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "semiannual-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 semiannual-report 사건의 filed/null와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 292,
+      "key": "2025-12/20251218000217",
+      "reportName": "분기보고서 (2025.09)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "quarterly-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 quarterly-report 사건의 filed/null와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 293,
+      "key": "2025-12/20251231000590",
+      "reportName": "주요사항보고서(자기전환사채매도결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "sold",
+          "state": "effective",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 convertible-bond 사건의 sold/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 294,
+      "key": "2025-12/20251231000232",
+      "reportName": "[기재정정]주요사항보고서(유상증자결정)",
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "pending",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "rationale": "2025-12-26에 USD 인수대금 전액을 납입받았다고 본문이 명시한다. 12-31 정정은 원화 환산액과 상장예정일 보완이므로 권리증자 상태를 pending으로 두는 것은 틀리고 updated/effective가 맞다."
+    },
+    {
+      "index": 295,
+      "key": "2025-12/20251231000013",
+      "reportName": "[기재정정]주요사항보고서(채권은행등의관리절차개시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "insolvency",
+          "action": "initiated",
+          "state": "effective",
+          "cause": "creditor-bank-management",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 creditor-bank-management 사건의 initiated/effective와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 296,
+      "key": "2025-12/20251230000797",
+      "reportName": "주요사항보고서(자기전환사채만기전취득결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "acquired",
+          "state": "effective",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 convertible-bond 사건의 acquired/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 297,
+      "key": "2025-12/20251230000689",
+      "reportName": "[기재정정]주요사항보고서(타법인주식및출자증권양도결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": "pending",
+          "cause": "equity-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 equity-disposal 사건의 updated/pending와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 298,
+      "key": "2025-12/20251230000675",
+      "reportName": "주요사항보고서(자기주식취득신탁계약해지결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 treasury-share-trust 사건의 terminated/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 299,
+      "key": "2025-12/20251230000620",
+      "reportName": "[기재정정]주요사항보고서(전환사채권발행결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "pending",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 convertible-bond 사건의 updated/pending와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 300,
+      "key": "2025-12/20251230000429",
+      "reportName": "주요사항보고서(자기주식처분결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 treasury-share-disposal 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 301,
+      "key": "2025-12/20251219000257",
+      "reportName": "[기재정정]주요사항보고서(회사합병결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": "pending",
+          "cause": "merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 merger 사건의 updated/pending와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 302,
+      "key": "2025-12/20251226000514",
+      "reportName": "주요사항보고서(자본으로인정되는채무증권발행결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 contingent-capital-securities 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 303,
+      "key": "2025-12/20251226000462",
+      "reportName": "[기재정정]주요사항보고서(타법인주식및출자증권양수결정)",
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": "pending",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": "effective",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "rationale": "주식 양수대금 지급·거래는 2022년에 끝났고, 이번 정정은 대상회사 IPO 미완료 시 매수청구권 행사기한을 2025년에서 2028년으로 바꾼 것이다. 양수 자체는 이미 효력이 있어 state는 effective다."
+    },
+    {
+      "index": 304,
+      "key": "2025-12/20251226000004",
+      "reportName": "주요사항보고서(주권관련사채권양수결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 convertible-bond-acquisition 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 305,
+      "key": "2025-12/20251224000560",
+      "reportName": "주요사항보고서(자기주식취득결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 treasury-share-acquisition 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 306,
+      "key": "2025-12/20251224000451",
+      "reportName": "[기재정정]주요사항보고서(교환사채권발행결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "pending",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 exchangeable-bond 사건의 updated/pending와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 307,
+      "key": "2025-12/20251223000787",
+      "reportName": "주요사항보고서(상각형조건부자본증권발행결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 contingent-capital-securities 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 308,
+      "key": "2025-12/20251222000449",
+      "reportName": "[기재정정]주요사항보고서(회생절차개시신청)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "insolvency",
+          "action": "updated",
+          "state": "effective",
+          "cause": "rehabilitation",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 rehabilitation 사건의 updated/effective와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 309,
+      "key": "2025-12/20251222000129",
+      "reportName": "주요사항보고서(무상증자결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bonus-issue",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 bonus-issue 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 310,
+      "key": "2025-12/20251219000412",
+      "reportName": "[첨부정정]주요사항보고서(유형자산양도결정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "updated",
+          "state": "proposed",
+          "cause": "tangible-asset-disposal",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·상세분류코드가 tangible-asset-disposal 사건의 updated/proposed와 대상 asset을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 311,
+      "key": "2025-12/20251219000238",
+      "reportName": "주요사항보고서(영업정지)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "pending",
+          "cause": "business-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 business-suspension 사건의 halted/pending와 대상 business을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 312,
+      "key": "2025-12/20251230000625",
+      "reportName": "증권발행실적보고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 equity-securities 사건의 completed/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 313,
+      "key": "2025-12/20251230000100",
+      "reportName": "투자설명서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 equity-securities 사건의 published/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 314,
+      "key": "2025-12/20251226000501",
+      "reportName": "[기재정정]증권신고서(지분증권)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 equity-securities 사건의 updated/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 315,
+      "key": "2025-12/20251231000648",
+      "reportName": "증권발행실적보고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 debt-securities 사건의 completed/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 316,
+      "key": "2025-12/20251231000430",
+      "reportName": "투자설명서(일괄신고)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 debt-securities 사건의 published/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 317,
+      "key": "2025-12/20251231000304",
+      "reportName": "일괄신고추가서류(기타파생결합사채)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 debt-securities 사건의 filed/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 318,
+      "key": "2025-12/20251231000296",
+      "reportName": "일괄신고추가서류(파생결합사채-주가연계파생결합사채)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 debt-securities 사건의 filed/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 319,
+      "key": "2025-12/20251231000616",
+      "reportName": "투자설명서(일괄신고)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 derivative-securities 사건의 published/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 320,
+      "key": "2025-12/20251231000608",
+      "reportName": "일괄신고추가서류(파생결합증권-주가연계증권)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 derivative-securities 사건의 filed/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 321,
+      "key": "2025-12/20251231000446",
+      "reportName": "증권발행실적보고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 derivative-securities 사건의 completed/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 322,
+      "key": "2025-12/20251226000351",
+      "reportName": "일괄신고추가서류(파생결합증권-상장지수증권)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 derivative-securities 사건의 filed/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 323,
+      "key": "2025-12/20251218000475",
+      "reportName": "일괄신고추가서류(기타파생결합증권)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 derivative-securities 사건의 filed/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 324,
+      "key": "2025-12/20251229000487",
+      "reportName": "[기재정정]증권신고서(합병)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": null,
+          "cause": "merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·상세분류코드가 merger 사건의 updated/null와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 325,
+      "key": "2025-12/20251217000544",
+      "reportName": "증권발행실적보고서(합병등)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "share-exchange",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 share-exchange 사건의 completed/effective와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 326,
+      "key": "2025-12/20251216000005",
+      "reportName": "투자설명서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "published",
+          "state": null,
+          "cause": "reorganization",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·상세분류코드가 reorganization 사건의 published/null와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 327,
+      "key": "2025-12/20251231000637",
+      "reportName": "주식등의대량보유상황보고서(일반)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": null,
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 large-shareholding 사건의 reported/null와 대상 ownership을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 328,
+      "key": "2025-12/20251230000631",
+      "reportName": "[기재정정]주식등의대량보유상황보고서(약식)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 large-shareholding 사건의 updated/effective와 대상 ownership을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 329,
+      "key": "2025-12/20251231000603",
+      "reportName": "임원ㆍ주요주주특정증권등소유상황보고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": null,
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 insider-ownership 사건의 reported/null와 대상 ownership을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 330,
+      "key": "2025-12/20251231000592",
+      "reportName": "[기재정정]의결권대리행사권유참고서류",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": "pending",
+          "cause": "proxy-solicitation",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 proxy-solicitation 사건의 updated/pending와 대상 governance을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 331,
+      "key": "2025-12/20251230000582",
+      "reportName": "공개매수결과보고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "completed",
+          "state": "effective",
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 tender-offer 사건의 completed/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 332,
+      "key": "2025-12/20251215000003",
+      "reportName": "공개매수설명서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 tender-offer 사건의 announced/null와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 333,
+      "key": "2025-12/20251215000002",
+      "reportName": "공개매수신고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 tender-offer 사건의 announced/null와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 334,
+      "key": "2025-12/20251230000640",
+      "reportName": "임원ㆍ주요주주특정증권등거래계획보고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "insider-trading-plan",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 insider-trading-plan 사건의 scheduled/pending와 대상 ownership을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 335,
+      "key": "2025-12/20251217000381",
+      "reportName": "임원ㆍ주요주주특정증권등거래계획철회보고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "withdrawn",
+          "state": "effective",
+          "cause": "insider-trading-plan",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 insider-trading-plan 사건의 withdrawn/effective와 대상 ownership을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 336,
+      "key": "2025-12/20251231000204",
+      "reportName": "자기주식취득결과보고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 treasury-share-acquisition 사건의 completed/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 337,
+      "key": "2025-12/20251230000785",
+      "reportName": "자기주식처분결과보고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 treasury-share-disposal 사건의 completed/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 338,
+      "key": "2025-12/20251230000716",
+      "reportName": "신탁계약해지결과보고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 treasury-share-trust 사건의 terminated/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 339,
+      "key": "2025-12/20251222000302",
+      "reportName": "신탁계약에의한취득상황보고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "reported",
+          "state": null,
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 treasury-share-trust 사건의 reported/null와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 340,
+      "key": "2025-12/20251230000789",
+      "reportName": "합병등종료보고서(합병)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 merger 사건의 completed/effective와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 341,
+      "key": "2025-12/20251210000526",
+      "reportName": "[기재정정]합병등종료보고서(자산양수도)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 equity-acquisition 사건의 completed/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 342,
+      "key": "2025-12/20251231000201",
+      "reportName": "[기재정정]주식매수선택권부여에관한신고",
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": false,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "granted",
+          "state": null,
+          "cause": "stock-option",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "stock-option",
+          "subjectType": "securities"
+        }
+      ],
+      "rationale": "이미 2025-03-18 부여된 주식매수선택권의 공정가치 산정 가정 등을 고친 정정신고다. 새로 granted한 사건이 아니라 기존 유효한 부여를 updated한 사건이다."
+    },
+    {
+      "index": 343,
+      "key": "2025-12/20251231000580",
+      "reportName": "사외이사의선임ㆍ해임또는중도퇴임에관한신고",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "changed",
+          "state": null,
+          "cause": "outside-director",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 outside-director 사건의 changed/null와 대상 governance을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 344,
+      "key": "2025-12/20251231000035",
+      "reportName": "주주총회소집공고",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 shareholder-meeting 사건의 scheduled/pending와 대상 governance을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 345,
+      "key": "2025-12/20251231800801",
+      "reportName": "[기재정정]단일판매ㆍ공급계약체결",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "updated",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 supply-contract 사건의 updated/effective와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 346,
+      "key": "2025-12/20251231800773",
+      "reportName": "투자판단관련주요경영사항",
+      "strictCorrect": false,
+      "resolved": false,
+      "confidence": "low",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "other",
+          "action": "decided",
+          "state": "proposed",
+          "cause": null,
+          "subjectType": null
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "rationale": "서울행정법원이 금융당국 처분의 집행정지 신청을 '기각'한 사실확인 공시다. other/unresolved가 아니라 법적 절차의 dismissed/effective 사건으로 확정할 수 있다."
+    },
+    {
+      "index": 347,
+      "key": "2025-12/20251231800791",
+      "reportName": "[기재정정]단일판매ㆍ공급계약체결(자율공시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "updated",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 supply-contract 사건의 updated/effective와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 348,
+      "key": "2025-12/20251231800754",
+      "reportName": "단일판매ㆍ공급계약해지",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 supply-contract 사건의 terminated/effective와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 349,
+      "key": "2025-12/20251231800778",
+      "reportName": "[기재정정]영업양도결정(자율공시)(종속회사의주요경영사항)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": "effective",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 business-disposal 사건의 updated/effective와 대상 business을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 350,
+      "key": "2025-12/20251231800751",
+      "reportName": "지주회사의자회사탈퇴",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-profile",
+          "action": "changed",
+          "state": null,
+          "cause": "subsidiary-exit",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 subsidiary-exit 사건의 changed/null와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 351,
+      "key": "2025-12/20251231800703",
+      "reportName": "[기재정정]신규시설투자등(자회사의 주요경영사항)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "updated",
+          "state": "effective",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 facility-investment 사건의 updated/effective와 대상 asset을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 352,
+      "key": "2025-12/20251231800697",
+      "reportName": "[기재정정]신규시설투자등",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "updated",
+          "state": "effective",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 facility-investment 사건의 updated/effective와 대상 asset을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 353,
+      "key": "2025-12/20251231800661",
+      "reportName": "단일판매ㆍ공급계약체결(자회사의 주요경영사항)",
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": false,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "contracted",
+          "state": null,
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "contracted",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "rationale": "공급계약 수주일이 공시일인 2025-12-31이고 계약기간은 이미 2025-03-03부터 시작했다. contracted는 맞지만 효력이 명백하므로 state=null이 아니라 effective다."
+    },
+    {
+      "index": 354,
+      "key": "2025-12/20251231800663",
+      "reportName": "대표이사(대표집행임원)변경(안내공시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "changed",
+          "state": "effective",
+          "cause": "chief-executive-change",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 chief-executive-change 사건의 changed/effective와 대상 governance을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 355,
+      "key": "2025-12/20251231800577",
+      "reportName": "금전대여결정",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "extended",
+          "state": "pending",
+          "cause": "related-party-loan",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 related-party-loan 사건의 extended/pending와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 356,
+      "key": "2025-12/20251231800563",
+      "reportName": "임시주주총회결과",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "held",
+          "state": "effective",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 shareholder-meeting 사건의 held/effective와 대상 governance을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 357,
+      "key": "2025-12/20251231800437",
+      "reportName": "[기재정정]타인에대한담보제공결정",
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "updated",
+          "state": "pending",
+          "cause": "collateral-provision",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "pending",
+          "cause": "collateral-provision",
+          "subjectType": "securities"
+        }
+      ],
+      "rationale": "채무자는 자회사이고 담보제공재산은 당사가 보유한 자회사 보통주 49,576,129주다. 따라서 관계 facet은 related-party, 대상은 securities이며, 2026-01-06 시작 예정이므로 pending은 유지된다."
+    },
+    {
+      "index": 358,
+      "key": "2025-12/20251231800431",
+      "reportName": "[기재정정]유형자산취득결정(종속회사의주요경영사항)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "updated",
+          "state": "pending",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "real-estate"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 tangible-asset-acquisition 사건의 updated/pending와 대상 real-estate을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 359,
+      "key": "2025-12/20251231800416",
+      "reportName": "[기재정정]소송등의제기ㆍ신청(일정금액이상의청구)",
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "withdrawn",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "updated",
+          "state": "active",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "rationale": "원고 2명만 소 일부취하하여 원고가 461명에서 459명으로 줄었을 뿐 소송 전체는 계속된다. 전체 사건을 withdrawn/effective로 종료 처리하면 안 되고 updated/active가 맞다."
+    },
+    {
+      "index": 360,
+      "key": "2025-12/20251231800382",
+      "reportName": "[기재정정]유형자산취득결정",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "updated",
+          "state": "pending",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "real-estate"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 tangible-asset-acquisition 사건의 updated/pending와 대상 real-estate을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 361,
+      "key": "2025-12/20251231800285",
+      "reportName": "타법인주식및출자증권취득결정(종속회사의주요경영사항)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 equity-acquisition 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 362,
+      "key": "2025-12/20251231800041",
+      "reportName": "조회공시요구(풍문또는보도)에대한답변(미확정)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "disclosure-inquiry",
+          "action": "responded",
+          "state": "uncertain",
+          "cause": "rumor-inquiry",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 rumor-inquiry 사건의 responded/uncertain와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 363,
+      "key": "2025-12/20251230801257",
+      "reportName": "[기재정정]유상증자또는주식관련사채등의발행결과(자율공시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 securities-issuance 사건의 completed/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 364,
+      "key": "2025-12/20251230801246",
+      "reportName": "투자판단관련주요경영사항(자회사의 주요경영사항)",
+      "strictCorrect": false,
+      "resolved": false,
+      "confidence": "low",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "other",
+          "action": "decided",
+          "state": "proposed",
+          "cause": null,
+          "subjectType": null
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bond-transactions",
+          "subjectType": "securities"
+        }
+      ],
+      "rationale": "자회사 CJ CGV가 종속회사 CJ 4DPLEX 발행 신종자본증권 500억원을 인수하기로 결정했고 발행예정일은 다음 날이다. related-party의 채권매수 결정 사건으로 해석 가능하므로 other/unresolved는 오답이다."
+    },
+    {
+      "index": 365,
+      "key": "2025-12/20251230801203",
+      "reportName": "[기재정정]타인에대한담보제공결정(자회사의 주요경영사항)",
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "pending",
+          "cause": "collateral-provision",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "effective",
+          "cause": "collateral-provision",
+          "subjectType": "securities"
+        }
+      ],
+      "rationale": "오기 정정 후 담보제공 시작일이 공시일과 같은 2025-12-30이며 담보는 계열회사 보통주다. 먼 종료일만 보고 pending으로 두면 안 되고, 정정 시점에 담보 설정은 effective다."
+    },
+    {
+      "index": 366,
+      "key": "2025-12/20251230801111",
+      "reportName": "단일판매ㆍ공급계약해지(자회사의 주요경영사항)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 supply-contract 사건의 terminated/effective와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 367,
+      "key": "2025-12/20251231800491",
+      "reportName": "[기재정정]장래사업ㆍ경영계획(공정공시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "updated",
+          "state": "effective",
+          "cause": "business-plan",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 business-plan 사건의 updated/effective와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 368,
+      "key": "2025-12/20251231800030",
+      "reportName": "연결재무제표기준영업실적등에대한전망(공정공시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "earnings",
+          "action": "forecasted",
+          "state": null,
+          "cause": "earnings-guidance",
+          "subjectType": "financials"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 earnings-guidance 사건의 forecasted/null와 대상 financials을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 369,
+      "key": "2025-12/20251230800675",
+      "reportName": "수시공시의무관련사항(공정공시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "announced",
+          "state": "proposed",
+          "cause": "dividend-policy",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 dividend-policy 사건의 announced/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 370,
+      "key": "2025-12/20251222800083",
+      "reportName": "영업(잠정)실적(공정공시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "operating-performance",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "sales-volume",
+          "subjectType": "operations"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 sales-volume 사건의 announced/preliminary와 대상 operations을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 371,
+      "key": "2025-12/20251216801278",
+      "reportName": "영업(잠정)실적(공정공시)(자회사의 주요경영사항)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 operating-results 사건의 announced/preliminary와 대상 financials을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 372,
+      "key": "2025-12/20251216800298",
+      "reportName": "연결재무제표기준영업(잠정)실적(공정공시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 operating-results 사건의 announced/preliminary와 대상 financials을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 373,
+      "key": "2025-12/20251204800032",
+      "reportName": "영업실적등에대한전망(공정공시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "earnings",
+          "action": "forecasted",
+          "state": null,
+          "cause": "earnings-guidance",
+          "subjectType": "financials"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 earnings-guidance 사건의 forecasted/null와 대상 financials을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 374,
+      "key": "2025-12/20251230800053",
+      "reportName": "기업설명회(IR)개최(안내공시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "investor-relations",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 investor-relations 사건의 scheduled/pending와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 375,
+      "key": "2025-12/20251229800127",
+      "reportName": "기타안내사항(안내공시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "announced",
+          "state": "pending",
+          "cause": "record-date",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 record-date 사건의 announced/pending와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 376,
+      "key": "2025-12/20251224800988",
+      "reportName": "불성실공시법인지정",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "designated",
+          "state": "pending",
+          "cause": "disclosure-compliance",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 disclosure-compliance 사건의 designated/pending와 대상 issuer을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 377,
+      "key": "2025-12/20251223800258",
+      "reportName": "[기재정정]유상증자신주발행가액(안내공시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 rights-offering 사건의 updated/effective와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 378,
+      "key": "2025-12/20251223800174",
+      "reportName": "전환가액ㆍ신주인수권행사가액ㆍ교환가액의조정(안내공시)",
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": false,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "adjusted",
+          "state": null,
+          "cause": "convertible-price",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "adjusted",
+          "state": "effective",
+          "cause": "convertible-price",
+          "subjectType": "securities"
+        }
+      ],
+      "rationale": "본문의 '조정가액 적용일'이 공시일과 같은 2025-12-23으로 명시되어 있다. adjusted tuple은 맞지만 state=null이 아니라 effective다."
+    },
+    {
+      "index": 379,
+      "key": "2025-12/20251222800283",
+      "reportName": "매매거래정지및정지해제(중요내용공시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "trading-status",
+          "action": "halted",
+          "state": "effective",
+          "cause": "bonus-issue",
+          "subjectType": "listed-shares"
+        },
+        {
+          "type": "trading-status",
+          "action": "lifted",
+          "state": "lifted",
+          "cause": "bonus-issue",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "본문에 매매거래 정지와 정지해제 시각이 모두 제시되어 halted/effective와 lifted/lifted 두 사건의 정확한 multiset을 이룬다."
+    },
+    {
+      "index": 380,
+      "key": "2025-12/20251212801379",
+      "reportName": "최대주주인명목회사의최대주주변경",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "changed",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 controlling-shareholder 사건의 changed/null와 대상 ownership을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 381,
+      "key": "2025-12/20251231800763",
+      "reportName": "최대주주등소유주식변동신고서",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 controlling-shareholder 사건의 reported/null와 대상 ownership을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 382,
+      "key": "2025-12/20251229800732",
+      "reportName": "최대주주등소유주식변동신고서(최대주주변경시)",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "changed",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 controlling-shareholder 사건의 changed/null와 대상 ownership을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 383,
+      "key": "2025-12/20251231000629",
+      "reportName": "동일인등출자계열회사와의상품ㆍ용역거래",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "internal-goods-services",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 internal-goods-services 사건의 decided/proposed와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 384,
+      "key": "2025-12/20251231000323",
+      "reportName": "동일인등출자계열회사와의상품ㆍ용역거래변경",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "changed",
+          "state": "effective",
+          "cause": "internal-goods-services",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 internal-goods-services 사건의 changed/effective와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 385,
+      "key": "2025-12/20251230000904",
+      "reportName": "특수관계인으로부터채권매수",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bond-transactions",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 bond-transactions 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 386,
+      "key": "2025-12/20251230000821",
+      "reportName": "특수관계인과의내부거래",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "reported",
+          "state": "effective",
+          "cause": "brand-license-fee",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 brand-license-fee 사건의 reported/effective와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 387,
+      "key": "2025-12/20251230000699",
+      "reportName": "특수관계인과의보험거래",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "retirement-pension",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 retirement-pension 사건의 decided/proposed와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 388,
+      "key": "2025-12/20251230000289",
+      "reportName": "[기재정정]특수관계인에대한자금대여",
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": false,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "effective",
+          "cause": "related-party-loan",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "pending",
+          "cause": "related-party-loan",
+          "subjectType": "contract"
+        }
+      ],
+      "rationale": "정정 후 신규 13,000백만원 대여가 2026년 1분기 중 실행 예정이라고 반복 명시된다. 과거 대여분이 함께 기재되어도 이번 변경 대상 tranche는 미실행이므로 updated/pending이 맞다."
+    },
+    {
+      "index": 389,
+      "key": "2025-12/20251229000686",
+      "reportName": "특수관계인과의수익증권거래",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "fund-security-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 fund-security-investment 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 390,
+      "key": "2025-12/20251226000318",
+      "reportName": "약관에의한금융거래시계열금융회사의거래상대방의공시",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "affiliate-financial-transactions",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 affiliate-financial-transactions 사건의 decided/proposed와 대상 contract을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 391,
+      "key": "2025-12/20251224000652",
+      "reportName": "특수관계인에대한증여",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "securities-donation",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 securities-donation 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 392,
+      "key": "2025-12/20251224000174",
+      "reportName": "특수관계인에대한출자",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "fund-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 fund-investment 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 393,
+      "key": "2025-12/20251224000119",
+      "reportName": "특수관계인으로부터부동산임차",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-real-estate-leased-in",
+          "subjectType": "real-estate"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 related-party-real-estate-leased-in 사건의 decided/proposed와 대상 real-estate을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 394,
+      "key": "2025-12/20251223000666",
+      "reportName": "특수관계인에대한부동산임대",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-real-estate-leased-out",
+          "subjectType": "real-estate"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 related-party-real-estate-leased-out 사건의 decided/proposed와 대상 real-estate을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 395,
+      "key": "2025-12/20251223000481",
+      "reportName": "특수관계인으로부터받은담보",
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "received",
+          "state": "effective",
+          "cause": "collateral-received",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "received",
+          "state": "effective",
+          "cause": "collateral-received",
+          "subjectType": "real-estate"
+        }
+      ],
+      "rationale": "담보물은 KG지엔에스 소유 1부두·2~6부두와 각 배후부지다. 토지·부지 성격이 명백하므로 subjectType은 generic asset이 아니라 real-estate다."
+    },
+    {
+      "index": 396,
+      "key": "2025-12/20251219000423",
+      "reportName": "특수관계인으로부터주식의취득",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 equity-acquisition 사건의 decided/proposed와 대상 securities을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 397,
+      "key": "2025-12/20251219000456",
+      "reportName": "[기재정정]대규모기업집단현황공시[연1회공시및1/4분기용(대표회사)]",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": null,
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·상세분류코드가 business-group-status 사건의 updated/null와 대상 governance을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 398,
+      "key": "2025-12/20251201000640",
+      "reportName": "대규모기업집단현황공시[분기별공시(개별회사용)]",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": null,
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 business-group-status 사건의 reported/null와 대상 governance을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    },
+    {
+      "index": 399,
+      "key": "2025-12/20251201000492",
+      "reportName": "대규모기업집단현황공시[분기별공시(대표회사용)]",
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": null,
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "제목·본문·상세분류코드가 business-group-status 사건의 reported/null와 대상 governance을 뒷받침하며, 상충하거나 추가해야 할 독립 이벤트가 없다."
+    }
+  ]
+}

@@ -1,0 +1,1717 @@
+{
+  "schemaVersion": "jaroo.kr-disclosure-event-q4-adjudication-evidence.v1",
+  "developmentOnly": true,
+  "ontologyVersion": "jaroo.kr-disclosure-event-ontology.v1",
+  "ontologyManifestSha256": "b3b29e0918060d7cfbaa1586703a2ac3e2ca5d5198c3c4d5d8b1325d199976f9",
+  "sourceCorpusSha256": "37472b36b474c60280da57928da1c647161c839e4e16c8318f8668999956dc4c",
+  "predecessorOracleSha256": "32524f90b0ba2c50ffe68de697e735303210d817a482c54ad26ba76f960672ea",
+  "discrepancySetSha256": "71ee50f7b366400ce5e835b980e77907678ec0f86922a2e5e406860bd0866800",
+  "sourceFiles": [
+    {
+      "path": "/tmp/jaroo-q4-adjudication-consensus.json",
+      "sha256": "46a924de9e4d32b4ea730c075fbee8ee2f8cb589dfea43d773f11816692cd1a0"
+    },
+    {
+      "path": "/tmp/jaroo-q4-final-consensus.json",
+      "sha256": "e7d2309b97a15172b5a4c8702b33a2c438eb8d96616667117dacb2ab3be0f884"
+    },
+    {
+      "path": "/tmp/jaroo-q4-tiebreak-result-1.json",
+      "sha256": "3dd775ccfbd8e2eceef4863fb7a03a8478e7bc13c84448090c11229612b851e4"
+    },
+    {
+      "path": "/tmp/jaroo-q4-tiebreak-result-2.json",
+      "sha256": "a19107d45e2ff0645b67e74bb46223898b1bbbc20de30749387036e5d378a1ad"
+    },
+    {
+      "path": "/tmp/jaroo-q4-tiebreak-result-3.json",
+      "sha256": "bdcb519c2fca050d0f622b9bc2a43c0f9a6ab7cc1af6567f9b565129115196bc"
+    }
+  ],
+  "summary": {
+    "caseCount": 77,
+    "initialDualConsensusCount": 45,
+    "secondDualConsensusCount": 23,
+    "independentTiebreakCount": 9
+  },
+  "cases": [
+    {
+      "index": 3,
+      "rceptNo": "20251031000576",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "이사회가 1,000억원 규모의 자본인정 후순위 영구성 채무증권 발행을 결정했지만 청약·납입일은 2025-12-03으로 미래이므로 발행 완료가 아닌 제안된 자본조달 사건이다.",
+      "ambiguities": [
+        "동일 사채가 별도 전환사채 발행결정 공시에도 나타나지만 이 문서는 자본인정 채무증권이라는 독립된 공시 관점을 갖는다.",
+        "동일한 제5회 사채를 전환사채 발행결정 공시도 별도로 다루지만, 이 문서에서는 자본인정 채무증권 발행이라는 한 사건으로 판정했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 4,
+      "rceptNo": "20251031000547",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "효성화학 이사회가 1,000억원 전환사채 발행을 결정했고 납입 및 발행은 미래 예정이므로 proposed 상태다.",
+      "ambiguities": [
+        "사채가 영구성·후순위 조건도 갖지만 이 문서의 실질 대상은 전환사채 발행결정이다.",
+        "index 3과 경제적으로 동일한 사채이나 각 공시 문서별 실질 사건을 독립 판정했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 5,
+      "rceptNo": "20251031000537",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "under-review",
+          "state": "deferred",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "independent-tiebreak",
+      "rationale": "2025-10-31 이사회는 기존 자기주식 처분안을 확정하거나 취소하지 않고 추가 논의를 위해 최종결정을 11월로 미뤘다. 따라서 최신 실질 사건은 자기주식 처분의 재검토이며, 명시적 연기이므로 under-review/deferred가 적합하다. Canonical template에서 자기주식 처분은 capital-change이고 대상 객체는 securities이므로 후보 A의 유형 판단을 유지하면서 subjectType을 canonical 값으로 합성했다.",
+      "ambiguities": [
+        "기존 처분결의와 수량은 문서에 남아 있으나 법적 효력이 철회되었다는 표현은 없으므로 cancelled로 판정하지 않았다.",
+        "실제 자기주식 이전은 교환권 행사에 달려 있지만 이번 정정이 새로 확립한 사실은 처분 완료가 아니라 최종 의사결정의 재검토 및 연기다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-tiebreak-result-1.json"
+    },
+    {
+      "index": 6,
+      "rceptNo": "20251031000533",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "under-review",
+          "state": "deferred",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "정정은 교환사채 발행 여부와 구체적 계획의 최종결정을 2025년 11월로 연기하고 재검토 중임을 알린다.",
+      "ambiguities": [
+        "정정 문구에 '자기주식 처분 관련 검토'가 섞여 있지만 정정대상 문서는 교환사채 발행결정이며 두 거래가 결합되어 있다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 16,
+      "rceptNo": "20251022000196",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "independent-tiebreak",
+      "rationale": "발행사가 자기 전환사채를 재취득하는 사건은 일반 영업자산 매입보다 발행사의 자본·채무증권 구조 변화에 해당하므로 capital-change가 적합하다. 계약과 계약금 지급은 완료됐지만 잔금 지급 및 전자등록금액 수령이 2025-11-20로 남아 있어 contracted/pending이다.",
+      "ambiguities": [
+        "표의 지급(예정)일은 2025-10-22이나 상세 설명은 당일 계약금만 지급하고 잔금과 사채 수령은 미래라고 명시한다.",
+        "증권을 매수한다는 거래 형식만 강조하면 asset-transaction으로 볼 여지가 있으나 자기 발행 전환사채라는 대상의 성격을 우선했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-tiebreak-result-3.json"
+    },
+    {
+      "index": 18,
+      "rceptNo": "20251020000309",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "ordered",
+          "state": "correction-requested",
+          "cause": "disclosure-correction",
+          "subjectType": "issuer"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "문서 표제의 정정명령부과가 이 접수의 신규 규제 사건이다. 재현된 자기주식 처분 원문은 정정 요구의 대상일 뿐이며, correction wrapper와 원 사업 사건을 중복 산입하지 않는다.",
+      "ambiguities": [
+        "본문에 정정명령의 상세 사유가 없지만 reportName이 명령 부과 사실과 대상 공시를 명시한다.",
+        "본문에 명령 상세가 없지만 reportName 자체가 정정명령 부과라는 규제 사건을 확립한다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 19,
+      "rceptNo": "20251020000303",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "ordered",
+          "state": "correction-requested",
+          "cause": "disclosure-correction",
+          "subjectType": "issuer"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "교환사채 발행결정 공시에 정정명령이 부과되어 발행인에게 공시 정정이 요구된 규제 사건이다.",
+      "ambiguities": [
+        "본문의 교환사채 발행결정은 정정 대상 원문이므로 별도 신규 발행 사건으로 세지 않았다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 20,
+      "rceptNo": "20251020000273",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "real-estate-purchase",
+          "subjectType": "real-estate"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "정정으로 거래상대방의 이사회 결의와 광화문 토지·건물 매매계약 체결이 완료됐음이 확정됐다. 그러나 잔금 지급, 양수기준일, 등기는 2025-12-31 예정이므로 부동산 매입계약은 아직 종결 전이다.",
+      "ambiguities": [
+        "최초 양수 결정은 2025-10-17이지만 이번 정정에서 새로 확정된 실질 내용은 2025-10-20 계약 체결이다.",
+        "정정은 기존 양수 결정과 동일한 occurrence를 갱신하지만, 이번 문서가 계약 체결이라는 실질 lifecycle 전이를 직접 확정한다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 32,
+      "rceptNo": "20251031000581",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "추가서류는 회차와 조건이 서로 다른 8개 ELS를 일반공모로 모집하며 각 청약 시작일과 납입일이 제출일 이후다. 단순 filing보다 투자자 모집을 개시한 solicited가 문서의 실질 행위를 잘 나타내고, 상품별 derivative-linked-securities 원인을 보존한다.",
+      "ambiguities": [
+        "제출 시점에는 청약 개시 전이므로 각 모집의 lifecycle은 pending이며, 동일 tuple 8개는 독립 회차 cardinality를 나타낸다.",
+        "청약 접수는 11월 3일 시작하지만 10월 31일 청약공고로 모집 권유는 이미 성립했다.",
+        "각 회차의 조건과 기초자산이 달라 문서 수준의 단일 사건으로 병합하지 않는다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 34,
+      "rceptNo": "20251030000222",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "현대차증권 제127~129회 기타파생결합증권 3개 회차를 각 500억원씩 모집하고 청약·납입은 미래다. 별도 회차 3건을 보존한다.",
+      "ambiguities": [
+        "일괄신고 추가서류 제출을 단순 filed 래퍼로 보지 않고 실질적인 증권 모집으로 판정했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 36,
+      "rceptNo": "20251015000124",
+      "expectedEvents": [],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "제공된 bodyText가 완전히 비어 있어 원문으로 확립 가능한 실질 canonical event가 없다.",
+      "ambiguities": [
+        "reportName이 투자설명서라는 사실만으로 특정 증권의 발행·모집 사건이나 시제를 추론할 수 없다.",
+        "보고서명 '투자설명서'만으로 증권 발행 또는 모집 사건을 추론하지 않았다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 37,
+      "rceptNo": "20251031000599",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "셀트리온홀딩스 및 특별관계자 집단의 대량보유 비율이 30.77%에서 31.02%로 변동한 사실을 보고한다. 여러 매매·담보·스톡옵션 행은 문서 수준 최대주주 집단 보유변동 한 사건으로 정규화한다.",
+      "ambiguities": [
+        "기초 거래는 복수지만 ontology의 maximum-shareholder-ownership-change 문서 수준 cardinality 계약을 적용한다.",
+        "다수 관계인의 매수·매도·옵션 행사는 문서 수준 대량보유 사건 하나로 집계했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 38,
+      "rceptNo": "20251031000294",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "홈캐스트가 컨소시엄 해산에 따른 전환사채 현물배분으로 제이준코스메틱 지분상당 6.23%를 신규 보유하게 된 대량보유 상황을 보고한다.",
+      "ambiguities": [
+        "법적 보유대상은 보통주가 아니라 전환사채권이지만 대량보유 보고의 실질은 발행회사에 대한 5% 이상 ownership position이다.",
+        "기초 원인은 CB 취득이지만 이 문서의 핵심 사건은 법정 대량보유 상태 보고다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 39,
+      "rceptNo": "20251031000592",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "비등기임원이 주식매수선택권 행사로 보통주 1,129주를 취득해 보유량이 2,631주에서 3,760주로 증가한 현재의 임원 특정증권 소유변동을 보고했다.",
+      "ambiguities": [
+        "주식매수선택권 행사는 변동 원인이지만 문서 수준 canonical 사건은 임원의 특정증권 소유상황 보고다.",
+        "ontology에 insider-ownership과 insider-holdings가 별도 alias 없이 함께 존재해 어휘 경계가 중첩되지만, 소유변동 사건의 원인으로 insider-ownership을 정규화해 선택했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 64,
+      "rceptNo": "20251031800937",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "이번 정정의 신규 경과는 대구고등법원이 한국수력원자력의 항소를 기각한 2심 판결이다. 과거 입찰제한과 집행정지 사건을 반복 생성하지 않는다.",
+      "ambiguities": [
+        "상고 가능성까지 원문이 배제하지 않으므로 사건 전체를 finalized로 두지 않고 해당 판결이 내려진 효과만 effective로 표현했다.",
+        "상고 가능성은 남을 수 있으나 항소심 기각 결정 자체는 이미 발생했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 67,
+      "rceptNo": "20251031800858",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "효성이 계열사 효성화학 발행 영구 CB 1,000억원을 현금 취득하기로 이사회에서 결정했으나 취득예정일은 2025-12-03이다.",
+      "ambiguities": [
+        "관련자 거래 성격도 있으나 문서의 직접 사건은 주권관련사채권 취득이다.",
+        "계열회사 거래지만 채권 취득의 직접 cause인 convertible-bond-acquisition을 우선했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 68,
+      "rceptNo": "20251031800886",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "SK이노베이션 전환사채 6,000억여원의 실제 발행금액 전액이 2025-10-31 납입 완료되어 앞선 발행결정이 실행 완료됐다.",
+      "ambiguities": [],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 72,
+      "rceptNo": "20251031800833",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "price-set",
+          "state": "finalized",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "이미 2025-09-01 종결된 편광필름 사업 양도의 정산 결과 양도가액이 1조1,825억원으로 최종 확정됐다. 거래를 다시 completed로 중복 생성하지 않고 최종 가격 확정 사건으로 판정한다.",
+      "ambiguities": [
+        "양도대상에는 사업 일체와 중국 법인 지분이 함께 있으나 하나의 결합된 사업양도 거래다.",
+        "사업 양도 완료를 다시 세지 않고 이번 문서가 새로 확립한 최종 가격 확정만 반영했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 76,
+      "rceptNo": "20251031800794",
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "extended",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "기존 전기집진기 설치공사 계약의 종료일을 2025-10-31에서 2025-11-30으로 연장한 서명된 변경으로, 활성 계약의 연장은 즉시 effective다.",
+      "ambiguities": [],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 87,
+      "rceptNo": "20251031800586",
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "2025년 1~9월 잠정 결산실적을 2025-11-07에 공시할 예정이라는 일정 예고다. 수치가 아직 발표되지 않았으므로 preliminary 실적 발표가 아니라 pending 일정이며, earnings canonical cause는 operating-results다.",
+      "ambiguities": [
+        "향후 발표 수치가 잠정치라는 설명은 현재 시점에 측정값이 공개되었다는 뜻이 아니다.",
+        "미래 발표치가 잠정치라는 설명은 아직 공개되지 않은 결과의 성격일 뿐 현재 사건의 state를 preliminary로 만들지 않는다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 90,
+      "rceptNo": "20251031800377",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": "active",
+          "cause": "compliance-program",
+          "subjectType": "governance"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "기아가 2025년 3분기 공정거래 자율준수 프로그램 운영실적과 4분기 계획을 함께 보고하며 프로그램이 계속 운영 중임을 나타낸다.",
+      "ambiguities": [
+        "완료된 세부 교육·평가와 미래 계획이 다수이나 하나의 CP 운영현황 문서로 집계했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 98,
+      "rceptNo": "20251031800001",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "대법원이 직무집행정지가처분 재항고를 모두 기각하는 결정을 내렸다.",
+      "ambiguities": [
+        "재항고 기각은 해당 절차의 종결을 의미하지만 ontology의 finalized는 가격·조건 확정에도 쓰이므로 보수적으로 결정 효력 effective를 사용했다.",
+        "회생절차 진행 사실은 배경 설명이며 이번 공시의 신규 사건이 아니다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 99,
+      "rceptNo": "20251030800831",
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "occurred",
+          "state": "effective",
+          "cause": "serious-industrial-accident",
+          "subjectType": "operations"
+        },
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "active",
+          "cause": "work-stop",
+          "subjectType": "operating-business"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "울산 1공장에서 감전 사망 1명의 중대재해가 발생했고, 다음 날 노동청이 현장 일부 생산라인에 작업중지 명령을 내렸다. 사고 발생과 현재 유효한 운영 제한은 행위자·시점·효과가 다른 두 사건이므로 모두 보존한다.",
+      "ambiguities": [
+        "부분 작업중지 명령의 종료 또는 해제 사실이 없어 active로 둔다.",
+        "작업중지의 범위는 현장 일부 생산라인으로 제한되며 종료일은 제시되지 않았다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 110,
+      "rceptNo": "20251030800620",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "pending",
+          "cause": "record-date",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "BNK금융지주 이사회가 분기배당 권리주주 확정을 위한 2025-11-14 기준일을 결정했으며 기준일 도래 전이다.",
+      "ambiguities": [
+        "배당금 자체는 아직 결정·공시되지 않았으므로 cash-dividend 사건을 생성하지 않는다.",
+        "배당 자체의 금액·지급 결정은 확립되지 않아 cash-dividend 사건은 추가하지 않았다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 114,
+      "rceptNo": "20251030800094",
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "updated",
+          "state": "projected",
+          "cause": "earnings-guidance",
+          "subjectType": "financials"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "independent-tiebreak",
+      "rationale": "기존 2025년 매출 성장 목표를 감소 전망으로 바꾸고 IRA Tax Credit 예상 수혜 규모도 낮춰, 이미 공시된 연간 실적 가이던스를 실질적으로 갱신했다. 정정된 값은 계속 미래 전망이므로 projected이며, canonical correction semantics상 수치가 바뀌었다는 이유만으로 correction wrapper와 별개인 action을 adjusted로 좁히기보다 기존 가이던스의 updated로 판정한다.",
+      "ambiguities": [
+        "Capex 감소 계획도 본문에 포함되지만 정정 전후 표의 변경 대상은 매출 목표와 IRA 수혜 예상치이며 별도의 시설투자 결정 변경은 확립되지 않는다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-tiebreak-result-1.json"
+    },
+    {
+      "index": 123,
+      "rceptNo": "20251031800845",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "최대주주등 보유 보통주가 교환으로 이틀간 총 253,220주 감소해 집단 지분율이 60.36%에서 59.13%로 변경된 사실을 보고한다. 두 세부 교환 행은 문서 수준 최대주주 집단 보유변동 한 사건으로 정규화한다.",
+      "ambiguities": [
+        "개별 거래일은 둘이지만 maximum-shareholder-ownership-change template 의미에 따라 aggregate document event 하나를 사용한다.",
+        "이틀의 개별 교환 감소 내역은 최대주주 그룹 총괄 양식의 문서 수준 사건 하나로 집계했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 125,
+      "rceptNo": "20251031000598",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "collateral-received",
+          "subjectType": "asset"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "효성이 계열회사 효성화학으로부터 차입 신용보강 의무의 상환담보를 제공받기로 위원회에서 의결했다. 계약 체결일은 미정이고 2025년 11월 체결 예정이므로 수령 완료가 아니라 제안·결정 단계의 1개 담보수령 사건이다.",
+      "ambiguities": [
+        "공시 제목은 담보를 이미 받은 것처럼 보이지만 본문은 계약 체결 및 담보 제공이 미래임을 명시한다.",
+        "담보물이 유형자산과 대여금채권을 함께 포함하지만 하나의 담보수령 거래이므로 단일 사건으로 본다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 138,
+      "rceptNo": "20251031000262",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "SK네트웍스가 계열회사 SK스퀘어와 인크로스 주식 전량의 양수도계약을 체결했다. 계약은 성립했지만 공시가 취득 진행상황에 따른 변동 가능성을 명시하므로 종결 전 pending으로 판정한다.",
+      "ambiguities": [
+        "거래일자가 계약체결일과 같아 acquired/effective로 볼 여지가 있으나, 원문은 취득 진행 중임을 명시한다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 156,
+      "rceptNo": "20251015000340",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": "effective",
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "연간 기업집단현황 공시에서 누락된 재무위원회 의안을 보충하여 기존 기업집단 지배구조 현황을 실질적으로 갱신한 정정이다. 정정 제출과 동시에 갱신 내용이 유효하다.",
+      "ambiguities": [
+        "본문에는 다수의 과거 이사회·거래 내역이 있으나 이는 현황표의 구성 자료이며 각각을 새 사건으로 세지 않는다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 157,
+      "rceptNo": "20251013000158",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": "effective",
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "대표회사 명의의 연간 기업집단현황 정정으로, 기존 기업집단 지배구조·현황 공시의 내용을 갱신한다. 정정 wrapper가 아닌 갱신된 현황 자체를 1개 사건으로 본다.",
+      "ambiguities": [
+        "대규모 현황 본문에 여러 회사와 과거 거래가 포함되지만 문서 단위 사건은 기업집단현황 갱신이다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 161,
+      "rceptNo": "20251125000685",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "real-estate"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "롯데리츠가 L7 홍대 토지·건물을 2,650억원에 양수하기로 결정했지만 2026년 1월 주주총회 승인, 인허가와 선행조건 충족 및 거래종결이 남아 있다. 따라서 부동산 취득 완료가 아닌 제안 상태의 양수 결정 1건이다.",
+      "ambiguities": [
+        "표의 계약체결일 2025-01-05는 기타사항의 2026년 1월 계약체결 예정 설명과 불일치하므로 완료 근거로 사용하지 않았다.",
+        "표의 계약체결일 표기와 기타사항의 계약체결예정일 설명 사이 날짜 표현이 불일치하지만, 선행조건 미충족이라는 lifecycle 판단에는 영향이 없다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 163,
+      "rceptNo": "20251128002061",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "acquired",
+          "state": "effective",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "발행사가 제37회 전환사채 2억원을 만기 전에 장외 매수했고 결정일과 지급일이 모두 2025-11-28이다. 향후 재매각 계획은 별도 미래 사건이며 현재 문서의 실질 사건은 자기 전환사채 취득 1건이다.",
+      "ambiguities": [
+        "재매각은 대상·일정이 미정이고 별도 공시 예정이므로 사건으로 추가하지 않는다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 164,
+      "rceptNo": "20251128001922",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "삼화페인트는 교환사채의 교환대상으로 자기주식 1,008,642주를 처분하기로 결정했다. 실제 주식 처분은 향후 교환권 행사 시 확정되므로 현재는 제안·결정 단계의 자기주식 corporate action이다.",
+      "ambiguities": [
+        "별도 시간외대량매매 예정분 1,380,000주는 별도 공시 대상이라고 명시되어 이 문서의 사건 수에 포함하지 않는다.",
+        "별도 시간외대량매매 예정분 1,380,000주는 별도 공시 대상이라고 명시되어 이 문서의 사건 수에 포함하지 않았다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 165,
+      "rceptNo": "20251128001918",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "삼화페인트가 자기주식을 교환대상으로 하는 제22회 사모 교환사채 발행을 결의했다. 납입·발행 예정일은 2025-12-08로 공시일 이후이므로 발행 완료 전 제안 상태다.",
+      "ambiguities": [
+        "교환대상 자기주식 처분은 별도 공시의 사건이며 이 문서에서는 교환사채 발행만 센다.",
+        "연계된 자기주식 처분은 별도 주요사항보고서의 주 사건이므로 여기서는 중복 계상하지 않는다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 167,
+      "rceptNo": "20251128001766",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "윌비스가 제3자배정 방식으로 상환전환우선주 350만주 유상증자를 결정했다. 문서는 발행 결정 단계이고 신주 발행·납입 절차가 남아 있어 제안 상태의 유상증자 1건이다.",
+      "ambiguities": [
+        "발행 증권이 보통주가 아닌 상환전환우선주이지만 사건 family는 유상증자다.",
+        "배정 방식은 제3자배정이지만 ontology에서는 유상증자 계열을 rights-offering으로 표상한다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 171,
+      "rceptNo": "20251124000330",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "withdrawn",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        },
+        {
+          "type": "capital-change",
+          "action": "withdrawn",
+          "state": "cancelled",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "withdrawn",
+          "state": "cancelled",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "independent-tiebreak",
+      "rationale": "정정표는 채권자·항고인의 가처분 신청 전부 취하서가 접수되었음을 확립하고, 주2는 회사가 같은 날 교환사채 발행결정과 자기주식 처분결정을 전면 철회했다고 각각 명시한다. 행위자와 객체가 다른 세 사건이므로 cardinality를 보존한다. 소송 취하는 접수되어 effective이고, 두 회사의 장래 결정은 철회로 무효화되어 cancelled다. Canonical template에서 자기주식 처분은 capital-change/securities이므로 후보 A의 유형 판단을 유지하면서 subjectType을 canonical 값으로 합성했다.",
+      "ambiguities": [
+        "교환사채 발행과 자기주식 처분 철회는 각각 별도 당일 관련공시 대상이기도 하지만 이 원문 자체가 두 철회를 명시적으로 확립하므로 생략하지 않았다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-tiebreak-result-1.json"
+    },
+    {
+      "index": 172,
+      "rceptNo": "20251124000287",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "유안타증권이 300억원 규모 신종자본증권 발행을 결정했으며 납입·발행일은 공시 다음 날인 2025-11-25이다. 공시 시점에는 아직 발행 전이므로 제안 상태다.",
+      "ambiguities": [
+        "이사회가 더 큰 발행한도를 승인했지만 본 문서의 확정 대상은 300억원 한 건이고 잔여한도는 미결정이다.",
+        "이사회가 앞서 승인한 3,000억원 한도 중 이번 확정분 300억원만 단일 사건으로 본다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 175,
+      "rceptNo": "20251120000031",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "차AI헬스케어가 카카오헬스케어 주식을 양수하기로 결정했고 거래종결 및 대금지급 예정일은 2025-12-23이다. 정정은 총자산·자기자본 수치만 바로잡았으며, 실질 사건은 아직 종결 전인 지분 양수 결정 1건이다.",
+      "ambiguities": [
+        "정정 wrapper 자체는 별도 사건이 아니며 재무비율 수정도 양수 lifecycle을 바꾸지 않는다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 177,
+      "rceptNo": "20251107000383",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "warrant-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "이미 2024-09-11 납입·발행된 제4회 신주인수권부사채의 조달자금 용도를 운영자금에서 채무상환자금으로 실질 정정했다. 새 발행 사건이 아니라 유효한 기존 사채발행 내용을 갱신한 1개 사건이다.",
+      "ambiguities": [
+        "정정 시점의 canonical action을 기존 발행 완료(completed)로 둘지 내용 갱신(updated)으로 둘 여지가 있으나, 이번 문서가 명시적으로 바꾸는 실질은 자금용도이므로 updated를 선택했다.",
+        "정정 시점에는 사채 발행이 완료되어 있어 decided/proposed를 재사용하지 않고 updated/effective로 판정한다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 188,
+      "rceptNo": "20251128002139",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "일괄신고 추가서류는 서로 다른 7개 ELS 회차(10741, 10742, 30138, 30139, 9445, 9446, 9447)를 각 50억원씩 모집한다. 청약은 2025-12-01 이후, 납입은 2025-12-12로 남아 있으므로 7개의 별도 파생결합증권 모집 사건을 순서와 중복 cardinality 그대로 둔다.",
+      "ambiguities": [
+        "7개 상품의 canonical tuple은 동일하지만 회차와 기초자산이 달라 중복 제거하면 안 된다.",
+        "하나의 일괄신고추가서류지만 회차·기초자산·만기가 구별되는 7개 증권이므로 7개 사건이다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 195,
+      "rceptNo": "20251128000481",
+      "expectedEvents": [],
+      "labelConfidence": "low",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "입력의 bodyText가 완전히 비어 있어 투자설명서가 다루는 실질 사건을 원문으로 확인할 수 없다. type=other를 만들지 않고 증거 부재로 빈 배열 처리한다.",
+      "ambiguities": [
+        "보고서명만으로 증권 발행·모집의 종류, 시제, 사건 수를 추론할 수 없다.",
+        "원문 누락으로 증권 종류, 모집 상태, 사건 cardinality를 판정할 수 없다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 198,
+      "rceptNo": "20251113000532",
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "demerger",
+          "subjectType": "issuer"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "independent-tiebreak",
+      "rationale": "분할기일과 분할등기일이 이미 경과했고 증권발행실적보고서가 제출되어 substantive demerger는 completed/effective다. 이번 기재정정은 주주명부 수령 및 단주 확인에 따른 대주주별 수치 보정으로, correction wrapper가 별도 분할 사건을 만들거나 substantive lifecycle을 corrected로 바꾸지 않는다. 인적분할의 직접 대상은 발행회사라는 juridical entity이므로 subjectType=issuer이며, 특정 영업 또는 양도 대상 사업을 객체로 삼는 business는 범주가 맞지 않는다.",
+      "ambiguities": [
+        "재상장일은 후속 일정이지만 분할의 법적 효력과 완료 판단을 뒤집지 않는다.",
+        "정정된 수치는 분할 결과의 배정 명세이며 독립 사건이 아니다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-tiebreak-result-2.json"
+    },
+    {
+      "index": 199,
+      "rceptNo": "20251128002150",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "사실상 지배주주와 특별관계자의 대량보유 현황 및 주식 관련 계약 변경을 법정 보고했다. 총 보유수량은 같아도 주요계약 체결 주식 수가 변했으므로 문서 단위 대량보유상황 보고 1건이다.",
+      "ambiguities": [
+        "개별 특별관계자와 계약 행을 각각 사건으로 분해하지 않고 합산된 대량보유 보고 family로 처리한다.",
+        "실질 변경은 현대차증권 담보계약 두 건의 만기연장이나 ontology의 holdings 문서 경계에서는 개별 계약행을 별도 사건으로 세지 않는 해석을 적용했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 200,
+      "rceptNo": "20251127000025",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "브이아이피자산운용이 롯데렌탈 주식 5.20%를 신규 보유해 5% 이상 대량보유 의무 발생을 보고했다. 문서 단위 신규 대량보유 보고 1건이다.",
+      "ambiguities": [
+        "여러 매매가 합산됐더라도 공시 family는 보고자의 총 대량보유상황이다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 201,
+      "rceptNo": "20251128002159",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "대표이사이자 사실상 지배주주인 보고자가 두 차례 장내매수로 31,775주를 추가 취득해 보유량이 3,309,327주로 증가한 현재의 임원·주요주주 특정증권 소유변동을 보고했다.",
+      "ambiguities": [
+        "세부 매수는 두 건이지만 이 서식은 한 보고자의 합산 소유상황 변동을 문서 단위로 보고하므로 canonical 사건은 한 건이다.",
+        "ontology의 insider-ownership과 insider-holdings가 의미상 중첩되지만, 소유변동 보고의 원인으로 insider-ownership을 일관되게 선택했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 203,
+      "rceptNo": "20251118000007",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "공개매수기간이 제출일인 2025-11-18에 시작되어 12-07까지 실제로 진행 중이다. 결제는 미래지만 공개매수 자체는 이미 개시되어 active이므로 solicited/pending보다 initiated/active가 정확하다.",
+      "ambiguities": [
+        "복수 펀드와 운용주체가 공동 매수자이지만 동일 대상·가격·기간으로 수행하는 하나의 공개매수다.",
+        "공동 공개매수자가 여러 법적 주체로 구성되지만 동일 대상·가격·기간 아래 공동 수행하는 하나의 공개매수다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 204,
+      "rceptNo": "20251118000006",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "공개매수신고서는 에이플러스에셋 보통주에 대한 동일 공개매수를 2025-11-18부터 개시했음을 확정한다. 매수 기간이 진행 중이므로 active인 공개매수 1건이다.",
+      "ambiguities": [
+        "설명서와 신고서는 별도 문서이지만 각 문서를 독립 adjudication하므로 이 문서에도 동일 실질 사건 1건을 둔다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 213,
+      "rceptNo": "20251127001306",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "convened",
+          "state": "pending",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "디앤디플랫폼리츠가 제11기 정기주주총회를 2025-12-16 개최하도록 정식 소집 공고했다. 소집은 성립했지만 실제 회의는 미래이므로 pending이다.",
+      "ambiguities": [
+        "배당·재무제표·사업계획 등은 아직 주총 의안일 뿐 승인된 개별 사건이 아니다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 216,
+      "rceptNo": "20251128801335",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "rescheduled",
+          "state": "deferred",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "계약 당사자 합의로 자기 전환사채 취득대금 지급일과 사채만기일을 2025-11-28에서 2026-01-30으로 미뤘고 금액도 조정했다. 기존 예정 전환이 명시적으로 연기됐으므로 rescheduled와 deferred의 결합이 현재 lifecycle을 정확히 나타낸다.",
+      "ambiguities": [
+        "취득 후 전량 소각은 후속 계획일 뿐 현재 발생하거나 완료된 독립 사건이 아니다.",
+        "취득금액도 이자 반영으로 조정됐지만 독립 occurrence가 아니라 동일 취득 사건의 일정·조건 변경이다.",
+        "취득 후 전량 소각은 미래 처리계획이므로 별도 사건으로 세지 않았다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 219,
+      "rceptNo": "20251128801291",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-borrowing",
+          "subjectType": "cash"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "자회사 메가박스중앙의 160억원 단기차입은 계열사 간 금전대차로 명시되고 공정위 신고대상에도 해당한다. 따라서 일반 short-term-borrowing보다 관계자 거래를 보존하는 related-party-borrowing이 우선하며, 이사회 결정 후 실행일이 확립되지 않아 proposed다.",
+      "ambiguities": [
+        "차입 후 총액은 제시되지만 실제 자금 실행일이나 완료 사실은 원문에 없다.",
+        "차입 후 총액이 제시되지만 실제 자금 이전 완료일은 없어 borrowed/effective로 올리지 않는다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 239,
+      "rceptNo": "20251128800765",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "disposed",
+          "state": "effective",
+          "cause": "equity-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "SK스퀘어가 보유한 십일번가 보통주 전량을 SK플래닛에 처분했고 정정은 예정일을 2025-11-28 거래 완료일로 확정했다. 따라서 지분 처분 완료 1건이다.",
+      "ambiguities": [
+        "관련 풍문 해명 확정은 배경이며 별도의 canonical 사건으로 추가하지 않는다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 242,
+      "rceptNo": "20251128800665",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "changed",
+          "state": "effective",
+          "cause": "real-estate-lease",
+          "subjectType": "real-estate"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "independent-tiebreak",
+      "rationale": "기존 임대계약을 변경계약으로 갱신한 사실 자체가 확정되어 있으며, 수정된 종료일이 미래라는 사정은 이미 체결된 활성 계약 변경의 효력을 pending으로 만들지 않는다. 공시 후 시작되는 것은 변경 조건의 적용기간이지 변경계약의 성립 자체가 아니다.",
+      "ambiguities": [
+        "변경된 월임대료의 적용 시작일은 2025-12-04이므로 경제적 조건의 실제 적용만 기준으로 보면 pending 해석도 가능하다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-tiebreak-result-3.json"
+    },
+    {
+      "index": 243,
+      "rceptNo": "20251128800672",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "제2회 사모 전환사채의 실제 발행금액과 납입 완료가 명시되어 있어 발행 결정이 아니라 완료된 자본변동 사건이다.",
+      "ambiguities": [],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 255,
+      "rceptNo": "20251124800598",
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "withdrawn",
+          "state": "cancelled",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "한화솔루션 이사회가 경제성 저하를 이유로 고순도 크레졸 시설 신규 투자 결정을 최종 철회했다. 원문의 명시적 행위가 철회이므로 action은 withdrawn이고, 기존 투자계획의 lifecycle은 cancelled다.",
+      "ambiguities": [],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 256,
+      "rceptNo": "20251124800231",
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "independent-tiebreak",
+      "rationale": "Canonical preliminary-operating-results template가 이 공시 가족을 earnings/announced/preliminary/operating-results/financials로 고정한다. 원문의 측정값이 판매량뿐이라는 사실은 empirical content이지만, 이를 곧바로 operating-performance/sales-volume로 재분류하면 문서 가족에 대한 canonical labeling contract와 충돌한다. 또한 '잠정치', '추정자료', 추후 정산 가능성은 관측값이 명시적으로 가변적임을 뜻하므로 state=preliminary가 성립한다.",
+      "ambiguities": [
+        "손익 항목은 모두 공란이고 실제 수치는 열·냉수·전기 판매량이므로 비계약적 의미 분류라면 operations 해석도 자연스럽지만, 현행 frozen template semantics에서는 허용되지 않는다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-tiebreak-result-2.json"
+    },
+    {
+      "index": 268,
+      "rceptNo": "20251128801261",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "최대주주등 집단의 합산 소유주식 18,490,179주(74.31%)를 신규 보고한다. 개별 상장·매도 행은 문서 수준 소유현황 사건에 통합한다.",
+      "ambiguities": [
+        "개인별 여러 행은 독립 사건으로 증식하지 않고 문서 단위 aggregate 한 건으로 판정했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 273,
+      "rceptNo": "20251128002043",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "affiliate-equity-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "이사회가 계열 출자조합 SVIC 76호에 200억원 출자를 승인했고 최초 납입은 향후 예정이므로 제안 단계의 특수관계인 지분투자다.",
+      "ambiguities": [],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 293,
+      "rceptNo": "20251231000590",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bond-sale",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "회사가 보유한 자기 전환사채 10억원의 재매각을 결정했다. 수령 예정일은 당일이지만 실제 수령·매도 완료 문구가 없어 결정된 채권 매각으로 유지한다.",
+      "ambiguities": [
+        "매도대금 수령 예정일이 공시일과 같아 effective로 볼 여지가 있으나 완료 사실은 명시되지 않았다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 294,
+      "rceptNo": "20251231000232",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "정정 본문은 제3자배정 유상증자의 전액 납입 사실과 실제 발행금액을 확정해 기재한다. 단순 환율 정정 wrapper보다 완료된 유상증자가 실질 사건이다.",
+      "ambiguities": [
+        "신주 상장은 이후 예정이지만 납입 완료를 자본변동 완료 기준으로 삼았다.",
+        "정정의 직접 항목은 가격·상장일이어서 price-set/finalized로 좁게 볼 수 있으나 동일 증자 occurrence의 현재 lifecycle은 납입 완료다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 299,
+      "rceptNo": "20251230000620",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "rescheduled",
+          "state": "deferred",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "제27회 전환사채의 납입일을 2025-12-31에서 2026-06-30으로 미루면서 만기와 전환청구기간도 함께 연기했다. 동일 발행 사건의 일정 연기 1건이다.",
+      "ambiguities": [],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 302,
+      "rceptNo": "20251226000514",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "대표이사가 2,000억원 규모 채권형 신종자본증권 발행을 결정했으며 청약·납입일은 공시 후인 2025-12-29이므로 아직 제안 단계다.",
+      "ambiguities": [],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 303,
+      "rceptNo": "20251226000462",
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "extended",
+          "state": "effective",
+          "cause": "contract-right",
+          "subjectType": "contract-right"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "기존 주식양수계약에 부수된 주식매수청구권의 상장 기한을 2025년 말에서 2028년 말로 연장하고 예외조건을 추가했다. 과거 주식양수 자체를 새 사건으로 반복하지 않고 계약상 권리 변경을 잡는다.",
+      "ambiguities": [
+        "ontology에 일반 put-option 전용 cause가 없어 contract-right로 표현했다.",
+        "일반 계약권 변경 전용 cause가 없어 contract-right를 사용했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 306,
+      "rceptNo": "20251224000451",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "정정은 설명자료 보완일 뿐 제33회 자기주식 교환사채 발행 조건을 바꾸지 않는다. 납입일 2025-12-29가 남아 있어 발행결정은 proposed다.",
+      "ambiguities": [
+        "기재보완 정정만 별도 사건으로 보지는 않았고 correction identity 원칙에 따라 원 발행결정을 유지했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 326,
+      "rceptNo": "20251216000005",
+      "expectedEvents": [],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "원문 bodyText가 빈 문자열이라 실질 사건을 입증할 정보가 전혀 없다.",
+      "ambiguities": [
+        "보고서명은 투자설명서이지만 제목만으로 periodic-report나 securities-offering 사건을 추론하지 않았다.",
+        "보고서명만으로 투자설명서 제출 행위를 추론하지 않았다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 327,
+      "rceptNo": "20251231000637",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "최대주주 및 특별관계자의 장내매수로 대량보유가 43.67%에서 44.75%로 변동된 현황을 보고한다. 다수 매수 행은 문서 수준 대량보유 변동 1건으로 통합한다.",
+      "ambiguities": [
+        "다수 매수 행은 ontology의 large-shareholding 문서 family에 따라 aggregate 한 건으로 판정했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 329,
+      "rceptNo": "20251231000603",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "비등기임원이 장내매수한 보통주 270주의 신규 특정증권 소유상황을 보고했으며, 보고 기준일 현재 해당 소유변동은 유효하다.",
+      "ambiguities": [
+        "ontology의 insider-ownership과 insider-holdings가 별도 alias 없이 중첩되지만, 문서 수준 소유변동의 원인으로 insider-ownership을 선택했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 344,
+      "rceptNo": "20251231000035",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "convened",
+          "state": "pending",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "2026-01-16 정기주주총회를 일시·장소·안건과 함께 정식 소집했으나 아직 개최 전이다.",
+      "ambiguities": [
+        "배당·재무제표·사업계획 등 상정 안건은 아직 승인되지 않아 별도 완료 사건으로 세지 않았다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 345,
+      "rceptNo": "20251231800801",
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "under-review",
+          "state": "pending",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "종전 계약 종료일은 도래했지만 정정 후 종료일을 삭제하고 계약상대와 변경 협의 중이며 확정 후 재공시한다고 밝혔다. 서명된 연장이나 확정된 종료를 추론하지 않고 계약 변경 검토 결과가 남은 pending으로 판정한다.",
+      "ambiguities": [
+        "정정사유에 계약기간 종료가 함께 적혀 있어 terminated 해석 여지가 있으나, 문서는 최종 종료 상태 대신 계속되는 변경 협의와 미정 종료일을 제시한다.",
+        "정정사유에 계약기간 종료가 언급되지만 종료일을 삭제했고 해지·종료를 확정 사건으로 공시하지 않아 terminated/cancelled를 추가하지 않는다.",
+        "협의 결과가 연장인지 다른 조건 변경인지 아직 확립되지 않았다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 346,
+      "rceptNo": "20251231800773",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "서울행정법원이 금융당국 처분에 대한 회사의 집행정지 신청을 기각했다. 기존 이자지급 정지는 변화 없이 유지된 결과이므로 별도 신규 halt 사건은 만들지 않는다.",
+      "ambiguities": [
+        "이자지급 정지는 기존 상태가 그대로 유지됐을 뿐 이번 문서에서 새로 발생한 별도 사건으로 중복 계상하지 않았다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 357,
+      "rceptNo": "20251231800437",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "finalized",
+          "cause": "collateral-provision",
+          "subjectType": "asset"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "자회사 차입에 대한 주식 담보제공의 인출일이 확정되어 제공기간 시작·종료일을 확정했다. 기존 담보제공 결정을 반복하지 않고 조건 확정 업데이트로 판정한다.",
+      "ambiguities": [
+        "action enum에 finalized가 없어 updated와 state=finalized 조합을 사용했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    },
+    {
+      "index": 363,
+      "rceptNo": "20251230801257",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "Crucible JV LLC 대상 제3자배정 유상증자의 실제 주식수·금액과 2025-12-26 전액 납입 완료가 명시된다. 원화 금액 정정은 동일 완료 사건의 수치 보정이다.",
+      "ambiguities": [],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 364,
+      "rceptNo": "20251230801246",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bond-purchase",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "CJ CGV가 종속회사 CJ 4DPLEX 발행 신종자본증권 500억원 인수를 결정했으며 발행 예정일은 다음 날이다. 그룹 내 향후 채권매입 결정이다.",
+      "ambiguities": [],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 367,
+      "rceptNo": "20251231800491",
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "adjusted",
+          "state": "effective",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        },
+        {
+          "type": "corporate-event",
+          "action": "cancelled",
+          "state": "cancelled",
+          "cause": "business-plan",
+          "subjectType": "business"
+        },
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "independent-tiebreak",
+      "rationale": "정정문은 투자 규모 조정, 양극재 사업 진출 계획 취소, CMP 패드·블랭크마스크 사업 매각 결정을 각각 확정한다. 아직 개시되지 않은 사업 진출 계획의 취소는 현재 운영상태 중단이 아니므로 corporate-event/business-plan으로 분류하고, 매각은 결정만 확인되어 proposed로 유지한다.",
+      "ambiguities": [
+        "사업 현황에는 CMP 패드·블랭크마스크 '사업 매각'이라고 기재되지만 변화 사유는 '매각을 결정'했다고 하므로 종결 여부는 확정되지 않는다.",
+        "동박·유리기판·PBAT 생산능력 수치는 현황 정보로서 별도의 신규 결정 또는 완료 시점이 명시되지 않는다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-tiebreak-result-3.json"
+    },
+    {
+      "index": 370,
+      "rceptNo": "20251222800083",
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "independent-tiebreak",
+      "rationale": "Canonical preliminary-operating-results template가 이 공시 가족의 5-tuple을 earnings/announced/preliminary/operating-results/financials로 명시한다. 판매량만 기재됐다는 이유로 operating-performance/reported/sales-volume/operations를 택하는 것은 원문 수치의 객체와 canonical 문서 사건 범주를 혼동하는 categorical mismatch다. 원문은 추정자료이며 정산 후 달라질 수 있다고 명시하므로 preliminary state도 직접 입증된다.",
+      "ambiguities": [
+        "재무 손익 수치는 없고 물량 지표만 존재하지만, 현재 template contract가 공시 가족 수준의 정규화를 우선한다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-tiebreak-result-2.json"
+    },
+    {
+      "index": 381,
+      "rceptNo": "20251231800763",
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "최대주주등 집단 합산 보유가 장내매도로 25,836주 감소한 현황을 신고한다. 개인 거래 1행은 문서 수준 최대주주등 소유변동 1건으로 통합한다.",
+      "ambiguities": [
+        "개인 허안의 매도는 문서 aggregate family 안의 원인 행이며 독립 event를 추가하지 않았다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 392,
+      "rceptNo": "20251224000174",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "affiliate-equity-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "labelConfidence": "high",
+      "adjudicationTier": "initial-independent-dual-consensus",
+      "rationale": "이사회가 설립 예정인 SVIC 75호 투자조합에 285억원 출자약정을 승인했고 최초 출자는 2026년 1~3월 예정이므로 proposed다.",
+      "ambiguities": [],
+      "sourceFile": "/tmp/jaroo-q4-adjudication-consensus.json"
+    },
+    {
+      "index": 395,
+      "rceptNo": "20251223000481",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "collateral-received",
+          "subjectType": "asset"
+        }
+      ],
+      "labelConfidence": "medium",
+      "adjudicationTier": "second-independent-dual-consensus",
+      "rationale": "회사 차입을 위해 100% 자회사 소유 부두·배후부지 담보를 제공받는 안건이 이사회에서 의결됐지만, 기재된 담보받은 일자는 실제 실행일이 아니라 의결일이고 일정·조건은 변경 가능하다.",
+      "ambiguities": [
+        "보고서 제목은 과거형이나 본문이 실행일을 확립하지 않아 received/effective가 아니라 decided/proposed로 판정했다."
+      ],
+      "sourceFile": "/tmp/jaroo-q4-final-consensus.json"
+    }
+  ]
+}

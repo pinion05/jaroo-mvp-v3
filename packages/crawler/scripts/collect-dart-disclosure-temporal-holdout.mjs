@@ -503,6 +503,24 @@ export async function publishValidatedRawCorpusArtifact(artifact, outputPath, {
   return bytes;
 }
 
+export function prepareTemporalPopulation(filings, { excludedReceipts = new Set() } = {}) {
+  const exclusions = excludedReceipts instanceof Set
+    ? excludedReceipts
+    : new Set(excludedReceipts);
+  const listedFilings = Array.isArray(filings) ? filings : [];
+  for (const filing of listedFilings) {
+    if (!issuerKey(filing)) {
+      throw new Error(`listed filing ${filing?.rceptNo ?? filing?.rcept_no ?? 'unknown'} must contain a KOSPI corpCode`);
+    }
+  }
+  const deduped = dedupeFilings(listedFilings);
+  return {
+    deduped,
+    population: deduped.filter((filing) => !exclusions.has(filing.rceptNo)),
+    excludedInWindowCount: deduped.filter((filing) => exclusions.has(filing.rceptNo)).length,
+  };
+}
+
 export async function main(argv = process.argv.slice(2), runtime = {}) {
   const parsedOptions = validateOptions(parseArgs(argv));
   const candidateFreeze = await readCandidateFreeze(parsedOptions.candidateFreezePath);
@@ -513,10 +531,9 @@ export async function main(argv = process.argv.slice(2), runtime = {}) {
   if (!apiKey) throw new Error('DART_KEY is not configured');
 
   const listed = await collectList(options, apiKey);
-  const deduped = dedupeFilings(listed.filings);
-  const population = deduped.filter((filing) => (
-    issuerKey(filing) && !exclusion.receipts.has(filing.rceptNo)
-  ));
+  const { deduped, population, excludedInWindowCount } = prepareTemporalPopulation(listed.filings, {
+    excludedReceipts: exclusion.receipts,
+  });
   const eligibleCount = population.length;
   const selectionOptions = {
     limit: options.limit,
@@ -582,7 +599,7 @@ export async function main(argv = process.argv.slice(2), runtime = {}) {
     deduplicatedCount: deduped.length,
     eligibleCount,
     duplicateCount: listed.filings.length - deduped.length,
-    excludedInWindowCount: deduped.length - eligibleCount,
+    excludedInWindowCount,
     selectedCount: selected.length,
     caseCount: cases.length,
     documentFailureCount: 0,

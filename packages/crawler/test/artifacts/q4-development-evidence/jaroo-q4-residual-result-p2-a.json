@@ -1,0 +1,181 @@
+[
+  {
+    "index": 4,
+    "rceptNo": "20251031000547",
+    "decision": "candidate-b",
+    "expectedEvents": [{"type":"capital-change","action":"decided","state":"proposed","cause":"convertible-bond","subjectType":"securities"}],
+    "labelConfidence": "high",
+    "rationale": "이사회가 제5회 전환사채 발행을 결정했지만 납입일은 2025-12-03으로 장래이므로 발행 결정은 proposed 상태다.",
+    "ambiguities": []
+  },
+  {
+    "index": 16,
+    "rceptNo": "20251022000196",
+    "decision": "candidate-a",
+    "expectedEvents": [{"type":"capital-change","action":"contracted","state":"pending","cause":"convertible-bond-acquisition","subjectType":"securities"}],
+    "labelConfidence": "high",
+    "rationale": "자기 전환사채 재취득 계약에 따라 계약금만 지급됐고 잔금 지급과 전자등록금 수령은 2025-11-20로 남아 있어 계약 체결 후 이행 대기 상태다.",
+    "ambiguities": []
+  },
+  {
+    "index": 20,
+    "rceptNo": "20251020000273",
+    "decision": "candidate-b",
+    "expectedEvents": [{"type":"asset-transaction","action":"contracted","state":"pending","cause":"real-estate-purchase","subjectType":"real-estate"}],
+    "labelConfidence": "high",
+    "rationale": "정정으로 매수·매도 양측 이사회 결의와 부동산 매매계약 체결이 확인됐으나 잔금·양수·등기는 2025-12-31 예정이므로 계약된 미완료 취득이다.",
+    "ambiguities": []
+  },
+  {
+    "index": 36,
+    "rceptNo": "20251015000124",
+    "decision": "unscorable",
+    "expectedEvents": [],
+    "labelConfidence": "low",
+    "rationale": "본문이 null이고 제목은 일반적인 투자설명서뿐이어서 구체적인 거래 유형·행위·상태를 확정할 원문 증거가 없다.",
+    "ambiguities": ["source body absent"]
+  },
+  {
+    "index": 68,
+    "rceptNo": "20251031800886",
+    "decision": "candidate-b",
+    "expectedEvents": [{"type":"capital-change","action":"completed","state":"effective","cause":"convertible-bond","subjectType":"securities"}],
+    "labelConfidence": "high",
+    "rationale": "실제 발행금액과 2025-10-31 납입 완료를 명시한 전환사채 발행결과 공시이므로 발행이 완료되어 유효하다.",
+    "ambiguities": []
+  },
+  {
+    "index": 98,
+    "rceptNo": "20251031800001",
+    "decision": "candidate-b",
+    "expectedEvents": [{"type":"legal-regulatory","action":"dismissed","state":"effective","cause":"litigation","subjectType":"issuer"}],
+    "labelConfidence": "high",
+    "rationale": "대법원이 재항고를 모두 기각한 주문과 결정일을 공시했으므로 소송상 재항고 기각 결정이 확정적으로 발생했다.",
+    "ambiguities": []
+  },
+  {
+    "index": 114,
+    "rceptNo": "20251030800094",
+    "decision": "candidate-b",
+    "expectedEvents": [{"type":"earnings","action":"updated","state":"projected","cause":"earnings-guidance","subjectType":"financials"}],
+    "labelConfidence": "high",
+    "rationale": "정정의 핵심은 2025년 매출 목표와 IRA 수혜 예상치를 변경한 연간 가이던스 업데이트이며 모두 미래 전망치다.",
+    "ambiguities": []
+  },
+  {
+    "index": 157,
+    "rceptNo": "20251013000158",
+    "decision": "candidate-a",
+    "expectedEvents": [{"type":"governance","action":"updated","state":"effective","cause":"business-group-status","subjectType":"governance"}],
+    "labelConfidence": "high",
+    "rationale": "대규모기업집단 현황공시에서 소속회사 이사회·주주총회 관련 기재를 정정해 현재 기업집단 지배구조 현황을 업데이트했다.",
+    "ambiguities": ["body retained at 60000 characters, but correction header and corrected section are present"]
+  },
+  {
+    "index": 164,
+    "rceptNo": "20251128001922",
+    "decision": "candidate-a",
+    "expectedEvents": [{"type":"corporate-action","action":"decided","state":"proposed","cause":"treasury-share-disposal","subjectType":"listed-shares"}],
+    "labelConfidence": "high",
+    "rationale": "이사회가 교환사채 교환대상으로 자기주식 1,008,642주 처분을 결정했지만 실제 처분은 장래 교환권 행사 시 확정되므로 제안 단계다.",
+    "ambiguities": []
+  },
+  {
+    "index": 171,
+    "rceptNo": "20251124000330",
+    "decision": "synthesized",
+    "expectedEvents": [
+      {"type":"legal-regulatory","action":"withdrawn","state":"effective","cause":"litigation","subjectType":"issuer"},
+      {"type":"capital-change","action":"withdrawn","state":"cancelled","cause":"exchangeable-bond","subjectType":"securities"},
+      {"type":"corporate-action","action":"withdrawn","state":"cancelled","cause":"treasury-share-disposal","subjectType":"listed-shares"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "신청인이 가처분 신청을 전부 취하했고 회사도 같은 날 교환사채 발행과 자기주식 처분 결정을 전면 철회했다. 서로 다른 세 발생 사실을 각각 보존하되 자기주식 처분 철회는 listed-shares 대상 corporate-action으로 표현한다.",
+    "ambiguities": ["correction form title remains litigation filing although the body also establishes two separate corporate withdrawals"]
+  },
+  {
+    "index": 177,
+    "rceptNo": "20251107000383",
+    "decision": "candidate-b",
+    "expectedEvents": [{"type":"capital-change","action":"updated","state":"effective","cause":"warrant-bond","subjectType":"securities"}],
+    "labelConfidence": "high",
+    "rationale": "기발행 신주인수권부사채의 조달자금 용도를 운영자금에서 채무상환자금으로 정정한 것으로, 발행 자체를 새로 결정하거나 재일정화한 공시가 아니라 기존 발행 조건의 유효한 업데이트다.",
+    "ambiguities": []
+  },
+  {
+    "index": 198,
+    "rceptNo": "20251113000532",
+    "decision": "candidate-a",
+    "expectedEvents": [{"type":"restructuring","action":"completed","state":"effective","cause":"demerger","subjectType":"issuer"}],
+    "labelConfidence": "high",
+    "rationale": "증권발행실적보고서는 분할 전·존속회사·신설회사 주식수와 분할기일 이후 결과를 보고하며 정정은 단주 확정치 반영이므로 완료된 회사분할이다.",
+    "ambiguities": []
+  },
+  {
+    "index": 216,
+    "rceptNo": "20251128801335",
+    "decision": "candidate-b",
+    "expectedEvents": [{"type":"capital-change","action":"rescheduled","state":"deferred","cause":"convertible-bond-acquisition","subjectType":"securities"}],
+    "labelConfidence": "high",
+    "rationale": "자기 전환사채 취득 지급예정일을 2025-11-28에서 2026-01-30로 미루고 금액도 조정했으므로 기존 취득 이행이 재일정화·연기됐다.",
+    "ambiguities": []
+  },
+  {
+    "index": 242,
+    "rceptNo": "20251128800665",
+    "decision": "candidate-b",
+    "expectedEvents": [{"type":"asset-transaction","action":"changed","state":"effective","cause":"real-estate-lease","subjectType":"real-estate"}],
+    "labelConfidence": "medium",
+    "rationale": "기존 부동산 임대계약을 변경계약으로 전환하고 월임대료와 적용기간을 확정했으므로 부동산 임대 거래 조건의 유효한 변경으로 본다.",
+    "ambiguities": ["revised rent applies from 2025-12-04, six days after receipt; contract amendment itself is established on the filing date"]
+  },
+  {
+    "index": 293,
+    "rceptNo": "20251231000590",
+    "decision": "candidate-a",
+    "expectedEvents": [{"type":"asset-transaction","action":"decided","state":"proposed","cause":"bond-sale","subjectType":"securities"}],
+    "labelConfidence": "high",
+    "rationale": "회사가 만기 전 취득해 보유한 제6회 전환사채 일부의 재매각을 결정한 공시로, 사건은 신규 전환사채 발행이 아니라 보유 사채 매도 결정이다.",
+    "ambiguities": ["sale consideration date equals receipt date, but the form establishes a sale decision rather than explicit receipt completion"]
+  },
+  {
+    "index": 302,
+    "rceptNo": "20251226000514",
+    "decision": "candidate-a",
+    "expectedEvents": [{"type":"capital-change","action":"decided","state":"proposed","cause":"contingent-capital-securities","subjectType":"securities"}],
+    "labelConfidence": "high",
+    "rationale": "대표이사가 자본으로 인정되는 채권형 신종자본증권 2,000억원 발행을 결정했으며 청약·납입은 2025-12-29 예정이라 제안 상태다.",
+    "ambiguities": []
+  },
+  {
+    "index": 326,
+    "rceptNo": "20251216000005",
+    "decision": "unscorable",
+    "expectedEvents": [],
+    "labelConfidence": "low",
+    "rationale": "본문이 null이고 제목은 일반적인 투자설명서뿐이어서 구체적인 구조조정 유형이나 발생 상태를 판정할 증거가 없다.",
+    "ambiguities": ["source body absent"]
+  },
+  {
+    "index": 357,
+    "rceptNo": "20251231800437",
+    "decision": "candidate-a",
+    "expectedEvents": [{"type":"related-party","action":"updated","state":"finalized","cause":"collateral-provision","subjectType":"asset"}],
+    "labelConfidence": "high",
+    "rationale": "자회사 차입 담보제공의 인출일 확정에 따라 기존 미정이던 담보제공 시작·종료일을 확정한 정정이므로 관계자 담보 조건 업데이트가 finalized 상태다.",
+    "ambiguities": []
+  },
+  {
+    "index": 367,
+    "rceptNo": "20251231800491",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {"type":"capital-expenditure","action":"adjusted","state":"effective","cause":"facility-investment","subjectType":"asset"},
+      {"type":"corporate-event","action":"cancelled","state":"cancelled","cause":"business-plan","subjectType":"business"},
+      {"type":"restructuring","action":"decided","state":"proposed","cause":"business-disposal","subjectType":"business"}
+    ],
+    "labelConfidence": "high",
+    "rationale": "이행현황 정정은 누적 투자규모 조정, 양극재 사업 진출 취소, CMP 패드·블랭크 마스크 사업 매각 결정이라는 서로 다른 세 사건을 명시하므로 각각의 발생을 보존한다.",
+    "ambiguities": ["the filing is a business-plan update wrapper, but its body explicitly establishes three distinct substantive outcomes"]
+  }
+]

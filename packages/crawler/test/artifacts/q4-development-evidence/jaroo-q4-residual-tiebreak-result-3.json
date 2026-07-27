@@ -1,0 +1,50 @@
+[
+  {
+    "index": 171,
+    "rceptNo": "20251124000330",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "legal-regulatory",
+        "action": "withdrawn",
+        "state": "effective",
+        "cause": "litigation",
+        "subjectType": "issuer"
+      },
+      {
+        "type": "capital-change",
+        "action": "withdrawn",
+        "state": "cancelled",
+        "cause": "exchangeable-bond",
+        "subjectType": "securities"
+      },
+      {
+        "type": "corporate-action",
+        "action": "withdrawn",
+        "state": "cancelled",
+        "cause": "treasury-share-disposal",
+        "subjectType": "listed-shares"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "접수일 현재 본문은 채권자의 가처분 신청 전부 취하를 명시하므로 소송 사건의 취하가 효력을 가진다. 또한 발행사는 같은 날 교환사채 발행 결정과 자기주식 처분 결정을 전면 철회했다고 명시하므로 서로 다른 두 예정 행위가 각각 취소되었다. 자기주식 처분의 직접 대상은 상장주식이며, 교환사채 발행과 달리 회사의 자기주식 처분이라는 corporate action으로 구분하는 것이 문서의 서로 다른 대상과 행위를 가장 충실히 보존한다.",
+    "ambiguities": []
+  },
+  {
+    "index": 138,
+    "rceptNo": "20251031000262",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "related-party",
+        "action": "contracted",
+        "state": "pending",
+        "cause": "equity-acquisition",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "본문은 계열회사 보유 주식 취득에 관한 공시이지만, 2025-10-30의 거래일자를 주식양수도계약 체결일이라고 직접 정의하고 이후 취득 진행상황에 따라 내용이 변동될 수 있다고 밝힌다. 따라서 접수일 현재 확정된 사실은 계약 체결이고 실제 주식 취득·소유권 이전 완료는 입증되지 않아 pending이 적절하다.",
+    "ambiguities": []
+  }
+]

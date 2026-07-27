@@ -1,0 +1,60 @@
+[
+  {
+    "index": 256,
+    "rceptNo": "20251124800231",
+    "expectedEvents": [
+      {
+        "type": "earnings",
+        "action": "announced",
+        "state": "preliminary",
+        "cause": "operating-results",
+        "subjectType": "financials"
+      }
+    ],
+    "labelConfidence": "high",
+    "decision": "candidate-a",
+    "rationale": "Canonical preliminary-operating-results template가 이 공시 가족을 earnings/announced/preliminary/operating-results/financials로 고정한다. 원문의 측정값이 판매량뿐이라는 사실은 empirical content이지만, 이를 곧바로 operating-performance/sales-volume로 재분류하면 문서 가족에 대한 canonical labeling contract와 충돌한다. 또한 '잠정치', '추정자료', 추후 정산 가능성은 관측값이 명시적으로 가변적임을 뜻하므로 state=preliminary가 성립한다.",
+    "ambiguities": [
+      "손익 항목은 모두 공란이고 실제 수치는 열·냉수·전기 판매량이므로 비계약적 의미 분류라면 operations 해석도 자연스럽지만, 현행 frozen template semantics에서는 허용되지 않는다."
+    ]
+  },
+  {
+    "index": 370,
+    "rceptNo": "20251222800083",
+    "expectedEvents": [
+      {
+        "type": "earnings",
+        "action": "announced",
+        "state": "preliminary",
+        "cause": "operating-results",
+        "subjectType": "financials"
+      }
+    ],
+    "labelConfidence": "high",
+    "decision": "candidate-a",
+    "rationale": "Canonical preliminary-operating-results template가 이 공시 가족의 5-tuple을 earnings/announced/preliminary/operating-results/financials로 명시한다. 판매량만 기재됐다는 이유로 operating-performance/reported/sales-volume/operations를 택하는 것은 원문 수치의 객체와 canonical 문서 사건 범주를 혼동하는 categorical mismatch다. 원문은 추정자료이며 정산 후 달라질 수 있다고 명시하므로 preliminary state도 직접 입증된다.",
+    "ambiguities": [
+      "재무 손익 수치는 없고 물량 지표만 존재하지만, 현재 template contract가 공시 가족 수준의 정규화를 우선한다."
+    ]
+  },
+  {
+    "index": 198,
+    "rceptNo": "20251113000532",
+    "expectedEvents": [
+      {
+        "type": "restructuring",
+        "action": "completed",
+        "state": "effective",
+        "cause": "demerger",
+        "subjectType": "issuer"
+      }
+    ],
+    "labelConfidence": "high",
+    "decision": "candidate-b",
+    "rationale": "분할기일과 분할등기일이 이미 경과했고 증권발행실적보고서가 제출되어 substantive demerger는 completed/effective다. 이번 기재정정은 주주명부 수령 및 단주 확인에 따른 대주주별 수치 보정으로, correction wrapper가 별도 분할 사건을 만들거나 substantive lifecycle을 corrected로 바꾸지 않는다. 인적분할의 직접 대상은 발행회사라는 juridical entity이므로 subjectType=issuer이며, 특정 영업 또는 양도 대상 사업을 객체로 삼는 business는 범주가 맞지 않는다.",
+    "ambiguities": [
+      "재상장일은 후속 일정이지만 분할의 법적 효력과 완료 판단을 뒤집지 않는다.",
+      "정정된 수치는 분할 결과의 배정 명세이며 독립 사건이 아니다."
+    ]
+  }
+]

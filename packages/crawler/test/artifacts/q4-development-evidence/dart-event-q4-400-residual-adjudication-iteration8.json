@@ -1,0 +1,3134 @@
+{
+  "schemaVersion": "jaroo.kr-disclosure-event-q4-residual-adjudication.v1",
+  "developmentOnly": true,
+  "sourceBenchmarkSha256": "6a94c50b2233c05f08d480b2cc8cfcaef7bca685d5a8ce35b3649173d792001c",
+  "summary": {
+    "caseCount": 56,
+    "dualConsensusCount": 48,
+    "tiebreakCount": 8,
+    "relationshipToIteration7": {
+      "oracle": 51,
+      "prediction": 3,
+      "synthesized": 2,
+      "empty": 0
+    }
+  },
+  "sourceFiles": [
+    {
+      "path": "/tmp/jaroo-q4-residual-result-p1-a.json",
+      "sha256": "4926e20ad729a285a21a73a7809e0bc89c72d747849b45ce1dc99abc846826c4"
+    },
+    {
+      "path": "/tmp/jaroo-q4-residual-result-p2-a.json",
+      "sha256": "852fca9d12efac9657b02d0b2e72daf841bcd47c92fb18416e2551e11a6e1c59"
+    },
+    {
+      "path": "/tmp/jaroo-q4-residual-result-p3-a.json",
+      "sha256": "a9a8f48da2251ef059140a50e19a4c96241976964b5252ae81e763787523e3e6"
+    },
+    {
+      "path": "/tmp/jaroo-q4-residual-result-p1-b.json",
+      "sha256": "6f221198b2a79133fe414ed6e62f16753a24df6d586ae0f4e836d99012721416"
+    },
+    {
+      "path": "/tmp/jaroo-q4-residual-result-p2-b.json",
+      "sha256": "4ee5fa20b948980c62c0690bb5519bf4175b00aaf60829aef169d8423d16b001"
+    },
+    {
+      "path": "/tmp/jaroo-q4-residual-result-p3-b.json",
+      "sha256": "50c1b92a5d067f0ab9c6863e6406c35cb17eb64caaac20bc40514ed7f14259f2"
+    },
+    {
+      "path": "/tmp/jaroo-q4-residual-tiebreak-result-1.json",
+      "sha256": "04c2488708504136d53f518d3c3b983d953f4255ce82a25214946168a7ff3e0f"
+    },
+    {
+      "path": "/tmp/jaroo-q4-residual-tiebreak-result-2.json",
+      "sha256": "29009f6dc4c9a83ff5ad4166b00863ebb4d1d16ef7e4b75710d255e368d7f169"
+    },
+    {
+      "path": "/tmp/jaroo-q4-residual-tiebreak-result-3.json",
+      "sha256": "7a8bcf141e233f3c6cb548e71646080b1bd2106730eab86aeda29f09db67d062"
+    }
+  ],
+  "cases": [
+    {
+      "index": 3,
+      "rceptNo": "20251031000576",
+      "reportName": "주요사항보고서(자본으로인정되는채무증권발행결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 3,
+        "rceptNo": "20251031000576",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "contingent-capital-securities",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "2025-10-31 이사회가 1,000억원 규모의 자본인정 후순위 전환사채 발행을 결정했고 청약·납입은 2025-12-03으로 예정되어 있어, 자본변동 관련 발행 결정이 존재하되 아직 실행 전이다.",
+        "ambiguities": [
+          "증권의 법적 형식은 후순위 전환사채이지만 공시 양식과 경제적 성격은 자본으로 인정되는 신종자본성 채무증권이다."
+        ]
+      },
+      "reviewB": {
+        "index": 3,
+        "rceptNo": "20251031000576",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "contingent-capital-securities",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "이사회가 2025-10-31 자본으로 인정되는 후순위 채무증권 1,000억원의 발행을 결정했고 납입일은 미래이므로 발행 결정은 proposed 상태이다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 4,
+      "rceptNo": "20251031000547",
+      "reportName": "주요사항보고서(전환사채권발행결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 4,
+        "rceptNo": "20251031000547",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "convertible-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "이사회가 제5회 전환사채 발행을 결정했지만 납입일은 2025-12-03으로 장래이므로 발행 결정은 proposed 상태다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 4,
+        "rceptNo": "20251031000547",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "convertible-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 5,
+      "rceptNo": "20251031000537",
+      "reportName": "[기재정정]주요사항보고서(자기주식처분결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "under-review",
+          "state": "deferred",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 5,
+        "rceptNo": "20251031000537",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "under-review",
+            "state": "deferred",
+            "cause": "treasury-share-disposal",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The correction states that the 31 October board concluded further discussion was required and moved the final decision target to November; it therefore establishes an ongoing review and deferral of the treasury-share disposition rather than a completed disposition.",
+        "ambiguities": [
+          "The underlying June disposition decision remains reproduced in the filing, but the correction's operative update is the deferred re-review status."
+        ]
+      },
+      "reviewB": {
+        "index": 5,
+        "rceptNo": "20251031000537",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "under-review",
+            "state": "deferred",
+            "cause": "treasury-share-disposal",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The correction records the 2025-10-31 board conclusion that the treasury-share disposal/linked EB plan needs further discussion and is deferred for a later final decision; it does not establish disposal completion.",
+        "ambiguities": [
+          "The original disposal decision remains reproduced in the form, but this correction changes its current lifecycle to re-review rather than creating a second disposal event."
+        ]
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 6,
+      "rceptNo": "20251031000533",
+      "reportName": "[기재정정]주요사항보고서(교환사채권발행결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "under-review",
+          "state": "deferred",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 6,
+        "rceptNo": "20251031000533",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "under-review",
+            "state": "deferred",
+            "cause": "exchangeable-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "정정 본문은 2025-10-31 이사회가 자기주식 처분 및 교환사채 발행에 추가 논의가 필요하다고 판단해 11월 내 최종결정을 목표로 재검토하기로 했음을 명시한다. 따라서 발행은 확정·실행된 것이 아니라 검토가 연기된 상태다.",
+        "ambiguities": [
+          "본문에 과거 발행결정 양식과 잠정 조건이 남아 있으나, 최신 정정사항이 그 발행 여부가 미확정임을 우선적으로 확정한다."
+        ]
+      },
+      "reviewB": {
+        "index": 6,
+        "rceptNo": "20251031000533",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "under-review",
+            "state": "deferred",
+            "cause": "exchangeable-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "정정 후 본문은 2025-10-31 이사회가 자기주식 처분 및 교환사채 발행에 추가 논의가 필요하다고 보아 11월 내 최종결정을 목표로 재검토하기로 했다고 명시한다. 발행은 확정되지 않았고 연기된 검토 상태이다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 16,
+      "rceptNo": "20251022000196",
+      "reportName": "주요사항보고서(자기전환사채만기전취득결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 16,
+        "rceptNo": "20251022000196",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "contracted",
+            "state": "pending",
+            "cause": "convertible-bond-acquisition",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "자기 전환사채 재취득 계약에 따라 계약금만 지급됐고 잔금 지급과 전자등록금 수령은 2025-11-20로 남아 있어 계약 체결 후 이행 대기 상태다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 16,
+        "rceptNo": "20251022000196",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "contracted",
+            "state": "pending",
+            "cause": "convertible-bond-acquisition",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 18,
+      "rceptNo": "20251020000309",
+      "reportName": "[정정명령부과]주요사항보고서(자기주식처분결정)",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "ordered",
+          "state": "correction-requested",
+          "cause": "disclosure-correction",
+          "subjectType": "issuer"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 18,
+        "rceptNo": "20251020000309",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "legal-regulatory",
+            "action": "ordered",
+            "state": "correction-requested",
+            "cause": "disclosure-correction",
+            "subjectType": "issuer"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The reportName explicitly identifies a correction order imposed on the filing. That wrapper establishes a regulatory order requiring correction, while the reproduced treasury-share decision must not be duplicated as a newly occurring disposition.",
+        "ambiguities": [
+          "The extracted body reproduces the substantive filing and does not separately narrate the order, so the authoritative reportName supplies the wrapper status."
+        ]
+      },
+      "reviewB": {
+        "index": 18,
+        "rceptNo": "20251020000309",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "legal-regulatory",
+            "action": "ordered",
+            "state": "correction-requested",
+            "cause": "disclosure-correction",
+            "subjectType": "issuer"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The filing title expressly establishes that the authority imposed a correction order. The underlying treasury-share disposal form is context and must not be duplicated as a new event by this wrapper.",
+        "ambiguities": [
+          "The extracted body lacks a separate narrative describing the order, so the wrapper title supplies the decisive evidence."
+        ]
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 19,
+      "rceptNo": "20251020000303",
+      "reportName": "[정정명령부과]주요사항보고서(교환사채권발행결정)",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "ordered",
+          "state": "correction-requested",
+          "cause": "disclosure-correction",
+          "subjectType": "issuer"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 19,
+        "rceptNo": "20251020000303",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "legal-regulatory",
+            "action": "ordered",
+            "state": "correction-requested",
+            "cause": "disclosure-correction",
+            "subjectType": "issuer"
+          }
+        ],
+        "labelConfidence": "medium",
+        "rationale": "보고서명 자체가 금융당국의 정정명령 부과를 식별하며, 이는 교환사채 발행의 완료를 새로 확정하는 공시가 아니라 발행인에게 공시 정정을 요구한 규제 조치다.",
+        "ambiguities": [
+          "수집된 bodyText에는 정정명령 주문문이 별도로 보이지 않고 기초 교환사채 발행결정 양식이 주로 담겨 있어, 정정명령 사실은 reportName에 의존한다."
+        ]
+      },
+      "reviewB": {
+        "index": 19,
+        "rceptNo": "20251020000303",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "legal-regulatory",
+            "action": "ordered",
+            "state": "correction-requested",
+            "cause": "disclosure-correction",
+            "subjectType": "issuer"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "보고서명 자체가 교환사채 발행결정 공시에 대한 정정명령 부과를 명시한다. 이 filing이 새로 확립하는 사건은 감독당국의 정정명령이며 원 공시의 교환사채 발행결정을 중복 산출하지 않는다.",
+        "ambiguities": [
+          "본문은 원 공시 전문 위주이고 정정명령의 구체적 문구는 보고서명에만 나타난다."
+        ]
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 20,
+      "rceptNo": "20251020000273",
+      "reportName": "[기재정정]주요사항보고서(유형자산양수결정)",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "real-estate-purchase",
+          "subjectType": "real-estate"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 20,
+        "rceptNo": "20251020000273",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "asset-transaction",
+            "action": "contracted",
+            "state": "pending",
+            "cause": "real-estate-purchase",
+            "subjectType": "real-estate"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "정정으로 매수·매도 양측 이사회 결의와 부동산 매매계약 체결이 확인됐으나 잔금·양수·등기는 2025-12-31 예정이므로 계약된 미완료 취득이다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 20,
+        "rceptNo": "20251020000273",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "asset-transaction",
+            "action": "contracted",
+            "state": "pending",
+            "cause": "real-estate-purchase",
+            "subjectType": "real-estate"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 32,
+      "rceptNo": "20251031000581",
+      "reportName": "일괄신고추가서류(파생결합증권-주가연계증권)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 32,
+        "rceptNo": "20251031000581",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The shelf supplement opens subscriptions for eight separately numbered ELS offerings, with subscription dates after receipt. Each distinct offering is therefore a pending solicitation of derivative-linked securities, preserving multiplicity eight.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 32,
+        "rceptNo": "20251031000581",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The shelf-registration supplement solicits eight separately named ELS offerings. Each is a pending derivative-linked securities offering, so multiplicity eight is preserved.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "packet": 1,
+      "index": 34,
+      "rceptNo": "20251030000222",
+      "reportName": "일괄신고추가서류(기타파생결합증권)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-tiebreak",
+      "tiebreak": {
+        "index": 34,
+        "rceptNo": "20251030000222",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-securities",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "접수일 현재 제127·128·129회 기타파생결합증권 각각에 대해 일반공모 청약을 모집하는 추가서류이며, 청약·납입·발행일은 모두 미래이므로 세 건의 독립적인 증권 모집 이벤트가 pending 상태이다. 상품 규제 승인이나 허가 접수가 아니므로 regulatory-product/filed보다 capital-change/solicited가 문서의 실질을 더 정확히 나타낸다.",
+        "ambiguities": [
+          "일괄신고추가서류라는 제출 형식 때문에 filed로 읽을 여지는 있으나, 실질 행위는 세 종목의 투자자 청약 모집이다."
+        ]
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 36,
+      "rceptNo": "20251015000124",
+      "reportName": "투자설명서",
+      "expectedEvents": [],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 36,
+        "rceptNo": "20251015000124",
+        "decision": "unscorable",
+        "expectedEvents": [],
+        "labelConfidence": "low",
+        "rationale": "본문이 null이고 제목은 일반적인 투자설명서뿐이어서 구체적인 거래 유형·행위·상태를 확정할 원문 증거가 없다.",
+        "ambiguities": [
+          "source body absent"
+        ]
+      },
+      "reviewB": {
+        "index": 36,
+        "rceptNo": "20251015000124",
+        "decision": "unscorable",
+        "expectedEvents": [],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "packet": 2,
+      "index": 64,
+      "rceptNo": "20251031800937",
+      "reportName": "[기재정정]거래처와의거래중단",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        },
+        {
+          "type": "operating-status",
+          "action": "updated",
+          "state": "deferred",
+          "cause": "business-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "adjudicationTier": "independent-tiebreak",
+      "tiebreak": {
+        "index": 64,
+        "rceptNo": "20251031800937",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "legal-regulatory",
+            "action": "dismissed",
+            "state": "effective",
+            "cause": "litigation",
+            "subjectType": "issuer"
+          },
+          {
+            "type": "operating-status",
+            "action": "updated",
+            "state": "deferred",
+            "cause": "business-suspension",
+            "subjectType": "business"
+          }
+        ],
+        "labelConfidence": "medium",
+        "rationale": "The correction adds an effective appeal dismissal and updates the stayed operating restriction.",
+        "ambiguities": [
+          "Further appeal and finality timing remain unstated."
+        ]
+      },
+      "relationshipToIteration7": "prediction"
+    },
+    {
+      "index": 67,
+      "rceptNo": "20251031800858",
+      "reportName": "주권관련사채권의취득결정",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 67,
+        "rceptNo": "20251031800858",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "asset-transaction",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "convertible-bond-acquisition",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "효성이 계열사 효성화학 발행 제5회 후순위 전환사채 1,000억원을 현금 취득하기로 2025-10-31 결정했으며 취득예정일은 2025-12-03이다. 발행 자체가 아니라 타사 전환사채의 취득 결정이다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 67,
+        "rceptNo": "20251031800858",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "asset-transaction",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "convertible-bond-acquisition",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "효성이 계열회사 효성화학의 제5회 전환사채 1,000억원을 현금 취득하기로 결정했으며 취득예정일은 2025-12-03으로 미래이다. 발행자 측 자본조달이 아니라 취득자 측 금융자산 취득 사건이다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 68,
+      "rceptNo": "20251031800886",
+      "reportName": "유상증자또는주식관련사채등의발행결과(자율공시)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 68,
+        "rceptNo": "20251031800886",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "completed",
+            "state": "effective",
+            "cause": "convertible-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "실제 발행금액과 2025-10-31 납입 완료를 명시한 전환사채 발행결과 공시이므로 발행이 완료되어 유효하다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 68,
+        "rceptNo": "20251031800886",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "completed",
+            "state": "effective",
+            "cause": "convertible-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 72,
+      "rceptNo": "20251031800833",
+      "reportName": "[기재정정]기타경영사항(자율공시)",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "price-set",
+          "state": "finalized",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 72,
+        "rceptNo": "20251031800833",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "asset-transaction",
+            "action": "price-set",
+            "state": "finalized",
+            "cause": "business-disposal",
+            "subjectType": "business"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The correction's only new substantive fact is that post-closing settlement fixed the final business-disposal price at KRW 1.1825 trillion. This is a finalized price-setting event, not a second disposal or a generic restructuring update.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 72,
+        "rceptNo": "20251031800833",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "asset-transaction",
+            "action": "price-set",
+            "state": "finalized",
+            "cause": "business-disposal",
+            "subjectType": "business"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The correction fixes the final settlement price for an already closed business disposal. It therefore finalizes the price of the business-disposal transaction rather than merely reporting a generic restructuring update.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 90,
+      "rceptNo": "20251031800377",
+      "reportName": "공정거래자율준수프로그램운영현황(안내공시)",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": "active",
+          "cause": "compliance-program",
+          "subjectType": "governance"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 90,
+        "rceptNo": "20251031800377",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "governance",
+            "action": "reported",
+            "state": "active",
+            "cause": "compliance-program",
+            "subjectType": "governance"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "기아는 공정거래 자율준수 프로그램의 2025년 3분기 운영 실적과 계속 수행 중인 활동 및 4분기 계획을 보고했다. 프로그램이 실제 운영 중임이 명시되므로 active 상태가 성립한다.",
+        "ambiguities": [
+          "일부 항목은 향후 계획이지만 공시 대상인 CP 프로그램 전체는 이미 운영 중이다."
+        ]
+      },
+      "reviewB": {
+        "index": 90,
+        "rceptNo": "20251031800377",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "governance",
+            "action": "reported",
+            "state": "active",
+            "cause": "compliance-program",
+            "subjectType": "governance"
+          }
+        ],
+        "labelConfidence": "medium",
+        "rationale": "공시는 2025년 3분기 수행 실적과 4분기 계속 운영할 계획을 함께 보고하고 자율준수관리자까지 특정하므로 CP가 현재 운영 중인 active 상태임을 확립한다.",
+        "ambiguities": [
+          "양식 자체는 운영현황 보고이므로 state를 생략하는 보수적 해석도 가능하지만, 완료 실적과 계속 활동이 현재 운영 상태를 직접 뒷받침한다."
+        ]
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 98,
+      "rceptNo": "20251031800001",
+      "reportName": "소송등의판결ㆍ결정",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 98,
+        "rceptNo": "20251031800001",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "legal-regulatory",
+            "action": "dismissed",
+            "state": "effective",
+            "cause": "litigation",
+            "subjectType": "issuer"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "대법원이 재항고를 모두 기각한 주문과 결정일을 공시했으므로 소송상 재항고 기각 결정이 확정적으로 발생했다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 98,
+        "rceptNo": "20251031800001",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "legal-regulatory",
+            "action": "dismissed",
+            "state": "effective",
+            "cause": "litigation",
+            "subjectType": "issuer"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 99,
+      "rceptNo": "20251030800831",
+      "reportName": "중대재해발생",
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "occurred",
+          "state": "effective",
+          "cause": "serious-industrial-accident",
+          "subjectType": "operations"
+        },
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "active",
+          "cause": "work-stop",
+          "subjectType": "operating-business"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 99,
+        "rceptNo": "20251030800831",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "corporate-event",
+            "action": "occurred",
+            "state": "effective",
+            "cause": "serious-industrial-accident",
+            "subjectType": "operations"
+          },
+          {
+            "type": "operating-status",
+            "action": "halted",
+            "state": "active",
+            "cause": "work-stop",
+            "subjectType": "operating-business"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The filing establishes a fatal workplace accident as an operational corporate event and separately records an active partial work-stop order issued by the labor authority. Both occurrences are explicit as of receipt.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 99,
+        "rceptNo": "20251030800831",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "corporate-event",
+            "action": "occurred",
+            "state": "effective",
+            "cause": "serious-industrial-accident",
+            "subjectType": "operations"
+          },
+          {
+            "type": "operating-status",
+            "action": "halted",
+            "state": "active",
+            "cause": "work-stop",
+            "subjectType": "operating-business"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The filing establishes two distinct occurrences: a fatal serious industrial accident and an active partial work-stop order issued for the affected production line.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 110,
+      "rceptNo": "20251030800620",
+      "reportName": "현금ㆍ현물배당을위한주주명부폐쇄(기준일)결정",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "pending",
+          "cause": "record-date",
+          "subjectType": "ownership"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 110,
+        "rceptNo": "20251030800620",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "corporate-action",
+            "action": "decided",
+            "state": "pending",
+            "cause": "record-date",
+            "subjectType": "ownership"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "이사회는 분기배당을 받을 권리주주를 확정하기 위한 2025-11-14 기준일을 결정했다. 접수일에는 기준일 도래 전이므로 pending이고, 직접 대상은 증권 자체가 아니라 주주의 권리·소유자 확정이다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 110,
+        "rceptNo": "20251030800620",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "corporate-action",
+            "action": "decided",
+            "state": "pending",
+            "cause": "record-date",
+            "subjectType": "ownership"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "이사회가 분기배당 권리주주를 확정하기 위한 2025-11-14 기준일을 결정했다. 기준일은 미래이고 대상 차원은 증권 자체보다 배당권을 갖는 주주 소유권이다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 114,
+      "rceptNo": "20251030800094",
+      "reportName": "[기재정정]장래사업ㆍ경영계획(공정공시)",
+      "expectedEvents": [
+        {
+          "type": "earnings",
+          "action": "updated",
+          "state": "projected",
+          "cause": "earnings-guidance",
+          "subjectType": "financials"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 114,
+        "rceptNo": "20251030800094",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "earnings",
+            "action": "updated",
+            "state": "projected",
+            "cause": "earnings-guidance",
+            "subjectType": "financials"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "정정의 핵심은 2025년 매출 목표와 IRA 수혜 예상치를 변경한 연간 가이던스 업데이트이며 모두 미래 전망치다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 114,
+        "rceptNo": "20251030800094",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "earnings",
+            "action": "updated",
+            "state": "projected",
+            "cause": "earnings-guidance",
+            "subjectType": "financials"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "packet": 3,
+      "index": 138,
+      "rceptNo": "20251031000262",
+      "reportName": "특수관계인으로부터주식의취득",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-tiebreak",
+      "tiebreak": {
+        "index": 138,
+        "rceptNo": "20251031000262",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "related-party",
+            "action": "contracted",
+            "state": "pending",
+            "cause": "equity-acquisition",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "본문은 계열회사 보유 주식 취득에 관한 공시이지만, 2025-10-30의 거래일자를 주식양수도계약 체결일이라고 직접 정의하고 이후 취득 진행상황에 따라 내용이 변동될 수 있다고 밝힌다. 따라서 접수일 현재 확정된 사실은 계약 체결이고 실제 주식 취득·소유권 이전 완료는 입증되지 않아 pending이 적절하다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 156,
+      "rceptNo": "20251015000340",
+      "reportName": "[기재정정]대규모기업집단현황공시[연1회공시및1/4분기용(개별회사)]",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": "effective",
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 156,
+        "rceptNo": "20251015000340",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "governance",
+            "action": "updated",
+            "state": "effective",
+            "cause": "business-group-status",
+            "subjectType": "governance"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "대규모기업집단 현황공시에서 재무위원회 의안 누락을 정정해 기존 기업집단·지배구조 현황을 갱신했으며, 그 정정은 제출 즉시 유효하다.",
+        "ambiguities": [
+          "정정은 누락된 이사회 안건 보완으로, 별도의 신규 이사회 사건을 추가로 생성하지 않는다."
+        ]
+      },
+      "reviewB": {
+        "index": 156,
+        "rceptNo": "20251015000340",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "governance",
+            "action": "updated",
+            "state": "effective",
+            "cause": "business-group-status",
+            "subjectType": "governance"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "정정신고는 대규모기업집단 현황공시에서 누락된 재무위원회 의안 내용을 본문에 반영한다. 이는 기존 기업집단 현황정보의 실질적 업데이트이며 제출 즉시 유효하다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 157,
+      "rceptNo": "20251013000158",
+      "reportName": "[기재정정]대규모기업집단현황공시[연1회공시및1/4분기용(대표회사)]",
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": "effective",
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 157,
+        "rceptNo": "20251013000158",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "governance",
+            "action": "updated",
+            "state": "effective",
+            "cause": "business-group-status",
+            "subjectType": "governance"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "대규모기업집단 현황공시에서 소속회사 이사회·주주총회 관련 기재를 정정해 현재 기업집단 지배구조 현황을 업데이트했다.",
+        "ambiguities": [
+          "body retained at 60000 characters, but correction header and corrected section are present"
+        ]
+      },
+      "reviewB": {
+        "index": 157,
+        "rceptNo": "20251013000158",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "governance",
+            "action": "updated",
+            "state": "effective",
+            "cause": "business-group-status",
+            "subjectType": "governance"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "packet": 1,
+      "index": 161,
+      "rceptNo": "20251125000685",
+      "reportName": "[첨부추가]주요사항보고서(유형자산양수결정)",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "real-estate"
+        }
+      ],
+      "adjudicationTier": "independent-tiebreak",
+      "tiebreak": {
+        "index": 161,
+        "rceptNo": "20251125000685",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "asset-transaction",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "tangible-asset-acquisition",
+            "subjectType": "real-estate"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "이사회가 호텔 토지·건물 양수를 결정했지만 접수일 현재 임시주주총회 승인, 관계기관 승인, 책임임대차계약 등 선행조건과 2026년 거래종결이 남아 있으므로 proposed인 유형자산 취득 결정이다. 첨부추가 wrapper는 별도 이벤트가 아니며 본문이 확립한 양수결정 한 건만 보존한다.",
+        "ambiguities": [
+          "계약체결일 표기가 2025년 1월 5일로 본문 시계열과 어긋나 보이지만, 접수일 이후 승인·종결 조건이 명시되어 완료로 추론하지 않았다."
+        ]
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "packet": 2,
+      "index": 163,
+      "rceptNo": "20251128002061",
+      "reportName": "주요사항보고서(자기전환사채만기전취득결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-tiebreak",
+      "tiebreak": {
+        "index": 163,
+        "rceptNo": "20251128002061",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "convertible-bond-acquisition",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The filing is a decision disclosure and does not establish completed settlement by receipt time.",
+        "ambiguities": [
+          "Same-day scheduled payment is not explicit completion."
+        ]
+      },
+      "relationshipToIteration7": "synthesized"
+    },
+    {
+      "index": 164,
+      "rceptNo": "20251128001922",
+      "reportName": "주요사항보고서(자기주식처분결정)",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 164,
+        "rceptNo": "20251128001922",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "corporate-action",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "treasury-share-disposal",
+            "subjectType": "listed-shares"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "이사회가 교환사채 교환대상으로 자기주식 1,008,642주 처분을 결정했지만 실제 처분은 장래 교환권 행사 시 확정되므로 제안 단계다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 164,
+        "rceptNo": "20251128001922",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "corporate-action",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "treasury-share-disposal",
+            "subjectType": "listed-shares"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 165,
+      "rceptNo": "20251128001918",
+      "reportName": "주요사항보고서(교환사채권발행결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 165,
+        "rceptNo": "20251128001918",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "exchangeable-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The board decided a private exchangeable-bond issuance, with subscription and payment scheduled after the receipt date. The filing therefore establishes a proposed exchangeable-bond capital event.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 165,
+        "rceptNo": "20251128001918",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "exchangeable-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The board/representative decision establishes a proposed private exchangeable-bond issuance with future payment and issuance mechanics; no completion is established on the receipt date.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 167,
+      "rceptNo": "20251128001766",
+      "reportName": "주요사항보고서(유상증자결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 167,
+        "rceptNo": "20251128001766",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "rights-offering",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "윌비스가 제3자배정 방식으로 기타주식 350만주를 발행하는 유상증자를 결정했으며, 접수 시점에는 신주 발행과 납입이 예정된 단계다.",
+        "ambiguities": [
+          "cause 명칭 rights-offering은 주주배정만을 연상시킬 수 있으나 ontology 내 유상증자 계열의 사용 가능한 표준 cause다."
+        ]
+      },
+      "reviewB": {
+        "index": 167,
+        "rceptNo": "20251128001766",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "rights-offering",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "이사회가 제3자배정 방식의 상환전환우선주 350만주 유상증자를 결정했고 납입일은 제출일 이후이므로 증자 사건은 proposed 상태이다.",
+        "ambiguities": [
+          "cause 명칭 rights-offering은 주주배정만을 연상시킬 수 있으나 ontology 후보에서는 유상증자 일반 가족으로 사용된다."
+        ]
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "packet": 3,
+      "index": 171,
+      "rceptNo": "20251124000330",
+      "reportName": "[기재정정]주요사항보고서(소송등의제기)",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "withdrawn",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        },
+        {
+          "type": "capital-change",
+          "action": "withdrawn",
+          "state": "cancelled",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        },
+        {
+          "type": "corporate-action",
+          "action": "withdrawn",
+          "state": "cancelled",
+          "cause": "treasury-share-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "adjudicationTier": "independent-tiebreak",
+      "tiebreak": {
+        "index": 171,
+        "rceptNo": "20251124000330",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "legal-regulatory",
+            "action": "withdrawn",
+            "state": "effective",
+            "cause": "litigation",
+            "subjectType": "issuer"
+          },
+          {
+            "type": "capital-change",
+            "action": "withdrawn",
+            "state": "cancelled",
+            "cause": "exchangeable-bond",
+            "subjectType": "securities"
+          },
+          {
+            "type": "corporate-action",
+            "action": "withdrawn",
+            "state": "cancelled",
+            "cause": "treasury-share-disposal",
+            "subjectType": "listed-shares"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "접수일 현재 본문은 채권자의 가처분 신청 전부 취하를 명시하므로 소송 사건의 취하가 효력을 가진다. 또한 발행사는 같은 날 교환사채 발행 결정과 자기주식 처분 결정을 전면 철회했다고 명시하므로 서로 다른 두 예정 행위가 각각 취소되었다. 자기주식 처분의 직접 대상은 상장주식이며, 교환사채 발행과 달리 회사의 자기주식 처분이라는 corporate action으로 구분하는 것이 문서의 서로 다른 대상과 행위를 가장 충실히 보존한다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "synthesized"
+    },
+    {
+      "index": 172,
+      "rceptNo": "20251124000287",
+      "reportName": "주요사항보고서(자본으로인정되는채무증권발행결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 172,
+        "rceptNo": "20251124000287",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "contingent-capital-securities",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The instrument is expressly a debt security recognized as capital (a private perpetual-style hybrid/new-capital security), not a convertible bond. Payment was scheduled for the following day, so the issuance remained proposed at receipt.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 172,
+        "rceptNo": "20251124000287",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "contingent-capital-securities",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The instrument is expressly a private hybrid/new-capital debt security recognized as capital, so the decision is a proposed contingent-capital-securities issuance, not a convertible bond.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 175,
+      "rceptNo": "20251120000031",
+      "reportName": "[기재정정]주요사항보고서(타법인주식및출자증권양수결정)",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 175,
+        "rceptNo": "20251120000031",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "asset-transaction",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "equity-acquisition",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "정정은 총자산·자기자본 기준 수치만 보완하며, 카카오헬스케어 지분 양수 결정과 2025-12-23 예정 거래라는 본질은 유지된다. 정정 wrapper를 별도 사건으로 세지 않고 동일한 미완료 지분취득 결정을 한 건으로 보존한다.",
+        "ambiguities": [
+          "기재정정 자체는 즉시 유효하지만 substantive 거래의 lifecycle은 여전히 proposed다."
+        ]
+      },
+      "reviewB": {
+        "index": 175,
+        "rceptNo": "20251120000031",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "asset-transaction",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "equity-acquisition",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "정정은 총자산·자기자본 수치와 설명을 바로잡을 뿐, 카카오헬스케어 지분 양수 결정의 실체와 미래 양수예정일 2025-12-23을 바꾸지 않는다. 같은 양수 occurrence를 유지하며 정정 wrapper를 별도 사건으로 만들지 않는다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 177,
+      "rceptNo": "20251107000383",
+      "reportName": "[기재정정]주요사항보고서(신주인수권부사채권발행결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "warrant-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 177,
+        "rceptNo": "20251107000383",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "updated",
+            "state": "effective",
+            "cause": "warrant-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "기발행 신주인수권부사채의 조달자금 용도를 운영자금에서 채무상환자금으로 정정한 것으로, 발행 자체를 새로 결정하거나 재일정화한 공시가 아니라 기존 발행 조건의 유효한 업데이트다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 177,
+        "rceptNo": "20251107000383",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "updated",
+            "state": "effective",
+            "cause": "warrant-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "medium",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 188,
+      "rceptNo": "20251128002139",
+      "reportName": "일괄신고추가서류(파생결합증권-주가연계증권)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 188,
+        "rceptNo": "20251128002139",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The supplement starts subscriptions for seven separately numbered ELS products after receipt. Each series is a distinct pending solicitation of derivative-linked securities, so seven equal tuples correctly preserve occurrence multiplicity.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 188,
+        "rceptNo": "20251128002139",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          },
+          {
+            "type": "capital-change",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "derivative-linked-securities",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The shelf-registration supplement solicits seven separately named ELS offerings. Each is a pending derivative-linked securities offering, and the seven distinct products require seven event occurrences.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 195,
+      "rceptNo": "20251128000481",
+      "reportName": "투자설명서",
+      "expectedEvents": [],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 195,
+        "rceptNo": "20251128000481",
+        "decision": "unscorable",
+        "expectedEvents": [],
+        "labelConfidence": "low",
+        "rationale": "입력에 투자설명서 reportName만 있고 bodyText가 null이라, 어떤 합병·재편 또는 상품을 설명하는지와 접수일 현재 lifecycle을 판정할 근거가 없다.",
+        "ambiguities": [
+          "제목만으로는 투자설명서의 대상 거래와 사건 수를 식별할 수 없다."
+        ]
+      },
+      "reviewB": {
+        "index": 195,
+        "rceptNo": "20251128000481",
+        "decision": "unscorable",
+        "expectedEvents": [],
+        "labelConfidence": "high",
+        "rationale": "packet의 bodyText가 null이라 투자설명서가 어떤 거래나 재편을 설명하는지 독립적으로 판정할 원문 증거가 없다.",
+        "ambiguities": [
+          "보고서명만으로는 merger-or-reorganization 사건 여부와 lifecycle을 확정할 수 없다."
+        ]
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 198,
+      "rceptNo": "20251113000532",
+      "reportName": "[기재정정]증권발행실적보고서(합병등)",
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "demerger",
+          "subjectType": "issuer"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 198,
+        "rceptNo": "20251113000532",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "restructuring",
+            "action": "completed",
+            "state": "effective",
+            "cause": "demerger",
+            "subjectType": "issuer"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "증권발행실적보고서는 분할 전·존속회사·신설회사 주식수와 분할기일 이후 결과를 보고하며 정정은 단주 확정치 반영이므로 완료된 회사분할이다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 198,
+        "rceptNo": "20251113000532",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "restructuring",
+            "action": "completed",
+            "state": "effective",
+            "cause": "demerger",
+            "subjectType": "issuer"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 203,
+      "rceptNo": "20251118000007",
+      "reportName": "공개매수설명서",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 203,
+        "rceptNo": "20251118000007",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "corporate-action",
+            "action": "initiated",
+            "state": "active",
+            "cause": "tender-offer",
+            "subjectType": "listed-shares"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The tender-offer period began on the filing date and continued through 7 December, with price, maximum quantity, funding, and tender mechanics established. It is therefore an active initiated offer concerning listed shares.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 203,
+        "rceptNo": "20251118000007",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "corporate-action",
+            "action": "initiated",
+            "state": "active",
+            "cause": "tender-offer",
+            "subjectType": "listed-shares"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The tender-offer explanatory statement was filed on the first day of the stated offer period, establishing that the tender offer for listed common shares was initiated and active.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 204,
+      "rceptNo": "20251118000006",
+      "reportName": "공개매수신고서",
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 204,
+        "rceptNo": "20251118000006",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "corporate-action",
+            "action": "initiated",
+            "state": "active",
+            "cause": "tender-offer",
+            "subjectType": "listed-shares"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "공개매수 신고일인 2025-11-18이 공개매수 시작일이며 종료일은 2025-12-07이다. 따라서 단순 발표가 아니라 상장 보통주를 대상으로 한 공개매수가 이미 개시되어 active 상태다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 204,
+        "rceptNo": "20251118000006",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "corporate-action",
+            "action": "initiated",
+            "state": "active",
+            "cause": "tender-offer",
+            "subjectType": "listed-shares"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "신고서는 에이플러스에셋 보통주 최대 4,501,192주에 대한 공개매수를 2025-11-18부터 개시하며 제출일이 곧 공개매수기간 첫날이다. 따라서 상장주식 공개매수는 active하게 시작되었다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 216,
+      "rceptNo": "20251128801335",
+      "reportName": "[기재정정]자기전환사채만기전취득결정",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "rescheduled",
+          "state": "deferred",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 216,
+        "rceptNo": "20251128801335",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "rescheduled",
+            "state": "deferred",
+            "cause": "convertible-bond-acquisition",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "자기 전환사채 취득 지급예정일을 2025-11-28에서 2026-01-30로 미루고 금액도 조정했으므로 기존 취득 이행이 재일정화·연기됐다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 216,
+        "rceptNo": "20251128801335",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "rescheduled",
+            "state": "deferred",
+            "cause": "convertible-bond-acquisition",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "packet": 2,
+      "index": 219,
+      "rceptNo": "20251128801291",
+      "reportName": "단기차입금증가결정(자회사의 주요경영사항)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "short-term-borrowing",
+          "subjectType": "subsidiary"
+        }
+      ],
+      "adjudicationTier": "independent-tiebreak",
+      "tiebreak": {
+        "index": 219,
+        "rceptNo": "20251128801291",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "short-term-borrowing",
+            "subjectType": "subsidiary"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The document-level event is the subsidiary short-term borrowing increase decision.",
+        "ambiguities": [
+          "The counterparty is affiliated but does not replace the primary filing family."
+        ]
+      },
+      "relationshipToIteration7": "prediction"
+    },
+    {
+      "index": 239,
+      "rceptNo": "20251128800765",
+      "reportName": "[기재정정]타법인주식및출자증권처분결정",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "disposed",
+          "state": "effective",
+          "cause": "equity-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 239,
+        "rceptNo": "20251128800765",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "asset-transaction",
+            "action": "disposed",
+            "state": "effective",
+            "cause": "equity-disposal",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "정정사유가 거래 종결이며, 처분예정일을 2025-11-28 거래 완료일로 바꾸고 십일번가 보유주식 전량 처분이 완료됐음을 확정한다.",
+        "ambiguities": [
+          "양식 필드명은 여전히 처분예정일자이지만 정정 설명이 해당 날짜를 거래 완료일이라고 명시한다."
+        ]
+      },
+      "reviewB": {
+        "index": 239,
+        "rceptNo": "20251128800765",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "asset-transaction",
+            "action": "disposed",
+            "state": "effective",
+            "cause": "equity-disposal",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "정정사유가 거래 종결이며 처분예정일을 2025-11-28 거래 완료일로 변경했다. SK스퀘어 보유 십일번가 주식 전량 처분이 제출일 현재 완료되어 effective하다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "packet": 1,
+      "index": 242,
+      "rceptNo": "20251128800665",
+      "reportName": "[기재정정]부동산투자회사부동산임대",
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "updated",
+          "state": "effective",
+          "cause": "real-estate-lease",
+          "subjectType": "real-estate"
+        }
+      ],
+      "adjudicationTier": "independent-tiebreak",
+      "tiebreak": {
+        "index": 242,
+        "rceptNo": "20251128800665",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "material-contract",
+            "action": "updated",
+            "state": "effective",
+            "cause": "real-estate-lease",
+            "subjectType": "real-estate"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "기재정정은 기존 임대계약의 월임대료·기간을 변경계약으로 갱신한 공시이다. 부동산 자체의 취득·처분이나 자산 상태 변경이 아니라 임대 계약조건의 업데이트이며, 이사회 결의일과 정정일이 접수일 당일로 확정되어 있다. 정정 wrapper는 별도 이벤트로 추가하지 않는다.",
+        "ambiguities": [
+          "변경된 임대 시작일은 미래이지만 변경계약의 결정·공시는 접수일에 성립해 계약 업데이트 자체는 effective로 판단했다."
+        ]
+      },
+      "relationshipToIteration7": "prediction"
+    },
+    {
+      "index": 243,
+      "rceptNo": "20251128800672",
+      "reportName": "유상증자또는주식관련사채등의발행결과(자율공시)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 243,
+        "rceptNo": "20251128800672",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "completed",
+            "state": "effective",
+            "cause": "convertible-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The issuance-results filing states that the full KRW 25.1 billion private convertible bond payment was completed on the receipt date. This establishes completed effective issuance.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 243,
+        "rceptNo": "20251128800672",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "completed",
+            "state": "effective",
+            "cause": "convertible-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The filing states that the private convertible bond was fully paid and issued for the actual amount on 2025-11-28, establishing completed effective issuance.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 255,
+      "rceptNo": "20251124800598",
+      "reportName": "[기재정정]장래사업ㆍ경영계획(공정공시)",
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "withdrawn",
+          "state": "cancelled",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 255,
+        "rceptNo": "20251124800598",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-expenditure",
+            "action": "withdrawn",
+            "state": "cancelled",
+            "cause": "facility-investment",
+            "subjectType": "asset"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "한화솔루션 이사회가 경제성 저하를 이유로 고순도 크레졸 시설 신규 투자 결정을 2025-11-24 최종 철회했다. 이는 사업계획 일반 업데이트가 아니라 특정 설비투자의 취소다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 255,
+        "rceptNo": "20251124800598",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-expenditure",
+            "action": "withdrawn",
+            "state": "cancelled",
+            "cause": "facility-investment",
+            "subjectType": "asset"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "한화솔루션 이사회가 경제성 저하를 이유로 고순도 크레졸 시설 신규 투자를 2025-11-24 최종 철회했다. 기존 투자계획의 lifecycle은 cancelled이다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 293,
+      "rceptNo": "20251231000590",
+      "reportName": "주요사항보고서(자기전환사채매도결정)",
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bond-sale",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 293,
+        "rceptNo": "20251231000590",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "asset-transaction",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "bond-sale",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "회사가 만기 전 취득해 보유한 제6회 전환사채 일부의 재매각을 결정한 공시로, 사건은 신규 전환사채 발행이 아니라 보유 사채 매도 결정이다.",
+        "ambiguities": [
+          "sale consideration date equals receipt date, but the form establishes a sale decision rather than explicit receipt completion"
+        ]
+      },
+      "reviewB": {
+        "index": 293,
+        "rceptNo": "20251231000590",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "asset-transaction",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "bond-sale",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 294,
+      "rceptNo": "20251231000232",
+      "reportName": "[기재정정]주요사항보고서(유상증자결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 294,
+        "rceptNo": "20251231000232",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "completed",
+            "state": "effective",
+            "cause": "rights-offering",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Although styled as a correction to the capital-increase decision, the corrected filing expressly states that the full USD subscription payment was received on 26 December. At the 31 December receipt date, the capital increase is completed and effective rather than pending.",
+        "ambiguities": [
+          "The Korean '유상증자' is a third-party allocation rather than a pro-rata shareholder offer, but the available canonical cause uses rights-offering for this capital-increase family."
+        ]
+      },
+      "reviewB": {
+        "index": 294,
+        "rceptNo": "20251231000232",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "completed",
+            "state": "effective",
+            "cause": "rights-offering",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Although styled as a correction to the capital-increase decision, the filing expressly states that the full USD subscription amount was received on 2025-12-26. As of the 2025-12-31 receipt, the rights-offering/capital increase was completed and effective.",
+        "ambiguities": [
+          "The newly listed shares had a future listing date, but listing is not required for completion of the paid capital issuance event."
+        ]
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 299,
+      "rceptNo": "20251230000620",
+      "reportName": "[기재정정]주요사항보고서(전환사채권발행결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "rescheduled",
+          "state": "deferred",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 299,
+        "rceptNo": "20251230000620",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "rescheduled",
+            "state": "deferred",
+            "cause": "convertible-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "정정은 전환사채 납입일을 2025-12-31에서 2026-06-30으로, 만기와 전환청구기간도 함께 뒤로 미룬다. 발행 조건의 일반 갱신이 아니라 실행 일정 연기다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 299,
+        "rceptNo": "20251230000620",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "rescheduled",
+            "state": "deferred",
+            "cause": "convertible-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "정정은 전환사채 납입일을 2025-12-31에서 2026-06-30으로 늦추고 만기와 전환청구기간도 함께 뒤로 변경한다. 발행 occurrence가 연기된 일정변경 사건이다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 302,
+      "rceptNo": "20251226000514",
+      "reportName": "주요사항보고서(자본으로인정되는채무증권발행결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 302,
+        "rceptNo": "20251226000514",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "contingent-capital-securities",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "대표이사가 자본으로 인정되는 채권형 신종자본증권 2,000억원 발행을 결정했으며 청약·납입은 2025-12-29 예정이라 제안 상태다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 302,
+        "rceptNo": "20251226000514",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "contingent-capital-securities",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 303,
+      "rceptNo": "20251226000462",
+      "reportName": "[기재정정]주요사항보고서(타법인주식및출자증권양수결정)",
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "extended",
+          "state": "effective",
+          "cause": "contract-right",
+          "subjectType": "contract-right"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 303,
+        "rceptNo": "20251226000462",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "material-contract",
+            "action": "extended",
+            "state": "effective",
+            "cause": "contract-right",
+            "subjectType": "contract-right"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The correction amends an existing put-option contractual right by extending its IPO/value-test deadline from 2025 to 2028. That executed amendment effectively extends the contract right and does not recreate the 2022 share acquisition.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 303,
+        "rceptNo": "20251226000462",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "material-contract",
+            "action": "extended",
+            "state": "effective",
+            "cause": "contract-right",
+            "subjectType": "contract-right"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The correction validly extends the existing put-option/contract-right trigger deadline from 2025-12-31 to 2028-12-31. It changes the effective contract right without recreating the historical share acquisition.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 306,
+      "rceptNo": "20251224000451",
+      "reportName": "[기재정정]주요사항보고서(교환사채권발행결정)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 306,
+        "rceptNo": "20251224000451",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "exchangeable-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "정정은 자금조달 비교, 주주영향, 재매각 우려 등 설명을 보완할 뿐 2025-12-18 교환사채 발행결정과 2025-12-29 납입 예정이라는 substantive 사건은 바꾸지 않는다. 따라서 동일한 미실행 발행결정 한 건을 보존한다.",
+        "ambiguities": [
+          "정정된 설명은 즉시 유효하지만 이를 별도의 business event로 추가하지 않는다."
+        ]
+      },
+      "reviewB": {
+        "index": 306,
+        "rceptNo": "20251224000451",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "exchangeable-bond",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "정정은 자금조달 비교와 기존 주주 영향 등 설명을 보완할 뿐 교환사채 발행결정, 2025-12-29 청약·납입일과 발행 조건을 유지한다. 정정 wrapper를 중복 사건으로 만들지 않고 기존 proposed 발행결정을 보존한다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 326,
+      "rceptNo": "20251216000005",
+      "reportName": "투자설명서",
+      "expectedEvents": [],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 326,
+        "rceptNo": "20251216000005",
+        "decision": "unscorable",
+        "expectedEvents": [],
+        "labelConfidence": "low",
+        "rationale": "본문이 null이고 제목은 일반적인 투자설명서뿐이어서 구체적인 구조조정 유형이나 발생 상태를 판정할 증거가 없다.",
+        "ambiguities": [
+          "source body absent"
+        ]
+      },
+      "reviewB": {
+        "index": 326,
+        "rceptNo": "20251216000005",
+        "decision": "unscorable",
+        "expectedEvents": [],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 345,
+      "rceptNo": "20251231800801",
+      "reportName": "[기재정정]단일판매ㆍ공급계약체결",
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "under-review",
+          "state": "pending",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 345,
+        "rceptNo": "20251231800801",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "material-contract",
+            "action": "under-review",
+            "state": "pending",
+            "cause": "supply-contract",
+            "subjectType": "contract"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "At the former end date the issuer removes the end date and states that contract changes are still under discussion, with another correction promised after confirmation. No signed extension is established, so the supply contract change remains pending review.",
+        "ambiguities": [
+          "The filing does not expressly terminate the existing contract, but it also does not establish an effective extension."
+        ]
+      },
+      "reviewB": {
+        "index": 345,
+        "rceptNo": "20251231800801",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "material-contract",
+            "action": "under-review",
+            "state": "pending",
+            "cause": "supply-contract",
+            "subjectType": "contract"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The correction deletes the expired end date and states that contract-change negotiations are still underway, with another filing promised only after agreement. No executed extension is established.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 346,
+      "rceptNo": "20251231800773",
+      "reportName": "투자판단관련주요경영사항",
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 346,
+        "rceptNo": "20251231800773",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "legal-regulatory",
+            "action": "dismissed",
+            "state": "effective",
+            "cause": "litigation",
+            "subjectType": "issuer"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "서울행정법원이 금융위 행정처분에 대한 롯데손해보험의 집행정지 신청을 2025-12-31 기각했고, 그 결과 기존 이자지급 정지 효력이 그대로 유지된다.",
+        "ambiguities": [
+          "기각 대상은 본안소송이 아니라 행정처분 집행정지 신청이다."
+        ]
+      },
+      "reviewB": {
+        "index": 346,
+        "rceptNo": "20251231800773",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "legal-regulatory",
+            "action": "dismissed",
+            "state": "effective",
+            "cause": "litigation",
+            "subjectType": "issuer"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "서울행정법원이 금융위원회 처분에 대한 롯데손해보험의 집행정지 신청을 2025-12-31 기각했다. 법원 결정은 당일 유효하며 향후 항고 가능성은 현재 기각 효력을 뒤집지 않는다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 357,
+      "rceptNo": "20251231800437",
+      "reportName": "[기재정정]타인에대한담보제공결정",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "finalized",
+          "cause": "collateral-provision",
+          "subjectType": "asset"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 357,
+        "rceptNo": "20251231800437",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "related-party",
+            "action": "updated",
+            "state": "finalized",
+            "cause": "collateral-provision",
+            "subjectType": "asset"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "자회사 차입 담보제공의 인출일 확정에 따라 기존 미정이던 담보제공 시작·종료일을 확정한 정정이므로 관계자 담보 조건 업데이트가 finalized 상태다.",
+        "ambiguities": []
+      },
+      "reviewB": {
+        "index": 357,
+        "rceptNo": "20251231800437",
+        "decision": "candidate-a",
+        "expectedEvents": [
+          {
+            "type": "related-party",
+            "action": "updated",
+            "state": "finalized",
+            "cause": "collateral-provision",
+            "subjectType": "asset"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 363,
+      "rceptNo": "20251230801257",
+      "reportName": "[기재정정]유상증자또는주식관련사채등의발행결과(자율공시)",
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 363,
+        "rceptNo": "20251230801257",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "completed",
+            "state": "effective",
+            "cause": "rights-offering",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The corrected issuance-results filing states that the full third-party allocated capital-increase payment was received and all 2,209,716 shares were issued. This is the completed effective paid-capital-increase event; the correction only fixes the KRW translation.",
+        "ambiguities": [
+          "The cause label 'rights-offering' is the canonical capital-increase family even though this transaction used third-party allocation."
+        ]
+      },
+      "reviewB": {
+        "index": 363,
+        "rceptNo": "20251230801257",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "completed",
+            "state": "effective",
+            "cause": "rights-offering",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "The corrected issuance-results filing confirms full payment and actual issuance of common shares through a third-party allotted capital increase. The canonical cause for the completed paid capital increase is rights-offering.",
+        "ambiguities": [
+          "The securities are common equity, but the disclosed transaction family is 유상증자, canonically represented as rights-offering rather than generic equity-securities."
+        ]
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 364,
+      "rceptNo": "20251230801246",
+      "reportName": "투자판단관련주요경영사항(자회사의 주요경영사항)",
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bond-purchase",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 364,
+        "rceptNo": "20251230801246",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "related-party",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "bond-purchase",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "CJ CGV가 종속회사 CJ 4DPLEX 발행 신종자본증권 500억원을 인수하기로 결정했고 발행예정일은 다음 날인 2025-12-31이다. 특수관계 종속회사 채권 매입 결정이므로 아직 proposed 상태다.",
+        "ambiguities": [
+          "형식상 신종자본증권 인수이지만 관련공시와 당사자 관계상 related-party bond-purchase가 문서 수준 사건을 가장 직접적으로 표현한다."
+        ]
+      },
+      "reviewB": {
+        "index": 364,
+        "rceptNo": "20251230801246",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "related-party",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "bond-purchase",
+            "subjectType": "securities"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "CJ CGV가 종속회사 CJ 4DPLEX가 발행할 신종자본증권 500억원을 매입하기로 결정했고 발행예정일은 다음 날이다. 계열관계 내 채권 매입 결정으로 아직 실행 전이다.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    },
+    {
+      "index": 367,
+      "rceptNo": "20251231800491",
+      "reportName": "[기재정정]장래사업ㆍ경영계획(공정공시)",
+      "expectedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "adjusted",
+          "state": "effective",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        },
+        {
+          "type": "corporate-event",
+          "action": "cancelled",
+          "state": "cancelled",
+          "cause": "business-plan",
+          "subjectType": "business"
+        },
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "adjudicationTier": "independent-dual-consensus",
+      "reviewA": {
+        "index": 367,
+        "rceptNo": "20251231800491",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-expenditure",
+            "action": "adjusted",
+            "state": "effective",
+            "cause": "facility-investment",
+            "subjectType": "asset"
+          },
+          {
+            "type": "corporate-event",
+            "action": "cancelled",
+            "state": "cancelled",
+            "cause": "business-plan",
+            "subjectType": "business"
+          },
+          {
+            "type": "restructuring",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "business-disposal",
+            "subjectType": "business"
+          }
+        ],
+        "labelConfidence": "high",
+        "rationale": "이행현황 정정은 누적 투자규모 조정, 양극재 사업 진출 취소, CMP 패드·블랭크 마스크 사업 매각 결정이라는 서로 다른 세 사건을 명시하므로 각각의 발생을 보존한다.",
+        "ambiguities": [
+          "the filing is a business-plan update wrapper, but its body explicitly establishes three distinct substantive outcomes"
+        ]
+      },
+      "reviewB": {
+        "index": 367,
+        "rceptNo": "20251231800491",
+        "decision": "candidate-b",
+        "expectedEvents": [
+          {
+            "type": "capital-expenditure",
+            "action": "adjusted",
+            "state": "effective",
+            "cause": "facility-investment",
+            "subjectType": "asset"
+          },
+          {
+            "type": "corporate-event",
+            "action": "cancelled",
+            "state": "cancelled",
+            "cause": "business-plan",
+            "subjectType": "business"
+          },
+          {
+            "type": "restructuring",
+            "action": "decided",
+            "state": "proposed",
+            "cause": "business-disposal",
+            "subjectType": "business"
+          }
+        ],
+        "labelConfidence": "medium",
+        "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+        "ambiguities": []
+      },
+      "relationshipToIteration7": "oracle"
+    }
+  ]
+}
