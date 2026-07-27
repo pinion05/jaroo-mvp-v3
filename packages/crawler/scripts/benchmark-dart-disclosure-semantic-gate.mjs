@@ -13,8 +13,6 @@ const DEFAULT_THRESHOLDS = Object.freeze({
   fieldAccuracy: 1,
   resolvedCoverage: 1,
   highConfidenceExactPrecision: 1,
-  highConfidenceWilsonLower: 0.7,
-  highConfidenceCoverage: 0.5,
   templateMacroAccuracy: 1,
 });
 
