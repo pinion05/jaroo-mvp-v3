@@ -228,8 +228,17 @@ function validateOracle({ corpus, corpusSha256, oracle, oraclePath }) {
     }
     if (oracleCase.goldDisposition === 'unscorable') {
       const corpusCase = corpus.cases[index] ?? {};
-      if (corpusCase.input?.bodyText || !(corpusCase.fetchFailures?.length > 0)) {
-        fail(`oracle case ${index} unscorable requires missing body text and document fetch failures`);
+      const input = corpusCase.input ?? {};
+      const permittedRetrievalFailure = input.disclosureDetailType === 'C004'
+        && input.reportName === '투자설명서'
+        && !input.bodyText
+        && corpusCase.fetchFailures?.length > 0
+        && corpusCase.fetchFailures.every((failure) => (
+          failure?.rceptNo === input.rceptNo
+          && failure?.code === 'document_resource_limited'
+        ));
+      if (!permittedRetrievalFailure) {
+        fail(`oracle case ${index} unscorable is restricted to generic C004 prospectus resource-limit failures`);
       }
       unscorableIndices.push(index);
     }

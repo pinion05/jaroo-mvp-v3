@@ -3282,6 +3282,24 @@ test('iteration 8 separated gates preserve wrapper authority, intent identity, l
       expected: [e('capital-change', 'updated', 'pending', 'exchangeable-bond', 'securities')],
     },
     {
+      id: 'numberless-table-explicit-no-change-exchangeable-bond-remains-decided',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '3. 정정사항 | 19. 기타 투자판단에 참고할 사항 | 기재보완에 따른 정정 | 납입일은 변경하지 않음 | 정정 전 | 2025년 12월 29일 | 정정 후 | 2025년 12월 29일',
+      },
+      expected: [e('capital-change', 'decided', 'proposed', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'numberless-table-value-change-wins-over-later-risk-explanation',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '3. 정정사항 | 납입일 | 정정 전 | 2025-12-29 | 정정 후 | 2026-01-15 | 변경 가능성 관련 위험 설명 추가 | 19. 기타 투자판단에 참고할 사항',
+      },
+      expected: [e('capital-change', 'updated', 'pending', 'exchangeable-bond', 'securities')],
+    },
+    {
       id: 'exchangeable-bond-price-change-possibility-only-remains-decided',
       input: {
         reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',

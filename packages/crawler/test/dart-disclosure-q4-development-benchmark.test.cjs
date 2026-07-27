@@ -160,6 +160,28 @@ test('Q4 oracle rejects unknown schemas and unbound extractor provenance', async
   );
 });
 
+test('Q4 oracle cannot exclude arbitrary missing-body cases from the scoring denominator', async (t) => {
+  const runner = await loadRunner();
+  const artifacts = await copiedArtifacts(t, 'jaroo-q4-unscorable-');
+  const paths = await rewriteOracleAndManifest(artifacts, (oracle) => {
+    const manipulatedIndex = 35;
+    oracle.cases[manipulatedIndex].expectedEvents = [];
+    oracle.cases[manipulatedIndex].goldDisposition = 'unscorable';
+    oracle.summary.unscorableIndices = [...oracle.summary.unscorableIndices, manipulatedIndex]
+      .sort((left, right) => left - right);
+    oracle.summary.unscorableCaseCount += 1;
+    oracle.summary.scorableCaseCount -= 1;
+  });
+  await assert.rejects(
+    runner.runQ4DevelopmentBenchmark({
+      corpusPath: join(artifacts, 'kr-disclosure-event-q4-2025q4-corpus.v1.json.gz'),
+      oraclePath: paths.oraclePath,
+      evidenceManifestPath: paths.manifestPath,
+    }),
+    /unscorable is restricted to generic C004 prospectus resource-limit failures/,
+  );
+});
+
 test('Q4 evidence manifest rejects symlink escapes', async (t) => {
   const runner = await loadRunner();
   const artifacts = await copiedArtifacts(t, 'jaroo-q4-symlink-');

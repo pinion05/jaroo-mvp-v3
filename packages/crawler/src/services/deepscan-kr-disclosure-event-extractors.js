@@ -890,14 +890,28 @@ const EXCHANGEABLE_BOND_OPERATIVE_FIELD = /(?:납입(?:일|기일)|발행(?:일|
 const EXCHANGEABLE_BOND_OPERATIVE_DELTA = /(?:변경|조정|연기|확정|수정|증액|감액|교체|삭제|추가|신설|해제|부여|연장|단축|취소|철회)/u;
 const EXCHANGEABLE_BOND_NONOPERATIVE_DELTA = /(?:변경|조정|수정)(?:가능성|여부|검토|예정|계획)|(?:변경|조정|수정)(?:하지않|하지아니|되지않)|(?:변경|조정|수정)(?:은|이)?없|설명(?:만|을|을만)?(?:추가|보완)|(?:가능성|설명).{0,40}(?:추가|보완)/u;
 
+function hasStructuredCorrectionDelta(clauses, operativeIndex) {
+  const window = clauses.slice(Math.max(0, operativeIndex - 2), operativeIndex + 7);
+  const context = window.join('|');
+  if (!/(?:정정전.*정정후|변경전.*변경후)/u.test(context)) return false;
+
+  const beforeIndex = window.findIndex((clause) => /^(?:정정전|변경전)$/u.test(clause));
+  const afterIndex = window.findIndex((clause) => /^(?:정정후|변경후)$/u.test(clause));
+  if (beforeIndex >= 0 && afterIndex > beforeIndex) {
+    const beforeValue = window.slice(beforeIndex + 1, afterIndex).find(Boolean) ?? '';
+    const afterValue = window.slice(afterIndex + 1).find(Boolean) ?? '';
+    if (beforeValue && afterValue) return beforeValue !== afterValue;
+  }
+  return !EXCHANGEABLE_BOND_NONOPERATIVE_DELTA.test(context);
+}
+
 function hasOperativeExchangeableBondCorrection(input, bodyFacts) {
   const scope = currentCorrectionScope(input, bodyFacts);
   const clauses = scope.split('|').filter(Boolean);
   return clauses.some((clause, index) => {
     if (!EXCHANGEABLE_BOND_OPERATIVE_FIELD.test(clause)) return false;
     const lexicalContext = clauses.slice(Math.max(0, index - 1), index + 2).join('|');
-    const tableContext = clauses.slice(Math.max(0, index - 2), index + 7).join('|');
-    const hasStructuredDelta = /(?:정정전.*정정후|변경전.*변경후)/u.test(tableContext);
+    const hasStructuredDelta = hasStructuredCorrectionDelta(clauses, index);
     return hasStructuredDelta || (
       EXCHANGEABLE_BOND_OPERATIVE_DELTA.test(lexicalContext)
       && !EXCHANGEABLE_BOND_NONOPERATIVE_DELTA.test(lexicalContext)
