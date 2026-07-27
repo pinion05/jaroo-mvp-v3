@@ -13,7 +13,7 @@
       },
       "expectedEvents": [
         {
-          "type": "restructuring",
+          "type": "asset-transaction",
           "action": "decided",
           "state": "proposed",
           "cause": "equity-acquisition",
@@ -831,7 +831,7 @@
           "subjectType": "securities"
         }
       ],
-      "expectedConfidence": "medium",
+      "expectedConfidence": "high",
       "tags": [
         "wrapper-temporal-separation"
       ],
@@ -1017,7 +1017,7 @@
           "subjectType": "issuer"
         }
       ],
-      "expectedConfidence": "medium",
+      "expectedConfidence": "high",
       "tags": [
         "wrapper-temporal-separation"
       ],
@@ -1040,7 +1040,7 @@
           "subjectType": "securities"
         }
       ],
-      "expectedConfidence": "medium",
+      "expectedConfidence": "high",
       "tags": [
         "wrapper-temporal-separation"
       ],
@@ -1057,8 +1057,8 @@
       "expectedEvents": [
         {
           "type": "governance",
-          "action": "reported",
-          "state": null,
+          "action": "updated",
+          "state": "effective",
           "cause": "business-group-status",
           "subjectType": "governance"
         }
@@ -1207,7 +1207,7 @@
           "subjectType": "securities"
         }
       ],
-      "expectedConfidence": "medium",
+      "expectedConfidence": "high",
       "tags": [
         "precedence-regression"
       ],
@@ -1297,7 +1297,7 @@
           "type": "capital-change",
           "action": "completed",
           "state": "effective",
-          "cause": "equity-securities",
+          "cause": "rights-offering",
           "subjectType": "securities"
         }
       ],
@@ -1348,7 +1348,7 @@
           "subjectType": "issuer"
         }
       ],
-      "expectedConfidence": "medium",
+      "expectedConfidence": "high",
       "tags": [
         "q1-promoted",
         "explicit-family"
@@ -1372,7 +1372,7 @@
           "subjectType": "securities"
         }
       ],
-      "expectedConfidence": "medium",
+      "expectedConfidence": "high",
       "tags": [
         "q1-promoted",
         "explicit-family"
@@ -1420,7 +1420,7 @@
           "subjectType": "issuer"
         }
       ],
-      "expectedConfidence": "medium",
+      "expectedConfidence": "high",
       "tags": [
         "q1-promoted",
         "explicit-family"
@@ -1444,7 +1444,7 @@
           "subjectType": "securities"
         }
       ],
-      "expectedConfidence": "medium",
+      "expectedConfidence": "high",
       "tags": [
         "q1-promoted",
         "explicit-family"
@@ -1468,7 +1468,7 @@
           "subjectType": "securities"
         }
       ],
-      "expectedConfidence": "medium",
+      "expectedConfidence": "high",
       "tags": [
         "q1-promoted",
         "explicit-family"
@@ -1622,6 +1622,94 @@
         "object-semantics"
       ],
       "templateKey": "related-party-business-transfer"
+    },
+    {
+      "id": "qualitative-correction-appeal-dismissed-suspension-deferred",
+      "family": "body-lifecycle-multi-event",
+      "input": {
+        "rceptNo": "20251031800937",
+        "reportName": "[기재정정]거래처와의거래중단",
+        "filedAt": "2025-10-31",
+        "bodyText": "정정사유 최초 공시 이후 경과사항 안내. 2025. 6. 30. 대구고등법원의 집행정지신청 인용 결정(항소심 판결 선고일로부터 30일이 되는 날까지 입찰참가자격제한처분 효력 정지). 2025. 10. 31. 대구고등법원 제2심 판결 결과: 항소 기각."
+      },
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        },
+        {
+          "type": "operating-status",
+          "action": "updated",
+          "state": "deferred",
+          "cause": "business-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "qualitative-feedback",
+        "correction",
+        "multi-event",
+        "temporal"
+      ],
+      "templateKey": "appeal-dismissal-suspended-restriction"
+    },
+    {
+      "id": "qualitative-generic-management-business-disposal-final-settlement",
+      "family": "generic-title-body-rescue",
+      "input": {
+        "rceptNo": "20251031800833",
+        "reportName": "[기재정정]기타경영사항(자율공시)",
+        "filedAt": "2025-10-31",
+        "bodyText": "정정사유 거래 정산에 따른 양도가액 최종 확정. 제목 편광필름 사업 양도. 거래 종결일(2025.09.01)을 기준으로 정산한 최종 확정금액이며 양도가액은 1조 1,825억 원임."
+      },
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "price-set",
+          "state": "finalized",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "qualitative-feedback",
+        "correction",
+        "generic-title",
+        "body-rescue"
+      ],
+      "templateKey": "generic-management-business-disposal-finalized"
+    },
+    {
+      "id": "qualitative-related-party-collateral-approved-before-receipt",
+      "family": "related-party-temporal-object",
+      "input": {
+        "rceptNo": "20251031000598",
+        "reportName": "특수관계인으로부터받은담보",
+        "filedAt": "2025-10-31",
+        "bodyText": "담보제공자는 계열회사 효성화학. 담보물은 토지 및 건물, 기계장치와 대여금채권. 담보받은 일자는 아직 계약 체결 일자가 정해지지 않아 미기재하였으며 2025년 11월 중 체결 예정임. 2025.10.31 ESG경영위원회 의결."
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "collateral-received",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "qualitative-feedback",
+        "related-party",
+        "future",
+        "mixed-asset"
+      ],
+      "templateKey": "related-party-collateral-pre-receipt"
     }
   ]
 }

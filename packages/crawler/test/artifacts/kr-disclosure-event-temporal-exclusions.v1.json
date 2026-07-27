@@ -18,16 +18,19 @@
     },
     {
       "path": "test/fixtures/kr-disclosure-event-semantic-gate.v1.json",
-      "sha256": "5a982fb086508edd487814ef59926438a6282eafcbfcd89d60a5bbef3cd7a6c4",
-      "receiptCount": 40
+      "sha256": "c188d53729cad40c5436c3319a9efe4083bda6039fb7554ca1c3d2ac540da90f",
+      "receiptCount": 43
     },
     {
       "path": "test/fixtures/kr-disclosure-event-temporal-holdout.v1.json",
-      "sha256": "7a1837bf609d2b03dfe0a874d98bab5e2784e965e1debcc2a628f628292469c7",
+      "sha256": "5304af0f7fc3b882f6999df77cd10d2b9f7c68d5971236b02c8fbb66bc79a4f4",
       "receiptCount": 63
     }
   ],
   "receiptNumbers": [
+    "20251031000598",
+    "20251031800833",
+    "20251031800937",
     "20260518800942",
     "20260521000404",
     "20260521800335",
@@ -200,6 +203,6 @@
   ],
   "summary": {
     "sourceCount": 5,
-    "uniqueReceiptCount": 169
+    "uniqueReceiptCount": 172
   }
 }

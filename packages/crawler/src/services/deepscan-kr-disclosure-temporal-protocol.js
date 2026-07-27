@@ -25,8 +25,8 @@ export const KR_DISCLOSURE_TEMPORAL_DEFAULT_COLLECTION_PLAN = Object.freeze({
   schemaVersion: KR_DISCLOSURE_TEMPORAL_COLLECTION_PLAN_SCHEMA_VERSION,
   startOffsetDays: 0,
   windowDays: 7,
-  limit: 60,
-  minIssuers: 20,
+  limit: 400,
+  minIssuers: 100,
   retainedBodyChars: 60_000,
   provider: 'opendart',
   corpClass: 'Y',
@@ -37,24 +37,34 @@ export const KR_DISCLOSURE_TEMPORAL_DEFAULT_COLLECTION_PLAN = Object.freeze({
   stoppingRule: 'fixed-window-fixed-limit-no-backfill.v1',
 });
 export const KR_DISCLOSURE_TEMPORAL_STRICT_THRESHOLDS = Object.freeze({
-  total: 40,
-  issuerCount: 20,
-  templateCount: 15,
+  total: 325,
+  issuerCount: 100,
+  templateCount: 50,
   exactMultisetAccuracy: 0.9,
-  exactMultisetWilsonLower: 0.75,
-  resolvedCoverage: 0.85,
-  fieldAccuracy: 0.95,
-  templateMacroAccuracy: 0.8,
+  exactMultisetWilsonLower: 0.9,
+  resolvedCoverage: 0.95,
+  resolvedCoverageWilsonLower: 0.92,
+  fieldAccuracy: 0.97,
+  templateMacroAccuracy: 0.9,
   highConfidenceExactPrecision: 0.95,
-  highConfidenceWilsonLower: 0.7,
+  highConfidenceWilsonLower: 0.9,
   highConfidenceCoverage: 0.35,
+  highConfidenceCoverageWilsonLower: 0.3,
   brierScore: 0.15,
+  expectedCalibrationError: 0.1,
 });
 
 const CRAWLER_ROOT = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const REPOSITORY_ROOT = resolve(CRAWLER_ROOT, '../..');
 const RFC3161_ROOT = resolve(CRAWLER_ROOT, 'config/rfc3161');
 const RFC3161_RESPONSE_MAX_BYTES = 256 * 1024;
+const RFC3161_RECEIPT_FIELDS = Object.freeze([
+  'authorityId', 'endpoint', 'policyOid', 'expectedAccuracy',
+  'formalAccuracyBoundVerified', 'operationalSafetyBufferSeconds',
+  'rootSha256', 'untrustedChainSha256', 'payloadSha256',
+  'querySha256', 'responseSha256', 'queryDerBase64', 'responseDerBase64',
+  'hashAlgorithm', 'genTime', 'nonce', 'accuracy',
+]);
 const CANDIDATE_PATHS = Object.freeze({
   extractor: resolve(CRAWLER_ROOT, 'src/services/deepscan-kr-disclosure-event-extractors.js'),
   ontology: resolve(CRAWLER_ROOT, 'src/services/deepscan-kr-disclosure-event-ontology.js'),
@@ -99,6 +109,34 @@ const CANDIDATE_REPOSITORY_PATHS = Object.freeze(Object.fromEntries(
     path.slice(REPOSITORY_ROOT.length + 1).replaceAll('\\', '/'),
   ]),
 ));
+const TEMPORAL_COLLECTION_PLAN_FIELDS = Object.freeze(Object.keys(
+  KR_DISCLOSURE_TEMPORAL_DEFAULT_COLLECTION_PLAN,
+));
+const TEMPORAL_CANDIDATE_FINGERPRINT_FIELDS = Object.freeze([
+  ...Object.keys(CANDIDATE_FILE_FIELDS),
+  'ontologyVersion', 'ontologyManifestSha256', 'thresholdsSha256',
+  'timestampAuthoritiesSha256', 'selectionAlgorithm', 'bundleSha256',
+]);
+const TEMPORAL_CANDIDATE_PRECOMMIT_FIELDS = Object.freeze([
+  'schemaVersion', 'experimentId', 'timeZone', 'timestampAuthorities',
+  'sampling', 'collectionPlan', 'candidate', 'repository',
+]);
+const TEMPORAL_CANDIDATE_SAMPLING_FIELDS = Object.freeze([
+  'selectionAlgorithm', 'selectionSeedCommitment', 'exclusionManifestSha256',
+  'excludedReceiptCount', 'excludedReceiptsSha256', 'excludedReceipts',
+]);
+const TEMPORAL_CANDIDATE_REPOSITORY_FIELDS = Object.freeze(['gitHead']);
+const TEMPORAL_COLLECTION_WINDOW_FIELDS = Object.freeze(['from', 'to']);
+const TEMPORAL_BOUNDARY_FIELDS = Object.freeze([
+  'formalAccuracyBoundVerified', 'operationalNotBefore', 'cutoff',
+  'firstEligibleFilingDate', 'collectionWindow',
+]);
+const TEMPORAL_CANDIDATE_FREEZE_FIELDS = Object.freeze([
+  'schemaVersion', 'timeZone', 'precommit', 'temporalBoundary', 'timestampReceipts',
+]);
+const TEMPORAL_TIMESTAMP_ENVELOPE_FIELDS = Object.freeze([
+  'schemaVersion', 'payloadCanonicalSha256', 'timestampReceipts',
+]);
 
 // These public RFC 3161 authorities report `Accuracy: unspecified`, and their
 // public policies do not provide a numeric bound for the pinned OIDs. The
@@ -222,6 +260,7 @@ function planInteger(value, label, { minimum, maximum }) {
 export function normalizeTemporalCollectionPlan(
   plan = KR_DISCLOSURE_TEMPORAL_DEFAULT_COLLECTION_PLAN,
 ) {
+  requireExactFields(plan, TEMPORAL_COLLECTION_PLAN_FIELDS, 'collectionPlan');
   const normalized = {
     schemaVersion: plan?.schemaVersion,
     startOffsetDays: planInteger(plan?.startOffsetDays, 'collectionPlan.startOffsetDays', { minimum: 0, maximum: 365 }),
@@ -278,10 +317,15 @@ function requireCanonicalIso(value, label) {
   return instant;
 }
 
-function canonicalBase64(value, label) {
+function canonicalBase64(value, label, { maximumBytes = RFC3161_RESPONSE_MAX_BYTES } = {}) {
   if (typeof value !== 'string' || value.length === 0) throw new Error(`${label} must be nonempty base64`);
+  const maximumEncodedLength = Math.ceil(maximumBytes / 3) * 4;
+  if (value.length > maximumEncodedLength) {
+    throw new Error(`${label} exceeds ${maximumBytes} bytes`);
+  }
   const bytes = Buffer.from(value, 'base64');
   if (bytes.length === 0 || bytes.toString('base64') !== value) throw new Error(`${label} must be canonical base64`);
+  if (bytes.length > maximumBytes) throw new Error(`${label} exceeds ${maximumBytes} bytes`);
   return bytes;
 }
 
@@ -467,6 +511,7 @@ export function validateRfc3161Receipts(payload, receipts, {
   for (const policy of policies) {
     const receipt = receipts.find((entry) => entry?.authorityId === policy.authorityId);
     if (!receipt || seen.has(receipt.authorityId)) throw new Error(`missing or duplicate RFC3161 receipt ${policy.authorityId}`);
+    requireExactFields(receipt, RFC3161_RECEIPT_FIELDS, `${policy.authorityId} RFC3161 receipt`);
     seen.add(receipt.authorityId);
     const snapshot = timestampAuthoritySnapshot(policy);
     for (const field of [
@@ -533,6 +578,7 @@ export function createDetachedTimestampEnvelope(payload, timestampReceipts) {
 }
 
 export function validateDetachedTimestampEnvelope(payload, envelope, options = {}) {
+  requireExactFields(envelope, TEMPORAL_TIMESTAMP_ENVELOPE_FIELDS, 'detached timestamp envelope');
   if (envelope?.schemaVersion !== KR_DISCLOSURE_TEMPORAL_TIMESTAMP_ENVELOPE_SCHEMA_VERSION) {
     throw new Error('invalid detached timestamp envelope schemaVersion');
   }
@@ -682,6 +728,7 @@ export function validateTemporalCandidateFreeze(manifest, {
   verifyExternalTimestamps = true,
   now = new Date(),
 } = {}) {
+  requireExactFields(manifest, TEMPORAL_CANDIDATE_FREEZE_FIELDS, 'candidate freeze manifest');
   if (manifest?.schemaVersion !== KR_DISCLOSURE_TEMPORAL_FREEZE_SCHEMA_VERSION) {
     throw new Error('invalid temporal candidate freeze schemaVersion');
   }
@@ -689,17 +736,22 @@ export function validateTemporalCandidateFreeze(manifest, {
     throw new Error(`temporal candidate freeze timeZone must be ${KR_DISCLOSURE_TEMPORAL_FREEZE_TIME_ZONE}`);
   }
   const precommit = manifest.precommit;
+  requireExactFields(precommit, TEMPORAL_CANDIDATE_PRECOMMIT_FIELDS, 'candidate freeze precommit');
   if (precommit?.schemaVersion !== 'jaroo.kr-disclosure-event-candidate-precommit.v2') {
     throw new Error('invalid temporal candidate precommit schemaVersion');
   }
   if (precommit.timeZone !== KR_DISCLOSURE_TEMPORAL_FREEZE_TIME_ZONE) {
     throw new Error('candidate precommit timeZone mismatch');
   }
+  if (!/^[a-z0-9][a-z0-9._-]{7,127}$/u.test(precommit.experimentId)) {
+    throw new Error('candidate precommit experimentId is invalid');
+  }
   if (canonicalJsonSha256(precommit.timestampAuthorities)
     !== canonicalJsonSha256(currentRfc3161AuthorityManifest())) {
     throw new Error('candidate precommit RFC3161 authority policy mismatch');
   }
   const sampling = precommit.sampling;
+  requireExactFields(sampling, TEMPORAL_CANDIDATE_SAMPLING_FIELDS, 'candidate freeze sampling');
   if (sampling?.selectionAlgorithm !== KR_DISCLOSURE_TEMPORAL_SELECTION_ALGORITHM) {
     throw new Error('candidate freeze selection algorithm mismatch');
   }
@@ -736,9 +788,7 @@ export function validateTemporalCandidateFreeze(manifest, {
   }
   const collectionPlan = normalizeTemporalCollectionPlan(precommit.collectionPlan);
   const candidate = precommit.candidate;
-  if (!candidate || typeof candidate !== 'object' || Array.isArray(candidate)) {
-    throw new Error('temporal candidate fingerprint is required');
-  }
+  requireExactFields(candidate, TEMPORAL_CANDIDATE_FINGERPRINT_FIELDS, 'candidate fingerprint');
   for (const field of [
     ...Object.keys(CANDIDATE_FILE_FIELDS),
     'ontologyManifestSha256',
@@ -773,6 +823,7 @@ export function validateTemporalCandidateFreeze(manifest, {
       throw new Error('candidate freeze does not match the repository-frozen exclusion manifest');
     }
   }
+  requireExactFields(precommit.repository, TEMPORAL_CANDIDATE_REPOSITORY_FIELDS, 'candidate repository');
   if (verifyRepositoryAnchor) validateCandidateRepositoryAnchor(precommit);
   const timestamp = validateRfc3161Receipts(precommit, manifest.timestampReceipts, {
     verifyCrypto: verifyExternalTimestamps,
@@ -781,6 +832,12 @@ export function validateTemporalCandidateFreeze(manifest, {
   const cutoff = seoulCalendarDate(timestamp.operationalNotBefore);
   const firstEligibleFilingDate = nextCalendarDate(cutoff);
   const collectionWindow = deriveTemporalCollectionWindow(firstEligibleFilingDate, collectionPlan);
+  requireExactFields(manifest.temporalBoundary, TEMPORAL_BOUNDARY_FIELDS, 'candidate temporal boundary');
+  requireExactFields(
+    manifest.temporalBoundary.collectionWindow,
+    TEMPORAL_COLLECTION_WINDOW_FIELDS,
+    'candidate collection window',
+  );
   if (manifest.temporalBoundary?.formalAccuracyBoundVerified !== timestamp.formalAccuracyBoundVerified
     || manifest.temporalBoundary?.operationalNotBefore !== timestamp.operationalNotBefore
     || manifest.temporalBoundary?.cutoff !== cutoff
@@ -810,6 +867,7 @@ export function createCandidateFreezeEnvelope(manifest, fileBytes) {
 }
 
 export function validateCandidateFreezeEnvelope(envelope, options = {}) {
+  requireExactFields(envelope, TEMPORAL_CANDIDATE_FREEZE_ENVELOPE_FIELDS, 'candidate freeze envelope');
   requireSha256(envelope?.manifestFileSha256, 'candidateFreeze.manifestFileSha256');
   requireSha256(envelope?.manifestCanonicalSha256, 'candidateFreeze.manifestCanonicalSha256');
   if (envelope.manifestCanonicalSha256 !== canonicalJsonSha256(envelope.manifest)) {
@@ -938,26 +996,159 @@ function filingProjection(filing) {
   });
 }
 
-function validateReceiptIdentity(projection, label) {
+function validateReceiptIdentity(projection, label, { requireCorpCode = true } = {}) {
   if (!/^\d{14}$/u.test(projection.rceptNo)) throw new Error(`${label}.rceptNo must be a 14-digit OpenDART receipt`);
   if (projection.rceptNo.slice(0, 8) !== projection.receiptDate) {
     throw new Error(`${label}.receiptDate must equal the receipt-number date prefix`);
   }
-  if (!projection.corpCode || projection.corpClass !== 'Y' || !projection.reportName) {
-    throw new Error(`${label} must contain KOSPI corpCode, corpClass Y, and reportName`);
+  if (projection.corpClass !== 'Y' || !projection.reportName) {
+    throw new Error(`${label} must contain KOSPI corpClass Y and reportName`);
+  }
+  if (requireCorpCode && !projection.corpCode) {
+    throw new Error(`${label} must contain a KOSPI corpCode`);
   }
 }
 
-export function temporalCorpusCaseProjection(corpusCase) {
+const TEMPORAL_CASE_INPUT_FIELDS = Object.freeze([
+  'rceptNo', 'receiptDate', 'issuer', 'stockCode', 'title', 'body',
+]);
+const TEMPORAL_CASE_SOURCE_FIELDS = Object.freeze([
+  'provider', 'corpClass', 'corpCode', 'filerName', 'remarks',
+  'listApiPath', 'documentApiPath', 'documentSource', 'fileCount',
+  'fullCharCount', 'retainedCharCount', 'truncated', 'fullSha256', 'retainedSha256',
+]);
+const TEMPORAL_RAW_CASE_FIELDS = Object.freeze(['id', 'labelStatus', 'input', 'source']);
+const TEMPORAL_ANNOTATED_CASE_FIELDS = Object.freeze([
+  'templateKey', 'expectedEvents', 'annotations', 'adjudication',
+]);
+const TEMPORAL_CANDIDATE_FREEZE_ENVELOPE_FIELDS = Object.freeze([
+  'manifestFileSha256', 'manifestCanonicalSha256', 'manifest',
+]);
+const TEMPORAL_RAW_ENVELOPE_FIELDS = Object.freeze([
+  'schemaVersion', 'payloadCanonicalSha256', 'payload', 'timestampReceipts',
+]);
+const TEMPORAL_RAW_PAYLOAD_FIELDS = Object.freeze([
+  'schemaVersion', 'labelStatus', 'candidateFreeze', 'query', 'source', 'capture',
+  'listedFilings', 'population', 'cases', 'selection',
+]);
+const TEMPORAL_RAW_QUERY_FIELDS = Object.freeze([
+  'from', 'to', 'cutoff', 'corpClass', 'lastReportOnly', 'sort', 'sortDirection',
+  'pageCount', 'limit', 'minIssuers', 'sampling', 'stoppingRule',
+  'selectionSeedReveal', 'selectionSeedCommitment', 'selectionAlgorithm',
+  'exclusionManifestSha256', 'excludedReceiptCount', 'excludedReceiptsSha256',
+  'retainedBodyChars', 'concurrency', 'timeoutMs',
+]);
+const TEMPORAL_RAW_QUERY_INPUT_FIELDS = Object.freeze(
+  TEMPORAL_RAW_QUERY_FIELDS.filter((field) => field !== 'selectionAlgorithm'),
+);
+const TEMPORAL_RAW_SOURCE_FIELDS = Object.freeze([
+  'provider', 'listApiPath', 'documentApiPath', 'market',
+]);
+const TEMPORAL_RAW_CAPTURE_FIELDS = Object.freeze([
+  'providerTotalCount', 'listedCount', 'pagesFetched', 'deduplicatedCount',
+  'eligibleCount', 'duplicateCount', 'excludedInWindowCount', 'selectedCount',
+  'caseCount', 'documentFailureCount', 'uniqueIssuerCount',
+  'uniqueTitleTemplateCount', 'truncatedBodyCount', 'retainedBodyCharCount',
+]);
+const TEMPORAL_RAW_SELECTION_FIELDS = Object.freeze([
+  'algorithm', 'populationSha256', 'selectedReceiptNumbers',
+  'selectedReceiptsSha256', 'selectedCaseDigests', 'selectedCasesSha256',
+]);
+const TEMPORAL_FILING_FIELDS = Object.freeze([
+  'rceptNo', 'receiptDate', 'corpCode', 'corpName', 'stockCode', 'corpClass',
+  'reportName', 'filerName', 'remarks',
+]);
+
+function validatedFilingProjection(raw, label, { requireCorpCode = true } = {}) {
+  requireExactFields(raw, TEMPORAL_FILING_FIELDS, label);
+  for (const field of ['rceptNo', 'receiptDate', 'corpClass', 'reportName']) {
+    if (typeof raw[field] !== 'string') throw new Error(`${label}.${field} must be a string`);
+  }
+  for (const field of ['corpCode', 'corpName', 'stockCode', 'filerName', 'remarks']) {
+    if (raw[field] !== null && typeof raw[field] !== 'string') {
+      throw new Error(`${label}.${field} must be a string or null`);
+    }
+  }
+  const projection = filingProjection(raw);
+  validateReceiptIdentity(projection, label, { requireCorpCode });
+  return projection;
+}
+
+function forbiddenField(value, allowedFields) {
+  const allowed = new Set(allowedFields);
+  return Object.keys(value ?? {}).find((key) => !allowed.has(key)) ?? null;
+}
+
+function requireExactFields(value, requiredFields, label, { optionalFields = [] } = {}) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+  const unexpected = forbiddenField(value, [...requiredFields, ...optionalFields]);
+  if (unexpected) throw new Error(`${label} contains forbidden field ${unexpected}`);
+  const missing = requiredFields.find((field) => !Object.hasOwn(value, field));
+  if (missing) throw new Error(`${label} is missing required field ${missing}`);
+  return value;
+}
+
+function requiredNonnegativeInteger(value, label) {
+  if (!Number.isSafeInteger(value) || value < 0) {
+    throw new Error(`${label} must be a nonnegative safe integer`);
+  }
+  return value;
+}
+
+export function temporalCorpusCaseProjection(corpusCase, {
+  maxRetainedBodyChars = null,
+} = {}) {
+  requireExactFields(corpusCase, TEMPORAL_RAW_CASE_FIELDS, 'temporal corpus case', {
+    optionalFields: corpusCase?.labelStatus === 'adjudicated'
+      ? TEMPORAL_ANNOTATED_CASE_FIELDS
+      : [],
+  });
   const input = corpusCase?.input ?? {};
   const source = corpusCase?.source ?? {};
-  const allowedInputKeys = new Set(['rceptNo', 'receiptDate', 'issuer', 'stockCode', 'title', 'body']);
-  const unexpectedInputKey = Object.keys(input).find((key) => !allowedInputKeys.has(key));
-  if (unexpectedInputKey) {
-    throw new Error(`temporal corpus case input contains forbidden alias or field ${unexpectedInputKey}`);
+  requireExactFields(input, TEMPORAL_CASE_INPUT_FIELDS, 'temporal corpus case input');
+  requireExactFields(source, TEMPORAL_CASE_SOURCE_FIELDS, 'temporal corpus case source');
+  if (typeof corpusCase.id !== 'string' || corpusCase.id.length === 0) {
+    throw new Error('temporal corpus case id must be nonempty');
   }
-  const body = String(input.body ?? input.bodyText ?? '');
+  if (corpusCase.labelStatus !== 'unlabeled' && corpusCase.labelStatus !== 'adjudicated') {
+    throw new Error('temporal corpus case labelStatus is invalid');
+  }
+  if (source.provider !== 'opendart'
+    || source.listApiPath !== '/api/list.json'
+    || source.documentApiPath !== '/api/document.xml'
+    || source.documentSource !== 'opendart-document') {
+    throw new Error('temporal corpus case source must match the frozen OpenDART document protocol');
+  }
+  if (!Number.isSafeInteger(source.fileCount) || source.fileCount < 1) {
+    throw new Error('temporal corpus case fileCount must be a positive safe integer');
+  }
+  for (const field of ['filerName', 'remarks']) {
+    if (source[field] !== null && typeof source[field] !== 'string') {
+      throw new Error(`temporal corpus case ${field} must be a string or null`);
+    }
+  }
+  for (const field of ['rceptNo', 'receiptDate', 'title', 'body']) {
+    if (typeof input[field] !== 'string') throw new Error(`temporal corpus case ${field} must be a string`);
+  }
+  for (const field of ['issuer', 'stockCode']) {
+    if (input[field] !== null && typeof input[field] !== 'string') {
+      throw new Error(`temporal corpus case ${field} must be a string or null`);
+    }
+  }
+  if (typeof input.body !== 'string') throw new Error('temporal corpus case body must be a string');
+  const body = input.body;
   if (!body) throw new Error('temporal corpus case body must be nonempty');
+  const retainedCharCount = [...body].length;
+  if (maxRetainedBodyChars !== null) {
+    if (!Number.isSafeInteger(maxRetainedBodyChars) || maxRetainedBodyChars < 1) {
+      throw new Error('maxRetainedBodyChars must be a positive safe integer');
+    }
+    if (retainedCharCount > maxRetainedBodyChars) {
+      throw new Error('temporal corpus case body exceeds the frozen retainedBodyChars limit');
+    }
+  }
   const filing = filingProjection({
     rceptNo: input.rceptNo,
     receiptDate: input.receiptDate,
@@ -971,15 +1162,41 @@ export function temporalCorpusCaseProjection(corpusCase) {
   });
   validateReceiptIdentity(filing, 'temporal corpus case');
   const retainedSha256 = sha256(body);
+  requireSha256(source.retainedSha256, 'temporal corpus case retainedSha256');
   if (source.retainedSha256 !== retainedSha256) throw new Error('temporal corpus case retainedSha256 mismatch');
+  requireSha256(source.fullSha256, 'temporal corpus case fullSha256');
+  const recordedRetainedCharCount = requiredNonnegativeInteger(
+    source.retainedCharCount,
+    'temporal corpus case retainedCharCount',
+  );
+  const fullCharCount = requiredNonnegativeInteger(
+    source.fullCharCount,
+    'temporal corpus case fullCharCount',
+  );
+  if (recordedRetainedCharCount !== retainedCharCount) {
+    throw new Error('temporal corpus case retainedCharCount must equal the retained body length');
+  }
+  if (fullCharCount < retainedCharCount) {
+    throw new Error('temporal corpus case fullCharCount cannot be less than retainedCharCount');
+  }
+  if (typeof source.truncated !== 'boolean') {
+    throw new Error('temporal corpus case truncated must be boolean');
+  }
+  const truncated = fullCharCount > retainedCharCount;
+  if (source.truncated !== truncated) {
+    throw new Error('temporal corpus case truncated must match the recorded character counts');
+  }
+  if (!truncated && source.fullSha256 !== retainedSha256) {
+    throw new Error('temporal corpus case fullSha256 must equal retainedSha256 when untruncated');
+  }
   return Object.freeze({
-    id: String(corpusCase.id ?? ''),
+    id: corpusCase.id,
     ...filing,
     bodySha256: retainedSha256,
-    fullSha256: String(source.fullSha256 ?? retainedSha256),
-    fullCharCount: Number(source.fullCharCount ?? [...body].length),
-    retainedCharCount: Number(source.retainedCharCount ?? [...body].length),
-    truncated: source.truncated === true,
+    fullSha256: source.fullSha256,
+    fullCharCount,
+    retainedCharCount,
+    truncated,
   });
 }
 
@@ -996,17 +1213,31 @@ export function buildTemporalRawCorpusPayload({
   population,
   cases,
 } = {}) {
+  requireExactFields(query, TEMPORAL_RAW_QUERY_INPUT_FIELDS, 'raw corpus query', {
+    optionalFields: ['selectionAlgorithm'],
+  });
+  requireExactFields(source, TEMPORAL_RAW_SOURCE_FIELDS, 'raw corpus source');
+  requireExactFields(capture, TEMPORAL_RAW_CAPTURE_FIELDS, 'raw corpus capture');
+  for (const [index, corpusCase] of (cases ?? []).entries()) {
+    requireExactFields(corpusCase, TEMPORAL_RAW_CASE_FIELDS, `raw corpus cases[${index}]`);
+  }
   const seed = String(query?.selectionSeedReveal ?? '').trim();
-  const normalizedListedFilings = (listedFilings ?? population ?? []).map(filingProjection);
-  for (const [index, filing] of normalizedListedFilings.entries()) validateReceiptIdentity(filing, `listedFilings[${index}]`);
+  const normalizedListedFilings = (listedFilings ?? population ?? []).map((filing, index) => (
+    validatedFilingProjection(filing, `listedFilings[${index}]`, { requireCorpCode: false })
+  ));
   const excluded = new Set(candidateFreeze?.manifest?.precommit?.sampling?.excludedReceipts ?? []);
   const normalizedPopulation = dedupeFilings(normalizedListedFilings)
-    .filter((filing) => !excluded.has(filing.rceptNo))
+    .filter((filing) => issuerKey(filing) && !excluded.has(filing.rceptNo))
     .map(filingProjection);
   for (const [index, filing] of normalizedPopulation.entries()) validateReceiptIdentity(filing, `population[${index}]`);
-  if (population && canonicalJsonSha256(dedupeFilings(population).map(filingProjection))
-    !== canonicalJsonSha256(normalizedPopulation)) {
-    throw new Error('raw corpus population must equal the complete deduplicated non-excluded listing');
+  if (population) {
+    const suppliedPopulation = population.map((filing, index) => (
+      validatedFilingProjection(filing, `population[${index}]`)
+    ));
+    if (canonicalJsonSha256(dedupeFilings(suppliedPopulation).map(filingProjection))
+      !== canonicalJsonSha256(normalizedPopulation)) {
+      throw new Error('raw corpus population must equal the complete deduplicated non-excluded listing');
+    }
   }
   const selected = selectStratifiedFilings(normalizedPopulation, {
     limit: query?.limit ?? null,
@@ -1063,10 +1294,12 @@ export function validateTemporalRawCorpusEnvelope(envelope, {
   verifyRepositoryAnchor = true,
   now = new Date(),
 } = {}) {
+  requireExactFields(envelope, TEMPORAL_RAW_ENVELOPE_FIELDS, 'temporal raw corpus envelope');
   if (envelope?.schemaVersion !== KR_DISCLOSURE_TEMPORAL_CORPUS_SCHEMA_VERSION) {
     throw new Error('invalid temporal raw corpus schemaVersion');
   }
   const payload = envelope.payload;
+  requireExactFields(payload, TEMPORAL_RAW_PAYLOAD_FIELDS, 'temporal raw corpus payload');
   if (envelope.payloadCanonicalSha256 !== canonicalJsonSha256(payload)) {
     throw new Error('temporal raw corpus payload canonical hash mismatch');
   }
@@ -1089,6 +1322,7 @@ export function validateTemporalRawCorpusEnvelope(envelope, {
     throw new Error('raw corpus RFC3161 receipt must follow the candidate freeze boundary');
   }
   const query = payload.query;
+  requireExactFields(query, TEMPORAL_RAW_QUERY_FIELDS, 'raw corpus query');
   if (query?.selectionAlgorithm !== KR_DISCLOSURE_TEMPORAL_SELECTION_ALGORITHM) {
     throw new Error('raw corpus selection algorithm mismatch');
   }
@@ -1101,6 +1335,9 @@ export function validateTemporalRawCorpusEnvelope(envelope, {
     || from !== freeze.collectionWindow.from
     || to !== freeze.collectionWindow.to) {
     throw new Error('raw corpus query window violates candidate freeze boundary');
+  }
+  if (query.cutoff !== freeze.cutoff) {
+    throw new Error('raw corpus query cutoff differs from the candidate freeze');
   }
   if (to >= seoulCalendarDate(timestamp.earliestGenTime)) {
     throw new Error('raw corpus must be timestamped on a KST date after query.to');
@@ -1119,46 +1356,72 @@ export function validateTemporalRawCorpusEnvelope(envelope, {
   for (const [field, expected] of Object.entries(expectedPlanQuery)) {
     if (query[field] !== expected) throw new Error(`raw corpus query.${field} differs from the candidate collection plan`);
   }
+  const expectedSampling = query.limit === null
+    ? 'all-deduplicated-filings'
+    : 'deterministic-issuer-title-template-stratified';
+  if (query.sampling !== expectedSampling) throw new Error('raw corpus query.sampling is invalid');
+  for (const field of ['concurrency', 'timeoutMs']) {
+    if (!Number.isSafeInteger(query[field]) || query[field] < 1) {
+      throw new Error(`raw corpus query.${field} must be a positive safe integer`);
+    }
+  }
   if (query.exclusionManifestSha256 !== freeze.sampling.exclusionManifestSha256
     || query.excludedReceiptsSha256 !== freeze.sampling.excludedReceiptsSha256
     || query.excludedReceiptCount !== freeze.sampling.excludedReceiptCount) {
     throw new Error('raw corpus exclusion binding does not match candidate freeze');
   }
+  requireExactFields(payload.source, TEMPORAL_RAW_SOURCE_FIELDS, 'raw corpus source');
+  requireExactFields(payload.capture, TEMPORAL_RAW_CAPTURE_FIELDS, 'raw corpus capture');
+  requireExactFields(payload.selection, TEMPORAL_RAW_SELECTION_FIELDS, 'raw corpus selection');
   if (payload.source?.provider !== 'opendart'
     || payload.source?.market !== 'KR'
+    || payload.source?.listApiPath !== '/api/list.json'
+    || payload.source?.documentApiPath !== '/api/document.xml'
     || !Array.isArray(payload.listedFilings)
     || payload.listedFilings.length === 0
     || !Array.isArray(payload.population)
     || payload.population.length === 0) {
     throw new Error('raw corpus population must be nonempty');
   }
+  if (payload.selection.algorithm !== KR_DISCLOSURE_TEMPORAL_SELECTION_ALGORITHM) {
+    throw new Error('raw corpus selection.algorithm mismatch');
+  }
+  for (const field of TEMPORAL_RAW_CAPTURE_FIELDS) {
+    requiredNonnegativeInteger(payload.capture[field], `raw corpus capture.${field}`);
+  }
   const excluded = new Set(freeze.sampling.excludedReceipts);
-  const normalizedListedFilings = payload.listedFilings.map(filingProjection);
+  const normalizedListedFilings = payload.listedFilings.map((raw, index) => (
+    validatedFilingProjection(raw, `rawCorpus.listedFilings[${index}]`, { requireCorpCode: false })
+  ));
   for (const [index, filing] of normalizedListedFilings.entries()) {
-    validateReceiptIdentity(filing, `rawCorpus.listedFilings[${index}]`);
     if (filing.receiptDate < from || filing.receiptDate > to) {
       throw new Error('raw corpus listed filing receiptDate is outside query window');
     }
   }
-  const recomputedPopulation = dedupeFilings(normalizedListedFilings)
-    .filter((filing) => !excluded.has(filing.rceptNo))
-    .map(filingProjection);
-  if (canonicalJsonSha256(recomputedPopulation) !== canonicalJsonSha256(payload.population)) {
-    throw new Error('raw corpus population is not the complete deduplicated non-excluded listing');
+  if (dedupeFilings(normalizedListedFilings).length !== normalizedListedFilings.length) {
+    throw new Error('raw corpus listed filings contain duplicate receipts');
   }
+  const recomputedPopulation = dedupeFilings(normalizedListedFilings)
+    .filter((filing) => issuerKey(filing) && !excluded.has(filing.rceptNo))
+    .map(filingProjection);
   const populationReceipts = new Set();
+  const normalizedSuppliedPopulation = [];
   for (const [index, raw] of payload.population.entries()) {
-    const filing = filingProjection(raw);
-    validateReceiptIdentity(filing, `rawCorpus.population[${index}]`);
+    const filing = validatedFilingProjection(raw, `rawCorpus.population[${index}]`);
     if (filing.receiptDate < from || filing.receiptDate > to) throw new Error('raw corpus population receiptDate is outside query window');
     if (excluded.has(filing.rceptNo)) throw new Error('raw corpus population overlaps frozen exclusions');
     if (populationReceipts.has(filing.rceptNo)) throw new Error('raw corpus population contains duplicate receipts');
     populationReceipts.add(filing.rceptNo);
+    normalizedSuppliedPopulation.push(filing);
+  }
+  if (canonicalJsonSha256(recomputedPopulation) !== canonicalJsonSha256(normalizedSuppliedPopulation)) {
+    throw new Error('raw corpus population is not the complete deduplicated non-excluded listing');
   }
   const capture = payload.capture;
   const recomputedCapture = {
     providerTotalCount: normalizedListedFilings.length,
     listedCount: normalizedListedFilings.length,
+    pagesFetched: Math.ceil(normalizedListedFilings.length / query.pageCount),
     deduplicatedCount: dedupeFilings(normalizedListedFilings).length,
     eligibleCount: recomputedPopulation.length,
     duplicateCount: normalizedListedFilings.length - dedupeFilings(normalizedListedFilings).length,
@@ -1188,11 +1451,14 @@ export function validateTemporalRawCorpusEnvelope(envelope, {
   const populationByReceipt = new Map(payload.population.map((entry) => [entry.rceptNo, filingProjection(entry)]));
   const receiptDateCeiling = seoulCalendarDate(timestamp.earliestGenTime);
   for (const [index, corpusCase] of payload.cases.entries()) {
-    if (corpusCase?.labelStatus !== 'unlabeled') throw new Error('raw corpus cases must remain unlabeled');
-    for (const forbidden of ['expectedEvents', 'annotations', 'adjudication', 'developmentExpectedEvents']) {
-      if (Object.hasOwn(corpusCase, forbidden)) throw new Error(`raw corpus case contains forbidden ${forbidden}`);
+    const unexpectedCaseField = forbiddenField(corpusCase, TEMPORAL_RAW_CASE_FIELDS);
+    if (unexpectedCaseField) {
+      throw new Error(`raw corpus case contains forbidden field ${unexpectedCaseField}`);
     }
-    const projection = temporalCorpusCaseProjection(corpusCase);
+    if (corpusCase?.labelStatus !== 'unlabeled') throw new Error('raw corpus cases must remain unlabeled');
+    const projection = temporalCorpusCaseProjection(corpusCase, {
+      maxRetainedBodyChars: freeze.collectionPlan.retainedBodyChars,
+    });
     if (projection.rceptNo !== replay[index]) throw new Error('raw corpus case order does not match selected receipts');
     if (projection.receiptDate > receiptDateCeiling) throw new Error('raw corpus case receiptDate is later than its RFC3161 capture');
     const populationFiling = populationByReceipt.get(projection.rceptNo);

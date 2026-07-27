@@ -11,9 +11,11 @@ import {
   dedupeFilings,
   issueRfc3161ReceiptSet,
   normalizeTitleTemplate,
+  seoulCalendarDate,
   selectStratifiedFilings,
   selectionSeedCommitment,
   validateCandidateFreezeEnvelope,
+  validateTemporalRawCorpusEnvelope,
 } from '../src/services/deepscan-kr-disclosure-temporal-protocol.js';
 
 export {
@@ -58,6 +60,18 @@ export function normalizeDate(value, name = 'date') {
   const roundTrip = date.toISOString().slice(0, 10).replaceAll('-', '');
   if (roundTrip !== compact) throw new Error(`--${name} is not a valid date`);
   return compact;
+}
+
+export function assertCollectionWindowClosed(to, now = new Date()) {
+  const lastFilingDate = normalizeDate(to, 'to');
+  const currentKstDate = seoulCalendarDate(now);
+  if (currentKstDate <= lastFilingDate) {
+    throw new Error('the frozen collection window must end before publication');
+  }
+}
+
+export function validateRawCorpusForPublication(artifact, options = {}) {
+  return validateTemporalRawCorpusEnvelope(artifact, options);
 }
 
 function dateDistanceDays(from, to) {
@@ -285,7 +299,14 @@ function serializeError(error, secrets) {
   };
 }
 
-async function fetchListPage({ apiKey, from, to, pageNo, timeoutMs }) {
+export async function fetchListPage({
+  apiKey,
+  from,
+  to,
+  pageNo,
+  timeoutMs,
+  fetchImpl = fetch,
+}) {
   const url = new URL(OPEN_DART_LIST_URL);
   for (const [key, value] of Object.entries({
     crtfc_key: apiKey,
@@ -301,7 +322,7 @@ async function fetchListPage({ apiKey, from, to, pageNo, timeoutMs }) {
 
   let response;
   try {
-    response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+    response = await fetchImpl(url, { signal: AbortSignal.timeout(timeoutMs) });
   } catch (error) {
     throw new Error(redact(error?.message ?? 'OpenDART list request failed', [apiKey]), { cause: error });
   }
@@ -312,7 +333,9 @@ async function fetchListPage({ apiKey, from, to, pageNo, timeoutMs }) {
   } catch {
     throw new Error('OpenDART list returned invalid JSON');
   }
-  if (payload?.status === '013') return { filings: [], totalCount: 0, totalPages: 0 };
+  if (payload?.status === '013') return {
+    filings: [], totalCount: 0, totalPages: 0, pageNo,
+  };
   if (payload?.status !== '000') {
     throw new Error(`OpenDART ${payload?.status ?? 'unknown'}: ${redact(payload?.message ?? 'provider error', [apiKey])}`);
   }
@@ -327,28 +350,63 @@ async function fetchListPage({ apiKey, from, to, pageNo, timeoutMs }) {
     filerName: String(item.flr_nm ?? '').trim() || null,
     remarks: String(item.rm ?? '').trim() || null,
   }));
+  const responsePageNo = Number(payload.page_no);
+  const totalCount = Number(payload.total_count);
+  const totalPages = Number(payload.total_page);
+  if (!Number.isSafeInteger(responsePageNo) || responsePageNo !== pageNo) {
+    throw new Error(`OpenDART pagination page number mismatch: requested ${pageNo}, received ${payload.page_no ?? 'missing'}`);
+  }
+  if (!Number.isSafeInteger(totalCount) || totalCount < 0) {
+    throw new Error('OpenDART pagination total_count must be a nonnegative integer');
+  }
+  if (!Number.isSafeInteger(totalPages) || totalPages < (totalCount === 0 ? 0 : 1)) {
+    throw new Error('OpenDART pagination total_page is invalid');
+  }
+  const computedTotalPages = totalCount === 0 ? 0 : Math.ceil(totalCount / PAGE_COUNT);
+  if (totalPages !== computedTotalPages) {
+    throw new Error(`OpenDART pagination total_page mismatch: expected ${computedTotalPages}, received ${totalPages}`);
+  }
   return {
     filings,
-    totalCount: Number(payload.total_count) || filings.length,
-    totalPages: Number(payload.total_page) || Math.ceil((Number(payload.total_count) || filings.length) / PAGE_COUNT),
+    totalCount,
+    totalPages,
+    pageNo: responsePageNo,
   };
 }
 
-async function collectList(options, apiKey) {
+export async function collectList(options, apiKey, { fetchPage = fetchListPage } = {}) {
   const filings = [];
+  const seenReceipts = new Set();
   let expectedTotalCount = 0;
   let pageNo = 1;
   let totalPages = 1;
   while (pageNo <= totalPages) {
-    const page = await fetchListPage({ ...options, apiKey, pageNo });
+    const page = await fetchPage({ ...options, apiKey, pageNo });
+    if (page.pageNo !== pageNo) {
+      throw new Error(`OpenDART pagination page number drifted at page ${pageNo}`);
+    }
     if (pageNo === 1) {
       expectedTotalCount = page.totalCount;
       totalPages = page.totalPages;
+    } else if (page.totalCount !== expectedTotalCount || page.totalPages !== totalPages) {
+      throw new Error(`OpenDART pagination metadata drifted at page ${pageNo}`);
+    }
+    const expectedPageSize = pageNo < totalPages
+      ? PAGE_COUNT
+      : expectedTotalCount - PAGE_COUNT * Math.max(0, totalPages - 1);
+    if (page.filings.length !== expectedPageSize) {
+      throw new Error(`OpenDART pagination page ${pageNo} size mismatch: expected ${expectedPageSize}, received ${page.filings.length}`);
+    }
+    for (const filing of page.filings) {
+      if (!/^\d{14}$/u.test(filing.rceptNo)) {
+        throw new Error(`OpenDART pagination returned an invalid receipt number on page ${pageNo}`);
+      }
+      if (seenReceipts.has(filing.rceptNo)) {
+        throw new Error(`OpenDART pagination returned duplicate receipt ${filing.rceptNo}`);
+      }
+      seenReceipts.add(filing.rceptNo);
     }
     filings.push(...page.filings);
-    if (page.filings.length === 0 && pageNo < totalPages) {
-      throw new Error(`OpenDART returned an empty page before completion (page ${pageNo}/${totalPages})`);
-    }
     pageNo += 1;
   }
   if (filings.length !== expectedTotalCount) {
@@ -434,11 +492,23 @@ export async function writeImmutableArtifact(outputPath, bytes) {
   }
 }
 
-export async function main(argv = process.argv.slice(2)) {
+export async function publishValidatedRawCorpusArtifact(artifact, outputPath, {
+  validationOptions = {},
+  validate = validateRawCorpusForPublication,
+  write = writeImmutableArtifact,
+} = {}) {
+  validate(artifact, validationOptions);
+  const bytes = `${JSON.stringify(artifact, null, 2)}\n`;
+  await write(outputPath, bytes);
+  return bytes;
+}
+
+export async function main(argv = process.argv.slice(2), runtime = {}) {
   const parsedOptions = validateOptions(parseArgs(argv));
   const candidateFreeze = await readCandidateFreeze(parsedOptions.candidateFreezePath);
   const exclusion = await readExclusionManifest(parsedOptions.exclusionManifestPath, { verifySources: true });
   const options = bindOptionsToCandidateFreeze(parsedOptions, candidateFreeze, exclusion);
+  assertCollectionWindowClosed(options.to, runtime.now ?? new Date());
   const apiKey = getApiKey();
   if (!apiKey) throw new Error('DART_KEY is not configured');
 
@@ -532,8 +602,9 @@ export async function main(argv = process.argv.slice(2)) {
   });
   const timestampReceipts = await issueRfc3161ReceiptSet(payload);
   const artifact = createTemporalRawCorpusEnvelope(payload, timestampReceipts);
-
-  await writeImmutableArtifact(options.outputPath, `${JSON.stringify(artifact, null, 2)}\n`);
+  await publishValidatedRawCorpusArtifact(artifact, options.outputPath, {
+    validationOptions: { now: runtime.now ?? new Date() },
+  });
   console.log(JSON.stringify({
     outputPath: options.outputPath,
     ...capture,

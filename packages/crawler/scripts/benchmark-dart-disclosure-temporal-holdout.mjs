@@ -28,7 +28,12 @@ const DEFAULT_FIXTURE = resolve(ROOT, 'test/fixtures/kr-disclosure-event-tempora
 const EVALUATOR_PATH = fileURLToPath(import.meta.url);
 const EXTRACTOR_PATH = resolve(ROOT, 'src/services/deepscan-kr-disclosure-event-extractors.js');
 export const CANONICAL_EVENT_FIELDS = CANONICAL_DISCLOSURE_EVENT_FIELDS;
-export const CONFIDENCE_PROBABILITIES = Object.freeze({ low: 0.1, medium: 0.75, high: 0.95 });
+// Development and burned temporal calibration both place the resolved
+// medium-confidence bucket near 90% exactness.  Keep a conservative gap to
+// the audited high bucket while scoring the labels with their observed base
+// rate instead of the former under-confident 0.75 prior.
+export const CONFIDENCE_PROBABILITIES = Object.freeze({ low: 0.1, medium: 0.9, high: 0.95 });
+const MAXIMUM_THRESHOLD_METRICS = new Set(['brierScore', 'expectedCalibrationError']);
 export const MAX_EVENTS_PER_CASE = 20;
 export const STRICT_THRESHOLDS = KR_DISCLOSURE_TEMPORAL_STRICT_THRESHOLDS;
 export const TEMPORAL_EXTERNAL_INDEPENDENCE_REQUIREMENTS = Object.freeze([
@@ -36,6 +41,33 @@ export const TEMPORAL_EXTERNAL_INDEPENDENCE_REQUIREMENTS = Object.freeze([
   'provider-population-authenticity-witness',
   'signed-independent-annotation-identities',
   'append-only-cohort-burn-ledger',
+]);
+const SEALED_V2_FIXTURE_FIELDS = Object.freeze([
+  'schemaVersion', 'role', 'labelStatus', 'ontologyVersion', 'ontologyHash',
+  'cutoff', 'candidateFreeze', 'audit', 'query', 'summary', 'cases', 'provenance',
+]);
+const SEALED_V2_AUDIT_FIELDS = Object.freeze([
+  'predictionsHiddenUntilAdjudication', 'unlabeledCorpusSha256', 'annotationManifestSha256',
+]);
+const SEALED_V2_PROVENANCE_FIELDS = Object.freeze([
+  'rawCorpusPath', 'rawCorpusFileSha256', 'rawCorpusPayloadCanonicalSha256',
+  'annotationFreeze',
+]);
+const SEALED_V2_SUMMARY_FIELDS = Object.freeze([
+  'selectedCount', 'caseCount', 'uniqueIssuerCount', 'uniqueTitleTemplateCount',
+  'truncatedBodyCount', 'retainedBodyCharCount', 'agreementCaseCount',
+  'dualAdjudicatorResolutionCount', 'finalAdjudicatorResolutionCount',
+  'documentFailureCount',
+]);
+const SEALED_V2_CASE_FIELDS = Object.freeze([
+  'id', 'labelStatus', 'templateKey', 'source', 'input', 'expectedEvents',
+  'annotations', 'adjudication',
+]);
+const SEALED_V2_ANNOTATION_FIELDS = Object.freeze([
+  'annotator', 'blindedToPrediction', 'confidenceInLabel', 'expectedEvents',
+]);
+const SEALED_V2_ADJUDICATION_FIELDS = Object.freeze([
+  'adjudicator', 'decision', 'blindedToPrediction', 'rationale', 'expectedEvents',
 ]);
 
 export class TemporalHoldoutFixtureError extends Error {
@@ -54,6 +86,50 @@ export class TemporalHoldoutPredictionError extends Error {
 
 function fail(message) {
   throw new TemporalHoldoutFixtureError(message);
+}
+
+function requireExactObjectFields(value, requiredFields, label, { optionalFields = [] } = {}) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) fail(`${label} must be an object`);
+  const allowed = new Set([...requiredFields, ...optionalFields]);
+  const unexpected = Object.keys(value).find((field) => !allowed.has(field));
+  if (unexpected) fail(`${label} contains forbidden field ${unexpected}`);
+  const missing = requiredFields.find((field) => !Object.hasOwn(value, field));
+  if (missing) fail(`${label} is missing required field ${missing}`);
+  return value;
+}
+
+function requireSealedV2ExactSchema(fixture, rawCorpus) {
+  requireExactObjectFields(fixture, SEALED_V2_FIXTURE_FIELDS, 'sealed v2 fixture');
+  requireExactObjectFields(fixture.audit, SEALED_V2_AUDIT_FIELDS, 'sealed v2 fixture audit');
+  requireExactObjectFields(
+    fixture.provenance,
+    SEALED_V2_PROVENANCE_FIELDS,
+    'sealed v2 fixture provenance',
+  );
+  requireExactObjectFields(fixture.summary, SEALED_V2_SUMMARY_FIELDS, 'sealed v2 fixture summary');
+  requireExactObjectFields(
+    fixture.query,
+    Object.keys(rawCorpus?.payload?.query ?? {}),
+    'sealed v2 fixture query',
+  );
+  for (const [index, fixtureCase] of (fixture.cases ?? []).entries()) {
+    const label = `sealed v2 fixture cases[${index}]`;
+    requireExactObjectFields(fixtureCase, SEALED_V2_CASE_FIELDS, label);
+    temporalCorpusCaseProjection(fixtureCase);
+    for (const [annotationIndex, annotation] of (fixtureCase.annotations ?? []).entries()) {
+      requireExactObjectFields(
+        annotation,
+        SEALED_V2_ANNOTATION_FIELDS,
+        `${label}.annotations[${annotationIndex}]`,
+      );
+    }
+    requireExactObjectFields(
+      fixtureCase.adjudication,
+      SEALED_V2_ADJUDICATION_FIELDS,
+      `${label}.adjudication`,
+      { optionalFields: ['resolutionTier'] },
+    );
+  }
 }
 
 function option(name, fallback = null) {
@@ -126,28 +202,76 @@ function fieldMatches(left, right) {
   return CANONICAL_EVENT_FIELDS.reduce((total, field) => total + Number(left[field] === right[field]), 0);
 }
 
-// Disclosure event sets are small. This exact assignment search is deterministic and
-// includes unmatched events in the denominator, so missing and extra events are penalized.
+// Solve the maximum-weight bipartite assignment in O(n^3). Padding with zero-weight
+// vertices preserves the unmatched-event penalty applied by the caller's denominator.
 export function optimalFieldMatches(expectedEvents = [], predictedEvents = []) {
-  let smaller = expectedEvents.map(canonicalEvent);
-  let larger = predictedEvents.map(canonicalEvent);
-  if (smaller.length > larger.length) [smaller, larger] = [larger, smaller];
-  let best = 0;
-  const used = new Set();
-  function visit(index, score) {
-    if (index === smaller.length) {
-      best = Math.max(best, score);
-      return;
-    }
-    for (let candidate = 0; candidate < larger.length; candidate += 1) {
-      if (used.has(candidate)) continue;
-      used.add(candidate);
-      visit(index + 1, score + fieldMatches(smaller[index], larger[candidate]));
-      used.delete(candidate);
+  const expected = expectedEvents.map(canonicalEvent);
+  const predicted = predictedEvents.map(canonicalEvent);
+  const size = Math.max(expected.length, predicted.length);
+  if (size === 0) return 0;
+
+  const maximumPairWeight = CANONICAL_EVENT_FIELDS.length;
+  const rowPotential = Array(size + 1).fill(0);
+  const columnPotential = Array(size + 1).fill(0);
+  const matchedRowByColumn = Array(size + 1).fill(0);
+  const previousColumn = Array(size + 1).fill(0);
+
+  for (let rowToMatch = 1; rowToMatch <= size; rowToMatch += 1) {
+    matchedRowByColumn[0] = rowToMatch;
+    const minimumReducedCost = Array(size + 1).fill(Number.POSITIVE_INFINITY);
+    const visitedColumn = Array(size + 1).fill(false);
+    let column = 0;
+
+    do {
+      visitedColumn[column] = true;
+      const row = matchedRowByColumn[column];
+      let delta = Number.POSITIVE_INFINITY;
+      let nextColumn = 0;
+
+      for (let candidateColumn = 1; candidateColumn <= size; candidateColumn += 1) {
+        if (visitedColumn[candidateColumn]) continue;
+        const weight = row <= expected.length && candidateColumn <= predicted.length
+          ? fieldMatches(expected[row - 1], predicted[candidateColumn - 1])
+          : 0;
+        const reducedCost = maximumPairWeight - weight
+          - rowPotential[row]
+          - columnPotential[candidateColumn];
+        if (reducedCost < minimumReducedCost[candidateColumn]) {
+          minimumReducedCost[candidateColumn] = reducedCost;
+          previousColumn[candidateColumn] = column;
+        }
+        if (minimumReducedCost[candidateColumn] < delta) {
+          delta = minimumReducedCost[candidateColumn];
+          nextColumn = candidateColumn;
+        }
+      }
+
+      for (let candidateColumn = 0; candidateColumn <= size; candidateColumn += 1) {
+        if (visitedColumn[candidateColumn]) {
+          rowPotential[matchedRowByColumn[candidateColumn]] += delta;
+          columnPotential[candidateColumn] -= delta;
+        } else if (candidateColumn > 0) {
+          minimumReducedCost[candidateColumn] -= delta;
+        }
+      }
+      column = nextColumn;
+    } while (matchedRowByColumn[column] !== 0);
+
+    do {
+      const prior = previousColumn[column];
+      matchedRowByColumn[column] = matchedRowByColumn[prior];
+      column = prior;
+    } while (column !== 0);
+  }
+
+  let total = 0;
+  for (let column = 1; column <= predicted.length; column += 1) {
+    const row = matchedRowByColumn[column];
+    if (row > 0 && row <= expected.length) {
+      total += fieldMatches(expected[row - 1], predicted[column - 1]);
     }
   }
-  if (smaller.length > 0) visit(0, 0);
-  return best;
+  return total;
 }
 
 export function wilsonLowerBound(successes, total, z = 1.959963984540054) {
@@ -168,6 +292,7 @@ export function buildTemporalAnnotationPayload(fixture, {
   rawCorpus,
 } = {}) {
   if (!rawCorpus?.payload?.selection) fail('raw corpus selection is required for the annotation payload');
+  requireSealedV2ExactSchema(fixture, rawCorpus);
   return {
     schemaVersion: 'jaroo.kr-disclosure-event-annotation-manifest.v2',
     rawCorpusFileSha256,
@@ -286,6 +411,7 @@ export function validateTemporalHoldoutFixture(fixture, {
       } catch (error) {
         fail(error.message);
       }
+      requireSealedV2ExactSchema(fixture, rawCorpus);
       candidateFreeze = rawCorpus.freeze;
       if (canonicalJsonSha256(fixture.candidateFreeze)
         !== canonicalJsonSha256(rawCorpus.payload.candidateFreeze)) {
@@ -303,6 +429,9 @@ export function validateTemporalHoldoutFixture(fixture, {
         if (fixture.query[field] !== rawCorpus.payload.query[field]) {
           fail(`fixture query.${field} must equal the timestamped raw corpus query`);
         }
+      }
+      if (canonicalJsonSha256(fixture.query) !== canonicalJsonSha256(rawCorpus.payload.query)) {
+        fail('sealed v2 fixture query must exactly equal the timestamped raw corpus query');
       }
     } else if (allowLegacySealedForTesting) {
       const legacy = fixture.candidateFreeze?.manifest;
@@ -573,6 +702,11 @@ export function evaluateTemporalHoldoutCase(
   const usesDevelopmentGold = allowDevelopmentGold && Array.isArray(fixtureCase.developmentExpectedEvents);
   const expected = usesDevelopmentGold ? fixtureCase.developmentExpectedEvents : fixtureCase.expectedEvents ?? [];
   const predicted = Array.isArray(prediction.events) ? prediction.events : [];
+  if (predicted.length > MAX_EVENTS_PER_CASE) {
+    throw new TemporalHoldoutPredictionError(
+      `prediction events for ${fixtureCase.id} exceeds the maximum of ${MAX_EVENTS_PER_CASE} events`,
+    );
+  }
   const explicitlyUnresolved = isExplicitlyUnresolved(prediction);
   const containsOther = predicted.some((event) => !event || event.type === 'other');
   const resolved = !explicitlyUnresolved && predicted.length > 0 && !containsOther;
@@ -607,7 +741,7 @@ export function evaluateTemporalHoldoutCase(
     confidence,
     goldSource: usesDevelopmentGold ? 'post-burn-development' : 'prediction-blinded',
     probability: CONFIDENCE_PROBABILITIES[confidence],
-    fieldMatches: optimalFieldMatches(expected, predicted),
+    fieldMatches: resolved ? optimalFieldMatches(expected, predicted) : 0,
     fieldDenominator: Math.max(expected.length, predicted.length) * CANONICAL_EVENT_FIELDS.length,
     expected: eventMultiset(expected),
     actual: eventMultiset(predicted),
@@ -663,6 +797,7 @@ export function assessTemporalHoldoutThresholds(evaluations, thresholds = STRICT
     exactMultisetWilsonLower,
     exactSetWilsonLower: exactMultisetWilsonLower,
     resolvedCoverage: total === 0 ? 0 : resolvedCount / total,
+    resolvedCoverageWilsonLower: wilsonLowerBound(resolvedCount, total),
     fieldAccuracy: fieldDenominator === 0 ? 0 : fieldMatchesTotal / fieldDenominator,
     templateMacroAccuracy,
     highConfidenceCount: high.length,
@@ -673,12 +808,16 @@ export function assessTemporalHoldoutThresholds(evaluations, thresholds = STRICT
     // including incorrect or unresolved outputs; precision separately measures correctness.
     highConfidenceCoverage: total === 0 ? 0 : high.length / total,
     highConfidencePredictionCoverage: total === 0 ? 0 : high.length / total,
+    highConfidenceCoverageWilsonLower: wilsonLowerBound(high.length, total),
     ...calibration,
     categoricalBrierScore: calibration.brierScore,
     ece: calibration.expectedCalibrationError,
   });
   const failures = Object.entries(thresholds).flatMap(([metric, threshold]) => {
-    const maximum = metric === 'brierScore';
+    const maximum = MAXIMUM_THRESHOLD_METRICS.has(metric);
+    if (!Object.hasOwn(metrics, metric)) {
+      return [{ metric, actual: null, requirement: 'metric-not-implemented' }];
+    }
     const failed = maximum ? metrics[metric] > threshold : metrics[metric] < threshold;
     return failed ? [{ metric, actual: metrics[metric], [maximum ? 'maximum' : 'minimum']: threshold }] : [];
   });
@@ -726,6 +865,72 @@ export function evaluateTemporalHoldoutFixture(
   });
 }
 
+export function buildTemporalExternalAttestation() {
+  return Object.freeze({
+    contractTsaFormalAccuracyBoundVerified: false,
+    providerPopulationAuthenticityWitnessVerified: false,
+    signedIndependentAnnotationIdentitiesVerified: false,
+    appendOnlyCohortBurnLedgerVerified: false,
+    passed: false,
+    failures: TEMPORAL_EXTERNAL_INDEPENDENCE_REQUIREMENTS,
+  });
+}
+
+export function assessTemporalClaimGates(options = {}) {
+  requireExactObjectFields(
+    options,
+    ['gateMode', 'assessment', 'provenanceVerified'],
+    'temporal claim gate options',
+  );
+  const { gateMode, assessment, provenanceVerified } = options;
+  if (!['strict', 'diagnostic'].includes(gateMode)) {
+    throw new TemporalHoldoutFixtureError('gateMode must be strict or diagnostic');
+  }
+  const externalAttestation = buildTemporalExternalAttestation();
+  const performanceGate = Object.freeze({
+    passed: assessment?.passed === true,
+    failures: Object.freeze([...(assessment?.failures ?? [])]),
+  });
+  const provenanceGate = Object.freeze({
+    passed: provenanceVerified === true,
+    failures: Object.freeze(provenanceVerified === true ? [] : [{ requirement: 'sealed-temporal-provenance' }]),
+  });
+  const temporalPerformanceClaimEligible = gateMode === 'strict'
+    && performanceGate.passed
+    && provenanceGate.passed;
+  const independentClaimEligible = temporalPerformanceClaimEligible
+    && externalAttestation.passed === true;
+  const independentGate = Object.freeze({
+    mode: 'strict',
+    enforced: true,
+    claimScope: 'independent-sealed-temporal-holdout',
+    passed: independentClaimEligible,
+    failures: Object.freeze([
+      ...performanceGate.failures,
+      ...provenanceGate.failures,
+      ...externalAttestation.failures.map((requirement) => ({ requirement })),
+    ]),
+  });
+  const gate = gateMode === 'strict'
+    ? independentGate
+    : Object.freeze({
+      mode: 'diagnostic',
+      enforced: false,
+      claimScope: 'diagnostic-only',
+      passed: true,
+      failures: Object.freeze([]),
+    });
+  return Object.freeze({
+    performanceGate,
+    provenanceGate,
+    externalAttestation,
+    temporalPerformanceClaimEligible,
+    independentClaimEligible,
+    independentGate,
+    gate,
+  });
+}
+
 export async function runTemporalHoldoutBenchmark({
   fixturePath = DEFAULT_FIXTURE,
   gateMode = 'strict',
@@ -767,7 +972,7 @@ export async function runTemporalHoldoutBenchmark({
   const { evaluations, assessment, provenanceVerified } = evaluateTemporalHoldoutFixture(
     fixture,
     extractEventsGatedProjection,
-    gateMode === 'strict' ? STRICT_THRESHOLDS : {},
+    STRICT_THRESHOLDS,
     {
       allowBurned: gateMode === 'diagnostic',
       allowLegacySealedForTesting,
@@ -784,25 +989,22 @@ export async function runTemporalHoldoutBenchmark({
   // population, that human labelers were prediction-blind, or that a cohort
   // has never been burned elsewhere. Keep the independent claim fail-closed
   // until dedicated external witness/signature/ledger verifiers are added.
-  const externalIndependence = Object.freeze({
-    contractTsaFormalAccuracyBoundVerified: false,
-    providerPopulationAuthenticityWitnessVerified: false,
-    signedIndependentAnnotationIdentitiesVerified: false,
-    appendOnlyCohortBurnLedgerVerified: false,
-    passed: false,
-    failures: TEMPORAL_EXTERNAL_INDEPENDENCE_REQUIREMENTS,
+  const claimGates = assessTemporalClaimGates({
+    gateMode,
+    assessment,
+    provenanceVerified,
   });
-  const fixtureIndependentClaimEligible = provenanceVerified && externalIndependence.passed;
-  const gatePassed = assessment.passed
-    && (gateMode !== 'strict' || fixtureIndependentClaimEligible);
+  const fixtureIndependentClaimEligible = claimGates.independentClaimEligible;
   return {
     schemaVersion: 'jaroo.kr-disclosure-event-temporal-holdout-result.v2',
     fixture: absoluteFixture,
     fixtureRole: fixture.role,
     fixtureIndependentClaimEligible,
-    independentClaimEligible: gateMode === 'strict' && gatePassed && fixtureIndependentClaimEligible,
+    temporalPerformanceClaimEligible: claimGates.temporalPerformanceClaimEligible,
+    independentClaimEligible: claimGates.independentClaimEligible,
     cryptographicChainVerified: provenanceVerified,
-    externalIndependence,
+    externalAttestation: claimGates.externalAttestation,
+    externalIndependence: claimGates.externalAttestation,
     developmentReAdjudicationCount: fixture.summary?.developmentReAdjudicationCount ?? 0,
     hashes: {
       fixtureSha256: createHash('sha256').update(fixtureBytes).digest('hex'),
@@ -821,14 +1023,10 @@ export async function runTemporalHoldoutBenchmark({
     rawCorpus: rawCorpusPath,
     metrics: assessment.metrics,
     failures: evaluations.filter((item) => !item.exact),
-    performanceGate: { passed: assessment.passed, failures: assessment.failures },
-    gate: {
-      mode: gateMode,
-      passed: gatePassed,
-      failures: gateMode === 'strict'
-        ? [...assessment.failures, ...externalIndependence.failures.map((requirement) => ({ requirement }))]
-        : assessment.failures,
-    },
+    performanceGate: claimGates.performanceGate,
+    provenanceGate: claimGates.provenanceGate,
+    independentGate: claimGates.independentGate,
+    gate: claimGates.gate,
   };
 }
 

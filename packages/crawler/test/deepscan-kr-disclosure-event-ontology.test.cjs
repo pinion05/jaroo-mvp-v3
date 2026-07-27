@@ -62,6 +62,8 @@ test('known tuples emitted by current extractors validate', () => {
     event({ type: 'regulatory-product', action: 'filed', state: 'pending', cause: 'equity-linked-securities', subjectType: 'product' }),
     event({ type: 'capital-change', action: 'decided', state: 'proposed', cause: 'short-term-borrowing', subjectType: 'subsidiary' }),
     event({ type: 'corporate-profile', action: 'changed', state: 'effective', cause: 'subsidiary-inclusion', subjectType: 'subsidiary' }),
+    event({ type: 'material-contract', action: 'lent', state: 'effective', cause: 'loan', subjectType: 'contract' }),
+    event({ type: 'related-party', action: 'reported', state: 'effective', cause: 'other-securities-transactions', subjectType: 'securities' }),
   ];
   for (const tuple of tuples) assert.deepEqual(ontology.validateCanonicalDisclosureEvent(tuple), { valid: true, errors: [] });
 });

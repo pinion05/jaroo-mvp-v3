@@ -42,7 +42,7 @@
     "agreementCaseCount": 40,
     "dualAdjudicatorResolutionCount": 12,
     "finalAdjudicatorResolutionCount": 8,
-    "developmentReAdjudicationCount": 7
+    "developmentReAdjudicationCount": 12
   },
   "audit": {
     "baseCommit": "e0e621b",
@@ -75,7 +75,7 @@
     "firstSealedFixtureSha256": "dcadf034dcf1de9d739ac3b01807eb83889b03970243f426c74c8a58226921cd",
     "firstSealedResultSha256": "57f7ee5095a88b4a9445a2d33a38179b7e2375f7edbbcdccddda8b3faedc5f2c",
     "developmentOntologyVersion": "jaroo.kr-disclosure-event-ontology.v1",
-    "developmentOntologyHash": "9546959673fb62c9264af038e59ad52a8dbb3fea3fc0f1f2c77f05169dbf7237",
+    "developmentOntologyHash": "b3b29e0918060d7cfbaa1586703a2ac3e2ca5d5198c3c4d5d8b1325d199976f9",
     "developmentReAdjudicationCaseIds": [
       "opendart-20260722000440",
       "opendart-20260722800530",
@@ -254,6 +254,56 @@
         "evidenceExcerpt": "한화스마트ELS 제8362호·제8363호·제8364호 ... 청약기일·납입기일 2026.08.10",
         "ontologyGap": "파생결합증권 일괄신고추가서류에 대한 regulatory-product 매핑과 filed/solicited 경계가 가이드에 명시되지 않았다.",
         "expectedEvents": [
+          {
+            "type": "regulatory-product",
+            "action": "filed",
+            "state": "pending",
+            "cause": "equity-linked-securities",
+            "subjectType": "product"
+          },
+          {
+            "type": "regulatory-product",
+            "action": "filed",
+            "state": "pending",
+            "cause": "equity-linked-securities",
+            "subjectType": "product"
+          },
+          {
+            "type": "regulatory-product",
+            "action": "filed",
+            "state": "pending",
+            "cause": "equity-linked-securities",
+            "subjectType": "product"
+          }
+        ]
+      },
+      "developmentExpectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "developmentReAdjudication": {
+        "predictionBlinded": false,
+        "reason": "C003 current-offering inventory now emits one solicited pending canonical occurrence per explicitly listed ELS series; historical shelf totals are excluded.",
+        "previousExpectedEvents": [
           {
             "type": "regulatory-product",
             "action": "filed",
@@ -854,6 +904,28 @@
         "evidenceExcerpt": "'26년 상반기 공정거래 자율준수 프로그램(CP) 운영 실적 및 '26년 하반기 운영 계획",
         "ontologyGap": "가이드에 공정거래 자율준수 프로그램 운영현황의 명시적 공통 매핑은 없으나 compliance-program이 문서 내용을 직접 표현한다.",
         "expectedEvents": [
+          {
+            "type": "governance",
+            "action": "reported",
+            "state": null,
+            "cause": "compliance-program",
+            "subjectType": "governance"
+          }
+        ]
+      },
+      "developmentExpectedEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": "active",
+          "cause": "compliance-program",
+          "subjectType": "governance"
+        }
+      ],
+      "developmentReAdjudication": {
+        "predictionBlinded": false,
+        "reason": "The filing reports an operating compliance program with completed current-period activities, so the program status is active.",
+        "previousExpectedEvents": [
           {
             "type": "governance",
             "action": "reported",
@@ -1765,6 +1837,42 @@
         "evidenceExcerpt": "협력업체 작업자 1인 설비에 협착 ... 사망자 수 1 ... 고용노동부 평택지청 부분작업중지 명령",
         "ontologyGap": null,
         "expectedEvents": [
+          {
+            "type": "legal-regulatory",
+            "action": "occurred",
+            "state": null,
+            "cause": "serious-industrial-accident",
+            "subjectType": "issuer"
+          },
+          {
+            "type": "operating-status",
+            "action": "halted",
+            "state": "active",
+            "cause": "work-stop",
+            "subjectType": "operating-business"
+          }
+        ]
+      },
+      "developmentExpectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "occurred",
+          "state": "effective",
+          "cause": "serious-industrial-accident",
+          "subjectType": "operations"
+        },
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "active",
+          "cause": "work-stop",
+          "subjectType": "operating-business"
+        }
+      ],
+      "developmentReAdjudication": {
+        "predictionBlinded": false,
+        "reason": "The accident is an effective operational occurrence, while the labor-office partial work-stop remains a separate active operating-status event.",
+        "previousExpectedEvents": [
           {
             "type": "legal-regulatory",
             "action": "occurred",
@@ -3059,6 +3167,28 @@
         "evidenceExcerpt": "기준일 2026-08-07… 권리주주 확정… 이사회결의일 2026-07-23",
         "ontologyGap": null,
         "expectedEvents": [
+          {
+            "type": "corporate-action",
+            "action": "decided",
+            "state": "pending",
+            "cause": "record-date",
+            "subjectType": "securities"
+          }
+        ]
+      },
+      "developmentExpectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "pending",
+          "cause": "record-date",
+          "subjectType": "ownership"
+        }
+      ],
+      "developmentReAdjudication": {
+        "predictionBlinded": false,
+        "reason": "A record date determines the entitled shareholder set; ownership is the canonical subject rather than the security instrument.",
+        "previousExpectedEvents": [
           {
             "type": "corporate-action",
             "action": "decided",
@@ -5386,6 +5516,28 @@
             "subjectType": "securities"
           }
         ]
+      },
+      "developmentExpectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "developmentReAdjudication": {
+        "predictionBlinded": false,
+        "reason": "The result filing explicitly identifies a third-party allotted rights offering, so rights-offering is more specific than generic equity-securities.",
+        "previousExpectedEvents": [
+          {
+            "type": "capital-change",
+            "action": "completed",
+            "state": "effective",
+            "cause": "equity-securities",
+            "subjectType": "securities"
+          }
+        ]
       }
     },
     {
@@ -6048,5 +6200,5 @@
     }
   ],
   "ontologyVersion": "jaroo.kr-disclosure-event-ontology.v1",
-  "ontologyHash": "9546959673fb62c9264af038e59ad52a8dbb3fea3fc0f1f2c77f05169dbf7237"
+  "ontologyHash": "b3b29e0918060d7cfbaa1586703a2ac3e2ca5d5198c3c4d5d8b1325d199976f9"
 }

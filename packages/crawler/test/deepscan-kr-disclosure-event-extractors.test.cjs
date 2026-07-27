@@ -47,7 +47,7 @@ const ITERATION_7_SYNTHETIC_CASES = [
   {
     id: 'i7-f1-positive-warrant-exercise-price', family: 'F1', kind: 'positive',
     input: { reportName: '[기재정정]주요사항보고서(신주인수권부사채권발행결정)', disclosureDetailType: 'B001', bodyText: '정정사항 | 정정사유 | 행사가액 확정에 따른 정정 | 정정 전 | 확정 예정 | 정정 후 | 신주인수권의 행사가액은 확정되었습니다' },
-    expectedEvents: [canonicalEvent('capital-change', 'price-set', 'effective', 'bond-with-warrants', 'securities')],
+    expectedEvents: [canonicalEvent('capital-change', 'price-set', 'effective', 'warrant-bond', 'securities')],
   },
   {
     id: 'i7-f1-control-provisional-price', family: 'F1', kind: 'control',
@@ -121,7 +121,7 @@ const ITERATION_7_SYNTHETIC_CASES = [
   {
     id: 'i7-f3-positive-equity-closing', family: 'F3', kind: 'positive',
     input: { reportName: '[기재정정]타법인주식및출자증권양수결정', disclosureDetailType: 'B001', bodyText: '정정사항 | 거래종결 확인 | 잔금 전액 지급 완료 | 주식 소유권 이전 완료' },
-    expectedEvents: [canonicalEvent('restructuring', 'acquired', 'effective', 'equity-acquisition', 'securities')],
+    expectedEvents: [canonicalEvent('asset-transaction', 'acquired', 'effective', 'equity-acquisition', 'securities')],
   },
   {
     id: 'i7-f3-positive-property-acquired', family: 'F3', kind: 'positive',
@@ -141,7 +141,7 @@ const ITERATION_7_SYNTHETIC_CASES = [
   {
     id: 'i7-f3-control-same-day-decision', family: 'F3', kind: 'control',
     input: { reportName: '타법인주식및출자증권양수결정', disclosureDetailType: 'I001', filedAt: '2027-04-01', bodyText: '이사회 결의일 | 2027-04-01 | 계약체결일 | 2027-04-01 | 잔금 지급과 소유권 이전은 추후 진행' },
-    expectedEvents: [canonicalEvent('restructuring', 'decided', 'proposed', 'equity-acquisition', 'securities')],
+    expectedEvents: [canonicalEvent('asset-transaction', 'decided', 'proposed', 'equity-acquisition', 'securities')],
   },
   {
     id: 'i7-f3-control-partial-payment-future-closing', family: 'F3', kind: 'control',
@@ -156,7 +156,7 @@ const ITERATION_7_SYNTHETIC_CASES = [
   {
     id: 'i7-f3-control-risk-historical-completion', family: 'F3', kind: 'control',
     input: { reportName: '타법인주식및출자증권취득결정', filedAt: '2027-04-01', bodyText: '취득예정일 | 2027-06-30 | 투자위험 | 과거 유사 거래는 잔금 지급 후 완료되었음' },
-    expectedEvents: [canonicalEvent('restructuring', 'decided', 'proposed', 'equity-acquisition', 'securities')],
+    expectedEvents: [canonicalEvent('asset-transaction', 'decided', 'proposed', 'equity-acquisition', 'securities')],
   },
 
   // F4: current before/after deltas select lifecycle without confusing maturity with termination.
@@ -168,7 +168,7 @@ const ITERATION_7_SYNTHETIC_CASES = [
   {
     id: 'i7-f4-positive-partial-sale-rescheduled', family: 'F4', kind: 'positive',
     input: { reportName: '[기재정정]자기전환사채매도결정', filedAt: '2027-05-01', bodyText: '정정사항 | 잔금일 변경 | 일부 대금 수령 | 정정 후 잔금일 | 2027-06-15 | 잔금 지급 후 매도 완료 예정' },
-    expectedEvents: [canonicalEvent('capital-change', 'rescheduled', 'pending', 'convertible-bond', 'securities')],
+    expectedEvents: [canonicalEvent('asset-transaction', 'rescheduled', 'pending', 'bond-sale', 'securities')],
     expectedConfidence: 'medium',
   },
   {
@@ -179,7 +179,7 @@ const ITERATION_7_SYNTHETIC_CASES = [
   {
     id: 'i7-f4-positive-buyer-change-pending-closing', family: 'F4', kind: 'positive',
     input: { reportName: '[기재정정]타법인주식및출자증권처분결정', filedAt: '2027-05-01', bodyText: '정정사항 | 매수인 지위 및 권리의무 이전 | 거래종결은 관계기관 승인 이후 진행 예정 | 아직 지분 이전 전' },
-    expectedEvents: [canonicalEvent('restructuring', 'updated', 'pending', 'equity-disposal', 'securities')],
+    expectedEvents: [canonicalEvent('asset-transaction', 'updated', 'pending', 'equity-disposal', 'securities')],
     expectedConfidence: 'medium',
   },
   {
@@ -321,7 +321,7 @@ const ITERATION_7_SYNTHETIC_CASES = [
     id: 'i7-f8-control-existing-independent-siblings', family: 'F8', kind: 'control',
     input: { reportName: '중대재해발생', bodyText: '사고 발생 | 관계기관의 작업중지명령에 따라 해당 공정 작업 중지' },
     expectedEvents: [
-      canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer'),
+      canonicalEvent('corporate-event', 'occurred', 'effective', 'serious-industrial-accident', 'operations'),
       canonicalEvent('operating-status', 'halted', 'active', 'work-stop', 'operating-business'),
     ],
   },
@@ -330,14 +330,14 @@ const ITERATION_7_SYNTHETIC_CASES = [
   {
     id: 'i7-protected-302', family: 'protected', kind: 'protected',
     input: { reportName: '타법인주식및출자증권양수결정', disclosureDetailType: 'I001', filedAt: '2027-10-01', bodyText: '이사회 결의일 | 2027-10-01 | 계약체결일 | 2027-10-01 | 잔금 지급 및 지분권리 이전은 선행조건 충족 후 진행' },
-    expectedEvents: [canonicalEvent('restructuring', 'decided', 'proposed', 'equity-acquisition', 'securities')],
-    expectedConfidence: 'medium',
+    expectedEvents: [canonicalEvent('asset-transaction', 'decided', 'proposed', 'equity-acquisition', 'securities')],
+    expectedConfidence: 'high',
   },
   {
     id: 'i7-protected-385', family: 'protected', kind: 'protected',
     input: { reportName: '기타안내사항(안내공시)', filedAt: '2027-10-01', bodyText: '| 1. 제목 | | 보통주 의무보유 기간 만료 안내 | | 의무보유 해제일 | 2027-10-30 | 해제 예정 |' },
     expectedEvents: [canonicalEvent('capital-change', 'scheduled', 'pending', 'lockup', 'securities')],
-    expectedConfidence: 'medium',
+    expectedConfidence: 'high',
   },
 
   // Audit-corrected tuples 65/70/86 are explicit contrast rows.
@@ -404,7 +404,7 @@ const ITERATION_7B_NEAR_MISS_CASES = [
       bodyText: '사건 1 | 신규 품목허가 신청을 자진 취하하였고 취하 접수 완료 | 사건 2 | 중대재해 발생 및 관계기관 작업중지명령',
     },
     expectedEvents: [
-      canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer'),
+      canonicalEvent('corporate-event', 'occurred', 'effective', 'serious-industrial-accident', 'operations'),
       canonicalEvent('operating-status', 'halted', 'active', 'work-stop', 'operating-business'),
       canonicalEvent('regulatory-product', 'withdrawn', 'cancelled', 'product-approval', 'product'),
     ],
@@ -541,7 +541,7 @@ test('document baseline remains separate while the gated candidate exposes all p
   assert.match(gated.ontologyVersion, /^jaroo\.kr-disclosure-event-ontology\.v\d+$/u);
   assert.match(gated.ontologyHash, /^[a-f0-9]{64}$/u);
   assert.equal(extractorModule.normalizeDisclosureEventGateInput({ reportName: '[첨부추가] 공시' }).wrapperKind, 'attachment-added');
-  assert.equal(extractorModule.extractEventsGatedProjection({ reportName: '투자설명서', disclosureDetailType: 'C004' }).confidence, 'medium');
+  assert.equal(extractorModule.extractEventsGatedProjection({ reportName: '투자설명서', disclosureDetailType: 'C004' }).confidence, 'low');
 });
 
 test('canonical receiptDate drives the same lifecycle decision as filedAt', async () => {
@@ -550,7 +550,7 @@ test('canonical receiptDate drives the same lifecycle decision as filedAt', asyn
     reportName: '주요사항보고서(자기전환사채만기전취득결정)',
     bodyText: '취득 결정일 2027-03-10 | 지급(예정)일 2027-04-10 | 취득 후 소각 | 회사 자금으로 해당 사채 대금을 지급할 계획',
   };
-  const expected = [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')];
+  const expected = [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities')];
 
   assert.deepEqual(extractEventsGatedProjection({ ...input, filedAt: '2027-03-10' }).events, expected);
   assert.deepEqual(extractEventsGatedProjection({ ...input, receiptDate: '2027-03-10' }).events, expected);
@@ -558,7 +558,7 @@ test('canonical receiptDate drives the same lifecycle decision as filedAt', asyn
 
 test('independent same-tuple sections preserve event cardinality', async () => {
   const { extractEventsGatedProjection } = await import(MODULE);
-  const filed = canonicalEvent('legal-regulatory', 'filed', null, 'litigation', 'issuer');
+  const filed = canonicalEvent('legal-regulatory', 'filed', 'active', 'litigation', 'issuer');
   const actual = extractEventsGatedProjection({
     reportName: '기타주요경영사항',
     receiptDate: '2026-07-24',
@@ -599,7 +599,7 @@ test('high confidence is opt-in to audited stable original disclosure families',
     receiptDate: '2026-07-24',
     bodyText: '편입사유 | 지분 취득 | 편입일자 | 2026년 7월 24일 | 편입 후 자회사 총수 | 8',
   });
-  assert.equal(genericDerived.confidence, 'medium');
+  assert.equal(genericDerived.confidence, 'high');
 
   const correctedStableTitle = extractEventsGatedProjection({
     reportName: '[기재정정] 기업설명회(IR)개최(안내공시)',
@@ -625,7 +625,7 @@ test('event evidence distinguishes title candidates, body confirmation, and gate
     reportName: '소송 등의 제기ㆍ신청',
     bodyText: '당사는 손해배상청구 소를 제기하였고 법원이 소장을 접수했습니다.',
   });
-  assert.equal(bodyConfirmed.eventEvidence[0].source, 'document-candidate+semantic-body-confirmed');
+  assert.equal(bodyConfirmed.eventEvidence[0].source, 'semantic-body-derived');
   assert.ok(bodyConfirmed.eventEvidence[0].evidence.includes('semantic-family:litigation'));
 
   const gateDerived = extractEventsGatedProjection({
@@ -858,7 +858,7 @@ test('iteration 5 gates cover Q4 lifecycle, fallback, polarity, and object taxon
       id: 'compliance-program-single-report',
       input: { reportName: '공정거래자율준수프로그램운영현황(안내공시)', bodyText: '운영현황 보고 | 차기 교육 예정' },
       expected: [
-        { type: 'governance', action: 'reported', state: null, cause: 'compliance-program', subjectType: 'governance' },
+        { type: 'governance', action: 'reported', state: 'active', cause: 'compliance-program', subjectType: 'governance' },
       ],
     },
     {
@@ -870,7 +870,7 @@ test('iteration 5 gates cover Q4 lifecycle, fallback, polarity, and object taxon
       id: 'serious-accident-independent-work-stop',
       input: { reportName: '중대재해발생', bodyText: '사고 발생 | 관계기관의 작업중지명령에 따라 해당 공정 작업 중지' },
       expected: [
-        { type: 'legal-regulatory', action: 'occurred', state: null, cause: 'serious-industrial-accident', subjectType: 'issuer' },
+        { type: 'corporate-event', action: 'occurred', state: 'effective', cause: 'serious-industrial-accident', subjectType: 'operations' },
         { type: 'operating-status', action: 'halted', state: 'active', cause: 'work-stop', subjectType: 'operating-business' },
       ],
     },
@@ -1090,7 +1090,7 @@ test('iteration 8 accumulates scoped lifecycle repairs without losing sibling in
         filedAt: '2027-03-10',
         bodyText: '3. 정정사항 | 사채만기일 | 일정변경에 따른 기재정정 | 정정 전 | 행사가액 확정 예정 | 정정 후 | 행사가액은 청약 후 확정될 예정 | 납입일 2027-04-20',
       },
-      expectedEvents: [canonicalEvent('capital-change', 'updated', 'pending', 'bond-with-warrants', 'securities')],
+      expectedEvents: [canonicalEvent('capital-change', 'updated', 'pending', 'warrant-bond', 'securities')],
     },
     {
       id: 'ownership-not-yet-effective',
@@ -1187,7 +1187,7 @@ test('iteration 8 accumulates scoped lifecycle repairs without losing sibling in
         filedAt: '2027-03-10',
         bodyText: '지급(예정)일 2027-04-10 | 향후처리계획 취득 후 소각 | 보유현금을 활용하여 상기 사채를 상환할 예정',
       },
-      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities')],
     },
     {
       id: 'future-related-party-debt-assumption',
@@ -1250,22 +1250,22 @@ test('iteration 8 semantic repair uses operative fields instead of purpose or fu
     {
       id: 'cb-future-payment-exact-cash-source-stays-proposed',
       input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '취득 결정일 2027-03-10 | 지급(예정)일 2027-04-10 | 취득 후 소각 | 보유현금을 활용하여 상기 사채를 상환할 예정' },
-      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities')],
     },
     {
       id: 'cb-future-payment-paraphrase-stays-proposed',
       input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '취득 결정일 2027-03-10 | 지급(예정)일 2027-04-10 | 취득 후 소각 | 회사 자금으로 해당 사채 대금을 지급할 계획' },
-      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities')],
     },
     {
       id: 'cb-deposit-now-balance-and-transfer-future-stays-proposed',
       input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '지급(예정)일 2027-03-10 | 계약금은 금일 지급 | 잔금은 2027-04-10 지급 예정 | 대금 전액 지급 완료 즉시 사채를 수령할 예정' },
-      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities')],
     },
     {
       id: 'cb-actual-same-day-acquisition-is-effective',
       input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '지급일 2027-03-10 | 실제 사채 취득일 2027-03-10 | 대금 지급 및 사채 취득 완료' },
-      expectedEvents: [canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities')],
+      expectedEvents: [canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond-acquisition', 'securities')],
     },
   ];
   const results = cases.map((fixtureCase) => ({ fixtureCase, actual: extractEventsGatedProjection(fixtureCase.input) }));
@@ -1288,31 +1288,32 @@ test('iteration 8 actuality repair rejects scheduled and historical evidence whi
       id: 'trust-current-perfective-paraphrase-is-effective',
       input: { reportName: '주요사항보고서(자기주식취득신탁계약체결결정)', filedAt: '2027-03-10', bodyText: '계약기간 | 시작일 | 2027-03-10 | 계약체결일 | 2027-03-10 | 금일 신탁 계약 체결 절차를 모두 마쳤습니다' },
       expectedEvents: [canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities')],
+      expectedConfidence: 'medium',
     },
     {
       id: 'cb-scheduled-actual-acquisition-label-stays-proposed',
       input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '실제 사채 취득일 2027-04-10 예정 | 취득 대금은 당일 지급 예정' },
-      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities')],
     },
     {
       id: 'cb-payment-date-mapped-to-scheduled-acquisition-stays-proposed',
       input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '지급(예정)일 2027-03-10 | 지급 예정일은 실제 사채 취득일로 예정되어 있습니다' },
-      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities')],
     },
     {
       id: 'cb-current-perfective-paraphrase-is-effective',
       input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '지급일 2027-03-10 | 오늘 사채 대금을 모두 지급하고 채권을 넘겨받았습니다' },
-      expectedEvents: [canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities')],
+      expectedEvents: [canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond-acquisition', 'securities')],
     },
     {
       id: 'cb-current-actual-acquisition-date-role-paraphrase-is-effective',
       input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '대금 지급일 2027-03-10 | 대금 지급일은 채권을 실제로 넘겨받은 날에 해당합니다' },
-      expectedEvents: [canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities')],
+      expectedEvents: [canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond-acquisition', 'securities')],
     },
     {
       id: 'cb-completed-acquisition-with-future-resale-remains-effective',
       input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '지급일 2027-03-10 | 대금 지급 및 사채 취득 완료 | 취득 후 2027-04-10 재매각 예정' },
-      expectedEvents: [canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities')],
+      expectedEvents: [canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond-acquisition', 'securities')],
     },
     {
       id: 'trust-historical-completion-stays-proposed',
@@ -1322,16 +1323,16 @@ test('iteration 8 actuality repair rejects scheduled and historical evidence whi
     {
       id: 'cb-historical-completion-stays-proposed',
       input: { reportName: '주요사항보고서(자기전환사채만기전취득결정)', filedAt: '2027-03-10', bodyText: '취득 결정일 2027-03-10 | 지급(예정)일 2027-04-10 | 과거내역 | 2026년에는 대금 지급 및 사채 취득 완료' },
-      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+      expectedEvents: [canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities')],
     },
   ];
-  const failures = cases.flatMap(({ id, input, expectedEvents }) => {
+  const failures = cases.flatMap(({ id, input, expectedEvents, expectedConfidence = 'high' }) => {
     const actual = extractEventsGatedProjection(input);
     const expected = eventSet(expectedEvents);
     const observed = eventSet(actual.events);
     const resolved = actual.events.length > 0 && actual.events.every((event) => event.type !== 'other');
     return JSON.stringify(observed) === JSON.stringify(expected)
-      && actual.confidence === 'medium'
+      && actual.confidence === expectedConfidence
       && resolved
       && actual.events.length === 1
       ? []
@@ -1538,8 +1539,8 @@ test('actuality roles combine current signature, settlement, and transfer eviden
   const { extractEventsGatedProjection } = await import(MODULE);
   const contracted = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
   const trustProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities');
-  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
-  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities');
+  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond-acquisition', 'securities');
+  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities');
   const cases = [
     {
       id: 'trust-seal-completed-on-contract-date',
@@ -1866,7 +1867,7 @@ test('round 2 independent semantic audit preserves current actors, actuality rol
   const { extractEventsGatedProjection } = await import(MODULE);
   const litigation = (action, state) => canonicalEvent('legal-regulatory', action, state, 'litigation', 'issuer');
   const trust = (action, state) => canonicalEvent('capital-change', action, state, 'treasury-share-trust', 'securities');
-  const bond = (action, state) => canonicalEvent('capital-change', action, state, 'convertible-bond', 'securities');
+  const bond = (action, state) => canonicalEvent('capital-change', action, state, 'convertible-bond-acquisition', 'securities');
   const equity = canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities');
   const product = canonicalEvent('regulatory-product', 'withdrawn', 'cancelled', 'product-approval', 'product');
   const litigationInput = (bodyText) => ({
@@ -1938,10 +1939,10 @@ test('round 3 independent semantic audit re-enters current spans and merges inte
   const { extractEventsGatedProjection } = await import(MODULE);
   const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
   const contracted = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
-  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
-  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities');
+  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond-acquisition', 'securities');
+  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities');
   const equity = canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities');
-  const accident = canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer');
+  const accident = canonicalEvent('corporate-event', 'occurred', 'effective', 'serious-industrial-accident', 'operations');
   const cases = [
     {
       id: 'litigation-current-span-after-history',
@@ -2018,10 +2019,10 @@ test('round 4 independent semantic audit binds actors, objects, ordered polarity
   const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
   const active = canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
   const contracted = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
-  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
-  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities');
+  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond-acquisition', 'securities');
+  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities');
   const equity = canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities');
-  const accident = canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer');
+  const accident = canonicalEvent('corporate-event', 'occurred', 'effective', 'serious-industrial-accident', 'operations');
   const workStop = canonicalEvent('operating-status', 'halted', 'active', 'work-stop', 'operating-business');
   const cases = [
     ['litigation-counterparty-continuation', { reportName: '[기재정정] 소송등의제기', filedAt: '20260720', bodyText: '3. 정정사유 | 이번 안건 | 당사는 청구를 철회하여 법원 기록에 반영됐습니다. 상대방 회사는 별도 반소를 계속합니다.' }, [withdrawn]],
@@ -2060,8 +2061,8 @@ test('round 5 independent semantic audit separates aliases, follow-up plans, and
   const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
   const active = canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
   const equity = canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities');
-  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
-  const accident = canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer');
+  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond-acquisition', 'securities');
+  const accident = canonicalEvent('corporate-event', 'occurred', 'effective', 'serious-industrial-accident', 'operations');
   const workStop = canonicalEvent('operating-status', 'halted', 'active', 'work-stop', 'operating-business');
   const cases = [
     {
@@ -2116,9 +2117,9 @@ test('round 6 independent semantic audit supports heading-free corrections and s
   const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
   const active = canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
   const trust = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
-  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
+  const acquired = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond-acquisition', 'securities');
   const equity = canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities');
-  const accident = canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer');
+  const accident = canonicalEvent('corporate-event', 'occurred', 'effective', 'serious-industrial-accident', 'operations');
   const workStop = canonicalEvent('operating-status', 'halted', 'active', 'work-stop', 'operating-business');
   const cases = [
     {
@@ -2215,10 +2216,10 @@ test('round 7 valid semantic contract accumulates explicit body intents under ge
   const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
   const trustProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities');
   const trustEffective = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
-  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities');
-  const bondEffective = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
+  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities');
+  const bondEffective = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond-acquisition', 'securities');
   const product = canonicalEvent('regulatory-product', 'withdrawn', 'cancelled', 'product-approval', 'product');
-  const accident = canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer');
+  const accident = canonicalEvent('corporate-event', 'occurred', 'effective', 'serious-industrial-accident', 'operations');
   const workStop = canonicalEvent('operating-status', 'halted', 'active', 'work-stop', 'operating-business');
   const equity = canonicalEvent('capital-change', 'rescheduled', 'pending', 'equity-securities', 'securities');
   const cases = [
@@ -2256,12 +2257,12 @@ test('round 7 valid semantic contract accumulates explicit body intents under ge
 test('round 8 natural prose keeps independent event lifecycles separate', async () => {
   const { extractEventsGatedProjection } = await import(MODULE);
   const active = canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
-  const filed = canonicalEvent('legal-regulatory', 'filed', null, 'litigation', 'issuer');
+  const filed = canonicalEvent('legal-regulatory', 'filed', 'active', 'litigation', 'issuer');
   const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
   const trustProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities');
   const trustEffective = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
-  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities');
-  const bondEffective = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
+  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities');
+  const bondEffective = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond-acquisition', 'securities');
   const product = canonicalEvent('regulatory-product', 'withdrawn', 'cancelled', 'product-approval', 'product');
   const cases = [
     ['generic-active-arbitration', {
@@ -2322,12 +2323,12 @@ test('round 8 natural prose keeps independent event lifecycles separate', async 
 test('round 9 semantic subjects separate lifecycle, actor, and independent objects', async () => {
   const { extractEventsGatedProjection } = await import(MODULE);
   const active = canonicalEvent('legal-regulatory', 'updated', 'active', 'litigation', 'issuer');
-  const filed = canonicalEvent('legal-regulatory', 'filed', null, 'litigation', 'issuer');
+  const filed = canonicalEvent('legal-regulatory', 'filed', 'active', 'litigation', 'issuer');
   const withdrawn = canonicalEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer');
   const trustEffective = canonicalEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities');
   const trustProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'treasury-share-trust', 'securities');
-  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities');
-  const bondEffective = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities');
+  const bondProposed = canonicalEvent('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities');
+  const bondEffective = canonicalEvent('capital-change', 'acquired', 'effective', 'convertible-bond-acquisition', 'securities');
   const product = canonicalEvent('regulatory-product', 'withdrawn', 'cancelled', 'product-approval', 'product');
   const positiveCases = [
     ['active-litigation-status-title', {
@@ -2402,15 +2403,15 @@ test('round 9 semantic subjects separate lifecycle, actor, and independent objec
     ['third-party-bond-purchase', {
       reportName: '전환사채 거래 관련 안내',
       bodyText: '관계회사가 당사가 발행한 전환사채 일부를 기존 투자자로부터 매수했습니다. 매수인은 발행회사인 당사가 아니며 당사의 자기 전환사채 취득도 아닙니다.',
-    }, (event) => event.cause === 'convertible-bond'],
+    }, (event) => event.cause === 'convertible-bond-acquisition'],
     ['withdrawn-bond-decision', {
       reportName: '자기 전환사채 취득 결정 철회',
       bodyText: '당초 예정했던 전환사채 매수는 합의가 무산되어 오늘 전면 철회되었습니다. 회사가 실제로 취득한 물량은 없고 향후 취득 의무도 없습니다.',
-    }, (event) => event.cause === 'convertible-bond'],
+    }, (event) => event.cause === 'convertible-bond-acquisition'],
     ['historical-own-bond-disposition-plan-is-not-current-acquisition', {
       reportName: '자기 전환사채 처분 계획',
       bodyText: '당사는 과거에 이미 취득해 보유 중인 자기 전환사채를 다음 분기에 재매각할 계획입니다. 이번 공시에서 새로 취득하거나 취득을 결정한 사실은 없습니다.',
-    }, (event) => event.cause === 'convertible-bond'],
+    }, (event) => event.cause === 'convertible-bond-acquisition'],
     ['product-reapplication-is-not-fda-crl', {
       reportName: '품목허가 보완 후 재신청',
       bodyText: '지난달 형식상 취하했던 품목허가 신청은 자료 보완을 마쳐 오늘 같은 품목으로 재신청했고 당국 심사가 진행 중입니다.',
@@ -2565,7 +2566,7 @@ test('temporal burn-in repairs use current actors, objects, and lifecycle semant
         reportName: '공정거래자율준수프로그램운영현황',
         bodyText: '상반기 운영실적과 하반기 운영계획을 하나의 운영현황 보고서로 공시합니다.',
       },
-      expected: canonicalEvent('governance', 'reported', null, 'compliance-program', 'governance'),
+      expected: canonicalEvent('governance', 'reported', 'active', 'compliance-program', 'governance'),
     },
     {
       id: 'approved-business-reorganization-plan',
@@ -2632,7 +2633,7 @@ test('temporal burn-in repairs use current actors, objects, and lifecycle semant
         filedAt: '2026-07-23',
         bodyText: '배당 받을 주주를 확정하기 위한 기준일은 2026년 8월 10일로 결정되었습니다.',
       },
-      expected: canonicalEvent('corporate-action', 'decided', 'pending', 'record-date', 'securities'),
+      expected: canonicalEvent('corporate-action', 'decided', 'pending', 'record-date', 'ownership'),
     },
     {
       id: 'subsidiary-inclusion-uses-subsidiary-object',
@@ -2657,7 +2658,7 @@ test('temporal burn-in repairs use current actors, objects, and lifecycle semant
         bodyText: '중대재해가 발생했습니다 | 고용노동부가 해당 공정에 부분작업중지 명령을 발령했습니다.',
       },
       expected: [
-        canonicalEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer'),
+        canonicalEvent('corporate-event', 'occurred', 'effective', 'serious-industrial-accident', 'operations'),
         canonicalEvent('operating-status', 'halted', 'active', 'work-stop', 'operating-business'),
       ],
     },
@@ -2666,6 +2667,30 @@ test('temporal burn-in repairs use current actors, objects, and lifecycle semant
       input: {
         reportName: '투자판단관련주요경영사항(자회사의 주요경영사항)',
         bodyText: '에이아이데이터 주식회사 설립 및 출자 결정 | 취득주식수 1,000주 | 취득금액 100억원 | 취득방법 현금 출자',
+      },
+      expected: canonicalEvent('restructuring', 'decided', 'proposed', 'equity-acquisition', 'securities'),
+    },
+    {
+      id: 'minority-equity-acquisition-remains-an-asset-transaction',
+      input: {
+        reportName: '타법인주식및출자증권취득결정',
+        bodyText: '회사와 관계 | - | 취득후 소유주식수 및 지분비율 | 지분비율(%) | 10.30 | 취득방법 | 현금 취득',
+      },
+      expected: canonicalEvent('asset-transaction', 'decided', 'proposed', 'equity-acquisition', 'securities'),
+    },
+    {
+      id: 'existing-wholly-owned-subsidiary-recapitalization-remains-an-asset-transaction',
+      input: {
+        reportName: '타법인주식및출자증권취득결정(종속회사의주요경영사항)',
+        bodyText: '회사와 관계 | 자회사 | 취득후 소유주식수 및 지분비율 | 지분비율(%) | 100 | 종속회사가 100% 지분을 보유한 자회사의 신주 전체를 유상 취득',
+      },
+      expected: canonicalEvent('asset-transaction', 'decided', 'proposed', 'equity-acquisition', 'securities'),
+    },
+    {
+      id: 'acquisition-from-no-relationship-to-full-control-is-restructuring',
+      input: {
+        reportName: '타법인주식및출자증권취득결정(종속회사의주요경영사항)',
+        bodyText: '회사와 관계 | - | 취득후 소유주식수 및 지분비율 | 지분비율(%) | 100 | 발행회사의 구주 인수일과 같은 날 신주를 취득',
       },
       expected: canonicalEvent('restructuring', 'decided', 'proposed', 'equity-acquisition', 'securities'),
     },
@@ -2701,7 +2726,7 @@ test('temporal burn-in repairs use current actors, objects, and lifecycle semant
         reportName: '유상증자또는주식관련사채등의발행결과(자율공시)',
         bodyText: '유상증자 신주 발행 결과 | 주금 납입 및 신주 발행을 완료했습니다.',
       },
-      expected: canonicalEvent('capital-change', 'completed', 'effective', 'equity-securities', 'securities'),
+      expected: canonicalEvent('capital-change', 'completed', 'effective', 'rights-offering', 'securities'),
     },
     {
       id: 'corrected-business-plan-remains-proposed-business',
@@ -2725,7 +2750,7 @@ test('temporal burn-in repairs use current actors, objects, and lifecycle semant
 
 test('structured occurrence gates preserve independent product and ownership-plan rows', async () => {
   const { extractEventsGatedProjection } = await import(MODULE);
-  const product = canonicalEvent('regulatory-product', 'filed', 'pending', 'equity-linked-securities', 'product');
+  const product = canonicalEvent('capital-change', 'solicited', 'pending', 'derivative-linked-securities', 'securities');
   const products = extractEventsGatedProjection({
     reportName: '일괄신고추가서류(파생결합증권-주가연계증권)',
     filedAt: '2026-07-22',
@@ -2753,6 +2778,27 @@ test('structured occurrence gates preserve independent product and ownership-pla
     ].join(' | '),
   });
   assert.deepEqual(eventSet(plans.events), eventSet([plan, plan, plan]));
+});
+
+test('published ontology accepts specialized financial-transaction outputs', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const securities = extractEventsGatedProjection({
+    reportName: '계열금융회사의약관에의한금융거래-[기타유가증권]',
+    disclosureDetailType: 'J001',
+    bodyText: '계열금융회사와 기타유가증권 거래 현황을 보고합니다.',
+  });
+  assert.deepEqual(securities.events, [
+    canonicalEvent('related-party', 'reported', 'effective', 'other-securities-transactions', 'securities'),
+  ]);
+
+  const loan = extractEventsGatedProjection({
+    reportName: '금전대여결정',
+    filedAt: '2025-11-28',
+    bodyText: '대여일자 | 2025.11.28 | 금전대여 계약을 실행했습니다.',
+  });
+  assert.deepEqual(loan.events, [
+    canonicalEvent('material-contract', 'lent', 'effective', 'loan', 'contract'),
+  ]);
 });
 
 test('correction delta gates preserve specific lifecycle semantics', async () => {
@@ -2787,4 +2833,302 @@ test('correction delta gates preserve specific lifecycle semantics', async () =>
       : [{ input, expected: eventSet([expected]), actual: eventSet(actual.events) }];
   });
   assert.deepEqual(failures, []);
+});
+
+test('iteration 8 separated gates preserve wrapper authority, intent identity, lifecycle, and slots', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const e = canonicalEvent;
+  const cases = [
+    {
+      id: 'administrative-correction-order-is-exclusive',
+      input: {
+        reportName: '[정정명령부과]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '교환사채권 발행결정 본문과 예정 발행조건이 포함되어 있습니다.',
+      },
+      expected: [e('legal-regulatory', 'ordered', 'correction-requested', 'disclosure-correction', 'issuer')],
+    },
+    {
+      id: 'bodyless-generic-c004-does-not-invent-a-reorganization',
+      input: { reportName: '투자설명서', disclosureDetailType: 'C004', bodyText: '' },
+      expected: [],
+    },
+    {
+      id: 'original-contingent-capital-keeps-specific-identity',
+      input: {
+        reportName: '주요사항보고서(자본으로인정되는채무증권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '자본으로 인정되는 채무증권 발행결정 | 채권형 신종자본증권 | 이사회에서 발행을 결정',
+      },
+      expected: [e('capital-change', 'decided', 'proposed', 'contingent-capital-securities', 'securities')],
+    },
+    {
+      id: 'original-convertible-bond-keeps-specific-identity',
+      input: {
+        reportName: '주요사항보고서(전환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '전환사채권 발행결정 | 이사회에서 발행을 결정 | 납입 예정',
+      },
+      expected: [e('capital-change', 'decided', 'proposed', 'convertible-bond', 'securities')],
+    },
+    {
+      id: 'original-exchangeable-bond-keeps-specific-identity',
+      input: {
+        reportName: '주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '교환사채권 발행결정 | 교환대상 자기주식 | 이사회에서 발행을 결정',
+      },
+      expected: [e('capital-change', 'decided', 'proposed', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'original-rights-offering-keeps-specific-identity',
+      input: {
+        reportName: '주요사항보고서(유상증자결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '유상증자 결정 | 신주 발행 | 납입 예정',
+      },
+      expected: [e('capital-change', 'decided', 'proposed', 'rights-offering', 'securities')],
+    },
+    {
+      id: 'original-treasury-share-disposal-uses-listed-shares',
+      input: {
+        reportName: '주요사항보고서(자기주식처분결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '자기주식 처분 결정 | 처분예정주식 | 이사회 결의',
+      },
+      expected: [e('corporate-action', 'decided', 'proposed', 'treasury-share-disposal', 'listed-shares')],
+    },
+    {
+      id: 'self-convertible-bond-acquisition-contract-is-pending',
+      input: {
+        reportName: '주요사항보고서(자기전환사채만기전취득결정)',
+        disclosureDetailType: 'B001',
+        filedAt: '2025-10-22',
+        bodyText: '취득 결정일 | 2025년 10월 22일 | 취득예정일 | 2025년 10월 31일 | 사채권 양수도계약 체결',
+      },
+      expected: [e('capital-change', 'contracted', 'pending', 'convertible-bond-acquisition', 'securities')],
+    },
+    {
+      id: 'self-convertible-bond-acquisition-decision-without-contract',
+      input: {
+        reportName: '주요사항보고서(자기전환사채만기전취득결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '이사회에서 만기 전 취득을 결정하였으며 구체적인 계약일은 추후 정합니다.',
+      },
+      expected: [e('capital-change', 'decided', 'proposed', 'convertible-bond-acquisition', 'securities')],
+    },
+    {
+      id: 'self-convertible-bond-sale-is-an-asset-transaction',
+      input: {
+        reportName: '주요사항보고서(자기전환사채매도결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '자기 전환사채 매도 결정 | 매도 대상 사채 | 이사회 결의',
+      },
+      expected: [e('asset-transaction', 'decided', 'proposed', 'bond-sale', 'securities')],
+    },
+    {
+      id: 'correction-under-review-treasury-share-disposal',
+      input: {
+        reportName: '[기재정정]주요사항보고서(자기주식처분결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '정정사유 | 추가적인 논의가 필요하여 재검토하기로 하였고 향후 최종결정 후 재공시 예정',
+      },
+      expected: [e('capital-change', 'under-review', 'deferred', 'treasury-share-disposal', 'securities')],
+    },
+    {
+      id: 'correction-under-review-exchangeable-bond',
+      input: {
+        reportName: '[기재정정]주요사항보고서(교환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '정정사유 | 추가적인 논의가 필요하여 재검토하기로 하였고 향후 발행 여부를 최종결정',
+      },
+      expected: [e('capital-change', 'under-review', 'deferred', 'exchangeable-bond', 'securities')],
+    },
+    {
+      id: 'correction-rescheduled-convertible-bond',
+      input: {
+        reportName: '[기재정정]주요사항보고서(전환사채권발행결정)',
+        disclosureDetailType: 'B001',
+        bodyText: '정정사유 | 납입일정 변경 | 정정 전 2025년 12월 31일 | 정정 후 2026년 6월 30일 | 만기일 변경',
+      },
+      expected: [e('capital-change', 'rescheduled', 'deferred', 'convertible-bond', 'securities')],
+    },
+    {
+      id: 'issuance-result-convertible-bond-is-completed',
+      input: {
+        reportName: '유상증자또는주식관련사채등의발행결과(자율공시)',
+        disclosureDetailType: 'I001',
+        bodyText: '증권의 종류 | 무기명식 무보증 사모 전환사채 | 실제발행금액 | 납입일 | 납입 완료',
+      },
+      expected: [e('capital-change', 'completed', 'effective', 'convertible-bond', 'securities')],
+    },
+    {
+      id: 'corrected-rights-offering-result-stays-completed',
+      input: {
+        reportName: '[기재정정]유상증자또는주식관련사채등의발행결과(자율공시)',
+        disclosureDetailType: 'I001',
+        bodyText: '정정사유 | 실제발행금액 기재 정정 | 유상증자 | 신주 실제발행주식수 | 납입 완료',
+      },
+      expected: [e('capital-change', 'completed', 'effective', 'rights-offering', 'securities')],
+    },
+    {
+      id: 'record-date-object-is-ownership-not-security',
+      input: {
+        reportName: '현금ㆍ현물배당을위한주주명부폐쇄(기준일)결정',
+        filedAt: '2025-12-01',
+        bodyText: '배당 받을 주주를 확정하기 위한 기준일은 2025년 12월 31일로 결정되었습니다.',
+      },
+      expected: [e('corporate-action', 'decided', 'pending', 'record-date', 'ownership')],
+    },
+    {
+      id: 'compliance-program-report-is-active',
+      input: {
+        reportName: '공정거래자율준수프로그램운영현황(안내공시)',
+        bodyText: '현재 운영 중인 자율준수프로그램의 운영실적과 향후 계획을 보고합니다.',
+      },
+      expected: [e('governance', 'reported', 'active', 'compliance-program', 'governance')],
+    },
+    {
+      id: 'litigation-dismissal-requires-actual-order',
+      input: {
+        reportName: '소송등의판결ㆍ결정',
+        bodyText: '법원의 주문 | 이 사건 신청을 기각한다 | 결정일에 효력이 발생',
+      },
+      expected: [e('legal-regulatory', 'dismissed', 'effective', 'litigation', 'issuer')],
+    },
+    {
+      id: 'prospective-dismissal-language-does-not-create-dismissal',
+      input: {
+        reportName: '소송등의제기ㆍ신청',
+        bodyText: '상대방은 본 신청이 기각될 가능성이 있다고 주장했으나 법원이 신청을 접수하여 심리 중입니다.',
+      },
+      expected: [e('legal-regulatory', 'filed', 'active', 'litigation', 'issuer')],
+    },
+    {
+      id: 'serious-accident-and-affirmative-work-stop-are-two-events',
+      input: {
+        reportName: '중대재해발생',
+        bodyText: '중대재해가 발생하였습니다 | 고용노동부가 해당 공정에 작업중지 명령을 발령했습니다.',
+      },
+      expected: [
+        e('corporate-event', 'occurred', 'effective', 'serious-industrial-accident', 'operations'),
+        e('operating-status', 'halted', 'active', 'work-stop', 'operating-business'),
+      ],
+    },
+    {
+      id: 'serious-accident-without-work-stop-does-not-invent-stop',
+      input: {
+        reportName: '중대재해발생',
+        bodyText: '중대재해가 발생하여 관계기관에 신고했습니다. 작업중지 명령은 발령되지 않았습니다.',
+      },
+      expected: [e('corporate-event', 'occurred', 'effective', 'serious-industrial-accident', 'operations')],
+    },
+    {
+      id: 'tender-offer-filing-is-active-and-targets-listed-shares',
+      input: {
+        reportName: '공개매수신고서',
+        disclosureDetailType: 'D004',
+        bodyText: '공개매수 기간이 개시되었으며 공개매수 대상은 상장주식입니다.',
+      },
+      expected: [e('corporate-action', 'initiated', 'active', 'tender-offer', 'listed-shares')],
+    },
+    {
+      id: 'corrected-business-group-status-is-effective',
+      input: {
+        reportName: '[기재정정]대규모기업집단현황공시[연1회공시및1/4분기용(대표회사)]',
+        disclosureDetailType: 'J004',
+        bodyText: '정정사항 | 계열회사 거래 금액 기재정정 | 정정 후 현황을 보고합니다.',
+      },
+      expected: [e('governance', 'updated', 'effective', 'business-group-status', 'governance')],
+    },
+    {
+      id: 'generic-management-business-disposal-final-settlement',
+      input: {
+        reportName: '[기재정정]기타경영사항(자율공시)',
+        bodyText: '정정사유 | 거래 정산에 따른 양도가액 최종 확정 | 편광필름 사업 양도 | 거래 종결일 기준 최종 확정금액',
+      },
+      expected: [e('asset-transaction', 'price-set', 'finalized', 'business-disposal', 'business')],
+    },
+    {
+      id: 'corrected-supply-contract-under-review',
+      input: {
+        reportName: '[기재정정]단일판매ㆍ공급계약체결',
+        filedAt: '2025-12-31',
+        bodyText: '정정사유 | 계약기간 종료 및 계약변경 협의중 | 계약 상대와 협의중으로 추후 확정시 정정공시 예정',
+      },
+      expected: [e('material-contract', 'under-review', 'pending', 'supply-contract', 'contract')],
+    },
+    {
+      id: 'related-party-collateral-period-finalized',
+      input: {
+        reportName: '[기재정정]타인에대한담보제공결정',
+        filedAt: '2025-12-31',
+        bodyText: '정정사유 | 담보제공기간 확정에 따른 정정 | 채무자는 당사의 자회사 | 시작일 2026년 1월 6일 | 종료일 2027년 1월 6일',
+      },
+      expected: [e('related-party', 'updated', 'finalized', 'collateral-provision', 'asset')],
+    },
+    {
+      id: 'business-plan-guidance-correction-keeps-earnings-identity',
+      input: {
+        reportName: '[기재정정]장래사업ㆍ경영계획(공정공시)',
+        bodyText: '정정사항 | 매출액 및 영업이익 전망 수치 정정 | 향후 실적 전망과 목표 매출을 갱신합니다.',
+      },
+      expected: [e('earnings', 'updated', 'projected', 'earnings-guidance', 'financials')],
+    },
+    {
+      id: 'business-plan-facility-investment-withdrawal',
+      input: {
+        reportName: '[기재정정]장래사업ㆍ경영계획(공정공시)',
+        bodyText: '정정사유 | 투자 철회 | 고순도 소재 생산시설 투자 계획을 경제성 하락에 따라 철회하기로 결정',
+      },
+      expected: [e('capital-expenditure', 'withdrawn', 'cancelled', 'facility-investment', 'asset')],
+    },
+    {
+      id: 'generic-business-plan-correction-remains-proposed',
+      input: {
+        reportName: '[기재정정]장래사업ㆍ경영계획(공정공시)',
+        bodyText: '정정사유 | 협력 구조 및 예상투자금액 정정 | 세부 계약 조건은 협의 중이며 현재 미확정',
+      },
+      expected: [e('corporate-event', 'updated', 'proposed', 'business-plan', 'business')],
+    },
+  ];
+
+  const failures = cases.flatMap(({ id, input, expected }) => {
+    const actual = extractEventsGatedProjection(input);
+    return JSON.stringify(eventSet(actual.events)) === JSON.stringify(eventSet(expected))
+      ? []
+      : [{ id, expected: eventSet(expected), actual: eventSet(actual.events) }];
+  });
+  assert.deepEqual(failures, []);
+});
+
+test('iteration 8 occurrence gate preserves C003 product multiplicity and security family', async () => {
+  const { extractEventsGatedProjection } = await import(MODULE);
+  const linked = canonicalEvent('capital-change', 'solicited', 'pending', 'derivative-linked-securities', 'securities');
+  const linkedOutput = extractEventsGatedProjection({
+    reportName: '일괄신고추가서류(파생결합증권-주가연계증권)',
+    disclosureDetailType: 'C003',
+    bodyText: [
+      '모집 또는 매출 증권의 종류',
+      '한화디럭스ELS 제10733호 파생결합증권(주가연계증권)',
+      '한화디럭스ELS 제10734호 파생결합증권(주가연계증권)',
+      '한화스마트ELS 제9434호 파생결합증권(주가연계증권)',
+      '이번 모집 또는 매출총액 | 30,000,000,000원',
+    ].join(' | '),
+  });
+  assert.deepEqual(eventSet(linkedOutput.events), eventSet([linked, linked, linked]));
+
+  const generic = canonicalEvent('capital-change', 'solicited', 'pending', 'derivative-securities', 'securities');
+  const genericOutput = extractEventsGatedProjection({
+    reportName: '일괄신고추가서류(기타파생결합증권)',
+    disclosureDetailType: 'C003',
+    bodyText: [
+      '모집 또는 매출 증권의 종류',
+      '현대차증권 제127회 기타파생결합증권',
+      '현대차증권 제128회 기타파생결합증권',
+      '현대차증권 제129회 기타파생결합증권',
+      '이번 모집 또는 매출총액 | 150,000,000,000원',
+    ].join(' | '),
+  });
+  assert.deepEqual(eventSet(genericOutput.events), eventSet([generic, generic, generic]));
 });

@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 import { realpathSync } from 'node:fs';
-import { mkdir, writeFile } from 'node:fs/promises';
-import { dirname, resolve } from 'node:path';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import {
   buildTemporalCandidateFreeze,
@@ -14,7 +13,10 @@ import {
   normalizeTemporalCollectionPlan,
   validateTemporalCandidateFreeze,
 } from '../src/services/deepscan-kr-disclosure-temporal-protocol.js';
-import { readExclusionManifest } from './collect-dart-disclosure-temporal-holdout.mjs';
+import {
+  readExclusionManifest,
+  writeImmutableArtifact,
+} from './collect-dart-disclosure-temporal-holdout.mjs';
 
 function parseArgs(argv) {
   const parsed = {};
@@ -75,8 +77,7 @@ export async function main(argv = process.argv.slice(2), options = {}) {
   const manifest = buildTemporalCandidateFreeze({ precommit, timestampReceipts });
   validateTemporalCandidateFreeze(manifest, { selectionSeed, exclusion });
   const bytes = `${JSON.stringify(manifest, null, 2)}\n`;
-  await mkdir(dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, bytes, { encoding: 'utf8', flag: 'wx' });
+  await writeImmutableArtifact(outputPath, bytes);
   process.stdout.write(`${JSON.stringify({
     outputPath,
     experimentId: precommit.experimentId,

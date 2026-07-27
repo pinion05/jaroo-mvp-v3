@@ -1,0 +1,12 @@
+{
+  "schemaVersion": "jaroo.kr-disclosure-event-candidate-attempt-status.v1",
+  "experimentId": "kospi-canonical-events-temporal-2026-07-29-v1",
+  "candidateFreezePath": "archive/kr-disclosure-event-candidate-freeze.2026-07-29-n60.superseded.v2.json",
+  "candidateFreezeFileSha256": "5535f37d164ee5ae3aadbc2c2a2779bd210039b91f381713a58451b2c8341094",
+  "status": "superseded-before-collection",
+  "recordedAt": "2026-07-27T04:04:37Z",
+  "dataCollected": false,
+  "predictionsGenerated": false,
+  "labelsInspected": false,
+  "reason": "The precommitted N=60 cohort was superseded before its future window because the strict statistical gate was strengthened to N>=325 with a 90% Wilson lower bound, explicit calibration, and coverage lower-bound requirements."
+}
