@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const { createHash } = require('node:crypto');
 const { execFileSync } = require('node:child_process');
 const { readFileSync, realpathSync } = require('node:fs');
-const { mkdtemp, readFile, readdir, rm, writeFile } = require('node:fs/promises');
+const { copyFile, mkdtemp, readFile, readdir, rm, writeFile } = require('node:fs/promises');
 const { tmpdir } = require('node:os');
 const { join, relative, resolve, sep } = require('node:path');
 const { pathToFileURL } = require('node:url');
@@ -615,9 +615,9 @@ test('benchmark result records fixture, evaluator, extractor, and threshold hash
     gateMode: 'diagnostic',
   });
   assert.deepEqual(Object.keys(report.hashes).sort(), [
-    'annotationManifestSha256', 'candidateFreezeManifestSha256', 'evaluatorSha256',
-    'extractorSha256', 'fixtureSha256', 'ontologyManifestSha256', 'rawCorpusFileSha256',
-    'thresholdsSha256',
+    'annotationManifestSha256', 'candidateFreezeManifestSha256', 'correctionTableSha256',
+    'evaluatorSha256', 'extractorSha256', 'fixtureSha256', 'ontologyManifestSha256',
+    'rawCorpusFileSha256', 'thresholdsSha256',
   ]);
   assert.equal(report.ontologyVersion, ONTOLOGY_VERSION);
   assert.equal(report.schemaVersion, 'jaroo.kr-disclosure-event-temporal-holdout-result.v3');
@@ -1990,11 +1990,28 @@ test('candidate fingerprint includes extractor and collector transitive dependen
   const protocol = await import(pathToFileURL(PROTOCOL));
   const fingerprint = protocol.currentTemporalCandidateFingerprint();
   for (const field of [
-    'classificationDatasetSha256', 'disclosurePipelineSha256',
+    'correctionTableSha256', 'classificationDatasetSha256', 'disclosurePipelineSha256',
     'disclosureRiskKeywordsSha256', 'safeJsonSha256', 'dartFilingsSha256',
     'exclusionManifestFileSha256',
     'exclusionBuilderSha256',
   ]) assert.match(fingerprint[field], /^[a-f0-9]{64}$/u);
+});
+
+test('candidate fingerprint changes when the correction parser changes', async (t) => {
+  const protocol = await import(pathToFileURL(PROTOCOL));
+  const temporaryRoot = await mkdtemp(join(tmpdir(), 'jaroo-correction-fingerprint-'));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const parserCopy = join(temporaryRoot, 'deepscan-kr-correction-table.js');
+  await copyFile(join(__dirname, '..', 'src/services/deepscan-kr-correction-table.js'), parserCopy);
+  const original = protocol.currentTemporalCandidateFingerprint(undefined, {
+    fileOverrides: { correctionTableSha256: parserCopy },
+  });
+  await writeFile(parserCopy, `${await readFile(parserCopy, 'utf8')}\n// fingerprint mutation\n`);
+  const mutated = protocol.currentTemporalCandidateFingerprint(undefined, {
+    fileOverrides: { correctionTableSha256: parserCopy },
+  });
+  assert.notEqual(mutated.correctionTableSha256, original.correctionTableSha256);
+  assert.notEqual(mutated.bundleSha256, original.bundleSha256);
 });
 
 test('burned v1 data cannot become claim-eligible by changing only role and audit fields', async () => {

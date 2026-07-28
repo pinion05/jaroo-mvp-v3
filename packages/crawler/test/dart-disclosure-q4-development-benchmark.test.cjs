@@ -90,6 +90,11 @@ test('Q4 benchmark runs from the committed git archive without dirty or untracke
   assert.match(report.hashes.evidenceManifestSha256, /^[a-f0-9]{64}$/);
   assert.match(report.oracleProvenance.sourceExtractorSha256, /^[a-f0-9]{64}$/);
   assert.match(report.hashes.extractorSha256, /^[a-f0-9]{64}$/);
+  assert.match(report.hashes.correctionTableSha256, /^[a-f0-9]{64}$/);
+  assert.match(report.hashes.classificationDatasetSha256, /^[a-f0-9]{64}$/);
+  assert.match(report.hashes.disclosurePipelineSha256, /^[a-f0-9]{64}$/);
+  assert.match(report.hashes.disclosureRiskKeywordsSha256, /^[a-f0-9]{64}$/);
+  assert.match(report.hashes.safeJsonSha256, /^[a-f0-9]{64}$/);
   assert.match(report.hashes.q4RunnerSha256, /^[a-f0-9]{64}$/);
   assert.match(report.hashes.scoringEvaluatorSha256, /^[a-f0-9]{64}$/);
 });
@@ -105,6 +110,40 @@ test('Q4 provenance detects a scoring evaluator source mutation', async (t) => {
   const mutated = await hashQ4BenchmarkSources({ scoringEvaluatorPath: mutatedEvaluator });
   assert.notEqual(mutated.scoringEvaluatorSha256, original.scoringEvaluatorSha256);
   assert.equal(mutated.q4RunnerSha256, original.q4RunnerSha256);
+});
+
+test('Q4 provenance detects a correction parser source mutation', async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), 'jaroo-q4-correction-hash-'));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const correctionTable = join(temporaryRoot, 'deepscan-kr-correction-table.js');
+  await copyFile(join(PACKAGE_ROOT, 'src/services/deepscan-kr-correction-table.js'), correctionTable);
+  const { hashQ4BenchmarkSources } = await loadRunner();
+  const original = await hashQ4BenchmarkSources();
+  await writeFile(correctionTable, `${await readFile(correctionTable, 'utf8')}\n// provenance mutation\n`);
+  const mutated = await hashQ4BenchmarkSources({ correctionTablePath: correctionTable });
+  assert.notEqual(mutated.correctionTableSha256, original.correctionTableSha256);
+  assert.equal(mutated.q4RunnerSha256, original.q4RunnerSha256);
+  assert.equal(mutated.scoringEvaluatorSha256, original.scoringEvaluatorSha256);
+});
+
+test('Q4 provenance detects extractor dependency mutations', async (t) => {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), 'jaroo-q4-dependency-hash-'));
+  t.after(() => rm(temporaryRoot, { recursive: true, force: true }));
+  const { hashQ4BenchmarkSources } = await loadRunner();
+  const original = await hashQ4BenchmarkSources();
+  const dependencies = [
+    ['classificationDatasetPath', 'classificationDatasetSha256', resolve(PACKAGE_ROOT, 'src/data/kr-disclosure-classification-dataset.js')],
+    ['disclosurePipelinePath', 'disclosurePipelineSha256', resolve(PACKAGE_ROOT, 'src/services/deepscan-kr-disclosure-pipeline.js')],
+    ['disclosureRiskKeywordsPath', 'disclosureRiskKeywordsSha256', resolve(PACKAGE_ROOT, 'src/services/deepscan-kr-disclosure-risk-keywords.js')],
+    ['safeJsonPath', 'safeJsonSha256', resolve(PACKAGE_ROOT, '../deepscan-runtime-core/src/safe-json.js')],
+  ];
+  for (const [optionName, hashName, source] of dependencies) {
+    const copy = join(temporaryRoot, basename(source));
+    await copyFile(source, copy);
+    await writeFile(copy, `${await readFile(copy, 'utf8')}\n// provenance mutation\n`);
+    const mutated = await hashQ4BenchmarkSources({ [optionName]: copy });
+    assert.notEqual(mutated[hashName], original[hashName], hashName);
+  }
 });
 
 async function copiedArtifacts(t, prefix) {

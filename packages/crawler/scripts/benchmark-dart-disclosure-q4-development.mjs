@@ -31,6 +31,11 @@ const DEFAULT_EVIDENCE_MANIFEST = resolve(
   'test/artifacts/kr-disclosure-event-q4-development-evidence-manifest.v1.json',
 );
 const EXTRACTOR_PATH = resolve(ROOT, 'src/services/deepscan-kr-disclosure-event-extractors.js');
+const CORRECTION_TABLE_PATH = resolve(ROOT, 'src/services/deepscan-kr-correction-table.js');
+const CLASSIFICATION_DATASET_PATH = resolve(ROOT, 'src/data/kr-disclosure-classification-dataset.js');
+const DISCLOSURE_PIPELINE_PATH = resolve(ROOT, 'src/services/deepscan-kr-disclosure-pipeline.js');
+const DISCLOSURE_RISK_KEYWORDS_PATH = resolve(ROOT, 'src/services/deepscan-kr-disclosure-risk-keywords.js');
+const SAFE_JSON_PATH = resolve(ROOT, '../deepscan-runtime-core/src/safe-json.js');
 const ONTOLOGY_PATH = resolve(ROOT, 'src/services/deepscan-kr-disclosure-event-ontology.js');
 const Q4_RUNNER_PATH = fileURLToPath(import.meta.url);
 const SCORING_EVALUATOR_PATH = resolve(ROOT, 'scripts/benchmark-dart-disclosure-temporal-holdout.mjs');
@@ -59,14 +64,37 @@ async function readArtifact(path) {
 export async function hashQ4BenchmarkSources({
   q4RunnerPath = Q4_RUNNER_PATH,
   scoringEvaluatorPath = SCORING_EVALUATOR_PATH,
+  correctionTablePath = CORRECTION_TABLE_PATH,
+  classificationDatasetPath = CLASSIFICATION_DATASET_PATH,
+  disclosurePipelinePath = DISCLOSURE_PIPELINE_PATH,
+  disclosureRiskKeywordsPath = DISCLOSURE_RISK_KEYWORDS_PATH,
+  safeJsonPath = SAFE_JSON_PATH,
 } = {}) {
-  const [q4RunnerBytes, scoringEvaluatorBytes] = await Promise.all([
+  const [
+    q4RunnerBytes,
+    scoringEvaluatorBytes,
+    correctionTableBytes,
+    classificationDatasetBytes,
+    disclosurePipelineBytes,
+    disclosureRiskKeywordsBytes,
+    safeJsonBytes,
+  ] = await Promise.all([
     readFile(q4RunnerPath),
     readFile(scoringEvaluatorPath),
+    readFile(correctionTablePath),
+    readFile(classificationDatasetPath),
+    readFile(disclosurePipelinePath),
+    readFile(disclosureRiskKeywordsPath),
+    readFile(safeJsonPath),
   ]);
   return {
     q4RunnerSha256: sha256(q4RunnerBytes),
     scoringEvaluatorSha256: sha256(scoringEvaluatorBytes),
+    correctionTableSha256: sha256(correctionTableBytes),
+    classificationDatasetSha256: sha256(classificationDatasetBytes),
+    disclosurePipelineSha256: sha256(disclosurePipelineBytes),
+    disclosureRiskKeywordsSha256: sha256(disclosureRiskKeywordsBytes),
+    safeJsonSha256: sha256(safeJsonBytes),
   };
 }
 
@@ -310,7 +338,13 @@ export async function runQ4DevelopmentBenchmark({
 } = {}) {
   const absoluteCorpusPath = resolve(corpusPath);
   const absoluteOraclePath = resolve(oraclePath);
-  const [corpusArtifact, oracleArtifact, extractorBytes, ontologyBytes, benchmarkSourceHashes] = await Promise.all([
+  const [
+    corpusArtifact,
+    oracleArtifact,
+    extractorBytes,
+    ontologyBytes,
+    benchmarkSourceHashes,
+  ] = await Promise.all([
     readArtifact(absoluteCorpusPath),
     readArtifact(absoluteOraclePath),
     readFile(EXTRACTOR_PATH),

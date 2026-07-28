@@ -537,7 +537,7 @@ test('document baseline remains separate while the gated candidate exposes all p
   const input = { rceptNo: '20260713800438', reportName: '기타안내사항(안내공시)', bodyText: '| 1. 제목 | | 의무보유 기간 만료 안내 | | 해제일 | 2026.07.16 |' };
   assert.equal(extractorModule.extractEventsDocumentAwareProjection(input).strategy, 'document-aware-hierarchical-projection');
   const gated = extractorModule.extractEventsGatedProjection(input);
-  assert.equal(gated.strategy, 'semantic-gate-v7');
+  assert.equal(gated.strategy, 'semantic-gate-v8');
   assert.match(gated.ontologyVersion, /^jaroo\.kr-disclosure-event-ontology\.v\d+$/u);
   assert.match(gated.ontologyHash, /^[a-f0-9]{64}$/u);
   assert.equal(extractorModule.normalizeDisclosureEventGateInput({ reportName: '[첨부추가] 공시' }).wrapperKind, 'attachment-added');

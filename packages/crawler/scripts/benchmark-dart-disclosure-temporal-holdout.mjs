@@ -27,6 +27,7 @@ const ROOT = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const DEFAULT_FIXTURE = resolve(ROOT, 'test/fixtures/kr-disclosure-event-temporal-holdout.v1.json');
 const EVALUATOR_PATH = fileURLToPath(import.meta.url);
 const EXTRACTOR_PATH = resolve(ROOT, 'src/services/deepscan-kr-disclosure-event-extractors.js');
+const CORRECTION_TABLE_PATH = resolve(ROOT, 'src/services/deepscan-kr-correction-table.js');
 export const CANONICAL_EVENT_FIELDS = CANONICAL_DISCLOSURE_EVENT_FIELDS;
 // Development and burned temporal calibration both place the resolved
 // medium-confidence bucket near 90% exactness.  Keep a conservative gap to
@@ -1216,6 +1217,7 @@ export async function runTemporalHoldoutBenchmark({
       fixtureSha256: createHash('sha256').update(fixtureBytes).digest('hex'),
       evaluatorSha256: createHash('sha256').update(await readFile(EVALUATOR_PATH)).digest('hex'),
       extractorSha256: createHash('sha256').update(await readFile(EXTRACTOR_PATH)).digest('hex'),
+      correctionTableSha256: createHash('sha256').update(await readFile(CORRECTION_TABLE_PATH)).digest('hex'),
       ontologyManifestSha256: KR_DISCLOSURE_EVENT_ONTOLOGY_HASH,
       thresholdsSha256: createHash('sha256').update(JSON.stringify(STRICT_THRESHOLDS)).digest('hex'),
       candidateFreezeManifestSha256: fixture.candidateFreeze?.manifestFileSha256 ?? null,

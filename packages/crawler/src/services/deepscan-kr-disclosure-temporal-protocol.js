@@ -14,7 +14,7 @@ import {
   KR_DISCLOSURE_EVENT_ONTOLOGY_VERSION,
 } from './deepscan-kr-disclosure-event-ontology.js';
 
-export const KR_DISCLOSURE_TEMPORAL_FREEZE_SCHEMA_VERSION = 'jaroo.kr-disclosure-event-candidate-freeze.v2';
+export const KR_DISCLOSURE_TEMPORAL_FREEZE_SCHEMA_VERSION = 'jaroo.kr-disclosure-event-candidate-freeze.v3';
 export const KR_DISCLOSURE_TEMPORAL_CORPUS_SCHEMA_VERSION = 'jaroo.kr-disclosure-temporal-holdout-corpus.v2';
 export const KR_DISCLOSURE_TEMPORAL_TIMESTAMP_ENVELOPE_SCHEMA_VERSION = 'jaroo.rfc3161-detached-envelope.v1';
 export const KR_DISCLOSURE_TEMPORAL_CHAIN_DOMAIN = 'jaroo.kr-disclosure-temporal-chain.v2';
@@ -68,6 +68,7 @@ const RFC3161_RECEIPT_FIELDS = Object.freeze([
 ]);
 const CANDIDATE_PATHS = Object.freeze({
   extractor: resolve(CRAWLER_ROOT, 'src/services/deepscan-kr-disclosure-event-extractors.js'),
+  correctionTable: resolve(CRAWLER_ROOT, 'src/services/deepscan-kr-correction-table.js'),
   ontology: resolve(CRAWLER_ROOT, 'src/services/deepscan-kr-disclosure-event-ontology.js'),
   classificationDataset: resolve(CRAWLER_ROOT, 'src/data/kr-disclosure-classification-dataset.js'),
   disclosurePipeline: resolve(CRAWLER_ROOT, 'src/services/deepscan-kr-disclosure-pipeline.js'),
@@ -87,6 +88,7 @@ const CANDIDATE_PATHS = Object.freeze({
 });
 const CANDIDATE_FILE_FIELDS = Object.freeze({
   extractorSha256: CANDIDATE_PATHS.extractor,
+  correctionTableSha256: CANDIDATE_PATHS.correctionTable,
   ontologySourceSha256: CANDIDATE_PATHS.ontology,
   classificationDatasetSha256: CANDIDATE_PATHS.classificationDataset,
   disclosurePipelineSha256: CANDIDATE_PATHS.disclosurePipeline,
@@ -104,20 +106,19 @@ const CANDIDATE_FILE_FIELDS = Object.freeze({
   freeTsaRootSha256: CANDIDATE_PATHS.freeTsaRoot,
   freeTsaChainSha256: CANDIDATE_PATHS.freeTsaChain,
 });
-const CANDIDATE_REPOSITORY_PATHS = Object.freeze(Object.fromEntries(
-  Object.entries(CANDIDATE_FILE_FIELDS).map(([field, path]) => [
-    field,
-    path.slice(REPOSITORY_ROOT.length + 1).replaceAll('\\', '/'),
-  ]),
+const LEGACY_V2_CANDIDATE_FILE_FIELDS = Object.freeze(Object.fromEntries(
+  Object.entries(CANDIDATE_FILE_FIELDS).filter(([field]) => field !== 'correctionTableSha256'),
 ));
 const TEMPORAL_COLLECTION_PLAN_FIELDS = Object.freeze(Object.keys(
   KR_DISCLOSURE_TEMPORAL_DEFAULT_COLLECTION_PLAN,
 ));
-const TEMPORAL_CANDIDATE_FINGERPRINT_FIELDS = Object.freeze([
-  ...Object.keys(CANDIDATE_FILE_FIELDS),
-  'ontologyVersion', 'ontologyManifestSha256', 'thresholdsSha256',
-  'timestampAuthoritiesSha256', 'selectionAlgorithm', 'bundleSha256',
-]);
+function temporalCandidateFingerprintFields(candidateFileFields) {
+  return [
+    ...Object.keys(candidateFileFields),
+    'ontologyVersion', 'ontologyManifestSha256', 'thresholdsSha256',
+    'timestampAuthoritiesSha256', 'selectionAlgorithm', 'bundleSha256',
+  ];
+}
 const TEMPORAL_CANDIDATE_PRECOMMIT_FIELDS = Object.freeze([
   'schemaVersion', 'experimentId', 'timeZone', 'timestampAuthorities',
   'sampling', 'collectionPlan', 'candidate', 'repository',
@@ -589,14 +590,17 @@ export function validateDetachedTimestampEnvelope(payload, envelope, options = {
   return validateRfc3161Receipts(payload, envelope.timestampReceipts, options);
 }
 
-export function currentTemporalCandidateFingerprint(thresholds = KR_DISCLOSURE_TEMPORAL_STRICT_THRESHOLDS) {
+export function currentTemporalCandidateFingerprint(
+  thresholds = KR_DISCLOSURE_TEMPORAL_STRICT_THRESHOLDS,
+  { fileOverrides = {} } = {},
+) {
   if (!thresholds || typeof thresholds !== 'object' || Array.isArray(thresholds)) {
     throw new Error('strict thresholds are required to fingerprint the candidate');
   }
   const components = {
     ...Object.fromEntries(Object.entries(CANDIDATE_FILE_FIELDS).map(([field, path]) => [
       field,
-      sha256(readFileSync(path)),
+      sha256(readFileSync(fileOverrides[field] ?? path)),
     ])),
     ontologyVersion: KR_DISCLOSURE_EVENT_ONTOLOGY_VERSION,
     ontologyManifestSha256: KR_DISCLOSURE_EVENT_ONTOLOGY_HASH,
@@ -658,7 +662,7 @@ export function buildTemporalCandidatePrecommit({
     throw new Error('candidate precommit must use the repository-frozen temporal exclusion manifest');
   }
   return Object.freeze({
-    schemaVersion: 'jaroo.kr-disclosure-event-candidate-precommit.v2',
+    schemaVersion: 'jaroo.kr-disclosure-event-candidate-precommit.v3',
     experimentId: normalizedExperimentId,
     timeZone: KR_DISCLOSURE_TEMPORAL_FREEZE_TIME_ZONE,
     timestampAuthorities: currentRfc3161AuthorityManifest(),
@@ -699,7 +703,7 @@ export function buildTemporalCandidateFreeze({
   });
 }
 
-function validateCandidateRepositoryAnchor(precommit) {
+function validateCandidateRepositoryAnchor(precommit, candidateFileFields) {
   const repository = precommit.repository;
   if (!/^[a-f0-9]{40}$/u.test(repository?.gitHead ?? '')) {
     throw new Error('candidate freeze repository.gitHead must be a full Git commit id');
@@ -709,10 +713,10 @@ function validateCandidateRepositoryAnchor(precommit) {
   } catch {
     throw new Error('candidate freeze Git commit is not available in the repository');
   }
-  const committedHashes = Object.fromEntries(Object.entries(CANDIDATE_REPOSITORY_PATHS).map(([field, path]) => [
-    field,
-    sha256(gitOutput(['show', `${repository.gitHead}:${path}`], { encoding: null })),
-  ]));
+  const committedHashes = Object.fromEntries(Object.entries(candidateFileFields).map(([field, absolutePath]) => {
+    const path = absolutePath.slice(REPOSITORY_ROOT.length + 1).replaceAll('\\', '/');
+    return [field, sha256(gitOutput(['show', `${repository.gitHead}:${path}`], { encoding: null }))];
+  }));
   for (const [field, committedHash] of Object.entries(committedHashes)) {
     if (precommit.candidate[field] !== committedHash) {
       throw new Error(`candidate freeze ${field} is not anchored by repository.gitHead`);
@@ -730,7 +734,8 @@ export function validateTemporalCandidateFreeze(manifest, {
   now = new Date(),
 } = {}) {
   requireExactFields(manifest, TEMPORAL_CANDIDATE_FREEZE_FIELDS, 'candidate freeze manifest');
-  if (manifest?.schemaVersion !== KR_DISCLOSURE_TEMPORAL_FREEZE_SCHEMA_VERSION) {
+  const legacyV2 = manifest?.schemaVersion === 'jaroo.kr-disclosure-event-candidate-freeze.v2';
+  if (!legacyV2 && manifest?.schemaVersion !== KR_DISCLOSURE_TEMPORAL_FREEZE_SCHEMA_VERSION) {
     throw new Error('invalid temporal candidate freeze schemaVersion');
   }
   if (manifest.timeZone !== KR_DISCLOSURE_TEMPORAL_FREEZE_TIME_ZONE) {
@@ -738,7 +743,10 @@ export function validateTemporalCandidateFreeze(manifest, {
   }
   const precommit = manifest.precommit;
   requireExactFields(precommit, TEMPORAL_CANDIDATE_PRECOMMIT_FIELDS, 'candidate freeze precommit');
-  if (precommit?.schemaVersion !== 'jaroo.kr-disclosure-event-candidate-precommit.v2') {
+  const expectedPrecommitSchema = legacyV2
+    ? 'jaroo.kr-disclosure-event-candidate-precommit.v2'
+    : 'jaroo.kr-disclosure-event-candidate-precommit.v3';
+  if (precommit?.schemaVersion !== expectedPrecommitSchema) {
     throw new Error('invalid temporal candidate precommit schemaVersion');
   }
   if (precommit.timeZone !== KR_DISCLOSURE_TEMPORAL_FREEZE_TIME_ZONE) {
@@ -789,9 +797,14 @@ export function validateTemporalCandidateFreeze(manifest, {
   }
   const collectionPlan = normalizeTemporalCollectionPlan(precommit.collectionPlan);
   const candidate = precommit.candidate;
-  requireExactFields(candidate, TEMPORAL_CANDIDATE_FINGERPRINT_FIELDS, 'candidate fingerprint');
+  const candidateFileFields = legacyV2 ? LEGACY_V2_CANDIDATE_FILE_FIELDS : CANDIDATE_FILE_FIELDS;
+  requireExactFields(
+    candidate,
+    temporalCandidateFingerprintFields(candidateFileFields),
+    'candidate fingerprint',
+  );
   for (const field of [
-    ...Object.keys(CANDIDATE_FILE_FIELDS),
+    ...Object.keys(candidateFileFields),
     'ontologyManifestSha256',
     'thresholdsSha256',
     'timestampAuthoritiesSha256',
@@ -825,7 +838,7 @@ export function validateTemporalCandidateFreeze(manifest, {
     }
   }
   requireExactFields(precommit.repository, TEMPORAL_CANDIDATE_REPOSITORY_FIELDS, 'candidate repository');
-  if (verifyRepositoryAnchor) validateCandidateRepositoryAnchor(precommit);
+  if (verifyRepositoryAnchor) validateCandidateRepositoryAnchor(precommit, candidateFileFields);
   const timestamp = validateRfc3161Receipts(precommit, manifest.timestampReceipts, {
     verifyCrypto: verifyExternalTimestamps,
     now,
