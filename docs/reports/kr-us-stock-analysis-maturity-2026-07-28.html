@@ -1,0 +1,837 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="color-scheme" content="light dark" />
+  <meta name="referrer" content="no-referrer" />
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'" />
+  <title>Jaroo 한국·미국 주식 분석 고도화 수준 비교</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f5f7fb;
+      --surface: #ffffff;
+      --surface-2: #eef2f8;
+      --ink: #172033;
+      --muted: #667085;
+      --border: #dce3ee;
+      --kr: #176b87;
+      --kr-soft: #e5f5f8;
+      --us: #7b4ab5;
+      --us-soft: #f2eafe;
+      --green: #15803d;
+      --green-soft: #eaf8ef;
+      --amber: #a15c00;
+      --amber-soft: #fff4d9;
+      --red: #b42318;
+      --red-soft: #fff0ee;
+      --blue: #175cd3;
+      --blue-soft: #edf4ff;
+      --shadow: 0 14px 34px rgba(31, 47, 78, 0.08);
+      --radius: 22px;
+      font-family: Pretendard, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #10141d;
+        --surface: #171d28;
+        --surface-2: #202838;
+        --ink: #edf2f7;
+        --muted: #aab5c6;
+        --border: #303b4f;
+        --kr: #63c5dd;
+        --kr-soft: #173640;
+        --us: #c09aef;
+        --us-soft: #302443;
+        --green: #75d693;
+        --green-soft: #173725;
+        --amber: #f2c66d;
+        --amber-soft: #3d321d;
+        --red: #ff9b91;
+        --red-soft: #482522;
+        --blue: #8bb5ff;
+        --blue-soft: #1d3154;
+        --shadow: 0 18px 48px rgba(0, 0, 0, 0.24);
+      }
+    }
+
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(circle at 8% 0%, color-mix(in srgb, var(--kr) 13%, transparent), transparent 31rem),
+        radial-gradient(circle at 92% 4%, color-mix(in srgb, var(--us) 12%, transparent), transparent 34rem),
+        var(--bg);
+      color: var(--ink);
+      font-size: 16px;
+      line-height: 1.68;
+    }
+
+    a { color: var(--blue); text-underline-offset: 3px; }
+    code, pre { font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace; }
+    code { overflow-wrap: anywhere; }
+    .page { width: min(1160px, calc(100% - 36px)); margin: 0 auto; padding: 28px 0 72px; }
+
+    .topbar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 18px;
+      margin-bottom: 54px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 700; color: var(--ink); }
+    .brand-mark {
+      display: grid;
+      place-items: center;
+      width: 31px;
+      height: 31px;
+      border-radius: 10px;
+      background: linear-gradient(135deg, var(--kr), var(--us));
+      color: white;
+      font-size: 12px;
+    }
+    .meta { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 8px 14px; }
+
+    .hero { display: grid; grid-template-columns: 1.24fr 0.76fr; gap: 34px; align-items: end; }
+    .eyebrow {
+      margin: 0 0 14px;
+      color: var(--blue);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+    }
+    h1, h2, h3 { margin: 0; letter-spacing: -0.035em; line-height: 1.2; }
+    h1 { max-width: 820px; font-size: clamp(38px, 6vw, 68px); }
+    h2 { font-size: clamp(28px, 4vw, 42px); }
+    h3 { font-size: 20px; }
+    .hero-copy { max-width: 780px; margin: 22px 0 0; color: var(--muted); font-size: clamp(17px, 2vw, 20px); }
+    .hero-card {
+      padding: 25px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: color-mix(in srgb, var(--surface) 94%, transparent);
+      box-shadow: var(--shadow);
+    }
+    .hero-card strong { display: block; margin-bottom: 8px; font-size: 18px; }
+    .hero-card p { margin: 0; color: var(--muted); }
+    .hero-card .big { margin: 14px 0 8px; color: var(--ink); font-size: 27px; font-weight: 800; line-height: 1.28; letter-spacing: -0.025em; }
+
+    .quick-verdict { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; margin-top: 38px; }
+    .verdict-card {
+      min-height: 154px;
+      padding: 22px;
+      border: 1px solid var(--border);
+      border-radius: 18px;
+      background: var(--surface);
+    }
+    .verdict-card .label { color: var(--muted); font-size: 13px; font-weight: 700; }
+    .verdict-card strong { display: block; margin: 11px 0 7px; font-size: 21px; line-height: 1.3; }
+    .verdict-card p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    nav {
+      position: sticky;
+      top: 12px;
+      z-index: 10;
+      display: flex;
+      gap: 7px;
+      margin: 42px 0 0;
+      padding: 8px;
+      overflow-x: auto;
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      background: color-mix(in srgb, var(--surface) 92%, transparent);
+      box-shadow: 0 8px 24px rgba(31, 47, 78, 0.07);
+      backdrop-filter: blur(14px);
+    }
+    nav a {
+      flex: 0 0 auto;
+      padding: 7px 12px;
+      border-radius: 9px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 700;
+      text-decoration: none;
+    }
+    nav a:hover, nav a:focus-visible { background: var(--surface-2); color: var(--ink); }
+
+    section { scroll-margin-top: 86px; margin-top: 96px; }
+    .section-head { display: grid; grid-template-columns: 0.72fr 1.28fr; gap: 30px; margin-bottom: 28px; }
+    .section-head p { margin: 4px 0 0; color: var(--muted); font-size: 17px; }
+    .section-num { color: var(--muted); font-size: 13px; font-weight: 800; letter-spacing: .08em; }
+
+    .analogy {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 22px;
+      align-items: stretch;
+    }
+    .country-card {
+      padding: 28px;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: var(--surface);
+      box-shadow: var(--shadow);
+    }
+    .country-card.kr { border-top: 6px solid var(--kr); }
+    .country-card.us { border-top: 6px solid var(--us); }
+    .country-label { display: flex; align-items: center; gap: 10px; font-size: 14px; font-weight: 800; }
+    .dot { width: 12px; height: 12px; border-radius: 50%; background: currentColor; }
+    .country-card.kr .country-label { color: var(--kr); }
+    .country-card.us .country-label { color: var(--us); }
+    .country-card .metaphor { margin: 20px 0 10px; font-size: 28px; font-weight: 800; line-height: 1.32; letter-spacing: -0.03em; }
+    .country-card p { margin: 0; color: var(--muted); }
+    .vs { display: grid; place-items: center; color: var(--muted); font-size: 12px; font-weight: 800; }
+
+    .note {
+      margin-top: 18px;
+      padding: 18px 20px;
+      border-left: 4px solid var(--blue);
+      border-radius: 10px;
+      background: var(--blue-soft);
+    }
+    .note strong { color: var(--blue); }
+    .note p { margin: 4px 0 0; }
+
+    .legend { display: flex; flex-wrap: wrap; gap: 8px; margin: 18px 0 24px; }
+    .pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 5px 10px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+    }
+    .pill.production { background: var(--green-soft); color: var(--green); }
+    .pill.partial { background: var(--amber-soft); color: var(--amber); }
+    .pill.research { background: var(--blue-soft); color: var(--blue); }
+    .pill.absent { background: var(--red-soft); color: var(--red); }
+
+    .matrix-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+    .matrix { width: 100%; min-width: 840px; border-collapse: collapse; }
+    .matrix th, .matrix td { padding: 16px 18px; border-bottom: 1px solid var(--border); text-align: left; vertical-align: middle; }
+    .matrix th { background: var(--surface-2); color: var(--muted); font-size: 12px; letter-spacing: .04em; }
+    .matrix tr:last-child td { border-bottom: 0; }
+    .matrix td:first-child { width: 22%; font-weight: 800; }
+    .matrix td:last-child { width: 38%; color: var(--muted); font-size: 14px; }
+    .stage { display: flex; align-items: center; gap: 10px; min-width: 180px; }
+    .segments { display: grid; grid-template-columns: repeat(4, 18px); gap: 4px; }
+    .segment { width: 18px; height: 8px; border-radius: 999px; background: var(--border); }
+    .stage.kr .segment.on { background: var(--kr); }
+    .stage.us .segment.on { background: var(--us); }
+    .stage-label { font-size: 13px; font-weight: 800; white-space: nowrap; }
+    .rubric {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin-top: 14px;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .rubric div { padding: 10px; border-top: 2px solid var(--border); }
+    .rubric strong { display: block; color: var(--ink); }
+
+    .pipeline-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .pipeline-card { padding: 25px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+    .pipeline-card h3 { display: flex; align-items: center; gap: 10px; }
+    .pipeline-card.kr h3 { color: var(--kr); }
+    .pipeline-card.us h3 { color: var(--us); }
+    .pipeline-sub { margin: 7px 0 22px; color: var(--muted); font-size: 14px; }
+    .flow { display: grid; gap: 8px; }
+    .node {
+      position: relative;
+      padding: 13px 15px;
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      background: var(--surface-2);
+    }
+    .node + .node::before {
+      content: "↓";
+      position: absolute;
+      top: -17px;
+      left: 50%;
+      color: var(--muted);
+      font-weight: 800;
+      transform: translateX(-50%);
+    }
+    .node strong { display: block; font-size: 14px; }
+    .node span { color: var(--muted); font-size: 12px; }
+    .node.good { border-color: color-mix(in srgb, var(--green) 35%, var(--border)); background: var(--green-soft); }
+    .node.warn { border-color: color-mix(in srgb, var(--amber) 40%, var(--border)); background: var(--amber-soft); }
+    .node.lab { border-style: dashed; border-color: var(--blue); background: var(--blue-soft); }
+    .node.none { border-style: dashed; border-color: color-mix(in srgb, var(--red) 55%, var(--border)); background: var(--red-soft); }
+    .branch {
+      margin-top: 14px;
+      padding: 14px;
+      border: 1px dashed var(--border);
+      border-radius: 14px;
+    }
+    .branch-title { margin-bottom: 8px; color: var(--muted); font-size: 12px; font-weight: 800; }
+
+    .context-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .context-card { overflow: hidden; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+    .context-head { padding: 18px 20px; border-bottom: 1px solid var(--border); }
+    .context-card.kr .context-head { background: var(--kr-soft); }
+    .context-card.us .context-head { background: var(--us-soft); }
+    .context-head strong { display: block; }
+    .context-head span { color: var(--muted); font-size: 13px; }
+    pre {
+      margin: 0;
+      padding: 20px;
+      overflow-x: auto;
+      background: transparent;
+      color: var(--ink);
+      font-size: 12px;
+      line-height: 1.65;
+      white-space: pre-wrap;
+    }
+    .key { color: var(--blue); }
+    .comment { color: var(--muted); }
+
+    .metrics { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+    .metric { padding: 20px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+    .metric .value { display: block; font-size: 30px; font-weight: 850; letter-spacing: -0.04em; }
+    .metric .name { display: block; margin-top: 4px; font-weight: 800; }
+    .metric p { margin: 6px 0 0; color: var(--muted); font-size: 13px; }
+    .metric.danger .value { color: var(--red); }
+    .metric.warning .value { color: var(--amber); }
+    .metric.info .value { color: var(--blue); }
+    .metric.good .value { color: var(--green); }
+    .empty-metric {
+      display: grid;
+      place-items: center;
+      min-height: 144px;
+      margin-top: 14px;
+      padding: 24px;
+      border: 1px dashed var(--border);
+      border-radius: 16px;
+      color: var(--muted);
+      text-align: center;
+    }
+    .empty-metric strong { display: block; margin-bottom: 5px; color: var(--ink); font-size: 20px; }
+
+    .experience-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .experience-card { padding: 26px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+    .experience-card ul { margin: 18px 0 0; padding-left: 22px; }
+    .experience-card li + li { margin-top: 10px; }
+    .experience-card li::marker { color: var(--green); }
+    .experience-card .missing li::marker { color: var(--red); }
+    .subhead { margin: 22px 0 8px; color: var(--muted); font-size: 13px; font-weight: 800; }
+
+    .conclusion {
+      display: grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap: 18px;
+    }
+    .conclusion-main, .conclusion-side { padding: 28px; border: 1px solid var(--border); border-radius: var(--radius); }
+    .conclusion-main { background: linear-gradient(135deg, var(--kr-soft), var(--surface) 55%, var(--us-soft)); }
+    .conclusion-side { background: var(--surface); }
+    .conclusion-main .big { margin: 18px 0 10px; font-size: clamp(26px, 4vw, 39px); font-weight: 850; line-height: 1.25; letter-spacing: -0.035em; }
+    .conclusion-main p, .conclusion-side p { margin: 0; color: var(--muted); }
+    .confidence-list { display: grid; gap: 12px; margin-top: 17px; }
+    .confidence-item { padding-top: 12px; border-top: 1px solid var(--border); }
+    .confidence-item strong { display: block; font-size: 14px; }
+    .confidence-item span { color: var(--muted); font-size: 13px; }
+
+    .roadmap { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; }
+    .roadmap-card { padding: 24px; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); }
+    .roadmap-card ol { margin: 18px 0 0; padding-left: 22px; }
+    .roadmap-card li + li { margin-top: 10px; }
+
+    details { border-top: 1px solid var(--border); }
+    details:last-child { border-bottom: 1px solid var(--border); }
+    summary { padding: 17px 4px; cursor: pointer; font-weight: 800; }
+    summary:hover { color: var(--blue); }
+    .evidence-body { padding: 0 4px 20px; color: var(--muted); }
+    .evidence-body ul { margin: 0; padding-left: 22px; }
+    .evidence-body li + li { margin-top: 8px; }
+    .path { color: var(--ink); font-family: "SFMono-Regular", Consolas, monospace; font-size: 12px; }
+
+    .limits { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+    .limit-card { padding: 19px; border: 1px solid var(--border); border-radius: 16px; background: var(--surface); }
+    .limit-card strong { display: block; margin-bottom: 7px; }
+    .limit-card p { margin: 0; color: var(--muted); font-size: 14px; }
+
+    footer { margin-top: 78px; padding-top: 24px; border-top: 1px solid var(--border); color: var(--muted); font-size: 12px; }
+    footer strong { color: var(--ink); }
+
+    @media (max-width: 860px) {
+      .hero, .section-head, .conclusion { grid-template-columns: 1fr; }
+      .hero-card { max-width: 620px; }
+      .quick-verdict, .metrics { grid-template-columns: repeat(2, 1fr); }
+      .analogy { grid-template-columns: 1fr; }
+      .vs { min-height: 30px; }
+      .pipeline-grid, .context-grid, .experience-grid, .roadmap { grid-template-columns: 1fr; }
+      .rubric { grid-template-columns: repeat(2, 1fr); }
+      .limits { grid-template-columns: 1fr; }
+    }
+
+    @media (max-width: 560px) {
+      .page { width: min(100% - 24px, 1160px); padding-top: 18px; }
+      .topbar { align-items: flex-start; flex-direction: column; margin-bottom: 38px; }
+      .meta { justify-content: flex-start; }
+      .quick-verdict, .metrics { grid-template-columns: 1fr; }
+      nav { top: 6px; margin-top: 28px; }
+      section { margin-top: 72px; }
+      .country-card, .pipeline-card, .experience-card, .roadmap-card, .conclusion-main, .conclusion-side { padding: 21px; }
+      .rubric { grid-template-columns: 1fr; }
+    }
+
+    @media print {
+      :root { --bg: #fff; --surface: #fff; --surface-2: #f4f6f8; --ink: #111827; --muted: #4b5563; --border: #d1d5db; }
+      body { background: #fff; font-size: 11pt; }
+      .page { width: 100%; padding: 0; }
+      nav { display: none; }
+      section { margin-top: 42px; break-inside: avoid; }
+      .hero-card, .country-card, .pipeline-card, .context-card, .metric, .experience-card, .conclusion-main, .conclusion-side, .roadmap-card { box-shadow: none; break-inside: avoid; }
+      details { break-inside: avoid; }
+      details > * { display: block; }
+    }
+  </style>
+</head>
+<body>
+  <main class="page">
+    <header>
+      <div class="topbar">
+        <div class="brand"><span class="brand-mark">J</span> Jaroo DeepScan 기술 분석</div>
+        <div class="meta"><span>기준 브랜치: release</span><span>커밋: ca7cc4e98d41</span><span>2026-07-28</span></div>
+      </div>
+
+      <div class="hero">
+        <div>
+          <p class="eyebrow">Korean vs. US stock analysis maturity</p>
+          <h1>한국과 미국 분석은 어디까지 똑똑해졌을까?</h1>
+          <p class="hero-copy">두 시장 모두 재무·가격·컨센서스를 9명의 AI 위원에게 나누어 평가하는 제품 파이프라인이 있습니다. 가장 큰 차이는 <strong>공시 원문을 실제로 읽고 해석하는가</strong>입니다.</p>
+        </div>
+        <aside class="hero-card" aria-label="핵심 결론">
+          <strong>한 문장 결론</strong>
+          <div class="big">일반 분석은 둘 다 제품 수준.<br />공시 분석은 한국이 약 두 단계 앞섰다.</div>
+          <p>단, 한국의 5필드 canonical 이벤트 추출기는 아직 연구실 단계이므로 “한국 공시를 완전히 이해한다”는 뜻은 아닙니다.</p>
+        </aside>
+      </div>
+
+      <div class="quick-verdict" aria-label="핵심 요약">
+        <article class="verdict-card">
+          <span class="label">공통 기반</span>
+          <strong>양쪽 모두 9인 LLM 위원회</strong>
+          <p>기업 체력, 시장 타이밍, 내 포지션이라는 세 축으로 실제 화면 점수를 만듭니다.</p>
+        </article>
+        <article class="verdict-card">
+          <span class="label">한국의 우위</span>
+          <strong>OpenDART 원문 일부를 읽음</strong>
+          <p>중요 공시를 고르고, 긴 문서는 핵심 구간을 잘라 LLM 이벤트 스캐너에 전달합니다.</p>
+        </article>
+        <article class="verdict-card">
+          <span class="label">미국의 현재 한계</span>
+          <strong>SEC 제목·날짜·건수 중심</strong>
+          <p>10-K·8-K·Form 4 목록은 가져오지만 원문/XML의 거래 의미까지 해석하지 않습니다.</p>
+        </article>
+      </div>
+    </header>
+
+    <nav aria-label="보고서 목차">
+      <a href="#easy">쉬운 설명</a>
+      <a href="#matrix">성숙도 표</a>
+      <a href="#pipeline">파이프라인</a>
+      <a href="#context">LLM 입력</a>
+      <a href="#accuracy">정확도</a>
+      <a href="#experience">사용자 체감</a>
+      <a href="#conclusion">최종 판단</a>
+      <a href="#evidence">코드 근거</a>
+    </nav>
+
+    <section id="easy">
+      <div class="section-head">
+        <div><span class="section-num">01 · 쉬운 설명</span><h2>학교 신문부로 비유하면</h2></div>
+        <p>주식 공시는 회사가 공식적으로 제출하는 중요한 문서입니다. 제목만 보는 것과 본문을 읽는 것은 시험에서 목차만 보는 것과 교과서를 읽는 것만큼 차이가 큽니다.</p>
+      </div>
+
+      <div class="analogy">
+        <article class="country-card kr">
+          <div class="country-label"><span class="dot"></span>한국 분석</div>
+          <div class="metaphor">“중요 기사를 골라<br />본문까지 읽는 기자”</div>
+          <p>OpenDART에서 공시 목록을 가져오고, 중요도와 위험도를 매긴 뒤 원문을 내려받습니다. 문서가 너무 길면 핵심 부분만 잘라 AI에게 읽힙니다.</p>
+        </article>
+        <div class="vs">VS</div>
+        <article class="country-card us">
+          <div class="country-label"><span class="dot"></span>미국 분석</div>
+          <div class="metaphor">“기사 제목과<br />발행 횟수를 세는 기자”</div>
+          <p>SEC/Finnhub에서 공시 종류·제목·날짜·URL을 가져옵니다. 내부자 공시가 몇 건인지 세지만, Form 4 안의 매수·매도 수량과 가격은 읽지 않습니다.</p>
+        </article>
+      </div>
+
+      <div class="note">
+        <strong>중요한 공정성 기준</strong>
+        <p>미국 분석 전체가 뒤처진 것은 아닙니다. 가격, 재무, 성장률, 컨센서스, 뉴스, OHLC, 회복 시뮬레이션은 미국도 제품에 연결되어 있습니다. <strong>큰 격차는 “공시 의미 분석” 영역</strong>에 집중되어 있습니다.</p>
+      </div>
+    </section>
+
+    <section id="matrix">
+      <div class="section-head">
+        <div><span class="section-num">02 · 비교표</span><h2>기능별 성숙도</h2></div>
+        <p>막대는 정확도 점수가 아니라 구현 단계입니다. 같은 기능이 “없음 → 목록 수집 → 구조화 → 의미 해석 → 실제 제품” 중 어디까지 연결되었는지를 나타냅니다.</p>
+      </div>
+
+      <div class="legend" aria-label="상태 범례">
+        <span class="pill production">● 운영 연결</span>
+        <span class="pill partial">● 부분 구현</span>
+        <span class="pill research">● 연구 전용</span>
+        <span class="pill absent">● 미구현</span>
+      </div>
+
+      <div class="matrix-wrap">
+        <table class="matrix">
+          <thead>
+            <tr><th>분석 영역</th><th>한국</th><th>미국</th><th>판단 근거</th></tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td>재무·밸류에이션</td>
+              <td><div class="stage kr"><span class="segments"><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i></span><span class="stage-label">제품 단계</span></div></td>
+              <td><div class="stage us"><span class="segments"><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i></span><span class="stage-label">제품 단계</span></div></td>
+              <td>양쪽 모두 재무 시계열·밸류·수익성·컨센서스를 위원회 입력과 화면 점수에 사용합니다.</td>
+            </tr>
+            <tr>
+              <td>가격·추세</td>
+              <td><div class="stage kr"><span class="segments"><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i></span><span class="stage-label">제품 단계</span></div></td>
+              <td><div class="stage us"><span class="segments"><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i></span><span class="stage-label">제품 단계</span></div></td>
+              <td>현재가·수익률·OHLC·시장 지표와 보유 평단을 사용하며, 회복 전망도 canonical payload에 포함됩니다.</td>
+            </tr>
+            <tr>
+              <td>LLM 위원회</td>
+              <td><div class="stage kr"><span class="segments"><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i></span><span class="stage-label">9명 운영</span></div></td>
+              <td><div class="stage us"><span class="segments"><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i></span><span class="stage-label">9명 운영</span></div></td>
+              <td>두 시장 모두 3개 축×3명 위원 결과를 실제 DeepScan 화면으로 롤업합니다.</td>
+            </tr>
+            <tr>
+              <td>공시 목록 수집</td>
+              <td><div class="stage kr"><span class="segments"><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i></span><span class="stage-label">운영 연결</span></div></td>
+              <td><div class="stage us"><span class="segments"><i class="segment on"></i><i class="segment on"></i><i class="segment"></i><i class="segment"></i></span><span class="stage-label">목록·요약</span></div></td>
+              <td>한국은 OpenDART 목록과 문서 API까지, 미국은 Finnhub/SEC submissions 목록·유형·URL까지 구현되어 있습니다.</td>
+            </tr>
+            <tr>
+              <td>공시 원문 읽기</td>
+              <td><div class="stage kr"><span class="segments"><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i><i class="segment"></i></span><span class="stage-label">제한적 원문</span></div></td>
+              <td><div class="stage us"><span class="segments"><i class="segment"></i><i class="segment"></i><i class="segment"></i><i class="segment"></i></span><span class="stage-label">미구현</span></div></td>
+              <td>한국은 파일당 1.5만 자·전체 6만 자·최대 20건으로 제한해 본문/핵심 구간을 읽습니다. 미국은 본문 fetch/parser가 없습니다.</td>
+            </tr>
+            <tr>
+              <td>공시 위험 해석</td>
+              <td><div class="stage kr"><span class="segments"><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i><i class="segment"></i></span><span class="stage-label">규칙+LLM</span></div></td>
+              <td><div class="stage us"><span class="segments"><i class="segment on"></i><i class="segment"></i><i class="segment"></i><i class="segment"></i></span><span class="stage-label">활동 건수</span></div></td>
+              <td>한국은 중요도·리스크·자본변동·정정 등을 분류하고 이벤트 스캐너가 읽습니다. 미국은 소유권 양식이 있었는지 정도만 봅니다.</td>
+            </tr>
+            <tr>
+              <td>5필드 사건 객체</td>
+              <td><div class="stage kr"><span class="segments"><i class="segment on"></i><i class="segment"></i><i class="segment"></i><i class="segment"></i></span><span class="stage-label">연구 전용</span></div></td>
+              <td><div class="stage us"><span class="segments"><i class="segment"></i><i class="segment"></i><i class="segment"></i><i class="segment"></i></span><span class="stage-label">미구현</span></div></td>
+              <td>한국의 type/action/state/cause/subjectType 추출기는 벤치마크 자산이며 운영 payload·UI에는 연결되지 않았습니다.</td>
+            </tr>
+            <tr>
+              <td>공시 UI 체감</td>
+              <td><div class="stage kr"><span class="segments"><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i><i class="segment"></i></span><span class="stage-label">카드·위원 반영</span></div></td>
+              <td><div class="stage us"><span class="segments"><i class="segment on"></i><i class="segment"></i><i class="segment"></i><i class="segment"></i></span><span class="stage-label">건수 노출</span></div></td>
+              <td>한국은 공시 수·고위험·정정·자본변동·최근 제목을 카드에 보여줍니다. 미국은 ownership 공시 건수가 hero 문구에 추가됩니다.</td>
+            </tr>
+            <tr>
+              <td>공시 의미 정확도 검증</td>
+              <td><div class="stage kr"><span class="segments"><i class="segment on"></i><i class="segment on"></i><i class="segment on"></i><i class="segment"></i></span><span class="stage-label">감사 있음</span></div></td>
+              <td><div class="stage us"><span class="segments"><i class="segment on"></i><i class="segment"></i><i class="segment"></i><i class="segment"></i></span><span class="stage-label">의미 평가 없음</span></div></td>
+              <td>한국 canonical 연구기는 150건 블라인드 골드 감사를 받았습니다. 미국은 의미 추출기가 없어 정답률 자체를 측정할 대상이 없습니다.</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+
+      <div class="rubric" aria-label="구현 단계 기준">
+        <div><strong>1 · 목록</strong>자료를 가져온다</div>
+        <div><strong>2 · 구조</strong>필드를 정리한다</div>
+        <div><strong>3 · 의미</strong>본문과 위험을 해석한다</div>
+        <div><strong>4 · 제품</strong>LLM·UI·실패처리까지 연결한다</div>
+      </div>
+    </section>
+
+    <section id="pipeline">
+      <div class="section-head">
+        <div><span class="section-num">03 · 구조도</span><h2>실제 공시 처리 흐름</h2></div>
+        <p>초록은 현재 운영 경로, 노랑은 제한된 해석, 파랑 점선은 연구 전용, 빨강 점선은 아직 없는 경로입니다.</p>
+      </div>
+
+      <div class="pipeline-grid">
+        <article class="pipeline-card kr">
+          <h3><span class="dot"></span>한국 OpenDART 경로</h3>
+          <p class="pipeline-sub">목록에서 화면까지 이어지는 실제 production path</p>
+          <div class="flow">
+            <div class="node good"><strong>1. OpenDART 목록 수집</strong><span>종목코드→고유번호, 최근 공시 목록</span></div>
+            <div class="node good"><strong>2. 코드·제목 기반 분류</strong><span>정정, 지분, 자본변동, 위험도, 중요도</span></div>
+            <div class="node good"><strong>3. 중요한 공시 선택</strong><span>중복·관계 공시 정리, 우선순위 부여</span></div>
+            <div class="node warn"><strong>4. document.xml 원문 추출</strong><span>긴 문서는 핵심 구간, 전체 6만 자 예산</span></div>
+            <div class="node warn"><strong>5. 이벤트 스캐너 LLM</strong><span>구조화 요약+원문 일부를 함께 읽음</span></div>
+            <div class="node good"><strong>6. DeepScan 화면</strong><span>공시 수·위험·정정·자본변동·최신 제목</span></div>
+          </div>
+          <div class="branch">
+            <div class="branch-title">별도 연구 가지 · 사용자 화면에는 미연결</div>
+            <div class="node lab"><strong>5필드 canonical event 추출기</strong><span>type / action / state / cause / subjectType · gated.v8</span></div>
+          </div>
+        </article>
+
+        <article class="pipeline-card us">
+          <h3><span class="dot"></span>미국 SEC 경로</h3>
+          <p class="pipeline-sub">공시 활동 감지는 있지만 의미 분석은 비어 있는 path</p>
+          <div class="flow">
+            <div class="node good"><strong>1. Finnhub·SEC 목록 수집</strong><span>10-K, 10-Q, 8-K, Form 4, SC13D/G 등</span></div>
+            <div class="node good"><strong>2. 메타데이터 정규화</strong><span>유형·제목·날짜·URL·accession number</span></div>
+            <div class="node warn"><strong>3. ownership 활동 요약</strong><span>최근 양식 건수와 마지막 날짜</span></div>
+            <div class="node warn"><strong>4. LLM 컨텍스트</strong><span>최대 4개 공시의 제목·날짜·URL과 건수</span></div>
+            <div class="node warn"><strong>5. DeepScan 화면</strong><span>ownership 공시 N건이라는 짧은 신호</span></div>
+          </div>
+          <div class="branch">
+            <div class="branch-title">현재 비어 있는 의미 분석 가지</div>
+            <div class="node none"><strong>SEC HTML/XML 본문 파서</strong><span>8-K 항목, Form 4 매수·매도·수량·가격 미해석</span></div>
+            <div class="node none"><strong>미국 canonical event·전용 UI</strong><span>사건 객체와 공시 근거 카드가 없음</span></div>
+          </div>
+        </article>
+      </div>
+    </section>
+
+    <section id="context">
+      <div class="section-head">
+        <div><span class="section-num">04 · LLM 컨텍스트</span><h2>AI가 실제로 보는 정보</h2></div>
+        <p>두 나라 모두 JSON을 LLM에 전달하지만 내용의 깊이가 다릅니다. 아래는 코드 구조를 고등학생이 읽기 쉽게 축약한 예입니다.</p>
+      </div>
+
+      <div class="context-grid">
+        <article class="context-card kr">
+          <div class="context-head"><strong>한국 이벤트 스캐너</strong><span>구조화 정보 + 제한된 원문</span></div>
+          <pre><span class="key">selected</span>: [
+  { 제목, 날짜, 중요도, 위험도, dumpPolicy }
+]
+<span class="key">materialEvents</span>: [ ... ]
+<span class="key">risks</span>: [ ... ]
+<span class="key">llmDump</span>: {
+  includedCount,
+  failedCount,
+  <span class="key">combinedText</span>: "공시 원문 또는 핵심 구간..."
+}
+
+<span class="comment">// 기본 최대: 파일당 15,000자, 전체 60,000자</span></pre>
+        </article>
+        <article class="context-card us">
+          <div class="context-head"><strong>미국 ownership 위원</strong><span>요약 + 메타데이터</span></div>
+          <pre><span class="key">directOwnershipFlow</span>: {
+  signal: "insider-flow-active",
+  counts: { totalDirectEvents: 6 },
+  latestDates: { latestEvent: "..." },
+  filings: [
+    { type, title, filedDate, url }
+  ]
+}
+
+<span class="comment">// 원문·거래 수량·가격·매수/매도 방향 없음</span>
+<span class="comment">// event-risk 위원은 뉴스·실적·컨센서스를 사용</span></pre>
+        </article>
+      </div>
+
+      <div class="note">
+        <strong>URL이 들어간다고 원문을 읽는 것은 아닙니다.</strong>
+        <p>현재 LLM 요청에는 웹 탐색 도구가 붙지 않습니다. 따라서 SEC URL을 컨텍스트에 넣어도 LLM은 링크 안의 문서를 스스로 열 수 없습니다.</p>
+      </div>
+    </section>
+
+    <section id="accuracy">
+      <div class="section-head">
+        <div><span class="section-num">05 · 검증과 정확도</span><h2>한국도 아직 “완성”은 아니다</h2></div>
+        <p>한국 production 공시 흐름과 별개로, 5칸짜리 canonical 사건 객체를 만드는 연구기는 블라인드 감사에서 어려움을 드러냈습니다.</p>
+      </div>
+
+      <div class="metrics" aria-label="OpenDART canonical 연구기 감사 결과">
+        <article class="metric danger"><span class="value">36.2%</span><span class="name">5필드 전체 정확 일치</span><p>본문 확보 138건 중 50건이 골드 사건 집합과 완전히 같았습니다.</p></article>
+        <article class="metric warning"><span class="value">58.4%</span><span class="name">필드 단위 micro 정확도</span><p>type·action·state·cause·subjectType를 낱개로 비교한 결과입니다.</p></article>
+        <article class="metric good"><span class="value">92.0%</span><span class="name">문서 확보율</span><p>150건 중 138건의 본문을 안전 제한 안에서 확보했습니다.</p></article>
+        <article class="metric info"><span class="value">0 / 14</span><span class="name">다중 이벤트 완전 일치</span><p>사건이 두 개 이상인 복잡한 공시는 아직 특히 어렵습니다.</p></article>
+      </div>
+
+      <div class="note">
+        <strong>이 수치는 “한국 DeepScan 전체 정확도”가 아닙니다.</strong>
+        <p>운영 화면은 현재 별도의 규칙 기반 공시 분류와 LLM 이벤트 스캐너를 사용합니다. 36.2%는 <strong>아직 UI에 연결하지 않은 gated.v8 5필드 연구기</strong>의 엄격한 계약 일치율입니다. 두 독립 주석자의 5필드 전체 합의율도 79/138(57.2%)라서 문제 자체의 경계가 어렵지만, 이것이 낮은 모델 정확도를 없애주는 것은 아닙니다.</p>
+      </div>
+
+      <div class="empty-metric">
+        <div><strong>미국 공시 의미 정확도: 측정 불가</strong>SEC 공시 본문을 사건으로 해석하는 엔진이 아직 없으므로, 낮은 점수가 아니라 “시험을 아직 만들지 않은 상태”입니다.</div>
+      </div>
+    </section>
+
+    <section id="experience">
+      <div class="section-head">
+        <div><span class="section-num">06 · 사용자 체감</span><h2>화면에서 무엇이 달라지나</h2></div>
+        <p>기술이 코드에만 있는지, 실제 사용자의 판단 화면에 반영되는지를 구분했습니다.</p>
+      </div>
+
+      <div class="experience-grid">
+        <article class="experience-card">
+          <div class="country-label" style="color:var(--kr)"><span class="dot"></span>한국 종목을 분석할 때</div>
+          <ul>
+            <li>수익성·밸류·지분안정성·트렌드·이벤트·가격위치 등 9명 위원 결과가 보입니다.</li>
+            <li>최근 OpenDART 공시 건수, 정정, 자본변동, 고위험 여부가 insight에 반영됩니다.</li>
+            <li>최근 공시 제목이 근거로 표시되고, 원문 일부가 이벤트 위원의 판단 재료가 됩니다.</li>
+          </ul>
+          <div class="subhead">아직 안 보이는 것</div>
+          <ul class="missing">
+            <li>type/action/state/cause/subjectType 5필드 결과는 UI에 표시되지 않습니다.</li>
+            <li>원문 전체를 그대로 보여주거나 모든 복합 사건을 정확히 분리하지는 못합니다.</li>
+          </ul>
+        </article>
+        <article class="experience-card">
+          <div class="country-label" style="color:var(--us)"><span class="dot"></span>미국 종목을 분석할 때</div>
+          <ul>
+            <li>밸류·성장·수익성·모멘텀·추정치 변화·재무안전성 등 9명 위원 결과가 보입니다.</li>
+            <li>뉴스·컨센서스·OHLC·보유 평단과 회복 전망은 실제 payload와 화면에 반영됩니다.</li>
+            <li>최근 Form 3/4/5 또는 SC13D/G가 있으면 ownership 공시 건수가 짧게 표시됩니다.</li>
+          </ul>
+          <div class="subhead">아직 안 보이는 것</div>
+          <ul class="missing">
+            <li>10-K·10-Q·8-K 본문에서 추출한 사건·위험 카드가 없습니다.</li>
+            <li>Form 4의 실제 매수/매도, 거래자, 주식 수, 가격을 해석한 설명이 없습니다.</li>
+          </ul>
+        </article>
+      </div>
+    </section>
+
+    <section id="conclusion">
+      <div class="section-head">
+        <div><span class="section-num">07 · 최종 판단</span><h2>어디까지 고도화됐나</h2></div>
+        <p>직접 코드로 확인된 사실과 그 사실에서 도출한 해석을 분리했습니다.</p>
+      </div>
+
+      <div class="conclusion">
+        <article class="conclusion-main">
+          <span class="pill production">근거가 강한 결론</span>
+          <div class="big">한국은 “공시를 읽는 제품”, 미국은 “공시 활동을 감지하는 제품”이다.</div>
+          <p>전체 주식 분석 수준은 양쪽 모두 상당히 높지만, 공시만 떼어 보면 한국은 수집→선별→원문→LLM→UI가 연결됐고 미국은 목록→건수→짧은 신호에 머뭅니다.</p>
+        </article>
+        <aside class="conclusion-side">
+          <h3>판단 신뢰도</h3>
+          <div class="confidence-list">
+            <div class="confidence-item"><strong>높음 · 생산 연결 여부</strong><span>호출 경로, payload, UI projection이 코드로 확인됨</span></div>
+            <div class="confidence-item"><strong>높음 · 미국 본문 미사용</strong><span>SEC collector와 LLM dump 양쪽에서 본문 파서가 없음</span></div>
+            <div class="confidence-item"><strong>중간 · 실제 사용자 품질</strong><span>코드 구조는 확인했지만 운영 텔레메트리·사용자 만족도 자료는 없음</span></div>
+          </div>
+        </aside>
+      </div>
+
+      <div class="roadmap" style="margin-top:18px">
+        <article class="roadmap-card">
+          <span class="pill partial">미국이 한국 수준에 도달하려면</span>
+          <ol>
+            <li>SEC primary document와 Form 4 XML을 실제로 다운로드</li>
+            <li>8-K item code, Form 4 거래, 10-K/10-Q 위험 요인별 파서 구축</li>
+            <li>미국용 사건 schema와 블라인드 정답셋으로 정확도 평가</li>
+            <li>shadow 실행 후 공시 근거 카드를 UI에 연결</li>
+          </ol>
+        </article>
+        <article class="roadmap-card">
+          <span class="pill research">한국이 다음 단계로 가려면</span>
+          <ol>
+            <li>운영 공시 위험 분류 자체의 블라인드 정확도 별도 측정</li>
+            <li>정정·긴 문서·다중 이벤트에서 canonical 추출 정확도 개선</li>
+            <li>충분한 정확도와 calibration 확보 전까지 연구 결과를 UI와 분리</li>
+            <li>사용자에게 근거 문장과 불확실성을 더 직접적으로 표시</li>
+          </ol>
+        </article>
+      </div>
+    </section>
+
+    <section id="evidence">
+      <div class="section-head">
+        <div><span class="section-num">08 · 코드 근거</span><h2>무엇을 보고 판단했나</h2></div>
+        <p>아래 항목은 release 브랜치 커밋 <code>ca7cc4e98d41</code>에서 직접 확인한 저장소 근거입니다. 펼치면 파일과 핵심 행을 볼 수 있습니다.</p>
+      </div>
+
+      <details open>
+        <summary>한국 공시: 목록 수집과 원문 다운로드</summary>
+        <div class="evidence-body"><ul>
+          <li><span class="path">packages/crawler/src/crawlers/dart-filings.js:1-35</span> — OpenDART list/corpCode, 캐시, ZIP·본문 크기 안전 제한.</li>
+          <li><span class="path">packages/crawler/src/crawlers/dart-filings.js:640-794</span> — <code>document.xml</code> 다운로드, ZIP 텍스트 추출, 파일당·전체 문자 예산으로 LLM dump 생성.</li>
+          <li><span class="path">packages/crawler/src/services/deepscan-payload.js:900-1050</span> — API 키/토글이 있으면 실제 KR DeepScan 요청에서 목록→pipeline→document dump를 연결.</li>
+        </ul></div>
+      </details>
+
+      <details>
+        <summary>한국 공시: 분류·LLM·UI 연결</summary>
+        <div class="evidence-body"><ul>
+          <li><span class="path">packages/crawler/src/services/deepscan-kr-disclosure-pipeline.js:165-360</span> — 공시 정규화, 상세 코드·제목·remarks 기반 category/risk/materiality/dump policy 결정.</li>
+          <li><span class="path">packages/crawler/src/services/deepscan-kr-disclosure-pipeline.js:1114-1328</span> — metadata_only/key_sections/full_text 정책과 최대 문자 예산 적용.</li>
+          <li><span class="path">packages/crawler/src/services/deepscan-kr-committee-runtime.js:131-133, 381-527, 794-810</span> — OpenDART 우선 prompt, 구조화 공시와 combinedText를 이벤트 스캐너 멤버에 주입.</li>
+          <li><span class="path">packages/crawler/src/services/deepscan-payload.js:2028-2059, 2182-2190</span> — 공시 건수·위험·정정·자본변동·최근 제목을 insight 카드로 변환.</li>
+        </ul></div>
+      </details>
+
+      <details>
+        <summary>한국 canonical 연구기와 정확도 한계</summary>
+        <div class="evidence-body"><ul>
+          <li><span class="path">packages/crawler/src/services/deepscan-kr-disclosure-event-extractors.js:1-115</span> — <code>experimental.v2</code>, <code>gated.v8</code>과 bodyText 기반 5필드 event 추출.</li>
+          <li><span class="path">packages/crawler/src/services/deepscan-kr-disclosure-event-ontology.js</span> — type/action/state/cause/subjectType의 5키 ontology 검증.</li>
+          <li><span class="path">docs/reports/opendart-random-classification-2026-07-28/accuracy-audit/accuracy-results.json</span> — 50/138 strict exact, 50/150 end-to-end, 58.4% field micro, 92% 문서 확보.</li>
+          <li>운영 payload/committee에서 <code>extractEventsGatedProjection</code> import가 없어 연구기 결과는 사용자 화면에 미연결.</li>
+        </ul></div>
+      </details>
+
+      <details>
+        <summary>미국 공시: 수집은 있지만 본문 의미 분석은 없음</summary>
+        <div class="evidence-body"><ul>
+          <li><span class="path">packages/crawler/src/crawlers/us-sec-filings.js:249-272, 383-427, 586-650</span> — Finnhub/SEC submissions에서 유형·제목·날짜·URL을 정규화·병합·요약.</li>
+          <li><span class="path">packages/crawler/src/crawlers/us-ownership-flow.js:45-104, 135-167</span> — Forms 3/4/5와 SC13D/G를 세고 generic activity signal 생성. 거래 XML은 읽지 않음.</li>
+          <li><span class="path">packages/crawler/src/crawlers/us-stock-report.js:52-119</span> — 재무·컨센서스·뉴스·공시·시장지표를 병렬로 합친 report API.</li>
+        </ul></div>
+      </details>
+
+      <details>
+        <summary>미국 LLM과 UI: 공시는 메타데이터만 사용</summary>
+        <div class="evidence-body"><ul>
+          <li><span class="path">scripts/generate_llm_dump_examples.py:272-310, 344-352</span> — report/ownership을 fetch하지만 일반 report는 section 이름만 shared context에 기록.</li>
+          <li><span class="path">scripts/generate_llm_dump_examples.py:409-449</span> — event-risk는 뉴스·실적·컨센서스, ownership-flow는 건수·날짜와 최대 4개 공시 메타데이터를 사용.</li>
+          <li><span class="path">packages/deepscan-runtime-core/src/committee-llm.js:108-127</span> — sharedContext/memberContext JSON을 실제 LLM user message로 직렬화.</li>
+          <li><span class="path">src/lib/deepscan-runtime/build-payload.ts:2008-2073, 2084-2086</span> — 미국 9인 LLM 결과를 payload로 만들고 ownership 공시 건수만 hero에 노출.</li>
+        </ul></div>
+      </details>
+
+      <details>
+        <summary>공통 제품 구조</summary>
+        <div class="evidence-body"><ul>
+          <li><span class="path">packages/crawler/src/services/deepscan-kr-committee-runtime.js:24-88, 1136-1147</span> — 한국 9개 위원을 사업 품질·시장 타이밍·포지션 적합도 3축으로 구성.</li>
+          <li><span class="path">src/lib/deepscan-runtime/llm-committee.ts:5-87</span> — 미국 valuation부터 portfolio-fit까지 9개 위원 정의.</li>
+          <li><span class="path">src/lib/deepscan-runtime/build-payload.ts:767-788, 1001-1049, 1902-2143</span> — 시장별 KR crawler/US runtime 분기와 공통 canonical payload 생성.</li>
+          <li><span class="path">src/app/deepscan/page.tsx</span> — 양쪽 canonical payload의 hero·committee·insights·strategy를 공통 화면으로 렌더링.</li>
+        </ul></div>
+      </details>
+
+      <div class="note">
+        <strong>신선한 회귀 검증: 92 / 92 통과</strong>
+        <p>2026-07-28에 KR 공시 pipeline·canonical extractor·US upstream ownership·정확도 scorer의 표적 테스트를 다시 실행했고 전체 92개가 통과했습니다. 이는 현재 코드가 테스트 계약을 지킨다는 뜻이며, 실제 투자 판단 정확도를 보증하는 수치는 아닙니다.</p>
+      </div>
+    </section>
+
+    <section id="limits">
+      <div class="section-head">
+        <div><span class="section-num">09 · 한계</span><h2>이 보고서가 말하지 못하는 것</h2></div>
+        <p>저장소 코드와 테스트만으로 확인할 수 없는 부분은 결론에서 제외했습니다.</p>
+      </div>
+      <div class="limits">
+        <article class="limit-card"><strong>운영 트래픽 품질</strong><p>실제 사용자 요청의 실패율·latency·재시도 성공률을 보여주는 production telemetry는 이번 근거에 없습니다.</p></article>
+        <article class="limit-card"><strong>전체 투자 판단 정확도</strong><p>DeepScan 점수가 미래 수익률을 얼마나 잘 맞히는지에 대한 투자 성과 백테스트는 이번 비교 대상이 아닙니다.</p></article>
+        <article class="limit-card"><strong>운영 공시 분류 정확도</strong><p>36.2% 감사 대상은 연구용 5필드 추출기입니다. 현재 UI에 쓰이는 risk/category pipeline의 독립 정확도는 별도 측정이 필요합니다.</p></article>
+      </div>
+    </section>
+
+    <footer>
+      <strong>작성 기준</strong> — 저장소 직접 코드 추적, 테스트·감사 산출물 교차검증, production/research 경로 분리. 외부 홍보 수치가 아니라 release 브랜치 구현 상태에 대한 기술 성숙도 분석입니다.
+    </footer>
+  </main>
+</body>
+</html>
