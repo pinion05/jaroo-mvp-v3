@@ -1,0 +1,1405 @@
+{
+  "schemaVersion": "jaroo.opendart-random-classification-qualitative-review.v1",
+  "generatedAt": "2026-07-28T02:48:45.993Z",
+  "methodology": "Four Codex native subagents reviewed disjoint result ranges. Reviewers compared filing title, OpenDART detail type, canonical tuple, and official body for suspicious cases. Verdicts represent semantic plausibility, not prediction-blind human gold accuracy.",
+  "accuracyClaimEligible": false,
+  "reviewers": [
+    {
+      "id": "code-review",
+      "range": [
+        0,
+        34
+      ],
+      "plausible": 32,
+      "questionable": 1,
+      "unassessable": 2
+    },
+    {
+      "id": "methodology-review",
+      "range": [
+        35,
+        74
+      ],
+      "plausible": 35,
+      "questionable": 2,
+      "unassessable": 3
+    },
+    {
+      "id": "architecture-review",
+      "range": [
+        75,
+        112
+      ],
+      "plausible": 33,
+      "questionable": 0,
+      "unassessable": 5
+    },
+    {
+      "id": "source-risk-review",
+      "range": [
+        113,
+        149
+      ],
+      "plausible": 35,
+      "questionable": 0,
+      "unassessable": 2
+    }
+  ],
+  "aggregate": {
+    "plausible": 135,
+    "questionable": 3,
+    "unassessable": 12
+  },
+  "cases": [
+    {
+      "index": 0,
+      "rceptNo": "20260629000003",
+      "corpName": "동일제강",
+      "reportName": "공개매수신고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 1,
+      "rceptNo": "20260722000398",
+      "corpName": "키움증권",
+      "reportName": "투자설명서(일괄신고)",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 2,
+      "rceptNo": "20260626000345",
+      "corpName": "계양전기",
+      "reportName": "투자설명서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 3,
+      "rceptNo": "20260519000164",
+      "corpName": "SK",
+      "reportName": "자기주식처분결과보고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 4,
+      "rceptNo": "20260610000151",
+      "corpName": "세아홀딩스",
+      "reportName": "공개매수결과보고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 5,
+      "rceptNo": "20260724000079",
+      "corpName": "교보증권",
+      "reportName": "일괄신고추가서류(파생결합증권-주가연계증권)",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "동일 tuple 2개는 실제 서로 다른 K-ELS 25회와 26회를 반영해 duplicate cardinality가 타당하다."
+    },
+    {
+      "index": 6,
+      "rceptNo": "20260727000169",
+      "corpName": "SK하이닉스",
+      "reportName": "동일인등출자계열회사와의상품ㆍ용역거래변경",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 7,
+      "rceptNo": "20260720800578",
+      "corpName": "조일알미늄",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 8,
+      "rceptNo": "20260514000609",
+      "corpName": "롯데리츠",
+      "reportName": "반기보고서 (2026.03)",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 9,
+      "rceptNo": "20260714000181",
+      "corpName": "삼성증권",
+      "reportName": "계열금융회사의약관에의한금융거래-[예ㆍ적금]",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 10,
+      "rceptNo": "20260715800523",
+      "corpName": "남양유업",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 11,
+      "rceptNo": "20260518000303",
+      "corpName": "아센디오",
+      "reportName": "소액공모실적보고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 12,
+      "rceptNo": "20260724800137",
+      "corpName": "HMM",
+      "reportName": "장래사업ㆍ경영계획(공정공시)",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 13,
+      "rceptNo": "20260716000760",
+      "corpName": "태영건설",
+      "reportName": "특수관계인과의내부거래",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 14,
+      "rceptNo": "20260727800553",
+      "corpName": "KR모터스",
+      "reportName": "주주명부폐쇄기간또는기준일설정",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 15,
+      "rceptNo": "20260615000077",
+      "corpName": "한세엠케이",
+      "reportName": "임원ㆍ주요주주특정증권등거래계획보고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 16,
+      "rceptNo": "20260720800426",
+      "corpName": "시디즈",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 17,
+      "rceptNo": "20260724000577",
+      "corpName": "블루산업개발",
+      "reportName": "주요사항보고서(유상증자결정)",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 18,
+      "rceptNo": "20260723800564",
+      "corpName": "하나금융지주",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 19,
+      "rceptNo": "20260713000482",
+      "corpName": "아시아나항공",
+      "reportName": "[기재정정]주요사항보고서(회사합병결정)",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 20,
+      "rceptNo": "20260601001865",
+      "corpName": "대한해운",
+      "reportName": "[기재정정]대규모기업집단현황공시[연1회공시및1/4분기용(대표회사)]",
+      "reviewer": "code-review",
+      "verdict": "unassessable",
+      "note": "OpenDART 본문 미확보: document_resource_limited — OpenDART document ZIP entry exceeds the decompressed byte limit"
+    },
+    {
+      "index": 21,
+      "rceptNo": "20260515002833",
+      "corpName": "에스원",
+      "reportName": "분기보고서 (2026.03)",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 22,
+      "rceptNo": "20260721001349",
+      "corpName": "까뮤이앤씨",
+      "reportName": "주식등의대량보유상황보고서(일반)",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 23,
+      "rceptNo": "20260610000559",
+      "corpName": "우리금융지주",
+      "reportName": "신탁계약해지결과보고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 24,
+      "rceptNo": "20260727000198",
+      "corpName": "동아쏘시오홀딩스",
+      "reportName": "[첨부정정]주요사항보고서(회사합병결정)",
+      "reviewer": "code-review",
+      "verdict": "unassessable",
+      "note": "OpenDART 본문 미확보: provider_status_error — OpenDART 014: 파일이 존재하지 않습니다."
+    },
+    {
+      "index": 25,
+      "rceptNo": "20260506000554",
+      "corpName": "동성제약",
+      "reportName": "[기재정정]사업보고서 (2025.12)",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 26,
+      "rceptNo": "20260723000170",
+      "corpName": "쏘카",
+      "reportName": "신탁계약해지결과보고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 27,
+      "rceptNo": "20260624000438",
+      "corpName": "한국특강",
+      "reportName": "임원ㆍ주요주주특정증권등거래계획보고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 28,
+      "rceptNo": "20260724000019",
+      "corpName": "유안타증권",
+      "reportName": "증권발행실적보고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 29,
+      "rceptNo": "20260721800851",
+      "corpName": "현대건설",
+      "reportName": "기업설명회(IR)개최(안내공시)",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 30,
+      "rceptNo": "20260720000182",
+      "corpName": "NH투자증권",
+      "reportName": "일괄신고추가서류(파생결합증권-주가연계증권)",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 31,
+      "rceptNo": "20260723000035",
+      "corpName": "한화오션",
+      "reportName": "특수관계인과의내부거래",
+      "reviewer": "code-review",
+      "verdict": "questionable",
+      "note": "원문은 계열사와의 USD RP 거래가 실행됐다는 보고인데, 유의문구의 “변경될 수 있음”을 근거로 updated / related-party-contract-updated를 선택한 것으로 보여 실제 거래 의미와 어긋날 가능성이 높다."
+    },
+    {
+      "index": 32,
+      "rceptNo": "20260724000508",
+      "corpName": "DH오토넥스",
+      "reportName": "독립이사의선임ㆍ해임또는중도퇴임에관한신고",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 33,
+      "rceptNo": "20260721800907",
+      "corpName": "화승코퍼레이션",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 34,
+      "rceptNo": "20260521000404",
+      "corpName": "갤럭시아에스엠",
+      "reportName": "[기재정정]지급수단별ㆍ지급기간별지급금액및분쟁조정기구에관한사항",
+      "reviewer": "code-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 35,
+      "rceptNo": "20260722000456",
+      "corpName": "동일제강",
+      "reportName": "주식등의대량보유상황보고서(일반)",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 36,
+      "rceptNo": "20260727800751",
+      "corpName": "롯데관광개발",
+      "reportName": "주주명부폐쇄기간또는기준일설정",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 37,
+      "rceptNo": "20260723000579",
+      "corpName": "ESR켄달스퀘어리츠",
+      "reportName": "임원ㆍ주요주주특정증권등소유상황보고서",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 38,
+      "rceptNo": "20260721000649",
+      "corpName": "한화",
+      "reportName": "약관에의한금융거래시계열금융회사의거래상대방의공시",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 39,
+      "rceptNo": "20260723000250",
+      "corpName": "현대건설",
+      "reportName": "임원ㆍ주요주주특정증권등소유상황보고서",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 40,
+      "rceptNo": "20260724800116",
+      "corpName": "현대모비스",
+      "reportName": "기업설명회(IR)개최(안내공시)",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 41,
+      "rceptNo": "20260724000456",
+      "corpName": "우성머티리얼스",
+      "reportName": "소액공모실적보고서",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 42,
+      "rceptNo": "20260615000317",
+      "corpName": "NH투자증권",
+      "reportName": "주주총회소집공고",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 43,
+      "rceptNo": "20260429000199",
+      "corpName": "명문제약",
+      "reportName": "자기주식처분결과보고서",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 44,
+      "rceptNo": "20260429000964",
+      "corpName": "블루산업개발",
+      "reportName": "[기재정정]주식매수선택권부여에관한신고",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 45,
+      "rceptNo": "20260630001095",
+      "corpName": "SK하이닉스",
+      "reportName": "[기재정정]증권신고서(지분증권)",
+      "reviewer": "methodology-review",
+      "verdict": "unassessable",
+      "note": "OpenDART 본문 미확보: document_resource_limited — OpenDART document ZIP entry exceeds the decompressed byte limit"
+    },
+    {
+      "index": 46,
+      "rceptNo": "20260715000506",
+      "corpName": "부국증권",
+      "reportName": "주식등의대량보유상황보고서(일반)",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 47,
+      "rceptNo": "20260720800089",
+      "corpName": "평화산업",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 48,
+      "rceptNo": "20260512000422",
+      "corpName": "OCI",
+      "reportName": "신탁계약에의한취득상황보고서",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 49,
+      "rceptNo": "20260515003003",
+      "corpName": "제이알글로벌리츠",
+      "reportName": "반기보고서 (2026.03)",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 50,
+      "rceptNo": "20260724800403",
+      "corpName": "하나금융지주",
+      "reportName": "연결재무제표기준영업(잠정)실적(공정공시)(자회사의 주요경영사항)",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 51,
+      "rceptNo": "20260715800476",
+      "corpName": "두산로보틱스",
+      "reportName": "[첨부추가]기업설명회(IR)개최(안내공시)",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 52,
+      "rceptNo": "20260630000245",
+      "corpName": "페이퍼코리아",
+      "reportName": "독립이사의선임ㆍ해임또는중도퇴임에관한신고",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 53,
+      "rceptNo": "20260727800773",
+      "corpName": "한솔홀딩스",
+      "reportName": "[기재정정]주식소각결정(자회사의 주요경영사항)",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 54,
+      "rceptNo": "20260518000224",
+      "corpName": "삼부토건",
+      "reportName": "[기재정정]분기보고서 (2026.03)",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 55,
+      "rceptNo": "20260601001392",
+      "corpName": "애경케미칼",
+      "reportName": "[기재정정]주식매수선택권부여에관한신고",
+      "reviewer": "methodology-review",
+      "verdict": "questionable",
+      "note": "원문 정정사유가 주식매수선택권 일부 취소이고 대상자·주식수가 감소했지만 updated로 출력됐다. 유사한 일부 취소 사례의 cancelled 처리와 lifecycle 기준이 일관되지 않다."
+    },
+    {
+      "index": 56,
+      "rceptNo": "20260723000532",
+      "corpName": "에이프로젠바이오로직스",
+      "reportName": "주식등의대량보유상황보고서(일반)",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 57,
+      "rceptNo": "20260722800575",
+      "corpName": "가온전선",
+      "reportName": "기업설명회(IR)개최(안내공시)",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 58,
+      "rceptNo": "20260716000387",
+      "corpName": "KB금융",
+      "reportName": "자기주식취득결과보고서",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 59,
+      "rceptNo": "20260714000157",
+      "corpName": "영화금속",
+      "reportName": "주주총회소집공고",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 60,
+      "rceptNo": "20260723000014",
+      "corpName": "POSCO홀딩스",
+      "reportName": "지급수단별ㆍ지급기간별지급금액및분쟁조정기구에관한사항",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 61,
+      "rceptNo": "20260526000465",
+      "corpName": "한화",
+      "reportName": "[기재정정]증권신고서(분할)",
+      "reviewer": "methodology-review",
+      "verdict": "unassessable",
+      "note": "OpenDART 본문 미확보: document_resource_limited — OpenDART document ZIP entry exceeds the decompressed byte limit"
+    },
+    {
+      "index": 62,
+      "rceptNo": "20260724800489",
+      "corpName": "삼성중공업",
+      "reportName": "연결재무제표기준영업(잠정)실적(공정공시)",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 63,
+      "rceptNo": "20260716000421",
+      "corpName": "SK디앤디",
+      "reportName": "주주총회소집공고",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 64,
+      "rceptNo": "20260513000821",
+      "corpName": "SK스퀘어",
+      "reportName": "자기주식처분결과보고서",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 65,
+      "rceptNo": "20260528000704",
+      "corpName": "대교",
+      "reportName": "자기주식처분결과보고서",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 66,
+      "rceptNo": "20260721800099",
+      "corpName": "솔루엠",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 67,
+      "rceptNo": "20260611000277",
+      "corpName": "쏘카",
+      "reportName": "[기재정정]주식매수선택권부여에관한신고",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 68,
+      "rceptNo": "20260601001381",
+      "corpName": "엘브이엠씨",
+      "reportName": "[기재정정]분기보고서 (2026.03)",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 69,
+      "rceptNo": "20260622000136",
+      "corpName": "동원수산",
+      "reportName": "임원ㆍ주요주주특정증권등거래계획보고서",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 70,
+      "rceptNo": "20260518000296",
+      "corpName": "대양금속",
+      "reportName": "[기재정정]주식매수선택권부여에관한신고",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 71,
+      "rceptNo": "20260701000569",
+      "corpName": "GS건설",
+      "reportName": "[기재정정]반기보고서 (2025.06)",
+      "reviewer": "methodology-review",
+      "verdict": "unassessable",
+      "note": "OpenDART 본문 미확보: document_resource_limited — OpenDART document ZIP entry exceeds the decompressed byte limit"
+    },
+    {
+      "index": 72,
+      "rceptNo": "20260528000782",
+      "corpName": "SKC",
+      "reportName": "[기재정정]주식매수선택권부여에관한신고",
+      "reviewer": "methodology-review",
+      "verdict": "questionable",
+      "note": "퇴임자 일부 옵션 취소와 잔존 옵션 행사가격 조정이 함께 있는데 cancelled 이벤트 하나만 남았다. 복합 변경을 한 occurrence로 축약할지 두 event로 보존할지 cardinality 경계가 불명확하다."
+    },
+    {
+      "index": 73,
+      "rceptNo": "20260714000158",
+      "corpName": "영화금속",
+      "reportName": "의결권대리행사권유참고서류",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 74,
+      "rceptNo": "20260601001483",
+      "corpName": "CJ",
+      "reportName": "대규모기업집단현황공시[연1회(동일인용)]",
+      "reviewer": "methodology-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 75,
+      "rceptNo": "20260727800006",
+      "corpName": "NAVER",
+      "reportName": "[기재정정]장래사업ㆍ경영계획(공정공시)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 76,
+      "rceptNo": "20260529001907",
+      "corpName": "메리츠금융지주",
+      "reportName": "[기재정정]분기보고서 (2026.03)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 77,
+      "rceptNo": "20260724000625",
+      "corpName": "삼성전자",
+      "reportName": "주식등의대량보유상황보고서(일반)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 78,
+      "rceptNo": "20260723000253",
+      "corpName": "이마트",
+      "reportName": "증권발행실적보고서(합병등)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 79,
+      "rceptNo": "20260702000587",
+      "corpName": "윌비스",
+      "reportName": "[기재정정]사업보고서 (2025.12)",
+      "reviewer": "architecture-review",
+      "verdict": "unassessable",
+      "note": "OpenDART 본문 미확보: document_resource_limited — OpenDART document ZIP entry exceeds the decompressed byte limit"
+    },
+    {
+      "index": 80,
+      "rceptNo": "20260721001108",
+      "corpName": "NH투자증권",
+      "reportName": "증권발행실적보고서",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 81,
+      "rceptNo": "20260722000342",
+      "corpName": "삼성중공업",
+      "reportName": "임원ㆍ주요주주특정증권등소유상황보고서",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 82,
+      "rceptNo": "20260629000583",
+      "corpName": "블루산업개발",
+      "reportName": "의결권대리행사권유참고서류",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 83,
+      "rceptNo": "20260716000781",
+      "corpName": "셀트리온",
+      "reportName": "주식등의대량보유상황보고서(일반)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 84,
+      "rceptNo": "20260604000445",
+      "corpName": "대호에이엘",
+      "reportName": "의결권대리행사권유참고서류",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 85,
+      "rceptNo": "20260506000291",
+      "corpName": "엑시큐어하이트론",
+      "reportName": "의결권대리행사권유참고서류",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 86,
+      "rceptNo": "20260716000129",
+      "corpName": "제이알글로벌리츠",
+      "reportName": "[기재정정]주요사항보고서(회생절차개시신청)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 87,
+      "rceptNo": "20260724000615",
+      "corpName": "계양전기",
+      "reportName": "[기재정정]투자설명서",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 88,
+      "rceptNo": "20260720000237",
+      "corpName": "삼일씨엔에스",
+      "reportName": "주주총회소집공고",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 89,
+      "rceptNo": "20260714800797",
+      "corpName": "풍산홀딩스",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 90,
+      "rceptNo": "20260713000285",
+      "corpName": "한화손해보험",
+      "reportName": "계열금융회사의약관에의한금융거래-[유가증권-채권]",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 91,
+      "rceptNo": "20260716000422",
+      "corpName": "솔루엠",
+      "reportName": "주식등의대량보유상황보고서(일반)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 92,
+      "rceptNo": "20260723000536",
+      "corpName": "아남전자",
+      "reportName": "주요사항보고서(자기주식취득신탁계약체결결정)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 93,
+      "rceptNo": "20260715800580",
+      "corpName": "HDC",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 94,
+      "rceptNo": "20260601001782",
+      "corpName": "효성",
+      "reportName": "[기재정정]대규모기업집단현황공시[연1회공시및1/4분기용(대표회사)]",
+      "reviewer": "architecture-review",
+      "verdict": "unassessable",
+      "note": "OpenDART 본문 미확보: document_resource_limited — OpenDART document ZIP entry exceeds the decompressed byte limit"
+    },
+    {
+      "index": 95,
+      "rceptNo": "20260716000372",
+      "corpName": "대원화성",
+      "reportName": "독립이사의선임ㆍ해임또는중도퇴임에관한신고",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 96,
+      "rceptNo": "20260515002203",
+      "corpName": "대양금속",
+      "reportName": "소액공모실적보고서",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 97,
+      "rceptNo": "20260724000413",
+      "corpName": "현대백화점",
+      "reportName": "주식등의대량보유상황보고서(약식)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 98,
+      "rceptNo": "20260714000302",
+      "corpName": "키움증권",
+      "reportName": "계열금융회사의약관에의한금융거래-[유가증권-채권]",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 99,
+      "rceptNo": "20260615000201",
+      "corpName": "경인전자",
+      "reportName": "[기재정정]임원ㆍ주요주주특정증권등거래계획보고서",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 100,
+      "rceptNo": "20260515002925",
+      "corpName": "HS효성첨단소재",
+      "reportName": "분기보고서 (2026.03)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 101,
+      "rceptNo": "20260512000219",
+      "corpName": "SKC",
+      "reportName": "[기재정정]투자설명서",
+      "reviewer": "architecture-review",
+      "verdict": "unassessable",
+      "note": "OpenDART 본문 미확보: document_resource_limited — OpenDART document ZIP entry exceeds the decompressed byte limit"
+    },
+    {
+      "index": 102,
+      "rceptNo": "20260514001506",
+      "corpName": "넷마블",
+      "reportName": "[첨부정정]증권신고서(주식의포괄적교환ㆍ이전)",
+      "reviewer": "architecture-review",
+      "verdict": "unassessable",
+      "note": "OpenDART 본문 미확보: provider_status_error — OpenDART 014: 파일이 존재하지 않습니다."
+    },
+    {
+      "index": 103,
+      "rceptNo": "20260713000369",
+      "corpName": "코아스",
+      "reportName": "[기재정정]주요사항보고서(유상증자결정)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 104,
+      "rceptNo": "20260727800084",
+      "corpName": "HDC랩스",
+      "reportName": "연결재무제표기준영업(잠정)실적(공정공시)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 105,
+      "rceptNo": "20260727800018",
+      "corpName": "HD현대중공업",
+      "reportName": "중대재해발생",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "중대재해 발생과 별도의 부분 작업중지 명령이 원문에 모두 있어 두 이벤트 분리가 타당하다."
+    },
+    {
+      "index": 106,
+      "rceptNo": "20260721000344",
+      "corpName": "플레이그램",
+      "reportName": "소액공모실적보고서",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 107,
+      "rceptNo": "20260520000002",
+      "corpName": "세아홀딩스",
+      "reportName": "공개매수설명서",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 108,
+      "rceptNo": "20260615000262",
+      "corpName": "KB스타리츠",
+      "reportName": "반기보고서 (2026.04)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 109,
+      "rceptNo": "20260602000322",
+      "corpName": "KG스틸",
+      "reportName": "합병등종료보고서(합병)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 110,
+      "rceptNo": "20260515002689",
+      "corpName": "크래프톤",
+      "reportName": "[기재정정]사업보고서 (2025.12)",
+      "reviewer": "architecture-review",
+      "verdict": "unassessable",
+      "note": "OpenDART 본문 미확보: document_resource_limited — OpenDART document ZIP entry exceeds the decompressed byte limit"
+    },
+    {
+      "index": 111,
+      "rceptNo": "20260724800083",
+      "corpName": "포스코DX",
+      "reportName": "기업설명회(IR)개최(안내공시)",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 112,
+      "rceptNo": "20260430000550",
+      "corpName": "현대퓨처넷",
+      "reportName": "자기주식취득결과보고서",
+      "reviewer": "architecture-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 113,
+      "rceptNo": "20260727000192",
+      "corpName": "DB증권",
+      "reportName": "증권발행실적보고서",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 114,
+      "rceptNo": "20260721800174",
+      "corpName": "화인베스틸",
+      "reportName": "영업(잠정)실적(공정공시)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 115,
+      "rceptNo": "20260619000517",
+      "corpName": "신영증권",
+      "reportName": "독립이사의선임ㆍ해임또는중도퇴임에관한신고",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 116,
+      "rceptNo": "20260601001372",
+      "corpName": "LG에너지솔루션",
+      "reportName": "대규모기업집단현황공시[연1회공시및1/4분기용(개별회사)]",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 117,
+      "rceptNo": "20260722800846",
+      "corpName": "해태제과식품",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 118,
+      "rceptNo": "20260724000269",
+      "corpName": "삼성카드",
+      "reportName": "특수관계인과의보험거래",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 119,
+      "rceptNo": "20260612000633",
+      "corpName": "남양유업",
+      "reportName": "신탁계약에의한취득상황보고서",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 120,
+      "rceptNo": "20260727800269",
+      "corpName": "LG이노텍",
+      "reportName": "연결재무제표기준영업(잠정)실적(공정공시)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 121,
+      "rceptNo": "20260724000384",
+      "corpName": "한솔홀딩스",
+      "reportName": "주식등의대량보유상황보고서(일반)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 122,
+      "rceptNo": "20260515000077",
+      "corpName": "샘표식품",
+      "reportName": "[기재정정]사업보고서 (2025.12)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 123,
+      "rceptNo": "20260721001316",
+      "corpName": "가온전선",
+      "reportName": "주식등의대량보유상황보고서(일반)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 124,
+      "rceptNo": "20260723800458",
+      "corpName": "동아지질",
+      "reportName": "[기재정정]매매거래정지및정지해제(중요내용공시)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "원문에 7월 23일 거래정지와 7월 24일 해제가 각각 명시돼 두 lifecycle event가 타당하다."
+    },
+    {
+      "index": 125,
+      "rceptNo": "20260723800952",
+      "corpName": "솔루스첨단소재",
+      "reportName": "기업설명회(IR)개최(안내공시)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 126,
+      "rceptNo": "20260727000053",
+      "corpName": "삼성증권",
+      "reportName": "일괄신고추가서류(파생결합사채-주가연계파생결합사채)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 127,
+      "rceptNo": "20260506000256",
+      "corpName": "카카오페이",
+      "reportName": "[기재정정]주식매수선택권부여에관한신고",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "퇴사자에 대한 주식매수선택권 일부 취소를 cancelled로 포착했다. 다만 canonical tuple에는 “일부” 범위가 남지 않는다."
+    },
+    {
+      "index": 128,
+      "rceptNo": "20260520000001",
+      "corpName": "세아홀딩스",
+      "reportName": "공개매수신고서",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 129,
+      "rceptNo": "20260727800621",
+      "corpName": "HD현대마린솔루션",
+      "reportName": "현금ㆍ현물배당을위한주주명부폐쇄(기준일)결정",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 130,
+      "rceptNo": "20260723000082",
+      "corpName": "키움증권",
+      "reportName": "투자설명서(일괄신고)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 131,
+      "rceptNo": "20260529001444",
+      "corpName": "SK텔레콤",
+      "reportName": "합병등종료보고서(주식의포괄적교환ㆍ이전)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 132,
+      "rceptNo": "20260521000036",
+      "corpName": "현대건설",
+      "reportName": "[기재정정]지급수단별ㆍ지급기간별지급금액및분쟁조정기구에관한사항",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 133,
+      "rceptNo": "20260515002266",
+      "corpName": "HD현대일렉트릭",
+      "reportName": "[기재정정]지급수단별ㆍ지급기간별지급금액및분쟁조정기구에관한사항",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 134,
+      "rceptNo": "20260724800606",
+      "corpName": "케이탑리츠",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 135,
+      "rceptNo": "20260722800278",
+      "corpName": "무학",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 136,
+      "rceptNo": "20260715800799",
+      "corpName": "유안타증권",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 137,
+      "rceptNo": "20260721000079",
+      "corpName": "신영증권",
+      "reportName": "증권발행실적보고서",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 138,
+      "rceptNo": "20260714000498",
+      "corpName": "한화생명",
+      "reportName": "[기재정정]계열금융회사의약관에의한금융거래-[유가증권-수익증권]",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 139,
+      "rceptNo": "20260724000601",
+      "corpName": "삼성생명",
+      "reportName": "특수관계인과의수익증권거래",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 140,
+      "rceptNo": "20260727800319",
+      "corpName": "시디즈",
+      "reportName": "최대주주등소유주식변동신고서",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 141,
+      "rceptNo": "20260713000459",
+      "corpName": "대한항공",
+      "reportName": "[기재정정]증권신고서(합병)",
+      "reviewer": "source-risk-review",
+      "verdict": "unassessable",
+      "note": "OpenDART 본문 미확보: document_resource_limited — OpenDART document ZIP entry exceeds the decompressed byte limit"
+    },
+    {
+      "index": 142,
+      "rceptNo": "20260709000344",
+      "corpName": "미래산업",
+      "reportName": "합병등종료보고서(자산양수도)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "자산양수도 종료보고서의 실질이 타법인 주식 양수 완료라 equity-acquisition/completed가 원문과 정합한다."
+    },
+    {
+      "index": 143,
+      "rceptNo": "20260723000353",
+      "corpName": "신세계푸드",
+      "reportName": "합병등종료보고서(주식의포괄적교환ㆍ이전)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 144,
+      "rceptNo": "20260515003078",
+      "corpName": "HL D&I",
+      "reportName": "분기보고서 (2026.03)",
+      "reviewer": "source-risk-review",
+      "verdict": "unassessable",
+      "note": "OpenDART 본문 미확보: document_resource_limited — OpenDART document ZIP entry exceeds the decompressed byte limit"
+    },
+    {
+      "index": 145,
+      "rceptNo": "20260724000497",
+      "corpName": "대신증권",
+      "reportName": "투자설명서(일괄신고)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 146,
+      "rceptNo": "20260727000065",
+      "corpName": "한화투자증권",
+      "reportName": "증권발행실적보고서",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 147,
+      "rceptNo": "20260724000256",
+      "corpName": "동방",
+      "reportName": "임원ㆍ주요주주특정증권등소유상황보고서",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 148,
+      "rceptNo": "20260723000599",
+      "corpName": "현대자동차",
+      "reportName": "주요사항보고서(자기주식처분결정)",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    },
+    {
+      "index": 149,
+      "rceptNo": "20260727000050",
+      "corpName": "현대차증권",
+      "reportName": "증권발행실적보고서",
+      "reviewer": "source-risk-review",
+      "verdict": "plausible",
+      "note": "제목·세부유형·canonical tuple 사이에서 구체적인 의미 모순이 발견되지 않았다."
+    }
+  ]
+}

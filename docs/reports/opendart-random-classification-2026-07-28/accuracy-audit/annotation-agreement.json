@@ -1,0 +1,43 @@
+{
+  "totalCases": 150,
+  "assessableComparedCount": 138,
+  "exactAgreementCount": 79,
+  "exactAgreementRate": 0.572463768115942,
+  "cardinalityAgreementCount": 135,
+  "cardinalityAgreementRate": 0.9782608695652174,
+  "fieldAgreement": {
+    "denominatorOccurrences": 190,
+    "matches": {
+      "type": 172,
+      "action": 152,
+      "state": 153,
+      "cause": 145,
+      "subjectType": 162
+    },
+    "accuracy": {
+      "type": 0.9052631578947369,
+      "action": 0.8,
+      "state": 0.8052631578947368,
+      "cause": 0.7631578947368421,
+      "subjectType": 0.8526315789473684
+    },
+    "microAccuracy": 0.8252631578947368
+  },
+  "unassessableAgreementCount": 12,
+  "disagreementCount": 59,
+  "alternativeCompatibleCount": 2,
+  "reviewers": {
+    "a": [
+      "prediction-blind-gold-adjudicator-slice-1",
+      "codex-prediction-blind-adjudicator-slice-2",
+      "Codex prediction-blind gold adjudicator (slice 3)",
+      "prediction-blind-gold-adjudicator-slice-4"
+    ],
+    "b": [
+      "prediction-blind-cross-adjudicator-b-slice-1",
+      "prediction-blind-cross-adjudicator-b-slice-2",
+      "codex-prediction-blind-adjudicator-b-slice-3",
+      "codex-executor-blind-b-slice-4"
+    ]
+  }
+}

@@ -1,0 +1,393 @@
+{
+  "schemaVersion": "jaroo.opendart-event-agreement-spotcheck.v1",
+  "reviewer": "prediction-blind-third-reviewer",
+  "reviewedAt": "2026-07-28T03:48:04.841707Z",
+  "predictionBlind": true,
+  "seed": "jaroo-accuracy-agreement-spotcheck-v1",
+  "cases": [
+    {
+      "index": 4,
+      "rceptNo": "20260610000151",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "completed",
+          "state": "effective",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "acceptableAlternatives": [
+        [
+          {
+            "type": "ownership-change",
+            "action": "acquired",
+            "state": "effective",
+            "cause": "tender-offer",
+            "subjectType": "ownership"
+          }
+        ]
+      ],
+      "confidence": "high",
+      "evidenceSummary": "공개매수 결과표는 499,122주 응모, 187,000주 매수와 2026-06-10 결제를 확정한다.",
+      "rationale": "결과보고서의 문서 단위 의도는 공개매수의 완료이며, 실제 매수와 결제가 성립했으므로 completed/effective 단일 사건이 맞다."
+    },
+    {
+      "index": 10,
+      "rceptNo": "20260715800523",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "남양유업 최대주주 집단의 보유 합계가 3,789,380주에서 3,587,053주로 202,327주 감소했다고 총괄 보고한다.",
+      "rationale": "다수의 장내매도 행은 집단 보유 변동 보고의 세부 내역이므로 문서 단위 family인 large-shareholding 보고 한 건으로 라벨하는 것이 맞다."
+    },
+    {
+      "index": 19,
+      "rceptNo": "20260713000482",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "merger",
+          "subjectType": "business"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "아시아나항공 흡수합병은 2026-05-13 이사회에서 결정되고 05-14 계약이 체결됐지만 주주총회·관계당국 승인과 합병기일이 남아 있다.",
+      "rationale": "정정 wrapper와 향후 계열사 개편 설명은 별도 사건이 아니다. 본문 중심 의도는 아직 완료되지 않은 합병 결정이므로 decided/proposed 한 건이 맞다."
+    },
+    {
+      "index": 27,
+      "rceptNo": "20260624000438",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "planned",
+          "state": "proposed",
+          "cause": "insider-trading-plan",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "매직홀딩스는 2026-07-27~08-25 한국특강 보통주 2,000,000주를 시간외매매로 처분할 계획을 신고한다.",
+      "rationale": "거래 수량과 단가는 예상치이며 실제 거래 전인 insider trading plan이므로 planned/proposed 소유변동 한 건이 맞다."
+    },
+    {
+      "index": 29,
+      "rceptNo": "20260721800851",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "corporate-event",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "investor-relations",
+          "subjectType": "issuer"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "현대건설은 2026-08-03~08-05 기관투자자 대상 실적발표 NDR 개최 일정을 안내한다.",
+      "rationale": "공시 시점에 IR 행사가 미래 일정으로 정식 예정되어 있으므로 scheduled/pending corporate-event가 맞다."
+    },
+    {
+      "index": 35,
+      "rceptNo": "20260722000456",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "동일제강 대량보유 보고는 최대주주 측 보유가 12,911,632주(63.60%)에서 14,190,309주(69.90%)로 변동했음을 보고한다.",
+      "rationale": "공개매수는 보유 변동의 원인이지만 문서 단위 의도는 대량보유 집단 현황 보고이므로 large-shareholding reported/effective 한 건이 맞다."
+    },
+    {
+      "index": 42,
+      "rceptNo": "20260615000317",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "governance",
+          "action": "convened",
+          "state": "pending",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "NH투자증권은 2026-06-30 임시주주총회를 소집하고 이사·대표이사 선임 및 보수한도 안건을 공고한다.",
+      "rationale": "회의는 공식 소집됐지만 개최 전이므로 shareholder-meeting convened/pending 한 건이 handbook template과 일치한다."
+    },
+    {
+      "index": 43,
+      "rceptNo": "20260429000199",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "disposed",
+          "state": "effective",
+          "cause": "treasury-share-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "명문제약은 2026-04-28 자기주식 525,123주 전량을 임직원에게 처분했고 예정 수량과 실제 수량이 일치한다고 보고한다.",
+      "rationale": "실제 처분 결과가 확정된 자기주식 처분이므로 disposed/effective corporate-action 한 건이 맞다."
+    },
+    {
+      "index": 47,
+      "rceptNo": "20260720800089",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "평화산업 최대주주등 합계가 임원의 30,000주 장내매수로 30,570,456주에서 30,600,456주로 증가했다.",
+      "rationale": "개별 임원 매수는 총괄 최대주주 집단 변동의 세부 근거이므로 large-shareholding reported/effective 한 건이 맞다."
+    },
+    {
+      "index": 55,
+      "rceptNo": "20260601001392",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "cancelled",
+          "state": "effective",
+          "cause": "stock-option",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "정정 후 주식매수선택권 대상자가 11명에서 8명, 당해 부여수량이 50,305주에서 25,537주로 줄었고 정정사유가 부여 취소로 명시됐다.",
+      "rationale": "정정 wrapper는 별도 사건이 아니며, 이미 효력이 발생한 옵션 취소를 문서 단위 단일 stock-option cancelled/effective 사건으로 라벨하는 것이 맞다."
+    },
+    {
+      "index": 85,
+      "rceptNo": "20260506000291",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "governance",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "proxy-solicitation",
+          "subjectType": "governance"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "엑시큐어하이트론은 2026-05-21 주주총회를 앞두고 05-11~05-20 의결권 대리행사를 권유해 정족수를 확보하려 한다.",
+      "rationale": "문서 자체가 향후 주총을 위한 proxy solicitation이며 권유 절차가 진행 예정이므로 solicited/pending governance 한 건이 맞다."
+    },
+    {
+      "index": 88,
+      "rceptNo": "20260720000237",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "governance",
+          "action": "convened",
+          "state": "pending",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "삼일씨엔에스는 2026-08-04 임시주주총회를 이사 선임 안건으로 공식 소집했다.",
+      "rationale": "소집은 확정됐으나 회의 개최가 남아 있으므로 shareholder-meeting convened/pending 한 건이 맞다."
+    },
+    {
+      "index": 89,
+      "rceptNo": "20260714800797",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "풍산홀딩스 최대주주등 보유 합계는 세 임원의 장내매수로 7,030,813주에서 7,031,221주로 408주 증가했다.",
+      "rationale": "여러 개인 행은 집단 변동의 세부 내역이며 문서 의도는 최대주주등 총괄 현황 보고 한 건이다."
+    },
+    {
+      "index": 96,
+      "rceptNo": "20260515002203",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "대양금속 일반공모 유상증자는 793,650주가 배정되고 납입일에 999,999,000원이 실제 조달된 것으로 보고됐다.",
+      "rationale": "상장 예정일이 남아 있어도 청약·배정·납입이라는 공모 실행은 완료됐으므로 securities-offering completed/effective 한 건이 맞다."
+    },
+    {
+      "index": 104,
+      "rceptNo": "20260727800084",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "HDC랩스는 2026년 2분기 연결 매출·이익을 외부감사인 검토 전 잠정치로 공정공시했다.",
+      "rationale": "명시적으로 잠정인 영업실적 발표이므로 announced/preliminary operating-results 한 건이 handbook template과 일치한다."
+    },
+    {
+      "index": 113,
+      "rceptNo": "20260727000192",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "DB증권 ELB 제902·903·904회는 각각 별도 청약·최종배정·조달금액과 2026-07-27 발행일이 확정됐다.",
+      "rationale": "서로 다른 세 회차는 독립 발행 occurrence이므로 동일 canonical tuple 세 건을 중복 보존하는 것이 정확하다."
+    },
+    {
+      "index": 114,
+      "rceptNo": "20260721800174",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "화인베스틸은 2026년 2분기 및 반기 누계 별도 영업실적을 외부감사인 검토 전 잠정치로 발표했다.",
+      "rationale": "분기와 누계 수치는 한 실적 공시의 측정 범위이지 독립 occurrence가 아니며 announced/preliminary 한 건이 맞다."
+    },
+    {
+      "index": 117,
+      "rceptNo": "20260722800846",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "해태제과식품 최대주주등 합계는 시간외매도로 18,026,208주에서 17,984,208주로 42,000주 감소했다.",
+      "rationale": "개별 매도는 집단 변동의 세부 원인이므로 large-shareholding reported/effective 한 건이 맞다."
+    },
+    {
+      "index": 135,
+      "rceptNo": "20260722800278",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "무학 최대주주등 합계는 계열사의 여러 장내매수로 17,511,310주에서 17,564,130주로 52,820주 증가했다.",
+      "rationale": "여러 거래일의 매수 행은 한 총괄 최대주주등 소유변동 보고의 세부 내역이므로 사건 수는 한 건이다."
+    },
+    {
+      "index": 136,
+      "rceptNo": "20260715800799",
+      "verdict": "confirmed",
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "유안타증권 최대주주등 합계는 최대주주의 9,000주 장내매수로 117,887,797주에서 117,896,797주로 증가했다.",
+      "rationale": "문서 단위 의도는 최대주주 집단 보유현황의 변동 보고이므로 large-shareholding reported/effective 한 건이 맞다."
+    }
+  ]
+}
