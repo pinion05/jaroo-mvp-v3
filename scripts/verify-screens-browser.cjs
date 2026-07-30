@@ -38,8 +38,61 @@ const requestedSuites = argv.filter((arg) => !arg.startsWith('--'))
  * agent-browser helpers
  * ------------------------------------------------------------------ */
 
+/**
+ * Resolve which `agent-browser` binary to drive.
+ *
+ * Multiple installs can coexist (npm global, bun, homebrew) and `npm run`
+ * reorders PATH, so the first match is not necessarily the one that supports
+ * the flags we need. Pick the first candidate whose help advertises
+ * `--session-name`; otherwise report every candidate so the mismatch is obvious.
+ *
+ * Override explicitly with AGENT_BROWSER_BIN when needed.
+ */
+const REQUIRED_FLAG = '--session-name'
+
+function listCandidateBinaries() {
+  if (process.env.AGENT_BROWSER_BIN) {
+    return [process.env.AGENT_BROWSER_BIN]
+  }
+
+  const lookup = spawnSync('which', ['-a', 'agent-browser'], { encoding: 'utf8', timeout: 10_000 })
+  const candidates = (lookup.stdout || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+
+  return [...new Set(candidates)]
+}
+
+function describeBinary(binPath) {
+  const version = spawnSync(binPath, ['--version'], { encoding: 'utf8', timeout: 15_000 })
+  const help = spawnSync(binPath, ['--help'], { encoding: 'utf8', timeout: 15_000 })
+  const helpText = `${help.stdout || ''}${help.stderr || ''}`
+
+  return {
+    path: binPath,
+    version: (version.stdout || '').trim() || '(unknown)',
+    supportsSession: helpText.includes(REQUIRED_FLAG),
+  }
+}
+
+function resolveAgentBrowser() {
+  const candidates = listCandidateBinaries()
+
+  if (candidates.length === 0) {
+    return { bin: null, inspected: [] }
+  }
+
+  const inspected = candidates.map(describeBinary)
+  const compatible = inspected.find((entry) => entry.supportsSession)
+
+  return { bin: compatible?.path ?? null, inspected }
+}
+
+const { bin: AGENT_BROWSER, inspected: AGENT_BROWSER_CANDIDATES } = resolveAgentBrowser()
+
 function ab(args, { timeoutMs = 90_000, allowFailure = false } = {}) {
-  const result = spawnSync('agent-browser', ['--session-name', SESSION, ...args], {
+  const result = spawnSync(AGENT_BROWSER, ['--session-name', SESSION, ...args], {
     encoding: 'utf8',
     timeout: timeoutMs,
   })
@@ -510,16 +563,29 @@ async function preflight() {
     console.log(`  ✓ crawler ${CRAWLER_URL} healthy`)
   }
 
-  const version = spawnSync('agent-browser', ['--version'], { encoding: 'utf8', timeout: 15_000 })
+  if (!AGENT_BROWSER) {
+    if (AGENT_BROWSER_CANDIDATES.length === 0) {
+      console.error('  ✗ agent-browser not found on PATH. Install it, then run `agent-browser install`.')
+    } else {
+      console.error(`  ✗ no agent-browser build on PATH supports ${REQUIRED_FLAG}:`)
+      for (const candidate of AGENT_BROWSER_CANDIDATES) {
+        console.error(`      ${candidate.path} (${candidate.version})`)
+      }
+      console.error('    Pin a compatible build with AGENT_BROWSER_BIN=/path/to/agent-browser')
+    }
+    process.exit(2)
+  }
+
+  const version = spawnSync(AGENT_BROWSER, ['--version'], { encoding: 'utf8', timeout: 15_000 })
   if (version.error) {
-    console.error(`  ✗ agent-browser unavailable (${version.error.code ?? version.error.message}). Install it and run \`agent-browser install\`.`)
+    console.error(`  ✗ agent-browser unavailable (${version.error.code ?? version.error.message}).`)
     process.exit(2)
   }
   if (version.status !== 0) {
     console.error(`  ✗ agent-browser exited ${version.status}: ${(version.stderr || '').trim()}`)
     process.exit(2)
   }
-  console.log(`  ✓ agent-browser ${(version.stdout || '').trim()}`)
+  console.log(`  ✓ agent-browser ${(version.stdout || '').trim()} (${AGENT_BROWSER})`)
   console.log('')
 }
 
