@@ -116,6 +116,10 @@ function waitFor(expression, predicate, { timeoutMs = 60_000, intervalMs = 3_000
  *
  * Framework/dev-tooling notices are excluded: they appear on every page in dev
  * mode and would otherwise mask genuine regressions.
+ *
+ * Returns CONSOLE_COLLECTION_FAILED when the log could not be read at all
+ * (dead session, timeout, CDP drop). A sentinel is used instead of 0 so a
+ * collection failure can never be mistaken for "no errors".
  */
 const IGNORED_CONSOLE_PATTERNS = [
   /react-devtools|Download the React DevTools/iu,
@@ -124,8 +128,15 @@ const IGNORED_CONSOLE_PATTERNS = [
   /\[Fast Refresh\]|\[HMR\]/iu,
 ]
 
+const CONSOLE_COLLECTION_FAILED = -1
+
 function consoleErrorCount() {
-  const { stdout } = ab(['console'], { allowFailure: true })
+  const { ok, stdout, stderr } = ab(['console'], { allowFailure: true })
+
+  if (!ok) {
+    return CONSOLE_COLLECTION_FAILED
+  }
+
   return stdout
     .split('\n')
     .filter((line) => /^\[(error|warning)\]/iu.test(line.trim()))
@@ -174,6 +185,21 @@ const expect = {
   }),
 }
 
+/**
+ * Assert the page produced no console errors, keeping "clean" and
+ * "could not be checked" as distinct outcomes.
+ */
+function checkConsoleClean() {
+  const count = consoleErrorCount()
+
+  if (count === CONSOLE_COLLECTION_FAILED) {
+    check('콘솔 에러 없음', 'console 수집 실패 (세션 종료/타임아웃)', expect.equals(0))
+    return
+  }
+
+  check('콘솔 에러 없음', count, expect.equals(0))
+}
+
 /* ------------------------------------------------------------------ *
  * Session fixtures
  * ------------------------------------------------------------------ */
@@ -203,6 +229,30 @@ function seedPortfolio() {
   open(`${BASE_URL}/home`)
   sleep(1_500)
   ab(['eval', SEED_PORTFOLIO])
+}
+
+/**
+ * Seed a screenshot upload session so /ocr renders instead of bouncing to
+ * /screenshot. Schema must satisfy sanitizeScreenshotUploadSession():
+ * { broker: string, uploads: [{ id, fileName, imageDataUrl: 'data:image/...' }] }.
+ *
+ * A 1x1 transparent PNG is enough — the suite only asserts the shell renders,
+ * and no OCR request is triggered without user action.
+ */
+const TINY_PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8DwHwAFAAH/q842iQAAAABJRU5ErkJggg=='
+
+const SEED_UPLOAD_SESSION = `
+sessionStorage.setItem('jaroo:screenshot-ocr-upload', JSON.stringify({
+  broker: '키움증권',
+  uploads: [{ id: 'verify-1', fileName: 'verify.png', imageDataUrl: '${TINY_PNG}' }]
+}));
+JSON.stringify('seeded')
+`
+
+function seedUploadSession() {
+  open(`${BASE_URL}/screenshot`)
+  sleep(1_500)
+  ab(['eval', SEED_UPLOAD_SESSION])
 }
 
 /* ------------------------------------------------------------------ *
@@ -302,7 +352,7 @@ const suites = {
         evalJson(`JSON.stringify(/세 팀의 의견|종합 결론/u.test(document.body.textContent))`),
         expect.equals(true))
 
-      check('콘솔 에러 없음', consoleErrorCount(), expect.equals(0))
+      checkConsoleClean()
     },
   },
 
@@ -334,29 +384,67 @@ const suites = {
         evalJson(`JSON.stringify(document.querySelectorAll('[aria-label="주요 화면"] a').length)`),
         expect.atLeast(6))
 
-      check('콘솔 에러 없음', consoleErrorCount(), expect.equals(0))
+      checkConsoleClean()
     },
   },
 
   /**
-   * OCR review screen. This page ships its own 340px shell with inline styles
-   * instead of JarooShell, so there is deliberately no shared bottom nav.
+   * OCR review screen.
+   *
+   * /ocr redirects to /screenshot when there is no upload session, and both
+   * pages share the 340px inline-style shell. Asserting only on a shared
+   * selector would pass on the redirect target, so this suite seeds an upload
+   * session and pins the pathname before checking OCR-specific markup.
    */
   ocr: {
     description: 'OCR 검수 화면 셸 렌더링',
     async run() {
+      seedUploadSession()
       open(`${BASE_URL}/ocr`)
-      sleep(5_000)
+      sleep(6_000)
+
+      check('/ocr 경로 유지 (리다이렉트 아님)',
+        evalJson(`JSON.stringify(window.location.pathname)`),
+        expect.equals('/ocr'))
+
+      check('OCR 전용 셸 마운트 (.jaroo-ocr-page)',
+        evalJson(`JSON.stringify(!!document.querySelector('.jaroo-ocr-page'))`),
+        expect.equals(true))
+
+      check('OCR 프레임 렌더링',
+        evalJson(`JSON.stringify(!!document.querySelector('.jaroo-ocr-frame'))`),
+        expect.equals(true))
 
       check('페이지 본문 렌더링',
         evalJson(`JSON.stringify(document.body.textContent.trim().length)`),
         expect.atLeast(50))
 
-      check('자체 업로드 셸 마운트',
-        evalJson(`JSON.stringify(!!document.querySelector('.jaroo-upload-page, [class*="uploadPage"]'))`),
-        expect.equals(true))
+      checkConsoleClean()
+    },
+  },
 
-      check('콘솔 에러 없음', consoleErrorCount(), expect.equals(0))
+  /**
+   * /ocr guard: without an upload session the page must bounce to /screenshot.
+   * Pairs with the `ocr` suite so a broken redirect cannot hide behind the
+   * shared shell markup.
+   */
+  'ocr-redirect': {
+    description: 'OCR 세션 없을 때 /screenshot 리다이렉트 가드',
+    async run() {
+      open(`${BASE_URL}/home`)
+      sleep(1_500)
+      ab(['eval', `sessionStorage.removeItem('jaroo:screenshot-ocr-upload'); JSON.stringify('cleared')`])
+
+      open(`${BASE_URL}/ocr`)
+      const pathname = waitFor(
+        `JSON.stringify(window.location.pathname)`,
+        (value) => value === '/screenshot',
+        { timeoutMs: 15_000, intervalMs: 1_000 },
+      )
+
+      check('세션 없음 → /screenshot 리다이렉트', pathname, expect.equals('/screenshot'))
+
+      checkConsoleClean()
     },
   },
 
@@ -371,7 +459,7 @@ const suites = {
         evalJson(`JSON.stringify(document.body.textContent.trim().length)`),
         expect.atLeast(50))
 
-      check('콘솔 에러 없음', consoleErrorCount(), expect.equals(0))
+      checkConsoleClean()
     },
   },
 }
@@ -380,25 +468,42 @@ const suites = {
  * Preflight
  * ------------------------------------------------------------------ */
 
-function httpStatus(url) {
-  const result = spawnSync('curl', ['-s', '-o', '/dev/null', '-w', '%{http_code}', url], {
-    encoding: 'utf8',
-    timeout: 10_000,
-  })
-  return (result.stdout || '').trim()
+/**
+ * Probe a health endpoint.
+ *
+ * Uses Node's global fetch (available on the project's Node 20.9+ baseline)
+ * rather than shelling out to curl, so a missing/failing binary can never be
+ * misreported as an HTTP problem. Failures return a diagnostic string such as
+ * `error:ECONNREFUSED` so preflight can name the real cause.
+ */
+async function httpStatus(url) {
+  const controller = new AbortController()
+  const timer = setTimeout(() => controller.abort(), 10_000)
+
+  try {
+    const response = await fetch(url, { signal: controller.signal })
+    return String(response.status)
+  } catch (error) {
+    if (error?.name === 'AbortError') {
+      return 'error:TIMEOUT'
+    }
+    return `error:${error?.cause?.code ?? error?.code ?? error?.name ?? 'UNKNOWN'}`
+  } finally {
+    clearTimeout(timer)
+  }
 }
 
-function preflight() {
+async function preflight() {
   console.log('Preflight')
 
-  const web = httpStatus(`${BASE_URL}/api/health`)
+  const web = await httpStatus(`${BASE_URL}/api/health`)
   if (web !== '200') {
     console.error(`  ✗ web ${BASE_URL} not healthy (status ${web}). Run: npm run dev`)
     process.exit(2)
   }
   console.log(`  ✓ web ${BASE_URL} healthy`)
 
-  const crawler = httpStatus(`${CRAWLER_URL}/api/source/system/health`)
+  const crawler = await httpStatus(`${CRAWLER_URL}/api/source/system/health`)
   if (crawler !== '200') {
     console.warn(`  ! crawler ${CRAWLER_URL} not healthy (status ${crawler}). DeepScan data may degrade.`)
   } else {
@@ -406,8 +511,12 @@ function preflight() {
   }
 
   const version = spawnSync('agent-browser', ['--version'], { encoding: 'utf8', timeout: 15_000 })
+  if (version.error) {
+    console.error(`  ✗ agent-browser unavailable (${version.error.code ?? version.error.message}). Install it and run \`agent-browser install\`.`)
+    process.exit(2)
+  }
   if (version.status !== 0) {
-    console.error('  ✗ agent-browser unavailable. Install it and run `agent-browser install`.')
+    console.error(`  ✗ agent-browser exited ${version.status}: ${(version.stderr || '').trim()}`)
     process.exit(2)
   }
   console.log(`  ✓ agent-browser ${(version.stdout || '').trim()}`)
@@ -427,7 +536,7 @@ async function main() {
     return
   }
 
-  preflight()
+  await preflight()
 
   const selected = requestedSuites.length > 0 ? requestedSuites : Object.keys(suites)
   const unknown = selected.filter((name) => !suites[name])
