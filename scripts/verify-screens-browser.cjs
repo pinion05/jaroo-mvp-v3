@@ -184,7 +184,7 @@ const IGNORED_CONSOLE_PATTERNS = [
 const CONSOLE_COLLECTION_FAILED = -1
 
 function consoleErrorCount() {
-  const { ok, stdout, stderr } = ab(['console'], { allowFailure: true })
+  const { ok, stdout } = ab(['console'], { allowFailure: true })
 
   if (!ok) {
     return CONSOLE_COLLECTION_FAILED
@@ -251,6 +251,76 @@ function checkConsoleClean() {
   }
 
   check('콘솔 에러 없음', count, expect.equals(0))
+}
+
+/* ------------------------------------------------------------------ *
+ * Network failures
+ * ------------------------------------------------------------------ */
+
+/**
+ * A console check alone cannot see HTTP failures: the app swallows most fetch
+ * errors in try/catch, so a 500 from an API route produces a silently degraded
+ * screen and a green console. These checks read the actual request log.
+ *
+ * Expected-by-design statuses are allowlisted rather than ignoring 4xx wholesale:
+ * the harness drives an unauthenticated browser (it seeds sessionStorage, not
+ * Supabase auth cookies), so auth-gated routes legitimately answer 401/403.
+ */
+const EXPECTED_HTTP_FAILURES = [
+  { status: 401, pattern: /\/api\/portfolio\b/u },
+  { status: 403, pattern: /\/api\/portfolio\b/u },
+  { status: 401, pattern: /\/api\/auth\//u },
+  { status: 403, pattern: /\/api\/auth\//u },
+]
+
+const NETWORK_COLLECTION_FAILED = -1
+
+/**
+ * Parse `agent-browser network requests` lines of the form
+ *   [requestId] METHOD url (Type) status
+ * Entries without a trailing status (redirects, still in flight) are skipped:
+ * only an explicit status code is unambiguous enough to fail a run on.
+ */
+function failedRequests() {
+  const { ok, stdout } = ab(['network', 'requests'], { allowFailure: true })
+
+  if (!ok) {
+    return NETWORK_COLLECTION_FAILED
+  }
+
+  return stdout
+    .split('\n')
+    .map((line) => {
+      const match = /^\[[^\]]+\]\s+(\S+)\s+(\S+)\s+\([^)]*\)\s+(\d{3})\s*$/u.exec(line.trim())
+      if (!match) {
+        return null
+      }
+      return { method: match[1], url: match[2], status: Number(match[3]) }
+    })
+    .filter((entry) => entry && entry.status >= 400)
+    .filter((entry) => !EXPECTED_HTTP_FAILURES.some(
+      (allowed) => allowed.status === entry.status && allowed.pattern.test(entry.url),
+    ))
+}
+
+/**
+ * Fail on any server fault or unexpected client error observed on the screen.
+ */
+function checkNoFailedRequests() {
+  const failed = failedRequests()
+
+  if (failed === NETWORK_COLLECTION_FAILED) {
+    check('HTTP 실패 응답 없음', 'network 수집 실패 (세션 종료/타임아웃)', expect.equals(0))
+    return
+  }
+
+  if (failed.length > 0) {
+    const summary = failed.map((entry) => `${entry.status} ${entry.method} ${entry.url}`).join(', ')
+    check('HTTP 실패 응답 없음', summary, expect.equals(0))
+    return
+  }
+
+  check('HTTP 실패 응답 없음', 0, expect.equals(0))
 }
 
 /* ------------------------------------------------------------------ *
@@ -413,6 +483,7 @@ const suites = {
         expect.equals(true))
 
       checkConsoleClean()
+      checkNoFailedRequests()
     },
   },
 
@@ -452,6 +523,7 @@ const suites = {
         expect.atLeast(6))
 
       checkConsoleClean()
+      checkNoFailedRequests()
     },
   },
 
@@ -494,6 +566,7 @@ const suites = {
         expect.equals(true))
 
       checkConsoleClean()
+      checkNoFailedRequests()
     },
   },
 
@@ -519,6 +592,7 @@ const suites = {
       check('세션 없음 → /screenshot 리다이렉트', pathname, expect.equals('/screenshot'))
 
       checkConsoleClean()
+      checkNoFailedRequests()
     },
   },
 
@@ -553,6 +627,7 @@ const suites = {
         expect.equals(true))
 
       checkConsoleClean()
+      checkNoFailedRequests()
     },
   },
 }

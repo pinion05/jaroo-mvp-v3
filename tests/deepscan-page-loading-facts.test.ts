@@ -9,6 +9,7 @@ import {
   getTargetPriceSubject,
   isExchangeProductMarket,
   isExchangeProductPayload,
+  isNoDataToken,
   isTargetPriceFailureText,
   isTargetPriceMissingText,
   parseLoadingConsensusBody,
@@ -83,20 +84,33 @@ test('정상 목표가가 있으면 목표가 값을 그대로 노출한다', ()
   assert.equal(fact.body, '목표가 92,000원')
 })
 
-test('목표가가 N/A면 값으로 취급하지 않는다', () => {
-  const fact = buildTargetPriceStatusQuickFact(payloadWith({}, 'N/A'))
+test('목표가가 N/A면 값으로 취급하지 않고 한국어 안내로 대체한다', () => {
+  const fact = buildTargetPriceStatusQuickFact(payloadWith({ name: '삼성전자' }, 'N/A'))
 
   // 'N/A' must not be promoted into the "목표가 <값>" phrasing.
   assert.doesNotMatch(fact.body, /^목표가 /u)
   assert.equal(fact.badge, '확인 중')
+  // The raw English placeholder must never reach the Korean UI.
+  assert.doesNotMatch(fact.body, /N\/A/iu)
+  assert.equal(fact.body, '삼성전자는 증권사 목표가를 확인하는 중입니다.')
+  // Absent data is not an upstream failure, so the tone stays informational.
+  assert.equal(fact.tone, 'info')
+  assert.equal(fact.detail, undefined)
+})
 
-  // KNOWN DEFECT (pre-existing, not introduced by the split): 'N/A' matches
-  // neither the failure nor the missing pattern, so the raw English token
-  // reaches a Korean-language UI with no context for the user. This assertion
-  // pins today's behaviour so the split can be proven faithful — it is NOT an
-  // endorsement. Fix by folding 'N/A' into isTargetPriceMissingText or
-  // mapping it to Korean copy, then update this test.
-  assert.equal(fact.body, 'N/A')
+test('데이터 부재 플레이스홀더 변형을 모두 값 없음으로 본다', () => {
+  assert.equal(isNoDataToken('N/A'), true)
+  assert.equal(isNoDataToken('n/a'), true)
+  assert.equal(isNoDataToken(' NA '), true)
+  assert.equal(isNoDataToken('-'), true)
+  assert.equal(isNoDataToken('—'), true)
+  assert.equal(isNoDataToken('null'), true)
+  assert.equal(isNoDataToken(undefined), true)
+
+  // Real values must not be swallowed.
+  assert.equal(isNoDataToken('92,000원'), false)
+  assert.equal(isNoDataToken('목표가 미제공'), false)
+  assert.equal(isNoDataToken('-8.2%'), false)
 })
 
 /* ----------------------------------------------------------------- *

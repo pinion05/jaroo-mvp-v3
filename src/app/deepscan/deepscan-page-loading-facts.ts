@@ -188,6 +188,20 @@ export function isTargetPriceMissingText(value: string) {
   return /목표가\s*미제공|ETF는\s*목표가\s*대신|데[이]?타가\s*존재하지\s*않습니다|데[이]?터가\s*존재하지\s*않습니다|최근\s*3개월\s*이내에\s*제시된\s*의견이\s*없습니다/u.test(value)
 }
 
+/**
+ * Placeholder tokens emitted by the payload builder when a number was not
+ * available (`signedPercent` / `formatNumber` fall back to 'N/A', and the
+ * degraded payloads set `targetPriceText: 'N/A'`).
+ *
+ * These are not a crawler failure and not a confirmed "no analyst coverage"
+ * either — they only mean the value is absent. Treating them as no-value keeps
+ * the raw English token out of a Korean-language UI.
+ */
+export function isNoDataToken(value: string | null | undefined) {
+  const normalized = (value ?? '').trim()
+  return !normalized || /^(?:n\s*\/?\s*a|-+|—+|null|undefined)$/iu.test(normalized)
+}
+
 export function isExchangeProductMarket(value: string | null | undefined) {
   return /(?:^|\b)(?:ETF|ETN)(?:\b|$)/iu.test(value ?? '')
 }
@@ -223,6 +237,12 @@ function summarizeTargetPriceReason(value: string, payload: JarooDeepScanPayload
     return `${subject} 증권사 목표가를 확인하는 중입니다.`
   }
 
+  // 'N/A' and friends used to fall through to the bottom `return normalized`,
+  // putting a raw English placeholder in front of the user.
+  if (isNoDataToken(normalized)) {
+    return `${subject} 증권사 목표가를 확인하는 중입니다.`
+  }
+
   if (isTargetPriceFailureText(normalized)) {
     return `${subject} 증권사 목표가를 지금 불러오지 못했습니다.`
   }
@@ -240,7 +260,7 @@ export function buildTargetPriceStatusQuickFact(payload: JarooDeepScanPayload | 
   const reasonSource = sourceBody?.trim() || targetPriceText
   const isFailure = isTargetPriceFailureText(reasonSource)
   const isMissing = !isFailure && isTargetPriceMissingText(reasonSource)
-  const hasTargetPriceValue = Boolean(targetPriceText && targetPriceText !== 'N/A' && !isFailure && !isMissing)
+  const hasTargetPriceValue = Boolean(targetPriceText && !isNoDataToken(targetPriceText) && !isFailure && !isMissing)
   const body = exchangeProduct
     ? summarizeTargetPriceReason(reasonSource, payload, fallbackName, fallbackMarket, fallbackKind)
     : hasTargetPriceValue
