@@ -375,8 +375,15 @@ const suites = {
         evalJson(`JSON.stringify(Array.from(document.querySelectorAll('[data-today-briefing-item="true"]')).some(el => /코스피|S&P|NASDAQ|코스닥/u.test(el.textContent)))`),
         expect.equals(true))
 
+      // `atLeast(1)` passed even if the tone mapping had collapsed to a single
+      // incidental element. The seeded holding carries profitRate -8.2, so a
+      // loss tone must actually be applied somewhere.
       check('금융 색상 토큰 적용 (financialToneClass)',
         evalJson(`JSON.stringify(document.querySelectorAll('[class*="gain"],[class*="loss"],[class*="financialNeutral"],[class*="todayUp"],[class*="todayDown"]').length)`),
+        expect.atLeast(3))
+
+      check('손실 톤이 실제로 매핑됨',
+        evalJson(`JSON.stringify(document.querySelectorAll('[class*="loss"],[class*="todayDown"]').length)`),
         expect.atLeast(1))
 
       // Narrative cards unlock at TEAM_BRIDGE_DONE_SECONDS (~73s) or as soon as
@@ -425,9 +432,16 @@ const suites = {
         evalJson(`JSON.stringify(!!document.querySelector('[aria-label="보유 종목 비중 원차트"]'))`),
         expect.equals(true))
 
-      check('총 평가액 표시',
-        evalJson(`JSON.stringify(/[0-9,]+원/u.test(document.body.textContent))`),
-        expect.equals(true))
+      // `/[0-9,]+원/` also matched a fallback "0원", so a broken valuation
+      // pipeline stayed green. Require the seeded holding's actual value.
+      check('총 평가액이 0원이 아님',
+        evalJson(`JSON.stringify((() => {
+          const amounts = (document.body.textContent.match(/[0-9][0-9,]*원/gu) || [])
+            .map((raw) => Number(raw.replace(/[^0-9]/gu, '')))
+            .filter((value) => Number.isFinite(value) && value > 0)
+          return amounts.length
+        })())`),
+        expect.atLeast(1))
 
       check('보유 종목 카드 존재',
         evalJson(`JSON.stringify(Array.from(document.querySelectorAll('button')).filter(b => /삼성전자/u.test(b.textContent)).length)`),
@@ -468,9 +482,16 @@ const suites = {
         evalJson(`JSON.stringify(!!document.querySelector('.jaroo-ocr-frame'))`),
         expect.equals(true))
 
-      check('페이지 본문 렌더링',
-        evalJson(`JSON.stringify(document.body.textContent.trim().length)`),
-        expect.atLeast(50))
+      // Replaces a bare `body.textContent.length >= 50` check, which an
+      // infinite loading spinner also satisfied. Assert the OCR body shell
+      // plus the action that closes the flow.
+      check('OCR 본문 셸 렌더링',
+        evalJson(`JSON.stringify(!!document.querySelector('.jaroo-ocr-body'))`),
+        expect.equals(true))
+
+      check('포트폴리오 적용 버튼 존재',
+        evalJson(`JSON.stringify(!!document.querySelector('.jaroo-ocr-apply-btn'))`),
+        expect.equals(true))
 
       checkConsoleClean()
     },
@@ -508,9 +529,28 @@ const suites = {
       open(`${BASE_URL}/screenshot`)
       sleep(4_000)
 
-      check('페이지 본문 렌더링',
-        evalJson(`JSON.stringify(document.body.textContent.trim().length)`),
-        expect.atLeast(50))
+      check('/screenshot 경로 유지', evalJson(`JSON.stringify(location.pathname)`), expect.equals('/screenshot'))
+
+      // A page-specific shell class. `body.textContent.length` alone used to
+      // satisfy this suite, which meant the whole upload UI could be deleted
+      // without turning the run red.
+      check('업로드 화면 셸 마운트',
+        evalJson(`JSON.stringify(!!document.querySelector('.jaroo-upload-frame'))`),
+        expect.equals(true))
+
+      // The one interaction this screen exists for.
+      check('업로드 존 버튼 존재',
+        evalJson(`JSON.stringify(!!document.querySelector('button.jaroo-upload-upzone'))`),
+        expect.equals(true))
+
+      // Camera / file / photo pickers must all be wired up.
+      check('파일 선택 input 3종',
+        evalJson(`JSON.stringify(document.querySelectorAll('input.jaroo-upload-file-input[type="file"]').length)`),
+        expect.equals(3))
+
+      check('업로드 예시 안내 렌더링',
+        evalJson(`JSON.stringify(/이렇게 보이는 화면/u.test(document.body.textContent))`),
+        expect.equals(true))
 
       checkConsoleClean()
     },

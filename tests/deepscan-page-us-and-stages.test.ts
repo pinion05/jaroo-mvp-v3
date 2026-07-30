@@ -82,7 +82,9 @@ test('US 지표는 close를 우선하고 없으면 value를 쓴다', () => {
     {
       ok: true,
       data: {
-        sp500: { close: 5_600, changePct: 1.2, timestamp: '2026-07-30T00:00:00Z' },
+        // Both fields present: `close` must win. Without this the precedence
+        // could be swapped without any test noticing.
+        sp500: { close: 5_600, value: 9_999, changePct: 1.2, timestamp: '2026-07-30T00:00:00Z' },
         nasdaq: { value: 18_000, changePct: -0.4, timestamp: 1_785_000_000_000 },
         vix: { close: 14.2, changePct: null, timestamp: null },
       },
@@ -105,6 +107,18 @@ test('US 지표가 전부 비어 있으면 스냅샷을 만들지 않는다', ()
   assert.equal(buildUsLoadingMarketSnapshot({ ok: false, data: null }, 'k'), null)
   assert.equal(
     buildUsLoadingMarketSnapshot({ ok: true, data: { sp500: null, nasdaq: null, vix: null } }, 'k'),
+    null,
+  )
+})
+
+test('ok=false면 데이터가 실려 있어도 스냅샷을 만들지 않는다', () => {
+  // Guards against dropping the `ok` check: a failed upstream response can
+  // still carry a stale/partial payload, which must not be rendered.
+  assert.equal(
+    buildUsLoadingMarketSnapshot(
+      { ok: false, data: { sp500: { close: 100, changePct: 1, timestamp: null } } },
+      'k',
+    ),
     null,
   )
 })

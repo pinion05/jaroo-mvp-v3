@@ -89,9 +89,13 @@ test('목표가가 N/A면 값으로 취급하지 않는다', () => {
   // 'N/A' must not be promoted into the "목표가 <값>" phrasing.
   assert.doesNotMatch(fact.body, /^목표가 /u)
   assert.equal(fact.badge, '확인 중')
-  // Documents current behaviour: the raw 'N/A' string falls through as the
-  // reason text because it matches neither the failure nor the missing pattern.
-  // Worth a friendlier copy later, but out of scope for a pure move.
+
+  // KNOWN DEFECT (pre-existing, not introduced by the split): 'N/A' matches
+  // neither the failure nor the missing pattern, so the raw English token
+  // reaches a Korean-language UI with no context for the user. This assertion
+  // pins today's behaviour so the split can be proven faithful — it is NOT an
+  // endorsement. Fix by folding 'N/A' into isTargetPriceMissingText or
+  // mapping it to Korean copy, then update this test.
   assert.equal(fact.body, 'N/A')
 })
 
@@ -208,6 +212,21 @@ test('52주 고저가가 유효하지 않으면 카드를 만들지 않는다', 
   assert.equal(buildWeek52LoadingQuickFact({ targetKey: 'k', currentPrice: 10, week52High: 5, week52Low: 5 }), null)
   // zero/negative prices are rejected
   assert.equal(buildWeek52LoadingQuickFact({ targetKey: 'k', currentPrice: 0, week52High: 200, week52Low: 100 }), null)
+})
+
+test('52주 위치 라벨은 구간별 임계치를 지킨다', () => {
+  const labelAt = (currentPrice: number) =>
+    buildWeek52LoadingQuickFact({ targetKey: 'k', currentPrice, week52High: 200, week52Low: 100 })?.detail
+
+  // highGapPct >= -10 → 고점 근처. 190/200 = -5%
+  assert.equal(labelAt(190), '고점 근처예요')
+  // lowGapPct <= 20 → 바닥권. 115/100 = +15%
+  assert.equal(labelAt(115), '바닥권 근처예요')
+  // lowGapPct <= 50 → 중하단. 140/100 = +40%
+  assert.equal(labelAt(140), '중하단 구간이에요')
+  // 그 위 구간은 위 셋과 달라야 한다. 175/100 = +75%, 175/200 = -12.5%
+  const upper = labelAt(175)
+  assert.ok(upper && !['고점 근처예요', '바닥권 근처예요', '중하단 구간이에요'].includes(upper))
 })
 
 test('실시간 시세가 없으면 브리핑 스냅샷 일봉으로 52주 위치를 복원한다', () => {
