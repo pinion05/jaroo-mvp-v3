@@ -9,6 +9,7 @@
     "start": "npm run start:web",
     "test": "node --test tests/*.test.mjs && npm run test:web:ts && npm run test:crawler && npm run test:instrument-core",
     "test:web:ts": "node scripts/run-web-ts-tests.cjs",
+    "verify:screens": "node scripts/verify-screens-browser.cjs",
     "lint": "npm run lint:web",
     "dev:web": "node scripts/with-local-env.cjs next dev",
     "build:web": "node scripts/with-local-env.cjs next build",
