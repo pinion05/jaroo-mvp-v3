@@ -405,7 +405,7 @@ export function DeepScanLoadingScreen({
             ].filter((tag): tag is { text: string; tone: NarrativeTone } => Boolean(tag))
 
             return (
-              <article key={card.key} className={cn(styles.narrativeCard, cardSettled ? styles.narrativeCardComplete : styles.narrativeCardPending)}>
+              <article key={card.key} className={cn(styles.narrativeCard, cardSettled ? undefined : styles.narrativeCardPending)}>
                 <div className={styles.narrativeHead}>
                   <span className={cn(styles.narrativeAvatar, card.placeholder && !card.teamKey ? styles.narrativeAvatarPending : undefined)} aria-hidden='true'>{card.placeholder && !card.teamKey ? <Loader2 className={styles.narrativeSpinner} aria-hidden /> : card.avatar}</span>
                   <div className={styles.narrativeNameWrap}>

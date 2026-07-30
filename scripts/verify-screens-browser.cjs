@@ -184,7 +184,7 @@ const IGNORED_CONSOLE_PATTERNS = [
 const CONSOLE_COLLECTION_FAILED = -1
 
 function consoleErrorCount() {
-  const { ok, stdout, stderr } = ab(['console'], { allowFailure: true })
+  const { ok, stdout } = ab(['console'], { allowFailure: true })
 
   if (!ok) {
     return CONSOLE_COLLECTION_FAILED
@@ -251,6 +251,88 @@ function checkConsoleClean() {
   }
 
   check('콘솔 에러 없음', count, expect.equals(0))
+}
+
+/* ------------------------------------------------------------------ *
+ * Network failures
+ * ------------------------------------------------------------------ */
+
+/**
+ * A console check alone cannot see HTTP failures: the app swallows most fetch
+ * errors in try/catch, so a 500 from an API route produces a silently degraded
+ * screen and a green console. These checks read the actual request log.
+ *
+ * Expected-by-design statuses are allowlisted rather than ignoring 4xx wholesale:
+ * the harness drives an unauthenticated browser (it seeds sessionStorage, not
+ * Supabase auth cookies), so auth-gated routes legitimately answer 401/403.
+ */
+const EXPECTED_HTTP_FAILURES = [
+  { status: 401, pattern: /\/api\/portfolio\b/u },
+  { status: 403, pattern: /\/api\/portfolio\b/u },
+  { status: 401, pattern: /\/api\/auth\//u },
+  { status: 403, pattern: /\/api\/auth\//u },
+]
+
+const NETWORK_COLLECTION_FAILED = -1
+
+/**
+ * Drop the accumulated request log.
+ *
+ * `agent-browser network requests` reports every request made since the
+ * session started, so without this a single failure in an early suite is
+ * re-reported by every later suite and the real culprit becomes ambiguous.
+ * Call this right before navigating in each suite.
+ */
+function resetNetworkLog() {
+  ab(['network', 'requests', '--clear'], { allowFailure: true })
+}
+
+/**
+ * Parse `agent-browser network requests` lines of the form
+ *   [requestId] METHOD url (Type) status
+ * Entries without a trailing status (redirects, still in flight) are skipped:
+ * only an explicit status code is unambiguous enough to fail a run on.
+ */
+function failedRequests() {
+  const { ok, stdout } = ab(['network', 'requests'], { allowFailure: true })
+
+  if (!ok) {
+    return NETWORK_COLLECTION_FAILED
+  }
+
+  return stdout
+    .split('\n')
+    .map((line) => {
+      const match = /^\[[^\]]+\]\s+(\S+)\s+(\S+)\s+\([^)]*\)\s+(\d{3})\s*$/u.exec(line.trim())
+      if (!match) {
+        return null
+      }
+      return { method: match[1], url: match[2], status: Number(match[3]) }
+    })
+    .filter((entry) => entry && entry.status >= 400)
+    .filter((entry) => !EXPECTED_HTTP_FAILURES.some(
+      (allowed) => allowed.status === entry.status && allowed.pattern.test(entry.url),
+    ))
+}
+
+/**
+ * Fail on any server fault or unexpected client error observed on the screen.
+ */
+function checkNoFailedRequests() {
+  const failed = failedRequests()
+
+  if (failed === NETWORK_COLLECTION_FAILED) {
+    check('HTTP 실패 응답 없음', 'network 수집 실패 (세션 종료/타임아웃)', expect.equals(0))
+    return
+  }
+
+  if (failed.length > 0) {
+    const summary = failed.map((entry) => `${entry.status} ${entry.method} ${entry.url}`).join(', ')
+    check('HTTP 실패 응답 없음', summary, expect.equals(0))
+    return
+  }
+
+  check('HTTP 실패 응답 없음', 0, expect.equals(0))
 }
 
 /* ------------------------------------------------------------------ *
@@ -321,6 +403,7 @@ const suites = {
     description: 'DeepScan 로딩 화면 + 브리핑 카드 + 위원 그리드 + 결과 전환',
     async run() {
       seedPortfolio()
+      resetNetworkLog()
       open(`${BASE_URL}/deepscan`)
       sleep(9_000)
 
@@ -413,6 +496,7 @@ const suites = {
         expect.equals(true))
 
       checkConsoleClean()
+      checkNoFailedRequests()
     },
   },
 
@@ -421,6 +505,7 @@ const suites = {
     description: '홈 화면 도넛 차트 + 종목 리스트 + 요약',
     async run() {
       seedPortfolio()
+      resetNetworkLog()
       open(`${BASE_URL}/home`)
       sleep(7_000)
 
@@ -452,6 +537,7 @@ const suites = {
         expect.atLeast(6))
 
       checkConsoleClean()
+      checkNoFailedRequests()
     },
   },
 
@@ -467,6 +553,7 @@ const suites = {
     description: 'OCR 검수 화면 셸 렌더링',
     async run() {
       seedUploadSession()
+      resetNetworkLog()
       open(`${BASE_URL}/ocr`)
       sleep(6_000)
 
@@ -483,10 +570,19 @@ const suites = {
         expect.equals(true))
 
       // Replaces a bare `body.textContent.length >= 50` check, which an
-      // infinite loading spinner also satisfied. Assert the OCR body shell
-      // plus the action that closes the flow.
-      check('OCR 본문 셸 렌더링',
-        evalJson(`JSON.stringify(!!document.querySelector('.jaroo-ocr-body'))`),
+      // infinite loading spinner also satisfied.
+      //
+      // `.jaroo-ocr-body` sits *inside* the `requestState === 'loading'` gate,
+      // so it only mounts once the OCR request resolves. A single-shot check
+      // was flaky; poll instead. Both the success and the `hasOcrError`
+      // branches render this shell, so reaching it proves the flow settled
+      // rather than hanging on the spinner forever.
+      check('OCR 본문 셸 렌더링 (로딩 게이트 통과)',
+        waitFor(
+          `JSON.stringify(!!document.querySelector('.jaroo-ocr-body'))`,
+          (value) => value === true,
+          { timeoutMs: 45_000, intervalMs: 2_000 },
+        ),
         expect.equals(true))
 
       check('포트폴리오 적용 버튼 존재',
@@ -494,6 +590,7 @@ const suites = {
         expect.equals(true))
 
       checkConsoleClean()
+      checkNoFailedRequests()
     },
   },
 
@@ -505,10 +602,12 @@ const suites = {
   'ocr-redirect': {
     description: 'OCR 세션 없을 때 /screenshot 리다이렉트 가드',
     async run() {
+      resetNetworkLog()
       open(`${BASE_URL}/home`)
       sleep(1_500)
       ab(['eval', `sessionStorage.removeItem('jaroo:screenshot-ocr-upload'); JSON.stringify('cleared')`])
 
+      resetNetworkLog()
       open(`${BASE_URL}/ocr`)
       const pathname = waitFor(
         `JSON.stringify(window.location.pathname)`,
@@ -519,6 +618,7 @@ const suites = {
       check('세션 없음 → /screenshot 리다이렉트', pathname, expect.equals('/screenshot'))
 
       checkConsoleClean()
+      checkNoFailedRequests()
     },
   },
 
@@ -526,6 +626,7 @@ const suites = {
   screenshot: {
     description: '스크린샷 업로드 화면 렌더링',
     async run() {
+      resetNetworkLog()
       open(`${BASE_URL}/screenshot`)
       sleep(4_000)
 
@@ -553,6 +654,7 @@ const suites = {
         expect.equals(true))
 
       checkConsoleClean()
+      checkNoFailedRequests()
     },
   },
 }
