@@ -276,6 +276,18 @@ const EXPECTED_HTTP_FAILURES = [
 const NETWORK_COLLECTION_FAILED = -1
 
 /**
+ * Drop the accumulated request log.
+ *
+ * `agent-browser network requests` reports every request made since the
+ * session started, so without this a single failure in an early suite is
+ * re-reported by every later suite and the real culprit becomes ambiguous.
+ * Call this right before navigating in each suite.
+ */
+function resetNetworkLog() {
+  ab(['network', 'requests', '--clear'], { allowFailure: true })
+}
+
+/**
  * Parse `agent-browser network requests` lines of the form
  *   [requestId] METHOD url (Type) status
  * Entries without a trailing status (redirects, still in flight) are skipped:
@@ -391,6 +403,7 @@ const suites = {
     description: 'DeepScan 로딩 화면 + 브리핑 카드 + 위원 그리드 + 결과 전환',
     async run() {
       seedPortfolio()
+      resetNetworkLog()
       open(`${BASE_URL}/deepscan`)
       sleep(9_000)
 
@@ -492,6 +505,7 @@ const suites = {
     description: '홈 화면 도넛 차트 + 종목 리스트 + 요약',
     async run() {
       seedPortfolio()
+      resetNetworkLog()
       open(`${BASE_URL}/home`)
       sleep(7_000)
 
@@ -539,6 +553,7 @@ const suites = {
     description: 'OCR 검수 화면 셸 렌더링',
     async run() {
       seedUploadSession()
+      resetNetworkLog()
       open(`${BASE_URL}/ocr`)
       sleep(6_000)
 
@@ -555,10 +570,19 @@ const suites = {
         expect.equals(true))
 
       // Replaces a bare `body.textContent.length >= 50` check, which an
-      // infinite loading spinner also satisfied. Assert the OCR body shell
-      // plus the action that closes the flow.
-      check('OCR 본문 셸 렌더링',
-        evalJson(`JSON.stringify(!!document.querySelector('.jaroo-ocr-body'))`),
+      // infinite loading spinner also satisfied.
+      //
+      // `.jaroo-ocr-body` sits *inside* the `requestState === 'loading'` gate,
+      // so it only mounts once the OCR request resolves. A single-shot check
+      // was flaky; poll instead. Both the success and the `hasOcrError`
+      // branches render this shell, so reaching it proves the flow settled
+      // rather than hanging on the spinner forever.
+      check('OCR 본문 셸 렌더링 (로딩 게이트 통과)',
+        waitFor(
+          `JSON.stringify(!!document.querySelector('.jaroo-ocr-body'))`,
+          (value) => value === true,
+          { timeoutMs: 45_000, intervalMs: 2_000 },
+        ),
         expect.equals(true))
 
       check('포트폴리오 적용 버튼 존재',
@@ -578,10 +602,12 @@ const suites = {
   'ocr-redirect': {
     description: 'OCR 세션 없을 때 /screenshot 리다이렉트 가드',
     async run() {
+      resetNetworkLog()
       open(`${BASE_URL}/home`)
       sleep(1_500)
       ab(['eval', `sessionStorage.removeItem('jaroo:screenshot-ocr-upload'); JSON.stringify('cleared')`])
 
+      resetNetworkLog()
       open(`${BASE_URL}/ocr`)
       const pathname = waitFor(
         `JSON.stringify(window.location.pathname)`,
@@ -600,6 +626,7 @@ const suites = {
   screenshot: {
     description: '스크린샷 업로드 화면 렌더링',
     async run() {
+      resetNetworkLog()
       open(`${BASE_URL}/screenshot`)
       sleep(4_000)
 
