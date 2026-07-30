@@ -20,7 +20,7 @@ export function createDeepScanLoadingStageArrival(targetKey: string | null): Dee
   }
 }
 
-export function isRecord(value: unknown): value is Record<string, unknown> {
+function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
@@ -50,7 +50,7 @@ export function extractLoadingStageKeysFromCommitteeAxes(committeeAxes: JarooDee
   )
 }
 
-export function compactFindingText(value: string | null | undefined) {
+function compactFindingText(value: string | null | undefined) {
   const normalized = value?.replace(/\s+/g, ' ').trim()
   if (!normalized) {
     return ''
@@ -61,7 +61,7 @@ export function compactFindingText(value: string | null | undefined) {
     : normalized
 }
 
-export function buildAxisFindingProgress(axis: JarooDeepScanCommitteeAxis | undefined): FindingProgress | null {
+function buildAxisFindingProgress(axis: JarooDeepScanCommitteeAxis | undefined): FindingProgress | null {
   if (!axis) {
     return null
   }

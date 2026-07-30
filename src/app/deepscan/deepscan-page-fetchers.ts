@@ -1,5 +1,5 @@
 import { isFiniteNumber } from '@/lib/deepscan-briefing-snapshot'
-import { resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
+import type { DeepScanTargetSession } from '@/lib/deepscan-target'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import type { DeepScanTargetInput, WorkflowMoneyCurrency } from '@/lib/workflow-types'
 
@@ -11,7 +11,7 @@ import type {
   UsMarketIndicatorsProxyResponse,
 } from './deepscan-page-types'
 
-export function normalizeDeepScanCode(value: string | undefined) {
+function normalizeDeepScanCode(value: string | undefined) {
   const normalized = value?.trim()
   if (!normalized) {
     return undefined
@@ -26,12 +26,12 @@ export function normalizeDeepScanCode(value: string | undefined) {
   return embeddedCode?.[1]
 }
 
-export function normalizeDeepScanTicker(value: string | undefined) {
+function normalizeDeepScanTicker(value: string | undefined) {
   const normalized = value?.trim().toUpperCase()
   return normalized || undefined
 }
 
-export function buildDeepScanTargetInputFromSession(session: ReturnType<typeof resolveDeepScanTargetSession>): DeepScanTargetInput | null {
+export function buildDeepScanTargetInputFromSession(session: DeepScanTargetSession | null): DeepScanTargetInput | null {
   const holding = session?.holding
   if (!holding || holding.id === -1 || holding.name === '종목 미선택') {
     return null
@@ -116,7 +116,7 @@ export function isDeepScanUsTarget(target: { ticker?: string; market?: string; m
     && (target?.marketTone === 'nasdaq' || target?.market?.toUpperCase() === 'US' || target?.market?.toUpperCase() === 'NASDAQ')
 }
 
-export function normalizeUsMarketIndicator(item: UsMarketIndicatorItem | null | undefined) {
+function normalizeUsMarketIndicator(item: UsMarketIndicatorItem | null | undefined) {
   if (!item) {
     return null
   }

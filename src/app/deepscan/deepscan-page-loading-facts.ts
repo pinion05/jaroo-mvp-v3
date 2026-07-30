@@ -14,16 +14,16 @@ export function formatLoadingPercent(value: number | undefined) {
   return `${sign}${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 }).format(value)}%`
 }
 
-export function formatLoadingMoney(value: number, currency: WorkflowMoneyCurrency = 'KRW') {
+function formatLoadingMoney(value: number, currency: WorkflowMoneyCurrency = 'KRW') {
   const suffix = currency === 'USD' ? '달러' : '원'
   return `${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 0 }).format(value)}${suffix}`
 }
 
-export function clampLoadingPercent(value: number) {
+function clampLoadingPercent(value: number) {
   return Math.min(100, Math.max(0, value))
 }
 
-export function resolveWeek52PositionLabel(lowGapPct: number | undefined, highGapPct: number | undefined) {
+function resolveWeek52PositionLabel(lowGapPct: number | undefined, highGapPct: number | undefined) {
   if (typeof highGapPct === 'number' && highGapPct >= -10) {
     return '고점 근처예요'
   }
@@ -176,7 +176,7 @@ export function parseLoadingConsensusBody(body: string, structured?: JarooDeepSc
   }
 }
 
-export function isNoDataConsensusBody(body: string) {
+function isNoDataConsensusBody(body: string) {
   return /데[이]?타가\s*존재하지\s*않습니다|데[이]?터가\s*존재하지\s*않습니다|최근\s*3개월\s*이내에\s*제시된\s*의견이\s*없습니다|목표가\s*미제공|목표가\s*조회\s*실패/u.test(body)
 }
 
@@ -197,7 +197,7 @@ export function isExchangeProductPayload(payload: JarooDeepScanPayload | null, f
     || /^(?:etf|etn)$/iu.test(payload?.input.instrument.kind ?? fallbackKind ?? '')
 }
 
-export function hasHangulBatchim(value: string) {
+function hasHangulBatchim(value: string) {
   const lastChar = Array.from(value.trim()).at(-1)
   if (!lastChar) {
     return false
@@ -212,7 +212,7 @@ export function getTargetPriceSubject(payload: JarooDeepScanPayload | null, fall
   return name ? `${name}${hasHangulBatchim(name) ? '은' : '는'}` : '이 종목은'
 }
 
-export function summarizeTargetPriceReason(value: string, payload: JarooDeepScanPayload | null, fallbackName?: string, fallbackMarket?: string, fallbackKind?: string) {
+function summarizeTargetPriceReason(value: string, payload: JarooDeepScanPayload | null, fallbackName?: string, fallbackMarket?: string, fallbackKind?: string) {
   const normalized = value.replace(/\s+/gu, ' ').trim()
   const subject = getTargetPriceSubject(payload, fallbackName)
   if (isExchangeProductPayload(payload, fallbackMarket, fallbackKind)) {
