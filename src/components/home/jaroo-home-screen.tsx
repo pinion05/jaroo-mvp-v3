@@ -532,38 +532,40 @@ function StockCard({
         </span>
       </button>
       <div className={styles.stockDetail} aria-hidden={!open}>
-        <div className={styles.sdFacts}>
-          <div>
-            <span className={styles.sdfLabel}>현재가</span>
-            <span className={styles.sdfVal}>{currentPriceText}</span>
+        <div className={styles.stockDetailInner}>
+          <div className={styles.sdFacts}>
+            <div>
+              <span className={styles.sdfLabel}>현재가</span>
+              <span className={styles.sdfVal}>{currentPriceText}</span>
+            </div>
+            <div>
+              <span className={styles.sdfLabel}>평단</span>
+              <span className={styles.sdfVal}>{item.averagePrice}</span>
+            </div>
+            <div>
+              <span className={styles.sdfLabel}>평가금액</span>
+              <span className={styles.sdfVal}>{evaluationAmountText !== '-' ? evaluationAmountText : formatKrw(evaluationAmount)}</span>
+            </div>
           </div>
-          <div>
-            <span className={styles.sdfLabel}>평단</span>
-            <span className={styles.sdfVal}>{item.averagePrice}</span>
-          </div>
-          <div>
-            <span className={styles.sdfLabel}>평가금액</span>
-            <span className={styles.sdfVal}>{evaluationAmountText !== '-' ? evaluationAmountText : formatKrw(evaluationAmount)}</span>
-          </div>
-        </div>
-        {item.actionHref ? (
-          <Link href={item.actionHref} className={styles.scanBtn} onClick={(event) => onAction(item, event)}>
-            🔍 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
-          </Link>
-        ) : (
-          <button type='button' className={styles.scanBtn}>
-            🔍 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
+          {item.actionHref ? (
+            <Link href={item.actionHref} className={styles.scanBtn} onClick={(event) => onAction(item, event)}>
+              🔍 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
+            </Link>
+          ) : (
+            <button type='button' className={styles.scanBtn}>
+              🔍 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
+            </button>
+          )}
+          <button
+            type='button'
+            className={styles.removeBtn}
+            onClick={() => onRemove(item)}
+            disabled={removeDisabled}
+            aria-label={`${item.name} 종목 제거`}
+          >
+            종목 제거
           </button>
-        )}
-        <button
-          type='button'
-          className={styles.removeBtn}
-          onClick={() => onRemove(item)}
-          disabled={removeDisabled}
-          aria-label={`${item.name} 종목 제거`}
-        >
-          종목 제거
-        </button>
+        </div>
       </div>
     </article>
   )

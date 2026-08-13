@@ -413,13 +413,24 @@
 }
 
 .stockDetail {
-  display: none;
-  border-top: 0.5px solid #eef0f3;
-  padding: 0 13px 13px;
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition:
+    grid-template-rows 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    visibility 0.28s;
 }
 
 .open .stockDetail {
-  display: block;
+  grid-template-rows: 1fr;
+  visibility: visible;
+}
+
+.stockDetailInner {
+  overflow: hidden;
+  min-height: 0;
+  border-top: 0.5px solid #eef0f3;
+  padding: 0 13px 13px;
 }
 
 .sdFacts {
@@ -896,4 +907,10 @@
   font-size: 10px;
   padding: 0;
   text-decoration: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stockDetail {
+    transition: none;
+  }
 }
