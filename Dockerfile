@@ -47,6 +47,9 @@ COPY --from=builder --chown=pwuser:pwuser /app/.next ./.next
 
 USER pwuser
 
-EXPOSE 3000 3040
+COPY --from=builder --chmod=0755 --chown=pwuser:pwuser /app/docker-entrypoint.sh ./docker-entrypoint.sh
 
-CMD ["node", "scripts/with-local-env.cjs", "node_modules/.bin/next", "start"]
+# Railway proxies the web port ($PORT). Crawler binds 127.0.0.1:3040 inside the container.
+EXPOSE 3000
+
+CMD ["./docker-entrypoint.sh"]

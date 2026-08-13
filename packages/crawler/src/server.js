@@ -48,7 +48,10 @@ const SERVICE_VERSION = '0.1.0';
 const RESPONSE_ENVELOPE_KEYS = ['ok', 'data', 'count', 'request', 'meta'];
 
 const app = express();
-const port = Number(process.env.PORT || 3040);
+// CRAWLER_PORT only — never read shared PORT (Railway injects PORT for the web
+// process; reading it here would cause EADDRINUSE in a single container).
+const port = Number(process.env.CRAWLER_PORT || 3040);
+const host = process.env.CRAWLER_HOST || '127.0.0.1';
 
 app.use(express.json());
 
@@ -3248,8 +3251,8 @@ app.use((error, req, res, _next) => {
 const isDirectExecution = process.argv[1] && fileURLToPath(import.meta.url) === process.argv[1];
 
 if (isDirectExecution) {
-  app.listen(port, () => {
-    console.log(`[${SERVICE_NAME}] listening on :${port}`);
+  app.listen(port, host, () => {
+    console.log(`[${SERVICE_NAME}] listening on ${host}:${port}`);
   });
 }
 
