@@ -21,6 +21,10 @@ RUN npm ci --include=dev --no-audit --no-fund
 
 FROM deps AS builder
 
+# Bust the build cache on every build so source edits always invalidate
+# downstream layers (Docker layer caching was masking code changes).
+RUN date -u +%s > /buildtime
+
 COPY . .
 
 RUN npm run build \
