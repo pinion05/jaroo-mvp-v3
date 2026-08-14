@@ -23,6 +23,10 @@ FROM deps AS builder
 
 # Bust the build cache on every build so source edits always invalidate
 # downstream layers (Docker layer caching was masking code changes).
+# Railway does not inject NEXT_PUBLIC_* at build time; inline explicitly.
+ENV NEXT_PUBLIC_SUPABASE_URL=https://hrfpnawmlcoaygipulpm.supabase.co
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_k74fVpT2-O1LQVL4KWXoBQ_Mu62TpV-
+
 RUN date -u +%s > /buildtime
 
 COPY . .
