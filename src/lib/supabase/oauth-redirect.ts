@@ -1,4 +1,7 @@
-const JAROO_PRODUCTION_ORIGIN = 'https://jaroo.kr'
+// Deployed origins canonicalize to a single production origin. Override per
+// deployment (e.g. Railway test env `https://test.jaroo.kr`) via env var so a
+// non-primary host still receives its own OAuth callback.
+const JAROO_PRODUCTION_ORIGIN = process.env.NEXT_PUBLIC_JAROO_ORIGIN || 'https://jaroo.kr'
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
 
 type OAuthRedirectLocation = {
