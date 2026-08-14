@@ -21,6 +21,10 @@ RUN npm ci --include=dev --no-audit --no-fund
 
 FROM deps AS builder
 
+# Surface Railway-injected NEXT_PUBLIC_* so Next.js inlines them at build.
+# Fallback keeps OCI (jaroo.kr) working if the var is absent.
+ENV NEXT_PUBLIC_JAROO_ORIGIN="${NEXT_PUBLIC_JAROO_ORIGIN:-https://jaroo.kr}"
+
 COPY . .
 
 RUN npm run build \
