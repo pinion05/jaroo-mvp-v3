@@ -29,7 +29,11 @@ export default function RootLayout({
     >
       <body className='min-h-full bg-background font-sans text-foreground' suppressHydrationWarning>
         <DebugPageNav />
-        <div className='lg:pl-28'>{children}</div>
+        <div className='min-h-dvh w-full bg-[color:var(--jaroo-canvas)] sm:px-6 sm:py-4'>
+          <div className='relative mx-auto flex min-h-dvh w-full max-w-[390px] flex-col overflow-hidden bg-white sm:min-h-[calc(100dvh-2rem)] sm:rounded-[32px] sm:shadow-[0_20px_60px_rgba(12,68,124,0.18)]'>
+            {children}
+          </div>
+        </div>
       </body>
     </html>
   )
