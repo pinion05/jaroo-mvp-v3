@@ -209,9 +209,8 @@ function OcrResultDesignStyles() {
   return (
     <style>{`
       .jaroo-ocr-page *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Pretendard',sans-serif;-webkit-font-smoothing:antialiased}
-      .jaroo-ocr-page{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;min-height:100vh;min-height:100dvh;align-items:flex-start;color:#0F1419}
-      @media (min-width:1024px){.jaroo-ocr-page{margin-left:-7rem}}
-      .jaroo-ocr-frame{background:#F5F6F8;border-radius:16px;width:340px;height:720px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative;display:flex;flex-direction:column}
+      .jaroo-ocr-page{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;height:100%;align-items:flex-start;color:#0F1419}
+      .jaroo-ocr-frame{background:#F5F6F8;border-radius:16px;width:340px;height:100%;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative;display:flex;flex-direction:column}
       .jaroo-ocr-frame::-webkit-scrollbar{display:none}
       .jaroo-ocr-head{position:relative;z-index:10;flex:0 0 auto;background:rgba(245,246,248,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;border-bottom:.5px solid #E8EAEE;display:flex;align-items:center;gap:11px}
       .jaroo-ocr-head-back{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;color:#0F1419;box-shadow:0 1px 2px rgba(0,0,0,.04);border:0;cursor:pointer}

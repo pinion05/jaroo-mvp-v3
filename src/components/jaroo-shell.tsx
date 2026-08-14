@@ -31,8 +31,10 @@ export function JarooShell({
   mainClassName?: string
   frameClassName?: string
 }) {
+  // h-full: 루트 PhoneFrame(h-dvh 확정 높이)을 정확히 채운다. min-h-dvh 를 주면
+  // 데스크톱 박스(calc(100dvh-2rem))보다 2rem 커져 overflow-hidden 에 nav 가 잘린다.
   return (
-    <div className={cn('relative flex h-full min-h-dvh w-full flex-col', frameClassName)}>
+    <div className={cn('relative flex h-full w-full flex-col', frameClassName)}>
       <header className='sticky top-0 z-20 border-b border-[color:var(--jaroo-border)] bg-white/95 px-4 py-3 backdrop-blur'>
         <div className='flex items-center gap-3'>
           {leading !== undefined ? (

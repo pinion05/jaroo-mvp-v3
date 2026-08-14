@@ -38,8 +38,9 @@ export function SpecFrame({
     </span>
   )
 
+  // h-full: 루트 PhoneFrame(h-dvh 확정 높이)을 정확히 채운다 (jaroo-shell 과 동일).
   return (
-    <div className={cn('relative flex h-full min-h-dvh w-full flex-col', frameClassName)} style={{ fontFamily: SPEC_FONT }}>
+    <div className={cn('relative flex h-full w-full flex-col', frameClassName)} style={{ fontFamily: SPEC_FONT }}>
       {hasHeader ? (
         <header className='flex items-center gap-3 px-4 py-[14px]'>
           {leading !== undefined ? (
