@@ -49,7 +49,6 @@ function UploadDesignStyles() {
       .jaroo-upload-head-login{min-height:28px;border-radius:999px;background:#fff;display:inline-flex;align-items:center;justify-content:center;padding:0 11px;font-size:12px;font-weight:700;color:#2B6BE6;text-decoration:none;box-shadow:0 1px 2px rgba(0,0,0,.04)}
       .jaroo-upload-body{padding:18px 16px 24px}
       .jaroo-upload-body.first{padding-top:24px}
-      .jaroo-upload-body.sheet-open{filter:blur(1px);opacity:.5}
       .jaroo-upload-logo{font-size:22px;font-weight:700;color:#0F1419;letter-spacing:-.5px;margin-bottom:6px}
       .jaroo-upload-intro{font-size:14px;color:#5A6473;line-height:1.5;margin-bottom:20px}
       .jaroo-upload-intro b{color:#0F1419;font-weight:600}
@@ -77,14 +76,6 @@ function UploadDesignStyles() {
       .jaroo-upload-up-note{font-size:10.5px;color:#97A0AE;text-align:center;margin-bottom:14px}
       .jaroo-upload-error{font-size:11px;color:#E5484D;text-align:center;margin:-5px 0 12px;line-height:1.45}
       .jaroo-upload-privacy{font-size:10px;color:#97A0AE;text-align:center;margin-top:8px;line-height:1.5}
-      .jaroo-upload-dim{position:absolute;inset:0;background:rgba(15,20,25,.45);display:flex;flex-direction:column;justify-content:flex-end;z-index:20}
-      .jaroo-upload-sheet{background:#fff;border-radius:18px 18px 0 0;padding:12px 0 24px}
-      .jaroo-upload-sh-handle{width:34px;height:4px;border-radius:2px;background:#D8DCE2;margin:0 auto 16px}
-      .jaroo-upload-sh-title{font-size:13px;font-weight:600;color:#0F1419;padding:0 20px;margin-bottom:16px}
-      .jaroo-upload-sh-opts{display:flex;justify-content:space-around;padding:0 16px}
-      .jaroo-upload-sh-opt{display:flex;flex-direction:column;align-items:center;gap:8px;border:0;background:transparent;cursor:pointer}
-      .jaroo-upload-sh-icon{width:54px;height:54px;border-radius:15px;display:flex;align-items:center;justify-content:center;font-size:23px}
-      .jaroo-upload-sh-lbl{font-size:11px;color:#5A6473;text-align:center;line-height:1.3}
       .jaroo-upload-load-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 16px}
       .jaroo-upload-load-thumb{width:120px;height:150px;border-radius:12px;background:#fff;border:.5px solid #E8EAEE;box-shadow:0 2px 12px rgba(0,0,0,.06);margin-bottom:24px;position:relative;overflow:hidden}
       .jaroo-upload-load-thumb-line{height:9px;background:#EEF0F3;border-radius:3px;margin:11px 12px}
@@ -157,9 +148,6 @@ export default function ScreenshotPage() {
   const clearDeepScanState = useDeepScanStore((state) => state.clear)
   const [isPreparing, setIsPreparing] = useState(false)
   const [errorMessage, setErrorMessage] = useState('')
-  const [isSheetOpen, setIsSheetOpen] = useState(false)
-  const cameraInputRef = useRef<HTMLInputElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const photoInputRef = useRef<HTMLInputElement>(null)
   const [hasAppliedPortfolio, setHasAppliedPortfolio] = useState(false)
   const [showLoginAction, setShowLoginAction] = useState(true)
@@ -221,7 +209,6 @@ export default function ScreenshotPage() {
   const handleFileChange = async (event: ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(event.target.files ?? [])
     event.target.value = ''
-    setIsSheetOpen(false)
     setIsPreparing(true)
 
     if (files.length === 0) {
@@ -302,7 +289,7 @@ export default function ScreenshotPage() {
         {isPreparing ? (
           <LoadingPanel />
         ) : (
-          <div className={`jaroo-upload-body ${isFirstPortfolio ? 'first' : ''} ${isSheetOpen ? 'sheet-open' : ''}`}>
+          <div className={`jaroo-upload-body ${isFirstPortfolio ? 'first' : ''}`}>
             {isFirstPortfolio ? (
               <>
                 <div className='jaroo-upload-logo'>Jaroo</div>
@@ -314,10 +301,10 @@ export default function ScreenshotPage() {
 
             <ExampleCard firstUser={isFirstPortfolio} />
 
-            <button type='button' className='jaroo-upload-upzone' onClick={() => setIsSheetOpen(true)}>
+            <button type='button' className='jaroo-upload-upzone' onClick={() => photoInputRef.current?.click()}>
               <div className='jaroo-upload-up-icon'>📷</div>
               <div className='jaroo-upload-up-label'>스크린샷 올리기</div>
-              <div className='jaroo-upload-up-hint'>탭해서 갤러리에서 선택</div>
+              <div className='jaroo-upload-up-hint'>탭해서 카메라·갤러리에서 선택</div>
             </button>
             <div className='jaroo-upload-up-note'>최대 5장까지 · 여러 계좌면 나눠 올려도 돼요</div>
             {errorMessage ? <div className='jaroo-upload-error'>{errorMessage}</div> : null}
@@ -325,31 +312,6 @@ export default function ScreenshotPage() {
           </div>
         )}
 
-        {isSheetOpen && !isPreparing ? (
-          <div className='jaroo-upload-dim' onClick={() => setIsSheetOpen(false)}>
-            <div className='jaroo-upload-sheet' onClick={(event) => event.stopPropagation()}>
-              <div className='jaroo-upload-sh-handle' />
-              <div className='jaroo-upload-sh-title'>어떻게 올릴까요?</div>
-              <div className='jaroo-upload-sh-opts'>
-                <button type='button' className='jaroo-upload-sh-opt' onClick={() => cameraInputRef.current?.click()}>
-                  <div className='jaroo-upload-sh-icon' style={{ background: '#F2F3F6' }}>📷</div>
-                  <div className='jaroo-upload-sh-lbl'>카메라</div>
-                </button>
-                <button type='button' className='jaroo-upload-sh-opt' onClick={() => fileInputRef.current?.click()}>
-                  <div className='jaroo-upload-sh-icon' style={{ background: '#FCEFD2' }}>📁</div>
-                  <div className='jaroo-upload-sh-lbl'>내 파일</div>
-                </button>
-                <button type='button' className='jaroo-upload-sh-opt' onClick={() => photoInputRef.current?.click()}>
-                  <div className='jaroo-upload-sh-icon' style={{ background: '#E6F0FE' }}>🖼️</div>
-                  <div className='jaroo-upload-sh-lbl'>사진</div>
-                </button>
-              </div>
-            </div>
-          </div>
-        ) : null}
-
-        <input ref={cameraInputRef} type='file' accept='image/*' capture='environment' multiple className='jaroo-upload-file-input' onChange={handleFileChange} />
-        <input ref={fileInputRef} type='file' accept='image/*' multiple className='jaroo-upload-file-input' onChange={handleFileChange} />
         <input ref={photoInputRef} type='file' accept='image/*' multiple className='jaroo-upload-file-input' onChange={handleFileChange} />
       </div>
     </div>
