@@ -27,6 +27,7 @@ export default function LoginPage() {
   const [pending, setPending] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
+  const [nextPath, setNextPath] = useState('/home')
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -34,7 +35,14 @@ export default function LoginPage() {
       setError('구글 로그인을 완료하지 못했어요. 다시 시도해주세요.')
       router.replace('/login', { scroll: false })
     }
+    const next = params.get('next')
+    // same-origin 상대 경로만 허용 (오픈 리다이렉트 방지)
+    if (next && next.startsWith('/') && !next.startsWith('//')) {
+      setNextPath(next)
+    }
   }, [router])
+
+  const loginSuccessPath = nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/home'
 
   async function handleGoogle() {
     setError(null)
@@ -42,7 +50,7 @@ export default function LoginPage() {
     const supabase = createSupabaseBrowserClient()
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: buildOAuthRedirectTo() },
+      options: { redirectTo: `${buildOAuthRedirectTo()}?next=${encodeURIComponent(loginSuccessPath)}` },
     })
     if (error) {
       setError(error.message || '구글 로그인을 시작하지 못했어요.')
@@ -72,7 +80,7 @@ export default function LoginPage() {
         setInfo('확인 이메일을 보냈어요. 메일 인증 후 로그인해주세요.')
         return
       }
-      router.replace('/home')
+      router.replace(loginSuccessPath)
       router.refresh()
     } catch {
       setError('네트워크 연결을 확인한 뒤 다시 시도해주세요.')
@@ -145,6 +153,10 @@ export default function LoginPage() {
             </button>
 
             {error ? <p className={styles.error} aria-live='polite'>{error}</p> : null}
+
+            <button type='button' className={styles.guestBtn} onClick={() => router.push('/home')}>
+              게스트로 둘러보기
+            </button>
 
             <div className={styles.terms}>
               시작하면 <span className={styles.termsA}>서비스 약관</span>과 <span className={styles.termsA}>개인정보처리방침</span>에
