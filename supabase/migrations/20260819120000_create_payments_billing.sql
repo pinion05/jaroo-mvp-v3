@@ -317,20 +317,6 @@ end;
 $$;
 grant execute on function public.cancel_my_subscription(boolean) to authenticated;
 
--- 보안: 서비스롤 전용 RPC 는 기본 PUBLIC execute 를 철회한다.
--- (해지하지 않으면 anon/authenticated 가 apply_credit_purchase 등을 직접 호출해
---  크레딧을 무단 적립할 수 있다. cancel_my_subscription 만 사용자 실행 허용.)
-revoke execute on function public.apply_credit_purchase(uuid, text, integer, text, jsonb) from public, authenticated, anon;
-revoke execute on function public.spend_credits(uuid, integer, text, text) from public, authenticated, anon;
-revoke execute on function public.activate_pro_subscription(uuid, text, text, text, text, integer, text, jsonb) from public, authenticated, anon;
-revoke execute on function public.renew_pro_subscription(uuid, text, integer, text, jsonb) from public, authenticated, anon;
-revoke execute on function public.record_payment_event(text, text, text, jsonb) from public, authenticated, anon;
-grant execute on function public.apply_credit_purchase(uuid, text, integer, text, jsonb) to service_role;
-grant execute on function public.spend_credits(uuid, integer, text, text) to service_role;
-grant execute on function public.activate_pro_subscription(uuid, text, text, text, text, integer, text, jsonb) to service_role;
-grant execute on function public.renew_pro_subscription(uuid, text, integer, text, jsonb) to service_role;
-grant execute on function public.record_payment_event(text, text, text, jsonb) to service_role;
-
 -- 웹훅 이벤트 기록 (멱등): 신규 삽입 시 true
 create or replace function public.record_payment_event(
   p_event_id text,
@@ -351,6 +337,20 @@ begin
   return found;
 end;
 $$;
+
+-- 보안: 서비스롤 전용 RPC 는 기본 PUBLIC execute 를 철회한다.
+-- (해지하지 않으면 anon/authenticated 가 apply_credit_purchase 등을 직접 호출해
+--  크레딧을 무단 적립할 수 있다. cancel_my_subscription 만 사용자 실행 허용.)
+revoke execute on function public.apply_credit_purchase(uuid, text, integer, text, jsonb) from public, authenticated, anon;
+revoke execute on function public.spend_credits(uuid, integer, text, text) from public, authenticated, anon;
+revoke execute on function public.activate_pro_subscription(uuid, text, text, text, text, integer, text, jsonb) from public, authenticated, anon;
+revoke execute on function public.renew_pro_subscription(uuid, text, integer, text, jsonb) from public, authenticated, anon;
+revoke execute on function public.record_payment_event(text, text, text, jsonb) from public, authenticated, anon;
+grant execute on function public.apply_credit_purchase(uuid, text, integer, text, jsonb) to service_role;
+grant execute on function public.spend_credits(uuid, integer, text, text) to service_role;
+grant execute on function public.activate_pro_subscription(uuid, text, text, text, text, integer, text, jsonb) to service_role;
+grant execute on function public.renew_pro_subscription(uuid, text, integer, text, jsonb) to service_role;
+grant execute on function public.record_payment_event(text, text, text, jsonb) to service_role;
 
 comment on table public.payment_orders is '토스페이먼츠 주문 (크레딧 팩 / Pro 구독 첫 결제 / 갱신 결제)';
 comment on table public.credit_ledger is '크레딧 적립/소모 append-only 원장';
