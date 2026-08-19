@@ -1,0 +1,233 @@
+/* /payments/* 공용 — mypage 시안 톤(흰 카드/ #0F1419 버튼) 포팅 */
+
+.wrap {
+  padding: 28px 20px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-height: 100%;
+}
+
+.state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 10px;
+  text-align: center;
+  padding: 40px 8px;
+}
+
+.ico {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #eaf0f8;
+  color: #2b6be6;
+}
+
+.icoDone {
+  background: #e8f3ec;
+  color: #1d8a4e;
+}
+
+.icoFail {
+  background: #fbeaea;
+  color: #e5484d;
+}
+
+.title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #0f1419;
+}
+
+.desc {
+  font-size: 12.5px;
+  color: #5a6473;
+  line-height: 1.6;
+  word-break: keep-all;
+}
+
+.primaryBtn {
+  width: 100%;
+  padding: 15px;
+  border-radius: 13px;
+  border: none;
+  background: #0f1419;
+  color: #fff;
+  font-size: 14.5px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(15, 20, 25, 0.28);
+  font-family: inherit;
+}
+
+.primaryBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ghostBtn {
+  width: 100%;
+  padding: 13px;
+  border-radius: 13px;
+  border: 0.5px solid #e8eaee;
+  background: #fff;
+  color: #5a6473;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+.packList {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.pack {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+  border: 0.5px solid #e8eaee;
+  border-radius: 14px;
+  padding: 16px 15px;
+  cursor: pointer;
+  text-align: left;
+  font-family: inherit;
+  transition: border-color 0.15s ease;
+}
+
+.pack:hover {
+  border-color: #c6d4ea;
+}
+
+.packSelected {
+  border-color: #2b6be6;
+  box-shadow: 0 0 0 1.5px #2b6be6 inset;
+}
+
+.packInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.packCredits {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f1419;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.packBadge {
+  font-size: 9px;
+  font-weight: 700;
+  color: #e5484d;
+  background: #fbeaea;
+  border-radius: 5px;
+  padding: 2.5px 6px;
+  letter-spacing: 0.02em;
+}
+
+.packMeta {
+  font-size: 10.5px;
+  color: #97a0ae;
+  margin-top: 3px;
+}
+
+.packPrice {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0f1419;
+  font-variant-numeric: tabular-nums;
+}
+
+.benefitCard {
+  background: #0f1419;
+  border-radius: 16px;
+  padding: 20px 18px;
+  color: #fff;
+}
+
+.benefitTitle {
+  font-size: 15px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.benefitPrice {
+  font-size: 26px;
+  font-weight: 800;
+  margin-top: 12px;
+  font-variant-numeric: tabular-nums;
+}
+
+.benefitPrice span {
+  font-size: 12px;
+  font-weight: 500;
+  color: #97a0ae;
+  margin-left: 4px;
+}
+
+.benefitList {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.benefitList li {
+  font-size: 12.5px;
+  color: #d7dce3;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: #2b6be6;
+  flex-shrink: 0;
+}
+
+.subCard {
+  background: #fff;
+  border: 0.5px solid #e8eaee;
+  border-radius: 14px;
+  padding: 16px 15px;
+}
+
+.subRow {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 12.5px;
+  color: #5a6473;
+  padding: 7px 0;
+}
+
+.subRowValue {
+  color: #0f1419;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.notice {
+  font-size: 10.5px;
+  color: #97a0ae;
+  line-height: 1.6;
+  word-break: keep-all;
+}
