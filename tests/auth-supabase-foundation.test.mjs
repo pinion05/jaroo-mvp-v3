@@ -10,7 +10,7 @@ function read(relativePath) {
 
 test('Supabase auth foundation exposes required routes and proxy', () => {
   for (const file of [
-    'proxy.ts',
+    'src/proxy.ts',
     'src/app/login/page.tsx',
     'src/app/signup/page.tsx',
     'src/app/api/auth/signup/route.ts',
