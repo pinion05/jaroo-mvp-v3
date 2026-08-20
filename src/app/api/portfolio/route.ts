@@ -1,7 +1,6 @@
 import { NextResponse } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createSupabaseServiceClient } from '@/lib/supabase/service'
-import { isExpectedSupabaseAuthMiss } from '@/lib/supabase/auth-error'
+import { NO_STORE_PRIVATE_HEADERS, resolveApiUserId } from '@/lib/supabase/api-auth'
 import type { PortfolioDbRow, PortfolioSaveRow } from '@/lib/portfolio-sync'
 import { MAX_PORTFOLIO_REQUEST_BODY_BYTES, getPortfolioRequestBodySizeError, getPortfolioRowsValidationError } from '@/lib/portfolio-validation'
 
@@ -25,43 +24,14 @@ const PORTFOLIO_COLUMNS = [
   'source',
 ].join(',')
 
-const NO_STORE_PRIVATE_HEADERS = { 'Cache-Control': 'no-store, private' }
-
-type PortfolioAuthResult =
-  | { status: 'authenticated'; userId: string }
-  | { status: 'unauthorized' }
-  | { status: 'unavailable' }
-
 function jsonNoStore(body: unknown, init?: ResponseInit) {
   return NextResponse.json(body, { ...init, headers: NO_STORE_PRIVATE_HEADERS })
 }
 
-async function resolvePortfolioUserId(): Promise<PortfolioAuthResult> {
-  try {
-    const supabase = await createSupabaseServerClient()
-    const { data, error } = await supabase.auth.getUser()
-    if (error) {
-      if (isExpectedSupabaseAuthMiss(error)) {
-        return { status: 'unauthorized' }
-      }
-
-      console.error('[portfolio] Supabase auth resolution failed', error)
-      return { status: 'unavailable' }
-    }
-
-    if (!data.user) {
-      return { status: 'unauthorized' }
-    }
-
-    return { status: 'authenticated', userId: data.user.id }
-  } catch (error) {
-    console.error('[portfolio] Supabase auth infrastructure failed', error)
-    return { status: 'unavailable' }
-  }
-}
+// 인증 해석은 lib/supabase/api-auth 단일 소스를 쓴다(과거 라우트 로컬 복제본).
 
 export async function GET() {
-  const auth = await resolvePortfolioUserId()
+  const auth = await resolveApiUserId('portfolio')
   if (auth.status === 'unavailable') {
     return jsonNoStore({ error: 'auth-unavailable' }, { status: 503 })
   }
@@ -89,7 +59,7 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
-  const auth = await resolvePortfolioUserId()
+  const auth = await resolveApiUserId('portfolio')
   if (auth.status === 'unavailable') {
     return jsonNoStore({ error: 'auth-unavailable' }, { status: 503 })
   }

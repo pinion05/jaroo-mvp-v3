@@ -1,7 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createSupabaseServiceClient } from '@/lib/supabase/service'
-import { isExpectedSupabaseAuthMiss } from '@/lib/supabase/auth-error'
+import { resolveApiUserId } from '@/lib/supabase/api-auth'
 import { deleteTossBillingKey } from '@/lib/payments/toss-client'
 import { NO_STORE_PRIVATE_HEADERS } from '@/lib/payments/server'
 
@@ -9,21 +8,14 @@ export const runtime = 'nodejs'
 
 // 구독 해지. 기본은 기간 종료 후 만료(남은 기간 유지), immediate=true 면 즉시 만료.
 export async function POST(request: NextRequest) {
-  let userId: string
-  try {
-    const supabase = await createSupabaseServerClient()
-    const { data, error } = await supabase.auth.getUser()
-    if (error || !data.user) {
-      if (error && !isExpectedSupabaseAuthMiss(error)) {
-        console.error('[payments/cancel] auth failed', error)
-      }
-      return NextResponse.json({ error: 'unauthorized' }, { status: 401, headers: NO_STORE_PRIVATE_HEADERS })
-    }
-    userId = data.user.id
-  } catch (error) {
-    console.error('[payments/cancel] auth infrastructure failed', error)
+  const auth = await resolveApiUserId('payments/cancel')
+  if (auth.status === 'unauthorized') {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401, headers: NO_STORE_PRIVATE_HEADERS })
+  }
+  if (auth.status === 'unavailable') {
     return NextResponse.json({ error: 'auth-unavailable' }, { status: 503, headers: NO_STORE_PRIVATE_HEADERS })
   }
+  const userId = auth.userId
 
   let immediate = false
   try {
