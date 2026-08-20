@@ -1,9 +1,11 @@
 'use client'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { FormEvent, useEffect, useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { buildOAuthRedirectTo } from '@/lib/supabase/oauth-redirect'
+import { useTermsConsent } from '@/components/auth/terms-consent'
 import { SpecFrame } from '@/components/spec/spec-frame'
 import { cn } from '@/lib/utils'
 import styles from './login.module.css'
@@ -28,6 +30,7 @@ export default function LoginPage() {
   const [error, setError] = useState<string | null>(null)
   const [info, setInfo] = useState<string | null>(null)
   const [nextPath, setNextPath] = useState('/home')
+  const { termsAgreed, consentAt, toggleTermsAgreed } = useTermsConsent()
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
@@ -46,11 +49,17 @@ export default function LoginPage() {
 
   async function handleGoogle() {
     setError(null)
+    if (!termsAgreed) {
+      setError('서비스 이용약관과 개인정보처리방침에 동의해주세요.')
+      return
+    }
     setPending(true)
     const supabase = createSupabaseBrowserClient()
+    // consent: 동의한 시점을 콜백으로 전달해 서버(profiles)에 동의 기록으로 남긴다.
+    const consentQuery = consentAt ? `&consent=${encodeURIComponent(consentAt)}` : ''
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: `${buildOAuthRedirectTo()}?next=${encodeURIComponent(loginSuccessPath)}` },
+      options: { redirectTo: `${buildOAuthRedirectTo()}?next=${encodeURIComponent(loginSuccessPath)}${consentQuery}` },
     })
     if (error) {
       setError(error.message || '구글 로그인을 시작하지 못했어요.')
@@ -61,14 +70,18 @@ export default function LoginPage() {
 
   async function handleEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
-    setPending(true)
     setError(null)
     setInfo(null)
+    if (!termsAgreed) {
+      setError('서비스 이용약관과 개인정보처리방침에 동의해주세요.')
+      return
+    }
+    setPending(true)
     try {
       const response = await fetch(`/api/auth/${mode}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.trim().toLowerCase(), password }),
+        body: JSON.stringify({ email: email.trim().toLowerCase(), password, termsAcceptedAt: consentAt }),
       })
       const payload = (await response.json().catch(() => ({}))) as { error?: { message?: string }; needsEmailConfirmation?: boolean }
 
@@ -82,6 +95,34 @@ export default function LoginPage() {
       }
       router.replace(loginSuccessPath)
       router.refresh()
+    } catch {
+      setError('네트워크 연결을 확인한 뒤 다시 시도해주세요.')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  // 비밀번호 재설정 메일 발송. 이메일 폼에 입력된 주소를 사용하며,
+  // 링크는 /auth/reset-password 로 돌아와 새 비밀번호를 설정한다.
+  async function handleForgotPassword() {
+    setError(null)
+    setInfo(null)
+    const target = email.trim().toLowerCase()
+    if (!target || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(target)) {
+      setError('이메일을 먼저 입력해주세요.')
+      return
+    }
+    setPending(true)
+    try {
+      const supabase = createSupabaseBrowserClient()
+      const { error: resetError } = await supabase.auth.resetPasswordForEmail(target, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      })
+      if (resetError) {
+        setError('재설정 메일을 보내지 못했어요. 잠시 후 다시 시도해주세요.')
+        return
+      }
+      setInfo('비밀번호 재설정 메일을 보냈어요. 메일함을 확인해주세요.')
     } catch {
       setError('네트워크 연결을 확인한 뒤 다시 시도해주세요.')
     } finally {
@@ -112,6 +153,7 @@ export default function LoginPage() {
           </div>
 
           <div className={styles.loginArea}>
+            <ConsentCheckbox agreed={termsAgreed} onToggle={toggleTermsAgreed} />
             <button
               type='button'
               className={cn(styles.loginBtn, styles.primary)}
@@ -126,7 +168,13 @@ export default function LoginPage() {
               </span>
               이메일로 시작하기
             </button>
-            <button type='button' className={styles.loginBtn} onClick={handleGoogle} disabled={pending}>
+            <button
+              type='button'
+              className={styles.loginBtn}
+              onClick={handleGoogle}
+              disabled={pending || !termsAgreed}
+              aria-disabled={!termsAgreed}
+            >
               <span className={styles.loginBtnIco}>
                 <GoogleIcon />
               </span>
@@ -157,12 +205,6 @@ export default function LoginPage() {
             <button type='button' className={styles.guestBtn} onClick={() => router.push('/home')}>
               게스트로 둘러보기
             </button>
-
-            <div className={styles.terms}>
-              시작하면 <span className={styles.termsA}>서비스 약관</span>과 <span className={styles.termsA}>개인정보처리방침</span>에
-              <br />
-              동의하는 것으로 간주돼요.
-            </div>
           </div>
         </div>
       </SpecFrame>
@@ -210,7 +252,11 @@ export default function LoginPage() {
               minLength={8}
               required
             />
-            <div className={styles.forgot}>비밀번호를 잊으셨나요?</div>
+            <div className={styles.forgotWrap}>
+              <button type='button' className={styles.forgotBtn} onClick={handleForgotPassword} disabled={pending}>
+                비밀번호를 잊으셨나요?
+              </button>
+            </div>
           </div>
 
           {error ? <p className={styles.error} aria-live='polite'>{error}</p> : null}
@@ -230,15 +276,42 @@ export default function LoginPage() {
               {mode === 'login' ? '이메일로 가입' : '로그인'}
             </button>
           </div>
-
-          <div className={styles.terms} style={{ marginTop: 28 }}>
-            시작하면 <span className={styles.termsA}>서비스 약관</span>과 <span className={styles.termsA}>개인정보처리방침</span>에
-            <br />
-            동의하는 것으로 간주돼요.
-          </div>
         </form>
+
+        <div style={{ marginTop: 24 }}>
+          <ConsentCheckbox agreed={termsAgreed} onToggle={toggleTermsAgreed} />
+        </div>
       </div>
     </SpecFrame>
+  )
+}
+
+// 필수 가입 동의. 체크 시점을 localStorage 에 남겨 재방문 시 유지하고,
+// 서버 동의 기록(profiles.terms_accepted_at)의 근거가 된다.
+function ConsentCheckbox({ agreed, onToggle }: { agreed: boolean; onToggle: (next: boolean) => void }) {
+  return (
+    <div className={styles.consent}>
+      <label className={styles.consentLabel}>
+        <input
+          type='checkbox'
+          className={styles.consentBox}
+          checked={agreed}
+          onChange={(e) => onToggle(e.target.checked)}
+          aria-required='true'
+        />
+        <span className={styles.consentText}>
+          <span className={styles.consentBadge}>필수</span> 만 14세 이상이며{' '}
+          <Link href='/terms' className={styles.termsLink}>
+            서비스 이용약관
+          </Link>
+          과{' '}
+          <Link href='/privacy' className={styles.termsLink}>
+            개인정보처리방침
+          </Link>
+          에 동의해요.
+        </span>
+      </label>
+    </div>
   )
 }
 

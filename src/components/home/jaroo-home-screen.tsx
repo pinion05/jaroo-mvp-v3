@@ -1193,6 +1193,11 @@ export function JarooHomeScreen() {
               {summary.forecast.cta}
             </Link>
           </div> : null}
+
+          {/* 전역 투자 디스클레이머 — 앱 허브(홈) 하단에 상시 고지한다 */}
+          <p className={styles.globalDisclaimer}>
+            Jaroo의 모든 분석은 참고용 정보예요. 투자 자문·권유가 아니며 투자 판단과 책임은 이용자에게 있습니다.
+          </p>
         </main>
 
         <AppBottomNav />
