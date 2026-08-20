@@ -27,7 +27,11 @@ jobs:
       # 크롤러 테스트는 전부 오프라인 fixture 기반이라 Playwright 브라우저 다운로드가 불필요하다.
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
+      # temporal-holdout 테스트가 candidate freeze 커밋을 git cat-file 로 검증하므로
+      # shallow clone 이 아니라 전체 히스토리를 내려받아야 한다.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-node@v4
         with:
