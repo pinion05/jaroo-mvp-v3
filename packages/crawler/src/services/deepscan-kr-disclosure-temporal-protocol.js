@@ -450,11 +450,31 @@ export async function issueRfc3161ReceiptSet(payload, {
   return Object.freeze(receipts);
 }
 
+// OpenSSL 3.x prints registered OIDs as human-readable names in the ts -reply -text
+// output (freetsa policy 1.2.3.4.1 becomes tsa_policy1) while LibreSSL keeps the
+// dotted-decimal form. Normalize to the dotted OID so receipts captured or verified
+// under either flavor compare identically.
+const OPENSSL_POLICY_NAME_TO_OID = new Map([
+  ['tsa_policy1', '1.2.3.4.1'],
+  ['tsa_policy2', '1.2.3.4.2'],
+  ['tsa_policy3', '1.2.3.4.3'],
+]);
+
+function normalizePolicyOid(raw, label) {
+  if (raw === null) return null;
+  if (/^[0-9]+([.][0-9]+)+$/u.test(raw)) return raw;
+  const mapped = OPENSSL_POLICY_NAME_TO_OID.get(raw);
+  if (!mapped) {
+    throw new Error(label + " RFC3161 policy OID [" + raw + "] is neither dotted-decimal nor a known OpenSSL name");
+  }
+  return mapped;
+}
+
 function parseTimestampReply(text, label) {
   const field = (name) => text.match(new RegExp(`^${name}:\\s*(.+)$`, 'mu'))?.[1]?.trim() ?? null;
   const status = field('Status');
   if (status !== 'Granted.') throw new Error(`${label} RFC3161 status must be Granted`);
-  const policyOid = field('Policy OID');
+  const policyOid = normalizePolicyOid(field('Policy OID'), label);
   const hashAlgorithm = field('Hash Algorithm');
   const timeStamp = field('Time stamp');
   const nonce = field('Nonce');
