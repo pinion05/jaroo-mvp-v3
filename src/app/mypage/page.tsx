@@ -23,7 +23,10 @@ export default function MyPage() {
         <div className={styles.topTitle}>마이</div>
       </div>
       <div className={styles.body}>
-        <AuthAccountCard />
+        {/* 계정 카드 — 아래 카드들과 동일한 리듬(14px)으로 띄운다 */}
+        <div className='mb-3.5'>
+          <AuthAccountCard />
+        </div>
 
         {/* 크레딧 / Pro — /api/payments/me 실데이터 */}
         <PaymentsStatusCards />
