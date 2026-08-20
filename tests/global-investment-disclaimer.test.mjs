@@ -17,6 +17,19 @@ test('홈 화면 하단에 전역 투자 디스클레이머가 상시 노출된�
   assert.match(source, /투자 자문·권유가 아니며 투자 판단과 책임은 이용자에게 있습니다/)
   // AppBottomNav 직전(main 끝)에 위치해 홈 스크롤 마지막에 항상 보인다
   assert.match(source, /globalDisclaimer[\s\S]*?<\/main>/)
+  // 홈 화면의 모든 <main> 블록(포트폴리오 빈 상태 조기 return 포함)이 디스클레이머를 포함해야 한다.
+  // 빈 상태 브랜치에만 누락되는 회귀(게스트/신규 유저에게 고지 안 됨)를 잡는다.
+  const mainBlocks = source.match(/<main[\s\S]*?<\/main>/g) ?? []
+  assert.ok(
+    mainBlocks.length >= 2,
+    '홈 화면 <main> 블록이 ' + mainBlocks.length + '개 — 빈 상태/기본 상태 두 브랜치가 있어야 한다',
+  )
+  for (const [index, block] of mainBlocks.entries()) {
+    assert.ok(
+      block.includes('globalDisclaimer'),
+      '홈 화면 ' + (index + 1) + '번째 <main> 블록(빈 상태일 수 있음)에 전역 디스클레이머가 없다'
+    )
+  }
 
   const css = read('src/components/home/jaroo-home-screen.module.css')
   assert.match(css, /\.globalDisclaimer/)
