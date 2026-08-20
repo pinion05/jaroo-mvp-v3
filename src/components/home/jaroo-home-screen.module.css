@@ -908,3 +908,14 @@
     transition: none;
   }
 }
+
+/* 전역 투자 디스클레이머 (홈 하단 상시 고지) */
+.globalDisclaimer {
+  margin: 10px 12px 0;
+  padding-bottom: 6px;
+  font-size: 9.5px;
+  color: #97a0ae;
+  line-height: 1.6;
+  text-align: center;
+  word-break: keep-all;
+}

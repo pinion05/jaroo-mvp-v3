@@ -1,0 +1,42 @@
+/* 약관/개인정보처리방침 문서 페이지 — /terms, /privacy 공통 */
+
+.doc {
+  padding: 8px 20px 32px;
+}
+.meta {
+  font-size: 11px;
+  color: #97a0ae;
+  margin: 2px 0 18px;
+}
+.section {
+  margin-bottom: 22px;
+}
+.h {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0f1419;
+  margin-bottom: 7px;
+  letter-spacing: -0.01em;
+}
+.p {
+  font-size: 12px;
+  color: #5a6473;
+  line-height: 1.7;
+  margin: 0 0 7px;
+  word-break: keep-all;
+}
+.list {
+  margin: 0 0 7px;
+  padding-left: 16px;
+}
+.list li {
+  font-size: 12px;
+  color: #5a6473;
+  line-height: 1.7;
+  margin-bottom: 3px;
+  word-break: keep-all;
+}
+.em {
+  color: #0f1419;
+  font-weight: 600;
+}

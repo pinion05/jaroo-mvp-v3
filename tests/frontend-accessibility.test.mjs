@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs'
 
 const shellSource = readFileSync('src/components/jaroo-shell.tsx', 'utf8')
 const bottomNavSource = readFileSync('src/components/app-bottom-nav.tsx', 'utf8')
-const deepScanSource = readFileSync('src/app/deepscan/page.tsx', 'utf8')
+const homeSource = readFileSync('src/components/home/jaroo-home-screen.tsx', 'utf8')
 const deepScanLoadingSource = readFileSync('src/components/deepscan-loading-screen.tsx', 'utf8')
 const deepScanLoadingStyles = readFileSync('src/components/deepscan-loading-screen.module.css', 'utf8')
 const screenshotSource = readFileSync('src/app/screenshot/page.tsx', 'utf8')
@@ -45,13 +45,9 @@ test('DeepScan labels live and broker snapshot return rates separately', () => {
   assert.match(deepScanLoadingStyles, /\.snapshotReturnRate\s*\{[^}]*color: var\(--ds-mid\)[^}]*font-size: 11px/s)
 })
 
-test('DeepScan collapsible sections expose expanded state and controlled panels', () => {
-  assert.match(deepScanSource, /aria-expanded=\{isOpen\}/)
-  assert.match(deepScanSource, /aria-controls=\{panelId\}/)
-  assert.match(deepScanSource, /<div id=\{panelId\} hidden=\{!isOpen\}>/)
-  assert.match(deepScanSource, /sectionKey='why'/)
-  assert.match(deepScanSource, /sectionKey='pfSim'/)
-  assert.match(deepScanSource, /aria-expanded=\{openSections\.scenarioDetail\}/)
-  assert.match(deepScanSource, /aria-controls=\{scenarioDetailPanelId\}/)
-  assert.match(deepScanSource, /<div id=\{scenarioDetailPanelId\} hidden=\{!openSections\.scenarioDetail\}>/)
+test('expandable controls expose their expanded state to assistive tech', () => {
+  // 홈 종목 행 펼침, OCR 수동 편집, DeepScan 로딩 요약 — 현재의 확장형 컨트롤들.
+  assert.match(homeSource, /aria-expanded=\{open\}/)
+  assert.match(ocrSource, /aria-expanded=\{isEditing\}/)
+  assert.match(deepScanLoadingSource, /aria-expanded=\{summaryExpanded\}/)
 })
