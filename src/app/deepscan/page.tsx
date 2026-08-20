@@ -5,8 +5,6 @@ import type { JarooDeepScanPayload } from '../../../packages/contracts/src/deeps
 import Link from 'next/link'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LineChart } from 'lucide-react'
-import { buttonVariants } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
 import { DeepScanInlineResults } from '@/components/deepscan-inline-results'
 import { DeepScanLoadingScreen, type LoadingStageKey } from '@/components/deepscan-loading-screen'
 import { JarooShell } from '@/components/jaroo-shell'
@@ -583,80 +581,69 @@ export default function DeepScanPage() {
         backHref='/home'
         showBottomNav={false}
         frameClassName='sm:max-w-[340px]'
-        mainClassName='relative overflow-x-hidden bg-[#f4f8fb] px-4 pt-4 pb-6 before:pointer-events-none before:absolute before:inset-x-[-80px] before:top-[-160px] before:h-[320px] before:rounded-full before:bg-[radial-gradient(circle_at_50%_50%,rgba(24,95,165,0.18),rgba(24,95,165,0)_68%)]'
+        mainClassName='space-y-3 bg-white px-3.5 pt-3.5 pb-6'
       >
-        {/* 최신 DeepScan 테마: 밝은 흰 카드 + 상단 연한 블루 그라데이션 + --jaroo-* 토큰. 로딩/결과 화면(#f4f8fc→#fbfdff) 톤과 정렬. */}
-        <section className='relative overflow-hidden rounded-[28px] border border-[color:var(--jaroo-border)] bg-white p-5 shadow-[0_16px_36px_rgba(24,95,165,0.10)]'>
-          <div className='pointer-events-none absolute inset-x-0 top-0 h-28 bg-[linear-gradient(135deg,#f4f8fc_0%,#e6f1fb_100%)]' />
-
-          <div className='relative flex items-start justify-between gap-4'>
-            <div>
-              <span className='inline-flex items-center gap-1.5 rounded-full border border-[color:var(--jaroo-border)] bg-white px-3 py-1 text-[11px] font-semibold text-[color:var(--jaroo-primary)]'>
-                <span className='size-1.5 rounded-full bg-[color:var(--jaroo-primary)]' />
+        {/* DeepScan 로딩/결과 화면(deepscan-loading-screen.module.css 의 --ds-* 토큰)과 같은 리포트 문법:
+            12px 카드 + 0.5px 헤어라인 보더 + 15~16px/700~800 타이포 + 절제된 그림자. 영문 워드마크(START GUIDE·3 STEP) 제거. */}
+        <section className='rounded-[12px] border-[0.5px] border-[#d7e8f7] bg-[linear-gradient(135deg,rgba(244,248,252,0.98),rgba(255,255,255,0.98))] p-3.5 shadow-[0_8px_20px_rgba(28,85,133,0.05)]'>
+          <div className='flex items-start justify-between gap-3'>
+            <div className='min-w-0'>
+              <p className='flex items-center gap-1.5 text-[12px] font-extrabold text-[#185fa5]'>
+                <span className='size-[5px] animate-pulse rounded-full bg-[#185fa5]' />
                 대기 화면
-              </span>
-              <h1 className='mt-4 text-[24px] font-black leading-[1.15] tracking-[-0.03em] text-[color:var(--jaroo-ink)]'>
+              </p>
+              <h1 className='mt-1.5 text-[16px] font-extrabold leading-[1.3] tracking-[-0.01em] text-[#111]'>
                 {missingTargetTitle}
               </h1>
             </div>
-            <div className='grid size-14 shrink-0 place-items-center rounded-2xl bg-[#e6f1fb] text-[color:var(--jaroo-primary)]'>
-              <LineChart className='size-7' aria-hidden />
+            <div className='grid size-9 shrink-0 place-items-center rounded-[10px] bg-[#e6f1fb] text-[#185fa5]'>
+              <LineChart className='size-[18px]' aria-hidden />
             </div>
           </div>
 
-          <p className='relative mt-4 max-w-[280px] text-sm leading-6 text-[color:var(--jaroo-muted)]'>
+          <p className='mt-2 text-[13px] leading-[1.6] text-[#555]'>
             홈에서 분석할 대상을 선택하면 가격 위치, 핵심 근거, 세 팀 판단을 한 흐름으로 보여드려요.
           </p>
 
-          <div className='relative mt-5 grid grid-cols-3 gap-2'>
+          <div className='mt-3 grid grid-cols-3 gap-2'>
             {[
               ['52주', '위치'],
               ['핵심', '근거'],
               ['세 팀', '판단'],
             ].map(([top, bottom]) => (
-              <div key={top} className='rounded-2xl border border-[color:var(--jaroo-border)] bg-[#f4f8fb] px-3 py-3'>
-                <p className='text-[15px] font-black leading-none text-[color:var(--jaroo-ink)]'>{top}</p>
-                <p className='mt-1 text-[10px] font-semibold text-[color:var(--jaroo-muted)]'>{bottom}</p>
+              <div key={top} className='rounded-[8px] border-[0.5px] border-[#eee] bg-white px-2 py-2'>
+                <p className='text-[13px] font-bold leading-none text-[#111]'>{top}</p>
+                <p className='mt-1 text-[10px] font-semibold text-[#aaa]'>{bottom}</p>
               </div>
             ))}
           </div>
         </section>
 
-        <Card className='relative mt-4 overflow-hidden rounded-[28px] border border-white bg-white/90 p-4 shadow-[0_16px_40px_rgba(24,95,165,0.12)] backdrop-blur'>
-          <div className='absolute right-4 top-4 rounded-full bg-[#e6f1fb] px-2.5 py-1 text-[10px] font-black text-[color:var(--jaroo-primary)]'>
-            3 STEP
-          </div>
-          <p className='text-[11px] font-black tracking-[0.14em] text-[color:var(--jaroo-primary)]'>START GUIDE</p>
-          <h2 className='mt-2 text-lg font-black tracking-[-0.03em] text-[color:var(--jaroo-ink)]'>
-            이렇게 시작하면 됩니다
-          </h2>
-          <div className='mt-4 space-y-3'>
+        <section className='rounded-[12px] border-[0.5px] border-[#eee] bg-white p-3.5'>
+          <h2 className='text-[15px] font-bold tracking-[-0.01em] text-[#111]'>이렇게 시작하면 됩니다</h2>
+          <div className='mt-1 divide-y divide-[#eee]'>
             {emptyDeepScanSteps.map((step, index) => {
               const Icon = step.icon
 
               return (
-                <div key={step.label} className='grid grid-cols-[42px_1fr] gap-3 rounded-2xl border border-[color:var(--jaroo-border)] bg-[#fbfdff] p-3'>
-                  <div className='relative grid size-10 place-items-center rounded-2xl bg-[#e6f1fb] text-[color:var(--jaroo-primary)]'>
-                    <Icon className='size-5' aria-hidden />
-                    <span className='absolute -right-1 -top-1 grid size-5 place-items-center rounded-full bg-[color:var(--jaroo-ink)] text-[9px] font-black text-white'>
-                      {index + 1}
-                    </span>
-                  </div>
+                <div key={step.label} className='flex items-start gap-2.5 py-2.5 first:pt-2 last:pb-0'>
+                  <span className='grid size-7 shrink-0 place-items-center rounded-[8px] bg-[#e6f1fb] text-[#185fa5]'>
+                    <Icon className='size-3.5' aria-hidden />
+                  </span>
                   <div className='min-w-0'>
-                    <p className='text-sm font-black text-[color:var(--jaroo-ink)]'>{step.label}</p>
-                    <p className='mt-1 text-xs leading-5 text-[color:var(--jaroo-muted)]'>{step.body}</p>
+                    <p className='text-[13px] font-bold text-[#111]'>{step.label}</p>
+                    <p className='mt-0.5 text-[11px] leading-[1.5] text-[#aaa]'>{step.body}</p>
                   </div>
+                  <span className='ml-auto shrink-0 pt-0.5 text-[11px] font-bold text-[#aaa]'>{index + 1}</span>
                 </div>
               )
             })}
           </div>
-        </Card>
+        </section>
 
         <Link
           href='/home'
-          className={buttonVariants({
-            className: 'mt-4 h-[52px] w-full rounded-[22px] bg-[color:var(--jaroo-primary)] text-[15px] font-black text-white shadow-[0_16px_28px_rgba(24,95,165,0.24)] hover:bg-[color:var(--jaroo-primary-strong)]',
-          })}
+          className='flex h-[46px] w-full items-center justify-center rounded-[14px] bg-[#185fa5] text-[14px] font-extrabold text-white transition hover:bg-[#0c447c]'
         >
           홈에서 종목 선택하기
         </Link>
