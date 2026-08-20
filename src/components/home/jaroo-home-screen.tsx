@@ -1094,6 +1094,11 @@ export function JarooHomeScreen() {
               <div className={styles.forecastText}>로그인하거나 스크린샷을 추가해서 보유 종목을 불러와요.</div>
               <Link href='/screenshot' className={styles.refreshBtn}>스크린샷 추가하기</Link>
             </div>
+
+            {/* 전역 투자 디스클레이머 — 포트폴리오가 비어있어도(게스트/신규 유저) 상시 고지한다 */}
+            <p className={styles.globalDisclaimer}>
+              Jaroo의 모든 분석은 참고용 정보예요. 투자 자문·권유가 아니며 투자 판단과 책임은 이용자에게 있습니다.
+            </p>
           </main>
         </div>
       </div>
