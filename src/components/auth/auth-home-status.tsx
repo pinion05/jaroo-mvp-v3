@@ -1,13 +1,11 @@
 'use client'
 
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import type { JarooAuthMe } from '@/lib/supabase/types'
 import styles from '@/components/home/jaroo-home-screen.module.css'
 
 export function AuthHomeStatus() {
-  const router = useRouter()
   const [authState, setAuthState] = useState<JarooAuthMe | null>(null)
   const user = authState?.authScope === 'authenticated' ? authState.user : null
 
@@ -31,21 +29,15 @@ export function AuthHomeStatus() {
     }
   }, [])
 
-  const logout = async () => {
-    await fetch('/api/auth/logout', { method: 'POST' })
-    setAuthState({ authScope: 'guest', provider: null, user: null, userContract: { userId: 'guest', authScope: 'guest', provider: null, email: null, displayName: null } })
-    router.refresh()
-  }
-
   if (authState === null) {
     return <span className={styles.authStatus}>확인 중</span>
   }
 
   if (user) {
     return (
+      // mypage-only-logout: 홈 헤더에서는 로그인 사용자 표시만 하고, 로그아웃은 마이페이지에서 제공한다.
       <span className={styles.authStatus} data-auth-scope='authenticated'>
         <span className={styles.authStatusName}>{user.displayName ?? user.email ?? '사용자'}</span>
-        <button type='button' className={styles.authStatusAction} onClick={logout}>로그아웃</button>
       </span>
     )
   }
