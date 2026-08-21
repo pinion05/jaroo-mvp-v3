@@ -475,6 +475,8 @@ test('applied home portfolio rows can rehydrate the in-memory portfolio store sh
     {
       name: '마이크로소프트',
       quantity: '3주',
+      profitRate: '+18.3%',
+      evaluationAmount: '$3,450.33',
       averagePrice: '$972.11',
       averagePriceCurrency: 'USD',
       resolvedName: 'Microsoft Corporation',
@@ -503,7 +505,8 @@ test('applied home portfolio rows can rehydrate the in-memory portfolio store sh
       currentPrice: 1150,
       currentPriceCurrency: 'USD',
       currentProfitRate: 18.3,
-      evaluationAmount: undefined,
+      snapshotProfitRate: 18.3,
+      evaluationAmount: 3450.33,
       identifierLabel: 'MSFT · US5949181045',
     },
   ])
@@ -649,6 +652,8 @@ test('deepscan client snapshot은 explicit target이 없으면 applied home port
         {
           name: '삼성전자',
           quantity: '10주',
+          profitRate: '+5%',
+          evaluationAmount: '800,000원',
           averagePrice: '80,000원',
           resolvedName: '삼성전자',
           resolvedCode: '005930',
@@ -676,6 +681,8 @@ test('home holdings builder maps manual KR/US market selections to home market t
     {
       name: '삼성전자',
       quantity: '10주',
+      profitRate: '+5%',
+      evaluationAmount: '800,000원',
       averagePrice: '80,000원',
       resolvedName: '삼성전자',
       resolvedCode: '005930',
@@ -685,6 +692,8 @@ test('home holdings builder maps manual KR/US market selections to home market t
     {
       name: '팔란티어',
       quantity: '3주',
+      profitRate: '+6.5%',
+      evaluationAmount: '$285.00',
       averagePrice: '$95.00',
       resolvedName: 'Palantir Technologies Inc.',
       resolvedTicker: 'PLTR',

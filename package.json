@@ -11,6 +11,7 @@
     "test:web:ts": "node scripts/run-web-ts-tests.cjs",
     "verify:screens": "node scripts/verify-screens-browser.cjs",
     "check:depcruise": "depcruise src packages/contracts/src packages/crawler/src packages/deepscan-runtime-core/src packages/instrument-core/src --config .dependency-cruiser.cjs",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
     "lint": "npm run lint:web",
     "dev:web": "node scripts/with-local-env.cjs next dev",
     "build:web": "node scripts/with-local-env.cjs next build",

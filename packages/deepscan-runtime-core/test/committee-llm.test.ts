@@ -56,7 +56,9 @@ test('committee request, retry, success, and summary logs redact nested credenti
         summaryKey: 'safe-log',
       },
     })
-    assert.equal(result.results.valuation.score, 70)
+    // scoreCommitteeMembers 의 results 는 JS 소스라 {} 로 추론된다 — 실제 shape 로 좁혀 검증한다.
+    const results = result.results as Record<string, { score: number }>
+    assert.equal(results.valuation?.score, 70)
 
     const files = [
       'request-valuation-attempt-1.json',
