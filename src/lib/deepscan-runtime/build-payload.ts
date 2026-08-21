@@ -16,7 +16,6 @@ import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 import { fetchKrDailyPriceHistory, type KrDailyPricePoint } from '@/lib/kr-daily-price-history'
 import { scoreUsCommitteeFromGeneratedDump, type UsMemberKey } from './llm-committee'
 import { decodeUsConsensusObservation } from './us-consensus'
-import { buildJarooDeepScanPayload as buildCrawlerDeepScanPayload } from '../../../packages/crawler/src/services/deepscan-payload.js'
 import { buildRecoveryForecastFromPriceSeries } from '../../../packages/deepscan-runtime-core/src/recovery-forecast.js'
 
 type UnknownRecord = Record<string, unknown>

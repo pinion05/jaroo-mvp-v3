@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { FormEvent, useEffect, useState } from 'react'
 import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { buildOAuthRedirectTo } from '@/lib/supabase/oauth-redirect'
+import { useTermsConsent } from '@/components/auth/terms-consent'
 import { cn } from '@/lib/utils'
 
 type AuthFormMode = 'login' | 'signup'
@@ -54,12 +55,17 @@ export function AuthForm({ mode }: AuthFormProps) {
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
   const [infoMessage, setInfoMessage] = useState<string | null>(null)
   const [pending, setPending] = useState(false)
+  const { termsAgreed, consentAt, toggleTermsAgreed } = useTermsConsent()
   const c = copy[mode]
 
   const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
-    setPending(true)
     setErrorMessage(null)
+    if (!termsAgreed) {
+      setErrorMessage('서비스 이용약관과 개인정보처리방침에 동의해주세요.')
+      return
+    }
+    setPending(true)
     setInfoMessage(null)
 
     const formData = new FormData(event.currentTarget)
@@ -67,6 +73,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       email: String(formData.get('email') ?? ''),
       password: String(formData.get('password') ?? ''),
       name: mode === 'signup' ? String(formData.get('name') ?? '') : undefined,
+      termsAcceptedAt: consentAt,
     }
 
     try {
@@ -106,12 +113,18 @@ export function AuthForm({ mode }: AuthFormProps) {
 
   const handleGoogle = async () => {
     setErrorMessage(null)
+    if (!termsAgreed) {
+      setErrorMessage('서비스 이용약관과 개인정보처리방침에 동의해주세요.')
+      return
+    }
     setInfoMessage(null)
     setPending(true)
     const supabase = createSupabaseBrowserClient()
+    // consent: 동의한 시점을 콜백으로 전달해 서버(profiles)에 동의 기록으로 남긴다.
+    const consentQuery = consentAt ? `?consent=${encodeURIComponent(consentAt)}` : ''
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
-      options: { redirectTo: buildOAuthRedirectTo() },
+      options: { redirectTo: `${buildOAuthRedirectTo()}${consentQuery}` },
     })
     if (error) {
       setErrorMessage(error.message || '구글 로그인을 시작하지 못했어요.')
@@ -131,10 +144,25 @@ export function AuthForm({ mode }: AuthFormProps) {
       {errorMessage ? <p className='rounded-2xl bg-[color:var(--jaroo-danger-ghost)] px-3 py-2 text-xs leading-5 text-[color:var(--jaroo-danger)]' aria-live='polite'>{errorMessage}</p> : null}
       {infoMessage ? <p className='rounded-2xl bg-[color:var(--jaroo-success-ghost)] px-3 py-2 text-xs leading-5 text-[color:var(--jaroo-success)]' aria-live='polite'>{infoMessage}</p> : null}
 
-      <button type='button' onClick={handleGoogle} disabled={pending} className='flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[#d8e0ea] bg-white text-sm font-semibold text-[color:var(--jaroo-ink)] transition hover:bg-[#f3f5f8] disabled:cursor-wait disabled:opacity-65'>
+      <button type='button' onClick={handleGoogle} disabled={pending || !termsAgreed} className='flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[#d8e0ea] bg-white text-sm font-semibold text-[color:var(--jaroo-ink)] transition hover:bg-[#f3f5f8] disabled:cursor-not-allowed disabled:opacity-45'>
         <GoogleIcon />
         Google로 계속하기
       </button>
+
+      <label className='flex items-start gap-2 text-xs leading-5 text-[color:var(--jaroo-muted)]'>
+        <input
+          type='checkbox'
+          checked={termsAgreed}
+          onChange={(e) => toggleTermsAgreed(e.target.checked)}
+          className='mt-1 size-[15px] shrink-0 accent-[color:var(--jaroo-primary)]'
+          aria-required='true'
+        />
+        <span>
+          (필수) 만 14세 이상이며{' '}
+          <Link href='/terms' className='font-semibold text-[color:var(--jaroo-ink)] underline underline-offset-2'>서비스 이용약관</Link>과{' '}
+          <Link href='/privacy' className='font-semibold text-[color:var(--jaroo-ink)] underline underline-offset-2'>개인정보처리방침</Link>에 동의해요.
+        </span>
+      </label>
 
       <div className='flex items-center gap-3 py-1 text-xs text-[color:var(--jaroo-muted)]'>
         <span className='h-px flex-1 bg-[color:var(--jaroo-border)]' />

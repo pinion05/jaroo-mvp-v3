@@ -5,6 +5,7 @@ import { readFileSync } from 'node:fs'
 const globals = readFileSync('src/app/globals.css', 'utf8')
 const homeStyles = readFileSync('src/components/home/jaroo-home-screen.module.css', 'utf8')
 const deepScanSource = readFileSync('src/components/deepscan-loading-screen.tsx', 'utf8')
+const deepScanBriefingCardSource = readFileSync('src/components/deepscan-loading-briefing-card.tsx', 'utf8')
 const deepScanStyles = readFileSync('src/components/deepscan-loading-screen.module.css', 'utf8')
 const ocrSource = readFileSync('src/app/ocr/page.tsx', 'utf8')
 const screenshotSource = readFileSync('src/app/screenshot/page.tsx', 'utf8')
@@ -29,7 +30,8 @@ test('홈과 DeepScan 수익률은 수익=빨강, 손실=파랑 토큰을 사용
   assert.match(deepScanStyles, /\.loss\s*\{[^}]*color:\s*var\(--jaroo-loss\)/s)
   assert.match(deepScanSource, /financialToneClass\(returnRateDisplay\.current\)/)
   assert.match(deepScanSource, /financialToneClass\(returnRateDisplay\.snapshot\)/)
-  assert.match(deepScanSource, /financialToneClass\(calculatedProfitAmount \?\? profitAmountText\)/)
+  // 평가손익 톤은 로딩 브리핑 카드가 계산·적용한다 (calculated 우선, OCR 텍스트 폴백).
+  assert.match(deepScanBriefingCardSource, /financialToneClass\(calculatedProfitAmount \?\? profitAmountText\)/)
 })
 
 test('OCR 검토와 업로드 예시도 같은 국내 금융 색상 토큰을 사용한다', () => {

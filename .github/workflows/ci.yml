@@ -1,0 +1,51 @@
+# CI 게이트: PR 과 dev/master 푸시에서 lint → test → build 를 검증한다.
+# Railway 자동 배포는 이 게이트와 무관하게 동작하므로, 배포 전 상태 확인 용도로 사용한다.
+# (master 브랜치 보호 규칙에 "verify" 를 required status check 으로 지정하면 머지 자체를 잠글 수 있다.)
+name: CI
+
+on:
+  pull_request:
+    branches: [dev, master]
+  push:
+    branches: [dev, master]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    env:
+      CI: 1
+      NEXT_TELEMETRY_DISABLED: 1
+      # Railway 빌드가 Dockerfile ENV 로 고정하는 것과 동일한 공개(publishable) 값.
+      # 시크릿은 포함돼 있지 않다.
+      NEXT_PUBLIC_SUPABASE_URL: https://hrfpnawmlcoaygipulpm.supabase.co
+      NEXT_PUBLIC_SUPABASE_ANON_KEY: sb_publishable_k74fVpT2-O1LQVL4KWXoBQ_Mu62TpV-
+      # 크롤러 테스트는 전부 오프라인 fixture 기반이라 Playwright 브라우저 다운로드가 불필요하다.
+      PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
+    steps:
+      # temporal-holdout 테스트가 candidate freeze 커밋을 git cat-file 로 검증하므로
+      # shallow clone 이 아니라 전체 히스토리를 내려받아야 한다.
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test (root + web TS + crawler + instrument-core)
+        run: npm test
+
+      - name: Build (web)
+        run: npm run build

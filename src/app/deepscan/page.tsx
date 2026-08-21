@@ -580,7 +580,7 @@ export default function DeepScanPage() {
         subtitle='종목을 선택하면 세 팀이 바로 분석해요'
         backHref='/home'
         showBottomNav={false}
-        frameClassName='sm:max-w-[340px]'
+        frameClassName='w-full'
         mainClassName='space-y-3 bg-white px-3.5 pt-3.5 pb-6'
       >
         {/* DeepScan 로딩/결과 화면(deepscan-loading-screen.module.css 의 --ds-* 토큰)과 같은 리포트 문법:
@@ -704,9 +704,9 @@ export default function DeepScanPage() {
     .join(' · ')
 
   return (
-    <div className='flex min-h-screen min-h-dvh justify-center bg-white sm:bg-[color:var(--jaroo-canvas)] sm:px-6 sm:py-4'>
+    <div className='flex h-full w-full justify-center bg-white'>
       <DeepScanLoadingScreen
-        className='w-full overflow-hidden sm:max-w-[340px] sm:rounded-[32px] sm:border sm:border-white/70 sm:shadow-[0_20px_60px_rgba(12,68,124,0.18)]'
+        className='w-full overflow-hidden'
         name={requestSeed.holding.name}
         identifier={identifier}
         market={requestSeed.holding.market}
