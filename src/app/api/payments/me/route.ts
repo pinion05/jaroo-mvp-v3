@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { isExpectedSupabaseAuthMiss } from '@/lib/supabase/auth-error'
-import { DEEPSCAN_CREDIT_COST } from '@/lib/payments/products'
+import { resolveApiUserId } from '@/lib/supabase/api-auth'
+import { DEEPSCAN_CREDIT_COST, deepScanRunsLeft } from '@/lib/payments/products'
 import { NO_STORE_PRIVATE_HEADERS } from '@/lib/payments/server'
 
 export const runtime = 'nodejs'
@@ -9,32 +9,20 @@ export const runtime = 'nodejs'
 // 마이페이지 결제 요약: 크레딧 잔액/구독 상태/주문 내역.
 // 사용자 세션(쿠키)으로 my_* security_invoker 뷰를 조회한다.
 export async function GET() {
+  const auth = await resolveApiUserId('payments/me')
+  if (auth.status === 'unavailable') {
+    return NextResponse.json({ error: 'auth-unavailable' }, { status: 503, headers: NO_STORE_PRIVATE_HEADERS })
+  }
+  if (auth.status === 'unauthorized') {
+    return NextResponse.json({ authScope: 'guest', balance: 0, deepScanLeft: 0, subscription: null, orders: [] }, { headers: NO_STORE_PRIVATE_HEADERS })
+  }
+
   let supabase
   try {
     supabase = await createSupabaseServerClient()
   } catch (error) {
     console.error('[payments/me] supabase client failed', error)
     return NextResponse.json({ error: 'unavailable' }, { status: 503, headers: NO_STORE_PRIVATE_HEADERS })
-  }
-
-  let userId: string | null = null
-  try {
-    const { data, error } = await supabase.auth.getUser()
-    if (error) {
-      if (isExpectedSupabaseAuthMiss(error)) {
-        return NextResponse.json({ authScope: 'guest', balance: 0, deepScanLeft: 0, subscription: null, orders: [] }, { headers: NO_STORE_PRIVATE_HEADERS })
-      }
-      console.error('[payments/me] auth failed', error)
-      return NextResponse.json({ error: 'auth-unavailable' }, { status: 503, headers: NO_STORE_PRIVATE_HEADERS })
-    }
-    userId = data.user?.id ?? null
-  } catch (error) {
-    console.error('[payments/me] auth infrastructure failed', error)
-    return NextResponse.json({ error: 'auth-unavailable' }, { status: 503, headers: NO_STORE_PRIVATE_HEADERS })
-  }
-
-  if (!userId) {
-    return NextResponse.json({ authScope: 'guest', balance: 0, deepScanLeft: 0, subscription: null, orders: [] }, { headers: NO_STORE_PRIVATE_HEADERS })
   }
 
   try {
@@ -55,7 +43,7 @@ export async function GET() {
       {
         authScope: 'authenticated',
         balance,
-        deepScanLeft: Math.floor(balance / DEEPSCAN_CREDIT_COST),
+        deepScanLeft: deepScanRunsLeft(balance),
         deepScanCreditCost: DEEPSCAN_CREDIT_COST,
         subscription: subscriptionRes.data ?? null,
         orders: ordersRes.data ?? [],

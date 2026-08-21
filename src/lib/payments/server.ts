@@ -1,38 +1,13 @@
 import 'server-only'
 
-import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { isExpectedSupabaseAuthMiss } from '@/lib/supabase/auth-error'
 import { PRO_PLAN, type PaymentProduct } from './products'
 
 // 결제 API 공통 서버 유틸.
+// 인증 해석과 no-store 헤더는 lib/supabase/api-auth 단일 소스를 재사용한다.
 
-export const NO_STORE_PRIVATE_HEADERS = { 'Cache-Control': 'no-store, private' } as const
-
-export type PaymentAuthResult =
-  | { status: 'authenticated'; userId: string }
-  | { status: 'unauthorized' }
-  | { status: 'unavailable' }
-
-export async function resolvePaymentUserId(): Promise<PaymentAuthResult> {
-  try {
-    const supabase = await createSupabaseServerClient()
-    const { data, error } = await supabase.auth.getUser()
-    if (error) {
-      if (isExpectedSupabaseAuthMiss(error)) {
-        return { status: 'unauthorized' }
-      }
-      console.error('[payments] Supabase auth resolution failed', error)
-      return { status: 'unavailable' }
-    }
-    if (!data.user) {
-      return { status: 'unauthorized' }
-    }
-    return { status: 'authenticated', userId: data.user.id }
-  } catch (error) {
-    console.error('[payments] Supabase auth infrastructure failed', error)
-    return { status: 'unavailable' }
-  }
-}
+export { NO_STORE_PRIVATE_HEADERS } from '@/lib/supabase/api-auth'
+export { resolveApiUserId as resolvePaymentUserId } from '@/lib/supabase/api-auth'
+export type { ApiAuthResult as PaymentAuthResult } from '@/lib/supabase/api-auth'
 
 /** 토스 orderId: 최대 64자, 영숫자/-/_ 만 허용. */
 export function createOrderId(kind: 'credit' | 'pro' | 'prorenew'): string {

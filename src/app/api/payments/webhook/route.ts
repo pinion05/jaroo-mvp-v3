@@ -1,4 +1,4 @@
-import { createHash } from 'node:crypto'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase/service'
 import { getTossPayment } from '@/lib/payments/toss-client'
@@ -8,9 +8,40 @@ export const runtime = 'nodejs'
 
 // 토스페이먼츠 웹훅. 10초 내 200 응답. 신뢰 원칙: 본문을 믿지 않고 paymentKey 로
 // 시크릿 키 재조회(re-query)한 뒤 상태를 반영한다. 처리는 payment_events 로 멱등.
+//
+// 엔드포인트 신뢰(선택): 토스 웹훅에는 서명 헤더가 없어 누구나 POST 할 수 있다.
+// PAYMENTS_WEBHOOK_SECRET 를 설정하면 토스 콘솔의 웹훅 URL 에 ?secret=<값> 을
+// 붙여 등록하고, 헤더(x-jaroo-webhook-secret) 또는 쿼리 파라미터 어느 쪽이든
+// 일치해야 처리한다. 미설정 시 기존 동작을 유지하되 경고를 한 번만 남긴다.
+const WEBHOOK_SECRET_HEADER = 'x-jaroo-webhook-secret'
+let warnedWebhookSecretMissing = false
+
+function secretsMatch(a: string, b: string): boolean {
+  const aBuf = Buffer.from(a)
+  const bBuf = Buffer.from(b)
+  if (aBuf.length !== bBuf.length) return false
+  return timingSafeEqual(aBuf, bBuf)
+}
+
+function webhookSecretMatches(request: NextRequest): boolean {
+  const secret = process.env.PAYMENTS_WEBHOOK_SECRET?.trim()
+  if (!secret) {
+    if (!warnedWebhookSecretMissing) {
+      warnedWebhookSecretMissing = true
+      console.warn('[payments/webhook] PAYMENTS_WEBHOOK_SECRET 미설정 — 엔드포인트가 공개 상태로 동작 중. 설정을 권장한다.')
+    }
+    return true
+  }
+  const presented = request.headers.get(WEBHOOK_SECRET_HEADER) ?? request.nextUrl.searchParams.get('secret') ?? ''
+  return presented.length > 0 && secretsMatch(presented, secret)
+}
+
 export async function POST(request: NextRequest) {
   if (!hasTossServerConfig()) {
     return NextResponse.json({ ok: true })
+  }
+  if (!webhookSecretMatches(request)) {
+    return NextResponse.json({ error: 'unauthorized' }, { status: 401 })
   }
 
   let body: Record<string, unknown>
