@@ -2,13 +2,26 @@ import { buildDeepScanTargetSession, createPlaceholderDeepScanHolding, pickDeepS
 import { buildIdentifierLabel, deriveSnapshotProfitRate, type PortfolioNormalizedItem, type WorkflowAsyncStatus } from '@/lib/workflow-types'
 import { isAveragePriceComputedFromEvaluation, normalizeStockName, parseOcrNumber, parseOcrProfitRate, type OcrRow } from '@/lib/screenshot-ocr'
 
-export type HomeBadgeTone = 'amber' | 'red' | 'green'
-export type HomeCardTone = 'danger' | 'warning' | 'halt' | 'profit' | 'etf'
-export type HomeMetricTone = 'danger' | 'warning' | 'positive' | 'locked' | 'neutral'
-export type HomeMarketTone = 'kospi' | 'kosdaq' | 'etf' | 'nasdaq'
+// 홈 카드 기본 타입들은 holding-types 로 이전됐다(순환 의존 해소).
+// 기존 임포터(18곳) 호환을 위해 같은 경로에서 re-export 한다.
+export type {
+  AveragePriceCurrency,
+  HomeBadgeTone,
+  HomeCardTone,
+  HomeHolding,
+  HomeMarketTone,
+  HomeMetricTone,
+} from '@/lib/holding-types'
+import type {
+  AveragePriceCurrency,
+  HomeBadgeTone,
+  HomeCardTone,
+  HomeHolding,
+  HomeMetricTone,
+} from '@/lib/holding-types'
+
 export type HomeActionTone = 'blue' | 'red' | 'green'
 export type MomentumStageTone = 'danger' | 'muted' | 'positive'
-export type AveragePriceCurrency = 'KRW' | 'USD'
 
 export type HomeMarketScoreStatus = 'loading' | 'ready' | 'fallback' | 'error'
 
@@ -67,60 +80,6 @@ export type BuildHomeMarketScoreOptions = {
   marketSignalStatus?: WorkflowAsyncStatus
   marketSignals?: HomeMarketScoreSignals | null
   updatedLabel?: string
-}
-
-export type HomeHolding = {
-  id: number
-  kind: 'stock' | 'etf'
-  name: string
-  code?: string
-  shortName: string
-  donutLabel: string
-  shares: string
-  averagePrice: string
-  averagePriceCurrency?: AveragePriceCurrency
-  snapshotProfitRate?: number
-  evaluationAmount?: string
-  market: string
-  marketTone: HomeMarketTone
-  identifierTicker?: string
-  identifierCode?: string
-  identifierLabel?: string
-  badge: string
-  badgeTone: HomeBadgeTone
-  cardTone: HomeCardTone
-  change: string
-  pnl: string
-  signalTone: 'danger' | 'warning' | 'positive' | 'halt' | 'etf'
-  centerScore: string
-  centerScoreColor: string
-  centerBadge: string
-  centerBadgeTone: HomeBadgeTone
-  centerName: string
-  donutColor: string
-  donutPercent: number
-  heatmapWeight: string
-  heatmapBackground: string
-  heatmapChange?: string
-  heatmapMeta?: string
-  heatmapBadge?: string
-  heatmapBadgeTone?: HomeBadgeTone
-  blink?: boolean
-  opinionLabel: string
-  opinionText: string
-  opinionBackground: string
-  opinionBorder: string
-  opinionTextColor: string
-  metaLine: string
-  metrics: Array<{
-    label: string
-    value: string
-    tone: HomeMetricTone
-  }>
-  actionLabel: string
-  actionSubLabel?: string
-  actionCredits?: string
-  actionHref: string | null
 }
 
 export type AppliedHomePortfolioRow = Pick<
@@ -778,8 +737,10 @@ export const momentumSignals = [
 
 export const APPLIED_HOME_PORTFOLIO_STORAGE_KEY = 'jaroo:applied-home-portfolio'
 export const APPLIED_HOME_PORTFOLIO_EVENT = 'jaroo:applied-home-portfolio:updated'
-export const DEEPSCAN_TARGET_STORAGE_KEY = 'jaroo:deepscan-target'
-export const DEEPSCAN_TARGET_EVENT = 'jaroo:deepscan-target:updated'
+
+// 딥스캔 타깃 저장 키/이벤트는 deepscan-target 소유다. 기존 임포터 호환을 위해 re-export.
+export { DEEPSCAN_TARGET_STORAGE_KEY, DEEPSCAN_TARGET_EVENT } from '@/lib/deepscan-target'
+import { DEEPSCAN_TARGET_STORAGE_KEY, DEEPSCAN_TARGET_EVENT } from '@/lib/deepscan-target'
 
 const DEEPSCAN_SERVER_SNAPSHOT = buildDeepScanTargetSession(createPlaceholderDeepScanHolding())
 

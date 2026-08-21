@@ -6,6 +6,11 @@ export type ProductType = 'credit_pack' | 'pro_subscription'
 /** 딥스캔 1회 소모 크레딧 (정책 변경 시 이 값만 수정). */
 export const DEEPSCAN_CREDIT_COST = 10
 
+/** 잔액으로 실행 가능한 딥스캔 횟수 — 서버(/api/payments/me)와 UI 가 같은 식으로 계산한다. */
+export function deepScanRunsLeft(balance: number): number {
+  return Math.floor(balance / DEEPSCAN_CREDIT_COST)
+}
+
 export type CreditPack = {
   id: string
   type: 'credit_pack'

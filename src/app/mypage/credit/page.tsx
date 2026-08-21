@@ -5,7 +5,7 @@ import { useEffect, useState } from 'react'
 import { Coins, CreditCard, Loader2, LogIn } from 'lucide-react'
 import { SpecFrame } from '@/components/spec/spec-frame'
 import { CREDIT_PACKS, fetchPaymentsMe, isTossClientConfigured, startCreditPackCheckout } from '@/lib/payments/client'
-import { DEEPSCAN_CREDIT_COST } from '@/lib/payments/products'
+import { DEEPSCAN_CREDIT_COST, deepScanRunsLeft } from '@/lib/payments/products'
 import styles from '../../payments/payments.module.css'
 
 export default function CreditPage() {
@@ -61,7 +61,7 @@ export default function CreditPage() {
               </div>
               <div className={styles.subRow}>
                 <span>딥스캔 가능 횟수</span>
-                <span className={styles.subRowValue}>{Math.floor(balance / DEEPSCAN_CREDIT_COST)}회</span>
+                <span className={styles.subRowValue}>{deepScanRunsLeft(balance)}회</span>
               </div>
             </div>
 

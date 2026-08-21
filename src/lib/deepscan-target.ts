@@ -1,5 +1,12 @@
-import type { HomeHolding } from './jaroo-home-data'
+// HomeHolding 타입은 중립 타입 모듈(holding-types)에서 가져온다.
+// 과거 './jaroo-home-data'에서 가져와 저장소 유일의 순환 의존을 이루고 있었다.
+import type { HomeHolding } from './holding-types'
 import { parseOcrNumber } from './screenshot-ocr'
+
+// 딥스캔 타깃 세션 저장 키/이벤트 상수. 홈(jaroo-home-data)과 딥스캔 양쪽이 쓰는
+// 딥스캔 도메인 상수라 이 모듈이 소유한다.
+export const DEEPSCAN_TARGET_STORAGE_KEY = 'jaroo:deepscan-target'
+export const DEEPSCAN_TARGET_EVENT = 'jaroo:deepscan-target:updated'
 
 export type DeepScanAxisTone = 'positive' | 'primary' | 'warning'
 export type DeepScanMemberTone = 'blue' | 'green' | 'amber' | 'red' | 'purple' | 'teal'
