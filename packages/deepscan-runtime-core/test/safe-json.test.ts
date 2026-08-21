@@ -15,7 +15,7 @@ test('sanitizeForJson is cycle-safe and recursively redacts credentials and URL 
       safe: 'kept',
       url: `https://example.test/path?x=1&crtfc_key=${secret}&access_token=${secret}`,
     },
-    bigint: 42n,
+    bigint: BigInt(42),
     fn: () => 'ignored',
     labeledError: new Error(`request failed: api_key=${secret}`),
     error,
