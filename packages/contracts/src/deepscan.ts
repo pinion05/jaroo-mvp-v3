@@ -63,7 +63,7 @@ export type JarooDeepScanInputInstrument = {
   code?: string
   ticker?: string
   market?: string
-  kind?: import('./index').JarooInstrumentKind
+  kind?: import('./instrument').JarooInstrumentKind
 }
 
 export type JarooDeepScanInputHolding = {
