@@ -1,17 +1,11 @@
-export type JarooInstrumentKind = 'stock' | 'etf'
-export type JarooLocale = 'KR' | 'US'
-export type JarooMarketTone = 'kospi' | 'kosdaq' | 'nasdaq' | 'etf'
+import type { JarooInstrumentKind, JarooMarketTone } from './instrument'
 
-export type JarooInstrumentRef = {
-  name: string
-  code?: string
-  ticker?: string
-  market?: string
-  marketTone?: JarooMarketTone
-  kind?: JarooInstrumentKind
-  locale?: JarooLocale
-  confidence?: number
-}
+export type {
+  JarooInstrumentKind,
+  JarooLocale,
+  JarooMarketTone,
+  JarooInstrumentRef,
+} from './instrument'
 
 export type JarooOcrRow = {
   name: string
