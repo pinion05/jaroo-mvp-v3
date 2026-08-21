@@ -159,8 +159,8 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
           <div><div className='text-[10px] text-[#97A0AE]'>종합 결론</div><h2 className='text-[14px] font-bold text-[#0F1419]'>세 팀의 의견을 모았어요</h2></div>
         </div>
         <div className='px-4 py-5 text-center'>
-          <div className={cn('text-[28px] font-black leading-none', strength.active <= 1 ? 'text-[#E5484D]' : 'text-[#1A9D55]')}>{strength.label}</div>
-          <div className='mx-auto mt-3 flex w-[122px] gap-1'>{Array.from({ length: 5 }, (_, index) => <span key={index} className={cn('h-[6px] flex-1 rounded-full', index < strength.active ? 'bg-[#1A9D55]' : 'bg-[#E8EAEE]')} />)}</div>
+          <div className={cn('text-[28px] font-black leading-none', strength.active <= 1 ? 'text-[#2B6BE6]' : 'text-[#E5484D]')}>{strength.label}</div>
+          <div className='mx-auto mt-3 flex w-[122px] gap-1'>{Array.from({ length: 5 }, (_, index) => <span key={index} className={cn('h-[6px] flex-1 rounded-full', index < strength.active ? 'bg-[#E5484D]' : 'bg-[#E8EAEE]')} />)}</div>
           <p className='mt-2 text-[11px] text-[#5A6473]'>{strength.helper}</p>
         </div>
         <p className='border-t border-[#EFF1F4] px-4 py-4 text-[13px] leading-6 text-[#0F1419]'>{summary}</p>
