@@ -96,6 +96,8 @@ test('home 보유종목은 resolve 된 ticker/code를 함께 유지한다', () =
     {
       name: '마이크로소프트',
       quantity: '3주',
+      profitRate: '+18.3%',
+      evaluationAmount: '$3,450.33',
       averagePrice: '$972.11',
       resolvedName: 'Microsoft Corporation',
       resolvedTicker: 'MSFT',
