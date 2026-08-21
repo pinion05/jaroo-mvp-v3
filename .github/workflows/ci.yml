@@ -44,6 +44,10 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      # 순환 의존 재발 방지 가드레일 (#207 리뷰노트 #7)
+      - name: Dependency graph (no cycles)
+        run: npm run check:depcruise
+
       - name: Test (root + web TS + crawler + instrument-core)
         run: npm test
 
