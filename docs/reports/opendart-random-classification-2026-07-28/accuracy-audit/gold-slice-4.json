@@ -1,0 +1,827 @@
+{
+  "schemaVersion": "jaroo.opendart-event-gold-slice.v1",
+  "reviewer": "prediction-blind-gold-adjudicator-slice-4",
+  "reviewedAt": "2026-07-28T00:00:00+09:00",
+  "range": {
+    "from": 113,
+    "to": 149
+  },
+  "ontologyVersion": "jaroo.kr-disclosure-event-ontology.v1",
+  "ontologyHash": "b3b29e0918060d7cfbaa1586703a2ac3e2ca5d5198c3c4d5d8b1325d199976f9",
+  "predictionBlind": true,
+  "cases": [
+    {
+      "index": 113,
+      "rceptNo": "20260727000192",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The issuance-results report states that ELB series 902, 903, and 904 were issued on 2026-07-27 with separate final allocations and proceeds.",
+      "rationale": "Each numbered series is an independently completed securities issuance, so the three occurrences and their document order are preserved."
+    },
+    {
+      "index": 114,
+      "rceptNo": "20260721800174",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The filing announces 2026 second-quarter and first-half operating results and expressly calls the figures provisional.",
+      "rationale": "The ontology's preliminary-operating-results template applies directly."
+    },
+    {
+      "index": 115,
+      "rceptNo": "20260619000517",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "governance",
+          "action": "appointed",
+          "state": "effective",
+          "cause": "outside-director",
+          "subjectType": "governance"
+        },
+        {
+          "type": "governance",
+          "action": "appointed",
+          "state": "effective",
+          "cause": "outside-director",
+          "subjectType": "governance"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The report identifies two newly appointed outside directors, Park Sun-young and Jang Hang-bae, both effective 2026-06-19.",
+      "rationale": "The two named appointments are independent occurrences and therefore remain two ordered events."
+    },
+    {
+      "index": 116,
+      "rceptNo": "20260601001372",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": "effective",
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "medium",
+      "evidenceSummary": "The annual individual-company filing reports LG Energy Solution's current LG business-group organization, governance, transactions, and affiliate scope.",
+      "rationale": "This is the operative annual business-group-status disclosure, represented at the document-family level rather than as every historical table row."
+    },
+    {
+      "index": 117,
+      "rceptNo": "20260722800846",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The maximum-shareholder group aggregate fell by 42,000 shares after an after-hours sale.",
+      "rationale": "The maximum-shareholder-ownership-change template requires one aggregate document-level event."
+    },
+    {
+      "index": 118,
+      "rceptNo": "20260724000269",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "related-party",
+          "action": "changed",
+          "state": "proposed",
+          "cause": "insurance-transaction",
+          "subjectType": "contract"
+        }
+      ],
+      "acceptableAlternatives": [
+        [
+          {
+            "type": "related-party",
+            "action": "updated",
+            "state": "effective",
+            "cause": "insurance-transaction",
+            "subjectType": "contract"
+          }
+        ]
+      ],
+      "confidence": "medium",
+      "evidenceSummary": "The board approved an increase in expected retirement-pension contributions to affiliate Samsung Securities, while the amount remains an estimate subject to change.",
+      "rationale": "The primary label treats the revised prospective transaction amount as a proposed change; treating the filed revision as an effective update is also defensible."
+    },
+    {
+      "index": 119,
+      "rceptNo": "20260612000633",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "acquired",
+          "state": "effective",
+          "cause": "treasury-share-trust",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The acquisition-status report records 334,782 treasury shares acquired through the disclosed trust contract through 2026-06-11.",
+      "rationale": "The filing reports performance of one treasury-share trust acquisition program; daily executions are components of that program, not separate document-level events."
+    },
+    {
+      "index": 120,
+      "rceptNo": "20260727800269",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "LG Innotek announces consolidated second-quarter and first-half results before completion of external review.",
+      "rationale": "The ontology's preliminary-operating-results template applies directly."
+    },
+    {
+      "index": 121,
+      "rceptNo": "20260724000384",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The general large-holding report records the reporting group at 14,437,211 shares after a special relation purchased 1,335 shares.",
+      "rationale": "The filing's operative event is the effective reported large-shareholding position."
+    },
+    {
+      "index": 122,
+      "rceptNo": "20260515000077",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "periodic-report",
+          "action": "updated",
+          "state": "effective",
+          "cause": "annual-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "medium",
+      "evidenceSummary": "This is a substantive amendment to the issuer's 2025 annual business report.",
+      "rationale": "The corrected filing updates the same annual-report occurrence; the correction wrapper is not used as the underlying event lifecycle state."
+    },
+    {
+      "index": 123,
+      "rceptNo": "20260721001316",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The report updates LS Cable's aggregate holding after a special-relation market purchase and bonus-share receipts.",
+      "rationale": "The operative document-level family is the effective large-shareholding report, not separate events for each holder row."
+    },
+    {
+      "index": 124,
+      "rceptNo": "20260723800458",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "trading-status",
+          "action": "halted",
+          "state": "active",
+          "cause": "share-cancellation",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "medium",
+      "evidenceSummary": "The corrected notice states that trading was halted at 14:59 on 2026-07-23 because of a share cancellation exceeding 10%; it also gives the next-day release time for that same halt.",
+      "rationale": "The document-level disclosure intent is the operative trading halt. Its release timestamp is a dependent lifecycle detail of the same halt, not an independent co-primary occurrence."
+    },
+    {
+      "index": 125,
+      "rceptNo": "20260723800952",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-event",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "investor-relations",
+          "subjectType": "issuer"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "Solus Advanced Materials schedules a two-day institutional-investor NDR for 2026-07-27 to 2026-07-28.",
+      "rationale": "The IR event is formally scheduled but had not yet occurred."
+    },
+    {
+      "index": 126,
+      "rceptNo": "20260727000053",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "Samsung Securities files shelf-registration supplemental terms for the future offering of ELB series 2933.",
+      "rationale": "One separately numbered security offering is filed, with subscription and issuance still outstanding."
+    },
+    {
+      "index": 127,
+      "rceptNo": "20260506000256",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "cancelled",
+          "state": "effective",
+          "cause": "stock-option",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The amendment reduces grantees from 711 to 701 and granted shares from 360,440 to 354,840 because departing employees' options were partially cancelled.",
+      "rationale": "The operative substantive change is an effective partial cancellation of the existing stock-option grant, not a corrected lifecycle state."
+    },
+    {
+      "index": 128,
+      "rceptNo": "20260520000001",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "acceptableAlternatives": [
+        [
+          {
+            "type": "corporate-action",
+            "action": "solicited",
+            "state": "pending",
+            "cause": "tender-offer",
+            "subjectType": "listed-shares"
+          }
+        ]
+      ],
+      "confidence": "medium",
+      "evidenceSummary": "SeAH Holdings commences a self-tender from 2026-05-20 through 2026-06-08 for up to 187,000 common shares at KRW 160,000.",
+      "rationale": "The offer is operative during the filing period; viewing the same event as a pending solicitation until settlement is also defensible."
+    },
+    {
+      "index": 129,
+      "rceptNo": "20260727800621",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "record-date",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The board fixed 2026-08-11 as the record date for shareholders eligible for a contemplated quarterly dividend.",
+      "rationale": "The record date has been decided but remains future; the filing does not itself establish a finalized cash dividend."
+    },
+    {
+      "index": 130,
+      "rceptNo": "20260723000082",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The shelf prospectus covers twelve separately numbered ELS offerings, Kiwoom series 1985 through 1996.",
+      "rationale": "Each series is an independent pending offering and the twelve occurrences are preserved in series order."
+    },
+    {
+      "index": 131,
+      "rceptNo": "20260529001444",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "share-exchange",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The comprehensive share exchange completed on 2026-05-29, making SK Broadband a wholly owned SK Telecom subsidiary.",
+      "rationale": "The termination report establishes the effective completion of one share-exchange transaction."
+    },
+    {
+      "index": 132,
+      "rceptNo": "20260521000036",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "supplier-payment",
+          "action": "updated",
+          "state": "effective",
+          "cause": "subcontract-payment-terms",
+          "subjectType": "operations"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "Hyundai Engineering & Construction corrects the disclosed payment-method and payment-period totals for the 2025 second half.",
+      "rationale": "The filing effectively updates the same supplier-payment disclosure rather than creating a corrected business-event lifecycle."
+    },
+    {
+      "index": 133,
+      "rceptNo": "20260515002266",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "supplier-payment",
+          "action": "updated",
+          "state": "effective",
+          "cause": "subcontract-payment-terms",
+          "subjectType": "operations"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "HD Hyundai Electric corrects unit-format errors in its payment-method totals for the 2025 second half.",
+      "rationale": "The filing effectively updates the same supplier-payment disclosure."
+    },
+    {
+      "index": 134,
+      "rceptNo": "20260724800606",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The maximum-shareholder group aggregate increases by 39,700 shares after an affiliate's market purchase.",
+      "rationale": "The maximum-shareholder-ownership-change template requires one aggregate document-level event."
+    },
+    {
+      "index": 135,
+      "rceptNo": "20260722800278",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The maximum-shareholder group aggregate increases by 52,820 shares after an affiliate's market purchases.",
+      "rationale": "The maximum-shareholder-ownership-change template requires one aggregate event despite multiple execution dates."
+    },
+    {
+      "index": 136,
+      "rceptNo": "20260715800799",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "Yuanta Securities' maximum-shareholder group aggregate increases by 9,000 common shares after a market purchase.",
+      "rationale": "The maximum-shareholder-ownership-change template applies."
+    },
+    {
+      "index": 137,
+      "rceptNo": "20260721000079",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The issuance-results report gives separate finalized allocations and proceeds for ELS series 12772, 12773, 12774, and 12775, issued on 2026-07-16.",
+      "rationale": "The four numbered securities are independent completed issuances in document order."
+    },
+    {
+      "index": 138,
+      "rceptNo": "20260714000498",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "effective",
+          "cause": "fund-security-transactions",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The same-day correction reallocates and adds second-quarter fund-security purchase rows, changing the reported total from KRW 890.7 billion to KRW 915.3 billion.",
+      "rationale": "The substantive quarterly affiliate fund-transaction disclosure is effectively updated; the correction wrapper is not treated as its lifecycle."
+    },
+    {
+      "index": 139,
+      "rceptNo": "20260724000601",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "fund-security-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "Samsung Life's board approved a planned August 2026 investment of KRW 1.458 trillion in an affiliate-managed real-estate fund.",
+      "rationale": "The board-approved future subscription is a proposed related-party fund-security investment."
+    },
+    {
+      "index": 140,
+      "rceptNo": "20260727800319",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The maximum-shareholder group aggregate increases by 1,017 shares after an affiliate market purchase.",
+      "rationale": "The maximum-shareholder-ownership-change template applies."
+    },
+    {
+      "index": 141,
+      "rceptNo": "20260713000459",
+      "assessable": false,
+      "goldEvents": null,
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The document was unavailable because the OpenDART ZIP entry exceeded the decompressed-byte limit.",
+      "rationale": "No document text was available for prediction-blind adjudication."
+    },
+    {
+      "index": 142,
+      "rceptNo": "20260709000344",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "completed",
+          "state": "effective",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [
+        [
+          {
+            "type": "asset-transaction",
+            "action": "completed",
+            "state": "effective",
+            "cause": "asset-transfer",
+            "subjectType": "asset-transfer"
+          }
+        ]
+      ],
+      "confidence": "medium",
+      "evidenceSummary": "Mirae Industry reports that payment and transfer of 12,751,342 Aloys shares for KRW 20.402 billion completed by 2026-07-09.",
+      "rationale": "The transferred asset is specifically equity securities; the broader asset-transfer canonicalization is also supported by the termination-report family."
+    },
+    {
+      "index": 143,
+      "rceptNo": "20260723000353",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "share-exchange",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The termination report fixes 2026-07-23 as the exchange date by which E-Mart obtains all remaining Shinsegae Food shares.",
+      "rationale": "The filing establishes completion of one comprehensive share exchange; preparatory treasury-share handling remains subordinate to that transaction."
+    },
+    {
+      "index": 144,
+      "rceptNo": "20260515003078",
+      "assessable": false,
+      "goldEvents": null,
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The quarterly-report document was unavailable because the OpenDART ZIP entry exceeded the decompressed-byte limit.",
+      "rationale": "No document text was available for prediction-blind adjudication."
+    },
+    {
+      "index": 145,
+      "rceptNo": "20260724000497",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The prospectus covers Daishin Securities DLB series 432 and 433, each scheduled for subscription and issuance on 2026-08-03.",
+      "rationale": "The two separately numbered offerings are independent pending occurrences in document order."
+    },
+    {
+      "index": 146,
+      "rceptNo": "20260727000065",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "Hanwha Investment & Securities reports final allocation and KRW 4.1 billion issuance proceeds for DLB series 571 on 2026-07-27.",
+      "rationale": "One separately numbered security was issued and completed."
+    },
+    {
+      "index": 147,
+      "rceptNo": "20260724000256",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The executive/major-shareholder report updates Kim Hyeong-gon's ownership to 9,335,724 shares after two market purchases.",
+      "rationale": "The form reports one effective insider ownership position; its two execution rows are components of that reported change."
+    },
+    {
+      "index": 148,
+      "rceptNo": "20260723000599",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "Hyundai Motor decides to transfer 2,747 treasury shares to three executives on 2026-07-31 as stock compensation.",
+      "rationale": "The disposal is board-decided but remains future, so its lifecycle is proposed."
+    },
+    {
+      "index": 149,
+      "rceptNo": "20260727000050",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "The issuance-results report gives final allocations and proceeds for Hyundai Motor Securities DLB series 627 and 628, both issued on 2026-07-27.",
+      "rationale": "The two numbered securities are independent completed issuances and their order is preserved."
+    }
+  ]
+}

@@ -1,0 +1,712 @@
+{
+  "schemaVersion": "jaroo.opendart-event-gold-slice.v1",
+  "reviewer": "codex-prediction-blind-adjudicator-b-slice-3",
+  "reviewedAt": "2026-07-28T12:00:00+09:00",
+  "range": {
+    "from": 75,
+    "to": 112
+  },
+  "ontologyVersion": "jaroo.kr-disclosure-event-ontology.v1",
+  "ontologyHash": "b3b29e0918060d7cfbaa1586703a2ac3e2ca5d5198c3c4d5d8b1325d199976f9",
+  "predictionBlind": true,
+  "cases": [
+    {
+      "index": 75,
+      "rceptNo": "20260727800006",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-event",
+          "action": "updated",
+          "state": "proposed",
+          "cause": "business-plan",
+          "subjectType": "issuer"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "엔비디아 협력 구조, 지분투자 내용과 AI 팩토리 예상 투자구조를 정정했다.",
+      "rationale": "별도 유상증자 공시는 참조 배경이며 핵심은 기존 장래 사업계획의 업데이트다."
+    },
+    {
+      "index": 76,
+      "rceptNo": "20260529001907",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": "corrected",
+          "cause": "quarterly-report",
+          "subjectType": "financials"
+        }
+      ],
+      "acceptableAlternatives": [
+        [
+          {
+            "type": "periodic-report",
+            "action": "updated",
+            "state": "effective",
+            "cause": "quarterly-report",
+            "subjectType": "financials"
+          }
+        ]
+      ],
+      "confidence": "medium",
+      "evidenceSummary": "확정 자기자본비율과 지급여력비율을 반영해 1분기보고서를 정정 제출했다.",
+      "rationale": "법정 분기보고서의 정정 filing이다."
+    },
+    {
+      "index": 77,
+      "rceptNo": "20260724000625",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "삼성전자 대량보유 그룹의 보유주식과 주요계약 주식 수가 변동·변경되었다.",
+      "rationale": "대량보유 일반보고의 문서 수준 집계 소유변동이다."
+    },
+    {
+      "index": 78,
+      "rceptNo": "20260723000253",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "share-exchange",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [
+        [
+          {
+            "type": "corporate-action",
+            "action": "completed",
+            "state": "effective",
+            "cause": "share-exchange",
+            "subjectType": "securities"
+          }
+        ]
+      ],
+      "confidence": "medium",
+      "evidenceSummary": "이마트와 신세계푸드의 포괄적 주식교환이 2026-07-23 실행되어 지분 100% 보유가 되었다.",
+      "rationale": "포괄적 주식교환 완료가 문서 핵심이다."
+    },
+    {
+      "index": 79,
+      "rceptNo": "20260702000587",
+      "assessable": false,
+      "goldEvents": null,
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "문서 ZIP 항목이 압축해제 한도를 초과했다.",
+      "rationale": "본문이 없어 사건을 판정할 수 없다."
+    },
+    {
+      "index": 80,
+      "rceptNo": "20260721001108",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "NH투자증권 ELS 제24936회가 배정되고 889,111,080원이 실제 조달되었다.",
+      "rationale": "주가연계증권 발행 실적이 확정되었다."
+    },
+    {
+      "index": 81,
+      "rceptNo": "20260722000342",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "비등기임원 허희영이 장내매수한 1,500주를 신규 소유상황으로 보고했다.",
+      "rationale": "임원 특정증권 소유상황의 신규·유효 보고다."
+    },
+    {
+      "index": 82,
+      "rceptNo": "20260629000583",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "governance",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "proxy-solicitation",
+          "subjectType": "governance"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "블루산업개발이 2026-07-02부터 의결권 대리행사를 권유했다.",
+      "rationale": "권유와 주총이 공고 시점 이후라 pending이다."
+    },
+    {
+      "index": 83,
+      "rceptNo": "20260716000781",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "셀트리온 최대주주 그룹의 보유량과 담보계약 비율이 변동했다.",
+      "rationale": "대량보유 일반보고의 집계 소유변동이다."
+    },
+    {
+      "index": 84,
+      "rceptNo": "20260604000445",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "governance",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "proxy-solicitation",
+          "subjectType": "governance"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "대호에이엘 주주연대가 경영정상화를 위해 의결권 위임을 권유했다.",
+      "rationale": "주주 측 proxy solicitation이며 행사 전이다."
+    },
+    {
+      "index": 85,
+      "rceptNo": "20260506000291",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "governance",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "proxy-solicitation",
+          "subjectType": "governance"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "엑시큐어하이트론이 임시주총 정족수 확보를 위해 의결권 대리행사를 권유했다.",
+      "rationale": "미래 권유기간과 주총을 위한 solicitation이다."
+    },
+    {
+      "index": 86,
+      "rceptNo": "20260716000129",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "insolvency",
+          "action": "rescheduled",
+          "state": "deferred",
+          "cause": "rehabilitation",
+          "subjectType": "issuer"
+        }
+      ],
+      "acceptableAlternatives": [
+        [
+          {
+            "type": "insolvency",
+            "action": "updated",
+            "state": "pending",
+            "cause": "rehabilitation",
+            "subjectType": "issuer"
+          }
+        ]
+      ],
+      "confidence": "medium",
+      "evidenceSummary": "회생절차 개시 여부 결정 보류기한을 2026-08-14로 연장했다.",
+      "rationale": "회생신청 재발생이 아니라 결정 일정의 재연기다."
+    },
+    {
+      "index": 87,
+      "rceptNo": "20260724000615",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "price-set",
+          "state": "preliminary",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [
+        [
+          {
+            "type": "capital-change",
+            "action": "adjusted",
+            "state": "proposed",
+            "cause": "rights-offering",
+            "subjectType": "securities"
+          }
+        ]
+      ],
+      "confidence": "medium",
+      "evidenceSummary": "유상증자의 1차 발행가액을 주당 3,200원으로 결정했다.",
+      "rationale": "최종 발행가액 전 단계여서 preliminary다."
+    },
+    {
+      "index": 88,
+      "rceptNo": "20260720000237",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "governance",
+          "action": "convened",
+          "state": "pending",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "삼일씨엔에스가 이사 선임을 위해 2026-08-04 임시주총을 소집했다.",
+      "rationale": "정식 소집됐지만 개최 전이다."
+    },
+    {
+      "index": 89,
+      "rceptNo": "20260714800797",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "풍산홀딩스 최대주주등 보유량이 임원 매수로 408주 증가했다.",
+      "rationale": "최대주주등 집계 변동신고다."
+    },
+    {
+      "index": 90,
+      "rceptNo": "20260713000285",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "related-party",
+          "action": "reported",
+          "state": "effective",
+          "cause": "bond-transactions",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "한화손해보험이 2분기 계열 금융회사 상대 국고채 매입 959.39억원을 공시했다.",
+      "rationale": "복수 거래는 분기 채권거래 현황 한 건에 집계된다."
+    },
+    {
+      "index": 91,
+      "rceptNo": "20260716000422",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "솔루엠 최대주주 그룹 보유량이 20,000주 증가했다.",
+      "rationale": "대량보유 일반보고의 집계 소유변동이다."
+    },
+    {
+      "index": 92,
+      "rceptNo": "20260723000536",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-trust",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "아남전자가 50억원 자기주식 취득 신탁계약을 체결하기로 결정했다.",
+      "rationale": "계약 예정일 전 이사회 결정이므로 proposed다."
+    },
+    {
+      "index": 93,
+      "rceptNo": "20260715800580",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "HDC 최대주주등 보유가 장내매수로 29,500주 증가했다.",
+      "rationale": "최대주주등 집계 변동신고다."
+    },
+    {
+      "index": 94,
+      "rceptNo": "20260601001782",
+      "assessable": false,
+      "goldEvents": null,
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "문서 ZIP 항목이 압축해제 한도를 초과했다.",
+      "rationale": "본문이 없어 사건을 판정할 수 없다."
+    },
+    {
+      "index": 95,
+      "rceptNo": "20260716000372",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "governance",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "outside-director",
+          "subjectType": "governance"
+        },
+        {
+          "type": "governance",
+          "action": "appointed",
+          "state": "effective",
+          "cause": "outside-director",
+          "subjectType": "governance"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "사외이사 2명이 같은 날 자진사임한 뒤 재선임되었다.",
+      "rationale": "사임과 재선임은 순차적으로 실제 발생한 공동 핵심 사건이다."
+    },
+    {
+      "index": 96,
+      "rceptNo": "20260515002203",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "대양금속 유상증자로 793,650주를 배정하고 999,999,000원을 조달했다.",
+      "rationale": "청약·납입과 배정이 끝난 발행 완료다."
+    },
+    {
+      "index": 97,
+      "rceptNo": "20260724000413",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "VIP자산운용 보유가 5.23%에서 4.20%로 감소했다.",
+      "rationale": "약식 대량보유보고의 문서 수준 변동이다."
+    },
+    {
+      "index": 98,
+      "rceptNo": "20260714000302",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "related-party",
+          "action": "reported",
+          "state": "effective",
+          "cause": "bond-transactions",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "키움증권이 2분기 계열 자산운용사 상대 국고채 매입·매도를 공시했다.",
+      "rationale": "개별 행은 분기 채권거래 현황 한 건의 구성 내역이다."
+    },
+    {
+      "index": 99,
+      "rceptNo": "20260615000201",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "adjusted",
+          "state": "proposed",
+          "cause": "insider-trading-plan",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "대표이사 주식매도 계획의 방법을 시간외매매에서 장외매도로 변경했다.",
+      "rationale": "실제 매도가 아니라 거래계획 조정이다."
+    },
+    {
+      "index": 100,
+      "rceptNo": "20260515002925",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": "effective",
+          "cause": "quarterly-report",
+          "subjectType": "financials"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "HS효성첨단소재가 2026년 1분기보고서를 제출했다.",
+      "rationale": "법정 분기보고서 제출 한 건이다."
+    },
+    {
+      "index": 101,
+      "rceptNo": "20260512000219",
+      "assessable": false,
+      "goldEvents": null,
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "문서 ZIP 항목이 압축해제 한도를 초과했다.",
+      "rationale": "본문이 없어 사건을 판정할 수 없다."
+    },
+    {
+      "index": 102,
+      "rceptNo": "20260514001506",
+      "assessable": false,
+      "goldEvents": null,
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "OpenDART가 파일이 존재하지 않는다고 반환했다.",
+      "rationale": "본문이 없어 사건을 판정할 수 없다."
+    },
+    {
+      "index": 103,
+      "rceptNo": "20260713000369",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "adjusted",
+          "state": "proposed",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "코아스 제3자배정 유상증자의 수량·가액·대상자와 일정을 변경했다.",
+      "rationale": "납입 전 유상증자 조건 조정이다."
+    },
+    {
+      "index": 104,
+      "rceptNo": "20260727800084",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "HDC랩스가 2026년 2분기 연결 잠정 실적을 공시했다.",
+      "rationale": "잠정치임이 명시된 영업실적 발표다."
+    },
+    {
+      "index": 105,
+      "rceptNo": "20260727800018",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "occurred",
+          "state": "effective",
+          "cause": "serious-industrial-accident",
+          "subjectType": "operations"
+        },
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "active",
+          "cause": "work-stop",
+          "subjectType": "operating-business"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "군산조선소 사고로 1명이 사망했고 노동청이 조립라인 작업중지를 명령했다.",
+      "rationale": "중대재해와 독립 작업중지 명령은 별도 공동 핵심 사건이다."
+    },
+    {
+      "index": 106,
+      "rceptNo": "20260721000344",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "플레이그램 유상증자로 560,852주를 배정하고 999,999,116원을 조달했다.",
+      "rationale": "납입과 배정이 완료된 발행 실적이다."
+    },
+    {
+      "index": 107,
+      "rceptNo": "20260520000002",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "pending",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "세아홀딩스가 자기주식 187,000주 공개매수를 시작했다.",
+      "rationale": "문서 의도는 tender offer이며 소각은 아직 별도 결정되지 않았다."
+    },
+    {
+      "index": 108,
+      "rceptNo": "20260615000262",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": "effective",
+          "cause": "semiannual-report",
+          "subjectType": "financials"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "KB스타리츠가 제9기 반기보고서를 제출했다.",
+      "rationale": "법정 반기보고서 제출 한 건이다."
+    },
+    {
+      "index": 109,
+      "rceptNo": "20260602000322",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "merger",
+          "subjectType": "business"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "KG스틸이 100% 자회사를 1:0 무증자 방식으로 흡수합병 완료했다.",
+      "rationale": "합병 종료보고서가 완료를 직접 공시한다."
+    },
+    {
+      "index": 110,
+      "rceptNo": "20260515002689",
+      "assessable": false,
+      "goldEvents": null,
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "문서 ZIP 항목이 압축해제 한도를 초과했다.",
+      "rationale": "본문이 없어 사건을 판정할 수 없다."
+    },
+    {
+      "index": 111,
+      "rceptNo": "20260724800083",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-event",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "investor-relations",
+          "subjectType": "issuer"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "포스코DX가 2026-07-30 IR 컨퍼런스콜을 안내했다.",
+      "rationale": "미래 IR 일정이므로 pending이다."
+    },
+    {
+      "index": 112,
+      "rceptNo": "20260430000550",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "acquired",
+          "state": "effective",
+          "cause": "treasury-share-acquisition",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "현대퓨처넷이 자기주식 1,391,840주를 실제 취득했다.",
+      "rationale": "일별 체결은 취득 결과보고 한 건의 구성 내역이다."
+    }
+  ]
+}

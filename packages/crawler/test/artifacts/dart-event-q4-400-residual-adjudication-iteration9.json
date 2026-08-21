@@ -1,0 +1,643 @@
+{
+  "schemaVersion": "jaroo.kr-disclosure-event-q4-residual-adjudication.v2",
+  "generatedAt": "2026-07-27T05:47:47Z",
+  "developmentOnly": true,
+  "sourceCorpusSha256": "37472b36b474c60280da57928da1c647161c839e4e16c8318f8668999956dc4c",
+  "predecessorOracleSha256": "a7d4a328e572b217d1b2217730f1debc8905fa59cf70f88555ecc819f620ca8b",
+  "reviewProtocol": {
+    "initialReview": "three independent native Codex semantic adjudicators split by residual families",
+    "adversarialReview": "one separate native Codex verifier re-read source bodies and could reject proposed labels",
+    "predictionBlind": false,
+    "scope": "development oracle correction only; not an independent temporal holdout claim",
+    "tieBreakRule": "newEntityFormation || (!controlBefore && controlAfter) => restructuring; otherwise asset-transaction"
+  },
+  "summary": {
+    "caseCount": 20,
+    "dualAcceptedCount": 14,
+    "adversariallyRepairedCount": 5,
+    "adversariallyRetainedCount": 1,
+    "repairedIndices": [
+      59,
+      217,
+      225,
+      251,
+      296
+    ],
+    "retainedIndices": [
+      361
+    ]
+  },
+  "cases": [
+    {
+      "index": 43,
+      "rceptNo": "20251001000005",
+      "reportName": "공개매수설명서",
+      "previousExpectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_regression_adjudication_a",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "접수일이 공개매수 시작일이고 보통주 대상 공개매수기간이 진행 중이므로 initiated/active이며 대상은 listed-shares다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 44,
+      "rceptNo": "20251001000004",
+      "reportName": "공개매수신고서",
+      "previousExpectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_regression_adjudication_a",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "공개매수신고서의 접수일과 공개매수 시작일이 같고 보통주 대상 기간이 진행 중이므로 initiated/active다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 48,
+      "rceptNo": "20251031000290",
+      "reportName": "자기주식처분결과보고서",
+      "previousExpectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_regression_adjudication_a",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "결과보고서에 보통주 29,510주의 실제 처분과 처분 후 보유현황이 있어 completed/effective다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 59,
+      "rceptNo": "20251029800713",
+      "reportName": "[첨부추가]타법인주식및출자증권취득결정",
+      "previousExpectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "adversarial-tie-break",
+      "reviewers": [
+        "i8_regression_adjudication_a",
+        "i8_regression_adjudication_b",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "기존 계열회사 추가투자 후 지분율이 39.62%에 그치고 신규 지배권 취득 근거가 없어 소수지분 자산거래로 판정했다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 61,
+      "rceptNo": "20251031800966",
+      "reportName": "소송등의제기ㆍ신청(일정금액이상의청구)",
+      "previousExpectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "filed",
+          "state": null,
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "filed",
+          "state": "active",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_regression_adjudication_a",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "사건번호와 제기일이 명시되고 종결·취하 증거 없이 대응이 진행 중이므로 filed/active다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 95,
+      "rceptNo": "20251031800205",
+      "reportName": "주주명부폐쇄기간또는기준일설정",
+      "previousExpectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "record-date",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "record-date",
+          "subjectType": "ownership"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_regression_adjudication_a",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "미래 기준일을 임시주총 권리주주 확정 목적으로 설정했으므로 record-date의 대상은 ownership이다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 192,
+      "rceptNo": "20251127000311",
+      "reportName": "일괄신고추가서류(기타파생결합증권)",
+      "previousExpectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_regression_adjudication_b",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "현재 발행분인 기타파생결합증권 1종의 청약기간이 접수일 이후여서 solicited/pending이다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 206,
+      "rceptNo": "20251128000644",
+      "reportName": "자기주식처분결과보고서",
+      "previousExpectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_regression_adjudication_b",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "실제 보통주 2,734주 처분과 완료일 및 처분 후 보유현황이 명시돼 completed/effective다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 217,
+      "rceptNo": "20251128801293",
+      "reportName": "중대재해발생",
+      "previousExpectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "occurred",
+          "state": null,
+          "cause": "serious-industrial-accident",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "occurred",
+          "state": "effective",
+          "cause": "serious-industrial-accident",
+          "subjectType": "operations"
+        },
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "active",
+          "cause": "work-stop",
+          "subjectType": "operating-business"
+        }
+      ],
+      "adjudicationTier": "adversarial-repair",
+      "reviewers": [
+        "i8_regression_adjudication_b",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "사망 사고와 발생일이 확정됐고 동시에 진행 중 작업공종의 자체 작업중지가 실시돼 사고와 active work-stop 두 사건을 보존한다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 220,
+      "rceptNo": "20251128801262",
+      "reportName": "주주명부폐쇄기간또는기준일설정",
+      "previousExpectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "record-date",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "record-date",
+          "subjectType": "ownership"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_regression_adjudication_b",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "미래 기준일의 목적이 권리주주 확정이므로 record-date의 subjectType은 ownership이다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 225,
+      "rceptNo": "20251128801257",
+      "reportName": "[기재정정]타법인주식및출자증권취득결정",
+      "previousExpectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "rescheduled",
+          "state": "pending",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "rescheduled",
+          "state": "pending",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "adversarial-tie-break",
+      "reviewers": [
+        "i8_regression_adjudication_a",
+        "i8_regression_adjudication_b",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "비관계 회사 지분 10.30%의 현금 취득이며 정정은 예정일 연기만 확립하므로 asset-transaction/rescheduled/pending으로 판정했다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 251,
+      "rceptNo": "20251127801003",
+      "reportName": "타법인주식및출자증권취득결정(종속회사의주요경영사항)",
+      "previousExpectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "adversarial-tie-break",
+      "reviewers": [
+        "i8_regression_adjudication_a",
+        "i8_regression_adjudication_b",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "취득 전부터 100% 지배 중인 자회사에 대한 추가 출자로 통제 경계가 변하지 않아 내부 recapitalization 자산거래로 판정했다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 296,
+      "rceptNo": "20251230000797",
+      "reportName": "주요사항보고서(자기전환사채만기전취득결정)",
+      "previousExpectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "acquired",
+          "state": "effective",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "adversarial-repair",
+      "reviewers": [
+        "i8_regression_adjudication_b",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "문서는 취득 결정·이사회 결의와 지급(예정)일만 확립한다. 실제 지급·권리이전 완료 증거가 없어 decided/proposed다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 300,
+      "rceptNo": "20251230000429",
+      "reportName": "주요사항보고서(자기주식처분결정)",
+      "previousExpectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_regression_adjudication_b",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "미래 기간의 자기주식 처분 결정이며 실제 결과보고서가 아니므로 corporate-action decided/proposed다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 320,
+      "rceptNo": "20251231000608",
+      "reportName": "일괄신고추가서류(파생결합증권-주가연계증권)",
+      "previousExpectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-linked-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_regression_adjudication_b",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "현재 상품이 주가연계증권이고 청약기간이 접수일 이후여서 derivative-linked-securities solicited/pending이다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 323,
+      "rceptNo": "20251218000475",
+      "reportName": "일괄신고추가서류(기타파생결합증권)",
+      "previousExpectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "solicited",
+          "state": "pending",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_regression_adjudication_b",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "현재 상품이 기타파생결합증권이고 청약기간이 접수일 이후여서 derivative-securities solicited/pending이다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 332,
+      "rceptNo": "20251215000003",
+      "reportName": "공개매수설명서",
+      "previousExpectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_residual_adjudication_c",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "접수일이 공개매수 시작일이고 기명식 보통주 대상 기간이 진행 중이므로 initiated/active다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 333,
+      "rceptNo": "20251215000002",
+      "reportName": "공개매수신고서",
+      "previousExpectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "active",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_residual_adjudication_c",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "신고서 접수일이 공개매수 시작일이고 기명식 보통주 대상 기간이 진행 중이므로 initiated/active다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 337,
+      "rceptNo": "20251230000785",
+      "reportName": "자기주식처분결과보고서",
+      "previousExpectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "adjudicationTier": "independent-confirmation",
+      "reviewers": [
+        "i8_residual_adjudication_c",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "실제 보통주 373,459주의 처분·대금지급과 처분 후 보유현황이 있어 completed/effective다.",
+      "labelConfidence": "high"
+    },
+    {
+      "index": 361,
+      "rceptNo": "20251231800285",
+      "reportName": "타법인주식및출자증권취득결정(종속회사의주요경영사항)",
+      "previousExpectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "adjudicationTier": "adversarial-retention",
+      "reviewers": [
+        "i8_regression_adjudication_a",
+        "i8_regression_adjudication_b",
+        "i9_oracle_revision_verifier"
+      ],
+      "rationale": "거래 전 관계가 없던 회사를 구주 인수와 같은 날 신주 취득으로 100% 지배하게 되므로 비지배에서 완전자회사로 통제 경계가 변경되어 restructuring을 유지했다.",
+      "labelConfidence": "high"
+    }
+  ]
+}

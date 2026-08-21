@@ -1,0 +1,1373 @@
+import {
+  OPEN_DART_BROAD_TYPE_DEFAULTS,
+  OPEN_DART_DISCLOSURE_DETAIL_TYPES,
+} from '../data/kr-disclosure-classification-dataset.js';
+import { classifyDisclosureFiling } from './deepscan-kr-disclosure-pipeline.js';
+
+export const KR_DISCLOSURE_EVENT_EXTRACTOR_VERSION = 'jaroo.kr-disclosure-event-extractors.experimental.v2';
+export const KR_DISCLOSURE_EVENT_GATED_VERSION = 'jaroo.kr-disclosure-event-extractors.gated.v3';
+
+const FILING_STATE_BY_PREFIX = Object.freeze({
+  기재정정: 'corrected',
+  첨부정정: 'corrected',
+  첨부추가: 'corrected',
+  변경등록: 'corrected',
+  연장결정: 'deferred',
+  발행조건확정: 'finalized',
+  정정제출요구: 'correction-requested',
+});
+
+const CATEGORY_TO_EVENT_TYPE = Object.freeze({
+  periodic: 'periodic-report',
+  'capital-change': 'capital-change',
+  restructuring: 'restructuring',
+  'material-contract': 'material-contract',
+  ownership: 'ownership-change',
+  governance: 'governance',
+  'corporate-action': 'corporate-action',
+  audit: 'audit',
+  insolvency: 'insolvency',
+  earnings: 'earnings',
+  'trading-status': 'trading-status',
+  'legal-regulatory': 'legal-regulatory',
+  'related-party': 'related-party',
+  other: 'other',
+});
+
+const DETAIL_BY_CODE = new Map(OPEN_DART_DISCLOSURE_DETAIL_TYPES.map((detail) => [detail.code, detail]));
+
+const DETAIL_EVENT_DEFAULTS = Object.freeze({
+  A001: { type: 'periodic-report', action: 'filed', cause: 'annual-report', subjectType: 'issuer' },
+  A002: { type: 'periodic-report', action: 'filed', cause: 'semiannual-report', subjectType: 'issuer' },
+  A003: { type: 'periodic-report', action: 'filed', cause: 'quarterly-report', subjectType: 'issuer' },
+  C001: { type: 'capital-change', action: 'filed', cause: 'equity-securities', subjectType: 'securities' },
+  C002: { type: 'capital-change', action: 'filed', cause: 'debt-securities', subjectType: 'securities' },
+  C004: { type: 'restructuring', action: 'filed', cause: 'merger', subjectType: 'issuer' },
+  D001: { type: 'ownership-change', action: 'reported', cause: 'large-shareholding', subjectType: 'ownership' },
+  D002: { type: 'ownership-change', action: 'reported', cause: 'insider-ownership', subjectType: 'ownership' },
+  D003: { type: 'governance', action: 'reported', cause: 'proxy-solicitation', subjectType: 'governance' },
+  D004: { type: 'corporate-action', action: 'announced', cause: 'tender-offer', subjectType: 'securities' },
+  D005: { type: 'ownership-change', action: 'reported', cause: 'insider-trading-plan', subjectType: 'ownership' },
+  E001: { type: 'capital-change', action: 'reported', cause: 'treasury-share', subjectType: 'securities' },
+  E002: { type: 'capital-change', action: 'reported', cause: 'treasury-share-trust', subjectType: 'securities' },
+  E003: { type: 'restructuring', action: 'completed', cause: 'merger', subjectType: 'issuer' },
+  E004: { type: 'capital-change', action: 'granted', cause: 'stock-option', subjectType: 'securities' },
+  E005: { type: 'governance', action: 'changed', cause: 'outside-director', subjectType: 'governance' },
+  E006: { type: 'governance', action: 'convened', cause: 'shareholder-meeting', subjectType: 'governance' },
+  F001: { type: 'audit', action: 'submitted', cause: 'audit-report', subjectType: 'audit-opinion' },
+  F002: { type: 'audit', action: 'submitted', cause: 'audit-report', subjectType: 'audit-opinion' },
+  J001: { type: 'related-party', action: 'reported', cause: 'internal-transaction', subjectType: 'issuer' },
+});
+
+const DETAIL_SECURITIES_CAUSE = Object.freeze({
+  C001: 'equity-securities',
+  C002: 'debt-securities',
+  C003: 'derivative-securities',
+  C006: 'equity-securities',
+  G002: 'fund-securities',
+});
+
+function normalizeText(value) {
+  if (value === null || typeof value === 'undefined') return '';
+  return String(value).normalize('NFKC').replaceAll(/\s+/gu, ' ').trim();
+}
+
+function compactText(value) {
+  return normalizeText(value).replaceAll(/\s+/gu, '');
+}
+
+function normalizeInput(entry = {}) {
+  const reportName = normalizeText(entry.reportName ?? entry.report_nm ?? entry.report_name);
+  const remarks = normalizeText(entry.remarks ?? entry.rm);
+  const correctionMatch = reportName.match(/^\[(기재정정|첨부정정|첨부추가|변경등록|연장결정|발행조건확정|정정제출요구)\]/u);
+  const bodyText = normalizeText(entry.bodyText ?? entry.documentText ?? entry.body_text);
+  return {
+    reportName,
+    remarks,
+    text: `${reportName} ${remarks}`.trim(),
+    compact: compactText(`${reportName} ${remarks}`),
+    correctionKind: correctionMatch?.[1] ?? null,
+    filingState: FILING_STATE_BY_PREFIX[correctionMatch?.[1]] ?? null,
+    bodyText,
+    receiptNumber: normalizeText(entry.rceptNo ?? entry.rcept_no ?? entry.receiptNumber) || null,
+    filedAt: normalizeText(entry.filedAt ?? entry.rceptDt ?? entry.rcept_dt) || null,
+    disclosureType: normalizeText(entry.disclosureType ?? entry.pblntfTy ?? entry.pblntf_ty).toUpperCase() || null,
+    disclosureDetailType: normalizeText(entry.disclosureDetailType ?? entry.pblntfDetailTy ?? entry.pblntf_detail_ty).toUpperCase() || null,
+  };
+}
+
+function createEvent({ type, action = null, state = null, cause = null, subjectType = null }) {
+  return { type, action, state, cause, subjectType };
+}
+
+function eventKey(event) {
+  return [event.type, event.action, event.state, event.cause, event.subjectType].map((value) => value ?? '').join('|');
+}
+
+function sortEvents(events) {
+  return [...events].sort((left, right) => eventKey(left).localeCompare(eventKey(right), 'en'));
+}
+
+function addEvent(events, event) {
+  if (!event?.type || events.some((candidate) => eventKey(candidate) === eventKey(event))) return;
+  events.push(createEvent(event));
+}
+
+function mergeEvent(events, event) {
+  const index = events.findIndex((candidate) => candidate.type === event.type);
+  if (index === -1) {
+    addEvent(events, event);
+    return;
+  }
+  const current = events[index];
+  events[index] = createEvent({
+    type: current.type,
+    action: current.action ?? event.action,
+    state: current.state ?? event.state,
+    cause: current.cause ?? event.cause,
+    subjectType: current.subjectType ?? event.subjectType,
+  });
+}
+
+function result(strategy, events, confidence, reasons = []) {
+  return {
+    version: KR_DISCLOSURE_EVENT_EXTRACTOR_VERSION,
+    strategy,
+    events: sortEvents(events),
+    confidence,
+    reasons,
+  };
+}
+
+function correctionState(input) {
+  return input.filingState;
+}
+
+function causeFromText(compact) {
+  if (/주식소각/u.test(compact)) return 'share-cancellation';
+  if (/감자/u.test(compact)) return 'capital-reduction';
+  if (/무상증자/u.test(compact)) return 'bonus-issue';
+  if (/유상증자/u.test(compact)) return 'rights-offering';
+  if (/전환사채/u.test(compact)) return 'convertible-bond';
+  if (/신주인수권/u.test(compact)) return 'warrant-bond';
+  if (/주식(?:의)?병합|주식분할/u.test(compact)) return 'share-consolidation-or-split';
+  if (/상장폐지|정리매매/u.test(compact)) return 'delisting';
+  if (/합병/u.test(compact)) return 'merger';
+  if (/FDA|보완요구서한|CRL/u.test(compact)) return 'fda-crl';
+  return null;
+}
+
+function securitiesCauseFromText(compact) {
+  if (/지분증권|유상증자/u.test(compact)) return 'equity-securities';
+  if (/채무증권/u.test(compact)) return 'debt-securities';
+  if (/파생결합/u.test(compact)) return 'derivative-securities';
+  if (/합병/u.test(compact)) return 'merger';
+  if (/분할/u.test(compact)) return 'demerger';
+  if (/주식.*교환|주식.*이전/u.test(compact)) return 'share-exchange';
+  if (/집합투자증권/u.test(compact)) return 'fund-securities';
+  return 'securities-issuance';
+}
+
+function extractDocumentSubject(bodyText) {
+  if (!bodyText) return '';
+  const patterns = [
+    /(?:^|\|)\s*1\.\s*제목\s*\|\s*\|\s*([^|]{2,300}?)\s*\|/u,
+    /공시제목\s*\|\s*\|\s*([^|]{2,300}?)\s*\|/u,
+  ];
+  for (const pattern of patterns) {
+    const match = bodyText.match(pattern);
+    if (match) return normalizeText(match[1]);
+  }
+  return '';
+}
+
+const PERFECTIVE_ACTIONS = new Set([
+  'acquired',
+  'borrowed',
+  'completed',
+  'disposed',
+  'dissolved',
+  'guaranteed',
+  'halted',
+  'lifted',
+  'listed',
+]);
+
+const DISCLOSURE_ACTIONS = new Set([
+  'announced',
+  'filed',
+  'opinion-filed',
+  'published',
+  'reported',
+  'responded',
+  'withdrawn',
+]);
+
+const EXECUTION_ACTIONS = new Set([
+  'adjusted',
+  'cancelled',
+  'changed',
+  'completed',
+  'deposited',
+  'designated',
+  'exercised',
+  'held',
+  'rescheduled',
+  'terminated',
+  'updated',
+  'withdrawn',
+]);
+
+function filingDate(input) {
+  const raw = input.filedAt || input.receiptNumber?.slice(0, 8);
+  const match = String(raw ?? '').match(/^(\d{4})[-.]?(\d{2})[-.]?(\d{2})/u);
+  if (!match) return null;
+  const date = new Date(`${match[1]}-${match[2]}-${match[3]}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function semanticDates(text) {
+  return [...normalizeText(text).matchAll(/(?<!\d)'?(20\d{2}|\d{2})[년.\-/\s]+(\d{1,2})[월.\-/\s]+(\d{1,2})일?/gu)]
+    .map((match) => {
+      const year = match[1].length === 2 ? `20${match[1]}` : match[1];
+      return new Date(`${year}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}T00:00:00Z`);
+    })
+    .filter((date) => !Number.isNaN(date.getTime()));
+}
+
+function firstDateAfterLabel(text, labelPattern, preferLast = false) {
+  const matches = [...compactText(text).matchAll(new RegExp(`(?:${labelPattern})[^0-9']{0,80}'?(20\\d{2}|\\d{2})[년.\\-/\\s]+(\\d{1,2})[월.\\-/\\s]+(\\d{1,2})일?`, 'gu'))];
+  const match = preferLast ? matches.at(-1) : matches[0];
+  if (!match) return null;
+  const year = match[1].length === 2 ? `20${match[1]}` : match[1];
+  const date = new Date(`${year}-${match[2].padStart(2, '0')}-${match[3].padStart(2, '0')}T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function firstMonthAfterLabel(text, labelPattern, preferLast = false) {
+  const matches = [...compactText(text).matchAll(new RegExp(`(?:${labelPattern})[^0-9']{0,80}'?(20\\d{2}|\\d{2})[년.\\-/\\s]+(\\d{1,2})월`, 'gu'))];
+  const match = preferLast ? matches.at(-1) : matches[0];
+  if (!match) return null;
+  const year = match[1].length === 2 ? `20${match[1]}` : match[1];
+  const date = new Date(`${year}-${match[2].padStart(2, '0')}-01T00:00:00Z`);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function relationToFiling(date, filed) {
+  if (!date || !filed) return null;
+  if (date > filed) return 'future';
+  if (date < filed) return 'past';
+  return 'same-day';
+}
+
+export function normalizeDisclosureEventGateInput(entry = {}) {
+  const input = normalizeInput(entry);
+  return Object.freeze({
+    ...input,
+    wrapperKind: input.correctionKind === '첨부추가'
+      ? 'attachment-added'
+      : input.correctionKind
+        ? 'correction'
+        : 'original',
+  });
+}
+
+export function runFilingWrapperGate(input, event) {
+  if (!input.filingState || event.state !== input.filingState) return createEvent(event);
+  return createEvent({ ...event, state: null });
+}
+
+export function extractStructuredBodyFacts(input) {
+  const rawText = normalizeText(`${input.reportName} ${input.remarks} ${input.bodyText}`);
+  const fullText = compactText(rawText);
+  const filed = filingDate(input);
+  const dates = semanticDates(fullText);
+  const preferLastLabeledDate = Boolean(input.correctionKind);
+  const operationalLabel = '권유시작일|거래시작일|차입일|대여일(?:자)?|증여일|보증(?:개시|시작)일|채무보증기간|지정[ㆍ·ᆞ]?부과일자|거래일자|매매일자|출자일자|상장일자|효력발생일|임차일자|임대(?:개시)?일자|계약시작일';
+  const operationalDate = firstDateAfterLabel(rawText, operationalLabel, preferLastLabeledDate);
+  const operationalMonth = firstMonthAfterLabel(rawText, operationalLabel, preferLastLabeledDate);
+  const effectivenessDate = firstDateAfterLabel(rawText, '효력발생(?:예정)?일', preferLastLabeledDate);
+  const scheduledDate = firstDateAfterLabel(rawText, '예정일|예정일자|예정기간|해제일|생산중단일|의무보유해제일', preferLastLabeledDate);
+  const releaseDate = firstDateAfterLabel(rawText, '매매거래정지해제일시|정지해제일시|해제일시', preferLastLabeledDate);
+  return Object.freeze({
+    rawText,
+    fullText,
+    dates: Object.freeze(dates.map((date) => date.toISOString().slice(0, 10))),
+    hasFutureDate: Boolean(filed && dates.some((date) => date > filed)),
+    operationalDateRelation: relationToFiling(operationalDate, filed),
+    operationalMonthRelation: relationToFiling(operationalMonth, filed),
+    effectivenessDateRelation: relationToFiling(effectivenessDate, filed),
+    scheduledDateRelation: relationToFiling(scheduledDate, filed),
+    releaseDateRelation: relationToFiling(releaseDate, filed),
+    scheduledPeriod: /(?:거래일자|출자일자|대여일자).{0,100}(?:20\d{2}년)?(?:[1-4]분기|\d{1,2}월).{0,30}예정/u.test(fullText),
+    completionObserved: /(?:상장하였습니다|거래(?:가)?종결(?:되었|완료)|대금(?:수령|지급).{0,20}완료|(?:주식|지분권리|자산).{0,20}(?:양수|양도|취득|처분).{0,20}완료|청약결과|발행결과|취득결과보고서|처분결과보고서|해지결과보고서|공개매수결과보고서)/u.test(fullText),
+    transactionCompletionObserved: /거래(?:가)?종결/u.test(fullText) && /대금.{0,40}(?:수령|지급)/u.test(fullText),
+    deferred: /(?:결정|절차).{0,30}(?:보류|유예)|(?:보류|유예).{0,30}(?:결정|절차)/u.test(fullText),
+    haltTimestampBlank: /매매거래정지일시\|+[-미정]+(?:\||$)/u.test(fullText),
+    releaseTimestampBlank: /(?:해제|정지해제)(?:일시|시각)[^|]{0,20}\|+[-미정]+(?:\||$)/u.test(fullText),
+    haltTimestampPresent: /매매거래정지일시[^0-9']{0,40}'?(?:20\d{2}|\d{2})[.년\-/\s]/u.test(fullText),
+    releaseTimestampPresent: /매매거래정지해제일시[^0-9']{0,40}'?(?:20\d{2}|\d{2})[.년\-/\s]/u.test(fullText),
+    bodyAvailable: Boolean(input.bodyText),
+  });
+}
+
+export function buildDetailPriorClaims(input) {
+  return Object.freeze({
+    detailType: input.disclosureDetailType,
+    requiresBody: ['C004', 'E004', 'J001'].includes(input.disclosureDetailType),
+    relatedParty: input.disclosureDetailType === 'J001',
+  });
+}
+
+export function buildTitleSemanticClaims(input) {
+  const reportText = compactText(input.reportName);
+  const text = compactText(`${input.reportName} ${extractDocumentSubject(input.bodyText)}`);
+  return Object.freeze({
+    detailType: input.disclosureDetailType,
+    reportText,
+    text,
+    decided: /결정|결의/u.test(text),
+    completed: /완료|종료보고|결과보고서|발행결과|실적보고|청약결과/u.test(text),
+    scheduled: /예정|계획/u.test(text),
+  });
+}
+
+export function resolveTemporalEvent(event, { bodyFacts, titleClaims }) {
+  let resolved = createEvent(event);
+  const disclosureAction = DISCLOSURE_ACTIONS.has(resolved.action);
+  const explicitDecision = resolved.action === 'decided' || resolved.action === 'planned' || titleClaims.decided;
+  const eventSpecificDeferred = resolved.cause === 'rehabilitation' && bodyFacts.deferred;
+  const filingLifecycleDetail = ['C002', 'C003', 'C006'].includes(titleClaims.detailType);
+
+  if (titleClaims.completed) {
+    resolved = createEvent({ ...resolved, state: 'effective' });
+  } else if (bodyFacts.transactionCompletionObserved && PERFECTIVE_ACTIONS.has(resolved.action)) {
+    resolved = createEvent({ ...resolved, state: 'effective' });
+  } else if (titleClaims.decided && resolved.action === 'announced') {
+    resolved = createEvent({ ...resolved, action: 'decided', state: 'proposed' });
+  } else if (resolved.action === 'reported' && resolved.cause === 'insider-trading-plan'
+    && (bodyFacts.operationalDateRelation === 'future' || bodyFacts.scheduledDateRelation === 'future')) {
+    resolved = createEvent({ ...resolved, action: 'scheduled', state: 'pending' });
+  } else if (disclosureAction) {
+    if (resolved.action === 'filed' && filingLifecycleDetail
+      && (bodyFacts.effectivenessDateRelation === 'future'
+        || (titleClaims.detailType === 'C006' && bodyFacts.scheduledDateRelation === 'future'))) {
+      resolved = createEvent({ ...resolved, state: 'pending' });
+    } else if (resolved.action === 'filed' && filingLifecycleDetail
+      && ['past', 'same-day'].includes(bodyFacts.effectivenessDateRelation)) {
+      resolved = createEvent({ ...resolved, state: 'effective' });
+    } else if (resolved.action === 'withdrawn') {
+      resolved = createEvent({ ...resolved, state: resolved.state ?? 'effective' });
+    } else if (['opinion-filed', 'published'].includes(resolved.action)
+      && ['past', 'same-day'].includes(bodyFacts.effectivenessDateRelation ?? bodyFacts.operationalDateRelation)) {
+      resolved = createEvent({ ...resolved, state: 'effective' });
+    }
+  } else if (eventSpecificDeferred) {
+    resolved = createEvent({ ...resolved, state: 'deferred' });
+  } else if ((bodyFacts.operationalDateRelation === 'past' || bodyFacts.operationalDateRelation === 'same-day')
+    && (PERFECTIVE_ACTIONS.has(resolved.action) || ['contracted', 'guaranteed', 'purchased', 'solicited'].includes(resolved.action))) {
+    resolved = createEvent({ ...resolved, state: 'effective' });
+  } else if (explicitDecision && !EXECUTION_ACTIONS.has(resolved.action)) {
+    resolved = createEvent({
+      ...resolved,
+      action: resolved.action === 'planned' ? 'planned' : 'decided',
+      state: 'proposed',
+    });
+  } else if (bodyFacts.scheduledDateRelation === 'future') {
+    resolved = createEvent({ ...resolved, action: 'scheduled', state: 'pending' });
+  } else if (bodyFacts.completionObserved) {
+    if (resolved.state === null) resolved = createEvent({ ...resolved, state: 'effective' });
+  } else if (bodyFacts.operationalDateRelation === 'future' || titleClaims.scheduled) {
+    resolved = createEvent({ ...resolved, action: 'scheduled', state: 'pending' });
+  }
+  if (resolved.action === 'initiated' && resolved.cause === 'creditor-bank-management' && resolved.state === null) {
+    resolved = createEvent({ ...resolved, state: 'effective' });
+  }
+  if (resolved.action === 'decided' && resolved.state === null) {
+    resolved = createEvent({ ...resolved, state: 'proposed' });
+  }
+  if (resolved.action === 'scheduled' && resolved.state === null) {
+    resolved = createEvent({ ...resolved, state: 'pending' });
+  }
+  if (resolved.type === 'trading-status' && resolved.action === 'lifted' && bodyFacts.releaseTimestampBlank) {
+    resolved = createEvent({ ...resolved, action: 'halted', state: 'effective' });
+  }
+  if (titleClaims.completed && resolved.state === null && ['completed', 'disposed', 'purchased'].includes(resolved.action)) {
+    resolved = createEvent({ ...resolved, state: 'effective' });
+  }
+  return resolved;
+}
+
+function j001EventFromText(input, bodyFacts) {
+  const title = compactText(input.reportName);
+  const body = bodyFacts.fullText;
+  const effective = bodyFacts.operationalDateRelation === 'past' || bodyFacts.operationalDateRelation === 'same-day' || bodyFacts.completionObserved;
+  const future = !effective && (bodyFacts.operationalDateRelation === 'future'
+    || bodyFacts.operationalMonthRelation === 'future'
+    || bodyFacts.scheduledDateRelation === 'future'
+    || bodyFacts.scheduledPeriod
+    || /예정/u.test(title)
+    || /(?:예정|예상|계획).{0,40}(?:거래|출연|전환|실행)/u.test(body));
+
+  if (!bodyFacts.bodyAvailable) return null;
+  if (/특수관계인으로부터받은담보/u.test(title)) {
+    return createEvent({ type: 'related-party', action: 'received', state: 'effective', cause: 'collateral-received', subjectType: 'securities' });
+  }
+  if (/특수관계인에대한담보제공/u.test(title)) {
+    return createEvent({
+      type: 'related-party',
+      action: future ? 'decided' : 'provided',
+      state: future ? 'proposed' : 'effective',
+      cause: 'collateral-provision',
+      subjectType: 'securities',
+    });
+  }
+  if (/특수관계인에게.*부동산매도|특수관계인에대한부동산매도/u.test(title)) {
+    return createEvent({ type: 'related-party', action: future ? 'decided' : 'sold', state: future ? 'proposed' : 'effective', cause: 'real-estate-sale', subjectType: 'real-estate' });
+  }
+  if (/특수관계인과의보험거래/u.test(title)) {
+    return createEvent({ type: 'related-party', action: 'decided', state: 'proposed', cause: /퇴직연금/u.test(body) ? 'retirement-pension' : 'insurance-transaction', subjectType: 'contract' });
+  }
+  if (/특수관계인의유상증자참여/u.test(title)) {
+    return createEvent({ type: 'related-party', action: 'decided', state: 'proposed', cause: 'rights-offering-participation', subjectType: 'securities' });
+  }
+  if (/특수관계인에대한채권매도/u.test(title)) {
+    return createEvent({ type: 'related-party', action: future ? 'decided' : 'sold', state: future ? 'proposed' : 'effective', cause: 'bond-sale', subjectType: 'securities' });
+  }
+  if (/특수관계인에대한영업양도/u.test(title)) {
+    const agreementUpdated = /변경합의/u.test(body);
+    return createEvent({
+      type: 'related-party',
+      action: agreementUpdated ? 'updated' : future ? 'decided' : 'disposed',
+      state: agreementUpdated || effective ? 'effective' : 'proposed',
+      cause: 'business-transfer',
+      subjectType: 'operating-business',
+    });
+  }
+  if (/특수관계인으로부터주식의취득/u.test(title)) {
+    return createEvent({ type: 'related-party', action: future ? 'decided' : 'acquired', state: future ? 'proposed' : 'effective', cause: 'equity-acquisition', subjectType: 'securities' });
+  }
+  if (/특수관계인과의예.*적금거래/u.test(title)) {
+    return createEvent({ type: 'related-party', action: future && !effective ? 'decided' : 'deposited', state: future && !effective ? 'proposed' : 'effective', cause: 'deposit-investment', subjectType: 'securities' });
+  }
+  if (/약관에의한금융거래시계열금융회사의거래상대방의공시/u.test(title)) {
+    return createEvent({ type: 'related-party', action: 'decided', state: 'proposed', cause: 'affiliate-financial-transactions', subjectType: 'contract' });
+  }
+  if (/특수관계인과의내부거래/u.test(title) && /브랜드|라이선스/u.test(body)) {
+    return createEvent({ type: 'related-party', action: input.correctionKind ? 'updated' : 'reported', state: 'effective', cause: 'brand-license-fee', subjectType: 'contract' });
+  }
+  if (/계열금융회사의약관에의한금융거래/u.test(title)) {
+    if (/장단기대여/u.test(title) && /실제(?:대여|거래|인수)?금액은?없/u.test(body)) return null;
+    const product = [
+      [/유가증권-수익증권/u, ['fund-security-transactions', 'securities']],
+      [/유가증권-채권/u, ['bond-transactions', 'securities']],
+      [/보험/u, ['retirement-pension-transactions', 'contract']],
+      [/기타유가증권/u, ['other-securities-transactions', 'securities']],
+      [/예[ㆍ·ᆞ]?적금/u, ['deposit-product-transactions', 'contract']],
+      [/파생금융상품/u, ['derivative-swap-transactions', 'contract']],
+      [/유가증권-주식/u, ['equity-transactions', 'securities']],
+      [/CP/u, ['commercial-paper-transactions', 'securities']],
+    ].find(([pattern]) => pattern.test(title));
+    if (product) return createEvent({ type: 'related-party', action: 'reported', state: 'effective', cause: product[1][0], subjectType: product[1][1] });
+    if (/장단기차입/u.test(title)) {
+      if (/주식|유가증권/u.test(body)) return createEvent({ type: 'related-party', action: 'borrowed', state: 'effective', cause: 'securities-borrowing', subjectType: 'securities' });
+      return createEvent({ type: 'related-party', action: 'borrowed', state: 'effective', cause: 'related-party-borrowing', subjectType: 'contract' });
+    }
+  }
+  if (/단기금융상품거래/u.test(title) && /MMF|MoneyMarketFund/u.test(body)) {
+    return createEvent({ type: 'related-party', action: 'purchased', state: 'effective', cause: 'mmf-purchase', subjectType: 'securities' });
+  }
+  if (/상품[ㆍ·ᆞ]?용역.*변경/u.test(title)) {
+    return createEvent({
+      type: 'related-party',
+      action: 'changed',
+      state: 'effective',
+      cause: 'internal-goods-services',
+      subjectType: 'contract',
+    });
+  }
+  if (/상품[ㆍ·ᆞ]?용역.*거래/u.test(title)) {
+    return createEvent({ type: 'related-party', action: 'decided', state: 'proposed', cause: 'internal-goods-services', subjectType: 'contract' });
+  }
+  if (/주식의처분|주식.*(?:처분|매도|양도)/u.test(title) && (effective || /거래종결일/u.test(body))) {
+    return createEvent({
+      type: 'related-party',
+      action: 'disposed',
+      state: 'effective',
+      cause: 'affiliate-share-disposal',
+      subjectType: 'securities',
+    });
+  }
+  if (/출자/u.test(title)) {
+    return createEvent({
+      type: 'related-party',
+      action: effective ? 'invested' : 'decided',
+      state: effective ? 'effective' : 'proposed',
+      cause: /투자조합|펀드/u.test(body) ? 'fund-investment' : 'affiliate-equity-investment',
+      subjectType: 'securities',
+    });
+  }
+  if (/유가증권차입/u.test(title)) return createEvent({ type: 'related-party', action: future ? 'decided' : 'borrowed', state: future ? 'proposed' : 'effective', cause: 'securities-borrowing', subjectType: 'securities' });
+  if (/수익증권/u.test(title) && /투자/u.test(body)) {
+    return createEvent({ type: 'related-party', action: future ? 'decided' : 'invested', state: future ? 'proposed' : 'effective', cause: 'fund-security-investment', subjectType: 'securities' });
+  }
+  if (/유가증권매수/u.test(title)) {
+    return createEvent({
+      type: 'related-party',
+      action: future && !effective ? 'decided' : 'purchased',
+      state: future && !effective ? 'proposed' : 'effective',
+      cause: 'securities-purchase',
+      subjectType: 'securities',
+    });
+  }
+  if (/자금대여/u.test(title)) {
+    return createEvent({
+      type: 'related-party',
+      action: /만기.{0,30}연장|연장.{0,30}만기/u.test(body) ? 'extended' : future ? 'decided' : 'lent',
+      state: future ? 'proposed' : 'effective',
+      cause: 'related-party-loan',
+      subjectType: 'contract',
+    });
+  }
+  if (/금전.*증여|증여/u.test(title)) {
+    const plannedDonation = future || /분기.{0,40}출연|출연.{0,40}(?:예정|계획)/u.test(body);
+    return createEvent({ type: 'related-party', action: plannedDonation ? 'decided' : 'donated', state: plannedDonation ? 'proposed' : 'effective', cause: 'cash-donation', subjectType: 'cash' });
+  }
+  if (/부동산매수/u.test(title)) return createEvent({ type: 'related-party', action: future && !effective ? 'decided' : 'purchased', state: future && !effective ? 'proposed' : 'effective', cause: 'real-estate-purchase', subjectType: 'real-estate' });
+  if (/부동산임차/u.test(title)) return createEvent({ type: 'related-party', action: future ? 'decided' : 'leased-in', state: future ? 'proposed' : 'effective', cause: 'related-party-real-estate-leased-in', subjectType: 'real-estate' });
+  if (/부동산임대/u.test(title)) return createEvent({ type: 'related-party', action: future ? 'decided' : 'leased-out', state: future ? 'proposed' : 'effective', cause: 'related-party-real-estate-leased-out', subjectType: 'real-estate' });
+  const object = /계약.*(?:권리|의무)|권리의무/u.test(body) ? 'contract-right' : 'contract';
+  const operation = /변경|승계/u.test(body) ? 'updated' : 'reported';
+  return createEvent({
+    type: 'related-party',
+    action: future ? 'decided' : operation,
+    state: future ? 'proposed' : 'effective',
+    cause: `related-party-${object}-${operation}`,
+    subjectType: object,
+  });
+}
+
+export function normalizeEventOntology(event, context) {
+  const { input, bodyFacts, titleClaims } = context;
+  const fullText = bodyFacts.fullText;
+  if (input.disclosureDetailType === 'J001') return j001EventFromText(input, bodyFacts);
+  if (input.disclosureDetailType === 'I001' && /정기주주총회결과/u.test(titleClaims.reportText)) {
+    return createEvent({ type: 'governance', action: 'completed', state: 'effective', cause: 'shareholder-meeting', subjectType: 'governance' });
+  }
+  if (input.disclosureDetailType === 'I003' && /불성실공시법인지정/u.test(titleClaims.reportText) && event.state === 'pending') {
+    return createEvent({ ...event, action: 'designated', state: 'pending' });
+  }
+  if (event.action === 'withdrawn') {
+    return createEvent({
+      ...event,
+      state: event.state ?? 'cancelled',
+      cause: causeFromText(fullText) ?? event.cause,
+      subjectType: event.subjectType ?? 'securities',
+    });
+  }
+  if (event.type === 'restructuring' && event.cause === 'business-disposal'
+    && (bodyFacts.completionObserved || /거래종결일.{0,120}예치금정산|최종양수도금액.{0,40}확정/u.test(fullText))) {
+    return createEvent({ ...event, action: 'completed', state: 'effective' });
+  }
+  if (/영업.*잠정.*실적/u.test(titleClaims.reportText)
+    && /판매량/u.test(fullText)
+    && /(?:매출액|영업이익|당기순이익)[^0-9]{0,30}[-–]/u.test(fullText)) {
+    return createEvent({ type: 'operating-performance', action: 'announced', state: 'preliminary', cause: 'sales-volume', subjectType: 'operations' });
+  }
+  if (/장래사업.*경영계획/u.test(titleClaims.reportText) && /영업이익.{0,100}(?:목표|전망)/u.test(fullText)) {
+    return createEvent({ type: 'earnings', action: 'forecasted', state: null, cause: 'earnings-guidance', subjectType: 'financials' });
+  }
+  if (/최대주주등소유주식변동/u.test(titleClaims.reportText) && /신규선임/u.test(fullText)) {
+    return createEvent({ type: 'ownership-change', action: 'reported', state: null, cause: 'insider-holdings', subjectType: 'ownership' });
+  }
+  if (event.type === 'capital-change' && event.action === 'completed'
+    && (/^유상증자(?!또는주식관련사채)/u.test(titleClaims.reportText)
+      || (/청약결과/u.test(titleClaims.reportText) && /발행방법.{0,100}유상증자/u.test(fullText)))) {
+    return createEvent({ ...event, cause: 'rights-offering' });
+  }
+  if (/기타시장안내.*상장적격성실질심사사유발생/u.test(titleClaims.reportText)) {
+    return createEvent({ type: 'trading-status', action: 'triggered', state: 'screening-pending', cause: 'listing-eligibility', subjectType: 'listed-shares' });
+  }
+  if (/단기차입금증가결정/u.test(titleClaims.reportText) && /기업어음|전자단기사채/u.test(fullText) && /발행한도/u.test(fullText)) {
+    return createEvent({ type: 'capital-change', action: 'decided', state: 'proposed', cause: 'short-term-debt-issuance-limit', subjectType: 'securities' });
+  }
+  if (input.disclosureDetailType === 'C004' && /증권신고서/u.test(titleClaims.reportText)) {
+    return createEvent({ ...event, action: 'filed', state: null });
+  }
+  if (input.disclosureDetailType === 'E004'
+    && ((/취소|철회/u.test(titleClaims.reportText) && !/부여|행사/u.test(titleClaims.reportText))
+      || /정정(?:사항|사유).{0,160}(?:주식매수선택권)?.{0,80}(?:취소|철회)/u.test(fullText))) {
+    return createEvent({ type: 'capital-change', action: 'cancelled', state: 'effective', cause: 'stock-option', subjectType: 'securities' });
+  }
+  if (input.disclosureDetailType === 'C004' && /분할합병/u.test(fullText)) {
+    return createEvent({ type: 'restructuring', action: titleClaims.completed ? 'completed' : 'decided', state: titleClaims.completed ? 'effective' : 'proposed', cause: 'split-merger', subjectType: 'issuer' });
+  }
+  if (input.disclosureDetailType === 'C004' && /(?:주식.*교환|주식.*이전)/u.test(fullText)) {
+    return createEvent({ type: 'restructuring', action: titleClaims.completed ? 'completed' : 'decided', state: titleClaims.completed ? 'effective' : 'proposed', cause: 'share-exchange', subjectType: 'issuer' });
+  }
+  if (input.disclosureDetailType === 'E003' && /타법인주식|출자증권양수|주식양수/u.test(fullText)) {
+    return createEvent({ type: 'restructuring', action: 'completed', state: 'effective', cause: 'equity-acquisition', subjectType: 'securities' });
+  }
+  if (input.disclosureDetailType === 'E003' && /영업양수도|영업양도/u.test(fullText)) {
+    return createEvent({ type: 'restructuring', action: 'completed', state: 'effective', cause: 'business-disposal', subjectType: 'business' });
+  }
+  if (input.disclosureDetailType === 'C004' && /투자설명서/u.test(fullText)
+    && /지분증권|채무증권|파생결합|증권발행/u.test(fullText)) {
+    return createEvent({ type: 'capital-change', action: 'published', state: 'effective', cause: securitiesCauseFromText(fullText), subjectType: 'securities' });
+  }
+  if (/(?:자진|자발적)(?:해산|청산)|종속회사.{0,80}청산결의|청산결의.{0,80}종속회사/u.test(fullText)) {
+    return createEvent({ type: 'restructuring', action: 'decided', state: 'proposed', cause: 'voluntary-liquidation', subjectType: 'subsidiary' });
+  }
+  return createEvent(event);
+}
+
+export function applyCorrectionLifecycle(event, { input, bodyFacts }) {
+  if (!event) return null;
+  if (input.wrapperKind !== 'correction') return createEvent(event);
+  const title = compactText(input.reportName);
+  const text = bodyFacts.fullText;
+  if (!/정정신고|정정사항|정정사유|정정대상/u.test(text)) return createEvent(event);
+  if (/정정사유.{0,40}단순기재오류/u.test(text)) return createEvent(event);
+  const correctionLead = text.match(/정정(?:사유|사항).{0,240}/u)?.[0] ?? '';
+
+  if (/철회신고서/u.test(title)) {
+    return createEvent({ ...event, action: 'withdrawn', state: 'cancelled' });
+  }
+  if (/투자설명서|증권신고서/u.test(title)
+    && /발행가액.{0,40}확정|확정.{0,40}발행가액/u.test(correctionLead)) {
+    return createEvent({ ...event, action: 'price-set', state: 'effective' });
+  }
+  if (EXECUTION_ACTIONS.has(event.action) && !['updated', 'rescheduled'].includes(event.action)) {
+    return createEvent({ ...event, state: event.state ?? 'effective' });
+  }
+  if (/사채.*발행결정|전환사채.*발행결정|신주인수권부사채.*발행결정|교환사채.*발행결정/u.test(title)) {
+    return createEvent(event);
+  }
+
+  if (event.action === 'initiated' && event.cause === 'creditor-bank-management') {
+    return createEvent({ ...event, state: 'effective' });
+  }
+  if (event.action === 'solicited' && event.cause === 'proxy-solicitation') {
+    return createEvent({ ...event, state: 'effective' });
+  }
+  if (event.action === 'halted' && event.cause === 'business-suspension') {
+    return createEvent({ ...event, state: 'proposed' });
+  }
+
+  const scheduleChanged = bodyFacts.hasFutureDate
+    && /소집일시변경|예정[)]?일(?:자)?(?:정정|변경)|정지일자.{0,20}(?:정정|변경)|납입일.{0,40}교부예정일정정|체결일확정/u.test(correctionLead);
+  if (scheduleChanged) return createEvent({ ...event, action: 'rescheduled', state: 'pending' });
+
+  let resolvedState = 'effective';
+  if (event.cause === 'litigation') resolvedState = 'active';
+  else if (event.state === 'preliminary' || ['active', 'alleged'].includes(event.state)) resolvedState = event.state;
+  else if (bodyFacts.hasFutureDate && /일자|예정일|일시|일정/u.test(correctionLead) && !/오기|오류/u.test(correctionLead)) resolvedState = 'pending';
+  else if (/오기|오류/u.test(correctionLead) && event.state === 'proposed') resolvedState = 'proposed';
+  return createEvent({ ...event, action: 'updated', state: resolvedState });
+}
+
+export function arbitrateEventCandidates(candidates) {
+  const events = [];
+  for (const candidate of candidates) addEvent(events, candidate.event ?? candidate);
+  return sortEvents(events);
+}
+
+function applyEventSetRules(input, events) {
+  const bodyFacts = extractStructuredBodyFacts(input);
+  const title = compactText(input.reportName);
+  const resolved = [...events];
+
+  if (/상장폐지관련안내/u.test(title) && /감사의견.{0,40}거절/u.test(bodyFacts.fullText)) {
+    return sortEvents([
+      createEvent({ type: 'trading-status', action: 'delisting-triggered', state: 'pending', cause: 'audit-opinion', subjectType: 'listed-shares' }),
+      createEvent({ type: 'trading-status', action: 'halted', state: 'effective', cause: 'delisting-review', subjectType: 'listed-shares' }),
+    ]);
+  }
+
+  if (resolved.some((event) => event.type === 'capital-change' && event.cause === 'rights-offering')
+    && /최대주주.{0,80}변경|경영권.{0,80}변경/u.test(bodyFacts.fullText)) {
+    addEvent(resolved, createEvent({
+      type: 'ownership-change',
+      action: 'changed',
+      state: bodyFacts.hasFutureDate ? 'pending' : 'effective',
+      cause: 'controlling-shareholder',
+      subjectType: 'ownership',
+    }));
+  }
+
+  if (!/매매거래정지및정지해제/u.test(title)) return sortEvents(resolved);
+
+  if (bodyFacts.haltTimestampBlank && bodyFacts.releaseTimestampBlank && /감자결정|변경상장절차/u.test(bodyFacts.fullText)) {
+    return [createEvent({
+      type: 'trading-status',
+      action: 'unchanged',
+      state: 'effective',
+      cause: 'capital-reduction',
+      subjectType: 'listed-shares',
+    })];
+  }
+  if (bodyFacts.haltTimestampPresent && bodyFacts.releaseTimestampPresent) {
+    const cause = causeFromText(bodyFacts.fullText)
+      ?? (/풍문|조회공시/u.test(title) ? 'rumor-inquiry' : 'material-disclosure');
+    return sortEvents([
+      createEvent({ type: 'trading-status', action: 'halted', state: 'effective', cause, subjectType: 'listed-shares' }),
+      createEvent({
+        type: 'trading-status',
+        action: 'lifted',
+        state: bodyFacts.releaseDateRelation === 'future' ? 'pending' : 'lifted',
+        cause,
+        subjectType: 'listed-shares',
+      }),
+    ]);
+  }
+  return sortEvents(resolved);
+}
+
+function semanticEvent(type, action, state, cause, subjectType) {
+  return createEvent({ type, action, state, cause, subjectType });
+}
+
+/**
+ * Iteration 5 semantic repair gate.
+ *
+ * This gate deliberately keys on document semantics (wrapper, lifecycle verb,
+ * object and relative-time evidence), never on issuer or receipt literals.  It
+ * sits after candidate arbitration so it can repair cross-field tuples and
+ * add independent events that the title-first candidate pass cannot express.
+ */
+function applyGeneralizedSemanticGates(input, events) {
+  const title = compactText(input.reportName);
+  const facts = extractStructuredBodyFacts(input);
+  const body = facts.fullText;
+  const corrected = input.wrapperKind === 'correction';
+  const replace = (...next) => sortEvents(next);
+
+  // Negative/terminal polarity must win over a generic positive contract noun.
+  if (/단일판매[ㆍ·ᆞ]?공급계약해지/u.test(title)) {
+    return replace(semanticEvent('material-contract', 'terminated', 'effective', 'supply-contract', 'contract'));
+  }
+
+  // Administrative order is an independent event, not a modifier of the
+  // underlying capital transaction.
+  if (/^\[정정명령부과\]/u.test(title)) {
+    return replace(
+      ...events,
+      semanticEvent('legal-regulatory', 'ordered', 'effective', 'disclosure-correction', 'issuer'),
+    );
+  }
+
+  // Body/title semantic rescue for formerly unresolved generic disclosures.
+  if (/개선기간종료관련안내/u.test(title)) {
+    return replace(
+      semanticEvent('legal-regulatory', 'period-ended', 'effective', 'listing-improvement-period', 'issuer'),
+      semanticEvent('trading-status', 'halted', 'effective', 'delisting-review', 'listed-shares'),
+    );
+  }
+  if (/타인에대한담보제공결정/u.test(title)) {
+    const related = corrected && /특수관계인|계열회사|최대주주/u.test(body);
+    return replace(semanticEvent(
+      related ? 'related-party' : 'material-contract',
+      corrected ? 'updated' : 'provided',
+      corrected ? (facts.hasFutureDate ? 'pending' : 'effective') : 'effective',
+      'collateral-provision',
+      related ? 'securities' : 'asset',
+    ));
+  }
+  if (/자산관리위탁계약변경/u.test(title)) return replace(semanticEvent('material-contract', 'changed', 'effective', 'asset-management-contract', 'contract'));
+  if (/자산보관위탁계약체결/u.test(title)) return replace(semanticEvent('material-contract', 'contracted', 'pending', 'asset-custody-contract', 'contract'));
+  if (/자산보관위탁계약변경/u.test(title)) return replace(semanticEvent('material-contract', 'changed', 'pending', 'asset-custody-contract', 'contract'));
+  if (/공정거래자율준수프로그램운영현황/u.test(title)) {
+    return replace(
+      semanticEvent('legal-regulatory', 'reported', 'effective', 'compliance-program', 'issuer'),
+      semanticEvent('legal-regulatory', 'scheduled', 'pending', 'compliance-program', 'issuer'),
+    );
+  }
+  if (/공동연구개발.*라이선스계약체결|라이선스계약체결.*공동연구개발/u.test(title + body)) {
+    return replace(semanticEvent('material-contract', 'contracted', 'effective', 'research-license-agreement', 'contract'));
+  }
+  if (/투자판단관련주요경영사항/u.test(title)
+    && /마일스톤|기술료.{0,40}(?:달성|수령|지급)/u.test(body)) {
+    return replace(semanticEvent('material-contract', 'milestone-earned', 'effective', 'licensing-milestone', 'contract'));
+  }
+  if (/소송등의판결[ㆍ·ᆞ]?결정/u.test(title) && /기각/u.test(body)) return replace(semanticEvent('legal-regulatory', 'dismissed', 'effective', 'litigation', 'issuer'));
+  if (/불성실공시법인지정예고/u.test(title)) {
+    return replace(semanticEvent('legal-regulatory', 'announced', /이의신청|사전통지/u.test(body) ? 'preliminary' : 'pending', 'disclosure-compliance', 'issuer'));
+  }
+  if (/조회공시요구.*현저한시황변동/u.test(title)) return replace(semanticEvent('disclosure-inquiry', 'received', 'pending', 'market-movement-inquiry', 'issuer'));
+  if (/상장채권관련기타주요사항/u.test(title) && /매매거래정지|거래정지/u.test(body)) return replace(semanticEvent('capital-change', 'halted', 'effective', 'debt-securities', 'securities'));
+  if (/영업실적등에대한전망/u.test(title)) return replace(semanticEvent('earnings', corrected ? 'updated' : 'forecasted', corrected ? 'projected' : null, 'earnings-guidance', 'financials'));
+  if (/기업가치제고계획/u.test(title) && /이행현황/u.test(title)) return replace(semanticEvent('corporate-event', 'reported', 'effective', 'value-up-plan', 'issuer'));
+  if (/어플리케이션운영서비스계약체결/u.test(title)) return replace(semanticEvent('material-contract', 'contracted', 'effective', 'service-contract', 'contract'));
+  if (/이사회.*위원회신설/u.test(title)) return replace(semanticEvent('governance', 'established', 'effective', 'board-committee', 'governance'));
+  if (/벌금등의부과/u.test(title) && /항소|불복|취소소송|행정소송|행정심판|취소청구|이의제기/u.test(body)) return replace(semanticEvent('legal-regulatory', 'appealed', 'active', 'regulatory-fine', 'issuer'));
+  if (/투자판단관련주요경영사항/u.test(title) && /소송|중재|청구/u.test(body)) return replace(semanticEvent('legal-regulatory', 'decided', 'effective', 'litigation', 'issuer'));
+  if (/수시공시의무관련사항/u.test(title) && /배당|주주환원/u.test(body)) return replace(semanticEvent('corporate-event', 'announced', 'proposed', 'dividend-policy', 'securities'));
+  if (/기타안내사항/u.test(title)
+    && /생산중단.{0,160}(?:종료|해제)|(?:종료|해제).{0,160}생산중단|가동중단관련진행사항|생산을종료|재개계획은없/u.test(body)) {
+    return replace(semanticEvent('operating-status', 'terminated', 'effective', 'production-suspension', 'business'));
+  }
+  if (/기타안내사항/u.test(title) && /기준일|주주명부폐쇄/u.test(body)) return replace(semanticEvent('corporate-event', 'announced', 'pending', 'record-date', 'securities'));
+  if (/상장채권관련기타주요사항/u.test(title)) return replace(semanticEvent('capital-change', 'halted', 'effective', 'debt-securities', 'securities'));
+
+  // Object/actor ontology is evaluated before the issuer-capital default.
+  if (/주권관련사채권의취득결정|주권관련사채권양수결정/u.test(title)) {
+    return replace(semanticEvent('asset-transaction', 'decided', 'proposed', /전환사채/u.test(body) ? 'convertible-bond-acquisition' : 'securities-purchase', 'securities'));
+  }
+  if (/유형자산(?:양수|취득)결정/u.test(title) && input.wrapperKind !== 'attachment-added') return replace(semanticEvent('asset-transaction', corrected ? 'updated' : 'decided', corrected && facts.hasFutureDate ? 'pending' : 'proposed', 'tangible-asset-acquisition', /토지|건물|부동산/u.test(body) ? 'real-estate' : 'asset'));
+  if (/유형자산(?:양도|처분)결정/u.test(title)) return replace(semanticEvent('asset-transaction', corrected ? 'updated' : 'decided', corrected && facts.hasFutureDate ? 'pending' : 'proposed', 'tangible-asset-disposal', /토지|건물|부동산/u.test(body) ? 'real-estate' : 'asset'));
+  if (/전환청구권.*신주인수권.*교환청구권행사/u.test(title) && /교환사채|교환청구/u.test(body)) return replace(semanticEvent('capital-change', 'exercised', 'effective', 'exchangeable-bond-exchange', 'securities'));
+  if (/유상증자또는주식관련사채등의발행결과/u.test(title) && /전환사채/u.test(body)) return replace(semanticEvent('capital-change', 'completed', 'effective', 'convertible-bond', 'securities'));
+
+  // Phase is derived from explicit business lifecycle evidence, not merely the
+  // presence of a decision noun in the form title.
+  if (!corrected && /영업양도결정/u.test(title) && !facts.completionObserved) return replace(semanticEvent('restructuring', 'decided', 'proposed', 'business-disposal', 'business'));
+  if (!corrected && /영업정지/u.test(title) && (facts.scheduledDateRelation === 'future' || facts.hasFutureDate)) return replace(semanticEvent('operating-status', 'halted', 'pending', 'business-suspension', 'business'));
+  if (/대표이사.*변경/u.test(title) && facts.hasFutureDate) return replace(semanticEvent('governance', 'changed', 'pending', 'chief-executive-change', 'governance'));
+  if (!corrected && /자기전환사채만기전취득결정/u.test(title)) return replace(semanticEvent('capital-change', 'acquired', 'effective', 'convertible-bond', 'securities'));
+  if (/자기전환사채매도결정/u.test(title)) return replace(semanticEvent('capital-change', 'sold', 'effective', 'convertible-bond', 'securities'));
+  if (/자기주식취득신탁계약체결결정/u.test(title) && !facts.hasFutureDate) return replace(semanticEvent('capital-change', 'contracted', 'effective', 'treasury-share-trust', 'securities'));
+  if (/자기주식취득신탁계약해지결정/u.test(title)) return replace(semanticEvent('capital-change', 'terminated', 'effective', 'treasury-share-trust', 'securities'));
+  if (!corrected && /주주총회소집공고/u.test(title)) return replace(semanticEvent('governance', 'scheduled', 'pending', 'shareholder-meeting', 'governance'));
+  if (/전환가액.*조정/u.test(title) && /조정(?:일|기준일).{0,60}(?:20\d{2}|\d{2})[년.\-/]/u.test(body)) return replace(semanticEvent('capital-change', 'adjusted', 'effective', 'convertible-price', 'securities'));
+  if (/중대재해발생/u.test(title) && /작업중지(?:명령|조치)|작업정지(?:명령|조치)/u.test(body)) {
+    return replace(
+      semanticEvent('legal-regulatory', 'occurred', null, 'serious-industrial-accident', 'issuer'),
+      semanticEvent('operating-status', 'halted', 'effective', 'regulatory-work-stop', 'business'),
+    );
+  }
+  if (/매매거래정지및정지해제/u.test(title) && /영업양도|사업양도/u.test(body)) {
+    return replace(...events.map((event) => createEvent({ ...event, cause: 'business-disposal' })));
+  }
+  if (/단기차입금증가결정.*자회사의주요경영사항/u.test(title)
+    || (/단기차입금증가결정/u.test(title) && /특수관계인|계열회사|관계회사/u.test(body))) {
+    return replace(semanticEvent('related-party', 'decided', 'proposed', 'related-party-borrowing', 'contract'));
+  }
+  if (/금전대여결정/u.test(title) && !corrected) {
+    if (/만기.{0,60}연장|연장.{0,60}만기/u.test(body)) return replace(semanticEvent('related-party', 'extended', 'pending', 'related-party-loan', 'contract'));
+    if (['past', 'same-day'].includes(facts.operationalDateRelation)) return replace(semanticEvent('related-party', 'lent', 'effective', 'related-party-loan', 'contract'));
+  }
+  if (corrected && /금전대여결정/u.test(title) && /해지|종료|조기상환|대여금회수|채권회수/u.test(body)) {
+    return replace(semanticEvent('material-contract', 'terminated', 'effective', 'loan', 'contract'));
+  }
+
+  // Corrections keep wrapper action separate from the underlying event state.
+  if (/^\[발행조건확정\]/u.test(title)) return replace(...events.map((event) => createEvent({ ...event, action: 'price-set', state: 'effective' })));
+  if (corrected && /자기주식처분결정/u.test(title)) return replace(semanticEvent('capital-change', 'updated', 'pending', 'treasury-share-disposal', 'securities'));
+  if (corrected && /교환사채권발행결정/u.test(title) && facts.hasFutureDate) return replace(semanticEvent('capital-change', 'updated', 'pending', 'exchangeable-bond', 'securities'));
+  if (corrected && input.disclosureDetailType === 'G002' && /증권신고서/u.test(title)) {
+    return replace(...events.map((event) => createEvent({ ...event, action: 'updated', state: 'effective' })));
+  }
+  if (input.correctionKind === '첨부정정' && input.disclosureDetailType === 'C004' && /증권신고서/u.test(title)) {
+    return replace(...events.map((event) => createEvent({ ...event, action: 'updated', state: null })));
+  }
+  if (corrected && /증권신고서/u.test(title)
+    && !(input.disclosureDetailType === 'C004' && /주식의포괄적교환[ㆍ·ᆞ]?이전/u.test(title))) {
+    return replace(...events.map((event) => createEvent({ ...event, action: 'updated', state: event.state === 'pending' ? 'pending' : event.state })));
+  }
+  if (corrected && /주주총회소집공고/u.test(title)) return replace(semanticEvent('governance', 'updated', 'pending', 'shareholder-meeting', 'governance'));
+  if (corrected && /(?:전환사채권|신주인수권부사채권)발행결정/u.test(title)) {
+    return replace(semanticEvent('capital-change', 'updated', facts.hasFutureDate ? 'pending' : 'effective', /신주인수권부/u.test(title) ? 'bond-with-warrants' : 'convertible-bond', 'securities'));
+  }
+  if (corrected && /자기전환사채만기전취득결정/u.test(title)) return replace(semanticEvent('capital-change', 'updated', 'pending', 'convertible-bond', 'securities'));
+  if (corrected && /상각형조건부자본증권발행결정/u.test(title)) return replace(semanticEvent('capital-change', 'updated', 'pending', 'contingent-capital-securities', 'securities'));
+  if (corrected && /신규시설투자등\(자율공시\)/u.test(title)) return replace(semanticEvent('capital-expenditure', 'updated', 'pending', 'facility-investment', 'asset'));
+  if (corrected && /회사(?:분할|합병)결정|타법인주식및출자증권양수결정/u.test(title)) return replace(...events.map((event) => createEvent({ ...event, action: 'updated', state: facts.completionObserved ? 'effective' : 'pending' })));
+  if (corrected && /생산중단/u.test(title) && /생산재개|재개일/u.test(body)) return replace(semanticEvent('operating-status', /재개완료|생산을재개/u.test(body) ? 'resumed' : 'lifted', /재개완료|생산을재개/u.test(body) ? 'effective' : 'lifted', 'production-suspension', 'business'));
+  if (corrected && /소송등의제기/u.test(title)
+    && /정정(?:사유|사항).{0,240}(?:취하|철회)|(?:취하|철회).{0,120}정정/u.test(body)) {
+    return replace(semanticEvent('legal-regulatory', 'withdrawn', 'effective', 'litigation', 'issuer'));
+  }
+  if (corrected && /장래사업[ㆍ·ᆞ]?경영계획/u.test(title) && /철회|중단/u.test(body)) return replace(semanticEvent('corporate-event', 'withdrawn', 'effective', 'business-plan', 'issuer'));
+  if (corrected && /최대주주변경.*주식양수도계약체결/u.test(title)) return replace(semanticEvent('ownership-change', 'rescheduled', 'pending', 'controlling-shareholder', 'ownership'));
+  if (corrected && /타법인주식및출자증권처분결정/u.test(title) && facts.completionObserved) return replace(semanticEvent('restructuring', 'disposed', 'effective', 'equity-disposal', 'securities'));
+  if (corrected && /부동산투자회사부동산임대/u.test(title)) return replace(semanticEvent('asset-transaction', 'updated', 'pending', 'real-estate-lease', 'real-estate'));
+  if (corrected && /부동산투자회사부동산취득/u.test(title)) return replace(semanticEvent('asset-transaction', 'rescheduled', 'pending', 'tangible-asset-acquisition', 'real-estate'));
+  if (corrected && /의결권대리행사권유/u.test(title) && !/단순(?:오기재|기재오류)/u.test(body)) return replace(semanticEvent('governance', 'updated', facts.hasFutureDate ? 'pending' : null, 'proxy-solicitation', 'governance'));
+  if (corrected && /대규모기업집단현황공시/u.test(title) && !/단순(?:오기재|기재오류)/u.test(body)) return replace(semanticEvent('governance', 'updated', facts.bodyAvailable ? 'effective' : null, 'business-group-status', 'governance'));
+
+  // J001 and related-party forms: relation is the outer facet; verb direction
+  // and economic object determine the inner canonical slots.
+  if (input.disclosureDetailType === 'J001') {
+    const proposed = facts.hasFutureDate || facts.operationalDateRelation === 'future' || /예정|계획|결의/u.test(body);
+    if (/채권매수/u.test(title)) return replace(semanticEvent('related-party', 'decided', 'proposed', /전환사채/u.test(body) ? 'bond-purchase' : 'bond-transactions', 'securities'));
+    if (/주식의처분/u.test(title)) return replace(semanticEvent('related-party', 'decided', 'proposed', 'equity-disposal', 'securities'));
+    if (/자산양수/u.test(title)) return replace(semanticEvent('related-party', 'decided', 'proposed', /유형자산|토지|건물/u.test(body) ? 'tangible-asset-acquisition' : 'asset-acquisition', 'asset'));
+    if (/자산양도/u.test(title)) return replace(semanticEvent('related-party', 'decided', 'proposed', 'asset-disposal', 'asset'));
+    if (/전환사채발행/u.test(title)) return replace(semanticEvent('related-party', 'decided', 'proposed', 'convertible-bond', 'securities'));
+    if (/기타유가증권매도/u.test(title)) return replace(semanticEvent('related-party', 'decided', 'proposed', 'securities-sale', 'securities'));
+    if (!corrected && /수익증권거래/u.test(title) && /연장/u.test(body)) return replace(semanticEvent('related-party', 'extended', 'effective', 'fund-security-investment', 'securities'));
+    if (/주식의취득/u.test(title) && /계약체결|주식양수도계약/u.test(body)
+      && facts.operationalDateRelation === 'future' && !facts.completionObserved) {
+      return replace(semanticEvent('related-party', 'contracted', 'pending', 'equity-acquisition', 'securities'));
+    }
+    if (/증여/u.test(title)) {
+      const securitiesDonation = /(?:증여대상|증여목적물|증여내역).{0,120}(?:주식|유가증권)/u.test(body);
+      return replace(semanticEvent('related-party', 'decided', 'proposed', securitiesDonation ? 'securities-donation' : 'cash-donation', securitiesDonation ? 'securities' : 'cash'));
+    }
+    if (/받은담보/u.test(title)) {
+      const realEstate = /(?:담보물|담보제공물|담보자산).{0,160}(?:부동산|토지|건물)/u.test(body);
+      const securities = /(?:담보물|담보제공물|담보자산).{0,160}(?:주식|유가증권)/u.test(body);
+      const receiptPending = facts.operationalDateRelation === 'future' || facts.scheduledDateRelation === 'future';
+      return replace(semanticEvent('related-party', receiptPending ? 'decided' : 'received', receiptPending ? 'proposed' : 'effective', 'collateral-received', realEstate ? 'real-estate' : securities ? 'securities' : 'asset'));
+    }
+    if (/담보제공/u.test(title)) {
+      const securitiesCollateral = /(?:담보물|담보제공물|담보자산).{0,160}(?:주식|유가증권)/u.test(body);
+      return replace(semanticEvent('related-party', proposed ? 'decided' : 'provided', proposed ? 'proposed' : 'effective', 'collateral-provision', securitiesCollateral ? 'securities' : 'asset'));
+    }
+    if (/장단기대여/u.test(title) && /실제(?:대여|거래|인수)?금액은?없/u.test(body)) return replace(semanticEvent('related-party', 'reported', 'effective', 'related-party-lending', 'contract'));
+    if (/장단기차입/u.test(title) && /주식|유가증권|기업어음|CP|채권/u.test(body)) return replace(semanticEvent('related-party', 'borrowed', 'effective', 'securities-borrowing', 'securities'));
+    if (/내부거래/u.test(title) && /기간.{0,40}연장|연장.{0,40}기간/u.test(body)) return replace(semanticEvent('related-party', 'extended', 'effective', 'related-party-contract-updated', 'contract'));
+    if (/내부거래/u.test(title) && /임대차|임차|임대|리스|렌트/u.test(body)) return replace(semanticEvent('related-party', 'decided', 'proposed', 'internal-lease', 'contract'));
+  }
+
+  return sortEvents(events);
+}
+
+export function scoreEventExtractionConfidence({ input, candidates, events }) {
+  if (events.length === 0 || events.some((event) => event.type === 'other')) return 'low';
+  if (!input.bodyText && input.disclosureDetailType === 'J001') return 'low';
+  if (!input.bodyText && ['C004', 'E004'].includes(input.disclosureDetailType)) return 'medium';
+  if (candidates.some((candidate) => candidate.confidence === 'medium')) return 'medium';
+  if (candidates.some((candidate) => candidate.evidence.includes('temporal:conflict'))) return 'medium';
+  if (events.length > 1 && events.some((event) => event.state === 'pending')) return 'medium';
+  if (input.wrapperKind === 'correction'
+    && events.some((event) => ['rescheduled', 'updated'].includes(event.action) && event.state === 'pending')) return 'medium';
+  const title = compactText(input.reportName);
+  const riskyCorrectionSemantic = input.wrapperKind !== 'original'
+    && /교환사채권발행결정|타법인주식및출자증권양수결정|발행조건확정|영업실적등에대한전망|유형자산양도결정|소송등의제기/u.test(title);
+  const bodyDependentRelatedPartySemantic = input.disclosureDetailType === 'J001'
+    && /받은담보|주식의취득|장단기대여/u.test(title);
+  const preliminaryComplianceSemantic = /불성실공시법인지정예고/u.test(title);
+  if (riskyCorrectionSemantic || bodyDependentRelatedPartySemantic || preliminaryComplianceSemantic) return 'medium';
+  return 'high';
+}
+
+export function evaluateDisclosureEventGate({ event, input, semanticCompact = '', source = 'document-candidate' }) {
+  const normalizedInput = input.wrapperKind ? input : normalizeDisclosureEventGateInput(input);
+  const bodyFacts = extractStructuredBodyFacts(normalizedInput);
+  const titleClaims = buildTitleSemanticClaims(normalizedInput);
+  const wrapped = runFilingWrapperGate(normalizedInput, event);
+  const temporal = resolveTemporalEvent(wrapped, { bodyFacts, titleClaims });
+  const normalized = normalizeEventOntology(temporal, {
+    input: normalizedInput,
+    bodyFacts,
+    titleClaims,
+    semanticCompact,
+  });
+  const corrected = applyCorrectionLifecycle(normalized, {
+    input: normalizedInput,
+    bodyFacts,
+    titleClaims,
+  });
+  const genericTemporalConflict = DISCLOSURE_ACTIONS.has(event.action)
+    && (bodyFacts.deferred || bodyFacts.completionObserved || bodyFacts.operationalDateRelation === 'future' || bodyFacts.operationalMonthRelation === 'future' || bodyFacts.scheduledDateRelation === 'future');
+  const confidence = (!bodyFacts.bodyAvailable && buildDetailPriorClaims(normalizedInput).requiresBody)
+    || bodyFacts.releaseTimestampBlank
+    || genericTemporalConflict
+    ? 'medium'
+    : 'high';
+  return {
+    event: corrected,
+    confidence,
+    evidence: [source, `wrapper:${normalizedInput.wrapperKind}`, genericTemporalConflict ? 'temporal:conflict' : `temporal:${bodyFacts.deferred
+      ? 'deferred'
+      : bodyFacts.completionObserved || titleClaims.completed
+        ? 'completed'
+        : bodyFacts.operationalDateRelation ?? bodyFacts.scheduledDateRelation ?? 'observed'}`],
+  };
+}
+
+export function createGatedDisclosureEventCandidate(candidate) {
+  const evaluated = evaluateDisclosureEventGate(candidate);
+  return Object.freeze({
+    event: evaluated.event,
+    confidence: evaluated.confidence,
+    evidence: Object.freeze([...evaluated.evidence]),
+  });
+}
+
+const DOCUMENT_SEMANTIC_RULES = Object.freeze([
+  [/사업보고서제출기한연장/u, { type: 'periodic-report', action: 'extended', state: 'pending', cause: 'annual-report-deadline', subjectType: 'issuer' }],
+  [/자기주식취득신탁계약체결/u, { type: 'capital-change', action: 'contracted', cause: 'treasury-share-trust', subjectType: 'securities' }],
+  [/자기주식취득신탁계약해지|신탁계약해지결과/u, { type: 'capital-change', action: 'terminated', cause: 'treasury-share-trust', subjectType: 'securities' }],
+  [/자기주식취득결정/u, { type: 'capital-change', action: 'decided', cause: 'treasury-share-acquisition', subjectType: 'securities' }],
+  [/자기주식처분결정/u, { type: 'capital-change', action: 'decided', cause: 'treasury-share-disposal', subjectType: 'securities' }],
+  [/자기주식취득결과/u, { type: 'capital-change', action: 'completed', cause: 'treasury-share-acquisition', subjectType: 'securities' }],
+  [/자기주식처분결과/u, { type: 'capital-change', action: 'completed', cause: 'treasury-share-disposal', subjectType: 'securities' }],
+  [/신탁계약에의한취득상황/u, { type: 'capital-change', action: 'reported', cause: 'treasury-share-trust', subjectType: 'securities' }],
+  [/감자결정/u, { type: 'capital-change', action: 'decided', cause: 'capital-reduction', subjectType: 'securities' }],
+  [/자기신주인수권부사채만기전취득/u, { type: 'capital-change', action: 'acquired', cause: 'warrant-bond', subjectType: 'securities' }],
+  [/자기신주인수권부사채매도결정/u, { type: 'capital-change', action: 'disposed', cause: 'warrant-bond-sale', subjectType: 'securities' }],
+  [/교환사채권발행결정/u, { type: 'capital-change', action: 'decided', state: 'proposed', cause: 'exchangeable-bond', subjectType: 'securities' }],
+  [/제3자의전환사채매수선택권행사/u, { type: 'capital-change', action: 'exercised', state: 'effective', cause: 'convertible-bond-call-option', subjectType: 'securities' }],
+  [/전환사채매수선택권행사자지정/u, { type: 'capital-change', action: 'designated', state: 'effective', cause: 'convertible-bond-call-option', subjectType: 'securities' }],
+  [/상각형조건부자본증권발행|자본으로인정되는채무증권발행/u, { type: 'capital-change', action: 'decided', cause: 'contingent-capital-securities', subjectType: 'securities' }],
+  [/주권관련사채권의취득/u, { type: 'capital-change', action: 'acquired', cause: 'equity-linked-bond', subjectType: 'securities' }],
+  [/주권관련사채권의처분/u, { type: 'capital-change', action: 'disposed', cause: 'equity-linked-bond', subjectType: 'securities' }],
+  [/해외증권시장주권등상장/u, { type: 'capital-change', action: 'listed', cause: 'overseas-listing', subjectType: 'securities' }],
+  [/타법인주식및출자증권(?:양수|취득)/u, { type: 'restructuring', action: 'acquired', cause: 'equity-acquisition', subjectType: 'securities' }],
+  [/타법인주식및출자증권(?:양도|처분)/u, { type: 'restructuring', action: 'disposed', cause: 'equity-disposal', subjectType: 'securities' }],
+  [/유형자산양수|비유동자산취득/u, { type: 'restructuring', action: 'acquired', cause: 'asset-acquisition', subjectType: 'asset' }],
+  [/유형자산취득결정/u, { type: 'asset-transaction', action: 'decided', cause: 'tangible-asset-acquisition', subjectType: 'real-estate' }],
+  [/유형자산처분결정/u, { type: 'asset-transaction', action: 'decided', cause: 'tangible-asset-disposal', subjectType: 'real-estate' }],
+  [/영업양수/u, { type: 'restructuring', action: 'acquired', cause: 'business-acquisition', subjectType: 'business' }],
+  [/영업양도/u, { type: 'restructuring', action: 'disposed', cause: 'business-disposal', subjectType: 'business' }],
+  [/영업정지/u, { type: 'operating-status', action: 'halted', cause: 'business-suspension', subjectType: 'business' }],
+  [/회사분할결정/u, { type: 'restructuring', action: 'decided', state: 'proposed', cause: 'demerger', subjectType: 'issuer' }],
+  [/회사합병결정/u, { type: 'restructuring', action: 'decided', cause: 'merger', subjectType: 'issuer' }],
+  [/주식(?:의)?포괄적교환|주식교환.*이전/u, { type: 'restructuring', action: 'decided', cause: 'share-exchange', subjectType: 'issuer' }],
+  [/합병등종료보고서/u, { type: 'restructuring', action: 'completed', cause: 'merger-or-reorganization', subjectType: 'issuer' }],
+  [/채권은행등의관리절차개시/u, { type: 'insolvency', action: 'initiated', cause: 'creditor-bank-management', subjectType: 'issuer' }],
+  [/회생절차개시신청/u, { type: 'insolvency', action: 'applied', cause: 'rehabilitation', subjectType: 'issuer' }],
+  [/상장채권기한의이익상실/u, { type: 'insolvency', action: 'defaulted', cause: 'bond-default', subjectType: 'securities' }],
+  [/소송등의제기|경영권분쟁소송/u, { type: 'legal-regulatory', action: 'filed', cause: 'litigation', subjectType: 'issuer' }],
+  [/횡령.*배임혐의발생/u, { type: 'legal-regulatory', action: 'reported', state: 'alleged', cause: 'embezzlement-breach-of-trust', subjectType: 'issuer' }],
+  [/회계처리기준위반/u, { type: 'legal-regulatory', action: 'sanctioned', cause: 'accounting-violation', subjectType: 'issuer' }],
+  [/중대재해관련형사처벌사실확인/u, { type: 'legal-regulatory', action: 'confirmed', cause: 'serious-industrial-accident-penalty', subjectType: 'issuer' }],
+  [/중대재해발생/u, { type: 'legal-regulatory', action: 'occurred', cause: 'serious-industrial-accident', subjectType: 'issuer' }],
+  [/특수관계인에대한자금대여|금전대여결정/u, { type: 'related-party', action: 'decided', state: 'proposed', cause: 'related-party-loan', subjectType: 'contract' }],
+  [/단기차입금증가|부동산투자회사자금차입/u, { type: 'material-contract', action: 'borrowed', cause: 'financing', subjectType: 'contract' }],
+  [/신규시설투자/u, { type: 'capital-expenditure', action: 'decided', cause: 'facility-investment', subjectType: 'asset' }],
+  [/생산중단/u, { type: 'operating-status', action: 'halted', cause: 'production-suspension', subjectType: 'business' }],
+  [/시공자선정/u, { type: 'material-contract', action: 'selected', cause: 'construction-project', subjectType: 'contract' }],
+  [/경영권매각/u, { type: 'ownership-change', action: 'initiated', cause: 'control-sale', subjectType: 'ownership' }],
+  [/최대주주변경/u, { type: 'ownership-change', action: 'changed', cause: 'controlling-shareholder', subjectType: 'ownership' }],
+  [/지주회사의자회사탈퇴/u, { type: 'corporate-profile', action: 'changed', cause: 'subsidiary-exit', subjectType: 'issuer' }],
+  [/자기주식소각계획/u, { type: 'corporate-action', action: 'planned', state: 'proposed', cause: 'share-cancellation', subjectType: 'securities' }],
+  [/주주환원정책/u, { type: 'corporate-action', action: 'announced', state: 'proposed', cause: 'shareholder-return-policy', subjectType: 'securities' }],
+  [/주식소각결정/u, { type: 'corporate-action', action: 'decided', cause: 'share-cancellation', subjectType: 'securities' }],
+  [/주주명부폐쇄기간|주주명부폐쇄.*기준일|기준일설정/u, { type: 'corporate-action', action: 'decided', cause: 'record-date', subjectType: 'securities' }],
+  [/부동산투자회사금전배당/u, { type: 'corporate-action', action: 'decided', cause: 'cash-dividend', subjectType: 'securities' }],
+  [/의무보유.*(?:만료|해제)/u, { type: 'capital-change', action: 'lifted', cause: 'lockup', subjectType: 'securities' }],
+  [/유상증자계획/u, { type: 'capital-change', action: 'planned', state: 'proposed', cause: 'rights-offering', subjectType: 'securities' }],
+  [/소액공모실적보고서/u, { type: 'capital-change', action: 'completed', cause: 'equity-securities', subjectType: 'securities' }],
+  [/유상증자.*(?:발행결과|청약결과)/u, { type: 'capital-change', action: 'completed', cause: 'securities-issuance', subjectType: 'securities' }],
+  [/증권발행(?:실적보고서|결과)/u, { type: 'capital-change', action: 'completed', cause: 'securities-issuance', subjectType: 'securities' }],
+  [/유상증자신주발행가액/u, { type: 'capital-change', action: 'price-set', cause: 'rights-offering', subjectType: 'securities' }],
+  [/(?:전환청구권|신주인수권|교환청구권)행사(?!가액)/u, { type: 'capital-change', action: 'exercised', state: 'effective', cause: 'convertible-bond-conversion', subjectType: 'securities' }],
+  [/철회신고서/u, { type: 'capital-change', action: 'withdrawn', state: 'cancelled', cause: 'rights-offering', subjectType: 'securities' }],
+  [/증권신고서|소액공모공시서류/u, { type: 'capital-change', action: 'filed', cause: 'securities-issuance', subjectType: 'securities' }],
+  [/투자설명서/u, { type: 'capital-change', action: 'published', cause: 'securities-offering', subjectType: 'securities' }],
+  [/일괄신고/u, { type: 'capital-change', action: 'filed', cause: 'shelf-registration', subjectType: 'securities' }],
+  [/의결권대리행사권유/u, { type: 'governance', action: 'solicited', cause: 'proxy-solicitation', subjectType: 'governance' }],
+  [/(?:정기|임시)?주주총회결과/u, { type: 'governance', action: 'held', state: 'effective', cause: 'shareholder-meeting', subjectType: 'governance' }],
+  [/주주총회소집결의/u, { type: 'governance', action: 'convened', cause: 'shareholder-meeting', subjectType: 'governance' }],
+  [/대표이사.*변경/u, { type: 'governance', action: 'changed', state: 'effective', cause: 'chief-executive-change', subjectType: 'governance' }],
+  [/공개매수결과/u, { type: 'corporate-action', action: 'completed', cause: 'tender-offer', subjectType: 'securities' }],
+  [/공개매수에관한의견/u, { type: 'corporate-action', action: 'opinion-filed', cause: 'tender-offer', subjectType: 'securities' }],
+  [/공개매수(?:신고서|설명서)/u, { type: 'corporate-action', action: 'announced', cause: 'tender-offer', subjectType: 'securities' }],
+  [/특정증권등거래계획철회/u, { type: 'ownership-change', action: 'withdrawn', cause: 'insider-trading-plan', subjectType: 'ownership' }],
+  [/특정증권등거래계획보고/u, { type: 'ownership-change', action: 'reported', cause: 'insider-trading-plan', subjectType: 'ownership' }],
+  [/임원.*주요주주특정증권등소유상황/u, { type: 'ownership-change', action: 'reported', cause: 'insider-ownership', subjectType: 'ownership' }],
+  [/주요주주의주식보유변동/u, { type: 'ownership-change', action: 'reported', cause: 'major-shareholder', subjectType: 'ownership' }],
+  [/주식등의대량보유상황/u, { type: 'ownership-change', action: 'reported', cause: 'large-shareholding', subjectType: 'ownership' }],
+  [/최대주주등소유주식변동/u, { type: 'ownership-change', action: 'reported', cause: 'controlling-shareholder', subjectType: 'ownership' }],
+  [/사명변경|회사명변경/u, { type: 'corporate-profile', action: 'changed', state: 'effective', cause: 'company-name-change', subjectType: 'issuer' }],
+  [/기업설명회\(IR\)개최/u, { type: 'corporate-event', action: 'scheduled', cause: 'investor-relations', subjectType: 'issuer' }],
+  [/장래사업.*경영계획/u, { type: 'corporate-event', action: 'announced', state: 'proposed', cause: 'business-plan', subjectType: 'issuer' }],
+  [/수시공시의무관련사항.*배당/u, { type: 'corporate-event', action: 'decided', state: 'proposed', cause: 'dividend-policy', subjectType: 'securities' }],
+  [/기업가치제고계획/u, { type: 'corporate-event', action: 'announced', cause: 'value-up-plan', subjectType: 'issuer' }],
+  [/재무구조개선계획/u, { type: 'capital-change', action: 'planned', state: 'proposed', cause: 'capital-strengthening', subjectType: 'issuer' }],
+  [/지속가능경영보고서/u, { type: 'sustainability', action: 'published', cause: 'sustainability-report', subjectType: 'issuer' }],
+  [/결산실적공시예고/u, { type: 'earnings', action: 'scheduled', cause: 'earnings-release', subjectType: 'financials' }],
+  [/연결재무제표기준영업실적등에대한전망/u, { type: 'earnings', action: 'forecasted', cause: 'earnings-guidance', subjectType: 'financials' }],
+  [/풍문또는보도에대한해명/u, { type: 'disclosure-inquiry', action: 'responded', state: 'uncertain', cause: 'rumor-inquiry', subjectType: 'issuer' }],
+  [/투자유의안내/u, { type: 'trading-status', action: 'warned', state: 'effective', cause: 'investor-caution', subjectType: 'listed-shares' }],
+  [/상장적격성실질심사/u, { type: 'trading-status', action: 'under-review', state: 'effective', cause: 'listing-eligibility', subjectType: 'listed-shares' }],
+  [/매매거래정지및정지해제\(풍문등조회공시\)/u, { type: 'trading-status', action: 'lifted', state: 'lifted', cause: 'rumor-inquiry', subjectType: 'listed-shares' }],
+  [/매매거래정지및정지해제\(중요내용공시\)/u, { type: 'trading-status', action: 'lifted', state: 'lifted', cause: 'material-disclosure', subjectType: 'listed-shares' }],
+  [/대규모기업집단현황공시/u, { type: 'governance', action: 'reported', cause: 'business-group-status', subjectType: 'governance' }],
+  [/지급수단별.*지급기간별/u, { type: 'supplier-payment', action: 'reported', cause: 'subcontract-payment-terms', subjectType: 'issuer' }],
+]);
+
+function addDocumentSemanticEvents(events, input, semanticCompact) {
+  const refinedTypes = new Set();
+  for (const [pattern, definition] of DOCUMENT_SEMANTIC_RULES) {
+    if (!pattern.test(semanticCompact)) continue;
+    if (refinedTypes.has(definition.type)) continue;
+    const event = createEvent({
+      ...definition,
+      state: definition.state ?? correctionState(input),
+    });
+    for (let index = events.length - 1; index >= 0; index -= 1) {
+      if (events[index].type === event.type) events.splice(index, 1);
+    }
+    addEvent(events, event);
+    refinedTypes.add(event.type);
+  }
+
+  if (/증권신고서|증권발행실적보고서|투자설명서|일괄신고|소액공모/u.test(semanticCompact)) {
+    const index = events.findIndex((event) => event.type === 'capital-change' && event.cause === 'securities-issuance');
+    if (index >= 0) events[index] = createEvent({ ...events[index], cause: securitiesCauseFromText(semanticCompact) });
+  }
+}
+
+function eventsFromFlatKeywords(input) {
+  const events = [];
+  const text = input.compact;
+  const state = correctionState(input);
+
+  if (/사업보고서/u.test(text)) addEvent(events, createEvent({ type: 'periodic-report', action: 'filed', state, cause: 'annual-report', subjectType: 'issuer' }));
+  else if (/반기보고서/u.test(text)) addEvent(events, createEvent({ type: 'periodic-report', action: 'filed', state, cause: 'semiannual-report', subjectType: 'issuer' }));
+  else if (/분기보고서/u.test(text)) addEvent(events, createEvent({ type: 'periodic-report', action: 'filed', state, cause: 'quarterly-report', subjectType: 'issuer' }));
+
+  if (/주권?매매거래정지|매매거래정지|거래정지|기타시장안내/u.test(text)) {
+    const action = /해제/u.test(text) ? 'lifted' : /기간변경/u.test(text) ? 'changed' : /NXT|시간외단일가매매제외/u.test(text) ? 'scope-changed' : 'halted';
+    addEvent(events, createEvent({ type: 'trading-status', action, state: action === 'lifted' ? 'lifted' : 'effective', cause: causeFromText(text), subjectType: 'listed-shares' }));
+  }
+  if (/불성실공시/u.test(text)) addEvent(events, createEvent({ type: 'legal-regulatory', action: 'designated', state: 'effective', cause: 'disclosure-compliance', subjectType: 'issuer' }));
+  if (/영문상호|상호변경|약명및영문명/u.test(text)) addEvent(events, createEvent({ type: 'corporate-profile', action: 'name-changed', state: 'effective', subjectType: 'issuer' }));
+  if (/FDA|보완요구서한|CRL|품목허가/u.test(text)) {
+    const action = /승인/u.test(text) && !/보완요구/u.test(text) ? 'approved' : 'received';
+    addEvent(events, createEvent({ type: 'regulatory-product', action, state: 'effective', cause: action === 'approved' ? 'fda-approval' : 'fda-crl', subjectType: 'product' }));
+  }
+  if (/유상증자/u.test(text)) addEvent(events, createEvent({ type: 'capital-change', action: /결정/u.test(text) ? 'decided' : /발행가액/u.test(text) ? 'price-set' : 'announced', state, cause: 'rights-offering', subjectType: 'securities' }));
+  if (/무상증자/u.test(text)) addEvent(events, createEvent({ type: 'capital-change', action: 'announced', state, cause: 'bonus-issue', subjectType: 'securities' }));
+  if (/전환사채|전환가액/u.test(text)) addEvent(events, createEvent({ type: 'capital-change', action: /조정/u.test(text) ? 'adjusted' : 'decided', state, cause: /조정/u.test(text) ? 'convertible-price' : 'convertible-bond', subjectType: 'securities' }));
+  if (/자기주식취득신탁계약해지|신탁계약해지/u.test(text)) addEvent(events, createEvent({ type: 'capital-change', action: 'terminated', state, cause: 'treasury-share-trust', subjectType: 'securities' }));
+  if (/주식매수선택권/u.test(text)) addEvent(events, createEvent({ type: 'capital-change', action: 'granted', state, cause: 'stock-option', subjectType: 'securities' }));
+  if (/비유동자산취득|자산양수/u.test(text)) addEvent(events, createEvent({ type: 'restructuring', action: 'acquired', state, cause: 'asset-acquisition', subjectType: 'asset' }));
+  if (/합병등종료|합병완료/u.test(text)) addEvent(events, createEvent({ type: 'restructuring', action: 'completed', state, cause: 'merger', subjectType: 'issuer' }));
+  if (/채무보증/u.test(text)) addEvent(events, createEvent({ type: 'material-contract', action: 'guaranteed', state, cause: 'debt-guarantee', subjectType: 'contract' }));
+  if (/단일판매.*공급계약|공급계약체결/u.test(text)) addEvent(events, createEvent({ type: 'material-contract', action: 'contracted', state, cause: 'supply-contract', subjectType: 'contract' }));
+  if (/주식등의대량보유|최대주주등소유주식변동/u.test(text)) addEvent(events, createEvent({ type: 'ownership-change', action: 'reported', state, cause: 'large-shareholding', subjectType: 'ownership' }));
+  if (/임원.*주요주주.*거래계획철회/u.test(text)) addEvent(events, createEvent({ type: 'ownership-change', action: 'withdrawn', state, cause: 'insider-trading-plan', subjectType: 'ownership' }));
+  if (/공개매수/u.test(text)) addEvent(events, createEvent({ type: 'corporate-action', action: 'announced', state, cause: 'tender-offer', subjectType: 'securities' }));
+  if (/현금.*배당결정/u.test(text)) addEvent(events, createEvent({ type: 'corporate-action', action: 'decided', state, cause: 'cash-dividend', subjectType: 'securities' }));
+  if (/주주총회소집/u.test(text)) addEvent(events, createEvent({ type: 'governance', action: 'convened', state, cause: 'shareholder-meeting', subjectType: 'governance' }));
+  if (/사외이사/u.test(text)) addEvent(events, createEvent({ type: 'governance', action: 'changed', state, cause: 'outside-director', subjectType: 'governance' }));
+  if (/감사보고서|감사의견/u.test(text)) addEvent(events, createEvent({ type: 'audit', action: 'submitted', state, cause: /의견거절/u.test(text) ? 'disclaimer-of-opinion' : 'audit-report', subjectType: 'audit-opinion' }));
+  if (/해산/u.test(text)) addEvent(events, createEvent({ type: 'insolvency', action: 'dissolved', state, cause: 'dissolution', subjectType: 'issuer' }));
+  if (/잠정.*실적|영업\(잠정\)실적/u.test(text)) addEvent(events, createEvent({ type: 'earnings', action: 'announced', state: 'preliminary', cause: 'operating-results', subjectType: 'financials' }));
+  if (/조회공시요구.*답변/u.test(text)) addEvent(events, createEvent({ type: 'disclosure-inquiry', action: 'responded', state: /미확정/u.test(text) ? 'uncertain' : null, cause: 'rumor-inquiry', subjectType: 'issuer' }));
+  if (/기업설명회\(IR\)개최/u.test(text)) addEvent(events, createEvent({ type: 'corporate-event', action: 'scheduled', state, cause: 'investor-relations', subjectType: 'issuer' }));
+  if (/특수관계인|대규모내부거래/u.test(text)) addEvent(events, createEvent({ type: 'related-party', action: 'reported', state, cause: 'internal-transaction', subjectType: 'issuer' }));
+
+  return events;
+}
+
+function eventsFromStructuredTitle(input) {
+  const events = eventsFromFlatKeywords({ ...input, compact: input.compact.replaceAll('기타시장안내', '') });
+  const text = input.compact;
+
+  if (/기타시장안내.*(?:영문상호|약명및영문명)/u.test(text)) {
+    return [createEvent({ type: 'corporate-profile', action: 'name-changed', state: 'effective', subjectType: 'issuer' })];
+  }
+
+  if (/불성실공시법인미지정/u.test(text)) {
+    return [createEvent({
+      type: 'legal-regulatory',
+      action: 'not-designated',
+      state: /지정유예/u.test(text) ? 'deferred' : 'effective',
+      cause: 'disclosure-compliance',
+      subjectType: 'issuer',
+    })];
+  }
+
+  if (/불성실공시법인지정해제/u.test(text)) {
+    return [createEvent({ type: 'legal-regulatory', action: 'designation-lifted', state: 'lifted', cause: 'disclosure-compliance', subjectType: 'issuer' })];
+  }
+
+  if (/불성실공시법인지정/u.test(text)) {
+    return [createEvent({ type: 'legal-regulatory', action: 'designated', state: 'effective', cause: 'disclosure-compliance', subjectType: 'issuer' })];
+  }
+
+  if (/NXT경쟁매매대상종목지정|시간외단일가매매제외/u.test(text)) {
+    return [createEvent({ type: 'trading-status', action: 'scope-changed', state: 'effective', cause: 'nxt-trading', subjectType: 'listed-shares' })];
+  }
+
+  return events;
+}
+
+function detailDefaultEvent(input) {
+  const explicit = DETAIL_EVENT_DEFAULTS[input.disclosureDetailType];
+  if (explicit) return createEvent({ ...explicit, state: correctionState(input) });
+
+  const detail = DETAIL_BY_CODE.get(input.disclosureDetailType);
+  if (!detail || detail.mode !== 'exact') return null;
+  const type = CATEGORY_TO_EVENT_TYPE[detail.defaultCategory];
+  if (!type || type === 'other') return null;
+  const action = {
+    'periodic-report': 'filed',
+    'capital-change': 'filed',
+    restructuring: 'filed',
+    'ownership-change': 'reported',
+    governance: 'reported',
+    audit: 'submitted',
+    'related-party': 'reported',
+    'corporate-action': 'announced',
+  }[type] ?? 'reported';
+  return createEvent({ type, action, state: correctionState(input) });
+}
+
+export function extractEventsLegacyCategoryProjection(entry = {}) {
+  const classified = classifyDisclosureFiling(entry);
+  const categories = Array.isArray(classified.categories) ? classified.categories : [classified.primaryCategory];
+  const events = [];
+  for (const category of categories) {
+    const type = CATEGORY_TO_EVENT_TYPE[category];
+    if (type && type !== 'other') addEvent(events, createEvent({ type }));
+  }
+  if (events.length === 0) addEvent(events, createEvent({ type: 'other' }));
+  return result('legacy-category-projection', events, classified.classificationConfidence ?? 'low', classified.classificationReasons ?? []);
+}
+
+export function extractEventsFlatKeywordProjection(entry = {}) {
+  const input = normalizeInput(entry);
+  const events = eventsFromFlatKeywords(input);
+  if (events.length === 0) addEvent(events, createEvent({ type: 'other' }));
+  return result('flat-keyword-projection', events, events[0]?.type === 'other' ? 'low' : 'medium', ['flat-title-keywords']);
+}
+
+export function extractEventsStructuredTitleProjection(entry = {}) {
+  const input = normalizeInput(entry);
+  const events = eventsFromStructuredTitle(input);
+  if (events.length === 0) addEvent(events, createEvent({ type: 'other' }));
+  return result('structured-title-projection', events, events[0]?.type === 'other' ? 'low' : 'high', ['wrapper-aware-title-structure']);
+}
+
+export function extractEventsHybridProjection(entry = {}) {
+  const input = normalizeInput(entry);
+  const events = eventsFromStructuredTitle(input);
+  const hasStructuredTitleEvent = events.length > 0;
+  const detailEvent = detailDefaultEvent(input);
+
+  if (detailEvent) {
+    if (events.length === 0) addEvent(events, detailEvent);
+    else if (events.some((event) => event.type === detailEvent.type)) mergeEvent(events, detailEvent);
+  }
+
+  if (events.length === 0 && input.disclosureType) {
+    const broadCategory = OPEN_DART_BROAD_TYPE_DEFAULTS[input.disclosureType];
+    const broadType = CATEGORY_TO_EVENT_TYPE[broadCategory];
+    if (broadType && broadType !== 'other') addEvent(events, createEvent({ type: broadType, state: correctionState(input) }));
+  }
+
+  if (events.length === 0) addEvent(events, createEvent({ type: 'other' }));
+  const exactDetail = DETAIL_BY_CODE.get(input.disclosureDetailType)?.mode === 'exact';
+  const confidence = events[0]?.type === 'other' ? 'low' : exactDetail || hasStructuredTitleEvent ? 'high' : 'medium';
+  return result('structured-hybrid-projection', events, confidence, [
+    'wrapper-aware-title-structure',
+    ...(detailEvent ? [`detail-type:${input.disclosureDetailType}`] : []),
+  ]);
+}
+
+export function extractEventsDocumentAwareProjection(entry = {}) {
+  const input = normalizeInput(entry);
+  const bodySubject = extractDocumentSubject(input.bodyText);
+  const semanticCompact = compactText([
+    input.reportName,
+    input.remarks,
+    bodySubject,
+  ].filter(Boolean).join(' '));
+  const semanticInput = { ...input, compact: semanticCompact };
+  const events = eventsFromStructuredTitle(semanticInput);
+  addDocumentSemanticEvents(events, input, semanticCompact);
+
+  if (input.disclosureDetailType === 'C004') {
+    for (let index = events.length - 1; index >= 0; index -= 1) {
+      if (['capital-change', 'restructuring'].includes(events[index].type)) events.splice(index, 1);
+    }
+    const action = /발행실적|결과/u.test(semanticCompact)
+      ? 'completed'
+      : /투자설명서/u.test(semanticCompact)
+        ? 'published'
+        : 'filed';
+    addEvent(events, createEvent({
+      type: 'restructuring',
+      action,
+      state: correctionState(input),
+      cause: securitiesCauseFromText(semanticCompact) === 'securities-issuance'
+        ? 'reorganization'
+        : securitiesCauseFromText(semanticCompact),
+      subjectType: 'issuer',
+    }));
+  }
+
+  if (input.disclosureDetailType === 'E003') {
+    for (let index = events.length - 1; index >= 0; index -= 1) {
+      if (events[index].type === 'restructuring') events.splice(index, 1);
+    }
+    const cause = /자산양수도/u.test(semanticCompact)
+      ? 'asset-transfer'
+      : /주식.*교환|주식.*이전/u.test(semanticCompact)
+        ? 'share-exchange'
+        : /분할/u.test(semanticCompact)
+          ? 'demerger'
+          : 'merger';
+    addEvent(events, createEvent({
+      type: 'restructuring',
+      action: 'completed',
+      state: correctionState(input),
+      cause,
+      subjectType: cause === 'asset-transfer' ? 'asset' : 'issuer',
+    }));
+  }
+
+  const securitiesCause = DETAIL_SECURITIES_CAUSE[input.disclosureDetailType];
+  if (securitiesCause) {
+    for (let index = 0; index < events.length; index += 1) {
+      if (events[index].type === 'capital-change') {
+        events[index] = createEvent({ ...events[index], cause: securitiesCause });
+      }
+    }
+  }
+
+  const detailEvent = detailDefaultEvent(input);
+  if (detailEvent) {
+    const matchingType = events.find((event) => event.type === detailEvent.type);
+    if (matchingType) mergeEvent(events, detailEvent);
+    else if (events.length === 0) addEvent(events, detailEvent);
+  }
+
+  if (events.length === 0 && input.disclosureType) {
+    const broadCategory = OPEN_DART_BROAD_TYPE_DEFAULTS[input.disclosureType];
+    const broadType = CATEGORY_TO_EVENT_TYPE[broadCategory];
+    if (broadType && broadType !== 'other') {
+      addEvent(events, createEvent({ type: broadType, state: correctionState(input) }));
+    }
+  }
+
+  if (events.length === 0) addEvent(events, createEvent({ type: 'other' }));
+  const usedBody = Boolean(input.bodyText && bodySubject);
+  return result('document-aware-hierarchical-projection', events, events[0]?.type === 'other' ? 'low' : 'high', [
+    'provider-detail-first',
+    'structured-title-semantics',
+    ...(usedBody ? ['document-subject-fallback'] : []),
+  ]);
+}
+
+export function extractEventsGatedProjection(entry = {}) {
+  const input = normalizeDisclosureEventGateInput(entry);
+  const base = extractEventsDocumentAwareProjection(entry);
+  const candidates = base.events.map((event) => createGatedDisclosureEventCandidate({
+    event,
+    input,
+    source: 'document-candidate',
+  }));
+  const events = applyGeneralizedSemanticGates(
+    input,
+    applyEventSetRules(input, arbitrateEventCandidates(candidates)),
+  );
+  const confidence = scoreEventExtractionConfidence({ input, candidates, events });
+  return {
+    version: KR_DISCLOSURE_EVENT_GATED_VERSION,
+    strategy: 'semantic-gate-v3',
+    events,
+    confidence,
+    reasons: [
+      'document-baseline-preserved',
+      'semantic-gate-v3',
+      ...new Set(candidates.flatMap((candidate) => candidate.evidence)),
+    ],
+  };
+}
+
+export const KR_DISCLOSURE_EVENT_EXTRACTOR_CANDIDATES = Object.freeze({
+  legacy: extractEventsLegacyCategoryProjection,
+  flat: extractEventsFlatKeywordProjection,
+  structured: extractEventsStructuredTitleProjection,
+  hybrid: extractEventsHybridProjection,
+  document: extractEventsDocumentAwareProjection,
+  gated: extractEventsGatedProjection,
+});

@@ -6,11 +6,20 @@ import {
   getCommitteeProgress,
   scoreCommitteeMembersProgressive,
 } from '../../../deepscan-runtime-core/src/committee-llm.js';
+import { safeJsonStringify } from '../../../deepscan-runtime-core/src/safe-json.js';
+import {
+  createDisclosureDebugProjection,
+  KR_DISCLOSURE_PIPELINE_SCHEMA_VERSION,
+} from './deepscan-kr-disclosure-pipeline.js';
 import { buildKrCommitteeFromMemberScores } from './deepscan-kr-score.js';
 
 export const DEFAULT_KR_LLM_TIMEOUT_MS = 180_000;
 export const DEFAULT_KR_LLM_SOFT_DEADLINE_MS = 5_000;
 export const DEFAULT_KR_LLM_MODEL = DEFAULT_COMMITTEE_LLM_MODEL;
+
+const EVENT_SCANNER_MAX_STRUCTURED_CHARS = 12_000;
+const EVENT_SCANNER_MAX_TEXT_CHARS = 60_000;
+const EVENT_SCANNER_MAX_DISCLOSURE_SLICE_CHARS = 72_000;
 
 export const KR_MEMBER_SPECS = Object.freeze({
   profitability: {
@@ -120,7 +129,7 @@ const ETF_MEMBER_PRESENTATION_SPECS = Object.freeze({
 });
 
 const KR_MEMBER_PROMPT_GUIDANCE = Object.freeze({
-  consensusMomentum: 'For ordinary KR equities, behave as the 이벤트 스캐너 persona: prioritize OpenDART disclosures before generic consensus; explicitly use filing counts, latest filing date, ownership filings, correction filings, capital-change filings, material-event filings, and high-risk filings when present. If memberContext.facts.eventScannerContext.value.documentDump.combinedText is present, use only that curated under-15000-character document dump as filing text evidence and do not complain about longer skipped filings. If OpenDART disclosures are present, the reason should state whether they are clean, cautionary, or risk-bearing; use analyst consensus/recent reports only as supporting event context.',
+  consensusMomentum: 'For ordinary KR equities, behave as the 이벤트 스캐너 persona: prioritize OpenDART disclosures before generic consensus; explicitly use selected filing counts, latest filing date, material events, risks, and the canonical disclosurePipeline LLM dump when present. Treat key-section excerpts as valid bounded filing evidence and do not infer claims outside their evidence references. If OpenDART disclosures are present, the reason should state whether they are clean, cautionary, or risk-bearing; use analyst consensus/recent reports only as supporting event context.',
 });
 
 const ETF_MEMBER_PROMPT_GUIDANCE = Object.freeze({
@@ -213,8 +222,12 @@ function ensureLogDir(root) {
 }
 
 function writeJson(root, fileName, payload) {
-  ensureLogDir(root);
-  writeFileSync(join(root, fileName), JSON.stringify(payload, null, 2));
+  try {
+    ensureLogDir(root);
+    writeFileSync(join(root, fileName), safeJsonStringify(payload, 2));
+  } catch {
+    // Debug artifacts are best-effort and must never abort DeepScan.
+  }
 }
 
 function createQuality(availability, reasonCode = [], extra = {}) {
@@ -310,7 +323,7 @@ function buildKrFactBank(evidence) {
     }, ['kr_valuation']),
     ownership: snapshotValue(evidence.ownershipSnapshot ?? {}, ['kr_ownership']),
     disclosures: evidence.disclosureAnalysis
-      ? snapshotValue(evidence.disclosureAnalysis, ['opendart_disclosures'])
+      ? snapshotValue(summarizeDisclosureAnalysisCompact(evidence.disclosureAnalysis), ['opendart_disclosures'])
       : missingFact('OpenDART 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
     styleFactors: snapshotValue(evidence.styleAnalysisSnapshot ?? {}, ['kr_style_factors']),
     reports: snapshotValue({
@@ -328,7 +341,7 @@ function buildKrFactBank(evidence) {
   };
 }
 
-function summarizeDisclosureAnalysisForEventScanner(disclosureAnalysis) {
+function summarizeDisclosureAnalysisCompact(disclosureAnalysis) {
   if (!disclosureAnalysis?.available) {
     return {
       available: false,
@@ -353,49 +366,165 @@ function summarizeDisclosureAnalysisForEventScanner(disclosureAnalysis) {
     mediumRiskCount: disclosureAnalysis.mediumRiskCount ?? 0,
     categoryCounts: disclosureAnalysis.categoryCounts ?? {},
     topReportTypes: Array.isArray(disclosureAnalysis.topReportTypes) ? disclosureAnalysis.topReportTypes.slice(0, 6) : [],
-    latestFilings: Array.isArray(disclosureAnalysis.latestFilings) ? disclosureAnalysis.latestFilings.slice(0, 8) : [],
+    summary: disclosureAnalysis.summary ?? null,
   };
 }
 
-function summarizeDisclosureDocumentDumpForEventScanner(documentDump) {
-  if (!documentDump?.available || typeof documentDump.combinedText !== 'string' || !documentDump.combinedText.trim()) {
-    return {
-      available: false,
-      reason: documentDump?.error ?? 'OpenDART document text dump is unavailable.',
-    };
+function codePointLength(value) {
+  return [...String(value ?? '')].length;
+}
+
+function truncateCodePoints(value, limit) {
+  return [...String(value ?? '')].slice(0, Math.max(0, limit)).join('');
+}
+
+function buildEventScannerDisclosureContext(disclosureAnalysis, disclosureSource) {
+  const source = disclosureSource && typeof disclosureSource === 'object' ? disclosureSource : {};
+  const canonical = source.disclosurePipeline?.schemaVersion === KR_DISCLOSURE_PIPELINE_SCHEMA_VERSION
+    ? source.disclosurePipeline
+    : null;
+  const analysis = canonical?.analysis ?? disclosureAnalysis;
+  const documentDump = canonical?.llmDump ?? source.documentDump ?? null;
+  const compact = summarizeDisclosureAnalysisCompact(analysis);
+  const structured = {
+    schemaVersion: canonical?.schemaVersion ?? KR_DISCLOSURE_PIPELINE_SCHEMA_VERSION,
+    collection: canonical?.collection
+      ? {
+          state: canonical.collection.state ?? null,
+          providerTotalCount: canonical.collection.providerTotalCount ?? compact.totalCount ?? 0,
+          collectedCount: canonical.collection.collectedCount ?? compact.displayedCount ?? 0,
+          truncated: canonical.collection.truncated ?? false,
+          pageCountFetched: canonical.collection.pageCountFetched ?? null,
+        }
+      : {
+          state: compact.available ? 'complete' : 'unavailable',
+          providerTotalCount: compact.totalCount ?? 0,
+          collectedCount: compact.displayedCount ?? 0,
+          truncated: false,
+          pageCountFetched: null,
+        },
+    selected: Array.isArray(canonical?.selected)
+      ? canonical.selected.map((filing) => ({
+          rceptNo: filing.rceptNo ?? null,
+          receiptDate: filing.receiptDate ?? null,
+          reportName: filing.reportName ?? null,
+          filerName: filing.filerName ?? null,
+          documentUrl: filing.documentUrl ?? null,
+          primaryCategory: filing.primaryCategory ?? null,
+          categories: filing.categories ?? [],
+          materialityLevel: filing.materialityLevel ?? null,
+          riskLevel: filing.riskLevel ?? null,
+          dumpPolicy: filing.dumpPolicy ?? null,
+          selectionRank: filing.selectionRank ?? null,
+          selectionReasonCodes: filing.selectionReasonCodes ?? [],
+        }))
+      : [],
+    analysis: {
+      ...compact,
+      materialEvents: Array.isArray(analysis?.materialEvents) ? [...analysis.materialEvents] : [],
+      risks: Array.isArray(analysis?.risks) ? [...analysis.risks] : [],
+    },
+    llmDump: documentDump
+      ? {
+          state: documentDump.state ?? (documentDump.available ? 'complete' : 'unavailable'),
+          available: Boolean(documentDump.available),
+          policy: documentDump.policy ?? null,
+          maxCharsPerFiling: documentDump.maxCharsPerFiling ?? null,
+          maxTotalChars: documentDump.maxTotalChars ?? 60_000,
+          includedCount: documentDump.includedCount ?? 0,
+          failedCount: documentDump.failedCount ?? documentDump.skippedUnavailableCount ?? 0,
+          policyExcludedCount: documentDump.policyExcludedCount ?? 0,
+          budgetExcludedCount: documentDump.budgetExcludedCount ?? 0,
+          included: Array.isArray(documentDump.included)
+            ? [...documentDump.included]
+            : Array.isArray(documentDump.filings)
+              ? documentDump.filings.map(({ text: _text, ...metadata }) => metadata)
+              : [],
+          excluded: Array.isArray(documentDump.excluded)
+            ? [...documentDump.excluded]
+            : Array.isArray(documentDump.skipped)
+              ? [...documentDump.skipped]
+              : [],
+        }
+      : { state: 'unavailable', available: false },
+  };
+
+  const recordRef = (record) => record?.rceptNo ?? record?.canonicalKey ?? null;
+  let combinedText = truncateCodePoints(documentDump?.combinedText ?? '', EVENT_SCANNER_MAX_TEXT_CHARS);
+  structured.llmDump.combinedCharCount = codePointLength(combinedText);
+  const originals = {
+    selected: structured.selected,
+    materialEvents: structured.analysis.materialEvents,
+    risks: structured.analysis.risks,
+    included: structured.llmDump.included ?? [],
+    excluded: structured.llmDump.excluded ?? [],
+  };
+  const rankByRef = new Map(originals.selected.map((record, index) => [recordRef(record), index + 1]));
+  const retainThroughRank = (items, retainedRank) => items.filter((item) => {
+    const rank = rankByRef.get(recordRef(item));
+    return rank === undefined || rank <= retainedRank;
+  });
+  const applyRankCutoff = (retainedRank) => {
+    structured.selected = originals.selected.slice(0, retainedRank);
+    structured.analysis.materialEvents = retainThroughRank(originals.materialEvents, retainedRank);
+    structured.analysis.risks = retainThroughRank(originals.risks, retainedRank);
+    structured.llmDump.included = retainThroughRank(originals.included, retainedRank);
+    structured.llmDump.excluded = retainThroughRank(originals.excluded, retainedRank);
+    const retainedCount = structured.selected.length
+      + structured.analysis.materialEvents.length
+      + structured.analysis.risks.length
+      + structured.llmDump.included.length
+      + structured.llmDump.excluded.length;
+    const originalCount = originals.selected.length
+      + originals.materialEvents.length
+      + originals.risks.length
+      + originals.included.length
+      + originals.excluded.length;
+    const removedCount = originalCount - retainedCount;
+    if (removedCount > 0) structured.structuredTruncatedCount = removedCount;
+    else delete structured.structuredTruncatedCount;
+    return removedCount;
+  };
+
+  let retainedFloor = 0;
+  let retainedCeiling = originals.selected.length;
+  let bestRetainedRank = -1;
+  while (retainedFloor <= retainedCeiling) {
+    const candidate = Math.floor((retainedFloor + retainedCeiling) / 2);
+    applyRankCutoff(candidate);
+    if (codePointLength(JSON.stringify(structured)) <= EVENT_SCANNER_MAX_STRUCTURED_CHARS) {
+      bestRetainedRank = candidate;
+      retainedFloor = candidate + 1;
+    } else {
+      retainedCeiling = candidate - 1;
+    }
   }
 
-  return {
-    available: true,
-    source: documentDump.source ?? 'opendart-document',
-    policy: documentDump.policy ?? 'skip_gte_max_chars_then_take_first_limit',
-    maxCharsPerFiling: documentDump.maxCharsPerFiling ?? null,
-    limit: documentDump.limit ?? null,
-    includedCount: documentDump.includedCount ?? 0,
-    skippedTooLongCount: documentDump.skippedTooLongCount ?? 0,
-    skippedUnavailableCount: documentDump.skippedUnavailableCount ?? 0,
-    totalCharCount: documentDump.totalCharCount ?? null,
-    filings: Array.isArray(documentDump.filings)
-      ? documentDump.filings.map((filing) => ({
-        rceptNo: filing.rceptNo ?? null,
-        reportName: filing.reportName ?? null,
-        receiptDate: filing.receiptDate ?? null,
-        filerName: filing.filerName ?? null,
-        charCount: filing.charCount ?? null,
-        wordishCount: filing.wordishCount ?? null,
-      }))
-      : [],
-    skipped: Array.isArray(documentDump.skipped)
-      ? documentDump.skipped.slice(0, 20).map((filing) => ({
-        rceptNo: filing.rceptNo ?? null,
-        reportName: filing.reportName ?? null,
-        receiptDate: filing.receiptDate ?? null,
-        reason: filing.reason ?? null,
-        charCount: filing.charCount ?? null,
-      }))
-      : [],
-    combinedText: documentDump.combinedText,
-  };
+  let trimmedCount = applyRankCutoff(Math.max(0, bestRetainedRank));
+  while (codePointLength(JSON.stringify(structured)) > EVENT_SCANNER_MAX_STRUCTURED_CHARS) {
+    const fallbackArrays = [
+      structured.analysis.materialEvents,
+      structured.analysis.risks,
+      structured.llmDump.included ?? [],
+      structured.llmDump.excluded ?? [],
+      structured.analysis.topReportTypes ?? [],
+    ];
+    const target = fallbackArrays.find((items) => items.length > 0);
+    if (!target) break;
+    target.pop();
+    trimmedCount += 1;
+    structured.structuredTruncatedCount = trimmedCount;
+  }
+
+  structured.llmDump.combinedText = combinedText;
+  while (combinedText && codePointLength(JSON.stringify(structured)) > EVENT_SCANNER_MAX_DISCLOSURE_SLICE_CHARS) {
+    const overflow = codePointLength(JSON.stringify(structured)) - EVENT_SCANNER_MAX_DISCLOSURE_SLICE_CHARS;
+    combinedText = truncateCodePoints(combinedText, codePointLength(combinedText) - Math.max(1, overflow));
+    structured.llmDump.combinedText = combinedText;
+    structured.llmDump.combinedCharCount = codePointLength(combinedText);
+  }
+
+  return { disclosurePipeline: structured };
 }
 
 function sanitizeOwnershipSnapshotForLlm(snapshot) {
@@ -416,15 +545,15 @@ function sanitizeOwnershipSnapshotForLlm(snapshot) {
   return sanitized;
 }
 
-function buildMemberKrFacts(memberKey, evidence, sources = {}) {
+function buildMemberKrFacts(memberKey, evidence) {
   const ownershipSnapshotForLlm = sanitizeOwnershipSnapshotForLlm(evidence.ownershipSnapshot);
   const etfProductSnapshot = evidence.etfProductSnapshot ?? null;
-  const disclosureDocumentDump = summarizeDisclosureDocumentDumpForEventScanner(sources?.disclosures?.documentDump);
+  const disclosureSummary = summarizeDisclosureAnalysisCompact(evidence.disclosureAnalysis);
   const base = {
     schemaVersion: 'jaroo.deepscan.kr-member-slice.v2',
     locale: 'KR',
     sourceFlavor: 'wisereport-fnguide-krx-opendart',
-    ...(evidence.disclosureAnalysis ? { disclosureAnalysis: evidence.disclosureAnalysis } : {}),
+    ...(evidence.disclosureAnalysis ? { disclosureAnalysis: disclosureSummary } : {}),
     ...(etfProductSnapshot ? { etfProductSnapshot } : {}),
   };
 
@@ -455,7 +584,7 @@ function buildMemberKrFacts(memberKey, evidence, sources = {}) {
       return {
         ...base,
         ownership: ownershipSnapshotForLlm,
-        disclosures: evidence.disclosureAnalysis ?? null,
+        disclosures: disclosureSummary,
         styleFactors: evidence.styleAnalysisSnapshot ?? {},
         pageCoverage: evidence.pageCoverage ?? {},
       };
@@ -465,7 +594,7 @@ function buildMemberKrFacts(memberKey, evidence, sources = {}) {
         market: evidence.marketSnapshot ?? {},
         relativeReturn: evidence.relativeReturnSnapshot ?? {},
         styleFactors: evidence.styleAnalysisSnapshot ?? {},
-        disclosures: evidence.disclosureAnalysis ?? null,
+        disclosures: disclosureSummary,
         reports: evidence.reportSignals ?? {},
         businessCommentary: evidence.businessCommentary ?? {},
       };
@@ -473,14 +602,13 @@ function buildMemberKrFacts(memberKey, evidence, sources = {}) {
       return {
         ...base,
         eventScanner: {
-          disclosures: summarizeDisclosureAnalysisForEventScanner(evidence.disclosureAnalysis),
-          documentDump: disclosureDocumentDump,
+          disclosures: disclosureSummary,
           consensus: evidence.consensusSnapshot ?? {},
           reports: evidence.reportSignals ?? {},
           topFacts: Array.isArray(evidence.topFacts) ? evidence.topFacts : [],
           topRisks: Array.isArray(evidence.topRisks) ? evidence.topRisks : [],
         },
-        disclosures: evidence.disclosureAnalysis ?? null,
+        disclosures: disclosureSummary,
         consensus: evidence.consensusSnapshot ?? {},
         reports: evidence.reportSignals ?? {},
         businessCommentary: evidence.businessCommentary ?? {},
@@ -508,7 +636,7 @@ function buildMemberKrFacts(memberKey, evidence, sources = {}) {
         consensus: evidence.consensusSnapshot ?? {},
         valuation: evidence.valuationSnapshot ?? {},
         reports: evidence.reportSignals ?? {},
-        disclosures: evidence.disclosureAnalysis ?? null,
+        disclosures: disclosureSummary,
         businessCommentary: evidence.businessCommentary ?? {},
       };
     case 'holdingCompleteness':
@@ -552,7 +680,7 @@ function buildSharedDump(input, evidence, sources) {
     financialSnapshot: presentValue(evidence.financialSnapshot ?? {}, ['financial_snapshot']),
     businessCommentary: presentValue(evidence.businessCommentary ?? {}, ['business_commentary']),
     disclosureAnalysis: evidence.disclosureAnalysis
-      ? presentValue(evidence.disclosureAnalysis, ['opendart_disclosures'])
+      ? presentValue(summarizeDisclosureAnalysisCompact(evidence.disclosureAnalysis), ['opendart_disclosures'])
       : missingFact('OpenDART 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
     etfProductSnapshot: evidence.etfProductSnapshot
       ? presentValue(evidence.etfProductSnapshot, ['wisereport_etf_snapshot'])
@@ -586,8 +714,8 @@ function buildMemberDump(memberKey, input, evidence, sources) {
     topRisks: shared.topRisks,
     packageContext: shared.packageContext,
   };
-  const krFacts = snapshotValue(buildMemberKrFacts(memberKey, evidence, sources), ['kr_member_fact_slice']);
-  const disclosureDocumentDump = summarizeDisclosureDocumentDumpForEventScanner(sources?.disclosures?.documentDump);
+  const krFacts = snapshotValue(buildMemberKrFacts(memberKey, evidence), ['kr_member_fact_slice']);
+  const eventScannerDisclosureContext = buildEventScannerDisclosureContext(evidence.disclosureAnalysis, sources?.disclosures);
 
   switch (memberKey) {
     case 'profitability':
@@ -671,14 +799,10 @@ function buildMemberDump(memberKey, input, evidence, sources) {
           etfProductSnapshot: common.etfProductSnapshot,
           instrument: common.instrument,
           eventScannerContext: presentValue({
-            disclosures: summarizeDisclosureAnalysisForEventScanner(evidence.disclosureAnalysis),
-            documentDump: disclosureDocumentDump,
+            ...eventScannerDisclosureContext,
             topFacts: Array.isArray(evidence.topFacts) ? evidence.topFacts : [],
             topRisks: Array.isArray(evidence.topRisks) ? evidence.topRisks : [],
           }, ['event_scanner_context']),
-          disclosureAnalysis: evidence.disclosureAnalysis
-            ? presentValue(summarizeDisclosureAnalysisForEventScanner(evidence.disclosureAnalysis), ['opendart_disclosures'])
-            : missingFact('OpenDART 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
           consensusSnapshot: common.consensusSnapshot,
           recentReportCount: optionalFact(evidence.reportSignals?.recentReportCount ?? null, ['recent_report_count'], '최근 리포트 수가 없습니다.'),
           recent30dReportCount: optionalFact(evidence.reportSignals?.recent30dReportCount ?? null, ['recent_30d_report_count'], '최근 30일 리포트 수가 없습니다.'),
@@ -844,7 +968,10 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
   const memberKeys = Object.keys(KR_MEMBER_SPECS);
   const members = Object.fromEntries(memberKeys.map((memberKey) => [memberKey, buildMemberDump(memberKey, input, evidence, sources)]));
   const logDir = join(process.cwd(), '.omx', 'context', 'committee-debug-logs', requestId);
-  writeJson(logDir, 'source-input.json', { rawInput, input, evidence, sources });
+  const debugSources = sources?.disclosures
+    ? { ...sources, disclosures: createDisclosureDebugProjection(sources.disclosures) }
+    : sources;
+  writeJson(logDir, 'source-input.json', { rawInput, input, evidence, sources: debugSources });
   writeJson(logDir, 'prompt-map.json', Object.fromEntries(memberKeys.map((memberKey) => [memberKey, systemPrompt(memberKey)])));
   writeJson(logDir, 'runtime-shape.json', {
     schemaVersion: 'jaroo.deepscan.runtime.v2',

@@ -1,0 +1,74 @@
+[
+  {
+    "index": 5,
+    "rceptNo": "20251031000537",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "under-review",
+        "state": "deferred",
+        "cause": "treasury-share-disposal",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "decision": "synthesized",
+    "rationale": "2025-10-31 이사회는 기존 자기주식 처분안을 확정하거나 취소하지 않고 추가 논의를 위해 최종결정을 11월로 미뤘다. 따라서 최신 실질 사건은 자기주식 처분의 재검토이며, 명시적 연기이므로 under-review/deferred가 적합하다. Canonical template에서 자기주식 처분은 capital-change이고 대상 객체는 securities이므로 후보 A의 유형 판단을 유지하면서 subjectType을 canonical 값으로 합성했다.",
+    "ambiguities": [
+      "기존 처분결의와 수량은 문서에 남아 있으나 법적 효력이 철회되었다는 표현은 없으므로 cancelled로 판정하지 않았다.",
+      "실제 자기주식 이전은 교환권 행사에 달려 있지만 이번 정정이 새로 확립한 사실은 처분 완료가 아니라 최종 의사결정의 재검토 및 연기다."
+    ]
+  },
+  {
+    "index": 114,
+    "rceptNo": "20251030800094",
+    "expectedEvents": [
+      {
+        "type": "earnings",
+        "action": "updated",
+        "state": "projected",
+        "cause": "earnings-guidance",
+        "subjectType": "financials"
+      }
+    ],
+    "labelConfidence": "high",
+    "decision": "candidate-a",
+    "rationale": "기존 2025년 매출 성장 목표를 감소 전망으로 바꾸고 IRA Tax Credit 예상 수혜 규모도 낮춰, 이미 공시된 연간 실적 가이던스를 실질적으로 갱신했다. 정정된 값은 계속 미래 전망이므로 projected이며, canonical correction semantics상 수치가 바뀌었다는 이유만으로 correction wrapper와 별개인 action을 adjusted로 좁히기보다 기존 가이던스의 updated로 판정한다.",
+    "ambiguities": [
+      "Capex 감소 계획도 본문에 포함되지만 정정 전후 표의 변경 대상은 매출 목표와 IRA 수혜 예상치이며 별도의 시설투자 결정 변경은 확립되지 않는다."
+    ]
+  },
+  {
+    "index": 171,
+    "rceptNo": "20251124000330",
+    "expectedEvents": [
+      {
+        "type": "legal-regulatory",
+        "action": "withdrawn",
+        "state": "effective",
+        "cause": "litigation",
+        "subjectType": "issuer"
+      },
+      {
+        "type": "capital-change",
+        "action": "withdrawn",
+        "state": "cancelled",
+        "cause": "exchangeable-bond",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "withdrawn",
+        "state": "cancelled",
+        "cause": "treasury-share-disposal",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "decision": "synthesized",
+    "rationale": "정정표는 채권자·항고인의 가처분 신청 전부 취하서가 접수되었음을 확립하고, 주2는 회사가 같은 날 교환사채 발행결정과 자기주식 처분결정을 전면 철회했다고 각각 명시한다. 행위자와 객체가 다른 세 사건이므로 cardinality를 보존한다. 소송 취하는 접수되어 effective이고, 두 회사의 장래 결정은 철회로 무효화되어 cancelled다. Canonical template에서 자기주식 처분은 capital-change/securities이므로 후보 A의 유형 판단을 유지하면서 subjectType을 canonical 값으로 합성했다.",
+    "ambiguities": [
+      "교환사채 발행과 자기주식 처분 철회는 각각 별도 당일 관련공시 대상이기도 하지만 이 원문 자체가 두 철회를 명시적으로 확립하므로 생략하지 않았다."
+    ]
+  }
+]

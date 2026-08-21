@@ -1,0 +1,337 @@
+[
+  {
+    "index": 4,
+    "rceptNo": "20251031000547",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "convertible-bond",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 16,
+    "rceptNo": "20251022000196",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "contracted",
+        "state": "pending",
+        "cause": "convertible-bond-acquisition",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 20,
+    "rceptNo": "20251020000273",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "asset-transaction",
+        "action": "contracted",
+        "state": "pending",
+        "cause": "real-estate-purchase",
+        "subjectType": "real-estate"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 36,
+    "rceptNo": "20251015000124",
+    "decision": "unscorable",
+    "expectedEvents": [],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 68,
+    "rceptNo": "20251031800886",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "completed",
+        "state": "effective",
+        "cause": "convertible-bond",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 98,
+    "rceptNo": "20251031800001",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "legal-regulatory",
+        "action": "dismissed",
+        "state": "effective",
+        "cause": "litigation",
+        "subjectType": "issuer"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 114,
+    "rceptNo": "20251030800094",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "earnings",
+        "action": "updated",
+        "state": "projected",
+        "cause": "earnings-guidance",
+        "subjectType": "financials"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 157,
+    "rceptNo": "20251013000158",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "governance",
+        "action": "updated",
+        "state": "effective",
+        "cause": "business-group-status",
+        "subjectType": "governance"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 164,
+    "rceptNo": "20251128001922",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "corporate-action",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "treasury-share-disposal",
+        "subjectType": "listed-shares"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 171,
+    "rceptNo": "20251124000330",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "legal-regulatory",
+        "action": "withdrawn",
+        "state": "effective",
+        "cause": "litigation",
+        "subjectType": "issuer"
+      },
+      {
+        "type": "capital-change",
+        "action": "withdrawn",
+        "state": "cancelled",
+        "cause": "exchangeable-bond",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "withdrawn",
+        "state": "cancelled",
+        "cause": "treasury-share-disposal",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 177,
+    "rceptNo": "20251107000383",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "updated",
+        "state": "effective",
+        "cause": "warrant-bond",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "medium",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 198,
+    "rceptNo": "20251113000532",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "restructuring",
+        "action": "completed",
+        "state": "effective",
+        "cause": "demerger",
+        "subjectType": "issuer"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 216,
+    "rceptNo": "20251128801335",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "rescheduled",
+        "state": "deferred",
+        "cause": "convertible-bond-acquisition",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 242,
+    "rceptNo": "20251128800665",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "material-contract",
+        "action": "updated",
+        "state": "effective",
+        "cause": "real-estate-lease",
+        "subjectType": "real-estate"
+      }
+    ],
+    "labelConfidence": "medium",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 293,
+    "rceptNo": "20251231000590",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "asset-transaction",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "bond-sale",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 302,
+    "rceptNo": "20251226000514",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "contingent-capital-securities",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 326,
+    "rceptNo": "20251216000005",
+    "decision": "unscorable",
+    "expectedEvents": [],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 357,
+    "rceptNo": "20251231800437",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "related-party",
+        "action": "updated",
+        "state": "finalized",
+        "cause": "collateral-provision",
+        "subjectType": "asset"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  },
+  {
+    "index": 367,
+    "rceptNo": "20251231800491",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "capital-expenditure",
+        "action": "adjusted",
+        "state": "effective",
+        "cause": "facility-investment",
+        "subjectType": "asset"
+      },
+      {
+        "type": "corporate-event",
+        "action": "cancelled",
+        "state": "cancelled",
+        "cause": "business-plan",
+        "subjectType": "business"
+      },
+      {
+        "type": "restructuring",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "business-disposal",
+        "subjectType": "business"
+      }
+    ],
+    "labelConfidence": "medium",
+    "rationale": "Reconstructed verbatim decision mapping from the independent reviewer final response; see conversation record for the full rationale.",
+    "ambiguities": []
+  }
+]

@@ -1,8 +1,15 @@
 import { createRequire } from 'node:module';
 import { getCurrentQuotes } from '../crawlers/current-quotes.js';
-import { buildDartDisclosureDocumentDump, getDartDisclosures } from '../crawlers/dart-filings.js';
+import { buildDartDisclosureDocumentDump, collectDartDisclosures } from '../crawlers/dart-filings.js';
+import { sanitizeForJson } from '../../../deepscan-runtime-core/src/safe-json.js';
 import { fetchWiseReportEtfSnapshot } from '../crawlers/wisereport-etf.js';
 import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
+import {
+  attachKrDisclosureLlmDump,
+  buildKrDisclosurePipeline,
+  createDisabledKrDisclosureDump,
+  createUnavailableKrDisclosurePipeline,
+} from './deepscan-kr-disclosure-pipeline.js';
 import { buildKrRecoveryForecast } from './recovery-forecast.js';
 import { scoreDeepScanKrEvidence, scoreDeepScanKrFromCommittee } from './deepscan-kr-score.js';
 import { invokeDeepScanKrPackage } from './deepscan-kr-package-adapter.js';
@@ -47,8 +54,12 @@ const DEFAULT_DEEPSCAN_KR_CURRENT_QUOTES_TIMEOUT_MS = 4_500;
 const DEFAULT_DEEPSCAN_KR_ETF_SNAPSHOT_TIMEOUT_MS = 4_500;
 const DEFAULT_DEEPSCAN_KR_DISCLOSURE_TIMEOUT_MS = 4_500;
 const DEFAULT_DEEPSCAN_KR_DISCLOSURE_LOOKBACK_DAYS = 30;
-const DEFAULT_DEEPSCAN_KR_DISCLOSURE_LIMIT = 30;
+const DEFAULT_DEEPSCAN_KR_DISCLOSURE_LIMIT = 100;
+const DEFAULT_DEEPSCAN_KR_DISCLOSURE_MAX_PAGES = 3;
+const DEFAULT_DEEPSCAN_KR_DISCLOSURE_MAX_COLLECTED = 300;
+const DEFAULT_DEEPSCAN_KR_DISCLOSURE_SELECTION_LIMIT = 50;
 const DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_MAX_CHARS = 15_000;
+const DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_MAX_TOTAL_CHARS = 60_000;
 const DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_LIMIT = 20;
 const DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_CONCURRENCY = 4;
 
@@ -108,11 +119,7 @@ function normalizeInput(rawInput = {}) {
 }
 
 function safeCloneRawInput(rawInput) {
-  try {
-    return structuredClone(rawInput);
-  } catch {
-    return null;
-  }
+  return sanitizeForJson(rawInput);
 }
 
 function safeNormalizeInput(rawInput = {}) {
@@ -912,6 +919,15 @@ function shouldInvokeKrDisclosures(rawInput, input) {
   return explicitEnable || hasConfiguredDartApiKey(disclosureOptions);
 }
 
+function isKrDisclosureExplicitlyRequested(rawInput) {
+  const safeRawInput = asObject(rawInput);
+  const disclosureOptions = asObject(safeRawInput.disclosureOptions ?? safeRawInput.dartOptions ?? safeRawInput.opendartOptions);
+  const explicitToggle = normalizeText(process.env.DEEPSCAN_KR_DISCLOSURES_ENABLE)?.toLowerCase();
+  return safeRawInput.invokeDisclosures === true
+    || disclosureOptions.invoke === true
+    || ['1', 'true', 'on', 'yes'].includes(explicitToggle ?? '');
+}
+
 function buildKrDisclosureRequest(rawInput, input) {
   const safeRawInput = asObject(rawInput);
   const disclosureOptions = asObject(safeRawInput.disclosureOptions ?? safeRawInput.dartOptions ?? safeRawInput.opendartOptions);
@@ -950,19 +966,34 @@ async function maybeResolveKrDisclosures(rawInput, input) {
 
   const safeRawInput = asObject(rawInput);
   const disclosureOptions = asObject(safeRawInput.disclosureOptions ?? safeRawInput.dartOptions ?? safeRawInput.opendartOptions);
+  const request = buildKrDisclosureRequest(rawInput, input);
+  const transportOptions = {
+    timeoutMs: parsePositiveInteger(
+      disclosureOptions.timeoutMs ?? process.env.DEEPSCAN_KR_DISCLOSURE_TIMEOUT_MS,
+      DEFAULT_DEEPSCAN_KR_DISCLOSURE_TIMEOUT_MS,
+    ),
+    maxPages: parsePositiveInteger(
+      disclosureOptions.maxPages ?? process.env.DEEPSCAN_KR_DISCLOSURE_MAX_PAGES,
+      DEFAULT_DEEPSCAN_KR_DISCLOSURE_MAX_PAGES,
+    ),
+    maxCollectedFilings: parsePositiveInteger(
+      disclosureOptions.maxCollectedFilings ?? process.env.DEEPSCAN_KR_DISCLOSURE_MAX_COLLECTED,
+      DEFAULT_DEEPSCAN_KR_DISCLOSURE_MAX_COLLECTED,
+    ),
+    ...(disclosureOptions.apiKey ? { apiKey: disclosureOptions.apiKey } : {}),
+    ...(disclosureOptions.fetchImpl ? { fetchImpl: disclosureOptions.fetchImpl } : {}),
+  };
 
   try {
-    const result = await getDartDisclosures(
-      buildKrDisclosureRequest(rawInput, input),
-      {
-        timeoutMs: parsePositiveInteger(
-          disclosureOptions.timeoutMs ?? process.env.DEEPSCAN_KR_DISCLOSURE_TIMEOUT_MS,
-          DEFAULT_DEEPSCAN_KR_DISCLOSURE_TIMEOUT_MS,
-        ),
-        ...(disclosureOptions.apiKey ? { apiKey: disclosureOptions.apiKey } : {}),
-        ...(disclosureOptions.fetchImpl ? { fetchImpl: disclosureOptions.fetchImpl } : {}),
-      },
-    );
+    const result = await collectDartDisclosures(request, transportOptions);
+    let disclosurePipeline = buildKrDisclosurePipeline(result, {
+      selectionLimit: parsePositiveInteger(
+        disclosureOptions.selectionLimit ?? process.env.DEEPSCAN_KR_DISCLOSURE_SELECTION_LIMIT,
+        DEFAULT_DEEPSCAN_KR_DISCLOSURE_SELECTION_LIMIT,
+      ),
+      selectedAt: input.selectedAt,
+      sourceContext: input.sourceContext,
+    });
 
     const includeDocumentDump = parseBooleanToggle(
       disclosureOptions.includeDocumentDump
@@ -970,14 +1001,19 @@ async function maybeResolveKrDisclosures(rawInput, input) {
         ?? process.env.DEEPSCAN_KR_DISCLOSURE_DOCUMENT_DUMP_ENABLE,
       true,
     );
-    if (includeDocumentDump && Array.isArray(result.filings) && result.filings.length > 0) {
+    if (includeDocumentDump) {
       try {
-        const documentDump = await buildDartDisclosureDocumentDump(result.filings, {
+        const documentDump = await buildDartDisclosureDocumentDump(disclosurePipeline.selected, {
           maxCharsPerFiling: parsePositiveInteger(
             disclosureOptions.documentMaxChars
               ?? disclosureOptions.documentMaxCharsPerFiling
               ?? process.env.DEEPSCAN_KR_DISCLOSURE_DOCUMENT_MAX_CHARS,
             DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_MAX_CHARS,
+          ),
+          maxTotalChars: parsePositiveInteger(
+            disclosureOptions.documentMaxTotalChars
+              ?? process.env.DEEPSCAN_KR_DISCLOSURE_DOCUMENT_MAX_TOTAL_CHARS,
+            DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_MAX_TOTAL_CHARS,
           ),
           limit: parsePositiveInteger(
             disclosureOptions.documentLimit
@@ -987,7 +1023,7 @@ async function maybeResolveKrDisclosures(rawInput, input) {
           fetchLimit: parsePositiveInteger(
             disclosureOptions.documentFetchLimit
               ?? process.env.DEEPSCAN_KR_DISCLOSURE_DOCUMENT_FETCH_LIMIT,
-            result.filings.length,
+            DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_LIMIT,
           ),
           concurrency: parsePositiveInteger(
             disclosureOptions.documentConcurrency
@@ -1004,45 +1040,60 @@ async function maybeResolveKrDisclosures(rawInput, input) {
           ...(disclosureOptions.apiKey ? { apiKey: disclosureOptions.apiKey } : {}),
           ...(disclosureOptions.fetchImpl ? { fetchImpl: disclosureOptions.fetchImpl } : {}),
         });
-        return {
-          value: {
-            ...result,
-            documentDump,
-          },
-          issue: null,
-        };
+        disclosurePipeline = attachKrDisclosureLlmDump(disclosurePipeline, documentDump);
       } catch (error) {
-        return {
-          value: {
-            ...result,
-            documentDump: {
-              available: false,
-              source: 'opendart-document',
-              error: normalizeText(error?.message) ?? 'OpenDART document dump unavailable',
-            },
-          },
-          issue: null,
+        const unavailableDump = {
+          ...createDisabledKrDisclosureDump(),
+          state: 'unavailable',
+          error: normalizeText(error?.message) ?? 'OpenDART document dump unavailable',
         };
+        disclosurePipeline = attachKrDisclosureLlmDump(disclosurePipeline, unavailableDump);
       }
     }
 
     return {
-      value: result,
+      value: {
+        ...result,
+        summary: {
+          ...result.summary,
+          count: disclosurePipeline.analysis.count,
+          totalCount: disclosurePipeline.analysis.totalCount,
+          latestReceiptDate: disclosurePipeline.analysis.latestReceiptDate,
+        },
+        filings: disclosurePipeline.analysis.filings,
+        disclosurePipeline,
+        documentDump: disclosurePipeline.llmDump,
+      },
       issue: null,
     };
   } catch (error) {
+    const issue = {
+      code: normalizeText(error?.code) ?? 'provider_unavailable',
+      message: normalizeText(error?.message) ?? 'OpenDART disclosures unavailable',
+    };
+    const unavailablePipeline = createUnavailableKrDisclosurePipeline({ requested: request, issue });
+    const unavailableSource = {
+      source: 'opendart',
+      market: 'KR',
+      requested: request,
+      corporation: null,
+      filings: [],
+      summary: { count: 0, totalCount: 0, latestReceiptDate: null },
+      disclosurePipeline: unavailablePipeline,
+      documentDump: unavailablePipeline.llmDump,
+    };
     if (error?.code === 'provider_unconfigured') {
       return {
-        value: null,
+        value: isKrDisclosureExplicitlyRequested(rawInput) ? unavailableSource : null,
         issue: null,
       };
     }
 
     return {
-      value: null,
+      value: unavailableSource,
       issue: {
         sourceId: 'disclosures',
-        message: normalizeText(error?.message) ?? 'OpenDART disclosures unavailable',
+        message: issue.message,
       },
     };
   }
@@ -1519,7 +1570,7 @@ function buildEventScannerReason(evidence) {
   const disclosureAnalysis = evidence.disclosureAnalysis;
   const reportCount = evidence.reportSignals?.recentReportCount ?? 0;
   if (disclosureAnalysis?.available) {
-    const totalCount = disclosureAnalysis.totalCount ?? disclosureAnalysis.count ?? 0;
+    const totalCount = disclosureAnalysis.count ?? disclosureAnalysis.totalCount ?? 0;
     const disclosureParts = [
       `OpenDART 공시 ${formatNumber(totalCount)}건`,
       disclosureAnalysis.ownershipCount > 0 ? `지분공시 ${formatNumber(disclosureAnalysis.ownershipCount)}건` : null,
@@ -1540,7 +1591,7 @@ function createCommitteeAxes(evidence, scored, packageResult) {
   }
 
   const disclosureText = evidence.disclosureAnalysis?.available
-    ? `, 최근 공시 ${formatNumber(evidence.disclosureAnalysis.totalCount ?? evidence.disclosureAnalysis.count ?? 0)}건`
+    ? `, 최근 공시 ${formatNumber(evidence.disclosureAnalysis.count ?? evidence.disclosureAnalysis.totalCount ?? 0)}건`
     : '';
   const disclosureRiskText = evidence.disclosureAnalysis?.available && evidence.disclosureAnalysis.riskCount > 0
     ? `, 주의 공시 ${formatNumber(evidence.disclosureAnalysis.riskCount)}건`
@@ -1986,7 +2037,7 @@ function buildDisclosureInsightBody(disclosureAnalysis) {
     ? disclosureAnalysis.topReportTypes[0]
     : null;
   const parts = [
-    `${periodLabel ? `${periodLabel} ` : ''}공시 ${formatNumber(disclosureAnalysis.totalCount ?? disclosureAnalysis.count ?? 0)}건`,
+    `${periodLabel ? `${periodLabel} ` : ''}공시 ${formatNumber(disclosureAnalysis.count ?? disclosureAnalysis.totalCount ?? 0)}건`,
     leadingType ? `${leadingType.reportName} ${formatNumber(leadingType.count)}건` : null,
     disclosureAnalysis.ownershipCount > 0 ? `지분/주요주주 ${formatNumber(disclosureAnalysis.ownershipCount)}건` : null,
     disclosureAnalysis.periodicReportCount > 0 ? `정기보고서 ${formatNumber(disclosureAnalysis.periodicReportCount)}건` : null,
@@ -2173,7 +2224,7 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
     summaryTags: [
       `점수 ${scored.hero.score}`,
       `리포트 ${evidence.pageCoverage.availableCount}/${evidence.pageCoverage.totalKnownPages}`,
-      ...(disclosureAnalysis?.available ? [`공시 ${formatNumber(disclosureAnalysis.totalCount ?? disclosureAnalysis.count ?? 0)}건`] : []),
+      ...(disclosureAnalysis?.available ? [`공시 ${formatNumber(disclosureAnalysis.count ?? disclosureAnalysis.totalCount ?? 0)}건`] : []),
       `판단 ${getDecisionBandLabel(scored.sellNow.decisionBand)}`,
     ],
   };
@@ -2580,6 +2631,7 @@ export {
   getCrawlerCacheOptions,
   loadWiseReportKrSlimSource,
   maybeResolveKrPackageResult,
+  maybeResolveKrDisclosures,
   resolveKrSourceBundle,
   MAJOR_BLOCK_KEYS,
 };

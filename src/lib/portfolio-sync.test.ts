@@ -2,7 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import type { AppliedHomePortfolioRow } from '@/lib/jaroo-home-data'
-import { mapAppliedRowsToSaveRows, mapDbRowsToAppliedRows, parsePortfolioFetchResponse } from './portfolio-sync'
+import {
+  mapAppliedRowsToSaveRows,
+  mapDbRowsToAppliedRows,
+  parsePortfolioFetchResponse,
+  parsePortfolioSyncResponse,
+  shouldUsePortfolioSessionFallback,
+} from './portfolio-sync'
 
 function createRow(overrides: Partial<AppliedHomePortfolioRow> = {}): AppliedHomePortfolioRow {
   return {
@@ -101,4 +107,29 @@ test('parsePortfolioFetchResponse: 200 + 빈 배열 → empty', async () => {
 test('parsePortfolioFetchResponse: 500 → error', async () => {
   const result = await parsePortfolioFetchResponse(createResponse(500, { error: 'load-failed' }))
   assert.equal(result.status, 'error')
+})
+
+test('DB의 빈 포트폴리오는 세션 fallback으로 되살리지 않는다', async () => {
+  const emptyResult = await parsePortfolioFetchResponse(createResponse(200, { rows: [] }))
+  const loggedOutResult = await parsePortfolioFetchResponse(createResponse(401, { error: 'unauthorized' }))
+  const errorResult = await parsePortfolioFetchResponse(createResponse(500, { error: 'load-failed' }))
+
+  assert.equal(shouldUsePortfolioSessionFallback(emptyResult), false)
+  assert.equal(shouldUsePortfolioSessionFallback(loggedOutResult), true)
+  assert.equal(shouldUsePortfolioSessionFallback(errorResult), true)
+})
+
+test('parsePortfolioSyncResponse는 저장, 로그아웃, 서버 오류를 구분한다', async () => {
+  assert.deepEqual(
+    await parsePortfolioSyncResponse(createResponse(200, { saved: 2 })),
+    { ok: true, saved: 2 },
+  )
+  assert.deepEqual(
+    await parsePortfolioSyncResponse(createResponse(401, { error: 'unauthorized' })),
+    { ok: false, reason: 'logged-out' },
+  )
+  assert.deepEqual(
+    await parsePortfolioSyncResponse(createResponse(500, { error: 'sync-failed' })),
+    { ok: false, reason: 'error' },
+  )
 })

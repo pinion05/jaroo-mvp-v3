@@ -13,17 +13,25 @@ type PortfolioStoreState = {
 type PortfolioStoreActions = {
   replaceItems: (items: PortfolioNormalizedItem[]) => void
   upsertItem: (item: PortfolioNormalizedItem) => void
+  removeItem: (identity: PortfolioItemIdentity) => void
   patchQuote: (identity: Pick<PortfolioNormalizedItem, 'code' | 'ticker' | 'name' | 'market'>, patch: Partial<PortfolioNormalizedItem>) => void
   clearItemQuote: (identity: Pick<PortfolioNormalizedItem, 'code' | 'ticker' | 'name' | 'market'>) => void
   setQuoteStatus: (status: WorkflowAsyncStatus, errorMessage?: string | null, quoteQueryKey?: string | null) => void
   clear: () => void
 }
 
+type PortfolioItemIdentity = Pick<PortfolioNormalizedItem, 'code' | 'ticker' | 'name' | 'market'>
+
 const initialState: PortfolioStoreState = {
   items: [],
   quoteStatus: 'idle',
   quoteErrorMessage: null,
   quoteQueryKey: null,
+}
+
+export function removePortfolioItemFromList(items: PortfolioNormalizedItem[], identity: PortfolioItemIdentity) {
+  const targetKey = getPortfolioItemKey(identity)
+  return items.filter((item) => getPortfolioItemKey(item) !== targetKey)
 }
 
 export const usePortfolioStore = create<PortfolioStoreState & PortfolioStoreActions>()((set) => ({
@@ -36,6 +44,21 @@ export const usePortfolioStore = create<PortfolioStoreState & PortfolioStoreActi
         items: state.items.some((existing) => getPortfolioItemKey(existing) === nextKey)
           ? state.items.map((existing) => (getPortfolioItemKey(existing) === nextKey ? item : existing))
           : [...state.items, item],
+      }
+    }),
+  removeItem: (identity) =>
+    set((state) => {
+      const items = removePortfolioItemFromList(state.items, identity)
+
+      if (items.length === state.items.length) {
+        return state
+      }
+
+      return {
+        items,
+        quoteStatus: 'idle',
+        quoteErrorMessage: null,
+        quoteQueryKey: null,
       }
     }),
   patchQuote: (identity, patch) =>

@@ -1,5 +1,6 @@
 import { AlertTriangle, Check } from 'lucide-react'
 import { Card } from '@/components/ui/card'
+import { getFinancialValueTextClass } from '@/lib/financial-value-tone'
 import { type OcrConflict } from '@/lib/screenshot-ocr'
 import { cn } from '@/lib/utils'
 
@@ -75,7 +76,7 @@ export function OcrConflictMergeCard({ conflict, selectedCandidateId, onSelect }
                 </div>
                 <div className='rounded-[16px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
                   <p className='text-[10px] text-[color:var(--jaroo-muted)]'>수익률</p>
-                  <p className='mt-1 text-[12px] font-semibold text-[color:var(--jaroo-primary)]'>{candidate.profitRate || '-'}</p>
+                  <p className={cn('mt-1 text-[12px] font-semibold', getFinancialValueTextClass(candidate.profitRate))}>{candidate.profitRate || '-'}</p>
                 </div>
               </div>
             </button>

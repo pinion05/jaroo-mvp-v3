@@ -2,6 +2,8 @@ import { NextResponse } from 'next/server'
 import { createAuthMeFromSupabaseUser } from '@/lib/supabase/auth'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { EXISTING_SIGNUP_MESSAGE, isLikelyExistingSignupUser, signupErrorMessage } from '@/lib/supabase/signup'
+import { parseTermsConsentAt } from '@/lib/supabase/terms-consent'
+import { TERMS_VERSION } from '@/lib/terms'
 
 export const runtime = 'nodejs'
 
@@ -15,6 +17,7 @@ type SignupBody = {
   email?: unknown
   password?: unknown
   name?: unknown
+  termsAcceptedAt?: unknown
 }
 
 function normalizeEmail(value: unknown): string {
@@ -41,11 +44,17 @@ export async function POST(request: Request) {
 
   try {
     const supabase = await createSupabaseServerClient()
+    // 가입 동의 시점은 로그인 화면 체크박스에서 왔다. 검증 통과 시 raw_user_meta_data 에
+    // 실어 보내고 handle_new_auth_user 트리거가 profiles 로 옮긴다(이메일 확인 전에도 생성됨).
+    const consentAt = parseTermsConsentAt(body.termsAcceptedAt)
     const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        data: name ? { display_name: name, name } : undefined,
+        data: {
+          ...(name ? { display_name: name, name } : {}),
+          ...(consentAt ? { terms_accepted_at: consentAt, terms_version: TERMS_VERSION } : {}),
+        },
       },
     })
 

@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createRequire } from 'node:module'
+import { readFileSync } from 'node:fs'
 
 import { homeHoldings, type HomeHolding } from '@/lib/jaroo-home-data'
 
@@ -79,4 +80,12 @@ test('home summary는 환율이 있으면 혼합 KRW/USD 손익을 KRW로 정규
   assert.equal(summary.totalPnl, -1_300_000)
   assert.equal(summary.totalPnlText, '-1,300,000원')
   assert.equal(summary.totalEvaluationText, '13,700,000원')
+})
+
+test('expanded home stock card exposes an accessible removal action', () => {
+  const source = readFileSync(new URL('./jaroo-home-screen.tsx', import.meta.url), 'utf8')
+
+  assert.match(source, /aria-label=\{`\$\{item\.name\} 종목 제거`\}/)
+  assert.match(source, /role='dialog'/)
+  assert.match(source, /aria-modal='true'/)
 })

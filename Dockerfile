@@ -21,6 +21,14 @@ RUN npm ci --include=dev --no-audit --no-fund
 
 FROM deps AS builder
 
+# Bust the build cache on every build so source edits always invalidate
+# downstream layers (Docker layer caching was masking code changes).
+# Railway does not inject NEXT_PUBLIC_* at build time; inline explicitly.
+ENV NEXT_PUBLIC_SUPABASE_URL=https://hrfpnawmlcoaygipulpm.supabase.co
+ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=sb_publishable_k74fVpT2-O1LQVL4KWXoBQ_Mu62TpV-
+
+RUN date -u +%s > /buildtime
+
 COPY . .
 
 RUN npm run build \
@@ -47,6 +55,9 @@ COPY --from=builder --chown=pwuser:pwuser /app/.next ./.next
 
 USER pwuser
 
-EXPOSE 3000 3040
+COPY --from=builder --chmod=0755 --chown=pwuser:pwuser /app/docker-entrypoint.sh ./docker-entrypoint.sh
 
-CMD ["node", "scripts/with-local-env.cjs", "node_modules/.bin/next", "start"]
+# Railway proxies the web port ($PORT). Crawler binds 127.0.0.1:3040 inside the container.
+EXPOSE 3000
+
+CMD ["./docker-entrypoint.sh"]

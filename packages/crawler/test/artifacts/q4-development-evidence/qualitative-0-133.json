@@ -1,0 +1,2556 @@
+{
+  "schemaVersion": "jaroo.dart-event.iteration5-independent-qualitative.v1",
+  "generatedAt": "2026-07-21T00:00:00+09:00",
+  "evaluationMethod": {
+    "mode": "independent-direct-semantic-review",
+    "scope": "2025Q4 development corpus indices 0..133",
+    "strictRule": "Exact event count and exact canonical type/action/state/cause/subjectType set; unresolved, other, or empty events are incorrect.",
+    "confidenceRule": "Prediction confidence copied without modification; highCorrect is populated only for high-confidence cases.",
+    "ambiguityRule": "No abstention credit; the evaluator supplies the best complete canonical expectedEvents for every incorrect case.",
+    "inputsUsed": [
+      ".omx/handoff/dart-event-final-2025q4/sealed/corpus.json",
+      ".omx/handoff/dart-event-q4-400-predictions-iteration5.json",
+      "packages/crawler/src/services/deepscan-kr-disclosure-event-extractors.js"
+    ],
+    "prohibitedAnswerArtifactsRead": false,
+    "prohibitedAnswerArtifactsStatement": "No pre-existing qualitative-*.json, development oracle, failure taxonomy, or 2025Q3 artifact was read or used as an evaluation input for this run."
+  },
+  "inputSha256": {
+    ".omx/handoff/dart-event-final-2025q4/sealed/corpus.json": "37472b36b474c60280da57928da1c647161c839e4e16c8318f8668999956dc4c",
+    ".omx/handoff/dart-event-q4-400-predictions-iteration5.json": "07f5546a3784324d59958b88bed823af00298c733746853e2896c73cc3de190b",
+    "packages/crawler/src/services/deepscan-kr-disclosure-event-extractors.js": "3f7737bf0bea2d2fd72bb832cbb34192c5f7bd566e1f6d8b08113afde2421003"
+  },
+  "summary": {
+    "range": {
+      "start": 0,
+      "end": 133
+    },
+    "total": 134,
+    "strictCorrect": 127,
+    "resolved": 132,
+    "high": 99,
+    "highCorrect": 96,
+    "strictAccuracy": 0.9477611940298507,
+    "resolvedCoverage": 0.9850746268656716,
+    "highPrecision": 0.9696969696969697
+  },
+  "cases": [
+    {
+      "index": 0,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "updated",
+          "state": "effective",
+          "cause": "annual-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "2025-10-24 정정 본문은 감사보고서와 재무제표 재작성 내용을 반영한 사업보고서 갱신이므로 annual-report의 updated/effective가 맞다."
+    },
+    {
+      "index": 1,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "semiannual-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251015 제출. '반기보고서 (2025.08)'의 상세유형과 본문상 핵심 행위가 periodic-report/filed/null/semiannual-report/issuer 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 2,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "quarterly-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251015 제출. '분기보고서 (2025.08)'의 상세유형과 본문상 핵심 행위가 periodic-report/filed/null/quarterly-report/issuer 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 3,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '주요사항보고서(자본으로인정되는채무증권발행결정)'의 상세유형과 본문상 핵심 행위가 capital-change/decided/proposed/contingent-capital-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 4,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '주요사항보고서(전환사채권발행결정)'의 상세유형과 본문상 핵심 행위가 capital-change/decided/proposed/convertible-bond/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 5,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "pending",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "정정 본문은 10월 31일 이사회가 최종 결정을 11월로 미루고 재검토한다고 명시하므로 자기주식 처분의 updated/pending가 맞다."
+    },
+    {
+      "index": 6,
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "pending",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "rationale": "정정 본문은 교환사채 발행 여부를 확정하지 않고 11월에 재검토한다고 명시한다. 기존 decided/proposed를 재진술한 것이 아니라 정정에 따른 updated/pending 전이다."
+    },
+    {
+      "index": 7,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '주요사항보고서(유상증자결정)'의 상세유형과 본문상 핵심 행위가 capital-change/decided/proposed/rights-offering/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 8,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '주요사항보고서(자기주식취득신탁계약해지결정)'의 상세유형과 본문상 핵심 행위가 capital-change/terminated/effective/treasury-share-trust/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 9,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "share-exchange",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251030 제출. '주요사항보고서(주식교환ㆍ이전결정)'의 상세유형과 본문상 핵심 행위가 restructuring/decided/proposed/share-exchange/issuer 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 10,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '주요사항보고서(자기주식취득신탁계약체결결정)'의 상세유형과 본문상 핵심 행위가 capital-change/decided/proposed/treasury-share-trust/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 11,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251029 제출. '주요사항보고서(회사합병결정)'의 상세유형과 본문상 핵심 행위가 restructuring/decided/proposed/merger/issuer 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 12,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "proposed",
+          "cause": "capital-reduction",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "정정은 감자 관련 매매정지 예정일의 오기를 고친 것이며 감자 자체는 향후 주총을 거치는 제안 단계라 updated/proposed가 의미상 유지된다."
+    },
+    {
+      "index": 13,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "영업양도 계약은 체결됐지만 주총 승인과 2026-01-01 양도기준일 전이므로 restructuring 결정의 proposed 단계다."
+    },
+    {
+      "index": 14,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "contingent-capital-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251028 제출. '주요사항보고서(상각형조건부자본증권발행결정)'의 상세유형과 본문상 핵심 행위가 capital-change/decided/proposed/contingent-capital-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 15,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251028 제출. '주요사항보고서(자기주식취득결정)'의 상세유형과 본문상 핵심 행위가 capital-change/decided/proposed/treasury-share-acquisition/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 16,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "acquired",
+          "state": "effective",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251022 제출. '주요사항보고서(자기전환사채만기전취득결정)'의 상세유형과 본문상 핵심 행위가 capital-change/acquired/effective/convertible-bond/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 17,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "pending",
+          "cause": "business-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "영업정지는 2025-12-01부터 시작 예정이므로 제출일 현재 halted이되 pending이며, 사업중단 대상도 business로 맞다."
+    },
+    {
+      "index": 18,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        },
+        {
+          "type": "legal-regulatory",
+          "action": "ordered",
+          "state": "effective",
+          "cause": "disclosure-correction",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "정정명령 부과와 자기주식 처분 결정은 서로 독립된 사건이므로 capital-change와 legal-regulatory 두 이벤트가 모두 필요하며 예측이 이를 충족한다."
+    },
+    {
+      "index": 19,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        },
+        {
+          "type": "legal-regulatory",
+          "action": "ordered",
+          "state": "effective",
+          "cause": "disclosure-correction",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "정정명령 부과와 교환사채 발행 결정은 독립 사건이어서 두 이벤트가 필요하고, 예측의 개수와 5개 필드가 모두 일치한다."
+    },
+    {
+      "index": 20,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "updated",
+          "state": "pending",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "real-estate"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "정정으로 상대방 이사회 승인과 계약 체결이 확인됐지만 양수 기준일은 2025-12-31이므로 real-estate 취득 갱신은 pending이다."
+    },
+    {
+      "index": 21,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": null,
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251015 제출. '[첨부추가]증권신고서(지분증권)'의 상세유형과 본문상 핵심 행위가 capital-change/filed/null/equity-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 22,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "price-set",
+          "state": "effective",
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "본문이 1차 발행가액 확정을 정정 사유로 명시하므로 equity-securities의 price-set/effective가 맞다."
+    },
+    {
+      "index": 23,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '투자설명서(일괄신고)'의 상세유형과 본문상 핵심 행위가 capital-change/published/effective/debt-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 24,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '일괄신고추가서류'의 상세유형과 본문상 핵심 행위가 capital-change/filed/effective/debt-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 25,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "정정은 발행금액을 바꿨지만 청약·납입과 발행결과 자체는 완료됐으므로 completed/effective를 유지하는 것이 맞다."
+    },
+    {
+      "index": 26,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '일괄신고추가서류(파생결합사채-주가연계파생결합사채)'의 상세유형과 본문상 핵심 행위가 capital-change/filed/effective/debt-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 27,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '일괄신고추가서류(기타파생결합사채)'의 상세유형과 본문상 핵심 행위가 capital-change/filed/effective/debt-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 28,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251030 제출. '투자설명서'의 상세유형과 본문상 핵심 행위가 capital-change/published/effective/debt-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 29,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "price-set",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "발행조건확정 문서가 기준금리와 발행금리 확정을 명시하므로 debt-securities의 price-set/effective가 맞다."
+    },
+    {
+      "index": 30,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251030 제출. '[기재정정]일괄신고서'의 상세유형과 본문상 핵심 행위가 capital-change/updated/effective/debt-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 31,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '투자설명서(일괄신고)'의 상세유형과 본문상 핵심 행위가 capital-change/published/effective/derivative-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 32,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '일괄신고추가서류(파생결합증권-주가연계증권)'의 상세유형과 본문상 핵심 행위가 capital-change/filed/effective/derivative-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 33,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '증권발행실적보고서'의 상세유형과 본문상 핵심 행위가 capital-change/completed/effective/derivative-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 34,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "effective",
+          "cause": "derivative-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251030 제출. '일괄신고추가서류(기타파생결합증권)'의 상세유형과 본문상 핵심 행위가 capital-change/filed/effective/derivative-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 35,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "filed",
+          "state": null,
+          "cause": "share-exchange",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "본문은 없지만 C004 상세유형과 제목이 주식의 포괄적 교환·이전 증권신고서이므로 restructuring/filed/share-exchange가 최선의 canonical 해석이다."
+    },
+    {
+      "index": 36,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "published",
+          "state": null,
+          "cause": "reorganization",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "본문 부재 상태에서 C004 투자설명서는 특정 합병 형태를 단정할 수 없어 reorganization의 published와 null state가 적절하다."
+    },
+    {
+      "index": 37,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": null,
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '주식등의대량보유상황보고서(일반)'의 상세유형과 본문상 핵심 행위가 ownership-change/reported/null/large-shareholding/ownership 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 38,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": null,
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '주식등의대량보유상황보고서(약식)'의 상세유형과 본문상 핵심 행위가 ownership-change/reported/null/large-shareholding/ownership 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 39,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": null,
+          "cause": "insider-ownership",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '임원ㆍ주요주주특정증권등소유상황보고서'의 상세유형과 본문상 핵심 행위가 ownership-change/reported/null/insider-ownership/ownership 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 40,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "proxy-solicitation",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "권유 시작일 2025-11-05와 주총일 2025-11-17이 제출일 뒤이므로 proxy solicitation은 scheduled/pending이다."
+    },
+    {
+      "index": 41,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "completed",
+          "state": "effective",
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "공개매수 결과보고서이며 매수 절차 종료 결과를 보고하므로 completed/effective가 맞다."
+    },
+    {
+      "index": 42,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "opinion-filed",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251020 제출. '공개매수에관한의견표명서'의 상세유형과 본문상 핵심 행위가 corporate-action/opinion-filed/null/tender-offer/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 43,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251001 제출. '공개매수설명서'의 상세유형과 본문상 핵심 행위가 corporate-action/announced/null/tender-offer/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 44,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": null,
+          "cause": "tender-offer",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251001 제출. '공개매수신고서'의 상세유형과 본문상 핵심 행위가 corporate-action/announced/null/tender-offer/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 45,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "insider-trading-plan",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "거래 시작일이 2025-12-01이고 매도·증여 계획을 보고하므로 insider-trading-plan의 scheduled/pending가 맞다."
+    },
+    {
+      "index": 46,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "withdrawn",
+          "state": "effective",
+          "cause": "insider-trading-plan",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "계획 철회사유가 제출일에 발생했고 실제 거래 전 전량 철회했으므로 withdrawn/effective가 맞다."
+    },
+    {
+      "index": 47,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '자기주식취득결과보고서'의 상세유형과 본문상 핵심 행위가 capital-change/completed/effective/treasury-share-acquisition/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 48,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '자기주식처분결과보고서'의 상세유형과 본문상 핵심 행위가 capital-change/completed/effective/treasury-share-disposal/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 49,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '신탁계약해지결과보고서'의 상세유형과 본문상 핵심 행위가 capital-change/terminated/effective/treasury-share-trust/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 50,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "reported",
+          "state": null,
+          "cause": "treasury-share-trust",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251028 제출. '신탁계약에의한취득상황보고서'의 상세유형과 본문상 핵심 행위가 capital-change/reported/null/treasury-share-trust/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 51,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "합병기일이 2025-10-01로 이미 지났고 정정은 회사명 기재오류뿐이어서 merger completed/effective가 맞다."
+    },
+    {
+      "index": 52,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "cancelled",
+          "state": "effective",
+          "cause": "stock-option",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "퇴사자에 대한 주식매수선택권 일부 부여취소가 확정 반영돼 stock-option cancelled/effective가 맞다."
+    },
+    {
+      "index": 53,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "changed",
+          "state": null,
+          "cause": "outside-director",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '사외이사의선임ㆍ해임또는중도퇴임에관한신고'의 상세유형과 본문상 핵심 행위가 governance/changed/null/outside-director/governance 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 54,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": "pending",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "주총 일시가 11월 3일에서 11월 18일로 정정되어 공고가 갱신됐고 회의는 아직 미래이므로 updated/pending가 맞다."
+    },
+    {
+      "index": 55,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "fund-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '증권발행실적보고서(집합투자증권)(㈜이지스밸류플러스위탁관리부동산투자회사)'의 상세유형과 본문상 핵심 행위가 capital-change/completed/effective/fund-securities/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 56,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "price-set",
+          "state": "effective",
+          "cause": "fund-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "정정 내역이 최종 발행가액 확정이라고 명시하므로 fund-securities의 price-set/effective가 맞다."
+    },
+    {
+      "index": 57,
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": false,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "fund-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": null,
+          "cause": "fund-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "rationale": "본문이 전혀 없는 기재정정 집합투자증권 신고서다. updated는 추론 가능하지만 효력발생 또는 거래완료의 시간 근거가 없어 state는 null이어야 한다."
+    },
+    {
+      "index": 58,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "contracted",
+          "state": null,
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251023 제출. '단일판매ㆍ공급계약체결'의 상세유형과 본문상 핵심 행위가 material-contract/contracted/null/supply-contract/contract 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 59,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "첨부추가는 본문의 취득결정을 바꾸지 않고 취득예정일이 2025-12-30이므로 equity-acquisition decided/proposed가 맞다."
+    },
+    {
+      "index": 60,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "updated",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "정정으로 공급계약 금액이 바뀌었고 계약은 이미 수행 중이므로 supply-contract updated/effective가 맞다."
+    },
+    {
+      "index": 61,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "filed",
+          "state": null,
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '소송등의제기ㆍ신청(일정금액이상의청구)'의 상세유형과 본문상 핵심 행위가 legal-regulatory/filed/null/litigation/issuer 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 62,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "changed",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '최대주주변경'의 상세유형과 본문상 핵심 행위가 ownership-change/changed/null/controlling-shareholder/ownership 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 63,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "period-ended",
+          "state": "effective",
+          "cause": "listing-improvement-period",
+          "subjectType": "issuer"
+        },
+        {
+          "type": "trading-status",
+          "action": "halted",
+          "state": "effective",
+          "cause": "delisting-review",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "본문은 개선기간 종료와 상장폐지 심사 중 매매정지 지속을 동시에 명시하므로 두 개의 독립 이벤트가 정확하다."
+    },
+    {
+      "index": 64,
+      "strictCorrect": false,
+      "resolved": false,
+      "confidence": "low",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "other",
+          "action": "updated",
+          "state": "effective",
+          "cause": null,
+          "subjectType": null
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "rationale": "새로운 정정 사실은 2025-10-31 항소심의 항소 기각이다. other는 의미를 잃으며 legal-regulatory/dismissed/effective/litigation이 직접적인 canonical 사건이다."
+    },
+    {
+      "index": 65,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "updated",
+          "state": "alleged",
+          "cause": "embezzlement-breach-of-trust",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "추가 고소로 혐의금액이 정정됐지만 유죄 확정이 아니므로 updated/alleged가 맞다."
+    },
+    {
+      "index": 66,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "changed",
+          "state": "pending",
+          "cause": "chief-executive-change",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "대표이사 변경일이 제출일 뒤인 2025-11-04라고 명시돼 changed/pending가 맞다."
+    },
+    {
+      "index": 67,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "계열사 발행 전환사채를 2025-12-03에 현금 취득하기로 한 결정이므로 asset-transaction decided/proposed와 securities 목적물이 맞다."
+    },
+    {
+      "index": 68,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "납입이 2025-10-31 완료됐다고 본문이 명시하므로 convertible-bond 발행 completed/effective가 맞다."
+    },
+    {
+      "index": 69,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "tangible-asset-disposal",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "처분 대상은 부동산이 아니라 백금이며 2026년까지 순차 처분 예정이어서 tangible-asset-disposal의 asset, decided/proposed가 맞다."
+    },
+    {
+      "index": 70,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "disclosure-inquiry",
+          "action": "responded",
+          "state": "uncertain",
+          "cause": "rumor-inquiry",
+          "subjectType": "issuer"
+        },
+        {
+          "type": "ownership-change",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "조회답변은 미확정이고, 조합원 양수도 계약에 따른 지배주주 구조 변경은 2025-11-17 종결 예정이므로 응답과 예정 ownership-change 두 이벤트가 맞다."
+    },
+    {
+      "index": 71,
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": false,
+      "predictedEvents": [
+        {
+          "type": "restructuring",
+          "action": "updated",
+          "state": "effective",
+          "cause": "equity-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "disposed",
+          "state": "effective",
+          "cause": "equity-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "rationale": "거래가 2025-09-01 종결됐고 이번 정정은 최종 정산금액 확정이다. 단순 updated가 아니라 equity-disposal의 disposed/effective 전이가 맞다."
+    },
+    {
+      "index": 72,
+      "strictCorrect": false,
+      "resolved": false,
+      "confidence": "low",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "other",
+          "action": "updated",
+          "state": "effective",
+          "cause": null,
+          "subjectType": null
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "rationale": "본문은 편광필름 사업양도 계약이 2025-09-01 종결됐고 최종 금액까지 확정됐다고 한다. other가 아니라 business-disposal completed/effective다."
+    },
+    {
+      "index": 73,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '유형자산취득결정'의 상세유형과 본문상 핵심 행위가 asset-transaction/decided/proposed/tangible-asset-acquisition/asset 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 74,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "exercised",
+          "state": "effective",
+          "cause": "exchangeable-bond-exchange",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "본문이 교환사채권 교환청구와 실제 교환 주식수를 보고하므로 exchangeable-bond-exchange exercised/effective가 정확하다."
+    },
+    {
+      "index": 75,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "debt-guarantee",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "채무보증은 이사회가 결정했지만 보증 시작일이 2025-11-03이라 decided/proposed가 맞다."
+    },
+    {
+      "index": 76,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "updated",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "공급계약 종료일을 연장하는 정정이고 기존 계약은 수행 중이므로 correction action인 updated와 현재 유효한 계약 state인 effective가 맞다."
+    },
+    {
+      "index": 77,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "updated",
+          "state": "pending",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "항공기 도입 구성과 투자액을 갱신한 장기 투자계획이며 2032년까지 진행되므로 facility-investment updated/pending가 맞다."
+    },
+    {
+      "index": 78,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "updated",
+          "state": "pending",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "자체 공시도 동일하게 항공기 도입계획을 변경했고 장기 집행 전이므로 updated/pending가 맞다."
+    },
+    {
+      "index": 79,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "held",
+          "state": "effective",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '임시주주총회결과'의 상세유형과 본문상 핵심 행위가 governance/held/effective/shareholder-meeting/governance 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 80,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "disclosure-inquiry",
+          "action": "responded",
+          "state": "uncertain",
+          "cause": "rumor-inquiry",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '풍문또는보도에대한해명(미확정)'의 상세유형과 본문상 핵심 행위가 disclosure-inquiry/responded/uncertain/rumor-inquiry/issuer 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 81,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "provided",
+          "state": "effective",
+          "cause": "collateral-provision",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "담보제공 기간이 제출일인 2025-10-31 시작이고 매출채권 담보가 실제 제공돼 provided/effective가 맞다."
+    },
+    {
+      "index": 82,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "guaranteed",
+          "state": "effective",
+          "cause": "debt-guarantee",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "채무보증 기간이 제출일에 시작돼 단순 결정 단계를 넘어 guaranteed/effective가 맞다."
+    },
+    {
+      "index": 83,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": "pending",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "주주총회 일정을 2025-11-18로 갱신했고 회의 전이므로 shareholder-meeting updated/pending가 맞다."
+    },
+    {
+      "index": 84,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "capital-expenditure",
+          "action": "updated",
+          "state": "pending",
+          "cause": "facility-investment",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "시설투자 종료일이 2026-02-28로 연장돼 투자 갱신은 아직 진행 중인 pending 상태다."
+    },
+    {
+      "index": 85,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "provided",
+          "state": "effective",
+          "cause": "collateral-provision",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '타인에대한담보제공결정'의 상세유형과 본문상 핵심 행위가 material-contract/provided/effective/collateral-provision/asset 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 86,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "cash-dividend",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '현금ㆍ현물배당결정'의 상세유형과 본문상 핵심 행위가 corporate-action/decided/proposed/cash-dividend/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 87,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "earnings",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "earnings-release",
+          "subjectType": "financials"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '결산실적공시예고(안내공시)'의 상세유형과 본문상 핵심 행위가 earnings/scheduled/pending/earnings-release/financials 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 88,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "updated",
+          "state": "pending",
+          "cause": "tangible-asset-disposal",
+          "subjectType": "real-estate"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "토지·건물 처분의 잔금일을 2025-12-19로 확정한 정정이므로 real-estate disposal updated/pending가 맞다."
+    },
+    {
+      "index": 89,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "changed",
+          "state": "effective",
+          "cause": "asset-management-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '부동산투자회사자산관리위탁계약변경'의 상세유형과 본문상 핵심 행위가 material-contract/changed/effective/asset-management-contract/contract 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 90,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "reported",
+          "state": "effective",
+          "cause": "compliance-program",
+          "subjectType": "issuer"
+        },
+        {
+          "type": "legal-regulatory",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "compliance-program",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "본문은 3분기 운영실적과 4분기 계획을 별도 구획으로 제시하므로 reported/effective와 scheduled/pending 두 이벤트가 필요하다."
+    },
+    {
+      "index": 91,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "updated",
+          "state": "pending",
+          "cause": "tangible-asset-acquisition",
+          "subjectType": "real-estate"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "건물 취득 종결 예정일이 2025-12-19로 미뤄졌으므로 acquisition updated/pending가 맞다."
+    },
+    {
+      "index": 92,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "share-cancellation",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '주식소각결정'의 상세유형과 본문상 핵심 행위가 corporate-action/decided/proposed/share-cancellation/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 93,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "contracted",
+          "state": "effective",
+          "cause": "research-license-agreement",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "공동연구개발 및 라이선스 계약이 제출일에 체결됐으므로 research-license-agreement contracted/effective가 맞다."
+    },
+    {
+      "index": 94,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "governance",
+          "action": "completed",
+          "state": "effective",
+          "cause": "shareholder-meeting",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "정기주주총회 결과 문서의 주 사건은 회의 완료이며 개최·의결이 끝났으므로 completed/effective가 맞다."
+    },
+    {
+      "index": 95,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "record-date",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '주주명부폐쇄기간또는기준일설정'의 상세유형과 본문상 핵심 행위가 corporate-action/decided/proposed/record-date/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 96,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "milestone-earned",
+          "state": "effective",
+          "cause": "licensing-milestone",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "중국 상업화 개시로 마일스톤 조건을 달성해 invoice를 발행했으므로 지급 전이라도 milestone-earned/effective가 맞다."
+    },
+    {
+      "index": 97,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "reported",
+          "state": "effective",
+          "cause": "value-up-plan",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "신규 계획 발표가 아니라 기존 기업가치 제고계획의 2025년 이행현황 보고이므로 reported/effective가 맞다."
+    },
+    {
+      "index": 98,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "대법원이 재항고를 모두 기각했다고 명시하므로 litigation dismissed/effective가 맞다."
+    },
+    {
+      "index": 99,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "occurred",
+          "state": null,
+          "cause": "serious-industrial-accident",
+          "subjectType": "issuer"
+        },
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "effective",
+          "cause": "regulatory-work-stop",
+          "subjectType": "business"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "사망 사고 발생과 고용노동청의 부분작업중지 명령은 별개의 사건이므로 사고와 operating halt 두 이벤트가 정확하다."
+    },
+    {
+      "index": 100,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "updated",
+          "state": "effective",
+          "cause": "supply-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "기존 반도체 장비 공급계약 종료일을 연장한 정정이며 계약은 유효하게 수행 중이므로 updated/effective가 맞다."
+    },
+    {
+      "index": 101,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "disclosure-compliance",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "지정예고 단계이고 이의신청·위원회 결정 전이므로 실제 지정이 아닌 announced/preliminary가 맞다."
+    },
+    {
+      "index": 102,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "loan",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "대여 종료일을 제출일인 2025-10-30으로 앞당긴 정정이므로 loan terminated/effective가 맞다."
+    },
+    {
+      "index": 103,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "terminated",
+          "state": "effective",
+          "cause": "loan",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "동일 금전대여의 종료일이 제출일로 변경돼 대여 종료가 효력을 발생했으므로 terminated/effective가 맞다."
+    },
+    {
+      "index": 104,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "contracted",
+          "state": "pending",
+          "cause": "asset-custody-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "계약은 체결됐지만 11월 주총 승인 후 효력이 발생한다고 명시돼 contracted/pending가 맞다."
+    },
+    {
+      "index": 105,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "changed",
+          "state": "pending",
+          "cause": "asset-custody-contract",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "보관업무 변경계약도 11월 주총 승인을 조건으로 하므로 changed/pending가 맞다."
+    },
+    {
+      "index": 106,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "material-contract",
+          "action": "borrowed",
+          "state": "effective",
+          "cause": "financing",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "단기사채 차입·발행일이 제출일과 같아 financing borrowed/effective가 맞다."
+    },
+    {
+      "index": 107,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251030 제출. '유상증자결정(자회사의 주요경영사항)'의 상세유형과 본문상 핵심 행위가 capital-change/decided/proposed/rights-offering/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 108,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "reported",
+          "state": "effective",
+          "cause": "value-up-plan",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251030 제출. '기업가치제고계획(자율공시) (2025년 이행현황)'의 상세유형과 본문상 핵심 행위가 corporate-event/reported/effective/value-up-plan/issuer 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 109,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "operating-status",
+          "action": "resumed",
+          "state": "effective",
+          "cause": "production-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "본문이 안성공장과 클로본스정 생산을 각각 이미 재개했다고 명시하므로 resumed/effective가 맞다."
+    },
+    {
+      "index": 110,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "record-date",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251030 제출. '현금ㆍ현물배당을위한주주명부폐쇄(기준일)결정'의 상세유형과 본문상 핵심 행위가 corporate-action/decided/proposed/record-date/securities 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 111,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '연결재무제표기준영업(잠정)실적(공정공시)'의 상세유형과 본문상 핵심 행위가 earnings/announced/preliminary/operating-results/financials 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 112,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '영업(잠정)실적(공정공시)'의 상세유형과 본문상 핵심 행위가 earnings/announced/preliminary/operating-results/financials 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 113,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251030 제출. '연결재무제표기준영업(잠정)실적(공정공시)(자회사의 주요경영사항)'의 상세유형과 본문상 핵심 행위가 earnings/announced/preliminary/operating-results/financials 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 114,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "updated",
+          "state": "pending",
+          "cause": "business-plan",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "매출 목표와 IRA 수혜 전망을 현재 경영환경에 맞춰 수정한 진행 중 사업계획이므로 updated/pending가 맞다."
+    },
+    {
+      "index": 115,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "announced",
+          "state": "proposed",
+          "cause": "dividend-policy",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "정정은 예정 공시일과 관련공시 표기이며 본문 핵심은 장래 배당정책 발표라 announced/proposed가 맞다."
+    },
+    {
+      "index": 116,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "earnings",
+          "action": "updated",
+          "state": "projected",
+          "cause": "earnings-guidance",
+          "subjectType": "financials"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "정정은 실적 비교 오류를 고치면서 2025년 전망치를 제시하므로 earnings-guidance updated/projected가 맞다."
+    },
+    {
+      "index": 117,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "investor-relations",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '기업설명회(IR)개최(안내공시)'의 상세유형과 본문상 핵심 행위가 corporate-event/scheduled/pending/investor-relations/issuer 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 118,
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": false,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "adjusted",
+          "state": null,
+          "cause": "convertible-price",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "adjusted",
+          "state": "effective",
+          "cause": "convertible-price",
+          "subjectType": "securities"
+        }
+      ],
+      "rationale": "전환가액 조정 적용일이 제출일인 2025-10-31이고 조정후 가액이 확정됐다. adjusted의 state는 null이 아니라 effective다."
+    },
+    {
+      "index": 119,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "designated",
+          "state": "pending",
+          "cause": "disclosure-compliance",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "지정·부과일자가 제출 다음 날인 2025-10-31이므로 designated이지만 제출 시점 state는 pending이다."
+    },
+    {
+      "index": 120,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "trading-status",
+          "action": "halted",
+          "state": "effective",
+          "cause": "business-disposal",
+          "subjectType": "listed-shares"
+        },
+        {
+          "type": "trading-status",
+          "action": "lifted",
+          "state": "pending",
+          "cause": "business-disposal",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "정지 시각은 제출일, 해제 시각은 다음 날 09:00이며 사유가 영업양도라 halted/effective와 lifted/pending 두 이벤트가 정확하다."
+    },
+    {
+      "index": 121,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "capital-change",
+          "action": "updated",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "유상증자 연기에 따라 기준가격을 다시 산정해 즉시 공시한 정정이므로 rights-offering updated/effective가 맞다."
+    },
+    {
+      "index": 122,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "changed",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '최대주주등소유주식변동신고서(최대주주변경시)'의 상세유형과 본문상 핵심 행위가 ownership-change/changed/null/controlling-shareholder/ownership 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 123,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": null,
+          "cause": "controlling-shareholder",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "20251031 제출. '최대주주등소유주식변동신고서'의 상세유형과 본문상 핵심 행위가 ownership-change/reported/null/controlling-shareholder/ownership 한 건과 의미상 일치한다."
+    },
+    {
+      "index": 124,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "bond-purchase",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "채권 매수일과 발행일이 2025-12-03 예정이고 이사회 의결만 끝나 related-party bond purchase는 decided/proposed다."
+    },
+    {
+      "index": 125,
+      "strictCorrect": false,
+      "resolved": true,
+      "confidence": "medium",
+      "highCorrect": null,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "received",
+          "state": "effective",
+          "cause": "collateral-received",
+          "subjectType": "real-estate"
+        }
+      ],
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "collateral-received",
+          "subjectType": "real-estate"
+        }
+      ],
+      "rationale": "담보받은 일자는 비어 있고 본문이 2025년 11월 중 계약 예정이라고 명시한다. received/effective가 아니라 decided/proposed여야 한다."
+    },
+    {
+      "index": 126,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "internal-lease",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "백금 리스는 2025년 12월부터 체결 예정이라 internal-lease decided/proposed가 맞다."
+    },
+    {
+      "index": 127,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "asset-acquisition",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "백금 양수는 2025년 12월부터 순차 매입 예정이므로 asset-acquisition decided/proposed가 맞다."
+    },
+    {
+      "index": 128,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "changed",
+          "state": "effective",
+          "cause": "internal-goods-services",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "2025년 3분기 실제 상품·용역 거래금액을 기존 예상치에서 변경 보고해 changed/effective가 맞다."
+    },
+    {
+      "index": 129,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "convertible-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "전환사채 청약·납입일이 2025-12-03 예정이고 현재는 의결 단계라 decided/proposed가 맞다."
+    },
+    {
+      "index": 130,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "asset-disposal",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "백금 양도는 2025년 12월부터 예정돼 asset-disposal decided/proposed가 맞다."
+    },
+    {
+      "index": 131,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "collateral-provision",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "담보제공일이 미정이고 2025년 11월 계약 예정이므로 collateral-provision decided/proposed가 맞다."
+    },
+    {
+      "index": 132,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "sold",
+          "state": "effective",
+          "cause": "bond-sale",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "채권 매도일과 발행일이 제출일과 같아 bond-sale sold/effective가 맞다."
+    },
+    {
+      "index": 133,
+      "strictCorrect": true,
+      "resolved": true,
+      "confidence": "high",
+      "highCorrect": true,
+      "predictedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "internal-goods-services",
+          "subjectType": "contract"
+        }
+      ],
+      "expectedEvents": null,
+      "rationale": "거래금액은 2026년 분기별 추정치로 의결만 완료돼 internal-goods-services decided/proposed가 맞다."
+    }
+  ]
+}

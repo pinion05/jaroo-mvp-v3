@@ -1,0 +1,804 @@
+{
+  "schemaVersion": "jaroo.opendart-event-gold-slice.v1",
+  "reviewer": "codex-executor-blind-b-slice-4",
+  "reviewedAt": "2026-07-28T03:41:38.399881Z",
+  "range": {
+    "start": 113,
+    "end": 149
+  },
+  "ontologyVersion": "jaroo.kr-disclosure-event-ontology.v1",
+  "ontologyHash": "b3b29e0918060d7cfbaa1586703a2ac3e2ca5d5198c3c4d5d8b1325d199976f9",
+  "predictionBlind": true,
+  "cases": [
+    {
+      "index": 113,
+      "rceptNo": "20260727000192",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "발행실적보고서가 제902·903·904회 파생결합사채의 2026-07-27 청약·배정 및 발행 실적을 각각 확정한다.",
+      "rationale": "서로 구분된 3개 회차가 각각 실제 발행된 독립 증권 시리즈이므로 동일 canonical event를 원문 순서대로 3회 유지한다."
+    },
+    {
+      "index": 114,
+      "rceptNo": "20260721800174",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "2026년 2분기 별도 영업실적이 외부감사 전 잠정 수치로 공시됐다.",
+      "rationale": "잠정 영업실적 공시는 preliminary operating-results 템플릿에 해당한다."
+    },
+    {
+      "index": 115,
+      "rceptNo": "20260619000517",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "governance",
+          "action": "appointed",
+          "state": "effective",
+          "cause": "outside-director",
+          "subjectType": "governance"
+        },
+        {
+          "type": "governance",
+          "action": "appointed",
+          "state": "effective",
+          "cause": "outside-director",
+          "subjectType": "governance"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "박선영과 장항배 두 사외이사의 신규 선임이 2026-06-19 효력을 발생한 것으로 보고됐다.",
+      "rationale": "별도로 지명된 두 이사의 선임은 독립적인 공동 핵심 발생이므로 공시 순서대로 2건을 유지한다."
+    },
+    {
+      "index": 116,
+      "rceptNo": "20260601001372",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "governance",
+          "action": "reported",
+          "state": "effective",
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "LG에너지솔루션의 기업집단현황 연차 공시가 기준일 현재 개별회사 현황을 보고한다.",
+      "rationale": "정정이 아닌 현황 공시이므로 유효한 business-group-status를 reported로 표현한다."
+    },
+    {
+      "index": 117,
+      "rceptNo": "20260722800846",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "최대주주 및 특수관계인 합산 보유가 장내매도로 42,000주 감소한 현황을 보고한다.",
+      "rationale": "개별 거래가 아니라 최대주주 집단의 합산 변동을 보고하는 표준 family다."
+    },
+    {
+      "index": 118,
+      "rceptNo": "20260724000269",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "related-party",
+          "action": "approved",
+          "state": "proposed",
+          "cause": "insurance-transaction",
+          "subjectType": "contract"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "medium",
+      "evidenceSummary": "이사회가 2026-07-23 계열회사 퇴직연금 보험거래의 예상 보험료 271.4억원을 승인했으며 실제 불입은 수시로 이뤄질 예정이다.",
+      "rationale": "승인된 장래 보험거래이므로 approved/proposed로 표현하며, 과거 공시 대비 예상액 변경은 별도 발생으로 늘리지 않는다."
+    },
+    {
+      "index": 119,
+      "rceptNo": "20260612000633",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "acquired",
+          "state": "effective",
+          "cause": "treasury-share-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "신탁계약을 통한 자기주식 취득상황보고서가 보고기간의 보통주·기타주식 취득 실적을 집계해 보고한다.",
+      "rationale": "거래 내역의 각 행은 하나의 취득상황 공시를 뒷받침하는 세부 이력이며 문서 수준의 자기주식 취득 발생 1건으로 라벨링한다."
+    },
+    {
+      "index": 120,
+      "rceptNo": "20260727800269",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "earnings",
+          "action": "announced",
+          "state": "preliminary",
+          "cause": "operating-results",
+          "subjectType": "financials"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "LG이노텍의 2026년 2분기 연결 영업실적이 외부감사 전 잠정 수치로 공시됐다.",
+      "rationale": "잠정 연결 실적도 preliminary operating-results 템플릿에 해당한다."
+    },
+    {
+      "index": 121,
+      "rceptNo": "20260724000384",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "한솔홀딩스 최대주주 집단의 보유 변동을 합산 기준으로 보고한다.",
+      "rationale": "최대주주 집단 합산 소유상황 보고 family이므로 문서 수준 1건이다."
+    },
+    {
+      "index": 122,
+      "rceptNo": "20260515000077",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": "corrected",
+          "cause": "annual-report",
+          "subjectType": "financials"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "2025.12 사업보고서의 요약재무정보 중 당기순이익 기재 오류를 정정했다.",
+      "rationale": "사업보고서라는 periodic-report 1건의 재무정보 정정이며 별도 영업사건을 생성하지 않는다."
+    },
+    {
+      "index": 123,
+      "rceptNo": "20260721001316",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "가온전선 최대주주 집단의 장내매수·무상신주 취득 후 합산 보유 변동을 보고한다.",
+      "rationale": "세부 취득 원인과 무관하게 문서의 핵심은 최대주주 집단 합산 변동 1건이다."
+    },
+    {
+      "index": 124,
+      "rceptNo": "20260723800458",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "trading-status",
+          "action": "halted",
+          "state": "active",
+          "cause": "share-cancellation",
+          "subjectType": "listed-shares"
+        },
+        {
+          "type": "trading-status",
+          "action": "resumed",
+          "state": "pending",
+          "cause": "share-cancellation",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "medium",
+      "evidenceSummary": "주식소각 10% 이상 공시를 이유로 2026-07-23 14:59 거래정지와 2026-07-24 09:00 정지해제 시각을 함께 확정했다.",
+      "rationale": "제목과 본문이 거래정지 및 정지해제를 별도 공동 핵심 상태로 공시한다. 정정은 안내사항 추가뿐이므로 두 상태의 실질 lifecycle을 바꾸지 않는다."
+    },
+    {
+      "index": 125,
+      "rceptNo": "20260723800952",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-event",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "investor-relations",
+          "subjectType": "issuer"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "회사가 2026-07-27~28 기관투자자 대상 IR 개최 일정을 공시했다.",
+      "rationale": "아직 개최 전인 IR 일정이므로 scheduled/pending이다."
+    },
+    {
+      "index": 126,
+      "rceptNo": "20260727000053",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "삼성증권 파생결합사채 제2933회 일괄신고 추가서류가 장래 청약·납입·발행 일정을 제시한다.",
+      "rationale": "아직 발행실적이 없는 단일 증권 시리즈의 계획된 offering이다."
+    },
+    {
+      "index": 127,
+      "rceptNo": "20260506000256",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "cancelled",
+          "state": "effective",
+          "cause": "stock-option",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "medium",
+      "evidenceSummary": "퇴사자 10명에 대한 기존 주식매수선택권 일부 부여취소를 반영해 부여 인원과 수량을 줄였다.",
+      "rationale": "정정의 operative change는 이미 부여된 옵션 일부의 취소이며 원래 부여를 새 사건으로 중복하지 않는다."
+    },
+    {
+      "index": 128,
+      "rceptNo": "20260520000001",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "initiated",
+          "state": "pending",
+          "cause": "tender-offer",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "세아홀딩스가 2026-05-20~06-08 자기주식 공개매수를 개시하고 최대 187,000주 매수를 제안했다.",
+      "rationale": "신고 시점에 청약기간과 결제가 남아 있는 공개매수 개시이므로 initiated/pending이다."
+    },
+    {
+      "index": 129,
+      "rceptNo": "20260727800621",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "pending",
+          "cause": "record-date",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "분기 현금배당 권리주주 확정을 위한 기준일을 2026-08-11로 정했다.",
+      "rationale": "이사회가 기준일을 결정했으나 기준일 도래 전이므로 decided/pending이며 아직 미정인 배당 자체는 별도 라벨링하지 않는다."
+    },
+    {
+      "index": 130,
+      "rceptNo": "20260723000082",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "투자설명서가 키움증권 제1985회부터 제1996회까지 12개 파생결합증권의 모집과 장래 납입 일정을 각각 제시한다.",
+      "rationale": "서로 구분된 12개 증권 시리즈가 공모의 공동 핵심 대상이므로 문서 순서대로 12건을 유지한다."
+    },
+    {
+      "index": 131,
+      "rceptNo": "20260529001444",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "completed",
+          "state": "effective",
+          "cause": "share-exchange",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "포괄적 주식교환이 2026-05-29 완료되어 완전자회사 관계가 성립했음을 종료보고한다.",
+      "rationale": "종료보고서의 핵심은 완료되어 효력이 발생한 share exchange 1건이다."
+    },
+    {
+      "index": 132,
+      "rceptNo": "20260521000036",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "supplier-payment",
+          "action": "reported",
+          "state": "corrected",
+          "cause": "subcontract-payment-terms",
+          "subjectType": "cash"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "현금·수표·어음 등 하도급대금 지급수단별 금액과 비중을 정정해 다시 보고했다.",
+      "rationale": "문서 수준의 공급업체 대금지급 조건 공시 1건을 corrected 상태로 표현한다."
+    },
+    {
+      "index": 133,
+      "rceptNo": "20260515002266",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "supplier-payment",
+          "action": "reported",
+          "state": "corrected",
+          "cause": "subcontract-payment-terms",
+          "subjectType": "cash"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "하도급대금 결제수단별 지급금액 표의 단위·기재 오류를 정정했다.",
+      "rationale": "정정된 지급조건 보고 1건이며 표의 각 수단을 별도 사건으로 늘리지 않는다."
+    },
+    {
+      "index": 134,
+      "rceptNo": "20260724800606",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "대상홀딩스 최대주주 및 특수관계인 집단의 합산 보유 변동을 보고한다.",
+      "rationale": "최대주주 집단 소유상황 보고 표준 family로 문서 수준 1건이다."
+    },
+    {
+      "index": 135,
+      "rceptNo": "20260722800278",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "GS리테일 최대주주 및 특수관계인 집단의 합산 보유 변동을 보고한다.",
+      "rationale": "최대주주 집단 소유상황 보고 표준 family로 문서 수준 1건이다."
+    },
+    {
+      "index": 136,
+      "rceptNo": "20260715800799",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "효성첨단소재 최대주주 및 특수관계인 집단의 합산 보유 변동을 보고한다.",
+      "rationale": "최대주주 집단 소유상황 보고 표준 family로 문서 수준 1건이다."
+    },
+    {
+      "index": 137,
+      "rceptNo": "20260721000079",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "증권발행실적보고서가 제12772·12773·12774·12775회 증권의 청약·배정 및 발행 종결을 각각 보고한다.",
+      "rationale": "서로 구분된 4개 발행 회차가 독립 증권 시리즈이므로 원문 순서대로 4건을 유지한다."
+    },
+    {
+      "index": 138,
+      "rceptNo": "20260714000498",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "effective",
+          "cause": "fund-security-transactions",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "정정 공시가 2026년 2분기 계열 금융회사를 통한 수익증권 거래 내역과 합계를 수정해 확정한다.",
+      "rationale": "표의 거래행들은 하나의 분기별 계열금융회사 거래 공시의 세부 내역이며, 정정의 실질은 기존 거래 공시의 effective update 1건이다."
+    },
+    {
+      "index": 139,
+      "rceptNo": "20260724000601",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "fund-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "이사회가 계열 관련 펀드 투자 거래를 의결했으며 약정·집행은 장래 예정이고 금액은 변동 가능하다.",
+      "rationale": "승인된 장래 펀드 투자는 proposed related-party investment 1건이다."
+    },
+    {
+      "index": 140,
+      "rceptNo": "20260727800319",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "large-shareholding",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "최대주주 및 특수관계인 집단의 합산 보유 변동을 보고한다.",
+      "rationale": "최대주주 집단 소유상황 보고 표준 family로 문서 수준 1건이다."
+    },
+    {
+      "index": 141,
+      "rceptNo": "20260713000459",
+      "assessable": false,
+      "goldEvents": null,
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "원문 문서를 확보하지 못해 합병등기 정정 공시의 operative 내용을 확인할 수 없다.",
+      "rationale": "제목만으로 정정의 실질 사건과 lifecycle을 확정할 수 없어 평가 불가로 둔다."
+    },
+    {
+      "index": 142,
+      "rceptNo": "20260709000344",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "completed",
+          "state": "effective",
+          "cause": "asset-transfer",
+          "subjectType": "asset-transfer"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "합병등 종료보고서가 대상회사 주식 양수를 포함한 자산양수도 절차의 완료를 보고한다.",
+      "rationale": "상대방별 내역은 하나의 자산양수도 종료 공시를 구성하며 문서 수준 완료 사건 1건이다."
+    },
+    {
+      "index": 143,
+      "rceptNo": "20260723000353",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "completed",
+          "state": "effective",
+          "cause": "share-exchange",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "신세계푸드와 이마트의 포괄적 주식교환일이 2026-07-23 도래해 교환 절차가 완료됐다.",
+      "rationale": "종료보고서의 문서 수준 핵심은 효력이 발생한 share exchange 1건이다."
+    },
+    {
+      "index": 144,
+      "rceptNo": "20260515003078",
+      "assessable": false,
+      "goldEvents": null,
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "분기보고서 원문을 확보하지 못해 보고기간과 정정 여부 등 필수 근거를 확인할 수 없다.",
+      "rationale": "문서가 unavailable이므로 제목만으로 canonical event를 확정하지 않는다."
+    },
+    {
+      "index": 145,
+      "rceptNo": "20260724000497",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "pending",
+          "cause": "securities-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "투자설명서가 대신증권 제432·433회 기타파생결합사채의 장래 청약·납입 조건을 각각 제시한다.",
+      "rationale": "서로 구분된 2개 증권 시리즈의 계획된 offering을 문서 순서대로 2건 유지한다."
+    },
+    {
+      "index": 146,
+      "rceptNo": "20260727000065",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "한화스마트DLB 제571호가 2026-07-27 청약·배정되어 41억원의 실제 발행실적이 확정됐다.",
+      "rationale": "단일 증권 시리즈의 완료된 발행 1건이다."
+    },
+    {
+      "index": 147,
+      "rceptNo": "20260724000256",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "ownership-change",
+          "action": "reported",
+          "state": "effective",
+          "cause": "insider-holdings",
+          "subjectType": "ownership"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "임원·사실상지배주주의 특정증권 보유가 직전 보고 대비 27,544주 증가한 현황을 보고한다.",
+      "rationale": "개별 매수행은 한 보고자의 집계 소유상황 변동을 뒷받침하므로 문서 수준 insider-holdings 1건이다."
+    },
+    {
+      "index": 148,
+      "rceptNo": "20260723000599",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "treasury-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "이사회가 임원 주식보상 지급을 위한 자기주식 처분을 결정했으며 처분은 2026-07-31 예정이다.",
+      "rationale": "단일 이사회 처분결정의 집행 전 상태이므로 decided/proposed 1건이다."
+    },
+    {
+      "index": 149,
+      "rceptNo": "20260727000050",
+      "assessable": true,
+      "goldEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        },
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "securities-issuance",
+          "subjectType": "securities"
+        }
+      ],
+      "acceptableAlternatives": [],
+      "confidence": "high",
+      "evidenceSummary": "현대차증권 DLB 제627·628회가 각각 청약·배정되어 실제 발행실적이 확정됐다.",
+      "rationale": "서로 구분된 2개 발행 회차가 독립 증권 시리즈이므로 원문 순서대로 2건을 유지한다."
+    }
+  ]
+}

@@ -1,27 +1,23 @@
+/* 루트 layout.tsx 의 PhoneFrame(390px 폰 박스)이 바깥 캔버스/박스를 담당한다.
+   viewport는 더 이상 박스 역할을 하지 않는다(no-op 래퍼). */
 .viewport {
-  min-height: 100vh;
-  min-height: 100dvh;
-  width: 100%;
-  background: #eceef2;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-start;
-  padding: 12px 0;
+  display: contents;
 }
 
+/* 박스 치수(폭/높이/radius/shadow)는 루트 PhoneFrame에 양보하고,
+   여기서는 내부 스크롤 컨테이너 + 스크린 색만 담당한다. frameRef 가 여기를 가리킨다. */
 .frame {
   background: #f5f6f8;
-  border-radius: 16px;
-  width: min(100vw, 340px);
-  height: min(100dvh - 48px, 760px);
-  min-height: 620px;
+  display: flex;
+  flex-direction: column;
   overflow-y: auto;
   overflow-x: hidden;
-  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.12);
   position: relative;
   color: #0f1419;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  width: 100%;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .frame::-webkit-scrollbar {
@@ -31,6 +27,7 @@
 .top {
   padding: 14px 16px 10px;
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   background: #f5f6f8;
@@ -80,7 +77,12 @@
 }
 
 .body {
+  flex: 1 0 auto;
   padding: 0 12px 14px;
+}
+
+.frame > nav {
+  flex: 0 0 auto;
 }
 
 .mainCard {
@@ -122,11 +124,11 @@
 }
 
 .up {
-  color: #169b4f;
+  color: var(--jaroo-profit);
 }
 
 .down {
-  color: #ef4444;
+  color: var(--jaroo-loss);
 }
 
 .mcBadge,
@@ -146,16 +148,16 @@
 
 .profit,
 .dCenterBadgeGreen {
-  background: #eaf3de;
-  color: #3b6d11;
-  border-color: rgba(59, 109, 17, 0.18);
+  background: var(--jaroo-profit-soft);
+  color: var(--jaroo-profit);
+  border-color: rgba(216, 58, 66, 0.18);
 }
 
 .loss,
 .dCenterBadgeRed {
-  background: #fcebeb;
-  color: #a32d2d;
-  border-color: rgba(163, 45, 45, 0.18);
+  background: var(--jaroo-loss-soft);
+  color: var(--jaroo-loss);
+  border-color: rgba(43, 107, 230, 0.18);
 }
 
 .watch {
@@ -396,14 +398,33 @@
   font-variant-numeric: tabular-nums;
 }
 
+.stockAmt.up {
+  color: var(--jaroo-profit);
+}
+
+.stockAmt.down {
+  color: var(--jaroo-loss);
+}
+
 .stockDetail {
-  display: none;
-  border-top: 0.5px solid #eef0f3;
-  padding: 0 13px 13px;
+  display: grid;
+  grid-template-rows: 0fr;
+  visibility: hidden;
+  transition:
+    grid-template-rows 0.28s cubic-bezier(0.4, 0, 0.2, 1),
+    visibility 0.28s;
 }
 
 .open .stockDetail {
-  display: block;
+  grid-template-rows: 1fr;
+  visibility: visible;
+}
+
+.stockDetailInner {
+  overflow: hidden;
+  min-height: 0;
+  border-top: 0.5px solid #eef0f3;
+  padding: 0 13px 13px;
 }
 
 .sdFacts {
@@ -460,6 +481,28 @@
   font-size: 10px;
   opacity: 0.82;
   font-weight: 650;
+}
+
+.removeBtn {
+  width: 100%;
+  min-height: 38px;
+  margin-top: 8px;
+  border: 0.5px solid #f0c9c6;
+  border-radius: 12px;
+  background: #fff;
+  color: #b42318;
+  font-size: 12px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.removeBtn:hover {
+  background: #fff6f5;
+}
+
+.removeBtn:disabled {
+  cursor: wait;
+  opacity: 0.55;
 }
 
 .forecastCard {
@@ -555,6 +598,107 @@
   height: 100%;
 }
 
+.confirmLayer {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  pointer-events: auto;
+}
+
+.confirmBackdrop {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: rgba(15, 20, 25, 0.42);
+  cursor: default;
+}
+
+.confirmDialog {
+  position: relative;
+  width: min(calc(100% - 40px), 308px);
+  border: 0.5px solid #e8eaee;
+  border-radius: 18px;
+  background: #fff;
+  box-shadow: 0 20px 50px rgba(15, 20, 25, 0.24);
+  padding: 20px;
+  color: #0f1419;
+}
+
+.confirmTitle {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 850;
+  letter-spacing: -0.02em;
+}
+
+.confirmDescription {
+  margin: 8px 0 0;
+  color: #5b6573;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+.confirmDescription strong {
+  color: #0f1419;
+}
+
+.confirmError {
+  margin: 10px 0 0;
+  border-radius: 10px;
+  background: #fff1f0;
+  padding: 9px 10px;
+  color: #b42318;
+  font-size: 11px;
+  line-height: 1.45;
+}
+
+.confirmActions {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.confirmCancelBtn,
+.confirmRemoveBtn {
+  min-height: 42px;
+  border-radius: 12px;
+  font-size: 13px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.confirmCancelBtn {
+  border: 0.5px solid #dfe3e8;
+  background: #fff;
+  color: #4b5563;
+}
+
+.confirmRemoveBtn {
+  border: 0;
+  background: #b42318;
+  color: #fff;
+}
+
+.confirmCancelBtn:disabled,
+.confirmRemoveBtn:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.removeBtn:focus-visible,
+.confirmBackdrop:focus-visible,
+.confirmCancelBtn:focus-visible,
+.confirmRemoveBtn:focus-visible {
+  outline: 2px solid #2563eb;
+  outline-offset: 2px;
+}
+
 .sheetOverlay {
   position: absolute;
   inset: 0;
@@ -575,7 +719,7 @@
   position: absolute;
   left: 50%;
   bottom: 0;
-  width: min(100vw, 340px);
+  width: 100%;
   max-height: min(78dvh, 620px);
   overflow-y: auto;
   transform: translate(-50%, 102%);
@@ -699,7 +843,7 @@
 }
 
 .deepScanLoadingInner {
-  width: min(100vw, 340px);
+  width: 100%;
   height: 100%;
 }
 
@@ -757,4 +901,67 @@
   font-size: 10px;
   padding: 0;
   text-decoration: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stockDetail {
+    transition: none;
+  }
+}
+
+/* 전역 투자 디스클레이머 (홈 하단 상시 고지) */
+.globalDisclaimer {
+  margin: 10px 12px 0;
+  padding-bottom: 6px;
+  font-size: 9.5px;
+  color: #97a0ae;
+  line-height: 1.6;
+  text-align: center;
+  word-break: keep-all;
+}
+
+/* 포트폴리오 빈 상태(게스트/신규 유저): 카드 없이 배경 위 글자+버튼 조합으로
+   수직 중앙 배치하고, 디스클레이머는 화면 바닥에 고정한다. */
+.bodyEmpty {
+  display: flex;
+  flex-direction: column;
+}
+
+.emptyState {
+  margin: auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px 28px;
+}
+
+.emptyStateTitle {
+  margin: 0;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: #0f1419;
+}
+
+.emptyStateText {
+  margin: 9px 0 0;
+  font-size: 12.5px;
+  line-height: 1.6;
+  color: #4b5563;
+  word-break: keep-all;
+}
+
+.emptyStateBtn {
+  margin-top: 20px;
+  min-height: 40px;
+  padding: 0 22px;
+  border-radius: 999px;
+  background: #185fa5;
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }

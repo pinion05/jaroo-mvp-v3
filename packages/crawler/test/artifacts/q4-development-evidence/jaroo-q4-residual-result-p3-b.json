@@ -1,0 +1,414 @@
+[
+  {
+    "index": 5,
+    "rceptNo": "20251031000537",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "under-review",
+        "state": "deferred",
+        "cause": "treasury-share-disposal",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The correction records the 2025-10-31 board conclusion that the treasury-share disposal/linked EB plan needs further discussion and is deferred for a later final decision; it does not establish disposal completion.",
+    "ambiguities": [
+      "The original disposal decision remains reproduced in the form, but this correction changes its current lifecycle to re-review rather than creating a second disposal event."
+    ]
+  },
+  {
+    "index": 18,
+    "rceptNo": "20251020000309",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "legal-regulatory",
+        "action": "ordered",
+        "state": "correction-requested",
+        "cause": "disclosure-correction",
+        "subjectType": "issuer"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The filing title expressly establishes that the authority imposed a correction order. The underlying treasury-share disposal form is context and must not be duplicated as a new event by this wrapper.",
+    "ambiguities": [
+      "The extracted body lacks a separate narrative describing the order, so the wrapper title supplies the decisive evidence."
+    ]
+  },
+  {
+    "index": 32,
+    "rceptNo": "20251031000581",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The shelf-registration supplement solicits eight separately named ELS offerings. Each is a pending derivative-linked securities offering, so multiplicity eight is preserved.",
+    "ambiguities": []
+  },
+  {
+    "index": 64,
+    "rceptNo": "20251031800937",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "legal-regulatory",
+        "action": "dismissed",
+        "state": "effective",
+        "cause": "litigation",
+        "subjectType": "issuer"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The new fact added by this correction is the appellate court dismissal of the counterparty’s appeal. The reproduced historical business-suspension disclosure is not a second new event and the filing does not newly defer a suspension.",
+    "ambiguities": [
+      "Further appeal remained legally possible, but the disclosed appellate dismissal itself was effective as of receipt."
+    ]
+  },
+  {
+    "index": 72,
+    "rceptNo": "20251031800833",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "asset-transaction",
+        "action": "price-set",
+        "state": "finalized",
+        "cause": "business-disposal",
+        "subjectType": "business"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The correction fixes the final settlement price for an already closed business disposal. It therefore finalizes the price of the business-disposal transaction rather than merely reporting a generic restructuring update.",
+    "ambiguities": []
+  },
+  {
+    "index": 99,
+    "rceptNo": "20251030800831",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "corporate-event",
+        "action": "occurred",
+        "state": "effective",
+        "cause": "serious-industrial-accident",
+        "subjectType": "operations"
+      },
+      {
+        "type": "operating-status",
+        "action": "halted",
+        "state": "active",
+        "cause": "work-stop",
+        "subjectType": "operating-business"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The filing establishes two distinct occurrences: a fatal serious industrial accident and an active partial work-stop order issued for the affected production line.",
+    "ambiguities": []
+  },
+  {
+    "index": 138,
+    "rceptNo": "20251031000262",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "related-party",
+        "action": "contracted",
+        "state": "pending",
+        "cause": "equity-acquisition",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "medium",
+    "rationale": "The board approved and signed the related-party share purchase agreement on the receipt date, while the filing says the acquisition process may still change. Thus the established occurrence is a pending related-party equity-acquisition contract, not completed acquisition.",
+    "ambiguities": [
+      "The form labels the transaction date as the contract-signing date, which can superficially read as an effective acquisition date."
+    ]
+  },
+  {
+    "index": 161,
+    "rceptNo": "20251125000685",
+    "decision": "synthesized",
+    "expectedEvents": [],
+    "labelConfidence": "high",
+    "rationale": "This is an attachment-addition wrapper. It adds supporting material but does not establish a new asset-acquisition occurrence; reproducing the underlying decision would double-count it.",
+    "ambiguities": [
+      "The reproduced body is substantive, but the wrapper action itself is only attachment addition."
+    ]
+  },
+  {
+    "index": 165,
+    "rceptNo": "20251128001918",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "exchangeable-bond",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The board/representative decision establishes a proposed private exchangeable-bond issuance with future payment and issuance mechanics; no completion is established on the receipt date.",
+    "ambiguities": []
+  },
+  {
+    "index": 172,
+    "rceptNo": "20251124000287",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "contingent-capital-securities",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The instrument is expressly a private hybrid/new-capital debt security recognized as capital, so the decision is a proposed contingent-capital-securities issuance, not a convertible bond.",
+    "ambiguities": []
+  },
+  {
+    "index": 188,
+    "rceptNo": "20251128002139",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      },
+      {
+        "type": "capital-change",
+        "action": "solicited",
+        "state": "pending",
+        "cause": "derivative-linked-securities",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The shelf-registration supplement solicits seven separately named ELS offerings. Each is a pending derivative-linked securities offering, and the seven distinct products require seven event occurrences.",
+    "ambiguities": []
+  },
+  {
+    "index": 203,
+    "rceptNo": "20251118000007",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "corporate-action",
+        "action": "initiated",
+        "state": "active",
+        "cause": "tender-offer",
+        "subjectType": "listed-shares"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The tender-offer explanatory statement was filed on the first day of the stated offer period, establishing that the tender offer for listed common shares was initiated and active.",
+    "ambiguities": []
+  },
+  {
+    "index": 219,
+    "rceptNo": "20251128801291",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "related-party",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "related-party-borrowing",
+        "subjectType": "cash"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The subsidiary board decided a future short-term cash borrowing explicitly structured as an inter-affiliate loan. The related-party nature is document-level and the borrowing remained proposed as of the decision.",
+    "ambiguities": [
+      "The lender is not named in the extracted table, but the filing explicitly identifies the form as an inter-affiliate money loan."
+    ]
+  },
+  {
+    "index": 243,
+    "rceptNo": "20251128800672",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "completed",
+        "state": "effective",
+        "cause": "convertible-bond",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The filing states that the private convertible bond was fully paid and issued for the actual amount on 2025-11-28, establishing completed effective issuance.",
+    "ambiguities": []
+  },
+  {
+    "index": 294,
+    "rceptNo": "20251231000232",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "completed",
+        "state": "effective",
+        "cause": "rights-offering",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "Although styled as a correction to the capital-increase decision, the filing expressly states that the full USD subscription amount was received on 2025-12-26. As of the 2025-12-31 receipt, the rights-offering/capital increase was completed and effective.",
+    "ambiguities": [
+      "The newly listed shares had a future listing date, but listing is not required for completion of the paid capital issuance event."
+    ]
+  },
+  {
+    "index": 303,
+    "rceptNo": "20251226000462",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "material-contract",
+        "action": "extended",
+        "state": "effective",
+        "cause": "contract-right",
+        "subjectType": "contract-right"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The correction validly extends the existing put-option/contract-right trigger deadline from 2025-12-31 to 2028-12-31. It changes the effective contract right without recreating the historical share acquisition.",
+    "ambiguities": []
+  },
+  {
+    "index": 345,
+    "rceptNo": "20251231800801",
+    "decision": "candidate-a",
+    "expectedEvents": [
+      {
+        "type": "material-contract",
+        "action": "under-review",
+        "state": "pending",
+        "cause": "supply-contract",
+        "subjectType": "contract"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The correction deletes the expired end date and states that contract-change negotiations are still underway, with another filing promised only after agreement. No executed extension is established.",
+    "ambiguities": []
+  },
+  {
+    "index": 363,
+    "rceptNo": "20251230801257",
+    "decision": "candidate-b",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "completed",
+        "state": "effective",
+        "cause": "rights-offering",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "high",
+    "rationale": "The corrected issuance-results filing confirms full payment and actual issuance of common shares through a third-party allotted capital increase. The canonical cause for the completed paid capital increase is rights-offering.",
+    "ambiguities": [
+      "The securities are common equity, but the disclosed transaction family is 유상증자, canonically represented as rights-offering rather than generic equity-securities."
+    ]
+  }
+]

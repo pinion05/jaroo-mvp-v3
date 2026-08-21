@@ -188,7 +188,7 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
           {facts.map(([label, value]) => (
             <div key={label} className='border-b border-r border-[#EFF1F4] px-4 py-3 last:border-r-0 [&:nth-child(2n)]:border-r-0 [&:nth-last-child(-n+2)]:border-b-0'>
               <div className='text-[10px] text-[#97A0AE]'>{label}</div>
-              <div className={cn('mt-1 text-[14px] font-bold text-[#0F1419]', label === '상승 여력' && upside !== null && upside > 0 ? 'text-[#1A9D55]' : undefined)}>{value}</div>
+              <div className={cn('mt-1 text-[14px] font-bold text-[#0F1419]', label === '상승 여력' && upside !== null && upside > 0 ? 'text-[color:var(--jaroo-profit)]' : undefined)}>{value}</div>
             </div>
           ))}
         </div>

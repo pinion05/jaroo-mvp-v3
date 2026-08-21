@@ -1,0 +1,1715 @@
+{
+  "schemaVersion": "jaroo.kr-disclosure-event-semantic-gate.v1",
+  "role": "semantic-family-regression",
+  "cases": [
+    {
+      "id": "temporal-attachment-equity-acquisition",
+      "family": "temporal-decision",
+      "input": {
+        "rceptNo": "20260720000001",
+        "reportName": "[첨부추가] 타법인 주식 및 출자증권 양수결정",
+        "disclosureType": "B",
+        "bodyText": "양수 예정일 | 2026-08-01 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "temporal-decision",
+        "temporal-future",
+        "filing-wrapper"
+      ],
+      "templateKey": "temporal-decision"
+    },
+    {
+      "id": "temporal-bond-disposal-decision",
+      "family": "temporal-decision",
+      "input": {
+        "rceptNo": "20260720800431",
+        "reportName": "주권 관련 사채권의 처분결정",
+        "bodyText": "처분 예정일 | 2026-08-03 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "equity-linked-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "temporal-decision",
+        "temporal-future"
+      ],
+      "templateKey": "temporal-decision"
+    },
+    {
+      "id": "temporal-production-future",
+      "family": "temporal-future",
+      "input": {
+        "rceptNo": "20260720800419",
+        "reportName": "생산중단",
+        "bodyText": "생산중단일 | 2026-08-10 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "operating-status",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "production-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "tags": [
+        "temporal-future"
+      ],
+      "templateKey": "temporal-future"
+    },
+    {
+      "id": "lockup-future-release",
+      "family": "lockup",
+      "input": {
+        "rceptNo": "20260713800438",
+        "reportName": "기타안내사항(안내공시)",
+        "disclosureType": "I",
+        "disclosureDetailType": "I003",
+        "bodyText": "| 1. 제목 | | 보통주 의무보유 기간 만료 안내 | | 의무보유 해제일 | 2026.07.16 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "lockup",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "temporal-future",
+        "confidence-cap"
+      ],
+      "templateKey": "lockup"
+    },
+    {
+      "id": "wrapper-does-not-leak-state",
+      "family": "filing-wrapper",
+      "input": {
+        "rceptNo": "20260720000194",
+        "reportName": "[기재정정] 유상증자결정"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "filing-wrapper",
+        "do-not-regress"
+      ],
+      "templateKey": "filing-wrapper"
+    },
+    {
+      "id": "e004-stock-option-cancellation",
+      "family": "body-contradiction",
+      "input": {
+        "rceptNo": "20260716000632",
+        "reportName": "[기재정정] 주식매수선택권부여에관한신고",
+        "disclosureDetailType": "E004",
+        "bodyText": "정정 사유 | 일부 부여 취소 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "cancelled",
+          "state": "effective",
+          "cause": "stock-option",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "correction-delta",
+        "type-boundary"
+      ],
+      "templateKey": "body-contradiction"
+    },
+    {
+      "id": "c004-share-exchange-completed",
+      "family": "body-contradiction",
+      "input": {
+        "rceptNo": "20260630000857",
+        "reportName": "합병등종료보고서",
+        "disclosureDetailType": "C004",
+        "bodyText": "주식교환 절차 완료 결과"
+      },
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "share-exchange",
+          "subjectType": "issuer"
+        }
+      ],
+      "tags": [
+        "type-boundary"
+      ],
+      "templateKey": "body-contradiction"
+    },
+    {
+      "id": "c004-securities-body-override",
+      "family": "body-contradiction",
+      "input": {
+        "rceptNo": "20260716000044",
+        "reportName": "투자설명서",
+        "disclosureDetailType": "C004",
+        "bodyText": "투자설명서 | 지분증권 발행"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "published",
+          "state": "effective",
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "type-boundary"
+      ],
+      "templateKey": "body-contradiction"
+    },
+    {
+      "id": "voluntary-dissolution-not-insolvency",
+      "family": "voluntary-dissolution",
+      "input": {
+        "rceptNo": "20260721800196",
+        "reportName": "종속회사 자진해산 결정",
+        "bodyText": "자발적 청산을 이사회에서 결정"
+      },
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "voluntary-liquidation",
+          "subjectType": "subsidiary"
+        }
+      ],
+      "tags": [
+        "type-boundary"
+      ],
+      "templateKey": "voluntary-dissolution"
+    },
+    {
+      "id": "j001-cash-lending-decision",
+      "family": "related-party",
+      "input": {
+        "rceptNo": "20260630000860",
+        "reportName": "특수관계인에 대한 자금대여 예정",
+        "disclosureDetailType": "J001",
+        "bodyText": "대여 예정일 | 2026-08-01 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-loan",
+          "subjectType": "contract"
+        }
+      ],
+      "tags": [
+        "related-party",
+        "temporal-future"
+      ],
+      "templateKey": "related-party"
+    },
+    {
+      "id": "j001-contract-right-update",
+      "family": "related-party",
+      "input": {
+        "rceptNo": "20260716000760",
+        "reportName": "특수관계인과의 계약 권리의무 승계",
+        "disclosureDetailType": "J001",
+        "bodyText": "계약상 권리와 의무를 승계함"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "effective",
+          "cause": "related-party-contract-right-updated",
+          "subjectType": "contract-right"
+        }
+      ],
+      "tags": [
+        "related-party"
+      ],
+      "templateKey": "related-party"
+    },
+    {
+      "id": "j001-securities-purchase",
+      "family": "related-party",
+      "input": {
+        "rceptNo": "20260710000577",
+        "reportName": "특수관계인으로부터 유가증권 매수",
+        "disclosureDetailType": "J001",
+        "bodyText": "유가증권 매수 완료"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "purchased",
+          "state": "effective",
+          "cause": "securities-purchase",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "related-party"
+      ],
+      "templateKey": "related-party"
+    },
+    {
+      "id": "status-blank-release-time",
+      "family": "trading-status",
+      "input": {
+        "rceptNo": "20260715800397",
+        "reportName": "매매거래정지 및 정지해제(중요내용공시)",
+        "bodyText": "정지해제 일시 | - |"
+      },
+      "expectedEvents": [
+        {
+          "type": "trading-status",
+          "action": "halted",
+          "state": "effective",
+          "cause": "material-disclosure",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "status-empty-field",
+        "confidence-cap"
+      ],
+      "templateKey": "trading-status"
+    },
+    {
+      "id": "issuance-result-completed",
+      "family": "temporal-completed",
+      "input": {
+        "rceptNo": "20260721800385",
+        "reportName": "유상증자 발행결과",
+        "bodyText": "발행 및 납입 완료"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "temporal-completed",
+        "do-not-regress"
+      ],
+      "templateKey": "temporal-completed"
+    },
+    {
+      "id": "guarantee-future-decision",
+      "family": "temporal-decision",
+      "input": {
+        "rceptNo": "20260720800591",
+        "reportName": "타인에 대한 채무보증 결정",
+        "bodyText": "보증 시작일 | 2026-08-01 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "debt-guarantee",
+          "subjectType": "contract"
+        }
+      ],
+      "tags": [
+        "temporal-decision",
+        "temporal-future"
+      ],
+      "templateKey": "temporal-decision"
+    },
+    {
+      "id": "j001-equity-investment-decision",
+      "family": "related-party",
+      "templateKey": "related-party-equity-investment",
+      "input": {
+        "rceptNo": "20260721000660",
+        "reportName": "특수관계인 계열사 출자 예정",
+        "disclosureDetailType": "J001",
+        "bodyText": "계열회사 지분 출자 예정일 | 2026-08-10 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "affiliate-equity-investment",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "related-party",
+        "temporal-future"
+      ]
+    },
+    {
+      "id": "j001-goods-services-change",
+      "family": "related-party",
+      "templateKey": "related-party-goods-services",
+      "input": {
+        "rceptNo": "20260630000850",
+        "reportName": "특수관계인 상품·용역 거래금액 변경",
+        "disclosureDetailType": "J001",
+        "bodyText": "상품 및 용역 거래금액 변경"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "changed",
+          "state": "effective",
+          "cause": "internal-goods-services",
+          "subjectType": "contract"
+        }
+      ],
+      "tags": [
+        "related-party"
+      ]
+    },
+    {
+      "id": "j001-completed-share-disposal",
+      "family": "related-party",
+      "templateKey": "related-party-share-disposal",
+      "input": {
+        "rceptNo": "20260716000336",
+        "reportName": "특수관계인 대상 주식 처분 완료",
+        "disclosureDetailType": "J001",
+        "bodyText": "계열회사 주식 처분 완료 결과"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "disposed",
+          "state": "effective",
+          "cause": "affiliate-share-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "related-party",
+        "temporal-completed"
+      ]
+    },
+    {
+      "id": "j001-future-securities-purchase",
+      "family": "related-party",
+      "templateKey": "related-party-securities-purchase-future",
+      "input": {
+        "rceptNo": "20260710000577",
+        "reportName": "특수관계인으로부터 유가증권 매수 예정",
+        "disclosureDetailType": "J001",
+        "bodyText": "유가증권 매수 예정일 | 2026-08-01 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "securities-purchase",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "related-party",
+        "temporal-future"
+      ]
+    },
+    {
+      "id": "c004-share-exchange-priority-collision",
+      "family": "body-contradiction",
+      "templateKey": "c004-share-exchange-priority",
+      "input": {
+        "rceptNo": "20260630000857",
+        "reportName": "투자설명서",
+        "disclosureDetailType": "C004",
+        "bodyText": "지분증권 투자설명서 | 주식의 포괄적 교환 및 이전 결정"
+      },
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "share-exchange",
+          "subjectType": "issuer"
+        }
+      ],
+      "tags": [
+        "type-boundary",
+        "priority-collision"
+      ]
+    },
+    {
+      "id": "temporal-completed-listing-beats-future",
+      "family": "temporal-facts",
+      "input": {
+        "rceptNo": "20260713000324",
+        "reportName": "해외증권시장주권등상장",
+        "bodyText": "상장일자 | 2026.07.10 | 나스닥에 상장하였습니다. 추가 상장 예정일 | 2026.07.29 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "listed",
+          "state": "effective",
+          "cause": "overseas-listing",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "temporal-facts"
+      ],
+      "templateKey": "temporal-facts"
+    },
+    {
+      "id": "temporal-rehabilitation-deferred",
+      "family": "temporal-facts",
+      "input": {
+        "rceptNo": "20260716000129",
+        "reportName": "[기재정정]주요사항보고서(회생절차개시신청)",
+        "bodyText": "회생절차 개시여부 결정을 2026년 8월 14일까지 보류하기로 결정"
+      },
+      "expectedEvents": [
+        {
+          "type": "insolvency",
+          "action": "applied",
+          "state": "deferred",
+          "cause": "rehabilitation",
+          "subjectType": "issuer"
+        }
+      ],
+      "tags": [
+        "temporal-facts"
+      ],
+      "templateKey": "temporal-facts"
+    },
+    {
+      "id": "temporal-proxy-future-start",
+      "family": "temporal-facts",
+      "input": {
+        "rceptNo": "20260720000087",
+        "reportName": "의결권대리행사권유참고서류",
+        "disclosureDetailType": "D003",
+        "bodyText": "권유 시작일 | 2026년 07월 25일 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "proxy-solicitation",
+          "subjectType": "governance"
+        }
+      ],
+      "tags": [
+        "temporal-facts"
+      ],
+      "templateKey": "temporal-facts"
+    },
+    {
+      "id": "temporal-guarantee-effective-same-day",
+      "family": "temporal-facts",
+      "input": {
+        "rceptNo": "20260716801010",
+        "reportName": "타인에대한채무보증결정",
+        "bodyText": "채무보증기간 | 2026-07-16부터 채무 변제시까지 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "guaranteed",
+          "state": "effective",
+          "cause": "debt-guarantee",
+          "subjectType": "contract"
+        }
+      ],
+      "tags": [
+        "temporal-facts"
+      ],
+      "templateKey": "temporal-facts"
+    },
+    {
+      "id": "temporal-designation-next-day",
+      "family": "temporal-facts",
+      "input": {
+        "rceptNo": "20260715800850",
+        "reportName": "불성실공시법인지정",
+        "bodyText": "지정ㆍ부과일자 | 2026-07-16 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "disclosure-compliance",
+          "subjectType": "issuer"
+        }
+      ],
+      "tags": [
+        "temporal-facts"
+      ],
+      "templateKey": "temporal-facts"
+    },
+    {
+      "id": "status-halt-and-lift",
+      "family": "status-fsm",
+      "input": {
+        "rceptNo": "20260716800429",
+        "reportName": "매매거래정지및정지해제(중요내용공시)",
+        "bodyText": "매매거래정지 일시 | 2026-07-16 | 14:28 | 매매거래정지 해제일시 | 2026-07-16 | 14:58 | 매매거래정지 사유 | 주식소각 10%이상 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "trading-status",
+          "action": "halted",
+          "state": "effective",
+          "cause": "share-cancellation",
+          "subjectType": "listed-shares"
+        },
+        {
+          "type": "trading-status",
+          "action": "lifted",
+          "state": "lifted",
+          "cause": "share-cancellation",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "tags": [
+        "status-fsm"
+      ],
+      "templateKey": "status-fsm"
+    },
+    {
+      "id": "status-existing-capital-reduction-halt",
+      "family": "status-fsm",
+      "input": {
+        "rceptNo": "20260715800397",
+        "reportName": "매매거래정지및정지해제(풍문등조회공시)",
+        "bodyText": "매매거래정지 일시 | - | - | 매매거래정지 해제일시 | - | - | 기존 감자결정에 따른 변경상장절차 관련 매매거래정지 중"
+      },
+      "expectedEvents": [
+        {
+          "type": "trading-status",
+          "action": "unchanged",
+          "state": "effective",
+          "cause": "capital-reduction",
+          "subjectType": "listed-shares"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "status-fsm"
+      ],
+      "templateKey": "status-fsm"
+    },
+    {
+      "id": "c004-securities-registration-filed",
+      "family": "detail-prior",
+      "input": {
+        "rceptNo": "20260706000312",
+        "reportName": "[기재정정]증권신고서(주식의포괄적교환ㆍ이전)",
+        "disclosureDetailType": "C004"
+      },
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "filed",
+          "state": null,
+          "cause": "share-exchange",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "detail-prior"
+      ],
+      "templateKey": "detail-prior"
+    },
+    {
+      "id": "e003-body-securities-object",
+      "family": "detail-prior",
+      "input": {
+        "rceptNo": "20260709000344",
+        "reportName": "합병등종료보고서(자산양수도)",
+        "disclosureDetailType": "E003",
+        "bodyText": "타법인 주식 및 출자증권 양수결정에 관한 종료보고서. 주식양수가 완료되어 거래가 종료됨."
+      },
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "equity-acquisition",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "detail-prior"
+      ],
+      "templateKey": "detail-prior"
+    },
+    {
+      "id": "subsidiary-liquidation-resolution",
+      "family": "ontology-carveout",
+      "input": {
+        "rceptNo": "20260721800196",
+        "reportName": "해산사유발생(종속회사의주요경영사항)",
+        "bodyText": "종속회사 경영효율성 제고를 위한 청산 결의"
+      },
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "voluntary-liquidation",
+          "subjectType": "subsidiary"
+        }
+      ],
+      "tags": [
+        "ontology-carveout"
+      ],
+      "templateKey": "ontology-carveout"
+    },
+    {
+      "id": "j001-fund-transactions-title-first",
+      "family": "related-party-title-first",
+      "input": {
+        "rceptNo": "20260714000498",
+        "reportName": "계열금융회사의약관에의한금융거래-[유가증권-수익증권]",
+        "disclosureDetailType": "J001",
+        "bodyText": "금융상품 거래조건 변경 boilerplate | 수익증권내역 | 매입 | 매도 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "reported",
+          "state": "effective",
+          "cause": "fund-security-transactions",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "related-party-title-first"
+      ],
+      "templateKey": "related-party-title-first"
+    },
+    {
+      "id": "j001-derivative-title-first",
+      "family": "related-party-title-first",
+      "input": {
+        "rceptNo": "20260714000271",
+        "reportName": "계열금융회사의약관에의한금융거래-[파생금융상품]",
+        "disclosureDetailType": "J001",
+        "bodyText": "상품 설명 변경 | 거래유형 | 스왑 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "reported",
+          "state": "effective",
+          "cause": "derivative-swap-transactions",
+          "subjectType": "contract"
+        }
+      ],
+      "tags": [
+        "related-party-title-first"
+      ],
+      "templateKey": "related-party-title-first"
+    },
+    {
+      "id": "j001-securities-purchase-effective-date",
+      "family": "related-party-title-first",
+      "input": {
+        "rceptNo": "20260710000577",
+        "reportName": "특수관계인으로부터기타유가증권매수",
+        "disclosureDetailType": "J001",
+        "bodyText": "거래일자 | 2026년 7월 10일 | 만기일 | 2026년 8월 31일 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "purchased",
+          "state": "effective",
+          "cause": "securities-purchase",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "related-party-title-first"
+      ],
+      "templateKey": "related-party-title-first"
+    },
+    {
+      "id": "short-term-debt-limit",
+      "family": "specific-ontology",
+      "input": {
+        "rceptNo": "20260720800459",
+        "reportName": "단기차입금증가결정",
+        "bodyText": "기업어음 및 전자단기사채 발행한도 증액 결정"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "short-term-debt-issuance-limit",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "specific-ontology"
+      ],
+      "templateKey": "specific-ontology"
+    },
+    {
+      "id": "supplier-payment-report",
+      "family": "specific-ontology",
+      "input": {
+        "rceptNo": "20260521000404",
+        "reportName": "지급수단별ㆍ지급기간별지급금액및분쟁조정기구에관한사항",
+        "bodyText": "지급수단별 지급금액 | 지급기간별 지급금액"
+      },
+      "expectedEvents": [
+        {
+          "type": "supplier-payment",
+          "action": "reported",
+          "state": null,
+          "cause": "subcontract-payment-terms",
+          "subjectType": "issuer"
+        }
+      ],
+      "tags": [
+        "specific-ontology"
+      ],
+      "templateKey": "specific-ontology"
+    },
+    {
+      "id": "decision-future-warrant-bond",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260702000000",
+        "reportName": "주요사항보고서(자기신주인수권부사채만기전취득결정)",
+        "bodyText": "취득 결정일 | 2026년 07월 02일 | 지급(예정)일 | 2026년 07월 09일 | 관련 공시: 발행결과"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "warrant-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "decision-future-warrant-bond"
+    },
+    {
+      "id": "creditor-management-generic-deferral",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260701000000",
+        "reportName": "[기재정정]주요사항보고서(채권은행등의관리절차개시)",
+        "bodyText": "관리절차 개시 | 제1호 의안 금융채권자협의회 구성 | 제2호 의안 채권행사 유예대상 채권범위 결정"
+      },
+      "expectedEvents": [
+        {
+          "type": "insolvency",
+          "action": "initiated",
+          "state": "effective",
+          "cause": "creditor-bank-management",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "creditor-management-generic-deferral"
+    },
+    {
+      "id": "shelf-registration-future-effectiveness",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260720000000",
+        "reportName": "일괄신고서(채무증권)",
+        "disclosureDetailType": "C002",
+        "bodyText": "일괄신고의 효력발생 예정일 | 2026년 07월 28일 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "debt-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "shelf-registration-future-effectiveness"
+    },
+    {
+      "id": "small-offering-future-schedule",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260716000000",
+        "reportName": "소액공모공시서류(지분증권)",
+        "disclosureDetailType": "C006",
+        "bodyText": "주식청약일 | 2026년 07월 21일 | 주권상장예정일 | 2026년 08월 10일 | 청약결과는 추후 공고"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "filed",
+          "state": "pending",
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "small-offering-future-schedule"
+    },
+    {
+      "id": "withdrawal-beats-stale-plan",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260720000000",
+        "reportName": "임원ㆍ주요주주특정증권등거래계획철회보고서",
+        "bodyText": "기존 거래 예정일 | 2026년 08월 20일 | 해당 계획을 철회함"
+      },
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "withdrawn",
+          "state": "effective",
+          "cause": "insider-trading-plan",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "withdrawal-beats-stale-plan"
+    },
+    {
+      "id": "decision-beats-result-reference",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260720000000",
+        "reportName": "[기재정정]주식소각결정",
+        "bodyText": "주식소각 결정 | 관련공시 자기주식처분결과보고서"
+      },
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "share-cancellation",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "decision-beats-result-reference"
+    },
+    {
+      "id": "rumor-response-followup-date",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260720000000",
+        "reportName": "풍문또는보도에대한해명(미확정)",
+        "bodyText": "현재 구체적으로 결정된 바 없음 | 재공시예정일 | 2026-08-19 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "disclosure-inquiry",
+          "action": "responded",
+          "state": "uncertain",
+          "cause": "rumor-inquiry",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "rumor-response-followup-date"
+    },
+    {
+      "id": "value-up-announcement-wrapper",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260720000000",
+        "reportName": "기업가치제고계획(자율공시)",
+        "bodyText": "향후 목표 | 2027년 상반기 가동 예정 | 결정일자 2026-07-20"
+      },
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "announced",
+          "state": null,
+          "cause": "value-up-plan",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "value-up-announcement-wrapper"
+    },
+    {
+      "id": "business-plan-announcement-proposed",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260706000000",
+        "reportName": "장래사업ㆍ경영계획(공정공시)",
+        "bodyText": "장래 사업 계획을 검토 중이며 구체적 시기는 미확정"
+      },
+      "expectedEvents": [
+        {
+          "type": "corporate-event",
+          "action": "announced",
+          "state": "proposed",
+          "cause": "business-plan",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "business-plan-announcement-proposed"
+    },
+    {
+      "id": "lockup-future-release-despite-result-reference",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260713000000",
+        "reportName": "기타안내사항(안내공시)",
+        "bodyText": "1. 제목 | | 의무보유 기간 만료 안내 | 의무보유 해제일 | 2026.07.16 | 관련공시 발행결과"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "lockup",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "lockup-future-release-despite-result-reference"
+    },
+    {
+      "id": "business-group-report-not-deferred",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260609000000",
+        "reportName": "[기재정정]대규모기업집단현황공시[개별회사]",
+        "bodyText": "정정사유 단순 기재오류 | 위원회 운영결과 보고 | 임기 만료 예정일 2027.03.24"
+      },
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "updated",
+          "state": "effective",
+          "cause": "business-group-status",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "business-group-report-not-deferred"
+    },
+    {
+      "id": "j001-future-cash-donation",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260714000000",
+        "reportName": "특수관계인에대한증여",
+        "disclosureDetailType": "J001",
+        "bodyText": "증여일 | 2026.07.23 | 이사회 의결일 | 2026.07.14 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "cash-donation",
+          "subjectType": "cash"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "j001-future-cash-donation"
+    },
+    {
+      "id": "j001-future-contract-right-update",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260716000000",
+        "reportName": "특수관계인과의내부거래",
+        "disclosureDetailType": "J001",
+        "bodyText": "거래일자 | 2026.07.20 | 계약상 권리의무를 승계하는 거래 | 거래 예정일"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "related-party-contract-right-updated",
+          "subjectType": "contract-right"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "j001-future-contract-right-update"
+    },
+    {
+      "id": "j001-future-securities-borrowing",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260716000000",
+        "reportName": "특수관계인으로부터유가증권차입",
+        "disclosureDetailType": "J001",
+        "bodyText": "차입일 | 2026.07.24 | 유가증권 차입"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "securities-borrowing",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "j001-future-securities-borrowing"
+    },
+    {
+      "id": "j001-future-real-estate-purchase",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260626000000",
+        "reportName": "특수관계인으로부터부동산매수",
+        "disclosureDetailType": "J001",
+        "bodyText": "매매일자 | 2026년 8월내 | 계약체결 예정일자"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "real-estate-purchase",
+          "subjectType": "real-estate"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "j001-future-real-estate-purchase"
+    },
+    {
+      "id": "j001-actual-stock-borrowing",
+      "family": "wrapper-temporal-separation",
+      "input": {
+        "rceptNo": "20260716000000",
+        "reportName": "계열금융회사의약관에의한금융거래-[장단기차입]",
+        "disclosureDetailType": "J001",
+        "bodyText": "차입일 | 2026.07.10 | 차입대상 | 상장주식 | 실제 차입금액 있음"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "borrowed",
+          "state": "effective",
+          "cause": "securities-borrowing",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "wrapper-temporal-separation"
+      ],
+      "templateKey": "j001-actual-stock-borrowing"
+    },
+    {
+      "id": "completed-title-beats-future-schedule",
+      "family": "precedence-regression",
+      "input": {
+        "rceptNo": "20260716000000",
+        "reportName": "소액공모실적보고서",
+        "disclosureDetailType": "C006",
+        "bodyText": "소액공모 실적보고 | 신주 상장예정일 | 2026.08.10 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "equity-securities",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "precedence-regression"
+      ],
+      "templateKey": "completed-title-beats-future-schedule"
+    },
+    {
+      "id": "transaction-completion-beats-decision-title",
+      "family": "precedence-regression",
+      "input": {
+        "rceptNo": "20260720000000",
+        "reportName": "[기재정정]주요사항보고서(타법인주식및출자증권양도결정)",
+        "bodyText": "주식 양도 거래종결 | 매매대금 전액 수령 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "disposed",
+          "state": "effective",
+          "cause": "equity-disposal",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "precedence-regression"
+      ],
+      "templateKey": "transaction-completion-beats-decision-title"
+    },
+    {
+      "id": "periodic-filed-ignores-unrelated-future",
+      "family": "precedence-regression",
+      "input": {
+        "rceptNo": "20260716000000",
+        "reportName": "사업보고서 (2026.04)",
+        "disclosureDetailType": "A001",
+        "bodyText": "향후 계획 예정일 | 2027.03.24 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "filed",
+          "state": null,
+          "cause": "annual-report",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "precedence-regression"
+      ],
+      "templateKey": "periodic-filed-ignores-unrelated-future"
+    },
+    {
+      "id": "insider-plan-report-keeps-underlying-schedule",
+      "family": "precedence-regression",
+      "input": {
+        "rceptNo": "20260720000000",
+        "reportName": "임원ㆍ주요주주특정증권등거래계획보고서",
+        "disclosureDetailType": "D005",
+        "bodyText": "거래시작일(결제일) | 2026.08.20 | 보고의무발생일 | 2026.07.20 |"
+      },
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "scheduled",
+          "state": "pending",
+          "cause": "insider-trading-plan",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "precedence-regression"
+      ],
+      "templateKey": "insider-plan-report-keeps-underlying-schedule"
+    },
+    {
+      "id": "generic-capital-result-keeps-generic-cause",
+      "family": "precedence-regression",
+      "input": {
+        "rceptNo": "20260721000000",
+        "reportName": "유상증자또는주식관련사채등의발행결과(자율공시)",
+        "bodyText": "증권의 종류 | 기명식 보통주 | 발행결과"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "completed",
+          "state": "effective",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "precedence-regression"
+      ],
+      "templateKey": "generic-capital-result-keeps-generic-cause"
+    },
+    {
+      "id": "unrelated-initiated-state-remains-null",
+      "family": "precedence-regression",
+      "input": {
+        "rceptNo": "20260721000000",
+        "reportName": "기타경영사항(자율공시)",
+        "bodyText": "| 1. 제목 | | 경영권 매각 절차 개시 | |"
+      },
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "initiated",
+          "state": null,
+          "cause": "control-sale",
+          "subjectType": "ownership"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "precedence-regression"
+      ],
+      "templateKey": "unrelated-initiated-state-remains-null"
+    },
+    {
+      "id": "q1-report-deadline-extension",
+      "family": "explicit-event-family",
+      "input": {
+        "reportName": "사업보고서제출기한연장신고서 (2025.12)",
+        "disclosureDetailType": "A001",
+        "filedAt": "2026-03-23",
+        "bodyText": "변경된 제출기한 | 2026.04.07 | 제출 기한 연장 사유 | 감사보고서 제출 지연"
+      },
+      "expectedEvents": [
+        {
+          "type": "periodic-report",
+          "action": "extended",
+          "state": "pending",
+          "cause": "annual-report-deadline",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "explicit-family"
+      ],
+      "templateKey": "report-deadline-extension"
+    },
+    {
+      "id": "q1-exchangeable-bond-issuance",
+      "family": "explicit-event-family",
+      "input": {
+        "reportName": "주요사항보고서(교환사채권발행결정)",
+        "filedAt": "2026-03-31",
+        "bodyText": "교환사채권 발행결정 | 이사회결의일 2026.03.31"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "exchangeable-bond",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "explicit-family"
+      ],
+      "templateKey": "exchangeable-bond"
+    },
+    {
+      "id": "q1-warrant-bond-sale-rescheduled",
+      "family": "correction-lifecycle",
+      "input": {
+        "reportName": "[기재정정]주요사항보고서(자기신주인수권부사채매도결정)",
+        "filedAt": "2026-03-26",
+        "bodyText": "정정사항 | 정정사유 | 매도대금 수령(예정)일 변경 | 정정 전 2026.03.27 | 정정 후 2026.06.26"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "rescheduled",
+          "state": "pending",
+          "cause": "warrant-bond-sale",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "q1-promoted",
+        "correction"
+      ],
+      "templateKey": "warrant-bond-sale"
+    },
+    {
+      "id": "q1-company-demerger-decision",
+      "family": "explicit-event-family",
+      "input": {
+        "reportName": "주요사항보고서(회사분할결정)",
+        "filedAt": "2026-03-26",
+        "bodyText": "회사분할 결정 | 분할기일 2026.06.01"
+      },
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "demerger",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "explicit-family"
+      ],
+      "templateKey": "company-demerger"
+    },
+    {
+      "id": "q1-convertible-call-option-exercise",
+      "family": "explicit-event-family",
+      "input": {
+        "reportName": "주요사항보고서(제3자의전환사채매수선택권행사)",
+        "filedAt": "2026-03-26",
+        "bodyText": "매수선택권 행사 통지 완료"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "exercised",
+          "state": "effective",
+          "cause": "convertible-bond-call-option",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "explicit-family"
+      ],
+      "templateKey": "convertible-call-option"
+    },
+    {
+      "id": "q1-convertible-call-option-designation",
+      "family": "explicit-event-family",
+      "input": {
+        "reportName": "주요사항보고서(전환사채매수선택권행사자지정)",
+        "filedAt": "2026-03-26",
+        "bodyText": "매수선택권 행사자를 지정함"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "designated",
+          "state": "effective",
+          "cause": "convertible-bond-call-option",
+          "subjectType": "securities"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "q1-promoted",
+        "explicit-family"
+      ],
+      "templateKey": "convertible-call-option"
+    },
+    {
+      "id": "q1-business-disposal-completed",
+      "family": "correction-lifecycle",
+      "input": {
+        "reportName": "[기재정정]주요사항보고서(영업양도결정)",
+        "filedAt": "2026-03-19",
+        "bodyText": "정정신고 | 정정사항 | 거래종결일 2025.12.01 이후 예치금정산 | 최종양수도금액 확정"
+      },
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "q1-promoted",
+        "correction"
+      ],
+      "templateKey": "business-disposal"
+    },
+    {
+      "id": "q1-split-merger-completed",
+      "family": "restructuring-subtype",
+      "input": {
+        "reportName": "증권발행실적보고서(합병등)",
+        "disclosureDetailType": "C004",
+        "filedAt": "2026-02-25",
+        "bodyText": "증권발행 결과보고서 | 분할합병 일정 완료"
+      },
+      "expectedEvents": [
+        {
+          "type": "restructuring",
+          "action": "completed",
+          "state": "effective",
+          "cause": "split-merger",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "q1-promoted",
+        "restructuring"
+      ],
+      "templateKey": "split-merger"
+    },
+    {
+      "id": "q1-correction-creditor-management-predicate",
+      "family": "correction-predicate-preservation",
+      "input": {
+        "reportName": "[기재정정]주요사항보고서(채권은행등의관리절차개시)",
+        "bodyText": "정정 신고 | 정정사항 | 관리범위 및 내용 | 금융채권자협의회 결의사항 추가"
+      },
+      "expectedEvents": [
+        {
+          "type": "insolvency",
+          "action": "initiated",
+          "state": "effective",
+          "cause": "creditor-bank-management",
+          "subjectType": "issuer"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "q1-promoted",
+        "correction",
+        "predicate-preservation"
+      ],
+      "templateKey": "creditor-management-correction"
+    },
+    {
+      "id": "q1-correction-business-suspension-predicate",
+      "family": "correction-predicate-preservation",
+      "input": {
+        "reportName": "[기재정정]주요사항보고서(영업정지)",
+        "filedAt": "2026-03-16",
+        "bodyText": "정정 신고 | 정정사항 | 영업정지일자 | 연장영업 | 정정 전 2026.03.17 | 정정 후 2026.04.16"
+      },
+      "expectedEvents": [
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": "proposed",
+          "cause": "business-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "q1-promoted",
+        "correction",
+        "predicate-preservation"
+      ],
+      "templateKey": "business-suspension-correction"
+    },
+    {
+      "id": "q1-correction-proxy-solicitation-predicate",
+      "family": "correction-predicate-preservation",
+      "input": {
+        "reportName": "[기재정정]의결권대리행사권유참고서류",
+        "bodyText": "정정 신고 | 정정사항 | 단순오기재 | 주주총회 목적사항"
+      },
+      "expectedEvents": [
+        {
+          "type": "governance",
+          "action": "solicited",
+          "state": "effective",
+          "cause": "proxy-solicitation",
+          "subjectType": "governance"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "q1-promoted",
+        "correction",
+        "predicate-preservation"
+      ],
+      "templateKey": "proxy-solicitation-correction"
+    },
+    {
+      "id": "q1-related-party-business-transfer-update",
+      "family": "related-party-object-semantics",
+      "input": {
+        "reportName": "특수관계인에대한영업양도",
+        "filedAt": "2026-03-11",
+        "disclosureDetailType": "J001",
+        "bodyText": "영업양수도계약 변경합의서 체결을 이사회에서 승인 | 양도일자 2026.03.11 | 양도목적물 콘텐츠 사업부문"
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "updated",
+          "state": "effective",
+          "cause": "business-transfer",
+          "subjectType": "operating-business"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "q1-promoted",
+        "related-party",
+        "object-semantics"
+      ],
+      "templateKey": "related-party-business-transfer"
+    },
+    {
+      "id": "qualitative-correction-appeal-dismissed-suspension-deferred",
+      "family": "body-lifecycle-multi-event",
+      "input": {
+        "rceptNo": "20251031800937",
+        "reportName": "[기재정정]거래처와의거래중단",
+        "filedAt": "2025-10-31",
+        "bodyText": "정정사유 최초 공시 이후 경과사항 안내. 2025. 6. 30. 대구고등법원의 집행정지신청 인용 결정(항소심 판결 선고일로부터 30일이 되는 날까지 입찰참가자격제한처분 효력 정지). 2025. 10. 31. 대구고등법원 제2심 판결 결과: 항소 기각."
+      },
+      "expectedEvents": [
+        {
+          "type": "legal-regulatory",
+          "action": "dismissed",
+          "state": "effective",
+          "cause": "litigation",
+          "subjectType": "issuer"
+        },
+        {
+          "type": "operating-status",
+          "action": "updated",
+          "state": "deferred",
+          "cause": "business-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "qualitative-feedback",
+        "correction",
+        "multi-event",
+        "temporal"
+      ],
+      "templateKey": "appeal-dismissal-suspended-restriction"
+    },
+    {
+      "id": "qualitative-generic-management-business-disposal-final-settlement",
+      "family": "generic-title-body-rescue",
+      "input": {
+        "rceptNo": "20251031800833",
+        "reportName": "[기재정정]기타경영사항(자율공시)",
+        "filedAt": "2025-10-31",
+        "bodyText": "정정사유 거래 정산에 따른 양도가액 최종 확정. 제목 편광필름 사업 양도. 거래 종결일(2025.09.01)을 기준으로 정산한 최종 확정금액이며 양도가액은 1조 1,825억 원임."
+      },
+      "expectedEvents": [
+        {
+          "type": "asset-transaction",
+          "action": "price-set",
+          "state": "finalized",
+          "cause": "business-disposal",
+          "subjectType": "business"
+        }
+      ],
+      "expectedConfidence": "medium",
+      "tags": [
+        "qualitative-feedback",
+        "correction",
+        "generic-title",
+        "body-rescue"
+      ],
+      "templateKey": "generic-management-business-disposal-finalized"
+    },
+    {
+      "id": "qualitative-related-party-collateral-approved-before-receipt",
+      "family": "related-party-temporal-object",
+      "input": {
+        "rceptNo": "20251031000598",
+        "reportName": "특수관계인으로부터받은담보",
+        "filedAt": "2025-10-31",
+        "bodyText": "담보제공자는 계열회사 효성화학. 담보물은 토지 및 건물, 기계장치와 대여금채권. 담보받은 일자는 아직 계약 체결 일자가 정해지지 않아 미기재하였으며 2025년 11월 중 체결 예정임. 2025.10.31 ESG경영위원회 의결."
+      },
+      "expectedEvents": [
+        {
+          "type": "related-party",
+          "action": "decided",
+          "state": "proposed",
+          "cause": "collateral-received",
+          "subjectType": "asset"
+        }
+      ],
+      "expectedConfidence": "high",
+      "tags": [
+        "qualitative-feedback",
+        "related-party",
+        "future",
+        "mixed-asset"
+      ],
+      "templateKey": "related-party-collateral-pre-receipt"
+    }
+  ]
+}

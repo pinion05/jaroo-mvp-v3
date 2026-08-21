@@ -8,6 +8,7 @@ import { Card } from '@/components/ui/card'
 import { JarooShell } from '@/components/jaroo-shell'
 import { buildHomeCurrentQuoteQuery } from '@/lib/home-current-quotes'
 import { hydratePortfolioItemsWithCurrentQuotes } from '@/lib/home-quote-bootstrap'
+import { getFinancialValueTextClass } from '@/lib/financial-value-tone'
 import {
   buildMergeRowsFromReviewRows,
   persistAppliedPortfolioFromMergeRows,
@@ -47,7 +48,7 @@ export function MergeResultRowCard({ row, isLast }: { row: MergeRow; isLast: boo
         <MergeMetricChip label='보유 수량' value={row.quantityText} />
         <MergeMetricChip label='평가 금액' value={row.evaluationAmountText} />
         <MergeMetricChip label='평균 단가' value={row.averagePriceText} />
-        <MergeMetricChip label='수익률' value={row.profitRateText} valueClassName='text-[color:var(--jaroo-primary)]' />
+        <MergeMetricChip label='수익률' value={row.profitRateText} valueClassName={getFinancialValueTextClass(row.profitRateText)} />
       </div>
 
       {row.status === 'error' ? (

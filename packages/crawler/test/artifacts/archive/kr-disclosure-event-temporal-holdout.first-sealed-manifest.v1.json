@@ -1,0 +1,23 @@
+{
+  "schemaVersion": "jaroo.kr-disclosure-event-temporal-archive-manifest.v1",
+  "status": "failed-and-burned",
+  "independentClaimEligible": false,
+  "reason": "The one-shot sealed evaluation failed and the cohort was subsequently inspected and used for development feedback.",
+  "fixture": {
+    "path": "packages/crawler/test/fixtures/archive/kr-disclosure-event-temporal-holdout.first-sealed.v1.json",
+    "sha256": "dcadf034dcf1de9d739ac3b01807eb83889b03970243f426c74c8a58226921cd"
+  },
+  "result": {
+    "path": "packages/crawler/test/artifacts/archive/kr-disclosure-event-temporal-holdout.first-sealed-result.v1.json",
+    "sha256": "57f7ee5095a88b4a9445a2d33a38179b7e2375f7edbbcdccddda8b3faedc5f2c",
+    "exactMultisetAccuracy": 0.18333333333333332,
+    "highConfidenceExactPrecision": 0.2391304347826087,
+    "gatePassed": false
+  },
+  "frozenCandidate": {
+    "baseCommit": "e0e621b",
+    "extractorSha256": "a02ad5faa778722bf7a5d4ecf062c6ed0b6154dc6fd9c517130ec634739b31e8",
+    "evaluatorSha256": "4a75379c038f67926de027a6a5f2ca74d27da3920e225d988c47d8d96927f4a7",
+    "workingDiffSha256": "2a1d3c706b0f4f6b37e4aae8a79c7c9870dee55255eaeebcc450b3158d57d956"
+  }
+}

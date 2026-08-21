@@ -7,6 +7,7 @@ import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { JarooShell } from '@/components/jaroo-shell'
+import { getFinancialValueTextClass } from '@/lib/financial-value-tone'
 import { etfAnalysis, type EtfScenarioTone, type EtfTab, type EtfValueTone } from '@/lib/jaroo-data'
 import { cn } from '@/lib/utils'
 
@@ -137,7 +138,7 @@ export default function EtfPage() {
             <h1 className='mt-1 text-[19px] font-medium text-white'>{etfAnalysis.hero.name}</h1>
             <p className='mt-1 text-[34px] leading-none font-medium text-white'>{etfAnalysis.hero.price}</p>
             <div className='mt-3 flex items-center gap-2'>
-              <span className='text-[13px] font-medium text-[#F09595]'>{etfAnalysis.hero.change}</span>
+              <span className={cn('rounded-[8px] bg-white/95 px-2 py-1 text-[13px] font-medium', getFinancialValueTextClass(etfAnalysis.hero.change))}>{etfAnalysis.hero.change}</span>
               <span className='text-[11px] text-white/40'>·</span>
               <span className='text-[11px] text-white/65'>{etfAnalysis.hero.averagePrice}</span>
             </div>
@@ -277,7 +278,7 @@ export default function EtfPage() {
                     <p className='mt-0.5 text-[10px] text-[color:#BBB]'>{item.code}</p>
                   </div>
                   <span className='text-right text-[12px] font-medium text-[color:var(--jaroo-primary)]'>{item.weight}</span>
-                  <span className={cn('text-right text-[11px]', valueToneClass(item.tone))}>{item.change}</span>
+                  <span className={cn('text-right text-[11px]', getFinancialValueTextClass(item.change))}>{item.change}</span>
                 </div>
               ))}
               <div className='border-t border-[color:var(--jaroo-border)] px-4 py-3 text-center text-[11px] text-[color:var(--jaroo-muted)]'>
@@ -333,7 +334,7 @@ export default function EtfPage() {
                     <p className='mt-0.5 text-[10px] text-[color:#BBB]'>{item.issuer}</p>
                   </div>
                   <span className='text-right text-[11px] text-[color:var(--jaroo-muted)]'>{item.aum}</span>
-                  <span className='text-right text-[12px] font-medium text-[color:var(--jaroo-danger)]'>{item.return1y}</span>
+                  <span className={cn('text-right text-[12px] font-medium', getFinancialValueTextClass(item.return1y))}>{item.return1y}</span>
                 </div>
               ))}
             </Card>

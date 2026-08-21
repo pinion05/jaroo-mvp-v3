@@ -6,6 +6,14 @@
  */
 
 import { inflateRawSync } from 'node:zlib';
+import {
+  OPEN_DART_DISCLOSURE_DETAIL_TYPES,
+  OPEN_DART_DISCLOSURE_TYPES,
+} from '../data/kr-disclosure-classification-dataset.js';
+import {
+  buildKrDisclosureLlmDump,
+  buildKrDisclosurePipeline,
+} from '../services/deepscan-kr-disclosure-pipeline.js';
 
 const OPEN_DART_BASE_URL = 'https://opendart.fss.or.kr/api';
 const DART_CORP_CODE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -14,20 +22,21 @@ const DART_DEFAULT_LOOKBACK_DAYS = 90;
 const DART_DEFAULT_TIMEOUT_MS = 15_000;
 const DART_DOCUMENT_CACHE_TTL_MS = 30 * 60 * 1000;
 const DART_DOCUMENT_DUMP_DEFAULT_MAX_CHARS = 15_000;
+const DART_DOCUMENT_DUMP_DEFAULT_MAX_TOTAL_CHARS = 60_000;
 const DART_DOCUMENT_DUMP_DEFAULT_LIMIT = 20;
 const DART_DOCUMENT_DUMP_DEFAULT_CONCURRENCY = 4;
-const DART_DISCLOSURE_TYPES = Object.freeze({
-  A: '정기공시',
-  B: '주요사항보고',
-  C: '발행공시',
-  D: '지분공시',
-  E: '기타공시',
-  F: '외부감사관련',
-  G: '펀드공시',
-  H: '자산유동화',
-  I: '거래소공시',
-  J: '공정위공시',
-});
+const DART_DOCUMENT_MAX_COMPRESSED_BYTES = 8 * 1024 * 1024;
+const DART_DOCUMENT_MAX_ARCHIVE_ENTRIES = 128;
+const DART_DOCUMENT_MAX_ENTRY_BYTES = 4 * 1024 * 1024;
+const DART_DOCUMENT_MAX_DECOMPRESSED_BYTES = 12 * 1024 * 1024;
+const DART_DOCUMENT_MAX_TEXT_CHARS = 2_000_000;
+const DART_COLLECTION_DEFAULT_PAGE_COUNT = 100;
+const DART_COLLECTION_DEFAULT_MAX_PAGES = 3;
+const DART_COLLECTION_DEFAULT_MAX_FILINGS = 300;
+const DART_DISCLOSURE_TYPES = OPEN_DART_DISCLOSURE_TYPES;
+const DART_DISCLOSURE_DETAIL_TYPE_BY_CODE = new Map(
+  OPEN_DART_DISCLOSURE_DETAIL_TYPES.map((entry) => [entry.code, entry]),
+);
 const DART_CORP_CLASS_LABELS = Object.freeze({
   Y: '유가',
   K: '코스닥',
@@ -224,13 +233,39 @@ function normalizeDartOptions(opts = {}) {
     });
   }
 
-  const disclosureType = normalizeEnum(
+  const requestedDisclosureType = normalizeEnum(
     opts.disclosureType ?? opts.pblntfTy ?? opts.pblntf_ty,
     new Set(Object.keys(DART_DISCLOSURE_TYPES)),
     'pblntf_ty',
     'disclosureType',
   );
   const disclosureDetailType = normalizeText(opts.disclosureDetailType ?? opts.pblntfDetailTy ?? opts.pblntf_detail_ty)?.toUpperCase();
+  const disclosureDetailDefinition = disclosureDetailType
+    ? DART_DISCLOSURE_DETAIL_TYPE_BY_CODE.get(disclosureDetailType)
+    : null;
+  if (disclosureDetailType && !disclosureDetailDefinition) {
+    throw new DartDisclosureError('invalid disclosureDetailType', {
+      status: 400,
+      code: 'invalid_enum',
+      details: {
+        key: 'pblntf_detail_ty',
+        value: disclosureDetailType,
+        allowed: OPEN_DART_DISCLOSURE_DETAIL_TYPES.map((entry) => entry.code),
+      },
+    });
+  }
+  if (requestedDisclosureType && disclosureDetailDefinition?.type !== requestedDisclosureType) {
+    throw new DartDisclosureError('disclosureType and disclosureDetailType do not match', {
+      status: 400,
+      code: 'invalid_disclosure_type_pair',
+      details: {
+        disclosureType: requestedDisclosureType,
+        disclosureDetailType,
+        expectedDisclosureType: disclosureDetailDefinition.type,
+      },
+    });
+  }
+  const disclosureType = requestedDisclosureType ?? disclosureDetailDefinition?.type;
   const corpCls = normalizeEnum(
     opts.corpCls ?? opts.corp_cls,
     new Set(Object.keys(DART_CORP_CLASS_LABELS)),
@@ -288,6 +323,17 @@ function redactDartUrl(url) {
   }
 }
 
+function redactDartErrorText(value, requestUrl) {
+  let redacted = String(value ?? 'OpenDART request failed');
+  try {
+    const secret = new URL(String(requestUrl)).searchParams.get('crtfc_key');
+    if (secret) redacted = redacted.split(secret).join('[redacted]');
+  } catch {
+    // The request URL is built locally, but redaction remains best-effort for test doubles.
+  }
+  return redacted.replace(/([?&]crtfc_key=)[^&\s]*/gi, '$1[redacted]');
+}
+
 function parseOpenDartXmlStatus(xmlText) {
   const status = xmlText.match(/<status>\s*([\s\S]*?)\s*<\/status>/i)?.[1]?.trim();
   if (!status) {
@@ -303,17 +349,38 @@ function parseOpenDartXmlStatus(xmlText) {
 function stripDartDocumentToText(value = '') {
   return decodeXmlText(String(value))
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-    .replace(/<style[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<script[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style[\s\S]*?<\/style>/gi, '\n')
+    .replace(/<script[\s\S]*?<\/script>/gi, '\n')
+    .replace(/<\/?(?:p|div|section|article|table|tr|h[1-6]|title|br|li|ul|ol|body|html|head)(?:\s[^>]*)?>/gi, '\n')
+    .replace(/<\/?(?:td|th)(?:\s[^>]*)?>/gi, ' | ')
     .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
+    .replace(/[\t\f\v ]+/g, ' ')
+    .replace(/ *\n */g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
     .trim();
 }
 
-function extractAllTextFilesFromZipBuffer(bufferLike) {
+function resourceLimitError(message, details = null) {
+  return new DartDisclosureError(message, {
+    status: 502,
+    code: 'document_resource_limited',
+    details,
+  });
+}
+
+function extractAllTextFilesFromZipBuffer(bufferLike, opts = {}) {
   const buffer = Buffer.isBuffer(bufferLike) ? bufferLike : Buffer.from(bufferLike);
+  const maxArchiveEntries = opts.maxArchiveEntries ?? DART_DOCUMENT_MAX_ARCHIVE_ENTRIES;
+  const maxEntryBytes = opts.maxEntryBytes ?? DART_DOCUMENT_MAX_ENTRY_BYTES;
+  const maxDecompressedBytes = opts.maxDecompressedBytes ?? DART_DOCUMENT_MAX_DECOMPRESSED_BYTES;
   const head = buffer.subarray(0, Math.min(buffer.length, 200)).toString('utf8').trimStart();
   if (head.startsWith('<?xml') || head.startsWith('<')) {
+    if (buffer.length > maxDecompressedBytes) {
+      throw resourceLimitError('OpenDART XML document exceeds the decompressed byte limit', {
+        byteCount: buffer.length,
+        maxDecompressedBytes,
+      });
+    }
     return [{ fileName: 'document.xml', buffer }];
   }
 
@@ -326,22 +393,57 @@ function extractAllTextFilesFromZipBuffer(bufferLike) {
   }
 
   const totalEntries = buffer.readUInt16LE(eocdOffset + 10);
+  if (totalEntries > maxArchiveEntries) {
+    throw resourceLimitError('OpenDART document ZIP has too many entries', {
+      totalEntries,
+      maxArchiveEntries,
+    });
+  }
   let centralOffset = buffer.readUInt32LE(eocdOffset + 16);
   const files = [];
+  let totalDecompressedBytes = 0;
 
   for (let index = 0; index < totalEntries; index += 1) {
-    if (buffer.readUInt32LE(centralOffset) !== 0x02014b50) break;
+    if (centralOffset + 46 > buffer.length || buffer.readUInt32LE(centralOffset) !== 0x02014b50) {
+      throw new DartDisclosureError('OpenDART document ZIP has an invalid central directory', {
+        status: 502,
+        code: 'provider_invalid_document_zip',
+      });
+    }
 
     const compressionMethod = buffer.readUInt16LE(centralOffset + 10);
     const compressedSize = buffer.readUInt32LE(centralOffset + 20);
+    const declaredUncompressedSize = buffer.readUInt32LE(centralOffset + 24);
     const fileNameLength = buffer.readUInt16LE(centralOffset + 28);
     const extraLength = buffer.readUInt16LE(centralOffset + 30);
     const commentLength = buffer.readUInt16LE(centralOffset + 32);
     const localHeaderOffset = buffer.readUInt32LE(centralOffset + 42);
+    const centralEntryEnd = centralOffset + 46 + fileNameLength + extraLength + commentLength;
+    if (centralEntryEnd > buffer.length) {
+      throw new DartDisclosureError('OpenDART document ZIP has a truncated central directory entry', {
+        status: 502,
+        code: 'provider_invalid_document_zip',
+      });
+    }
     const fileName = buffer.subarray(centralOffset + 46, centralOffset + 46 + fileNameLength).toString('utf8');
 
     if (/(\.xml|\.html?|\.xhtml|\.txt)$/i.test(fileName)) {
-      if (buffer.readUInt32LE(localHeaderOffset) !== 0x04034b50) {
+      if (declaredUncompressedSize > maxEntryBytes) {
+        throw resourceLimitError('OpenDART document ZIP entry exceeds the decompressed byte limit', {
+          fileName,
+          declaredUncompressedSize,
+          maxEntryBytes,
+        });
+      }
+      if (totalDecompressedBytes + declaredUncompressedSize > maxDecompressedBytes) {
+        throw resourceLimitError('OpenDART document ZIP exceeds the total decompressed byte limit', {
+          fileName,
+          totalDecompressedBytes,
+          declaredUncompressedSize,
+          maxDecompressedBytes,
+        });
+      }
+      if (localHeaderOffset + 30 > buffer.length || buffer.readUInt32LE(localHeaderOffset) !== 0x04034b50) {
         throw new DartDisclosureError('OpenDART document ZIP has invalid local header', {
           status: 502,
           code: 'provider_invalid_document_zip',
@@ -352,14 +454,45 @@ function extractAllTextFilesFromZipBuffer(bufferLike) {
       const localFileNameLength = buffer.readUInt16LE(localHeaderOffset + 26);
       const localExtraLength = buffer.readUInt16LE(localHeaderOffset + 28);
       const dataStart = localHeaderOffset + 30 + localFileNameLength + localExtraLength;
+      if (dataStart + compressedSize > buffer.length) {
+        throw new DartDisclosureError('OpenDART document ZIP entry is truncated', {
+          status: 502,
+          code: 'provider_invalid_document_zip',
+          details: { fileName },
+        });
+      }
       const compressed = buffer.subarray(dataStart, dataStart + compressedSize);
-      const fileBuffer = compressionMethod === 0
-        ? compressed
-        : compressionMethod === 8
-          ? inflateRawSync(compressed)
-          : null;
+      let fileBuffer = null;
+      try {
+        fileBuffer = compressionMethod === 0
+          ? compressed
+          : compressionMethod === 8
+            ? inflateRawSync(compressed, { maxOutputLength: Math.min(maxEntryBytes, maxDecompressedBytes - totalDecompressedBytes) })
+            : null;
+      } catch (error) {
+        if (/buffer|output|size|length|memory/i.test(error?.message ?? '')) {
+          throw resourceLimitError('OpenDART document ZIP inflate exceeded its resource budget', {
+            fileName,
+            maxEntryBytes,
+          });
+        }
+        throw new DartDisclosureError('OpenDART document ZIP entry could not be inflated', {
+          status: 502,
+          code: 'provider_invalid_document_zip',
+          details: { fileName },
+        });
+      }
 
       if (fileBuffer) {
+        if (fileBuffer.length > maxEntryBytes || totalDecompressedBytes + fileBuffer.length > maxDecompressedBytes) {
+          throw resourceLimitError('OpenDART document ZIP inflate exceeded its resource budget', {
+            fileName,
+            byteCount: fileBuffer.length,
+            maxEntryBytes,
+            maxDecompressedBytes,
+          });
+        }
+        totalDecompressedBytes += fileBuffer.length;
         files.push({ fileName, buffer: fileBuffer });
       }
     }
@@ -408,7 +541,7 @@ async function fetchWithTimeout(url, { fetchImpl = fetch, timeoutMs = DART_DEFAU
         details: { url: redactDartUrl(url), timeoutMs },
       });
     }
-    throw new DartDisclosureError(error?.message ?? 'OpenDART request failed', {
+    throw new DartDisclosureError(redactDartErrorText(error?.message, url), {
       status: 502,
       code: 'provider_request_failed',
       details: { url: redactDartUrl(url) },
@@ -416,6 +549,50 @@ async function fetchWithTimeout(url, { fetchImpl = fetch, timeoutMs = DART_DEFAU
   } finally {
     if (timer) clearTimeout(timer);
   }
+}
+
+async function readResponseBodyWithLimit(response, maxBytes = DART_DOCUMENT_MAX_COMPRESSED_BYTES) {
+  const declaredLength = Number(response.headers?.get?.('content-length'));
+  if (Number.isFinite(declaredLength) && declaredLength > maxBytes) {
+    throw resourceLimitError('OpenDART document response exceeds the compressed byte limit', {
+      declaredLength,
+      maxBytes,
+    });
+  }
+
+  if (!response.body?.getReader) {
+    const payload = Buffer.from(await response.arrayBuffer());
+    if (payload.length > maxBytes) {
+      throw resourceLimitError('OpenDART document response exceeds the compressed byte limit', {
+        byteCount: payload.length,
+        maxBytes,
+      });
+    }
+    return payload;
+  }
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let totalBytes = 0;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      const chunk = Buffer.from(value);
+      totalBytes += chunk.length;
+      if (totalBytes > maxBytes) {
+        await reader.cancel().catch(() => {});
+        throw resourceLimitError('OpenDART document response exceeds the compressed byte limit', {
+          byteCount: totalBytes,
+          maxBytes,
+        });
+      }
+      chunks.push(chunk);
+    }
+  } finally {
+    reader.releaseLock?.();
+  }
+  return Buffer.concat(chunks, totalBytes);
 }
 
 async function fetchDartJson(path, params, opts = {}) {
@@ -472,7 +649,15 @@ export async function getDartDisclosureDocumentText(rceptNoInput, opts = {}) {
   url.searchParams.set('crtfc_key', apiKey);
   url.searchParams.set('rcept_no', rceptNo);
 
-  const cacheKey = `document:${redactDartUrl(url.toString())}`;
+  const resourcePolicy = {
+    maxCompressedBytes: opts.maxCompressedBytes ?? DART_DOCUMENT_MAX_COMPRESSED_BYTES,
+    maxArchiveEntries: opts.maxArchiveEntries ?? DART_DOCUMENT_MAX_ARCHIVE_ENTRIES,
+    maxEntryBytes: opts.maxEntryBytes ?? DART_DOCUMENT_MAX_ENTRY_BYTES,
+    maxDecompressedBytes: opts.maxDecompressedBytes ?? DART_DOCUMENT_MAX_DECOMPRESSED_BYTES,
+    maxTextChars: opts.maxTextChars ?? DART_DOCUMENT_MAX_TEXT_CHARS,
+  };
+
+  const cacheKey = `document:${redactDartUrl(url.toString())}:${JSON.stringify(resourcePolicy)}`;
   const cached = listCache.get(cacheKey);
   if (cached && Date.now() - cached.fetchedAt < (opts.cacheTtlMs ?? DART_DOCUMENT_CACHE_TTL_MS)) {
     return cached.value;
@@ -490,7 +675,10 @@ export async function getDartDisclosureDocumentText(rceptNoInput, opts = {}) {
     });
   }
 
-  const payload = Buffer.from(await response.arrayBuffer());
+  const payload = await readResponseBodyWithLimit(
+    response,
+    resourcePolicy.maxCompressedBytes,
+  );
   const head = payload.subarray(0, Math.min(payload.length, 800)).toString('utf8').trimStart();
   const xmlStatus = parseOpenDartXmlStatus(head);
   if (xmlStatus && xmlStatus.status !== '000') {
@@ -501,7 +689,7 @@ export async function getDartDisclosureDocumentText(rceptNoInput, opts = {}) {
     });
   }
 
-  const files = extractAllTextFilesFromZipBuffer(payload);
+  const files = extractAllTextFilesFromZipBuffer(payload, resourcePolicy);
   const textFiles = files
     .map((file) => ({
       fileName: file.fileName,
@@ -509,11 +697,19 @@ export async function getDartDisclosureDocumentText(rceptNoInput, opts = {}) {
     }))
     .filter((file) => file.text);
   const text = textFiles.map((file) => file.text).join('\n').trim();
+  const textCharCount = [...text].length;
+  const maxTextChars = resourcePolicy.maxTextChars;
+  if (textCharCount > maxTextChars) {
+    throw resourceLimitError('OpenDART normalized document text exceeds the character limit', {
+      textCharCount,
+      maxTextChars,
+    });
+  }
   const result = {
     source: 'opendart-document',
     rceptNo,
     text,
-    charCount: [...text].length,
+    charCount: textCharCount,
     byteCount: Buffer.byteLength(text, 'utf8'),
     wordishCount: text ? text.split(/\s+/).filter(Boolean).length : 0,
     fileCount: textFiles.length,
@@ -533,6 +729,12 @@ export async function buildDartDisclosureDocumentDump(filings = [], opts = {}) {
     DART_DOCUMENT_DUMP_DEFAULT_MAX_CHARS,
     { max: 500_000 },
   );
+  const maxTotalChars = normalizePositiveInteger(
+    opts.maxTotalChars ?? opts.documentMaxTotalChars,
+    'maxTotalChars',
+    DART_DOCUMENT_DUMP_DEFAULT_MAX_TOTAL_CHARS,
+    { max: 500_000 },
+  );
   const limit = normalizePositiveInteger(
     opts.limit ?? opts.documentLimit,
     'documentLimit',
@@ -542,7 +744,7 @@ export async function buildDartDisclosureDocumentDump(filings = [], opts = {}) {
   const fetchLimit = normalizePositiveInteger(
     opts.fetchLimit ?? opts.documentFetchLimit,
     'documentFetchLimit',
-    sourceFilings.length || limit,
+    limit,
     { max: 100 },
   );
   const concurrency = normalizePositiveInteger(
@@ -551,91 +753,45 @@ export async function buildDartDisclosureDocumentDump(filings = [], opts = {}) {
     DART_DOCUMENT_DUMP_DEFAULT_CONCURRENCY,
     { max: 10 },
   );
-  const candidates = sourceFilings
+  const selectedFilings = sourceFilings.every((filing) => filing?.primaryCategory && filing?.dumpPolicy)
+    ? sourceFilings
+    : buildKrDisclosurePipeline({
+        source: 'opendart',
+        summary: { totalCount: sourceFilings.length },
+        filings: sourceFilings,
+      }, { selectionLimit: Math.max(1, Math.min(200, sourceFilings.length || 1)) }).selected;
+  const effectiveFetchLimit = Math.min(limit, fetchLimit);
+  const candidates = selectedFilings
+    .filter((filing) => filing.dumpPolicy !== 'metadata_only')
     .filter((filing) => normalizeText(filing?.rceptNo ?? filing?.rcept_no))
-    .slice(0, fetchLimit);
+    .slice(0, effectiveFetchLimit);
 
   const fetched = await mapWithConcurrency(candidates, concurrency, async (filing) => {
     const rceptNo = normalizeText(filing.rceptNo ?? filing.rcept_no);
     try {
       return {
-        filing,
+        rceptNo,
         document: await getDartDisclosureDocumentText(rceptNo, opts),
         error: null,
       };
     } catch (error) {
       return {
-        filing,
+        rceptNo,
         document: null,
-        error: normalizeText(error?.message) ?? 'document fetch failed',
+        error: {
+          code: normalizeText(error?.code) ?? 'document_fetch_failed',
+          message: normalizeText(error?.message) ?? 'document fetch failed',
+          details: error?.details ?? null,
+        },
       };
     }
   });
 
-  const included = [];
-  const skipped = [];
-  for (const entry of fetched) {
-    const filing = entry.filing;
-    const rceptNo = normalizeText(filing.rceptNo ?? filing.rcept_no) ?? null;
-    const reportName = normalizeText(filing.reportName ?? filing.report_nm) ?? '';
-    const receiptDate = normalizeText(filing.receiptDate ?? filing.rcept_dt) ?? null;
-    const filerName = normalizeText(filing.filerName ?? filing.flr_nm) ?? null;
-
-    if (!entry.document) {
-      skipped.push({ rceptNo, reportName, receiptDate, filerName, reason: 'fetch_failed', error: entry.error });
-      continue;
-    }
-
-    const charCount = entry.document.charCount;
-    if (charCount >= maxCharsPerFiling) {
-      skipped.push({ rceptNo, reportName, receiptDate, filerName, reason: 'too_long', charCount });
-      continue;
-    }
-
-    if (included.length >= limit) {
-      skipped.push({ rceptNo, reportName, receiptDate, filerName, reason: 'limit_exceeded', charCount });
-      continue;
-    }
-
-    included.push({
-      rceptNo,
-      reportName,
-      receiptDate,
-      filerName,
-      charCount,
-      wordishCount: entry.document.wordishCount,
-      text: entry.document.text,
-    });
-  }
-
-  const combinedText = included
-    .map((entry, index) => [
-      `[${index + 1}] ${entry.receiptDate ?? 'date-unknown'} · ${entry.reportName || '제목 없음'}${entry.filerName ? ` · 제출:${entry.filerName}` : ''} · ${entry.rceptNo ?? 'receipt-unknown'} · ${entry.charCount}자`,
-      entry.text,
-    ].join('\n'))
-    .join('\n\n---\n\n');
-
-  const skippedTooLongCount = skipped.filter((entry) => entry.reason === 'too_long').length;
-  const skippedUnavailableCount = skipped.filter((entry) => entry.reason === 'fetch_failed').length;
-
-  return {
-    available: included.length > 0,
-    source: 'opendart-document',
-    policy: 'skip_gte_max_chars_then_take_first_limit',
+  return buildKrDisclosureLlmDump(selectedFilings, fetched, {
     maxCharsPerFiling,
-    limit,
-    fetchLimit,
-    fetchedCount: fetched.length,
-    includedCount: included.length,
-    skippedCount: skipped.length,
-    skippedTooLongCount,
-    skippedUnavailableCount,
-    totalCharCount: included.reduce((sum, entry) => sum + entry.charCount, 0),
-    combinedText,
-    filings: included,
-    skipped,
-    generatedAt: new Date().toISOString(),
-  };
+    maxTotalChars,
+    limit: effectiveFetchLimit,
+  });
 }
 
 function decodeXmlText(value = '') {
@@ -712,7 +868,12 @@ export function extractFirstXmlFromZipBuffer(bufferLike) {
   let centralOffset = buffer.readUInt32LE(eocdOffset + 16);
 
   for (let index = 0; index < totalEntries; index += 1) {
-    if (buffer.readUInt32LE(centralOffset) !== 0x02014b50) break;
+    if (centralOffset + 46 > buffer.length || buffer.readUInt32LE(centralOffset) !== 0x02014b50) {
+      throw new DartDisclosureError('OpenDART corpCode ZIP has an invalid central directory', {
+        status: 502,
+        code: 'provider_invalid_zip',
+      });
+    }
 
     const compressionMethod = buffer.readUInt16LE(centralOffset + 10);
     const compressedSize = buffer.readUInt32LE(centralOffset + 20);
@@ -720,10 +881,17 @@ export function extractFirstXmlFromZipBuffer(bufferLike) {
     const extraLength = buffer.readUInt16LE(centralOffset + 30);
     const commentLength = buffer.readUInt16LE(centralOffset + 32);
     const localHeaderOffset = buffer.readUInt32LE(centralOffset + 42);
+    const centralEntryEnd = centralOffset + 46 + fileNameLength + extraLength + commentLength;
+    if (centralEntryEnd > buffer.length) {
+      throw new DartDisclosureError('OpenDART corpCode ZIP has a truncated central directory entry', {
+        status: 502,
+        code: 'provider_invalid_zip',
+      });
+    }
     const fileName = buffer.subarray(centralOffset + 46, centralOffset + 46 + fileNameLength).toString('utf8');
 
     if (/\.xml$/i.test(fileName) || index === 0) {
-      if (buffer.readUInt32LE(localHeaderOffset) !== 0x04034b50) {
+      if (localHeaderOffset + 30 > buffer.length || buffer.readUInt32LE(localHeaderOffset) !== 0x04034b50) {
         throw new DartDisclosureError('OpenDART corpCode ZIP has invalid local header', {
           status: 502,
           code: 'provider_invalid_zip',
@@ -734,6 +902,13 @@ export function extractFirstXmlFromZipBuffer(bufferLike) {
       const localFileNameLength = buffer.readUInt16LE(localHeaderOffset + 26);
       const localExtraLength = buffer.readUInt16LE(localHeaderOffset + 28);
       const dataStart = localHeaderOffset + 30 + localFileNameLength + localExtraLength;
+      if (dataStart + compressedSize > buffer.length) {
+        throw new DartDisclosureError('OpenDART corpCode ZIP entry is truncated', {
+          status: 502,
+          code: 'provider_invalid_zip',
+          details: { fileName },
+        });
+      }
       const compressed = buffer.subarray(dataStart, dataStart + compressedSize);
       const xmlBuffer = compressionMethod === 0
         ? compressed
@@ -864,9 +1039,20 @@ async function resolveDartCorporation(options, opts = {}) {
   };
 }
 
-function normalizeDartFiling(item = {}) {
+function normalizeDartFiling(item = {}, defaults = {}) {
   const rceptNo = normalizeText(item.rcept_no);
-  const disclosureType = normalizeText(item.pblntf_ty);
+  // OpenDART list.json documents pblntf_ty / pblntf_detail_ty as request
+  // filters, not response fields. Preserve a requested filter as provenance
+  // when the provider omits those values from each row.
+  const disclosureType = normalizeText(item.pblntf_ty)?.toUpperCase()
+    ?? normalizeText(defaults.disclosureType)?.toUpperCase()
+    ?? null;
+  const disclosureDetailType = normalizeText(item.pblntf_detail_ty)?.toUpperCase()
+    ?? normalizeText(defaults.disclosureDetailType)?.toUpperCase()
+    ?? null;
+  const disclosureDetailDefinition = disclosureDetailType
+    ? DART_DISCLOSURE_DETAIL_TYPE_BY_CODE.get(disclosureDetailType)
+    : null;
   const stockCode = normalizeText(item.stock_code);
 
   return {
@@ -882,10 +1068,11 @@ function normalizeDartFiling(item = {}) {
     reportDate: normalizeCompactDate(item.rcept_dt, 'rcept_dt') ?? null,
     disclosureType,
     disclosureTypeLabel: disclosureType ? DART_DISCLOSURE_TYPES[disclosureType] ?? null : null,
+    disclosureDetailType,
+    disclosureDetailTypeLabel: disclosureDetailDefinition?.label ?? null,
     remarks: normalizeText(item.rm) ?? null,
     documentUrl: rceptNo ? `https://dart.fss.or.kr/dsaf001/main.do?rcpNo=${encodeURIComponent(rceptNo)}` : null,
     source: 'opendart-list',
-    raw: item,
   };
 }
 
@@ -962,7 +1149,7 @@ export async function getDartDisclosures(input = {}, opts = {}) {
   const filings = raw?.status === '013'
     ? []
     : Array.isArray(raw?.list)
-      ? raw.list.map((item) => normalizeDartFiling(item))
+      ? raw.list.map((item) => normalizeDartFiling(item, options))
       : [];
 
   return {
@@ -993,6 +1180,113 @@ export async function getDartDisclosures(input = {}, opts = {}) {
       provider: 'opendart',
       apiPath: '/api/list.json',
       generatedAt: new Date().toISOString(),
+    },
+  };
+}
+
+export async function collectDartDisclosures(input = {}, opts = {}) {
+  const pageCount = normalizePositiveInteger(
+    opts.pageCount ?? input.pageCount ?? input.page_count,
+    'pageCount',
+    DART_COLLECTION_DEFAULT_PAGE_COUNT,
+    { max: 100 },
+  );
+  const maxPages = normalizePositiveInteger(
+    opts.maxPages ?? input.maxPages,
+    'maxPages',
+    DART_COLLECTION_DEFAULT_MAX_PAGES,
+    { max: 10 },
+  );
+  const maxCollectedFilings = normalizePositiveInteger(
+    opts.maxCollectedFilings ?? input.maxCollectedFilings,
+    'maxCollectedFilings',
+    DART_COLLECTION_DEFAULT_MAX_FILINGS,
+    { max: 1_000 },
+  );
+  const firstPageNo = normalizePositiveInteger(input.pageNo ?? input.page_no, 'pageNo', 1, { max: 99_999 });
+  const collected = [];
+  const issues = [];
+  let pageCountFetched = 0;
+  let latestResult = null;
+  let providerTotalCount = 0;
+  let providerHasMore = false;
+
+  for (let offset = 0; offset < maxPages && collected.length < maxCollectedFilings; offset += 1) {
+    const pageNo = firstPageNo + offset;
+    let page;
+    try {
+      page = await getDartDisclosures({
+        ...input,
+        ...(latestResult?.corporation?.corpCode ? { corpCode: latestResult.corporation.corpCode } : {}),
+        pageNo,
+        pageCount,
+      }, opts);
+    } catch (error) {
+      if (pageCountFetched === 0) throw error;
+      issues.push({
+        code: normalizeText(error?.code) ?? 'provider_page_failed',
+        message: normalizeText(error?.message) ?? 'OpenDART later page unavailable',
+        pageNo,
+      });
+      providerHasMore = true;
+      break;
+    }
+
+    latestResult = latestResult ?? page;
+    pageCountFetched += 1;
+    providerTotalCount = Math.max(providerTotalCount, Number(page.summary?.totalCount) || 0);
+    collected.push(...page.filings);
+    providerHasMore = Boolean(page.summary?.hasMore);
+    if (!providerHasMore || page.filings.length === 0) break;
+  }
+
+  const cappedFilings = collected.slice(0, maxCollectedFilings);
+  const truncated = providerHasMore
+    || collected.length > maxCollectedFilings
+    || issues.length > 0
+    || providerTotalCount > cappedFilings.length && pageCountFetched >= maxPages;
+  const state = cappedFilings.length === 0 ? 'empty' : truncated ? 'truncated' : 'complete';
+  const result = latestResult ?? {
+    source: 'opendart',
+    market: 'KR',
+    requested: {},
+    corporation: null,
+    summary: {},
+    meta: { status: '013', message: '조회된 데이터가 없습니다.', provider: 'opendart', apiPath: '/api/list.json' },
+  };
+  const sortedByDate = [...cappedFilings].sort((left, right) => (
+    (right.receiptDate ?? '').localeCompare(left.receiptDate ?? '')
+    || (left.rceptNo ?? '').localeCompare(right.rceptNo ?? '')
+  ));
+
+  return {
+    ...result,
+    requested: {
+      ...result.requested,
+      pageNo: firstPageNo,
+      pageCount,
+    },
+    filings: cappedFilings,
+    summary: {
+      ...result.summary,
+      count: cappedFilings.length,
+      totalCount: providerTotalCount,
+      pageNo: firstPageNo,
+      pageCount,
+      hasMore: truncated,
+      latestReceiptDate: sortedByDate[0]?.receiptDate ?? null,
+    },
+    collection: {
+      state,
+      providerTotalCount,
+      collectedCount: cappedFilings.length,
+      pageCountFetched,
+      hasMore: truncated,
+      truncated,
+      maxCollectedFilings,
+      maxPages,
+      pageCount,
+      issues,
     },
   };
 }

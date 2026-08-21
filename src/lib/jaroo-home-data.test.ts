@@ -4,6 +4,7 @@ import assert from 'node:assert/strict'
 import {
   APPLIED_HOME_PORTFOLIO_STORAGE_KEY,
   DEEPSCAN_TARGET_STORAGE_KEY,
+  buildAppliedHomePortfolioRowsFromPortfolioItems,
   buildHomeHoldingsFromOcrRows,
   buildHomeHoldingsFromPortfolioItems,
   buildHomeMarketScore,
@@ -506,6 +507,32 @@ test('applied home portfolio rows can rehydrate the in-memory portfolio store sh
       identifierLabel: 'MSFT · US5949181045',
     },
   ])
+})
+
+test('portfolio items can be persisted again after removing one holding', () => {
+  const persistedRows = buildAppliedHomePortfolioRowsFromPortfolioItems([
+    {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KOSPI',
+      marketTone: 'kospi',
+      kind: 'stock',
+      quantity: 10,
+      averagePrice: 70000,
+      averagePriceCurrency: 'KRW',
+      currentPrice: 73500,
+      currentPriceCurrency: 'KRW',
+      currentProfitRate: 5,
+      evaluationAmount: 735000,
+    },
+  ])
+
+  assert.equal(persistedRows.length, 1)
+  assert.equal(persistedRows[0]?.name, '삼성전자')
+  assert.equal(persistedRows[0]?.quantity, '10주')
+  assert.equal(persistedRows[0]?.averagePrice, '70,000원')
+  assert.equal(persistedRows[0]?.currentPrice, 73500)
+  assert.deepEqual(buildAppliedHomePortfolioRowsFromPortfolioItems([]), [])
 })
 
 test('applied home portfolio handoff는 미국 종목 OCR 평단의 KRW 통화 맥락을 보존한다', () => {

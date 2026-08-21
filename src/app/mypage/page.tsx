@@ -1,10 +1,12 @@
 'use client'
 
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import type { ReactNode } from 'react'
 import { useState } from 'react'
 
-import { CreditCard, Crown, ListChecks, Camera, History, Bell, TrendingDown, Megaphone, FileText, Shield, MessageCircle, UserMinus, ChevronRight } from 'lucide-react'
+import { ListChecks, Camera, History, Bell, TrendingDown, Megaphone, FileText, Shield, MessageCircle, UserMinus, ChevronRight } from 'lucide-react'
+import { PaymentsStatusCards } from '@/components/mypage/payments-status-cards'
 import { SpecFrame } from '@/components/spec/spec-frame'
 import { AuthAccountCard } from '@/components/auth/auth-account-card'
 import { cn } from '@/lib/utils'
@@ -14,7 +16,42 @@ import styles from './mypage.module.css'
 
 
 export default function MyPage() {
+  const router = useRouter()
   const [notif, setNotif] = useState(T.notifications)
+  const [withdrawOpen, setWithdrawOpen] = useState(false)
+  const [withdrawPending, setWithdrawPending] = useState(false)
+  const [withdrawError, setWithdrawError] = useState<string | null>(null)
+
+  const openWithdraw = () => {
+    setWithdrawError(null)
+    setWithdrawOpen(true)
+  }
+
+  const closeWithdraw = () => {
+    if (!withdrawPending) setWithdrawOpen(false)
+  }
+
+  // 회원 탈퇴: 계정·포트폴리오·크레딧·분석 기록이 모두 삭제되고 복구할 수 없다.
+  const confirmWithdraw = async () => {
+    setWithdrawPending(true)
+    setWithdrawError(null)
+    try {
+      const response = await fetch('/api/account/delete', { method: 'POST' })
+      const payload = (await response.json().catch(() => ({}))) as { error?: { message?: string } }
+      if (!response.ok) {
+        setWithdrawError(payload.error?.message || '회원 탈퇴 처리 중 문제가 생겼어요. 잠시 후 다시 시도해주세요.')
+        return
+      }
+      await fetch('/api/auth/logout', { method: 'POST' })
+      setWithdrawOpen(false)
+      router.replace('/home')
+      router.refresh()
+    } catch {
+      setWithdrawError('네트워크 연결을 확인한 뒤 다시 시도해주세요.')
+    } finally {
+      setWithdrawPending(false)
+    }
+  }
 
   return (
     <SpecFrame showBottomNav>
@@ -22,27 +59,13 @@ export default function MyPage() {
         <div className={styles.topTitle}>마이</div>
       </div>
       <div className={styles.body}>
-        <AuthAccountCard />
-
-        {/* 크레딧 (테스트 데이터) */}
-        <div className={styles.creditCard}>
-          <span className={styles.testBadge} title='백엔드 연동 전 테스트 데이터'>테스트 데이터</span>
-          <div className={styles.creditLabel}>지금 이용 가능</div>
-          <div className={styles.creditAmt}>딥스캔 <span>{T.credit.deepScanLeft}</span>회</div>
-          <div className={styles.creditSub}>스캔은 {T.credit.scanTotal}회 · 보유 크레딧 {T.credit.creditBalance.toLocaleString()}</div>
-          <Link href='/mypage/credit' className={styles.creditBtn}><CreditCard className='size-4' /> 크레딧 충전</Link>
+        {/* 계정 카드 — 아래 카드들과 동일한 리듬(14px)으로 띄운다 */}
+        <div className='mb-3.5'>
+          <AuthAccountCard />
         </div>
 
-        {/* Pro (테스트 데이터) */}
-        <div className={styles.proCard}>
-          <span className={styles.testBadge} title='백엔드 연동 전 테스트 데이터'>테스트 데이터</span>
-          <div className={styles.proMark}><Crown className='size-5' /></div>
-          <div className={styles.proInfo}>
-            <div className={styles.proTitle}>Jaroo Pro</div>
-            <div className={styles.proDesc}>딥스캔 무제한 · 월 {T.pro.pricePerMonth.toLocaleString()}원</div>
-          </div>
-          <Link href='/mypage/pro' className={styles.proBtn}>시작하기</Link>
-        </div>
+        {/* 크레딧 / Pro — /api/payments/me 실데이터 */}
+        <PaymentsStatusCards />
 
         {/* 포트폴리오 */}
         <div className={styles.menuLabel}>포트폴리오<span className={styles.testBadgeInline}>테스트 데이터</span></div>
@@ -65,15 +88,38 @@ export default function MyPage() {
         {/* 기타 */}
         <div className={styles.menuLabel}>기타</div>
         <div className={styles.menuGroup}>
-          {/* TODO: 약관/개인정보/문의 페이지 생기면 링크 연결 */}
-          <RowButton icon={<FileText className='size-[18px]' />} label='서비스 약관' />
-          <RowButton icon={<Shield className='size-[18px]' />} label='개인정보처리방침' />
-          <RowButton icon={<MessageCircle className='size-[18px]' />} label='문의하기' />
-          <RowButton icon={<UserMinus className='size-[18px]' />} label='회원 탈퇴' danger />
+          <RowLink href='/terms' icon={<FileText className='size-[18px]' />} label='서비스 약관' />
+          <RowLink href='/privacy' icon={<Shield className='size-[18px]' />} label='개인정보처리방침' />
+          <RowLink href='mailto:support@jaroo.kr' icon={<MessageCircle className='size-[18px]' />} label='문의하기' />
+          <RowButton icon={<UserMinus className='size-[18px]' />} label='회원 탈퇴' danger onClick={openWithdraw} />
         </div>
 
         <div className={styles.version}>Jaroo {T.appVersion}</div>
       </div>
+
+      {withdrawOpen ? (
+        <div className={styles.confirmLayer} role='dialog' aria-modal='true' aria-labelledby='withdraw-title' aria-describedby='withdraw-desc'>
+          <button type='button' className={styles.confirmBackdrop} onClick={closeWithdraw} aria-label='회원 탈퇴 취소' />
+          <div className={styles.confirmDialog}>
+            <div className={styles.confirmTitle} id='withdraw-title'>회원 탈퇴</div>
+            <p className={styles.confirmText} id='withdraw-desc'>
+              탈퇴하면 계정, 포트폴리오, 분석 기록, 잔여 크레딧이 모두 삭제되고 복구할 수 없어요.
+              유료 구독 중이라면 남은 혜택도 함께 소멸해요.
+            </p>
+            {withdrawError ? (
+              <p className={styles.confirmError} aria-live='polite'>{withdrawError}</p>
+            ) : null}
+            <div className={styles.confirmActions}>
+              <button type='button' className={styles.confirmCancel} onClick={closeWithdraw} disabled={withdrawPending}>
+                취소
+              </button>
+              <button type='button' className={styles.confirmDanger} onClick={() => void confirmWithdraw()} disabled={withdrawPending}>
+                {withdrawPending ? '처리 중...' : '탈퇴하기'}
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
     </SpecFrame>
   )
 }

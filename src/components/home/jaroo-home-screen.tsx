@@ -8,6 +8,7 @@ import { AuthHomeStatus } from '@/components/auth/auth-home-status'
 import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
 import { shouldUseDeepScanLoadingHandoff } from '@/lib/deepscan-navigation'
 import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
+import { getFinancialValueTone } from '@/lib/financial-value-tone'
 import {
   applyCurrentQuotesToHomeHoldings,
   buildHomeCurrentQuoteQuery,
@@ -26,21 +27,23 @@ import {
   shouldSkipHomeQuoteHydration,
 } from '@/lib/home-quote-bootstrap'
 import {
+  buildAppliedHomePortfolioRowsFromPortfolioItems,
   buildHomeHoldingsFromPortfolioItems,
   buildPortfolioItemsFromAppliedHomePortfolioRows,
   homeForecast as defaultHomeForecast,
   momentumSignals as defaultMomentumSignals,
   momentumStages as defaultMomentumStages,
+  persistAppliedHomePortfolio,
   persistDeepScanTarget,
   readAppliedHomePortfolio,
   type HomeBadgeTone,
   type HomeHolding,
 } from '@/lib/jaroo-home-data'
-import { fetchPortfolio } from '@/lib/portfolio-sync'
+import { fetchPortfolio, shouldUsePortfolioSessionFallback, syncPortfolioToServer } from '@/lib/portfolio-sync'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { AppBottomNav } from '@/components/app-bottom-nav'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
-import { usePortfolioStore } from '@/lib/stores/use-portfolio-store'
+import { removePortfolioItemFromList, usePortfolioStore } from '@/lib/stores/use-portfolio-store'
 import { cn } from '@/lib/utils'
 import { toDeepScanTargetInput } from '@/lib/workflow-types'
 import styles from './jaroo-home-screen.module.css'
@@ -48,6 +51,11 @@ import styles from './jaroo-home-screen.module.css'
 type MomentumSignalItem = (typeof defaultMomentumSignals)[number]
 type ForecastCard = typeof defaultHomeForecast
 type PortfolioStoreItem = ReturnType<typeof usePortfolioStore.getState>['items'][number]
+
+type PortfolioRemovalTarget = {
+  item: PortfolioStoreItem
+  displayName: string
+}
 
 type DeepScanLoadingTarget = {
   name: string
@@ -288,11 +296,8 @@ function formatSignedRate(value: number | null) {
 }
 
 function getToneClass(value: number | null) {
-  if (value === null) {
-    return undefined
-  }
-
-  return value < 0 ? styles.down : styles.up
+  const tone = getFinancialValueTone(value)
+  return tone === 'profit' ? styles.up : tone === 'loss' ? styles.down : undefined
 }
 
 function getStockTag(item: HomeHolding) {
@@ -494,11 +499,15 @@ function StockCard({
   open,
   onToggle,
   onAction,
+  onRemove,
+  removeDisabled,
 }: {
   item: HomeHolding
   open: boolean
   onToggle: () => void
   onAction: (item: HomeHolding, event: MouseEvent<HTMLAnchorElement>) => void
+  onRemove: (item: HomeHolding) => void
+  removeDisabled: boolean
 }) {
   const changeValue = getHoldingChangeValue(item)
   const evaluationAmount = getEvaluationAmount(item)
@@ -523,29 +532,40 @@ function StockCard({
         </span>
       </button>
       <div className={styles.stockDetail} aria-hidden={!open}>
-        <div className={styles.sdFacts}>
-          <div>
-            <span className={styles.sdfLabel}>현재가</span>
-            <span className={styles.sdfVal}>{currentPriceText}</span>
+        <div className={styles.stockDetailInner}>
+          <div className={styles.sdFacts}>
+            <div>
+              <span className={styles.sdfLabel}>현재가</span>
+              <span className={styles.sdfVal}>{currentPriceText}</span>
+            </div>
+            <div>
+              <span className={styles.sdfLabel}>평단</span>
+              <span className={styles.sdfVal}>{item.averagePrice}</span>
+            </div>
+            <div>
+              <span className={styles.sdfLabel}>평가금액</span>
+              <span className={styles.sdfVal}>{evaluationAmountText !== '-' ? evaluationAmountText : formatKrw(evaluationAmount)}</span>
+            </div>
           </div>
-          <div>
-            <span className={styles.sdfLabel}>평단</span>
-            <span className={styles.sdfVal}>{item.averagePrice}</span>
-          </div>
-          <div>
-            <span className={styles.sdfLabel}>평가금액</span>
-            <span className={styles.sdfVal}>{evaluationAmountText !== '-' ? evaluationAmountText : formatKrw(evaluationAmount)}</span>
-          </div>
-        </div>
-        {item.actionHref ? (
-          <Link href={item.actionHref} className={styles.scanBtn} onClick={(event) => onAction(item, event)}>
-            🔍 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
-          </Link>
-        ) : (
-          <button type='button' className={styles.scanBtn}>
-            🔍 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
+          {item.actionHref ? (
+            <Link href={item.actionHref} className={styles.scanBtn} onClick={(event) => onAction(item, event)}>
+              🔍 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
+            </Link>
+          ) : (
+            <button type='button' className={styles.scanBtn}>
+              🔍 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
+            </button>
+          )}
+          <button
+            type='button'
+            className={styles.removeBtn}
+            onClick={() => onRemove(item)}
+            disabled={removeDisabled}
+            aria-label={`${item.name} 종목 제거`}
+          >
+            종목 제거
           </button>
-        )}
+        </div>
       </div>
     </article>
   )
@@ -562,6 +582,7 @@ export function JarooHomeScreen() {
   const quoteErrorMessage = usePortfolioStore((state) => state.quoteErrorMessage)
   const quoteQueryKey = usePortfolioStore((state) => state.quoteQueryKey)
   const replacePortfolioItems = usePortfolioStore((state) => state.replaceItems)
+  const removePortfolioStoreItem = usePortfolioStore((state) => state.removeItem)
   const setQuoteStatus = usePortfolioStore((state) => state.setQuoteStatus)
   const patchQuote = usePortfolioStore((state) => state.patchQuote)
   const clearItemQuote = usePortfolioStore((state) => state.clearItemQuote)
@@ -577,6 +598,9 @@ export function JarooHomeScreen() {
   const [refreshVersion, setRefreshVersion] = useState(0)
   const [deepScanLoadingTarget, setDeepScanLoadingTarget] = useState<DeepScanLoadingTarget | null>(null)
   const [persistedPortfolioLoading, setPersistedPortfolioLoading] = useState(true)
+  const [portfolioRemovalTarget, setPortfolioRemovalTarget] = useState<PortfolioRemovalTarget | null>(null)
+  const [portfolioRemovalPending, setPortfolioRemovalPending] = useState(false)
+  const [portfolioRemovalError, setPortfolioRemovalError] = useState<string | null>(null)
 
 
   const portfolioBaseItems = useMemo(() => portfolioItems.map((item) => stripPortfolioQuoteFields(item)), [portfolioItems])
@@ -624,10 +648,15 @@ export function JarooHomeScreen() {
         return
       }
 
+      setPersistedPortfolioLoading(false)
+
+      if (!shouldUsePortfolioSessionFallback(result)) {
+        return
+      }
+
       // logged-out (401) or fetch error → session cache fallback (resilience), then empty.
       const sessionPortfolio = readAppliedHomePortfolio()
       const sessionItems = sessionPortfolio ? buildPortfolioItemsFromAppliedHomePortfolioRows(sessionPortfolio.rows) : []
-      setPersistedPortfolioLoading(false)
       if (sessionItems.length > 0) {
         replacePortfolioItems(sessionItems)
         return
@@ -653,6 +682,22 @@ export function JarooHomeScreen() {
   useEffect(() => {
     quoteQueryKeyRef.current = quoteQueryKey
   }, [quoteQueryKey])
+
+  useEffect(() => {
+    if (!portfolioRemovalTarget) {
+      return
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !portfolioRemovalPending) {
+        setPortfolioRemovalTarget(null)
+        setPortfolioRemovalError(null)
+      }
+    }
+
+    document.addEventListener('keydown', handleEscape)
+    return () => document.removeEventListener('keydown', handleEscape)
+  }, [portfolioRemovalPending, portfolioRemovalTarget])
 
   useEffect(() => {
     if (!quoteSurfaceEnabled) {
@@ -947,6 +992,75 @@ export function JarooHomeScreen() {
     await navigateToDeepScanForHolding(item.id, item.actionHref)
   }, [navigateToDeepScanForHolding])
 
+  const requestHoldingRemoval = useCallback((holding: HomeHolding) => {
+    const item = portfolioItems[holding.id]
+
+    if (!item || portfolioRemovalPending) {
+      return
+    }
+
+    setOpenSheet(null)
+    setPortfolioRemovalError(null)
+    setPortfolioRemovalTarget({ item, displayName: holding.name })
+  }, [portfolioItems, portfolioRemovalPending])
+
+  const closeHoldingRemoval = useCallback(() => {
+    if (portfolioRemovalPending) {
+      return
+    }
+
+    setPortfolioRemovalTarget(null)
+    setPortfolioRemovalError(null)
+  }, [portfolioRemovalPending])
+
+  const confirmHoldingRemoval = useCallback(async () => {
+    if (!portfolioRemovalTarget || portfolioRemovalPending) {
+      return
+    }
+
+    const currentItems = usePortfolioStore.getState().items
+    const nextItems = removePortfolioItemFromList(currentItems, portfolioRemovalTarget.item)
+
+    if (nextItems.length === currentItems.length) {
+      setPortfolioRemovalTarget(null)
+      setPortfolioRemovalError(null)
+      return
+    }
+
+    const currentSession = readAppliedHomePortfolio()
+    const broker = currentSession?.broker ?? '홈 편집 포트폴리오'
+    const previousRows = buildAppliedHomePortfolioRowsFromPortfolioItems(currentItems)
+    const nextRows = buildAppliedHomePortfolioRowsFromPortfolioItems(nextItems)
+    const appliedAt = new Date().toISOString()
+
+    setPortfolioRemovalPending(true)
+    setPortfolioRemovalError(null)
+
+    try {
+      const persisted = persistAppliedHomePortfolio({ broker, rows: nextRows, appliedAt })
+      if (!persisted) {
+        setPortfolioRemovalError('기기 저장소에 변경 내용을 저장하지 못했어요. 다시 시도해주세요.')
+        return
+      }
+
+      const syncResult = await syncPortfolioToServer(nextRows)
+      if (!syncResult.ok && syncResult.reason === 'error') {
+        persistAppliedHomePortfolio({ broker, rows: previousRows, appliedAt: currentSession?.appliedAt })
+        setPortfolioRemovalError('저장된 포트폴리오를 변경하지 못했어요. 네트워크 상태를 확인한 뒤 다시 시도해주세요.')
+        return
+      }
+
+      setPersistedPortfolioLoading(false)
+      removePortfolioStoreItem(portfolioRemovalTarget.item)
+      setSelectedId(null)
+      setOpenCardId(null)
+      setPortfolioRemovalTarget(null)
+      setPortfolioRemovalError(null)
+    } finally {
+      setPortfolioRemovalPending(false)
+    }
+  }, [portfolioRemovalPending, portfolioRemovalTarget, removePortfolioStoreItem])
+
   if (!hasPortfolioItems) {
     if (persistedPortfolioLoading) {
       return (
@@ -974,12 +1088,17 @@ export function JarooHomeScreen() {
             <div className={styles.brand}>Jaroo</div>
             <AuthHomeStatus />
           </header>
-          <main className={styles.body}>
-            <div className={styles.forecastCard}>
-              <div className={styles.forecastLabel}>포트폴리오 준비</div>
-              <div className={styles.forecastText}>로그인하거나 스크린샷을 추가해서 보유 종목을 불러와요.</div>
-              <Link href='/screenshot' className={styles.refreshBtn}>스크린샷 추가하기</Link>
+          <main className={`${styles.body} ${styles.bodyEmpty}`}>
+            <div className={styles.emptyState}>
+              <h2 className={styles.emptyStateTitle}>포트폴리오 준비</h2>
+              <p className={styles.emptyStateText}>로그인하거나 스크린샷을 추가해서 보유 종목을 불러와요.</p>
+              <Link href='/screenshot' className={styles.emptyStateBtn}>스크린샷 추가하기</Link>
             </div>
+
+            {/* 전역 투자 디스클레이머 — 포트폴리오가 비어있어도(게스트/신규 유저) 상시 고지한다. 빈 화면에서는 바닥에 고정한다 */}
+            <p className={styles.globalDisclaimer}>
+              Jaroo의 모든 분석은 참고용 정보예요. 투자 자문·권유가 아니며 투자 판단과 책임은 이용자에게 있습니다.
+            </p>
           </main>
         </div>
       </div>
@@ -1057,6 +1176,8 @@ export function JarooHomeScreen() {
                 open={openCardId === item.id}
                 onToggle={() => toggleCard(item.id)}
                 onAction={handleHoldingActionClick}
+                onRemove={requestHoldingRemoval}
+                removeDisabled={portfolioRemovalPending}
               />
             </div>
           ))}
@@ -1077,6 +1198,11 @@ export function JarooHomeScreen() {
               {summary.forecast.cta}
             </Link>
           </div> : null}
+
+          {/* 전역 투자 디스클레이머 — 앱 허브(홈) 하단에 상시 고지한다 */}
+          <p className={styles.globalDisclaimer}>
+            Jaroo의 모든 분석은 참고용 정보예요. 투자 자문·권유가 아니며 투자 판단과 책임은 이용자에게 있습니다.
+          </p>
         </main>
 
         <AppBottomNav />
@@ -1114,6 +1240,50 @@ export function JarooHomeScreen() {
               </div>
             ))}
           </div>
+          {portfolioRemovalTarget ? (
+            <div className={styles.confirmLayer}>
+              <button
+                type='button'
+                className={styles.confirmBackdrop}
+                onClick={closeHoldingRemoval}
+                disabled={portfolioRemovalPending}
+                aria-label='종목 제거 창 닫기'
+              />
+              <section
+                className={styles.confirmDialog}
+                role='dialog'
+                aria-modal='true'
+                aria-labelledby='portfolio-removal-title'
+                aria-describedby='portfolio-removal-description'
+              >
+                <h2 id='portfolio-removal-title' className={styles.confirmTitle}>종목을 제거할까요?</h2>
+                <p id='portfolio-removal-description' className={styles.confirmDescription}>
+                  <strong>{portfolioRemovalTarget.displayName}</strong> 종목이 홈과 저장된 포트폴리오에서 제거됩니다.
+                  {portfolioItems.length === 1 ? ' 마지막 종목을 제거하면 빈 포트폴리오 화면으로 전환됩니다.' : ''}
+                </p>
+                {portfolioRemovalError ? <p className={styles.confirmError} role='alert'>{portfolioRemovalError}</p> : null}
+                <div className={styles.confirmActions}>
+                  <button
+                    type='button'
+                    className={styles.confirmCancelBtn}
+                    onClick={closeHoldingRemoval}
+                    disabled={portfolioRemovalPending}
+                    autoFocus
+                  >
+                    취소
+                  </button>
+                  <button
+                    type='button'
+                    className={styles.confirmRemoveBtn}
+                    onClick={() => void confirmHoldingRemoval()}
+                    disabled={portfolioRemovalPending}
+                  >
+                    {portfolioRemovalPending ? '제거 중…' : '제거하기'}
+                  </button>
+                </div>
+              </section>
+            </div>
+          ) : null}
         </div>
       </div>
 

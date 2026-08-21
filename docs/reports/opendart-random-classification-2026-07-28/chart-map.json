@@ -1,0 +1,42 @@
+{
+  "generatedAt": "2026-07-28T03:04:49.832Z",
+  "charts": [
+    {
+      "section": "이벤트 유형 폭",
+      "question": "무작위 표본이 어떤 canonical event 유형으로 분리됐는가?",
+      "family": "Comparison & Ranking",
+      "type": "bar",
+      "fields": [
+        "eventTypeLabel",
+        "count",
+        "share"
+      ],
+      "takeaway": "자본·지분이 크지만 13개 유형이 관찰됨",
+      "palette": "single-root blue"
+    },
+    {
+      "section": "정정 공시 처리 병목",
+      "question": "정정 공시는 어느 단계에서 손실되는가?",
+      "family": "Progression",
+      "type": "bar",
+      "fields": [
+        "stage",
+        "count"
+      ],
+      "takeaway": "분류보다 본문 수집에서 손실이 발생함",
+      "palette": "single-root orange"
+    },
+    {
+      "section": "정성 검토",
+      "question": "의미상 타당·재검토·평가불가가 어떻게 분포하는가?",
+      "family": "Composition",
+      "type": "bar",
+      "fields": [
+        "outcome",
+        "count"
+      ],
+      "takeaway": "구체적 이슈와 본문 미확보를 성공 출력과 분리함",
+      "palette": "three-category blue/orange/gold"
+    }
+  ]
+}

@@ -17,8 +17,8 @@
 
   background: var(--ds-card);
   width: 100%;
-  min-height: 100vh;
-  min-height: 100dvh;
+  min-height: 100%;
+  height: 100%;
   overflow-y: auto;
   overflow-x: hidden;
   position: relative;
@@ -189,12 +189,16 @@
   color: var(--ds-muted);
 }
 
-.stockChange.loss {
-  color: var(--ds-red);
+.loss {
+  color: var(--jaroo-loss);
 }
 
-.stockChange.gain {
-  color: var(--ds-green);
+.gain {
+  color: var(--jaroo-profit);
+}
+
+.financialNeutral {
+  color: var(--ds-muted);
 }
 
 .returnRateContext {
@@ -212,7 +216,6 @@
 }
 
 .snapshotReturnRate strong {
-  color: var(--ds-ink);
   font-weight: 600;
 }
 
@@ -2543,7 +2546,6 @@
 }
 
 .todayProfitRate {
-  color: var(--ds-red);
   font-size: 17px;
   font-weight: 800;
   line-height: 1;
@@ -2552,7 +2554,6 @@
 
 .todayProfitAmount {
   margin-top: 4px;
-  color: var(--ds-red);
   font-size: 11px;
   font-weight: 700;
   font-variant-numeric: tabular-nums;
@@ -2837,11 +2838,11 @@
 }
 
 .todayUp {
-  color: var(--ds-green);
+  color: var(--jaroo-profit);
 }
 
 .todayDown {
-  color: var(--ds-red);
+  color: var(--jaroo-loss);
 }
 
 .todayBlue {

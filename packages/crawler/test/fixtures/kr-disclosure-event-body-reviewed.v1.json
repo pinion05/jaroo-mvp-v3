@@ -1,0 +1,402 @@
+{
+  "schemaVersion": "jaroo.kr-disclosure-event-body-reviewed.v1",
+  "curatedAt": "2026-07-21",
+  "scope": {
+    "market": "KOSPI",
+    "from": "20260422",
+    "to": "20260721",
+    "description": "해당 기간 1,861건 중 상세코드+제목 단계에서 보류된 13건 전수의 OpenDART 원문 기반 단일 리뷰 라벨"
+  },
+  "cases": [
+    {
+      "id": "body-20260518800942",
+      "input": {
+        "rceptNo": "20260518800942",
+        "reportName": "수시공시의무관련사항(공정공시)",
+        "corpName": "신한글로벌액티브리츠",
+        "disclosureType": "I",
+        "disclosureDetailType": "I002",
+        "bodyText": "신한글로벌액티브리츠/수시공시의무관련사항(공정공시)/(2026.05.18)수시공시의무관련사항(공정공시)\n\r\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n\n\r\n수시공시의무관련사항(공정공시) \r\n\n\r\n\n\r\n\r\n\n\r\n\r\n\n\r\n| 1. 정보내용 | \r\n| 공시제목 | \r\n| 종속회사(자리츠) 유상증자 계획 관련 안내 | \r\n\n\r\n\n\r\n| 관련 수시공시내용 | \r\n| □ 종속회사 유상증자 계획\n- 당사는 재무구조 개선 및 신규투자재원 확보를 위해 약 650억원의 규모로 종속회사(자리츠)인 신한글로벌제1호리츠의 제3자 배정방식의 유상증자를 진행할 계획임.\n\n- 다만, 유상증자 금액 및 시기 등은 확정된 사항이 아님.\n\n□ 기대 효과\n- 종속회사의 유상증자를 통해 확보한 금원을 활용하여 신한글로벌액티브리츠의 재무구조 개선 및 신규 투자 재원 확보 기대 | \r\n\n\r\n\n\r\n| 예정 공시 일시 | \r\n| 2026-05-18 | \r\n\n\r\n\n\r\n| 2. 정보제공내역 | \r\n| 정보제공자 | \r\n| 신한리츠운용 IR 담당 | \r\n\n\r\n\n\r\n| 정보제공대상자 | \r\n| 기관투자자 및 애널리스트 등 | \r\n\n\r\n\n\r\n| 정보제공(예정)일시 | \r\n| 2026년 5월 18일(월) 18:00 | \r\n\n\r\n\n\r\n| 행사명(장소) | \r\n| 당사 홈페이지(https://shglobalreit.com/) | \r\n\n\r\n\n\r\n| 3. 연락처(관련부서/전화번호) | \r\n| IR 담당(02-2158-7400) | \r\n\n\r\n\n\r\n| 4. 기타 투자판단과 관련한 중요사항 | \r\n\n\r\n\n\r\n| - 자세한 내용은 당사 홈페이지(https://shglobalreit.com/)의 공시정보 게시판을 참조하시기 바랍니다.\n\n- 관련 자료는 투자자의 이해 증진을 위해 제공하는 자료로써, 예측정보는 향후 경영환경 변화에 따라 변경될 수 있습니다. | \r\n\n\r\n\n\r\n| ※ 관련공시 | \r\n| - |"
+      },
+      "provenance": {
+        "source": "opendart-document",
+        "labelMethod": "single-review-body-adjudication",
+        "reviewedAt": "2026-07-21"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "proposed",
+          "cause": "rights-offering",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "body-required",
+        "kospi",
+        "live"
+      ]
+    },
+    {
+      "id": "body-20260521800335",
+      "input": {
+        "rceptNo": "20260521800335",
+        "reportName": "수시공시의무관련사항(공정공시)",
+        "corpName": "동양",
+        "disclosureType": "I",
+        "disclosureDetailType": "I002",
+        "bodyText": "동양/수시공시의무관련사항(공정공시)/(2026.05.21)수시공시의무관련사항(공정공시)\n\r\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n\n\r\n수시공시의무관련사항(공정공시) \r\n\n\r\n\n\r\n\r\n\n\r\n\r\n\n\r\n| 1. 정보내용 | \r\n| 공시제목 | \r\n| 자기주식 소각 계획 안내 | \r\n\n\r\n\n\r\n| 관련 수시공시내용 | \r\n| 당사의 자기주식 소각 계획을 아래와 같이 안내드립니다.\n\n1. 소각 대상\n\n\r\n\r\n- 총 24,611,979주 (발행주식총수의 약 10.26%)\n\r\n\r\n\n\r\n\r\n(보통주 24,439,999주, 우선주 171,980주)\n\n2. 소각 목적\n\n\r\n\r\n- 주주가치 제고\n\n3. 소각 시기\n\n\r\n\r\n- 2026년 6월 이내 | \r\n\n\r\n\n\r\n| 예정 공시 일시 | \r\n| - | \r\n\n\r\n\n\r\n| 2. 정보제공내역 | \r\n| 정보제공자 | \r\n| (주)동양 자금팀 | \r\n\n\r\n\n\r\n| 정보제공대상자 | \r\n| 국내외 정보이용자 | \r\n\n\r\n\n\r\n| 정보제공(예정)일시 | \r\n| 공정공시 후 | \r\n\n\r\n\n\r\n| 행사명(장소) | \r\n| - | \r\n\n\r\n\n\r\n| 3. 연락처(관련부서/전화번호) | \r\n| 02-6150-7000 | \r\n\n\r\n\n\r\n| 4. 기타 투자판단과 관련한 중요사항 | \r\n\n\r\n\n\r\n| - 자기주식 소각 결정은 6월 중 이사회 결의를 통해 확정될 예정입니다.\n\n- 상기 내용은 시장상황 및 경영환경에 따라 변경될 수 있으며, 변경 시 공시하겠습니다. | \r\n\n\r\n\n\r\n| ※ 관련공시 | \r\n| - |"
+      },
+      "provenance": {
+        "source": "opendart-document",
+        "labelMethod": "single-review-body-adjudication",
+        "reviewedAt": "2026-07-21"
+      },
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "planned",
+          "state": "proposed",
+          "cause": "share-cancellation",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "body-required",
+        "kospi",
+        "live"
+      ]
+    },
+    {
+      "id": "body-20260609800694",
+      "input": {
+        "rceptNo": "20260609800694",
+        "reportName": "수시공시의무관련사항(공정공시)",
+        "corpName": "한샘",
+        "disclosureType": "I",
+        "disclosureDetailType": "I002",
+        "bodyText": "한샘/수시공시의무관련사항(공정공시)/(2026.06.09)수시공시의무관련사항(공정공시)\n\r\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n\n\r\n수시공시의무관련사항(공정공시) \r\n\n\r\n\n\r\n\r\n\n\r\n\r\n\n\r\n| 1. 정보내용 | \r\n| 공시제목 | \r\n| 중장기 주주환원정책 발표 | \r\n\n\r\n\n\r\n| 관련 수시공시내용 | \r\n| □ 중장기 주주환원정책 수립 목적\n\n중장기적 관점에서 안정적이고 일관적인 주주환원정책을 시행함으로써 주주가치를 극대화하고 시장과의 신뢰 및 소통 투명성을 제고하고자 함\n\n□ 주요 내용\n\n- 적용 기간 : 2026 사업연도부터 향후 3개년간\n\n- 목표 주주환원율 : 연간 별도 기준 조정 당기순이익의 50% 이상\n\n- 주주환원율 산식 : (총 배당금액 + 자사주 매입액) ÷ 별도기준 조정 당기순이익\n\n- 별도 기준 조정 당기순이익은 별도 재무제표 기준 당기순이익에서 일회성, 비경상적 요인 등을 조정한 금액임\n\n- 현금배당, 자기주식 취득 및 자기주식 소각 등 각 실행사항에 따른 세부 내용은 관련 이사회 결의 및 개별 공시를 통해 안내 예정 | \r\n\n\r\n\n\r\n| 예정 공시 일시 | \r\n| 2026-06-09 | \r\n\n\r\n\n\r\n| 2. 정보제공내역 | \r\n| 정보제공자 | \r\n| IR팀 | \r\n\n\r\n\n\r\n| 정보제공대상자 | \r\n| 언론기관 등 | \r\n\n\r\n\n\r\n| 정보제공(예정)일시 | \r\n| 공정공시 후 수시 제공 | \r\n\n\r\n\n\r\n| 행사명(장소) | \r\n| 보도자료 배포 | \r\n\n\r\n\n\r\n| 3. 연락처(관련부서/전화번호) | \r\n| IR팀 (02-6470-3756) | \r\n\n\r\n\n\r\n| 4. 기타 투자판단과 관련한 중요사항 | \r\n\n\r\n\n\r\n| □ 기타 사항\n\n- 본 주주환원정책은 현재 시점의 경영계획 및 재무상황을 기준으로 수립하였으며, 세부적인 실행은 관련 법령, 정관 및 회사 규정에 따라 필요한 절차를 거쳐 결정될 예정입니다. 또한 향후 경영환경 및 시장상황 등에 따라 변경될 수 있습니다. | \r\n\n\r\n\n\r\n| ※ 관련공시 | \r\n| - |"
+      },
+      "provenance": {
+        "source": "opendart-document",
+        "labelMethod": "single-review-body-adjudication",
+        "reviewedAt": "2026-07-21"
+      },
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": "proposed",
+          "cause": "shareholder-return-policy",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "body-required",
+        "kospi",
+        "live"
+      ]
+    },
+    {
+      "id": "body-20260611800327",
+      "input": {
+        "rceptNo": "20260611800327",
+        "reportName": "수시공시의무관련사항(공정공시)",
+        "corpName": "KG스틸",
+        "disclosureType": "I",
+        "disclosureDetailType": "I002",
+        "bodyText": "KG스틸/수시공시의무관련사항(공정공시)/(2026.06.11)수시공시의무관련사항(공정공시)\n\r\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n\n\r\n수시공시의무관련사항(공정공시) \r\n\n\r\n\n\r\n\r\n\n\r\n\r\n\n\r\n| 1. 정보내용 | \r\n| 공시제목 | \r\n| 중장기 주주환원정책 수립 | \r\n\n\r\n\n\r\n| 관련 수시공시내용 | \r\n| □ 목적\n\n중장기적 관점에서 안정적이고 일관적인 주주환원 정책을 시행 함으로써 주주가치를 극대화하고 시장과의 신뢰 및 소통투명성을 제고하고자 함\n\n□ 주요내용\n\n- 적용기간: 2026년 사업연도 결산 시점부터 향후 5개년간\n\n- 목표 주주환원율: 연간 별도 기준 조정 당기순이익의 50%\n\n- 주주환원율 산식: (총 배당금액 + 자사주 매입/소각)÷별도기준 조정 당기순이익\n\n- 별도 기준 조정 당기순이익은 별도 재무제표 기준 당기순이익에서 일회성, 비경상적 요인 등을 조정한 금액임\n\n- 목표 배당: 현금배당, 자기주식 취득 및 자기주식 소각 등 각 실행사항에 따른 세부 내용은 관련 이사회 결의 및 개별 공시를 통해 안내 예정 | \r\n\n\r\n\n\r\n| 예정 공시 일시 | \r\n| 2026-06-11 | \r\n\n\r\n\n\r\n| 2. 정보제공내역 | \r\n| 정보제공자 | \r\n| KG스틸 자금팀 | \r\n\n\r\n\n\r\n| 정보제공대상자 | \r\n| 언론기관 등 | \r\n\n\r\n\n\r\n| 정보제공(예정)일시 | \r\n| 공정공시 후 수시 제공 | \r\n\n\r\n\n\r\n| 행사명(장소) | \r\n| 보도자료 배포 | \r\n\n\r\n\n\r\n| 3. 연락처(관련부서/전화번호) | \r\n| 자금팀/02-3450-8114 | \r\n\n\r\n\n\r\n| 4. 기타 투자판단과 관련한 중요사항 | \r\n\n\r\n\n\r\n| - 본 주주환원정책은 현재 시점의 경영계획 및 재무 상황을 기준으로 수립하였으며, 세부적인 실행은 관련 법령, 정관 및 회사 규정에 따라 필요한 절차를 거쳐 결정될 예정입니다. 또한, 향후 경영환경 및 시장상황에 따라 변경될 수 있습니다.\n\n- 이 공시는 2026년 6월 9일 '풍문 또는 보도에 대한 해명(미확정)'에 대한 확정 공시사항 입니다.\n\n(공시책임자) CFO 김형도 | \r\n\n\r\n\n\r\n| ※ 관련공시 | \r\n| 2026-06-09 풍문 또는 보도에 대한 해명(미확정)\n|"
+      },
+      "provenance": {
+        "source": "opendart-document",
+        "labelMethod": "single-review-body-adjudication",
+        "reviewedAt": "2026-07-21"
+      },
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": "proposed",
+          "cause": "shareholder-return-policy",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "body-required",
+        "kospi",
+        "live"
+      ]
+    },
+    {
+      "id": "body-20260611800336",
+      "input": {
+        "rceptNo": "20260611800336",
+        "reportName": "수시공시의무관련사항(공정공시)",
+        "corpName": "KG모빌리티",
+        "disclosureType": "I",
+        "disclosureDetailType": "I002",
+        "bodyText": "KG모빌리티/수시공시의무관련사항(공정공시)/(2026.06.11)수시공시의무관련사항(공정공시)\n\r\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n\n\r\n수시공시의무관련사항(공정공시) \r\n\n\r\n\n\r\n\r\n\n\r\n\r\n\n\r\n| 1. 정보내용 | \r\n| 공시제목 | \r\n| 중장기 주주환원정책 발표 | \r\n\n\r\n\n\r\n| 관련 수시공시내용 | \r\n| □ 중장기 주주환원정책 수립 목적\n\n중장기적 관점에서 안정적이고 일관적인 주주환원정책을 시행함으로써 주주가치를 극대화하고 시장과의 신뢰 및 소통 투명성을 제고하고자 함\n\n□ 주요 내용\n\n- 적용 기간 : 2026년 결산시점 부터 향후 5개년간\n\n- 목표 주주환원율 : 연간 별도 기준 조정 당기순이익의 50%\n\n- 주주환원율 산식 : (총 배당금액 + 자사주 매입액) ÷ 별도기준 조정 당기순이익\n\n- 별도 기준 조정 당기순이익은 별도 재무제표 기준 당기순이익에서 일회성, 비경상적 요인 등을 조정한 금액임\n\n- 현금배당, 자기주식 취득 및 자기주식 소각 등 각 실행사항에 따른 세부 내용은 관련 이사회 결의 및 개별 공시를 통해 안내 예정 | \r\n\n\r\n\n\r\n| 예정 공시 일시 | \r\n| - | \r\n\n\r\n\n\r\n| 2. 정보제공내역 | \r\n| 정보제공자 | \r\n| 자금팀 | \r\n\n\r\n\n\r\n| 정보제공대상자 | \r\n| 국내외 정보이용자 | \r\n\n\r\n\n\r\n| 정보제공(예정)일시 | \r\n| 공정공시 후 | \r\n\n\r\n\n\r\n| 행사명(장소) | \r\n| - | \r\n\n\r\n\n\r\n| 3. 연락처(관련부서/전화번호) | \r\n| 자금팀 (031-610-1368) | \r\n\n\r\n\n\r\n| 4. 기타 투자판단과 관련한 중요사항 | \r\n\n\r\n\n\r\n| - 본 주주환원정책은 현재 시점의 경영계획 및 재무상황을 기준으로 수립하였으며, 세부적인 실행은 관련 법령, 정관 및 회사 규정에 따라 필요한 절차를 거쳐 결정될 예정입니다. 또한 향후 경영환경 및 시장상황 등에 따라 변경될 수 있습니다.\n\n- 해당 공시는 2026년 6월 9일 조회공시 요구(풍문 또는 보도)에 대한 확정공시 사항임. | \r\n\n\r\n\n\r\n| ※ 관련공시 | \r\n| 2026-06-09 조회공시 요구(풍문 또는 보도)\n2026-06-10 조회공시 요구(풍문 또는 보도)에 대한 답변(미확정)\n|"
+      },
+      "provenance": {
+        "source": "opendart-document",
+        "labelMethod": "single-review-body-adjudication",
+        "reviewedAt": "2026-07-21"
+      },
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": "proposed",
+          "cause": "shareholder-return-policy",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "body-required",
+        "kospi",
+        "live"
+      ]
+    },
+    {
+      "id": "body-20260611800337",
+      "input": {
+        "rceptNo": "20260611800337",
+        "reportName": "수시공시의무관련사항(공정공시)",
+        "corpName": "KG케미칼",
+        "disclosureType": "I",
+        "disclosureDetailType": "I002",
+        "bodyText": "KG케미칼/수시공시의무관련사항(공정공시)/(2026.06.11)수시공시의무관련사항(공정공시)\n\r\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n\n\r\n수시공시의무관련사항(공정공시) \r\n\n\r\n\n\r\n\r\n\n\r\n\r\n\n\r\n| 1. 정보내용 | \r\n| 공시제목 | \r\n| 중장기 주주환원정책 수립 | \r\n\n\r\n\n\r\n| 관련 수시공시내용 | \r\n| ㅁ 중장기 주주환원정책 수립 목적\n중장기적 관점에서 안정적이고 일관적인 주주환원정책을 시행함으로써 주주가치를 극대화하고 시장과의 신뢰 및 소통 투명성을 제고하고자 함\n\nㅁ 주요 내용\n- 적용기간: 2026년 사업연도 결산 시점부터 향후 5개년간\n\n- 목표 주주환원율: 연간 별도 기준 조정 당기순이익의 50%\n\n- 주주환원율 산식: (총 배당금액 + 자사주 매입/소각)÷별도기준 조정 당기순이익\n\n- 별도 기준 조정 당기순이익은 별도 재무제표 기준 당기순이익에서 일회성, 비경상적 요인 등을 조정한 금액임\n\n- 현금배당, 자기주식 취득 및 자기주식 소각 등 각 실행사항에 따른 세부 내용은 관련 이사회 결의 및 개별 공시를 통해 안내 예정 | \r\n\n\r\n\n\r\n| 예정 공시 일시 | \r\n| - | \r\n\n\r\n\n\r\n| 2. 정보제공내역 | \r\n| 정보제공자 | \r\n| KG케미칼 IR팀 | \r\n\n\r\n\n\r\n| 정보제공대상자 | \r\n| 언론기관 등 | \r\n\n\r\n\n\r\n| 정보제공(예정)일시 | \r\n| 공정공시 후 수시 제공 | \r\n\n\r\n\n\r\n| 행사명(장소) | \r\n| 보도자료 배포 | \r\n\n\r\n\n\r\n| 3. 연락처(관련부서/전화번호) | \r\n| IR팀(02-2680-4284) | \r\n\n\r\n\n\r\n| 4. 기타 투자판단과 관련한 중요사항 | \r\n\n\r\n\n\r\n| - 본 주주환원정책은 현재 시점의 경영계획 및 재무 상황을 기준으로 수립하였으며, 세부적인 실행은 관련 법령, 정관 및 회사 규정에 따라 필요한 절차를 거쳐 결정될 예정입니다. 또한, 향후 경영환경 및 시장상황에 따라 변경될 수 있습니다.\n\n- 이 공시는 2026년 6월 9일 풍문또는보도에대한해명(미확정)에 대한 답변입니다. | \r\n\n\r\n\n\r\n| ※ 관련공시 | \r\n| 2026-06-09 풍문 또는 보도에 대한 해명(미확정)\n|"
+      },
+      "provenance": {
+        "source": "opendart-document",
+        "labelMethod": "single-review-body-adjudication",
+        "reviewedAt": "2026-07-21"
+      },
+      "expectedEvents": [
+        {
+          "type": "corporate-action",
+          "action": "announced",
+          "state": "proposed",
+          "cause": "shareholder-return-policy",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "body-required",
+        "kospi",
+        "live"
+      ]
+    },
+    {
+      "id": "body-20260710800261",
+      "input": {
+        "rceptNo": "20260710800261",
+        "reportName": "기타안내사항(안내공시)",
+        "corpName": "한세엠케이",
+        "disclosureType": "I",
+        "disclosureDetailType": "I003",
+        "bodyText": "한세엠케이/기타 안내사항(안내공시)/(2026.07.10)기타 안내사항(안내공시)\n\r\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n\n\r\n기타 안내사항(안내공시) \r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n| 1. 제목 | \r\n| 한세엠케이(주) 보통주 의무보유기간 만료 안내 | \r\n\n\r\n\n\r\n| 2. 주요내용 | \r\n| 당사는 주주배정후 실권주 일반공모 유상증자 시 '자본시장과 금융투자업에 관한 법률' 제165조의7 및 '근로복지기본법' 제43조에 따라 우리사주조합에 주식을 우선 배정하였으며, 취득한 주식에 대하여 1년간 의무보유 조치를 취하였습니다. 이에 따라 해당 주식의 의무보유 기간이 다음과 같이 만료됨을 안내해 드립니다.\n\n1.의무보유 주주 및 주식수\n\r\n\r\n- 한세엠케이 우리사주조합장이상일증금\n\r\n\r\n- 6,226주\n\n2.의무보유 기간 : 2025년 07월 15일 ~ 2026년 07월 14일\n\n3.의무보유 해제일 : 2026년 07월 15일 | \r\n\n\r\n\n\r\n| 3. 결정(확인)일자 | \r\n| - | \r\n\n\r\n\n\r\n| 4. 기타 투자판단과 관련한 중요사항 | \r\n| - | \r\n\n\r\n\n\r\n| ※ 관련공시 | \r\n| 2025-06-23 유상증자결정\n2025-06-23 증권신고서(지분증권)\n2025-06-27 유상증자 또는 주식관련사채 등의 청약결과(자율공시)\n2025-07-02 유상증자 또는 주식관련사채 등의 청약결과(자율공시)\n2025-07-03 유상증자 또는 주식관련사채 등의 발행결과(자율공시)\n2025-07-03 증권발행실적보고서\n|"
+      },
+      "provenance": {
+        "source": "opendart-document",
+        "labelMethod": "single-review-body-adjudication",
+        "reviewedAt": "2026-07-21"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "lifted",
+          "state": null,
+          "cause": "lockup",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "body-required",
+        "kospi",
+        "live"
+      ]
+    },
+    {
+      "id": "body-20260713800438",
+      "input": {
+        "rceptNo": "20260713800438",
+        "reportName": "기타안내사항(안내공시)",
+        "corpName": "대호에이엘",
+        "disclosureType": "I",
+        "disclosureDetailType": "I003",
+        "bodyText": "대호에이엘/기타 안내사항(안내공시)/(2026.07.13)기타 안내사항(안내공시)\n\r\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n\n\r\n기타 안내사항(안내공시) \r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n| 1. 제목 | \r\n| 주식회사 대호에이엘 보통주 의무보유 기간 만료 안내 | \r\n\n\r\n\n\r\n| 2. 주요내용 | \r\n| 제3자배정 유상증자로 인하여 의무보유된 주식회사 대호에이엘 보통주 의무보유(보호예수) 기간이 다음과 같이 만료됨을 안내드립니다.\n\n\r\n\r\n- 다 음 -\n\n1. 의무보유 주식수 : 1,853,567주\n\n2. 의무보유 주식 보유자 : 송창운, 해든스카이일반사모투자신탁 제1호\n\n3. 의무보유 기간 : 2025.07.16 ~ 2026.07.15\n\n4. 의무보유 해제일 : 2026.07.16\n\n5. 근거규정 : 증권의 발행 및 공시 등에 관한 규정 제 2-2조 제2항 제1호\n\n6. 기타사항 : 주식병합에 따라 보통주 5주가 동일한 액면주식 1주로 무상병합되어 보호예수 시작시점의 9,267,840주가 현재 1,853,567주로 변동됨. | \r\n\n\r\n\n\r\n| 3. 결정(확인)일자 | \r\n| - | \r\n\n\r\n\n\r\n| 4. 기타 투자판단과 관련한 중요사항 | \r\n| - | \r\n\n\r\n\n\r\n| ※ 관련공시 | \r\n| 2025-06-25 유상증자결정\n2025-06-26 유상증자 또는 주식관련사채 등의 발행결과(자율공시)\n|"
+      },
+      "provenance": {
+        "source": "opendart-document",
+        "labelMethod": "single-review-body-adjudication",
+        "reviewedAt": "2026-07-21"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "lifted",
+          "state": null,
+          "cause": "lockup",
+          "subjectType": "securities"
+        }
+      ],
+      "tags": [
+        "body-required",
+        "kospi",
+        "live"
+      ]
+    },
+    {
+      "id": "body-20260713800496",
+      "input": {
+        "rceptNo": "20260713800496",
+        "reportName": "수시공시의무관련사항(공정공시)",
+        "corpName": "SK디앤디",
+        "disclosureType": "I",
+        "disclosureDetailType": "I002",
+        "bodyText": "SK디앤디/수시공시의무관련사항(공정공시)/(2026.07.13)수시공시의무관련사항(공정공시)\n\r\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n\n\r\n수시공시의무관련사항(공정공시) \r\n\n\r\n\n\r\n\r\n\n\r\n\r\n\n\r\n| 1. 정보내용 | \r\n| 공시제목 | \r\n| 재무구조 개선 계획 | \r\n\n\r\n\n\r\n| 관련 수시공시내용 | \r\n| - 당사는 부동산 시장 침체가 장기화되고 자금조달 환경이 악화된 상황 하에서 만기도래 차입금 상환 재원과 유동성 확보 및 성장재원 확보를 위해 적극적 자산 매각 및 유동화를 추진하고 있으며, 이와 더불어, 자본 확충 등 보다 근본적인 재무구조 개선 방안을 강구하고 있습니다.\n\r\n\r\n\n- 자본 확충 방식은 주주가치 희석을 최소화하기 위해 주주배정 방식의 유상증자를 최우선 방안으로 검토하고 있습니다.\n\n- 구체적인 자본 확충 방안은 향후 이사회 검토와 결의를 통해 확정할 계획입니다. | \r\n\n\r\n\n\r\n| 예정 공시 일시 | \r\n| - | \r\n\n\r\n\n\r\n| 2. 정보제공내역 | \r\n| 정보제공자 | \r\n| SK디앤디 ESG Part | \r\n\n\r\n\n\r\n| 정보제공대상자 | \r\n| 주주 및 기타 국내외 투자자, 애널리스트, 언론 등 | \r\n\n\r\n\n\r\n| 정보제공(예정)일시 | \r\n| 공정공시 후 수시 제공 | \r\n\n\r\n\n\r\n| 행사명(장소) | \r\n| - | \r\n\n\r\n\n\r\n| 3. 연락처(관련부서/전화번호) | \r\n| ESG Part (02-398-4700) | \r\n\n\r\n\n\r\n| 4. 기타 투자판단과 관련한 중요사항 | \r\n\n\r\n\n\r\n| - 상기 사항은 경영 상황에 따라 일부 변경될 수 있습니다.\n- 향후 이사회를 통한 확정 결의 시 관련 내용을 공시할 예정입니다. | \r\n\n\r\n\n\r\n| ※ 관련공시 | \r\n| - |"
+      },
+      "provenance": {
+        "source": "opendart-document",
+        "labelMethod": "single-review-body-adjudication",
+        "reviewedAt": "2026-07-21"
+      },
+      "expectedEvents": [
+        {
+          "type": "capital-change",
+          "action": "planned",
+          "state": "proposed",
+          "cause": "capital-strengthening",
+          "subjectType": "issuer"
+        }
+      ],
+      "tags": [
+        "body-required",
+        "kospi",
+        "live"
+      ]
+    },
+    {
+      "id": "body-20260716801020",
+      "input": {
+        "rceptNo": "20260716801020",
+        "reportName": "투자판단관련주요경영사항",
+        "corpName": "진원생명과학",
+        "disclosureType": "I",
+        "disclosureDetailType": "I001",
+        "bodyText": "진원생명과학/투자판단 관련 주요경영사항/(2026.07.16)투자판단 관련 주요경영사항\n\r\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n\n\r\n투자판단 관련 주요경영사항 \r\n\n\r\n\n\r\n\r\n\n\r\n\r\n\n\r\n| 1. 제목 | \r\n| 종속회사 VGXI, Inc.의 CDMO 관련 생산 중단 및 CDMO 사업부문 매출액('26년 1월~6월) 미발생 | \r\n\n\r\n\n\r\n| 2. 주요내용 | \r\n| 1. 종속회사 VGXI, Inc.의 CDMO 관련 생산 중단 여부\n* 현재 당사 종속회사 VGXI, Inc.의 제1공장(우드랜드 소재)과 제2공장(콘로소재)의 CDMO 관련 생산은 상반기동안 중단된 상태입니다.\n\n(1) VGXI, Inc 현황\n- 당반기 중 발생한 일시적인 (완제)생산유보는 법적 또는 행정적 처분에 의한 '영업정지'나 경영 마비가 아닙니다.\n- 내부 공정 효율화 및 인적 물적 표준운영절차의 적격성 평가(Validation) 준비를 수행함에 따른 기술적 잠정 유보 조치입니다.\n- 이 기간 중에도 종속회사 시설 내에 수탁 보관 중인 클라이언트사들의 원료의약품 및 핵심 임상 자산은 cGMP 기준 하에 잔여 안정성 테스트 등을 거치며 철저하게 유지 관리되고 있습니다.\n\n(2) 향후 계획\n- VGXI 제1공장(우드랜드 소재) :당사가 보유한 특허기술 등을 기반으로 소규모 완제의약품 생산 프로젝트(Small-scale Niche Fills) 전환을 위해 향후 10개월 내 총 26회 가동 수요에 대한 라인 할당과 원료 소싱 전략을 준비해놓고 있습니다.\n- VGXI 제2공장(콘로 소재) :공장신축 이후 생산내역은 없으나 펀딩 이후 시운전 및 재검증(C&Q) 단계를 거쳐 AI 등 신기술을 접목한 공정효율화 프로세스를 검토 추진하여 공장 가동을 준비하고 있습니다.\n\n2. CDMO 사업부문 매출액('26년 1월~6월) 발생 여부\n* CDMO 사업부문의 인식된 매출액은 2026년 상반기(1월~6월)까지 없습니다.\n\n(1) 매출 미발생 사유\n- 공장 재가동을 위한 자산실사 및 생산라인 조정으로 완제 생산이 일시 유보되었습니다. 하반기 신규 프로젝트 가동과 함께 조속히 매출을 실현할 예정입니다.\n\n(2) 영업활동\n- 지연되었던 고객사 서비스가 완전 재개되고 금년 6월 미국 내 2026 Bio International Convention 참여 등 적극적 영업활동은 지속하고 있습니다.\n- 기존 고객사 외, 2026년 6월 25일 기준, 신규 1개 업체(S**** Bio)와 $16,900,000 상당의 약정서를 체결하여 향후 본 계약 체결을 준비하고 있으며, 기존 2개 업체로부터 추가 생산 견적 요청이 들어왔습니다.\n- 특히 당사가 보유한 독자적 노하우 및 특허기술을 기반으로 고부가가치 소규모 완제의약품 생산 프로젝트 전환을 통해 향후 10개월 내 총 26회 가동 수요에 대한 라인 할당과 원료 소싱 전략을 준비해놓고 있습니다.\n- 당사는 신규 업무협약 및 본 프로젝트 가동을 통해 하반기부터 신속한 실적 턴어라운드를 추진하고 있습니다. | \r\n\n\r\n\n\r\n| 3. 이사회결의일(결정일) 또는 사실확인일 | \r\n| - | \r\n\n\r\n\n\r\n| - 사외이사 참석여부 | \r\n| 참석(명) | \r\n| - | \r\n\n\r\n\n\r\n| 불참(명) | \r\n| - | \r\n\n\r\n\n\r\n| - 감사"
+      },
+      "provenance": {
+        "source": "opendart-document",
+        "labelMethod": "single-review-body-adjudication",
+        "reviewedAt": "2026-07-21"
+      },
+      "expectedEvents": [
+        {
+          "type": "operating-status",
+          "action": "halted",
+          "state": null,
+          "cause": "production-suspension",
+          "subjectType": "business"
+        }
+      ],
+      "tags": [
+        "body-required",
+        "kospi",
+        "live"
+      ]
+    },
+    {
+      "id": "body-20260720800005",
+      "input": {
+        "rceptNo": "20260720800005",
+        "reportName": "투자판단관련주요경영사항",
+        "corpName": "대우건설",
+        "disclosureType": "I",
+        "disclosureDetailType": "I001",
+        "bodyText": "대우건설/투자판단 관련 주요경영사항/(2026.07.20)투자판단 관련 주요경영사항\n\r\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n\n\r\n투자판단 관련 주요경영사항 \r\n\n\r\n\n\r\n\r\n\n\r\n\r\n\n\r\n| 1. 제목 | \r\n| 상도15구역 주택정비형 재개발사업 시공자 선정 | \r\n\n\r\n\n\r\n| 2. 주요내용 | \r\n| - 당사는 상도15구역 주택정비형 재개발사업 조합 총회에서 시공자로 선정됨\n\n- 본 사업의 공사금액은 약 1조 4,367억원임(VAT 제외)\n\n- 선정일자 : 2026.7.16 (목)\n\n- 공사개요 :\n서울특별시 동작구 상도동 279번지 일대\n지하 8층~지상 35층 30개동, 아파트 3,207세대 및 근린생활시설 | \r\n\n\r\n\n\r\n| 3. 이사회결의일(결정일) 또는 사실확인일 | \r\n| 2026-07-16 | \r\n\n\r\n\n\r\n| - 사외이사 참석여부 | \r\n| 참석(명) | \r\n| - | \r\n\n\r\n\n\r\n| 불참(명) | \r\n| - | \r\n\n\r\n\n\r\n| - 감사(사외이사가 아닌 감사위원) 참석여부 | \r\n| - | \r\n\n\r\n\n\r\n| 4. 기타 투자판단과 관련한 중요사항 | \r\n\n\r\n\n\r\n| - 상기 2의 공사금액은 '25년말 기준 연결매출액의 약 17.84%에 해당함\n\n- 상기 3의 이사회결의일(결정일) 또는 사실확인일은 시공자 선정 확인일임\n\n- 상기 사항은 사업 진행과정에서 변동될 수 있으며 향후 본계약 체결시 확정된 내용을 공시할 예정임 | \r\n\n\r\n\n\r\n| ※ 관련공시 | \r\n| - |"
+      },
+      "provenance": {
+        "source": "opendart-document",
+        "labelMethod": "single-review-body-adjudication",
+        "reviewedAt": "2026-07-21"
+      },
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "selected",
+          "state": null,
+          "cause": "construction-project",
+          "subjectType": "contract"
+        }
+      ],
+      "tags": [
+        "body-required",
+        "kospi",
+        "live"
+      ]
+    },
+    {
+      "id": "body-20260720800114",
+      "input": {
+        "rceptNo": "20260720800114",
+        "reportName": "기타경영사항(자율공시)",
+        "corpName": "대호에이엘",
+        "disclosureType": "I",
+        "disclosureDetailType": "I001",
+        "bodyText": "대호에이엘/기타 경영사항(자율공시)/(2026.07.20)기타 경영사항(자율공시)\n\r\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n\n\r\n기타 경영사항(자율공시) \r\n\n\r\n\n\r\n\r\n\n\r\n\r\n\n\r\n| 1. 제목 | \r\n| (주)대호에이엘 경영권 매각 및 매각주관사 선정 | \r\n\n\r\n\n\r\n| 2. 주요내용 | \r\n| 당사의 지배구조 개선, 경영투명성을 확보하기 위하여 최대주주 변경을 아래와 같이 추진합니다.\n\n- 아 래 -\n\n1. 매각 목적 : 매각을 통한 지배구조 개선\n\n2. 매각 대상 : 주식회사 대호에이엘의 경영권\n\n3. 매각 방식 : 제한경쟁입찰\n(단, 입찰공고 전 적격인수자를 우선매수권자로 지정할 수 있음)\n\r\n\r\n\n4. 매각목적물 : 제3자배정 유상증자 등을 통한 경영권 매각\n\n5. 매각주관사 : 안진회계법인\n\n6. 진행일정 :\n\r\n\r\n- 2026년 07월 16일 매각주관사 선정\n\r\n\r\n- 세부 매각 일정은 매각주관사와 협의하여 진행할 예정입니다.\n\n7. 기타 :\n입찰공고는 회사 홈페이지를 통해 게시할 예정입니다. | \r\n\n\r\n\n\r\n| 3. 결정(확인)일자 | \r\n| 2026-07-16 | \r\n\n\r\n\n\r\n| 4. 기타 투자판단과 관련한 중요사항 | \r\n\n\r\n\n\r\n| - 상기 3. 결정(확인)일자는 매각주관사(매각자문) 용역계약 체결일입니다.\n\n- 상기 진행일정은 관계기관과의 협의 및 거래 진행 상황에 따라 변경될 수 있습니다.\n\n- 향후 거래진행 과정에서 구체적인 내용이 확정될 경우 공시 관련 법률 및 규정에 따라 추가 공시할 예정입니다. | \r\n\n\r\n\n\r\n| ※ 관련공시 | \r\n| - |"
+      },
+      "provenance": {
+        "source": "opendart-document",
+        "labelMethod": "single-review-body-adjudication",
+        "reviewedAt": "2026-07-21"
+      },
+      "expectedEvents": [
+        {
+          "type": "ownership-change",
+          "action": "initiated",
+          "state": null,
+          "cause": "control-sale",
+          "subjectType": "ownership"
+        }
+      ],
+      "tags": [
+        "body-required",
+        "kospi",
+        "live"
+      ]
+    },
+    {
+      "id": "body-20260720800121",
+      "input": {
+        "rceptNo": "20260720800121",
+        "reportName": "투자판단관련주요경영사항",
+        "corpName": "남광토건",
+        "disclosureType": "I",
+        "disclosureDetailType": "I001",
+        "bodyText": "남광토건/투자판단 관련 주요경영사항/(2026.07.20)투자판단 관련 주요경영사항\n\r\n\n\r\n\n\r\n\n\r\n\n\r\n\r\n\n\r\n\n\r\n투자판단 관련 주요경영사항 \r\n\n\r\n\n\r\n\r\n\n\r\n\r\n\n\r\n| 1. 제목 | \r\n| 동아아파트 LH참여형 가로주택정비사업 시공자 선정 | \r\n\n\r\n\n\r\n| 2. 주요내용 | \r\n| 당사는 \"동아아파트 LH참여형 가로주택정비사업\"의 시공자로 선정되었으며, 주요 내용은 아래와 같습니다.\n\r\n\r\n\n\r\n\r\n- 아 래 -\n\n1. 시행자 : 동아아파트 LH참여형 가로주택정비사업조합\n\n3. 낙찰금액(원) : 298,341,110,565\n\r\n\r\n당사분(51%): 152,153,966,388(부가세 제외)\n\n4. 최근매출액(원) : 357,445,671,453\n\n5. 매출액대비(%) : 42.57 | \r\n\n\r\n\n\r\n| 3. 이사회결의일(결정일) 또는 사실확인일 | \r\n| 2026-07-20 | \r\n\n\r\n\n\r\n| - 사외이사 참석여부 | \r\n| 참석(명) | \r\n| - | \r\n\n\r\n\n\r\n| 불참(명) | \r\n| - | \r\n\n\r\n\n\r\n| - 감사(사외이사가 아닌 감사위원) 참석여부 | \r\n| - | \r\n\n\r\n\n\r\n| 4. 기타 투자판단과 관련한 중요사항 | \r\n\n\r\n\n\r\n| 1. 사업개요\n\n\r\n\r\n- 위치 : 인천광역시 미추홀구 용현동 610-113번지 일원\n\r\n\r\n- 공사규모 : 지하5층 ~ 지상39층 6개동, APT 994세대 및 부대복리시설\n\r\n\r\n\n2. 상기 \"최근매출액\"은 2025년말 연결 재무제표 기준입니다.\n\n3. 상기 \"사실확인일\"은 시공자 선정 공문 수령일 입니다.\n\n4. 상기 사항은 본 계약 체결 시 변경될 수 있으며, 향후 본계약 체결 시 확정된 내용을 공시할 예정입니다. | \r\n\n\r\n\n\r\n| ※ 관련공시 | \r\n| - |"
+      },
+      "provenance": {
+        "source": "opendart-document",
+        "labelMethod": "single-review-body-adjudication",
+        "reviewedAt": "2026-07-21"
+      },
+      "expectedEvents": [
+        {
+          "type": "material-contract",
+          "action": "selected",
+          "state": null,
+          "cause": "construction-project",
+          "subjectType": "contract"
+        }
+      ],
+      "tags": [
+        "body-required",
+        "kospi",
+        "live"
+      ]
+    }
+  ]
+}

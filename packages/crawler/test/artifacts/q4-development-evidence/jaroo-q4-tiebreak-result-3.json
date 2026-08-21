@@ -1,0 +1,75 @@
+[
+  {
+    "index": 242,
+    "rceptNo": "20251128800665",
+    "expectedEvents": [
+      {
+        "type": "asset-transaction",
+        "action": "changed",
+        "state": "effective",
+        "cause": "real-estate-lease",
+        "subjectType": "real-estate"
+      }
+    ],
+    "labelConfidence": "medium",
+    "decision": "candidate-b",
+    "rationale": "기존 임대계약을 변경계약으로 갱신한 사실 자체가 확정되어 있으며, 수정된 종료일이 미래라는 사정은 이미 체결된 활성 계약 변경의 효력을 pending으로 만들지 않는다. 공시 후 시작되는 것은 변경 조건의 적용기간이지 변경계약의 성립 자체가 아니다.",
+    "ambiguities": [
+      "변경된 월임대료의 적용 시작일은 2025-12-04이므로 경제적 조건의 실제 적용만 기준으로 보면 pending 해석도 가능하다."
+    ]
+  },
+  {
+    "index": 16,
+    "rceptNo": "20251022000196",
+    "expectedEvents": [
+      {
+        "type": "capital-change",
+        "action": "contracted",
+        "state": "pending",
+        "cause": "convertible-bond-acquisition",
+        "subjectType": "securities"
+      }
+    ],
+    "labelConfidence": "medium",
+    "decision": "candidate-b",
+    "rationale": "발행사가 자기 전환사채를 재취득하는 사건은 일반 영업자산 매입보다 발행사의 자본·채무증권 구조 변화에 해당하므로 capital-change가 적합하다. 계약과 계약금 지급은 완료됐지만 잔금 지급 및 전자등록금액 수령이 2025-11-20로 남아 있어 contracted/pending이다.",
+    "ambiguities": [
+      "표의 지급(예정)일은 2025-10-22이나 상세 설명은 당일 계약금만 지급하고 잔금과 사채 수령은 미래라고 명시한다.",
+      "증권을 매수한다는 거래 형식만 강조하면 asset-transaction으로 볼 여지가 있으나 자기 발행 전환사채라는 대상의 성격을 우선했다."
+    ]
+  },
+  {
+    "index": 367,
+    "rceptNo": "20251231800491",
+    "expectedEvents": [
+      {
+        "type": "capital-expenditure",
+        "action": "adjusted",
+        "state": "effective",
+        "cause": "facility-investment",
+        "subjectType": "asset"
+      },
+      {
+        "type": "corporate-event",
+        "action": "cancelled",
+        "state": "cancelled",
+        "cause": "business-plan",
+        "subjectType": "business"
+      },
+      {
+        "type": "restructuring",
+        "action": "decided",
+        "state": "proposed",
+        "cause": "business-disposal",
+        "subjectType": "business"
+      }
+    ],
+    "labelConfidence": "medium",
+    "decision": "candidate-b",
+    "rationale": "정정문은 투자 규모 조정, 양극재 사업 진출 계획 취소, CMP 패드·블랭크마스크 사업 매각 결정을 각각 확정한다. 아직 개시되지 않은 사업 진출 계획의 취소는 현재 운영상태 중단이 아니므로 corporate-event/business-plan으로 분류하고, 매각은 결정만 확인되어 proposed로 유지한다.",
+    "ambiguities": [
+      "사업 현황에는 CMP 패드·블랭크마스크 '사업 매각'이라고 기재되지만 변화 사유는 '매각을 결정'했다고 하므로 종결 여부는 확정되지 않는다.",
+      "동박·유리기판·PBAT 생산능력 수치는 현황 정보로서 별도의 신규 결정 또는 완료 시점이 명시되지 않는다."
+    ]
+  }
+]

@@ -19,6 +19,7 @@ import {
 import { resolveIdentifierRowsWithRetry, type OcrIdentifierResolutionResult } from '@/lib/ocr-identifier-resolution'
 import { buildHomeCurrentQuoteQuery } from '@/lib/home-current-quotes'
 import { hydratePortfolioItemsWithCurrentQuotes } from '@/lib/home-quote-bootstrap'
+import { getFinancialValueTone } from '@/lib/financial-value-tone'
 import { aggregateResolvedOcrReviewRows, type AggregatedOcrReviewRow } from '@/lib/ocr-review-aggregation'
 import { buildMergeRowsFromReviewRows, persistAppliedPortfolioFromMergeRows } from '@/lib/ocr-portfolio-apply'
 import { syncPortfolioToServer } from '@/lib/portfolio-sync'
@@ -208,9 +209,9 @@ function OcrResultDesignStyles() {
   return (
     <style>{`
       .jaroo-ocr-page *{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Pretendard',sans-serif;-webkit-font-smoothing:antialiased}
-      .jaroo-ocr-page{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;min-height:100vh;min-height:100dvh;align-items:flex-start;color:#0F1419}
-      @media (min-width:1024px){.jaroo-ocr-page{margin-left:-7rem}}
-      .jaroo-ocr-frame{background:#F5F6F8;border-radius:16px;width:340px;height:720px;overflow:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative;display:flex;flex-direction:column}
+      /* 루트 PhoneFrame 안에 또 폰 박스를 그리지 않는다. 바깥 프레임을 그대로 채운다. */
+      .jaroo-ocr-page{background:#F5F6F8;display:flex;height:100%;width:100%;color:#0F1419}
+      .jaroo-ocr-frame{background:#F5F6F8;width:100%;height:100%;overflow:hidden;position:relative;display:flex;flex-direction:column}
       .jaroo-ocr-frame::-webkit-scrollbar{display:none}
       .jaroo-ocr-head{position:relative;z-index:10;flex:0 0 auto;background:rgba(245,246,248,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;border-bottom:.5px solid #E8EAEE;display:flex;align-items:center;gap:11px}
       .jaroo-ocr-head-back{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:14px;color:#0F1419;box-shadow:0 1px 2px rgba(0,0,0,.04);border:0;cursor:pointer}
@@ -240,7 +241,7 @@ function OcrResultDesignStyles() {
       .jaroo-ocr-okr-right{text-align:right;flex-shrink:0}
       .jaroo-ocr-okr-amt{font-size:12.5px;font-weight:600;color:#0F1419;font-variant-numeric:tabular-nums;white-space:nowrap}
       .jaroo-ocr-okr-rate{font-size:11px;margin-top:1px;font-variant-numeric:tabular-nums}
-      .jaroo-ocr-okr-rate.up{color:#1A9D55}.jaroo-ocr-okr-rate.down{color:#E5484D}
+      .jaroo-ocr-okr-rate.up{color:var(--jaroo-profit)}.jaroo-ocr-okr-rate.down{color:var(--jaroo-loss)}
       .jaroo-ocr-okr-edit{font-size:10.5px;color:#2B6BE6;margin-top:3px;cursor:pointer;border:0;background:transparent}
       .jaroo-ocr-edit-panel{border-top:.5px solid #EFF1F4;background:#F8FAFD;padding:12px 14px}
       .jaroo-ocr-edit-title{font-size:11.5px;font-weight:700;color:#0F1419;margin-bottom:9px}
@@ -327,13 +328,8 @@ function getRowIdentifierMeta(row: OcrReviewRow | AggregatedOcrReviewRow) {
 }
 
 function getProfitRateClass(value: string) {
-  const trimmed = value.trim()
-
-  if (!trimmed || trimmed === '-') {
-    return ''
-  }
-
-  return !trimmed.startsWith('-') && !trimmed.startsWith('−') ? 'up' : 'down'
+  const tone = getFinancialValueTone(value)
+  return tone === 'profit' ? 'up' : tone === 'loss' ? 'down' : ''
 }
 
 export default function OcrPage() {
