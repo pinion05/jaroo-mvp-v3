@@ -1240,7 +1240,7 @@ svg{display:block}
 
 <div class="kpi">
 <div class="k"><div class="n" style="color:#1a7340">100%</div><div class="l">진단(스캔→홈→분석) 흐름</div></div>
-<div class="k"><div class="n" style="color:#b8860b">~70%</div><div class="l">딥스캔 60초 화면</div></div>
+<div class="k"><div class="n" style="color:#b8860b">~75%</div><div class="l">딥스캔 60초 화면 (8/25 인트로·전환 문구 추가)</div></div>
 <div class="k"><div class="n" style="color:#A8323A">0%</div><div class="l">워치(구독) 영역</div></div>
 <div class="k"><div class="n" style="color:#1a7340">실결제</div><div class="l">과금 인프라 (구조는 상이)</div></div>
 </div>
@@ -1267,10 +1267,10 @@ svg{display:block}
 <tr><td>세 팀의 근거 제시 방식</td><td class="dif">⚪</td><td>지시: 정해진 수치 목록(현재가·거래량·목표가 등 12항목). 실제: <b>AI가 그때그때 쓰는 3~4문장 요약</b> + 태그 2개</td></tr>
 <tr><td>최종 판정 방식</td><td class="dif">⚪</td><td>지시: 세 팀 투표로 5단계(강세~위험) + 막대 5칸. 실제: <b>내부 점수 계산으로 4단계</b>(강세/중립⁺/중립/주의), 막대는 최대 4칸만 점등. "점수를 쓰지 말라"는 지시 원칙과도 충돌</td></tr>
 <tr><td>시나리오 3개 (보유/추가매수/손절)</td><td class="part">🟡</td><td>3개 구조와 합계 100% 규칙은 구현됨. 단 실제 내용은 "보유 유지/일부 차익/축소 대기" 계열로, 지시한 추가매수·손절 시나리오가 없음. 비중도 투표가 아닌 점수에서 파생</td></tr>
-<tr><td>손익 인트로 (5단계 멘트)</td><td class="miss">🔴</td><td>"꽤 오르셨네요 / 거의 본전이네요" 식의 첫인사 멘트 없음 — 목업에만 존재</td></tr>
+<tr><td>손익 인트로 (5단계 멘트)</td><td class="ok">✅</td><td><b>8/25 구현 완료</b> — "꽤 오르셨네요 / 거의 본전이네요" 5단계 멘트가 딥스캔 첫 화면 제목에 적용. 판정 기준(전체 자산 대비 충격)도 스펙 그대로. 손익 데이터 없는 경우·ETF는 기존 안내 문구로 안전 폴백</td></tr>
 <tr><td>차트 색 규칙</td><td class="miss">🔴</td><td>지시: 수익 중이면 빨강, 손실 중이면 파랑으로 바꿔라. 실제: <b>항상 빨간색 고정</b></td></tr>
 <tr><td>"자세히 보기" 펼침</td><td class="miss">🔴</td><td>결론 아래 행동별 비중·목표가 근거 펼침 없음</td></tr>
-<tr><td><b>워치 전환 버튼 ("지켜보기 시작")</b></td><td class="miss">🔴</td><td>분석→구독으로 넘어가는 이 핵심 장면이 실제 제품에는 없음 — 목업의 하이라이트가 미구현</td></tr>
+<tr><td><b>워치 전환 문구·버튼 ("지켜보기 시작")</b></td><td class="part">🟡</td><td><b>8/25 부분 구현</b> — "이 판단, 계속 지켜봐드릴까요?" 안내 카드가 딥스캔 결과 말미에 추가됨(문구·디자인 목업과 동일). 단 "지켜보기 시작" 버튼과 워치 연결은 여전히 없음(워치 미구현 상태라 의도적 제외)</td></tr>
 </table>
 <p class="small">스펙에 없는데 실제로 더해진 것: 분석가 목표가 범위를 보여주는 팬 차트, 손실 종목의 "원금 회수까지 얼마나 걸리나" 예측 카드, 환율 반영 평단 표시.</p>
 
