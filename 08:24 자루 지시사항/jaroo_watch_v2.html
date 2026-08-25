@@ -1,0 +1,342 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jaroo — 워치 (버틸 근거)</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Pretendard',sans-serif;-webkit-font-smoothing:antialiased}
+:root{--ink:#0F1419;--up:#E5484D;--down:#2B6BE6;--bg:#F5F6F8;--card:#fff;--line:#E8EAEE;--t2:#5A6473;--t3:#97A0AE;--ink-soft:#EEF0F3;}
+body{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;align-items:flex-start}
+.frame{background:var(--bg);border-radius:16px;width:340px;height:820px;overflow-y:auto;overflow-x:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative}
+.frame::-webkit-scrollbar{display:none}
+.caption{width:340px;text-align:center;font-size:12px;color:#555;margin-top:8px;font-weight:600}
+svg{display:block}
+
+.head{position:sticky;top:0;z-index:10;background:rgba(245,246,248,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;border-bottom:.5px solid var(--line);display:flex;align-items:center;gap:11px}
+.hb{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.ht{font-size:15px;font-weight:600;color:var(--ink)}
+.body{padding:18px 16px 24px}
+.section-label{font-size:11px;color:var(--t3);letter-spacing:.04em;margin:0 0 10px;font-weight:500}
+
+.trial-banner{background:var(--ink);border-radius:13px;padding:13px 15px;margin-bottom:16px;display:flex;align-items:center;gap:11px}
+.tb-ico{width:32px;height:32px;border-radius:9px;background:rgba(255,255,255,.14);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0}
+.tb-txt{flex:1;color:#fff}
+.tb-t{font-size:12.5px;font-weight:600}
+.tb-d{font-size:10.5px;color:rgba(255,255,255,.6);margin-top:1px}
+.tb-days{font-size:11px;font-weight:700;color:#fff;background:rgba(255,255,255,.16);padding:4px 9px;border-radius:7px}
+
+/* 대시보드 카드 (요약) */
+.watch-card{background:#fff;border-radius:14px;border:.5px solid var(--line);box-shadow:0 1px 2px rgba(0,0,0,.03);padding:15px 16px;margin-bottom:10px}
+.wc-top{display:flex;align-items:center;margin-bottom:11px}
+.wc-dot{width:8px;height:8px;border-radius:50%;margin-right:10px}
+.wc-name{flex:1;font-size:14px;font-weight:600;color:var(--ink)}
+.wc-status{font-size:10.5px;font-weight:600;padding:3px 9px;border-radius:6px}
+.wc-status.calm{background:var(--ink-soft);color:var(--t2)}
+.wc-status.alert{background:#FBE6E7;color:#A8323A}
+
+/* 진행감 */
+.prog{margin-bottom:10px}
+.prog-label{display:flex;justify-content:space-between;align-items:baseline;font-size:10.5px;color:var(--t3);margin-bottom:5px}
+.prog-label b{font-size:12px;color:var(--ink);font-weight:700;font-variant-numeric:tabular-nums}
+.prog-bar{height:7px;border-radius:4px;background:#EEF0F3;overflow:hidden;position:relative}
+.prog-fill{height:100%;border-radius:4px}
+.prog-delta{display:flex;align-items:center;gap:4px;font-size:10.5px;margin-top:5px;font-weight:600}
+.prog-delta.better{color:var(--up)}
+.prog-delta.worse{color:var(--down)}
+.prog-delta.flat{color:var(--t3)}
+
+.wc-signal{display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--t2);background:#F7F8FA;border-radius:9px;padding:9px 11px}
+.wc-signal.warn{background:#FBE6E7;color:#A8323A}
+.wc-time{font-size:10px;color:var(--t3);margin-left:auto;flex-shrink:0}
+
+.add-watch{display:flex;align-items:center;justify-content:center;gap:7px;padding:13px;border-radius:12px;border:1px dashed #B8C4D4;background:#fff;color:var(--t2);font-size:12.5px;font-weight:500;margin-top:4px}
+
+/* 상세 — 버틸 근거 블록들 */
+.detail-hero{background:#fff;border-radius:16px;border:.5px solid var(--line);padding:17px 17px 15px;margin-bottom:12px}
+.dh-top{display:flex;align-items:center;margin-bottom:14px}
+.dh-name{flex:1;font-size:16px;font-weight:700;color:var(--ink)}
+.dh-rate{font-size:17px;font-weight:700;font-variant-numeric:tabular-nums;color:var(--down)}
+.dh-sub{font-size:11px;color:var(--t3);text-align:right;margin-top:2px}
+
+/* 요약 + 접기 */
+.gist{display:flex;align-items:flex-start;gap:10px;background:#FBE6E7;border:.5px solid #F5D5D7;border-radius:13px;padding:14px 15px;margin-bottom:12px}
+.gist-ico{width:24px;height:24px;border-radius:50%;background:#fff;color:#A8323A;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.gist-t{flex:1;font-size:12.5px;color:#8E2A31;line-height:1.6}
+.gist-t b{color:#7A2129;font-weight:700}
+.more{margin-bottom:11px}
+.more-btn{background:#fff;border:.5px solid var(--line);border-radius:13px;padding:14px 16px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.more-t{font-size:13px;font-weight:700;color:var(--ink);flex-shrink:0}
+.more-s{flex:1;font-size:10.5px;color:var(--t3);min-width:0;text-align:right}
+.more-a{color:var(--t3);transition:transform .3s;flex-shrink:0}
+.more.open .more-a{transform:rotate(180deg)}
+.more-body{max-height:0;overflow:hidden;transition:max-height .4s ease}
+.more.open .more-body{max-height:2400px;margin-top:11px}
+
+/* 번호 섹션 */
+.sec{background:#fff;border:.5px solid var(--line);border-radius:13px;padding:15px 16px;margin-bottom:9px}
+.sec-h{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.sec-n{width:19px;height:19px;border-radius:50%;background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sec-t{flex:1;font-size:13px;font-weight:700;color:var(--ink)}
+.sec-d{font-size:10px;font-weight:700;color:var(--t2);background:var(--ink-soft);padding:3px 8px;border-radius:5px}
+.sec-score{font-size:11px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.sec-lead{font-size:11.5px;color:var(--t2);line-height:1.6;margin-bottom:11px}
+.sec-tip{font-size:10.5px;color:var(--t2);line-height:1.55;background:#F7F8FA;border-radius:9px;padding:10px 11px;margin-top:10px}
+.sec-tip b{color:var(--ink);font-weight:700}
+
+.big-num{background:#F0F4FB;border:.5px solid #D4E0F2;border-radius:11px;padding:13px;text-align:center;margin-top:12px}
+.bn-l{font-size:10px;color:var(--t3);margin-bottom:4px}
+.bn-v{font-size:20px;font-weight:800;color:#2B6BE6;font-variant-numeric:tabular-nums;line-height:1.1}
+.bn-s{font-size:10px;color:var(--t3);margin-top:5px}
+
+.dots{display:flex;gap:5px;margin-bottom:11px}
+.dot{flex:1;height:4px;border-radius:2px;background:#E4E8EE}
+.dot.on{background:var(--ink)}
+.ck{display:flex;align-items:flex-start;gap:9px;padding:7px 0}
+.ck-m{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.ck.ok .ck-m{background:#FBE6E7;color:#A8323A}
+.ck.no .ck-m{background:#EEF0F3;color:#97A0AE}
+.ck-t{flex:1;font-size:11.5px;color:var(--t2);line-height:1.5}
+.ck-t b{color:var(--ink);font-weight:700;margin-right:4px}
+.ck.no .ck-t{opacity:.7}
+
+.tl2-r{display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:.5px dashed var(--line)}
+.tl2-r:last-child{border-bottom:none}
+.tl2-d{font-size:11px;font-weight:800;color:var(--ink);width:44px;flex-shrink:0}
+.tl2-w{flex:1;font-size:11.5px;color:var(--t2);line-height:1.4}
+.tl2-k{font-size:9px;font-weight:700;color:#A8323A;background:#FBE6E7;padding:2px 6px;border-radius:5px;flex-shrink:0}
+.tl2-r.key .tl2-w{color:var(--ink);font-weight:600}
+
+.tw{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.tw-c{border:.5px solid var(--line);border-radius:11px;padding:12px}
+.tw-when{font-size:11px;font-weight:700;color:var(--t2);margin-bottom:8px}
+.tw-big{font-size:17px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.1;margin-bottom:6px}
+.tw-note{font-size:10px;color:var(--t3);line-height:1.45}
+
+.blk{background:#fff;border-radius:14px;border:.5px solid var(--line);padding:15px 16px;margin-bottom:11px}
+.blk-h{display:flex;align-items:center;gap:8px;margin-bottom:11px}
+.blk-ico{width:26px;height:26px;border-radius:8px;background:var(--ink-soft);display:flex;align-items:center;justify-content:center;color:var(--ink);flex-shrink:0}
+.blk-t{font-size:13px;font-weight:600;color:var(--ink)}
+.blk-body{font-size:12px;color:var(--t2);line-height:1.6}
+.blk-body b{color:var(--ink);font-weight:600}
+
+/* 최악 시나리오 범위 바 */
+.range{margin-top:10px}
+.range-bar{height:34px;border-radius:9px;background:linear-gradient(90deg,#DCE6F5,#F0F2F5,#FBE3E4);position:relative;display:flex;align-items:center}
+.range-mark{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);border-radius:1px}
+.range-mark::after{content:attr(data-label);position:absolute;top:-16px;left:50%;transform:translateX(-50%);font-size:9px;font-weight:700;color:var(--ink);white-space:nowrap}
+.range-ends{display:flex;justify-content:space-between;font-size:10px;color:var(--t3);margin-top:7px;font-variant-numeric:tabular-nums}
+.range-ends .lo{color:var(--down);font-weight:600}
+.range-ends .hi{color:var(--up);font-weight:600}
+
+/* 조건 체크리스트 */
+.cond{display:flex;align-items:flex-start;gap:9px;padding:9px 0;border-bottom:.5px dashed var(--line)}
+.cond:last-child{border-bottom:none}
+.cond-mark{width:17px;height:17px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.cond-mark.ok{background:#FBE6E7;color:#A8323A}
+.cond-mark.no{background:#EEF0F3;color:#97A0AE}
+.cond-txt{flex:1;font-size:11.5px;color:var(--t2);line-height:1.5}
+.cond-txt b{color:var(--ink);font-weight:600}
+
+/* 시간 프레임 */
+.tf-row{display:flex;align-items:center;gap:10px;padding:8px 0}
+.tf-when{font-size:11px;font-weight:700;color:var(--ink);width:52px;flex-shrink:0;font-variant-numeric:tabular-nums}
+.tf-what{flex:1;font-size:11.5px;color:var(--t2);line-height:1.4}
+.tf-key{font-size:9px;font-weight:700;color:#A8323A;background:#FBE6E7;padding:2px 6px;border-radius:5px;flex-shrink:0}
+
+/* 선택의 대칭 */
+.choice{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:4px}
+.ch{border:.5px solid var(--line);border-radius:11px;padding:12px}
+.ch-t{font-size:11.5px;font-weight:700;color:var(--ink);margin-bottom:7px}
+.ch-num{font-size:15px;font-weight:700;font-variant-numeric:tabular-nums;margin-bottom:4px}
+.ch-d{font-size:10.5px;color:var(--t3);line-height:1.45}
+
+/* 보편성 */
+.uni{display:flex;align-items:center;gap:11px}
+.uni-num{font-size:22px;font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+.uni-txt{flex:1;font-size:11.5px;color:var(--t2);line-height:1.5}
+
+.cta{width:100%;padding:15px;border-radius:13px;border:none;background:var(--ink);color:#fff;font-size:14px;font-weight:700;margin-top:6px}
+</style>
+</head>
+<body>
+
+<!-- 1. 대시보드 (진행감 강화) -->
+<div>
+<div class="frame">
+  <div class="head"><div class="ht" style="font-size:17px;font-weight:700">포트폴리오 워치</div></div>
+  <div class="body">
+    <div class="trial-banner">
+      <div class="tb-ico"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>
+      <div class="tb-txt"><div class="tb-t">무료 체험 중</div><div class="tb-d">전체 기능을 사용해보고 있어요</div></div>
+      <div class="tb-days">D-5</div>
+    </div>
+
+    <div class="section-label">지켜보는 중 · 2종목</div>
+
+    <div class="watch-card">
+      <div class="wc-top"><span class="wc-dot" style="background:#2B6BE6"></span><span class="wc-name">SFA반도체</span><span class="wc-status calm">지켜보는 중</span></div>
+      <div class="prog">
+        <div class="prog-label"><span>본전까지</span><b>+16.7%</b></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:38%;background:#2B6BE6"></div></div>
+        <div class="prog-delta better">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          3주 전보다 2.1% 가까워졌어요
+        </div>
+      </div>
+      <div class="wc-signal"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>아직 버틸 근거가 있어요 <span class="wc-time">2일 전</span></div>
+    </div>
+
+    <div class="watch-card">
+      <div class="wc-top"><span class="wc-dot" style="background:#2B6BE6"></span><span class="wc-name">한화오션</span><span class="wc-status alert">확인 필요</span></div>
+      <div class="prog">
+        <div class="prog-label"><span>본전까지</span><b>+28.3%</b></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:22%;background:#2B6BE6"></div></div>
+        <div class="prog-delta worse">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+          3주 전보다 4.4% 멀어졌어요
+        </div>
+      </div>
+      <div class="wc-signal warn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg>버틸 근거가 약해지고 있어요 <span class="wc-time">3시간 전</span></div>
+    </div>
+
+    <div class="add-watch">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+      다른 종목도 지켜보기
+    </div>
+  </div>
+</div>
+<div class="caption">1. 대시보드 — 본전 거리 + 지난주 대비 변화(진행감)</div>
+</div>
+
+<!-- 2. 종목 상세 — 버틸 근거 전부 -->
+<div>
+<div class="frame">
+  <div class="head"><div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div><div class="ht">SFA반도체</div></div>
+  <div class="body">
+    <!-- 히어로: 진행감 -->
+    <div class="detail-hero">
+      <div class="dh-top">
+        <div><div class="dh-name">SFA반도체</div><div style="font-size:10.5px;color:#97A0AE;margin-top:2px">23주 · 평단 11,400원</div></div>
+        <div><div class="dh-rate">−14.3%</div><div class="dh-sub">−34,494원</div></div>
+      </div>
+      <div class="prog">
+        <div class="prog-label"><span>본전까지</span><b>+16.7%</b></div>
+        <div class="prog-bar"><div class="prog-fill" style="width:38%;background:#2B6BE6"></div></div>
+        <div class="prog-delta better">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          3주 전보다 2.1% 가까워졌어요
+        </div>
+      </div>
+    </div>
+
+    <!-- 요약 한 줄 -->
+    <div class="gist">
+      <div class="gist-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
+      <div class="gist-t">아직 <b>버틸 근거가 있어요.</b> 조건 3개 중 2개가 충족됐고, 마지막 하나는 <b>8월 5일 실적</b>에서 갈려요.</div>
+    </div>
+
+    <div class="more" id="m1">
+      <div class="more-btn" onclick="document.getElementById('m1').classList.toggle('open')">
+        <span class="more-t">판단에 필요한 것</span>
+        <span class="more-s">최악 시나리오 · 조건 · 일정 · 팔면/안 팔면</span>
+        <span class="more-a"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+      </div>
+      <div class="more-body">
+        <!-- 1. 어디까지 빠질 수 있나 -->
+        <div class="sec">
+          <div class="sec-h"><span class="sec-n">1</span><span class="sec-t">어디까지 빠질 수 있나</span></div>
+          <div class="sec-lead">모르는 게 제일 불안하죠. 지난 1년 범위예요.</div>
+          <div class="range">
+            <div class="range-bar">
+              <div class="range-mark" style="left:38%" data-label="지금 9,770"></div>
+              <div class="range-mark" style="left:62%;opacity:.4" data-label="평단 11,400"></div>
+            </div>
+            <div class="range-ends">
+              <span class="lo">최저 8,120원</span>
+              <span class="hi">최고 14,300원</span>
+            </div>
+          </div>
+          <div class="big-num">
+            <div class="bn-l">최악의 경우 손실</div>
+            <div class="bn-v">−73,700원</div>
+            <div class="bn-s">여기서 16.9% 더 빠졌을 때</div>
+          </div>
+        </div>
+
+        <!-- 2. 본전 조건 -->
+        <div class="sec">
+          <div class="sec-h"><span class="sec-n">2</span><span class="sec-t">본전 가려면 뭐가 필요한가</span><span class="sec-score">2 / 3</span></div>
+          <div class="dots"><span class="dot on"></span><span class="dot on"></span><span class="dot"></span></div>
+          <div class="ck ok"><span class="ck-m"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="ck-t"><b>업황 회복</b> 후공정 수주 2분기 연속 증가</span></div>
+          <div class="ck ok"><span class="ck-m"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="ck-t"><b>목표가 여력</b> 증권가 13,200원 · 평단보다 위</span></div>
+          <div class="ck no"><span class="ck-m"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M5 12h14"/></svg></span><span class="ck-t"><b>흑자 전환</b> 8/5 실적이 분기점이에요</span></div>
+        </div>
+
+        <!-- 3. 일정 -->
+        <div class="sec">
+          <div class="sec-h"><span class="sec-n">3</span><span class="sec-t">언제 다시 볼까</span><span class="sec-d">D-6</span></div>
+          <div class="tl2">
+            <div class="tl2-r key">
+              <div class="tl2-d">8월 초</div>
+              <div class="tl2-w">2분기 실적 — 흑자 전환 여부</div>
+              <div class="tl2-k">분기점</div>
+            </div>
+            <div class="tl2-r"><div class="tl2-d">9월</div><div class="tl2-w">반도체 업황 지표 갱신</div></div>
+            <div class="tl2-r"><div class="tl2-d">11월</div><div class="tl2-w">3분기 실적 — 추세 확인</div></div>
+          </div>
+          <div class="sec-tip">무기한 기다리지 마세요. <b>8월 실적</b>을 보고 다시 판단하면 돼요.</div>
+        </div>
+
+        <!-- 4. 선택의 대칭 -->
+        <div class="sec">
+          <div class="sec-h"><span class="sec-n">4</span><span class="sec-t">지금 팔면 / 안 팔면</span></div>
+          <div class="tw">
+            <div class="tw-c">
+              <div class="tw-when">지금 판다면</div>
+              <div class="tw-big" style="color:#2B6BE6">−34,494원</div>
+              <div class="tw-note">손실 확정 · 224,710원을 다른 기회에</div>
+            </div>
+            <div class="tw-c">
+              <div class="tw-when">기다린다면</div>
+              <div class="tw-big">+16.7%</div>
+              <div class="tw-note">본전까지 필요한 상승폭 · 조건 2/3 충족</div>
+            </div>
+          </div>
+          <div class="sec-tip">어느 쪽도 정답은 아니에요. 다만 <b>모르고 기다리는 것</b>과 <b>알고 기다리는 것</b>은 달라요.</div>
+        </div>
+
+
+      </div>
+    </div>
+
+    <div class="more" id="m2">
+      <div class="more-btn" onclick="document.getElementById('m2').classList.toggle('open')">
+        <span class="more-t">참고</span>
+        <span class="more-s">다른 사람들은 어떤가</span>
+        <span class="more-a"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+      </div>
+      <div class="more-body">
+    <!-- 보편성 -->
+    <div class="blk">
+      <div class="blk-h">
+        <div class="blk-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75"/></svg></div>
+        <div class="blk-t">나만 그런 게 아니에요</div>
+      </div>
+      <div class="uni">
+        <div class="uni-num">68%</div>
+        <div class="uni-txt">같은 기간 이 종목을 산 사람 중 <b>68%가 손실 구간</b>이에요. 코스닥 평균도 같은 기간 <b>−11.2%</b>였어요.</div>
+      </div>
+    </div>
+
+      </div>
+    </div>
+
+    <button class="cta">딥스캔으로 자세히 보기</button>
+  </div>
+</div>
+<div class="caption">2. 종목 상세 — 버틸 근거 6요소 전부</div>
+</div>
+
+</body>
+</html>

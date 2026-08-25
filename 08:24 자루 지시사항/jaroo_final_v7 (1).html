@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jaroo — 6항목 펼침 브리핑</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Pretendard',sans-serif;-webkit-font-smoothing:antialiased}
+body{background:#e8e8e8;display:flex;justify-content:center;padding:20px;min-height:100vh}
+.frame{background:#F5F6F8;border-radius:16px;width:340px;height:720px;overflow-y:auto;overflow-x:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative;scroll-behavior:smooth}
+.frame::-webkit-scrollbar{display:none}
+
+.sticky-head{position:sticky;top:0;z-index:10;background:rgba(245,246,248,.94);backdrop-filter:saturate(180%) blur(14px);-webkit-backdrop-filter:saturate(180%) blur(14px);padding:12px 16px 10px;border-bottom:.5px solid #E8EAEE}
+.sh-top{display:flex;align-items:center;gap:10px}
+.sh-back{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;font-size:13px;color:#0F1419;flex-shrink:0;box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.sh-stock{flex:1;min-width:0}
+.sh-name{font-size:13.5px;font-weight:600;color:#0F1419;line-height:1.15}
+.sh-code{font-size:10px;color:#97A0AE;margin-top:1px}
+.sh-loss{text-align:right}
+.sh-loss-pct{font-size:14px;font-weight:700;color:#5A6473;font-variant-numeric:tabular-nums;line-height:1.1}
+.sh-loss-amt{font-size:10.5px;color:#5A6473;opacity:.72;margin-top:1px;font-variant-numeric:tabular-nums}
+
+.body{padding:18px 16px 16px}
+.intro-title{font-size:16px;font-weight:600;color:#0F1419;line-height:1.5;margin-bottom:16px}
+
+.live-card{background:#fff;border-radius:16px;border:.5px solid #E8EAEE;box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;margin-bottom:10px}
+.lc-head{padding:13px 16px 12px;border-bottom:.5px solid #EFF1F4}
+.live-badge{display:inline-flex;align-items:center;gap:5px;font-size:10px;color:#E5484D;font-weight:600;margin-bottom:9px}
+.live-dot{width:6px;height:6px;border-radius:50%;background:#E5484D;animation:pulse 1.6s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.3}}
+.lc-price-row{display:flex;justify-content:space-between;align-items:flex-start}
+.lc-price{font-size:24px;font-weight:700;color:#0F1419;font-variant-numeric:tabular-nums;letter-spacing:-.02em;line-height:1}
+.lc-price-sub{font-size:10px;color:#97A0AE;margin-top:3px}
+.lc-pl{text-align:right}
+.lc-pl-pct{font-size:17px;font-weight:700;color:#5A6473;font-variant-numeric:tabular-nums;line-height:1}
+.lc-pl-amt{font-size:11px;color:#5A6473;margin-top:3px;font-variant-numeric:tabular-nums}
+
+.chart-wrap{padding:14px 16px 12px;border-bottom:.5px solid #EFF1F4}
+.chart-label{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.chart-title{font-size:10px;color:#97A0AE}
+.chart-period{font-size:9.5px;color:#97A0AE;background:#F5F6F8;padding:2px 7px;border-radius:5px}
+.chart-box{position:relative;height:120px}
+.chart-svg{width:100%;height:120px;display:block;overflow:visible}
+.avg-line{stroke:#97A0AE;stroke-width:1;stroke-dasharray:3 3}
+.avg-tag{font-size:8.5px;fill:#5A6473;font-weight:600}
+
+/* === 브리핑 카드 (한 항목씩 펼침) === */
+.brief{padding:6px 16px 14px}
+.bcard{padding:13px 0;border-top:.5px solid #EFF1F4;opacity:0;transform:translateY(8px);transition:all .5s cubic-bezier(.2,.7,.3,1)}
+.bcard.in{opacity:1;transform:translateY(0)}
+.bcard:first-child{border-top:none}
+.bc-head{display:flex;align-items:center;gap:10px}
+.bc-ico{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0;background:#F5F6F8}
+.bc-q{font-size:12px;color:#5A6473;font-weight:500}
+/* 단계별 등장 요소 */
+.bc-stage{margin-top:9px;margin-left:40px;opacity:0;max-height:0;overflow:hidden;transition:opacity .4s ease,max-height .5s ease}
+.bc-stage.in{opacity:1;max-height:120px}
+.bc-data{font-size:14px;font-weight:700;color:#0F1419;line-height:1.3;font-variant-numeric:tabular-nums}
+.bc-data .up{color:#E5484D}.bc-data .down{color:#2B6BE6}.bc-data .blue{color:#0F1419}
+.bc-mean{font-size:11.5px;color:#5A6473;margin-top:6px;line-height:1.45;opacity:0;transition:opacity .4s ease}
+.bc-mean.in{opacity:1}
+.bc-mean b{color:#0F1419;font-weight:600}
+
+.mkt-cmp{display:flex;gap:7px;margin-top:4px}
+.mkt-cell{flex:1;text-align:center;background:#F5F6F8;border-radius:7px;padding:7px 4px}
+.mkt-cell.me{background:#EAF0F8}
+.mkt-name{font-size:8.5px;color:#97A0AE;margin-bottom:2px}
+.mkt-name.me{color:#0F1419;font-weight:600}
+.mkt-val{font-size:12px;font-weight:700;font-variant-numeric:tabular-nums}
+
+.bridge-box{background:#fff;border-radius:12px;border:.5px solid #E8EAEE;overflow:hidden;opacity:0;max-height:0;margin:0;transition:all .5s ease}
+.bridge-box.show{opacity:1;max-height:140px;padding:14px 16px;margin:16px 0 12px}
+.bridge-box.done{opacity:0;max-height:0;padding:0;margin:0;border:none}
+.bridge-text{font-size:12.5px;color:#0F1419;line-height:1.5;font-weight:500;letter-spacing:-.01em;margin-bottom:11px}
+.bridge-text b{color:#0F1419;font-weight:600}
+.bridge-prog{display:flex;align-items:center;gap:10px;padding-top:11px;border-top:.5px solid #EFF1F4}
+.llm-spinner{width:15px;height:15px;border:2px solid #E8EAEE;border-top-color:#0F1419;border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}
+@keyframes spin{to{transform:rotate(360deg)}}
+.llm-status-text{flex:1;font-size:11.5px;color:#5A6473}
+.llm-status-time{font-size:11px;color:#0F1419;font-weight:700;font-variant-numeric:tabular-nums}
+
+.team{background:#fff;border-radius:14px;border:.5px solid #E8EAEE;box-shadow:0 1px 2px rgba(0,0,0,.03);margin-bottom:0;opacity:0;max-height:0;overflow:hidden;transition:all .5s ease;padding:0 14px}
+.team.show{opacity:1;max-height:420px;padding:13px 14px;margin-bottom:10px}
+.team-head{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.team-avatar{width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+.team.t1 .team-avatar{background:#E5F3EB}.team.t2 .team-avatar{background:#EAF0F8}.team.t3 .team-avatar{background:#FEF3E3}
+.team-name{font-size:12.5px;font-weight:600;color:#0F1419;line-height:1.1}
+.team-desc{font-size:10px;color:#97A0AE;margin-top:1px}
+.team-body{min-height:20px}
+.typing{display:inline-flex;gap:4px;padding:4px 0}
+.typing span{width:6px;height:6px;border-radius:50%;background:#C2C8D0;animation:bounce 1.3s ease-in-out infinite}
+.typing span:nth-child(2){animation-delay:.15s}.typing span:nth-child(3){animation-delay:.3s}
+@keyframes bounce{0%,60%,100%{transform:translateY(0);opacity:.4}30%{transform:translateY(-5px);opacity:1}}
+.team-text{font-size:12.5px;color:#0F1419;line-height:1.6;letter-spacing:-.01em}
+.team-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:9px}
+.team-basis{margin-top:10px;border-top:.5px solid #EFF1F4}
+.tb-toggle{display:flex;align-items:center;justify-content:space-between;padding:9px 0 0;cursor:pointer;font-size:11px;color:#97A0AE;font-weight:500}
+.tb-arr{font-size:9px;transition:transform .2s}
+.team-basis.open .tb-arr{transform:rotate(180deg)}
+.tb-body{display:none;padding-top:6px}
+.team-basis.open .tb-body{display:block}
+.tb-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;font-size:11.5px}
+.tb-row .tbk{color:#5A6473}
+.tb-row .tbv{color:#0F1419;font-weight:600;font-variant-numeric:tabular-nums}
+.tag{font-size:10.5px;padding:3px 9px;border-radius:5px;font-weight:500}
+.tag.plus{background:#E5F3EB;color:#1A7340}.tag.minus{background:#FBE6E7;color:#A8323A}.tag.neutral{background:#F2F3F6;color:#5A6473}
+
+.conclusion{opacity:0;max-height:0;overflow:hidden;transition:all .7s ease}
+.conclusion.show{opacity:1;max-height:900px;margin-top:8px}
+/* 결론 요약 2칸 */
+.cc-quick{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+.cq{background:#F7F8FA;border-radius:11px;padding:12px 13px;text-align:center}
+.cq-l{font-size:9.5px;color:#97A0AE;margin-bottom:5px}
+.cq-v{font-size:15px;font-weight:800;color:#0F1419;font-variant-numeric:tabular-nums;line-height:1.15}
+.cq-s{font-size:10px;color:#97A0AE;margin-top:3px}
+.cq-s.up{color:#E5484D;font-weight:600}
+
+/* 접기 */
+.more{margin-top:12px;opacity:0;max-height:0;overflow:hidden;transition:all .6s ease}
+.more.hidden{opacity:0;max-height:0}
+.more.reveal{opacity:1;max-height:2400px}
+.more-btn{background:#fff;border:.5px solid #E8EAEE;border-radius:13px;padding:14px 16px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.more-t{font-size:13px;font-weight:700;color:#0F1419;flex-shrink:0}
+.more-s{flex:1;font-size:10.5px;color:#97A0AE;text-align:right;min-width:0}
+.more-a{color:#97A0AE;transition:transform .3s;flex-shrink:0}
+.more.open .more-a{transform:rotate(180deg)}
+.more-body{max-height:0;overflow:hidden;transition:max-height .4s ease}
+.more.open .more-body{max-height:1600px;margin-top:10px}
+.sec{background:#fff;border:.5px solid #E8EAEE;border-radius:13px;padding:15px 16px;margin-bottom:9px}
+.sec-h{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.sec-n{width:19px;height:19px;border-radius:50%;background:#0F1419;color:#fff;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sec-t{flex:1;font-size:13px;font-weight:700;color:#0F1419}
+.sec-tip{font-size:10.5px;color:#5A6473;line-height:1.55;background:#F7F8FA;border-radius:9px;padding:10px 11px;margin-top:10px}
+.sec-tip b{color:#0F1419;font-weight:700}
+
+.watch-cta{opacity:0;max-height:0;overflow:hidden;transition:all .7s ease;background:#0F1419;border-radius:16px;color:#fff}
+.watch-cta.show{opacity:1;max-height:400px;margin-top:12px;padding:18px}
+.wcta-h{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.wcta-ico{width:34px;height:34px;border-radius:10px;background:rgba(255,255,255,.12);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.85);flex-shrink:0}
+.wcta-t{flex:1;font-size:14.5px;font-weight:700;letter-spacing:-.2px}
+.wcta-b{font-size:12px;color:rgba(255,255,255,.62);line-height:1.65;margin-bottom:14px}
+.wcta-b b{color:#fff;font-weight:600}
+.wcta-btn{width:100%;padding:13px;border-radius:11px;border:none;background:#fff;color:#0F1419;font-size:13.5px;font-weight:700;cursor:pointer}
+.wcta-note{text-align:center;font-size:10.5px;color:rgba(255,255,255,.4);margin-top:9px}
+.concl-card{border-radius:16px;background:#fff;border:.5px solid #E8EAEE;box-shadow:0 4px 20px rgba(15,20,25,.06);overflow:hidden}
+.cc-head{padding:13px 16px;background:linear-gradient(180deg,#F8FAFD,#fff);border-bottom:.5px solid #EFF1F4;display:flex;align-items:center;gap:10px}
+.cc-icon{width:30px;height:30px;border-radius:8px;background:#0F1419;color:#fff;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:600}
+.cc-eyebrow{font-size:10px;color:#97A0AE;letter-spacing:.05em}
+.cc-title{font-size:12.5px;font-weight:600;color:#0F1419;margin-top:1px}
+.cc-zone{padding:16px;text-align:center}
+.cc-level{font-size:26px;font-weight:700;color:#E5484D;line-height:1;margin-bottom:11px;animation:popIn .5s ease}
+@keyframes popIn{0%{transform:scale(.7);opacity:0}50%{transform:scale(1.06)}100%{transform:scale(1);opacity:1}}
+.cc-bar{display:flex;gap:5px;justify-content:center;margin-bottom:10px}
+.cc-seg{width:32px;height:7px;border-radius:4px;background:#E8EAEE;transition:background .3s}
+.cc-seg.on{background:#E5484D}
+.cc-dist{font-size:11.5px;color:#5A6473}.cc-dist b{color:#1A7340;font-weight:600}
+.cc-summary{padding:14px 16px;border-top:.5px solid #EFF1F4;font-size:12.5px;color:#0F1419;line-height:1.6;letter-spacing:-.01em}
+.cc-summary b{font-weight:600}
+.cc-scn{padding:4px 16px 14px;border-top:.5px solid #EFF1F4}
+.cc-scn-label{font-size:10px;color:#97A0AE;letter-spacing:.04em;font-weight:500;margin:12px 0 10px}
+.scn{margin-bottom:11px}.scn:last-child{margin-bottom:0}
+.scn-top{display:flex;align-items:center;gap:8px;margin-bottom:5px}
+.scn-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.scn-name{font-size:12.5px;font-weight:600;color:#0F1419;flex:1}
+.scn-name.dim{color:#5A6473;font-weight:500}
+.scn-tag{font-size:9.5px;padding:2px 6px;border-radius:4px;background:#0F1419;color:#fff;font-weight:700}
+.scn-pct{font-size:13px;font-weight:700;color:#0F1419;font-variant-numeric:tabular-nums}
+.scn-pct.dim{color:#5A6473;font-weight:600}
+.scn-bar{height:5px;border-radius:3px;background:#F2F3F6;overflow:hidden;margin-bottom:5px}
+.scn-fill{height:100%;border-radius:3px;width:0;transition:width .9s ease}
+.scn-trig{font-size:10.5px;color:#5A6473;line-height:1.4}
+.scn-trig .down{color:#2B6BE6;font-weight:600}
+.cc-facts{display:grid;grid-template-columns:1fr 1fr;border-top:.5px solid #EFF1F4}
+.ccf{padding:11px 16px}
+.ccf:nth-child(odd){border-right:.5px solid #EFF1F4}
+.ccf:nth-child(-n+2){border-bottom:.5px solid #EFF1F4}
+.ccf-label{font-size:9.5px;color:#97A0AE;margin-bottom:3px}
+.ccf-val{font-size:13.5px;font-weight:700;color:#0F1419;font-variant-numeric:tabular-nums}
+.ccf-val.up{color:#E5484D}
+
+.disclaimer{font-size:10px;color:#97A0AE;text-align:center;padding:18px 16px 8px;line-height:1.5}
+.banner{position:fixed;bottom:30px;left:50%;transform:translateX(-50%);background:#0F1419;color:#fff;padding:11px 18px;border-radius:24px;font-size:12px;font-weight:600;box-shadow:0 8px 24px rgba(15,20,25,.25);display:flex;align-items:center;gap:8px;opacity:0;pointer-events:none;transition:all .5s ease;z-index:100}
+.banner.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+.banner span:first-child{color:#E5484D}
+</style>
+</head>
+<body>
+<div class="frame">
+
+  <div class="sticky-head">
+    <div class="sh-top">
+      <div class="sh-back">←</div>
+      <div class="sh-stock">
+        <div class="sh-name">LG디스플레이</div>
+        <div class="sh-code">KOSPI · 034220 · 16주</div>
+      </div>
+      <div class="sh-loss">
+        <div class="sh-loss-pct">−0.4%</div>
+        <div class="sh-loss-amt">−877원</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="body">
+    <div class="intro-title">LG디스플레이, 거의 본전이네요</div>
+
+    <div class="live-card">
+      <div class="lc-head">
+        <div class="live-badge"><span class="live-dot"></span>오늘 장 기준 · 14:32 조회</div>
+        <div class="lc-price-row">
+          <div>
+            <div class="lc-price">14,185<span style="font-size:13px;font-weight:600">원</span></div>
+            <div class="lc-price-sub">평단 14,240원 · 16주</div>
+          </div>
+          <div class="lc-pl">
+            <div class="lc-pl-pct">−0.4%</div>
+            <div class="lc-pl-amt">−877원</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chart-wrap">
+        <div class="chart-label">
+          <span class="chart-title">최근 3개월 · 점선은 내 평단</span>
+          <span class="chart-period">일봉</span>
+        </div>
+        <div class="chart-box">
+          <svg class="chart-svg" id="chart" viewBox="0 0 300 120" preserveAspectRatio="none"></svg>
+        </div>
+      </div>
+
+      <div class="brief" id="brief"></div>
+    </div>
+
+    <div class="bridge-box" id="teams-label">
+      <div class="bridge-text">시세는 다 봤어요. 이제 <b>세 팀이 더 깊이</b> 분석하는 중이에요.</div>
+      <div class="bridge-prog">
+        <div class="llm-spinner"></div>
+        <div class="llm-status-text" id="llm-status-text">증권사 리포트를 읽는 중…</div>
+        <div class="llm-status-time" id="llm-time">0:10</div>
+      </div>
+    </div>
+
+    <div class="team t1" data-tid="1">
+      <div class="team-head"><div class="team-avatar">📈</div>
+        <div><div class="team-name">시장·차트 팀</div><div class="team-desc">차트 마스터 · 거래량 · 상승세 추적</div></div></div>
+      <div class="team-body" id="tb-1"><div class="typing"><span></span><span></span><span></span></div></div>
+    </div>
+    <div class="team t2" data-tid="2">
+      <div class="team-head"><div class="team-avatar">🧠</div>
+        <div><div class="team-name">심리·환경 팀</div><div class="team-desc">증권사 의견 · 산업 전문가 · 이슈 탐색</div></div></div>
+      <div class="team-body" id="tb-2"><div class="typing"><span></span><span></span><span></span></div></div>
+    </div>
+    <div class="team t3" data-tid="3">
+      <div class="team-head"><div class="team-avatar">📊</div>
+        <div><div class="team-name">가치·기본 팀</div><div class="team-desc">가치 분석 · 성장 전략 · 재무 점검</div></div></div>
+      <div class="team-body" id="tb-3"><div class="typing"><span></span><span></span><span></span></div></div>
+    </div>
+
+    <div class="conclusion" id="conclusion">
+      <div class="concl-card">
+        <div class="cc-head"><div class="cc-icon">AI</div>
+          <div><div class="cc-eyebrow">종합 결론</div><div class="cc-title">세 팀의 의견을 모았어요</div></div></div>
+        <div class="cc-zone">
+          <div class="cc-level">강세</div>
+          <div class="cc-bar"><div class="cc-seg"></div><div class="cc-seg"></div><div class="cc-seg"></div><div class="cc-seg"></div><div class="cc-seg"></div></div>
+          <div class="cc-dist">3팀 중 <b>2팀 긍정</b> · 1팀 중립</div>
+        </div>
+
+        <div class="cc-summary">
+          거의 본전이고 <b>상승 여력이 남아 있어</b>, 지금 서둘러 정리하기보다 <b>1–2주 더 지켜보는</b> 게 좋겠어요.
+        </div>
+
+        <div class="cc-quick">
+          <div class="cq"><div class="cq-l">추천 행동</div><div class="cq-v">보유 유지</div><div class="cq-s">3팀 중 2팀</div></div>
+          <div class="cq"><div class="cq-l">평균 목표가</div><div class="cq-v">17,500원</div><div class="cq-s up">+23.4%</div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="more hidden" id="mDetail">
+      <div class="more-btn" onclick="document.getElementById('mDetail').classList.toggle('open')">
+        <span class="more-t">자세히 보기</span>
+        <span class="more-s">행동별 비중 · 목표가 근거</span>
+        <span class="more-a"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+      </div>
+      <div class="more-body">
+
+        <div class="sec">
+          <div class="sec-h"><span class="sec-n">1</span><span class="sec-t">세 팀이 나눈 의견</span></div>
+          <div class="scn">
+            <div class="scn-top"><span class="scn-dot" style="background:#E5484D"></span><span class="scn-name">보유 유지</span><span class="scn-tag">추천</span><span class="scn-pct">62%</span></div>
+            <div class="scn-bar"><div class="scn-fill" style="background:#E5484D"></div></div>
+            <div class="scn-trig">목표가 도달 시 분할 매도</div>
+          </div>
+          <div class="scn">
+            <div class="scn-top"><span class="scn-dot" style="background:#0F1419"></span><span class="scn-name dim">추가 매수</span><span class="scn-pct dim">23%</span></div>
+            <div class="scn-bar"><div class="scn-fill" style="background:#0F1419"></div></div>
+            <div class="scn-trig">−10% 도달 시 평단 낮추기</div>
+          </div>
+          <div class="scn">
+            <div class="scn-top"><span class="scn-dot" style="background:#2B6BE6"></span><span class="scn-name dim">손절</span><span class="scn-pct dim">15%</span></div>
+            <div class="scn-bar"><div class="scn-fill" style="background:#2B6BE6"></div></div>
+            <div class="scn-trig"><span class="down">지금 팔면 −877원</span> · 추세 이탈 시 검토</div>
+          </div>
+        </div>
+
+        <div class="sec">
+          <div class="sec-h"><span class="sec-n">2</span><span class="sec-t">목표가는 어디서 왔나</span></div>
+          <div class="cc-facts">
+            <div class="ccf"><div class="ccf-label">평균 목표가</div><div class="ccf-val">17,500원</div></div>
+            <div class="ccf"><div class="ccf-label">상승 여력</div><div class="ccf-val up">+23.4%</div></div>
+            <div class="ccf"><div class="ccf-label">투자의견</div><div class="ccf-val">매수 우세</div></div>
+            <div class="ccf"><div class="ccf-label">증권사</div><div class="ccf-val">13곳</div></div>
+          </div>
+          <div class="sec-tip">증권사 <b>13곳</b>이 낸 목표가의 평균이에요. 최근 <b>상향</b> 조정됐어요.</div>
+        </div>
+
+      </div>
+    </div>
+
+
+    <div class="watch-cta" id="watchCta">
+      <div class="wcta-h">
+        <div class="wcta-ico">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
+        </div>
+        <div class="wcta-t">이 판단, 계속 지켜봐드릴까요?</div>
+      </div>
+      <div class="wcta-b">오늘 나온 결론은 <b>오늘 기준</b>이에요. 실적이 나오거나 상황이 바뀌면 판단도 달라져요.<br>매번 확인하지 않으셔도, <b>바뀌는 순간에만</b> 알려드릴게요.</div>
+      <button class="wcta-btn">지켜보기 시작</button>
+      <div class="wcta-note">며칠간 무료 · 언제든 그만둘 수 있어요</div>
+    </div>
+
+    <div class="disclaimer">AI 분석은 데이터 기반 참고 자료예요. 투자 권유나 수익 보장이 아닙니다.</div>
+  </div>
+
+  <div class="banner" id="banner"><span>✓</span><span>분석이 완료됐어요</span></div>
+</div>
+
+<script>
+const HIGH=16800, LOW=8080, AVG=14240, CUR=14185;
+const bars=[];
+(function(){let p=16200;
+  const pat=[-1,-1.5,-2,-1,-2.5,-1.5,-1,1,-1.5,-2,-1,-0.5,-1.5,-2,-1,-1,-1.5,-1,0.5,-1,
+    -1.5,-1,-0.5,1,-1,-1.5,-1,0.5,1,-0.5,1,1.5,1,-0.5,1,1.5,2,1,1.5,1,
+    -0.5,1,1.5,1,2,1,1.5,1,0.5,1,1.5,1,2,1.5,1,0.5,1,1.5,1,0.8];
+  for(let i=0;i<60;i++){p=p*(1+pat[i]/100);bars.push(Math.round(p));}bars[59]=CUR;})();
+
+function buildChart(prog){
+  const svg=document.getElementById('chart'),W=300,H=120,pad=4;
+  const x=i=>pad+(i/(bars.length-1))*(W-pad*2);
+  const y=v=>pad+(1-(v-LOW)/(HIGH-LOW))*(H-pad*2);
+  const n=Math.max(2,Math.floor(bars.length*prog));
+  let d=`M ${x(0)} ${y(bars[0])}`;
+  for(let i=1;i<n;i++)d+=` L ${x(i)} ${y(bars[i])}`;
+  const li=n-1, avgY=y(AVG), col=CUR>=AVG?'#E5484D':'#2B6BE6';
+  svg.innerHTML=`
+    <path d="${d} L ${x(li)} ${H-pad} L ${x(0)} ${H-pad} Z" fill="${CUR>=AVG?'rgba(26,157,85,.08)':'rgba(229,72,77,.08)'}"/>
+    <path d="${d}" fill="none" stroke="${col}" stroke-width="1.8" stroke-linejoin="round"/>
+    <line x1="${pad}" y1="${avgY}" x2="${W-pad}" y2="${avgY}" class="avg-line"/>
+    <text x="${W-pad}" y="${avgY-4}" text-anchor="end" class="avg-tag">내 평단 14,240</text>
+    <circle cx="${x(li)}" cy="${y(bars[li])}" r="3" fill="${col}"/>
+    ${prog>=1?`<circle cx="${x(li)}" cy="${y(bars[li])}" r="6" fill="none" stroke="${col}" stroke-width="1.5" opacity=".3"><animate attributeName="r" values="4;9;4" dur="1.8s" repeatCount="indefinite"/><animate attributeName="opacity" values=".4;0;.4" dur="1.8s" repeatCount="indefinite"/></circle>`:''}
+  `;
+}
+
+// === 6개 항목 (제목→데이터→의미 단계 펼침). 희망→현재 순서 ===
+const briefs=[
+  { at:6, ico:'🗓️', q:'최근 한 달, 어떻게 흘러왔나요?',
+    data:'한 달 전보다 <span class="up">+12.3%</span>', mean:'고점에서 빠졌다가 <b>바닥을 다지고 회복하는 중</b>이에요.' },
+  { at:11, ico:'📈', q:'단기 흐름은요?',
+    data:'<span class="up">3일 연속 상승</span>', mean:'짧게 봐도 흐름이 살아나고 있어요.' },
+  { at:16, ico:'🎯', q:'내 자리는 어디쯤일까요?',
+    data:'본전까지 <span class="up">+0.4%</span>', mean:'고점 부근에서 사셨지만, <b>55원만 오르면 원금 회복</b>이에요.' },
+  { at:22, ico:'🏛️', q:'오늘 시장 속에서는?',
+    mkt:[['코스피','+0.8%','up'],['코스닥','−0.3%','down'],['내 종목','+0.2%','up']],
+    mean:'시장 흐름은 좋은데 <b>아직 덜 따라온</b> 상태예요.' },
+  { at:28, ico:'📊', q:'오늘 하루는 어땠나요?',
+    data:'<span class="up">반등 흐름</span>', mean:'저가 14,050에서 올라 고가 부근, 시초가보다 +0.6%.' },
+  { at:33, ico:'🔥', q:'거래는 활발했나요?',
+    data:'어제의 <span class="blue">1.4배</span>', mean:'평소보다 관심이 붙은 하루예요.' },
+];
+
+function addBrief(b){
+  const wrap=document.getElementById('brief');
+  const el=document.createElement('div');
+  el.className='bcard';
+  el.innerHTML=`<div class="bc-head"><div class="bc-ico">${b.ico}</div><div class="bc-q">${b.q}</div></div>
+    <div class="bc-stage"><div class="bc-data">${b.data?b.data:''}</div>${b.mkt?`<div class="mkt-cmp">${b.mkt.map((m,i)=>`<div class="mkt-cell${i===2?' me':''}"><div class="mkt-name${i===2?' me':''}">${m[0]}</div><div class="mkt-val ${m[2]}">${m[1]}</div></div>`).join('')}</div>`:''}<div class="bc-mean">${b.mean}</div></div>`;
+  wrap.appendChild(el);
+  requestAnimationFrame(()=>el.classList.add('in'));
+  // 단계: 제목(0) → 데이터(1.2s) → 의미(2.4s)
+  setTimeout(()=>el.querySelector('.bc-stage').classList.add('in'),1200);
+  setTimeout(()=>el.querySelector('.bc-mean').classList.add('in'),2400);
+}
+
+const teamData=[
+  {tid:1,at:48,text:'현재 가격이 52주 중상단에 있고 단기 추세는 우상향이에요. 오늘 거래량도 늘어 관심이 붙는 모습이에요.',tags:[['중상단 구간','plus'],['거래 활발','plus']],
+   basis:[['현재가','14,185원'],['20일 이동평균','13,200원'],['52주 위치','53% · 중상단'],['거래량','어제의 1.4배']]},
+  {tid:2,at:50.5,text:'증권사들이 매수 의견 우세예요. OLED·AR/VR 수요 확대가 호재인데, 환율 변동성은 변수로 봐야 해요.',tags:[['매수 우세','plus'],['환율 변수','minus']],
+   basis:[['평균 목표가','17,500원'],['투자의견','매수 우세 · 4.0/5'],['분석 리포트','13곳 · 14페이지'],['최근 변동','목표가 상향']]},
+  {tid:3,at:53,text:'영업이익이 흑자로 돌아서며 수익성이 개선됐어요. 다만 주가가 실적 대비 다소 높아 밸류 부담은 감안해야 해요.',tags:[['흑자 전환','plus'],['밸류 부담','minus']],
+   basis:[['영업이익','흑자 전환'],['PER / PBR','96배 / 0.8배'],['ROE','낮은 편'],['지배구조','최대주주 안정']]}
+];
+function fillTeam(td){
+  const el=document.querySelector(`.team[data-tid="${td.tid}"]`);el.classList.add('show');
+  setTimeout(()=>{document.getElementById('tb-'+td.tid).innerHTML=
+    `<div class="team-text">${td.text}</div><div class="team-tags">${td.tags.map(x=>`<span class="tag ${x[1]}">${x[0]}</span>`).join('')}</div>`+
+    `<div class="team-basis"><div class="tb-toggle" onclick="this.closest('.team-basis').classList.toggle('open')"><span>근거 데이터</span><span class="tb-arr">▼</span></div>`+
+    `<div class="tb-body">${td.basis.map(b=>`<div class="tb-row"><span class="tbk">${b[0]}</span><span class="tbv">${b[1]}</span></div>`).join('')}</div></div>`;},700);
+}
+function fmt(s){const m=Math.floor(s/60),ss=String(Math.max(0,Math.ceil(s))%60).padStart(2,'0');return `${m}:${ss}`}
+function statusText(el){const t=document.getElementById('llm-status-text');
+  if(el<43)t.textContent='세 팀이 의견을 정리하는 중…';else t.textContent='곧 결과를 보여드릴게요…';}
+
+const DEMO=1; // 실시간 60초
+const start=Date.now();
+const chartStart=Date.now();
+function drawChart(){const p=Math.min(1,((Date.now()-chartStart)/1000)/(5*DEMO));buildChart(p);if(p<1)requestAnimationFrame(drawChart);}
+drawChart();
+
+const shown=new Set();
+let statusShown=false,labelShown=false,conclShown=false;
+function tick(){
+  const el=((Date.now()-start)/1000)/DEMO;
+  briefs.forEach((b,i)=>{if(el>=b.at&&!shown.has(i)){shown.add(i);addBrief(b);}});
+  if(el>=38&&!statusShown){statusShown=true;document.getElementById('teams-label').classList.add('show');}
+  if(statusShown&&el<48){statusText(el);document.getElementById('llm-time').textContent=fmt(48-el);}
+  if(el>=47.5&&!labelShown){labelShown=true;
+    document.getElementById('teams-label').classList.add('done');}
+  teamData.forEach(td=>{if(el>=td.at&&!document.querySelector(`.team[data-tid="${td.tid}"]`).classList.contains('show'))fillTeam(td);});
+  if(el>=56&&!conclShown){conclShown=true;
+    document.getElementById('conclusion').classList.add('show');
+    setTimeout(()=>{document.getElementById('mDetail').classList.remove('hidden');document.getElementById('mDetail').classList.add('reveal');},600);
+    setTimeout(()=>document.getElementById('watchCta').classList.add('show'),1200);
+    const segs=document.querySelectorAll('.cc-seg');
+    [0,1,2,3].forEach((i,k)=>setTimeout(()=>segs[i].classList.add('on'),300+k*120));
+    setTimeout(()=>{const f=document.querySelectorAll('.scn-fill');f[0].style.width='62%';f[1].style.width='23%';f[2].style.width='15%';},500);
+    const b=document.getElementById('banner');b.classList.add('show');setTimeout(()=>b.classList.remove('show'),2600);return;}
+  requestAnimationFrame(tick);
+}
+tick();
+</script>
+</body>
+</html>
