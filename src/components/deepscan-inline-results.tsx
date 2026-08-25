@@ -194,6 +194,19 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
         </div>
       </article>
       <DeepScanRecoveryForecastCard payload={payload} />
+      <article className='rounded-[16px] bg-[#0F1419] px-4 py-[18px] text-white' aria-label='딥스캔 후속 안내'>
+        <div className='mb-2.5 flex items-center gap-2.5'>
+          <div className='flex size-[34px] shrink-0 items-center justify-center rounded-[10px] bg-white/10 text-white/85'>
+            <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.9' strokeLinecap='round' strokeLinejoin='round'><path d='M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z' /><circle cx='12' cy='12' r='3' /></svg>
+          </div>
+          <h3 className='text-[14.5px] font-bold tracking-[-0.2px]'>이 판단, 계속 지켜봐드릴까요?</h3>
+        </div>
+        <p className='text-[12px] leading-[1.65] text-white/60'>
+          오늘 나온 결론은 <b className='font-semibold text-white'>오늘 기준</b>이에요. 실적이 나오거나 상황이 바뀌면 판단도 달라져요.
+          <br />
+          매번 확인하지 않으셔도, <b className='font-semibold text-white'>바뀌는 순간에만</b> 알려드릴게요.
+        </p>
+      </article>
       <p className='px-2 pb-2 text-center text-[10px] leading-4 text-[#97A0AE]'>AI 분석은 데이터 기반 참고 자료예요. 투자 권유나 수익 보장이 아닙니다.</p>
     </section>
   )
