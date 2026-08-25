@@ -17,6 +17,8 @@ export type { LoadingBriefingDailyRow, LoadingBriefingSnapshot, MoneyCurrency, J
 
 export type DeepScanLoadingScreenProps = {
   name?: string
+  /** 스펙 spec_v7 §4 손익 인트로 멘트(예: "삼성전자, 거의 본전이네요"). 없으면 기존 안내 문구. */
+  introMention?: string | null
   identifier?: string
   market?: string
   instrumentKind?: string

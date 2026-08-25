@@ -15,7 +15,8 @@ import { resolveDeepScanPageCacheState } from '@/lib/deepscan-page-projection'
 import { resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
 import { isDeepScanInlineResultsReady } from '@/lib/deepscan-loading-behavior'
 import { resolveDeepScanHydratedTarget, shouldStartDeepScanRequestAfterHydration } from '@/lib/deepscan-target-hydration'
-import { resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
+import { readAppliedHomePortfolio, resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
+import { buildProfitIntroMention } from '@/lib/deepscan-intro-mention'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
 import { getDeepScanTargetKey } from '@/lib/workflow-types'
@@ -116,6 +117,23 @@ export default function DeepScanPage() {
   }, [setDeepScanTarget, target])
 
   const targetKey = useMemo(() => (target ? getDeepScanTargetKey(target) : null), [target])
+  // 스펙 spec_v7 §4 인트로 멘트(손익 5단계). 판정 = 손익액 ÷ 전체 포트폴리오 평가액(즉시 데이터, 금액 미표시).
+  // 전체 평가액은 적용된 포트폴리오 세션(OCR 평가액 문자열) 합산. 세션 없으면 null → 기존 안내 문구 폴백.
+  const introMention = useMemo(() => {
+    if (!target || target.kind === 'etf') {
+      return null
+    }
+    const costBasis = target.quantity * target.averagePrice
+    const evaluation = target.evaluationAmount ?? (typeof target.currentPrice === 'number' ? target.currentPrice * target.quantity : undefined)
+    if (!Number.isFinite(costBasis) || costBasis <= 0 || typeof evaluation !== 'number' || !Number.isFinite(evaluation)) {
+      return null
+    }
+    const portfolioTotal = (readAppliedHomePortfolio()?.rows ?? []).reduce(
+      (sum, row) => sum + (parseOcrNumber(row.evaluationAmount ?? '') ?? 0),
+      0,
+    )
+    return buildProfitIntroMention({ name: target.name, profitAmount: evaluation - costBasis, portfolioTotal })
+  }, [target])
   const targetKeyRef = useRef(targetKey)
   const requestSeed = useMemo<DeepScanCanonicalTargetSession | null>(
     () =>
@@ -708,6 +726,7 @@ export default function DeepScanPage() {
       <DeepScanLoadingScreen
         className='w-full overflow-hidden'
         name={requestSeed.holding.name}
+        introMention={introMention}
         identifier={identifier}
         market={requestSeed.holding.market}
         instrumentKind={target?.kind}

@@ -74,6 +74,7 @@ import {
 
 export function DeepScanLoadingScreen({
   name = '선택 종목',
+  introMention,
   identifier,
   market,
   instrumentKind,
@@ -342,7 +343,11 @@ export function DeepScanLoadingScreen({
           <>
         <section className={styles.intro} aria-label='딥스캔 안내'>
           <p className={styles.introGreet}>{new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date())}</p>
-          <h2 className={styles.introTitle}>세 분석가가 {exchangeProduct ? 'ETF를' : '종목을'}<br />차례로 살펴보고 있어요</h2>
+          {introMention ? (
+            <h2 className={styles.introTitle}>{introMention}</h2>
+          ) : (
+            <h2 className={styles.introTitle}>세 분석가가 {exchangeProduct ? 'ETF를' : '종목을'}<br />차례로 살펴보고 있어요</h2>
+          )}
           <p className={styles.introBody}>{resultsReadyForDisplay ? '실제 응답이 도착했어요. 아래 결과 카드가 바로 이어집니다.' : '완료 신호가 오면 기다림 없이 이 화면 아래에 결과가 이어집니다.'}</p>
         </section>
 
