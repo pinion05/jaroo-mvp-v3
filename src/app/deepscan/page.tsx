@@ -117,10 +117,41 @@ export default function DeepScanPage() {
   }, [setDeepScanTarget, target])
 
   const targetKey = useMemo(() => (target ? getDeepScanTargetKey(target) : null), [target])
-  // 스펙 spec_v7 §4 인트로 멘트(손익 5단계). 판정 = 손익액 ÷ 전체 포트폴리오 평가액(즉시 데이터, 금액 미표시).
-  // 전체 평가액은 적용된 포트폴리오 세션(OCR 평가액 문자열) 합산. 세션 없으면 null → 기존 안내 문구 폴백.
+// 스펙 spec_v7 §4 인트로 멘트(손익 5단계). 판정 = 손익액 ÷ 전체 포트폴리오 평가액(즉시 데이터, 금액 미표시).
+  // 분모 우선순위: ① 적용 포트폴리오 세션(OCR 평가액 합산) ② 서버 포트폴리오 합산(재방문 세션 부재 폴백).
+  // 둘 다 없으면 null → 기존 안내 문구.
+  const introSessionTotal = useMemo(
+    () => (readAppliedHomePortfolio()?.rows ?? []).reduce((sum, row) => sum + (parseOcrNumber(row.evaluationAmount ?? '') ?? 0), 0),
+    [],
+  )
+  const [introPortfolioTotal, setIntroPortfolioTotal] = useState<number | null>(null)
+  useEffect(() => {
+    if (introSessionTotal > 0) {
+      setIntroPortfolioTotal(introSessionTotal)
+      return
+    }
+    let cancelled = false
+    void fetch('/api/portfolio')
+      .then((response) => (response.ok ? (response.json() as Promise<{ rows?: Array<{ evaluation_amount: number | null; average_price: number | null; quantity: number | null }> }>) : null))
+      .then((body) => {
+        if (cancelled || !body?.rows?.length) {
+          return
+        }
+        const total = body.rows.reduce(
+          (sum, row) => sum + (row.evaluation_amount ?? (row.average_price ?? 0) * (row.quantity ?? 0)),
+          0,
+        )
+        if (total > 0) {
+          setIntroPortfolioTotal(total)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [introSessionTotal])
   const introMention = useMemo(() => {
-    if (!target || target.kind === 'etf') {
+    if (!target || target.kind === 'etf' || introPortfolioTotal === null) {
       return null
     }
     const costBasis = target.quantity * target.averagePrice
@@ -128,12 +159,8 @@ export default function DeepScanPage() {
     if (!Number.isFinite(costBasis) || costBasis <= 0 || typeof evaluation !== 'number' || !Number.isFinite(evaluation)) {
       return null
     }
-    const portfolioTotal = (readAppliedHomePortfolio()?.rows ?? []).reduce(
-      (sum, row) => sum + (parseOcrNumber(row.evaluationAmount ?? '') ?? 0),
-      0,
-    )
-    return buildProfitIntroMention({ name: target.name, profitAmount: evaluation - costBasis, portfolioTotal })
-  }, [target])
+    return buildProfitIntroMention({ name: target.name, profitAmount: evaluation - costBasis, portfolioTotal: introPortfolioTotal })
+  }, [introPortfolioTotal, target])
   const targetKeyRef = useRef(targetKey)
   const requestSeed = useMemo<DeepScanCanonicalTargetSession | null>(
     () =>
