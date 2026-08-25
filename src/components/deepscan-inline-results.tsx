@@ -1,4 +1,6 @@
 'use client'
+import { useState } from 'react'
+import type { ReactNode } from 'react'
 
 import type {
   JarooDeepScanPayload,
@@ -126,12 +128,49 @@ function toneClasses(tone: ScenarioView['tone']) {
   return { dot: 'bg-[#2B6BE6]', bar: 'bg-[#2B6BE6]', text: 'text-[#2B6BE6]' }
 }
 
+function findConsensus(payload: JarooDeepScanPayload) {
+  const items = payload.insights?.items ?? []
+  return items.find((item) => item.consensus && (item.consensus.targetPrice != null || item.consensus.analystCount != null))?.consensus ?? null
+}
+
+function formatConsensusPrice(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return null
+  return `${Math.round(value).toLocaleString('ko-KR')}원`
+}
+
+function axisStatusTone(status: string) {
+  if (status.includes('우세')) return 'text-[#1A9D55]'
+  if (status.includes('경계')) return 'text-[#E5484D]'
+  return 'text-[#5A6473]'
+}
+
+type DetailSectionProps = {
+  n: string
+  title: string
+  meta?: string
+  children: ReactNode
+}
+
+function DetailSection({ n, title, meta, children }: DetailSectionProps) {
+  return (
+    <section>
+      <div className='mb-2.5 flex items-center gap-2'>
+        <span className='flex size-[18px] shrink-0 items-center justify-center rounded-full bg-[#0F1419] text-[10px] font-bold text-white'>{n}</span>
+        <span className='text-[12.5px] font-bold text-[#0F1419]'>{title}</span>
+        {meta ? <span className='ml-auto text-[10px] text-[#97A0AE]'>{meta}</span> : null}
+      </div>
+      {children}
+    </section>
+  )
+}
 export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScanInlineResultsProps) {
   const exchangeProduct = isExchangeProductPayload(payload)
   const name = firstNonEmpty(payload.input.instrument.name, target?.name, requestSeed?.holding.name) ?? '선택 종목'
   const strength = buildStrength(payload)
   const scenarios = buildScenarioViews(payload, exchangeProduct)
   const upside = exchangeProduct ? null : deriveUpside(payload.strategy.currentPriceText, payload.strategy.targetPriceText)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const consensus = exchangeProduct ? null : findConsensus(payload)
   const evidenceCount = payload.metadata.sourceRefs.length || payload.insights.items.length
   const rawSummary = payload.hero.blockState === 'ok'
     ? payload.hero.body
@@ -139,13 +178,11 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
   const summary = exchangeProduct ? sanitizeExchangeProductCopy(rawSummary) : rawSummary
   const facts = exchangeProduct
     ? [
-        ['현재가', payload.strategy.currentPriceText || '확인 중'],
         ['ETF 기준', payload.strategy.targetPriceText || 'NAV·구성 확인'],
         ['가격 위치', payload.strategy.otherScenarioTags?.[1] ?? '확인 중'],
         ['근거', evidenceCount > 0 ? `${evidenceCount}개` : payload.insights.summaryTags[0] ?? '확인 중'],
       ]
     : [
-        ['현재가', payload.strategy.currentPriceText || '확인 중'],
         ['목표가', payload.strategy.targetPriceText || '확인 중'],
         ['상승 여력', upside === null ? '확인 중' : formatPercent(upside)],
         ['근거', evidenceCount > 0 ? `${evidenceCount}개` : payload.insights.summaryTags[0] ?? '확인 중'],
@@ -164,33 +201,83 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
           <p className='mt-2 text-[11px] text-[#5A6473]'>{strength.helper}</p>
         </div>
         <p className='border-t border-[#EFF1F4] px-4 py-4 text-[13px] leading-6 text-[#0F1419]'>{summary}</p>
-        <div className='border-t border-[#EFF1F4] px-4 py-4'>
-          <div className='mb-3 text-[10px] text-[#97A0AE]'>{exchangeProduct ? '가능 시나리오' : '추천 행동'}</div>
-          <div className='space-y-3'>
-            {scenarios.map((scenario) => {
-              const tone = toneClasses(scenario.tone)
-              return (
-                <div key={`${scenario.label}-${scenario.probability}`}>
-                  <div className='mb-1 flex items-center gap-2 text-[13px]'>
-                    <span className={cn('size-2 rounded-full', tone.dot)} />
-                    <span className={cn('font-bold', scenario.recommended ? 'text-[#0F1419]' : 'text-[#5A6473]')}>{scenario.label}</span>
-                    {scenario.recommended ? <span className='rounded-[4px] bg-[#0F1419] px-1.5 py-0.5 text-[9px] font-bold text-white'>{exchangeProduct ? '주요' : '추천'}</span> : null}
-                    <span className='ml-auto font-bold text-[#5A6473]'>{scenario.probability || '--'}</span>
-                  </div>
-                  <div className='h-[5px] overflow-hidden rounded-full bg-[#EFF1F4]'><div className={cn('h-full rounded-full', tone.bar)} style={{ width: scenarioWidth(scenario) }} /></div>
-                  <div className={cn('mt-1 text-[10px]', scenario.tone === 'red' ? tone.text : 'text-[#97A0AE]')}>{scenario.condition}</div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
-        <div className='grid grid-cols-2 border-t border-[#EFF1F4]'>
+        <div className='grid grid-cols-3 border-t border-[#EFF1F4]'>
           {facts.map(([label, value]) => (
-            <div key={label} className='border-b border-r border-[#EFF1F4] px-4 py-3 last:border-r-0 [&:nth-child(2n)]:border-r-0 [&:nth-last-child(-n+2)]:border-b-0'>
+            <div key={label} className='border-r border-[#EFF1F4] px-3 py-3 last:border-r-0'>
               <div className='text-[10px] text-[#97A0AE]'>{label}</div>
-              <div className={cn('mt-1 text-[14px] font-bold text-[#0F1419]', label === '상승 여력' && upside !== null && upside > 0 ? 'text-[color:var(--jaroo-profit)]' : undefined)}>{value}</div>
+              <div className={cn('mt-1 text-[13px] font-bold text-[#0F1419]', label === '상승 여력' && upside !== null && upside > 0 ? 'text-[color:var(--jaroo-profit)]' : undefined)}>{value}</div>
             </div>
           ))}
+        </div>
+        <div className='border-t border-[#EFF1F4]'>
+          <button type='button' aria-expanded={detailsOpen} onClick={() => setDetailsOpen((v) => !v)} className='flex w-full items-center gap-2 px-4 py-3.5 text-left'>
+            <span className='text-[13px] font-bold text-[#0F1419]'>자세히 보기</span>
+            <span className='text-[10px] text-[#97A0AE]'>{exchangeProduct ? '가능 시나리오 · 가격 근거 · 세 팀 의견' : '추천 행동 · 목표가 근거 · 세 팀 의견'}</span>
+            <svg className={cn('ml-auto size-4 transition-transform duration-200', detailsOpen ? 'rotate-180' : '', 'text-[#5A6473]')} width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'><path d='m6 9 6 6 6-6' /></svg>
+          </button>
+          <div className={cn('grid transition-[grid-template-rows] duration-300 ease-out', detailsOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+            <div className='overflow-hidden'>
+              <div className='space-y-4 border-t border-[#EFF1F4] px-4 py-4 pb-5'>
+                <DetailSection n='1' title={exchangeProduct ? '가능 시나리오' : '추천 행동'}>
+                  <div className='space-y-3'>
+                    {scenarios.map((scenario) => {
+                      const tone = toneClasses(scenario.tone)
+                      return (
+                        <div key={`${scenario.label}-${scenario.probability}`}>
+                          <div className='mb-1 flex items-center gap-2 text-[13px]'>
+                            <span className={cn('size-2 rounded-full', tone.dot)} />
+                            <span className={cn('font-bold', scenario.recommended ? 'text-[#0F1419]' : 'text-[#5A6473]')}>{scenario.label}</span>
+                            {scenario.recommended ? <span className='rounded-[4px] bg-[#0F1419] px-1.5 py-0.5 text-[9px] font-bold text-white'>{exchangeProduct ? '주요' : '추천'}</span> : null}
+                            <span className='ml-auto font-bold text-[#5A6473]'>{scenario.probability || '--'}</span>
+                          </div>
+                          <div className='h-[5px] overflow-hidden rounded-full bg-[#EFF1F4]'><div className={cn('h-full rounded-full', tone.bar)} style={{ width: scenarioWidth(scenario) }} /></div>
+                          <div className={cn('mt-1 text-[10px]', scenario.tone === 'red' ? tone.text : 'text-[#97A0AE]')}>{scenario.condition}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </DetailSection>
+                {!exchangeProduct ? (
+                  <DetailSection n='2' title='목표가 근거' meta={consensus?.analystCount ? `증권사 ${consensus.analystCount}개` : undefined}>
+                    <div className='overflow-hidden rounded-[12px] border border-[#E8EAEE]'>
+                      <div className='grid grid-cols-2 divide-x divide-[#EFF1F4] border-b border-[#EFF1F4]'>
+                        <div className='px-3 py-3'><div className='text-[10px] text-[#97A0AE]'>현재가</div><div className='mt-1 text-[13px] font-bold text-[#0F1419]'>{payload.strategy.currentPriceText || '확인 중'}</div></div>
+                        <div className='px-3 py-3'><div className='text-[10px] text-[#97A0AE]'>평균 목표가</div><div className={cn('mt-1 text-[13px] font-bold text-[#0F1419]', upside !== null && upside > 0 ? 'text-[color:var(--jaroo-profit)]' : undefined)}>{(formatConsensusPrice(consensus?.targetPrice) ?? payload.strategy.targetPriceText) || '확인 중'}</div></div>
+                      </div>
+                      {consensus?.highestTargetPrice != null || consensus?.lowestTargetPrice != null ? (
+                        <div className='grid grid-cols-2 divide-x divide-[#EFF1F4] border-b border-[#EFF1F4]'>
+                          <div className='px-3 py-2.5'><div className='text-[10px] text-[#97A0AE]'>최고 목표가</div><div className='mt-0.5 text-[12px] font-bold text-[#0F1419]'>{formatConsensusPrice(consensus?.highestTargetPrice) ?? '--'}</div></div>
+                          <div className='px-3 py-2.5'><div className='text-[10px] text-[#97A0AE]'>최저 목표가</div><div className='mt-0.5 text-[12px] font-bold text-[#0F1419]'>{formatConsensusPrice(consensus?.lowestTargetPrice) ?? '--'}</div></div>
+                        </div>
+                      ) : null}
+                      {consensus?.opinionSummary ? <div className='px-3 py-2.5 text-[11px] leading-5 text-[#5A6473]'>{consensus.opinionSummary}</div> : null}
+                    </div>
+                  </DetailSection>
+                ) : (
+                  <DetailSection n='2' title='가격 근거'>
+                    <div className='overflow-hidden rounded-[12px] border border-[#E8EAEE]'>
+                      <div className='grid grid-cols-2 divide-x divide-[#EFF1F4]'>
+                        <div className='px-3 py-3'><div className='text-[10px] text-[#97A0AE]'>현재가</div><div className='mt-1 text-[12px] font-bold text-[#0F1419]'>{payload.strategy.currentPriceText || '확인 중'}</div></div>
+                        <div className='px-3 py-3'><div className='text-[10px] text-[#97A0AE]'>ETF 기준</div><div className='mt-1 text-[12px] font-bold text-[#0F1419]'>{payload.strategy.targetPriceText || 'NAV·구성 확인'}</div></div>
+                      </div>
+                    </div>
+                  </DetailSection>
+                )}
+                {payload.committee.axes.length > 0 ? (
+                  <DetailSection n='3' title='세 팀 의견' meta={payload.committee.axes.length > 1 ? `${payload.committee.axes.length}팀` : undefined}>
+                    <div className='space-y-2'>
+                      {payload.committee.axes.map((axis) => (
+                        <div key={axis.label} className='flex items-center gap-2 rounded-[12px] border border-[#E8EAEE] bg-[#F8F9FB] px-3 py-2.5'>
+                          <div><div className='text-[12px] font-bold text-[#0F1419]'>{axis.label}</div><div className='mt-0.5 text-[10px] text-[#97A0AE]'>{axis.subtitle}</div></div>
+                          <span className={cn('ml-auto shrink-0 rounded-full bg-white px-2 py-1 text-[11px] font-bold', axisStatusTone(axis.axisStatusText ?? ''))}>{axis.axisStatusText || '확인 중'}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </DetailSection>
+                ) : null}
+              </div>
+            </div>
+          </div>
         </div>
       </article>
       <DeepScanRecoveryForecastCard payload={payload} />

@@ -106,3 +106,35 @@ test('DeepScanInlineResults uses ETF-native labels instead of target-price upsid
   assert.doesNotMatch(markup, />목표가</)
   assert.doesNotMatch(markup, /상승 여력/)
 })
+
+test('DeepScanInlineResults folds detail behind 자세히 보기 with numbered sections and hides raw scores', () => {
+  const payload = basePayload()
+  payload.insights.items[0].consensus = { targetPrice: 17500, highestTargetPrice: 18400, lowestTargetPrice: 16200, analystCount: 12, recommendation: '매수', opinionSummary: '상승 여력이 남아 있다는 중론입니다.' }
+  const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
+
+  assert.match(markup, /자세히 보기/)
+  assert.match(markup, /aria-expanded="false"/)
+  assert.match(markup, /추천 행동 · 목표가 근거 · 세 팀 의견/)
+  assert.match(markup, />1</)
+  assert.match(markup, />2</)
+  assert.match(markup, />3</)
+  assert.match(markup, /목표가 근거/)
+  assert.match(markup, /증권사 12개/)
+  assert.match(markup, /17,500원/)
+  assert.match(markup, /세 팀 의견/)
+  assert.match(markup, /시장/)
+  assert.doesNotMatch(markup, /위원 평균|70점|\/ 100/)
+})
+
+test('DeepScanInlineResults hides target-price section and consensus for ETF', () => {
+  const payload = basePayload()
+  payload.input.instrument = { name: 'KODEX 코스피', code: '226490', market: 'ETF', kind: 'etf' }
+  payload.insights.items[0].consensus = { targetPrice: 29999, analystCount: 12, recommendation: '매수', highestTargetPrice: 32000 }
+  const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
+
+  assert.match(markup, /가격 근거/)
+  assert.match(markup, /ETF 기준/)
+  assert.doesNotMatch(markup, /목표가 근거/)
+  assert.doesNotMatch(markup, /증권사 12개/)
+  assert.doesNotMatch(markup, /29,999|32,000원/)
+})
