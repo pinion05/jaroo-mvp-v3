@@ -2645,6 +2645,30 @@
   animation: today-chart-point-reveal 0.45s 5.1s ease-out forwards, today-ring-pulse 1.8s 5.55s ease-in-out infinite;
 }
 
+/* 한국 증시 관습(8/21 handoff §4): 수익=빨강(기본), 손실=파랑. 차트 선·음영·점·링에 적용. */
+.todayChartToneProfit {
+  stroke: var(--jaroo-profit, #d83a42);
+}
+
+.todayChartToneProfit.todayChartArea,
+.todayChartArea.todayChartToneProfit {
+  fill: rgba(216, 58, 66, 0.08);
+}
+
+.todayChartToneLoss {
+  stroke: var(--jaroo-loss, #2b6be6);
+}
+
+.todayChartToneLoss.todayChartArea,
+.todayChartArea.todayChartToneLoss {
+  fill: rgba(43, 107, 230, 0.08);
+}
+
+.todayChartToneLoss.todayChartDot,
+.todayChartDot.todayChartToneLoss {
+  fill: var(--jaroo-loss, #2b6be6);
+}
+
 .todayBriefList {
   padding: 6px 16px 14px;
 }

@@ -490,12 +490,12 @@ export function TodayBriefingCard({
         </div>
         {chart.hasData ? (
           <svg className={styles.todayChartSvg} viewBox='0 0 300 120' aria-label='최근 3개월 일봉 차트'>
-            <path className={styles.todayChartArea} d={chart.areaPath} />
-            <path className={styles.todayChartLine} d={chart.linePath} pathLength={1} />
+            <path className={cn(styles.todayChartArea, chart.isProfit === false ? styles.todayChartToneLoss : styles.todayChartToneProfit)} d={chart.areaPath} />
+            <path className={cn(styles.todayChartLine, chart.isProfit === false ? styles.todayChartToneLoss : styles.todayChartToneProfit)} d={chart.linePath} pathLength={1} />
             <line className={styles.todayAvgLine} x1='4' y1={chart.averageY} x2='296' y2={chart.averageY} />
               <text className={styles.todayAvgText} x='296' y={Math.max(12, chart.averageY - 6)} textAnchor='end'>{chartAverageLabel} {displayChartAveragePrice.replace(/원$/u, '')}</text>
-            <circle className={styles.todayChartDot} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='3' />
-            <circle className={styles.todayChartRing} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='7' />
+            <circle className={cn(styles.todayChartDot, chart.isProfit === false ? styles.todayChartToneLoss : styles.todayChartToneProfit)} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='3' />
+            <circle className={cn(styles.todayChartRing, chart.isProfit === false ? styles.todayChartToneLoss : styles.todayChartToneProfit)} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='7' />
           </svg>
         ) : (
           <div className={styles.todayChartEmpty} role='status'>차트 데이터를 확인하는 중이에요</div>

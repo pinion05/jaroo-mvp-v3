@@ -633,6 +633,7 @@ export function buildChartGeometry(rows: LoadingBriefingDailyRow[], averagePrice
       areaPath: '',
       lastPoint: { x: 296, y: 36 },
       averageY: 35,
+      isProfit: undefined,
     }
   }
 
@@ -658,8 +659,11 @@ export function buildChartGeometry(rows: LoadingBriefingDailyRow[], averagePrice
   const averageY = isFiniteNumber(averagePriceValue)
     ? Math.round(clamp(bottom - ((averagePriceValue - minValue) / range) * (bottom - top), top, bottom) * 10) / 10
     : 35
-
-  return { hasData: true, linePath, areaPath, lastPoint, averageY }
+  // 지시사항(8/21 handoff §4): 한국 증시 관습 — 수익=빨강, 손실=파랑. 현재가(마지막 종가)와 평단 비교.
+  // 평단을 모르면(null) 수익 여부도 모르므로 기존 기본색(red)을 유지한다.
+  const lastValue = values[values.length - 1]
+  const isProfit = isFiniteNumber(averagePriceValue) && isFiniteNumber(lastValue) ? lastValue >= averagePriceValue : undefined
+  return { hasData: true, linePath, areaPath, lastPoint, averageY, isProfit }
 }
 
 /**
