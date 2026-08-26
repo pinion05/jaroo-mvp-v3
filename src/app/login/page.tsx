@@ -103,7 +103,7 @@ export default function LoginPage() {
   }
 
   // 비밀번호 재설정 메일 발송. 이메일 폼에 입력된 주소를 사용하며,
-  // 링크는 /auth/reset-password 로 돌아와 새 비밀번호를 설정한다.
+  // 링크는 /auth/reset-password/confirm(서버 교환)을 거쳐 새 비밀번호를 설정한다.
   async function handleForgotPassword() {
     setError(null)
     setInfo(null)
@@ -116,7 +116,7 @@ export default function LoginPage() {
     try {
       const supabase = createSupabaseBrowserClient()
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(target, {
-        redirectTo: `${window.location.origin}/auth/reset-password`,
+        redirectTo: `${window.location.origin}/auth/reset-password/confirm`,
       })
       if (resetError) {
         setError('재설정 메일을 보내지 못했어요. 잠시 후 다시 시도해주세요.')
