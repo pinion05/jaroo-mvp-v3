@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { resolveApiUserId } from '@/lib/supabase/api-auth'
 
 export const runtime = 'nodejs'
 
@@ -248,6 +249,15 @@ export async function createDeepScanTeamSummaryResponse(
 }
 
 export async function POST(request: Request) {
+  // 서버 LLM 키 비용 보호(이슈 #224 H2): 로그인된 사용자만 호출 가능.
+  // 유일 호출처가 딥스캔(로그인+크레딧 게이트)이라 정상 플로우는 영향 없다.
+  const auth = await resolveApiUserId('deepscan-team-summary')
+  if (auth.status === 'unavailable') {
+    return NextResponse.json({ ok: false, error: { message: 'auth-unavailable' } }, { status: 503 })
+  }
+  if (auth.status === 'unauthorized') {
+    return NextResponse.json({ ok: false, error: { message: 'unauthorized' } }, { status: 401 })
+  }
   const body = await request.json().catch(() => null) as TeamSummaryRequestBody | null
   if (!body || typeof body !== 'object') {
     return NextResponse.json({ ok: false, error: { message: 'invalid JSON body' } }, { status: 400 })
