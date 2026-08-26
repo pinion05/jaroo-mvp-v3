@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase/service'
 import { NO_STORE_PRIVATE_HEADERS, resolveApiUserId } from '@/lib/supabase/api-auth'
+import { originAllowedForStateChange } from '@/lib/http-origin-guard'
 import type { PortfolioDbRow, PortfolioSaveRow } from '@/lib/portfolio-sync'
 import { MAX_PORTFOLIO_REQUEST_BODY_BYTES, getPortfolioRequestBodySizeError, getPortfolioRowsValidationError } from '@/lib/portfolio-validation'
 
@@ -59,6 +60,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  if (!originAllowedForStateChange(request)) {
+    return jsonNoStore({ error: 'origin-not-allowed' }, { status: 403 })
+  }
   const auth = await resolveApiUserId('portfolio')
   if (auth.status === 'unavailable') {
     return jsonNoStore({ error: 'auth-unavailable' }, { status: 503 })
