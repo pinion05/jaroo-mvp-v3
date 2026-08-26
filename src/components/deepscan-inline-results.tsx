@@ -293,6 +293,14 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
           <br />
           매번 확인하지 않으셔도, <b className='font-semibold text-white'>바뀌는 순간에만</b> 알려드릴게요.
         </p>
+        {/* 워치 미구현 — 표시 전용 버튼(지시사항 워치 전환 🟡). 기능 연결 전까지 동작 없음. */}
+        <button
+          type='button'
+          className='mt-3 w-full rounded-[11px] bg-white px-3 py-[13px] text-[13.5px] font-bold text-[#0F1419]'
+        >
+          지켜보기 시작
+        </button>
+        <p className='mt-[9px] text-center text-[10.5px] text-white/40'>며칠간 무료 · 언제든 그만둘 수 있어요</p>
       </article>
       <p className='px-2 pb-2 text-center text-[10px] leading-4 text-[#97A0AE]'>AI 분석은 데이터 기반 참고 자료예요. 투자 권유나 수익 보장이 아닙니다.</p>
     </section>
