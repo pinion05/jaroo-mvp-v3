@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { sanitizeOcrRows } from '@/lib/screenshot-ocr'
+import { checkOcrQuota, clientIpFromRequest } from '@/lib/ocr-rate-limit'
 
 export const dynamic = 'force-dynamic'
 
@@ -297,6 +298,15 @@ export async function POST(request: Request) {
 
   if (!imageDataUrl.startsWith('data:image/')) {
     return NextResponse.json({ error: 'A valid imageDataUrl is required.' }, { status: 400 })
+  }
+
+  // 게스트 퍼널은 유지하되 IP별 쿼터로 서버 비용을 보호한다(이슈 #224 H1).
+  const quota = checkOcrQuota(clientIpFromRequest(request))
+  if (!quota.allowed) {
+    return NextResponse.json(
+      { error: `요청이 너무 많아요. 약 ${Math.ceil(quota.retryAfterSec / 60)}분 뒤에 다시 시도해주세요.` },
+      { status: 429, headers: { 'Retry-After': String(quota.retryAfterSec) } },
+    )
   }
 
   const attempts = [

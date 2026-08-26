@@ -1,5 +1,4 @@
 import { NextResponse } from 'next/server'
-import { resolveApiUserId } from '@/lib/supabase/api-auth'
 
 export const runtime = 'nodejs'
 
@@ -251,6 +250,8 @@ export async function createDeepScanTeamSummaryResponse(
 export async function POST(request: Request) {
   // 서버 LLM 키 비용 보호(이슈 #224 H2): 로그인된 사용자만 호출 가능.
   // 유일 호출처가 딥스캔(로그인+크레딧 게이트)이라 정상 플로우는 영향 없다.
+  // 동적 import: route 모듈을 직접 import하는 단위 테스트가 server-only 그래프에 묶이지 않게 한다.
+  const { resolveApiUserId } = await import('@/lib/supabase/api-auth')
   const auth = await resolveApiUserId('deepscan-team-summary')
   if (auth.status === 'unavailable') {
     return NextResponse.json({ ok: false, error: { message: 'auth-unavailable' } }, { status: 503 })
