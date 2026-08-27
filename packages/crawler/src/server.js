@@ -1,5 +1,6 @@
 import express from 'express';
 import { fileURLToPath } from 'node:url';
+import { buildNaverConsensusSyntheticRow } from './services/deepscan-kr-naver-consensus.js';
 import {
   WISEREPORT_GLOBAL_ROUTES,
   WISEREPORT_KR_PAGES,
@@ -2446,7 +2447,35 @@ const endpointDefinitions = [
     params: ['code'],
     query: [],
     rawSuccess: true,
-    handler: async (req) => buildWiseReportKrSlimPayloadV12(await getCrawlV12(req.params.code), req.params.code),
+    handler: async (req) => {
+      const rawAggregate = await getCrawlV12(req.params.code);
+      const payload = buildWiseReportKrSlimPayloadV12(rawAggregate, req.params.code);
+      // 컨센서스 폴백(이슈): fnguide 투자의견 페이지 장애 시 네이버 데이터를
+      // opinion 합성 행으로 주입해 목표주가·투자의견 스냅샷을 회복한다.
+      try {
+        const consensusEmpty = !payload.pages?.consensus?.consensusTrend?.rows?.some((row) => /목표/.test(row?.['구분'] ?? ''));
+        const krEvidenceOpinionMissing = !payload.krFacts || JSON.stringify(payload.krFacts).indexOf('targetPrice') < 0;
+        if (consensusEmpty) {
+          const synthetic = await buildNaverConsensusSyntheticRow(req.params.code);
+          if (synthetic) {
+            const opinionPage = { rows: [synthetic] };
+            payload.pages = payload.pages || {};
+            // fnguide 원본이 실패 응답('페이지가 없습니다')일 때만 덮어쓴다.
+            const existingOpinionText = JSON.stringify(payload.pages.opinion ?? {});
+            if (!payload.pages.opinion || existingOpinionText.indexOf('페이지가 없습니다') >= 0 || Object.keys(payload.pages.opinion).length === 0) {
+              payload.pages.opinion = opinionPage;
+            } else {
+              payload.pages.opinion.fallbackRow = synthetic;
+            }
+            console.log(`[naver-consensus-fallback] code=${req.params.code} target=${synthetic.targetPrice} score=${synthetic['투자의견(점수)']}`);
+          }
+        }
+        void krEvidenceOpinionMissing;
+      } catch (fallbackError) {
+        console.warn('[naver-consensus-fallback] 주입 실패(원본 흐름 유지)', fallbackError?.message ?? fallbackError);
+      }
+      return payload;
+    },
   },
   ...WISEREPORT_KR_PAGE_ROUTES.map((route) => ({
     id: route.id,
