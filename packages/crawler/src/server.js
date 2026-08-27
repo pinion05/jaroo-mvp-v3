@@ -294,6 +294,10 @@ function buildJarooDeepScanInputFromQuery(req) {
     sourceContext: {
       from: from ?? 'system',
     },
+    // 긴급 캐시 무효화용(운영): ?crawlerCacheBypass=1 → 크롤러 캐시 우회 재수집
+    ...(parseSingleQueryValue(req.query.crawlerCacheBypass) === '1'
+      ? { crawlerCache: { bypassCache: true } }
+      : {}),
   };
 }
 
