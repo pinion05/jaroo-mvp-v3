@@ -124,7 +124,28 @@ async function getCrawl(targetCode, options = {}) {
 }
 
 async function getCrawlV12(targetCode, options = {}) {
-  return crawlWiseReportKrV12(targetCode, options);
+  const aggregate = await crawlWiseReportKrV12(targetCode, options);
+
+  // 컨센서스 폴백: fnguide 투자의견 페이지 장애('페이지가 없습니다') 시
+  // 네이버 증권 데이터를 opinion 페이지에 주입해 목표주가·투자의견을 회복한다.
+  try {
+    const opinionPage = aggregate?.normalized?.opinion ?? aggregate?.pages?.opinion;
+    const opinionText = JSON.stringify(opinionPage?.bodyTextHead ?? opinionPage ?? '');
+    if (opinionPage && (opinionText.includes('페이지가 없습니다') || !JSON.stringify(opinionPage).includes('목표'))) {
+      const { buildNaverConsensusSyntheticRow } = await import('../services/deepscan-kr-naver-consensus.js');
+      const synthetic = await buildNaverConsensusSyntheticRow(targetCode);
+      if (synthetic) {
+        synthetic.bodyTextHead = '네이버 증권 컨센서스 폴백 데이터';
+        if (aggregate.normalized) aggregate.normalized.opinion = synthetic;
+        if (aggregate.pages) aggregate.pages.opinion = synthetic;
+        logger.info('Crawler', `[naver-consensus-fallback] ${targetCode} | 목표주가 ${synthetic.targetPrice}원 · 점수 ${synthetic['투자의견(점수)']}`);
+      }
+    }
+  } catch (error) {
+    logger.warn?.('Crawler', `[naver-consensus-fallback] 실패(무시): ${error?.message}`);
+  }
+
+  return aggregate;
 }
 
 async function getCrawlSection(targetCode, routeRef, options = {}) {
