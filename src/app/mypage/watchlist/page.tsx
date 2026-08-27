@@ -12,7 +12,7 @@ export default function WatchlistPage() {
   const [items, setItems] = useState(INITIAL)
 
   return (
-    <SpecFrame backHref='/mypage' title='내 종목 관리'>
+    <SpecFrame backHref='/mypage' title='내 종목 관리' showBottomNav>
       <div className={styles.body}>
         <div className={styles.subLabel}>
           {items.length}종목 보유 중 · 빼려면 오른쪽 버튼을 누르세요

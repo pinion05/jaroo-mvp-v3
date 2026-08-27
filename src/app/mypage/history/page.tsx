@@ -8,7 +8,7 @@ import styles from '../detail.module.css'
 
 export default function HistoryPage() {
   return (
-    <SpecFrame backHref='/mypage' title='분석 기록'>
+    <SpecFrame backHref='/mypage' title='분석 기록' showBottomNav>
       <div className={styles.body}>
         <div className={styles.subLabel}>
           지난 딥스캔 결과를 다시 볼 수 있어요

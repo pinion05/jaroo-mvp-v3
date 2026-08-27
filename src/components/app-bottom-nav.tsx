@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { House, ScanLine, UserRound } from 'lucide-react'
+import { History, House, ScanLine, UserRound, Waypoints } from 'lucide-react'
 import type { ComponentType } from 'react'
 import { cn } from '@/lib/utils'
 
@@ -10,7 +10,7 @@ type NavItem = {
   href: string
   label: string
   icon: ComponentType<{ className?: string }>
-  /** 이 항목이 '활성'으로 보일 경로 접두사들 (퍼널 하위 화면 포함) */
+  /** 이 항목이 '활성'으로 보일 경로 접두사들 */
   activePrefixes: string[]
   /** 중앙 강조 버튼(스캔) 여부 */
   emphasized?: boolean
@@ -18,18 +18,26 @@ type NavItem = {
 
 /**
  * 앱 전체의 단일 네비게이션 소스. 모든 하단 탭바는 이 컴포넌트를 렌더한다.
- * 2026-08-26 개편: 퍼널 단계(검수·병합)와 컨텍스트 흐름(분석)을 탭에서 제외하고
- * 홈·스캔(퍼널 입구)·마이 3탭 + 중앙 강조로 축소했다.
- * 검수/병합은 퍼널 내 화면으로, 딥스캔은 홈 종목 카드로 진입한다.
- * (워치 출시 시 '워치' 탭 추가 예정 자리는 중앙 강조 좌우)
+ * 시안: 홈 · 워치 · (스캔 FAB) · 기록 · 마이 5슬롯 — 제품 루프(홈→딥스캔→워치)를 따른다.
+ * 워치(/mypage/watchlist)·기록(/mypage/history)은 현재 목업 페이지에 연결되어 있으며
+ * 실데이터화 시 독립 라우트로 승격할 때 href만 바꾸면 된다.
+ * 검수/병합은 퍼널 내 화면, 딥스캔은 홈 종목 카드로 진입한다.
  */
 export const NAV_ITEMS: NavItem[] = [
   { href: '/home', label: '홈', icon: House, activePrefixes: ['/home'] },
+  { href: '/mypage/watchlist', label: '워치', icon: Waypoints, activePrefixes: ['/mypage/watchlist'] },
   { href: '/screenshot', label: '스캔', icon: ScanLine, activePrefixes: ['/screenshot', '/ocr', '/merge'], emphasized: true },
+  { href: '/mypage/history', label: '기록', icon: History, activePrefixes: ['/mypage/history'] },
   { href: '/mypage', label: '마이', icon: UserRound, activePrefixes: ['/mypage'] },
 ]
 
 function isActive(pathname: string, item: NavItem) {
+  if (item.href === '/mypage') {
+    // 마이 하위 중 워치·기록은 각자 탭이 활성을 가져간다.
+    if (pathname.startsWith('/mypage/watchlist') || pathname.startsWith('/mypage/history')) {
+      return false
+    }
+  }
   return item.activePrefixes.some((prefix) => pathname === prefix || pathname.startsWith(`${prefix}/`))
 }
 
