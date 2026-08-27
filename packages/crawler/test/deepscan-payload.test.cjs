@@ -364,7 +364,7 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
   assert.equal(payload.hero.statusText, '우세');
   assert.match(payload.hero.headline, /삼성전자/);
   assert.match(payload.hero.headline, /76/);
-  assert.match(payload.hero.body, /현재가 85200 KRW 확인/);
+  assert.match(payload.hero.body, /현재가 85,200원 확인/);
   assert.equal(payload.hero.fallback, null);
   assert.equal(payload.committee.axes.length, 3);
   assert.equal(payload.committee.axes[0].score, 65);
@@ -379,7 +379,7 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
       date: '2026-04-14',
       label: '거래량',
       title: '삼성전자 거래량',
-      body: '거래량 1234567주 확인',
+      body: '거래량 1,234,567주 확인',
     },
   );
   assert.deepEqual(
@@ -402,7 +402,7 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
       date: '2026-04-14',
       label: '컨센서스',
       title: '삼성전자 증권사 컨센서스',
-      body: '평균 목표가 100000 KRW · 현재가 대비 +17.37% · 매수 의견이 우세해요 · 투자의견 BUY',
+      body: '평균 목표가 100,000원 · 현재가 대비 +17.37% · 매수 의견이 우세해요 · 투자의견 BUY',
       consensus: {
         targetPrice: 100000,
         targetGapPct: 17.370892018779344,
@@ -417,9 +417,9 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
     },
   );
   assert.equal(payload.strategy.weekSignal, '관찰 지속');
-  assert.equal(payload.strategy.currentPriceText, '85200 KRW');
-  assert.equal(payload.strategy.targetPriceText, '100000 KRW');
-  assert.equal(payload.sellNow.realizedText, '현재가 기준 평가손익 +170400 KRW (+20%). 즉시 매도 판단은 보유 유지입니다.');
+  assert.equal(payload.strategy.currentPriceText, '85,200원');
+  assert.equal(payload.strategy.targetPriceText, '100,000원');
+  assert.equal(payload.sellNow.realizedText, '현재가 기준 평가손익 +170,400원 (+20%). 즉시 매도 판단은 보유 유지입니다.');
   assert.equal(payload.sellNow.rows.length, 4);
   assert.equal(payload.portfolioSimulation.beforeScore, 82);
   assert.equal(payload.portfolioSimulation.afterScore, 84);
@@ -764,9 +764,9 @@ test('buildJarooDeepScanPayload keeps position-fit evidence when the handoff use
   const positionFitAxis = payload.committee.axes.find((axis) => axis.label === '포지션 적합도');
   assert.ok(positionFitAxis);
   assert.equal(positionFitAxis.score, 84);
-  assert.match(positionFitAxis.members[0].reason, /현재가 85200 대비 평단 71000/);
+  assert.match(positionFitAxis.members[0].reason, /현재가 85,200 대비 평단 71,000/);
   assert.equal(positionFitAxis.members[2].reason, '보유 수량, 평단, 현재가가 모두 확인되어 즉시 매도 계산이 가능합니다.');
-  assert.match(payload.sellNow.realizedText, /\+170400 KRW/);
+  assert.match(payload.sellNow.realizedText, /\+170,400원/);
 });
 
 test('buildJarooDeepScanPayload uses package-derived KR committee wording when available', async () => {
@@ -814,7 +814,7 @@ test('buildJarooDeepScanPayload uses package-derived KR committee wording when a
   assert.doesNotMatch(reasons[0], /최근 리포트 2건 기준입니다/)
   const marketTimingAxis = payload.committee.axes.find((axis) => axis.label === '시장 타이밍');
   assert.ok(marketTimingAxis);
-  assert.match(marketTimingAxis.members[2].reason, /현재가 85200 KRW와 평단 71000 비교 기준/)
+  assert.match(marketTimingAxis.members[2].reason, /현재가 85,200원 · 평단 71,000원 비교 기준/)
   const positionFitAxis = payload.committee.axes.find((axis) => axis.label === '포지션 적합도');
   assert.ok(positionFitAxis);
   assert.equal(positionFitAxis.members[2].reason, '보유 수량, 평단, 현재가가 모두 확인되어 즉시 매도 계산이 가능합니다.');
