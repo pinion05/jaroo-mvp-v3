@@ -63,8 +63,8 @@ function createStrongEvidencePacket() {
     },
     missingSources: [],
     topFacts: [
-      '현재가 85200 KRW 확인',
-      '보유 12주 / 평단 71000 확인',
+      '현재가 85,200원 확인',
+      '보유 12주 / 평단 71,000원 확인',
       'KR 리포트 페이지 6/10 확보',
     ],
     topRisks: ['미확보 KR 페이지 4건'],

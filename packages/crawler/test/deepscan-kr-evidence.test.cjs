@@ -211,8 +211,8 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
   });
   assert.deepEqual(packet.missingSources, []);
   assert.deepEqual(packet.topFacts, [
-    '현재가 85200 KRW 확인',
-    '보유 12주 / 평단 71000 확인',
+    '현재가 85,200원 확인',
+    '보유 12주 / 평단 71,000원 확인',
     'KR 리포트 페이지 6/11 확보',
   ]);
   assert.deepEqual(packet.topRisks, ['미확보 KR 페이지 5건']);
@@ -294,7 +294,7 @@ test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a dire
   assert.deepEqual(packet.packageContext.summaryFacts, []);
   assert.deepEqual(packet.missingSources, ['slim']);
   assert.deepEqual(packet.topFacts, [
-    '현재가 90000 KRW 확인',
+    '현재가 90,000원 확인',
     '보유 맥락 일부 확인',
   ]);
   assert.deepEqual(packet.topRisks, [
@@ -393,8 +393,8 @@ test('buildDeepScanKrEvidencePacket promotes OpenDART disclosures into structure
   assert.equal(packet.reportSignals.disclosureCount, 4);
   assert.equal(packet.reportSignals.disclosureRiskCount, 1);
   assert.deepEqual(packet.topFacts, [
-    '현재가 85200 KRW 확인',
-    '보유 12주 / 평단 71000 확인',
+    '현재가 85,200원 확인',
+    '보유 12주 / 평단 71,000원 확인',
     '최근 OpenDART 공시 4건 / 주요 리스크 1건 확인',
   ]);
   assert.deepEqual(packet.topRisks, [
@@ -982,8 +982,8 @@ test('buildDeepScanKrEvidencePacket parses display-formatted holding strings fro
     hasFullSellNowInputs: true,
   });
   assert.deepEqual(packet.topFacts, [
-    '현재가 85200 KRW 확인',
-    '보유 12주 / 평단 71000 확인',
+    '현재가 85,200원 확인',
+    '보유 12주 / 평단 71,000원 확인',
   ]);
   assert.deepEqual(packet.topRisks, [
     'KR 리포트 페이지 근거 없음',
@@ -1046,8 +1046,8 @@ test('buildDeepScanKrEvidencePacket promotes ETF constituent snapshot into facts
   assert.equal(packet.etfProductSnapshot.constituents.top10WeightPct, 57.12);
   assert.deepEqual(packet.missingSources, ['slim']);
   assert.deepEqual(packet.topFacts, [
-    '현재가 84235 KRW 확인',
-    '보유 35주 / 평단 58828.75 확인',
+    '현재가 84,235원 확인',
+    '보유 35주 / 평단 58,828.75원 확인',
     'ETF 기초지수 코스피지수 / 상위 구성 삼성전자·SK하이닉스 확인',
   ]);
   assert.deepEqual(packet.topRisks, ['KR 리포트 페이지 근거 없음']);

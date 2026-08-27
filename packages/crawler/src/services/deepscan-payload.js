@@ -1186,7 +1186,10 @@ function formatNumber(value) {
     return 'N/A';
   }
 
-  return Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100);
+  // UI 표기 통일: 천단위 콤마(이슈 — krw->원·콤마 전역 치환)
+  return Number.isInteger(value)
+    ? value.toLocaleString('en-US')
+    : (Math.round(value * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
 function formatSignedNumber(value) {
@@ -1208,9 +1211,16 @@ function formatSignedPercent(value) {
 }
 
 function formatCurrencyValue(value, currency) {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? `${formatNumber(value)}${currency ? ` ${currency}` : ''}`
-    : 'N/A';
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 'N/A';
+  }
+
+  // 한국 화폐는 '265,000원' 형태로 표기한다(krw->원 전역 치환).
+  if (currency === 'KRW') {
+    return `${formatNumber(value)}원`;
+  }
+
+  return `${formatNumber(value)}${currency ? ` ${currency}` : ''}`;
 }
 
 function resolveConsensusOpinionSummary(consensusSnapshot) {
@@ -1662,7 +1672,7 @@ function createCommitteeAxes(evidence, scored, packageResult) {
           '가격 위치',
           scored.committee.marketTiming.priceLocation,
           evidence.currentQuote
-            ? `현재가 ${formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency)}와 평단 ${formatNumber(evidence.holding.averagePrice)} 비교 기준입니다.`
+            ? `현재가 ${formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency)} · 평단 ${formatNumber(evidence.holding.averagePrice)}원 비교 기준입니다.`
             : '현재가가 없어 가격 위치 점수는 보수적으로 계산했습니다.',
           'priceLocation',
         ),
@@ -2198,7 +2208,7 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
       title: '보유 포지션 맥락',
       body: evidence.holding.hasHoldingContext
         ? (evidence.holding.hasFullSellNowInputs
-          ? `보유 ${formatNumber(evidence.holding.shares)}주 / 평단 ${formatNumber(evidence.holding.averagePrice)} 확인`
+          ? `보유 ${formatNumber(evidence.holding.shares)}주 / 평단 ${formatNumber(evidence.holding.averagePrice)}원 확인`
           : '보유 맥락 일부 확인')
         : '국내 보유 맥락 없음',
     },
@@ -2334,7 +2344,9 @@ function buildSellNow(evidence, scored) {
   const currency = evidence.currentQuote?.currency ?? 'KRW';
   const decisionBandLabel = getDecisionBandLabel(scored.sellNow.decisionBand);
   return {
-    realizedText: `현재가 기준 평가손익 ${formatSignedNumber(scored.sellNow.evaluationPnL)} ${currency} (${formatSignedPercent(scored.sellNow.evaluationPnLPct)}). 즉시 매도 판단은 ${decisionBandLabel}입니다.`,
+    realizedText: currency === 'KRW'
+        ? `현재가 기준 평가손익 ${formatSignedNumber(scored.sellNow.evaluationPnL)}원 (${formatSignedPercent(scored.sellNow.evaluationPnLPct)}). 즉시 매도 판단은 ${decisionBandLabel}입니다.`
+        : `현재가 기준 평가손익 ${formatSignedNumber(scored.sellNow.evaluationPnL)} ${currency} (${formatSignedPercent(scored.sellNow.evaluationPnLPct)}). 즉시 매도 판단은 ${decisionBandLabel}입니다.`,
     rows: [
       {
         label: '판단 밴드',

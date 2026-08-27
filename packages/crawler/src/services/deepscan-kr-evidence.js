@@ -223,7 +223,13 @@ function resolveKnownPageIds(slimSource, slimPages) {
 }
 
 function formatNumber(value) {
-  return Number.isInteger(value) ? String(value) : String(Number(value));
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return Number.isInteger(value)
+    ? value.toLocaleString('en-US')
+    : Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
 function normalizeLabel(value) {
@@ -1414,13 +1420,15 @@ function buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals, etf
   const facts = [];
 
   if (currentQuote) {
-    const priceText = `현재가 ${formatNumber(currentQuote.price)}${currentQuote.currency ? ` ${currentQuote.currency}` : ''} 확인`;
+    const priceText = currentQuote.currency === 'KRW'
+      ? `현재가 ${formatNumber(currentQuote.price)}원 확인`
+      : `현재가 ${formatNumber(currentQuote.price)}${currentQuote.currency ? ` ${currentQuote.currency}` : ''} 확인`;
     facts.push(priceText);
   }
 
   if (holding.hasHoldingContext) {
     if (holding.shares !== null && holding.averagePrice !== null) {
-      facts.push(`보유 ${formatNumber(holding.shares)}주 / 평단 ${formatNumber(holding.averagePrice)} 확인`);
+      facts.push(`보유 ${formatNumber(holding.shares)}주 / 평단 ${formatNumber(holding.averagePrice)}원 확인`);
     } else {
       facts.push('보유 맥락 일부 확인');
     }
