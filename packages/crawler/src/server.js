@@ -1098,6 +1098,9 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
         : makeSlimV12MissingFact({ provider: 'internal', checkedSources: ['targetPrice', 'quotes.currentPrice'], reasonCode: 'target_gap_requires_quote', message: '목표가 괴리율 계산에는 현재가 source가 필요합니다.' }),
       recommendation: makeSlimV12Fact(evidence.consensusSnapshot?.recommendationScore ?? evidence.consensusSnapshot?.recommendation ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].투자의견' }),
       analystOpinionRows: makeSlimV12Fact(slimPayload.pages?.opinion?.analystOpinions?.rows ?? [], { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions.rows' }),
+      analystCount: makeSlimV12Fact(evidence.consensusSnapshot?.analystCount ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinations.brokerCount' }),
+      highestTargetPrice: makeSlimV12Fact(evidence.consensusSnapshot?.highestTargetPrice ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가(최고)' }),
+      lowestTargetPrice: makeSlimV12Fact(evidence.consensusSnapshot?.lowestTargetPrice ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가(최저)' }),
     },
     profitability: {
       revenueLatest: makeSlimV12FinancialFact(evidence.financialSnapshot?.revenueLatest ?? null, financialSource, instrumentKind),
@@ -2466,10 +2469,12 @@ const endpointDefinitions = [
             payload.pages = payload.pages || {};
             // fnguide 원본이 실패 응답('페이지가 없습니다')일 때만 덮어쓴다.
             const existingOpinionText = JSON.stringify(payload.pages.opinion ?? {});
-            if (!payload.pages.opinion || existingOpinionText.indexOf('페이지가 없습니다') >= 0 || Object.keys(payload.pages.opinion).length === 0) {
+            const isFailurePage = existingOpinionText.indexOf('페이지가 없습니다') >= 0;
+            const hasNoRows = !Array.isArray(payload.pages.opinion?.rows) || payload.pages.opinion.rows.length === 0;
+            if (!payload.pages.opinion || isFailurePage || hasNoRows) {
               payload.pages.opinion = opinionPage;
             } else {
-              payload.pages.opinion.fallbackRow = synthetic;
+              payload.pages.opinion.rows = [...payload.pages.opinion.rows, synthetic];
             }
             console.log(`[naver-consensus-fallback] code=${req.params.code} target=${synthetic.targetPrice} score=${synthetic['투자의견(점수)']}`);
           }

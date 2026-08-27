@@ -523,6 +523,27 @@ function isConsensusOpinionRow(row) {
 }
 
 function extractAnalystTargetStats(opinionPage) {
+  // 네이버 폴백 합성 행은 증권사별 집계(최고/최저/증권사 수)를 요약 필드로 이미 갖고 있다.
+  // slim 파이프라인에서 합성 행이 opinion 페이지 '루트'에 위치할 수 있어 루트도 후보에 포함한다.
+  const candidateRows = [...collectRows(opinionPage)];
+  if (opinionPage && typeof opinionPage === 'object' && !Array.isArray(opinionPage)) {
+    candidateRows.push(opinionPage);
+  }
+  const syntheticSummary = candidateRows
+    .map((row) => ({
+      highest: normalizeNumber(row?.최고목표주가),
+      lowest: normalizeNumber(row?.최저목표주가),
+      count: normalizeNumber(row?.증권사수),
+    }))
+    .find((entry) => entry.highest !== null || entry.lowest !== null || (entry.count !== null && entry.count > 0));
+  if (syntheticSummary) {
+    return {
+      analystCount: syntheticSummary.count,
+      highestTargetPrice: syntheticSummary.highest,
+      lowestTargetPrice: syntheticSummary.lowest,
+    };
+  }
+
   const targetRows = collectRows(opinionPage)
     .map((row) => ({
       row,
