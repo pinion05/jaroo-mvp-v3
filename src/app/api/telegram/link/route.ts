@@ -25,6 +25,12 @@ export async function GET() {
     return NextResponse.json({ authScope: 'guest', linked: false }, { headers: NO_STORE_PRIVATE_HEADERS })
   }
 
+  // POST와 동일한 설정 체크 — 미설정 배포에서는 행을 숨기도록 503으로 응답한다.
+  // (GET만 체크를 빼먹어 미설정인데 행이 보이고, 클릭 시에야 503 알럿이 뜬 사례 반영)
+  if (!hasTelegramBotConfig() || !getTelegramBotUsername()) {
+    return NextResponse.json({ error: 'telegram-unconfigured' }, { status: 503, headers: NO_STORE_PRIVATE_HEADERS })
+  }
+
   const supabase = await createSupabaseServerClient()
   const { data, error } = await supabase
     .from('telegram_links')
