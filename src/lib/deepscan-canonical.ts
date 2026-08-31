@@ -311,6 +311,14 @@ export async function fetchDeepScanCanonicalPayload(
   const response = await fetcher(`/api/deepscan?${query}`, { cache: 'no-store' })
   const payload = await response.json()
 
+  if (!response.ok && payload && typeof payload === 'object' && 'error' in payload) {
+    const message = (payload as { error?: { message?: string } }).error?.message
+    if (message) {
+      // 서버 안내(크레딧 부족·로그인·환불 안내 등)를 화면까지 전달한다 (§6-6).
+      throw new Error(String(message))
+    }
+  }
+
   return isCanonicalPayload(payload) ? payload : null
 }
 

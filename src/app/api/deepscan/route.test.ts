@@ -96,7 +96,7 @@ test('createDeepScanCanonicalResponse는 internal builder 예외를 local JSON e
     data: null,
     count: 0,
     error: {
-      message: 'builder down',
+      message: '딥스캔에 일시적인 문제가 생겼어요. 잠시 후 다시 시도해 주세요.',
     },
   })
 })
@@ -168,7 +168,7 @@ test('GET은 KR crawler admission failure status를 보존한다', async () => {
     const body = await response.json()
 
     assert.equal(response.status, 429)
-    assert.equal(body.error.message, 'KR DeepScan crawler is busy')
+    assert.equal(body.error.message, '딥스캔에 일시적인 문제가 생겼어요. 잠시 후 다시 시도해 주세요.')
   } finally {
     global.fetch = originalFetch
     if (originalCrawlerBaseUrl === undefined) {
