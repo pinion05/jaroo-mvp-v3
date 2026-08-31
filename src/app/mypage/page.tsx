@@ -3,9 +3,9 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import type { ReactNode } from 'react'
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 
-import { ListChecks, Camera, History, Bell, TrendingDown, Megaphone, FileText, Shield, MessageCircle, UserMinus, ChevronRight } from 'lucide-react'
+import { ListChecks, Camera, History, Bell, TrendingDown, Megaphone, FileText, Shield, MessageCircle, UserMinus, ChevronRight, Send } from 'lucide-react'
 import { PaymentsStatusCards } from '@/components/mypage/payments-status-cards'
 import { SpecFrame } from '@/components/spec/spec-frame'
 import { AuthAccountCard } from '@/components/auth/auth-account-card'
@@ -21,6 +21,83 @@ export default function MyPage() {
   const [withdrawOpen, setWithdrawOpen] = useState(false)
   const [withdrawPending, setWithdrawPending] = useState(false)
   const [withdrawError, setWithdrawError] = useState<string | null>(null)
+
+
+  // 텔레그램 알림 연결 (실데이터 /api/telegram/link) — 워치 알림 수신 채널
+  const [tgLinked, setTgLinked] = useState(false)
+  const [tgUsername, setTgUsername] = useState<string | null>(null)
+  const [tgWaiting, setTgWaiting] = useState(false) // 딥링크로 봇 시작 후 웹훅 확정 대기
+  const [tgConfigured, setTgConfigured] = useState(true) // 미설정 배포(503)면 행을 숨긴다
+  const [tgBusy, setTgBusy] = useState(false)
+
+  const loadTelegramStatus = async () => {
+    try {
+      const res = await fetch('/api/telegram/link')
+      if (res.status === 503) {
+        setTgConfigured(false)
+        return
+      }
+      const data = (await res.json().catch(() => ({}))) as { linked?: boolean; telegram_username?: string | null }
+      if (data.linked) {
+        setTgLinked(true)
+        setTgUsername(data.telegram_username ?? null)
+        setTgWaiting(false)
+      } else {
+        setTgLinked(false)
+      }
+    } catch {
+      // 조회 실패 시 현재 표시 유지
+    }
+  }
+
+  useEffect(() => {
+    void loadTelegramStatus()
+  }, [])
+
+  // 연결 대기 중 폴링 — 유저가 텔레그램에서 시작을 누르면 webhook 이 연결을 확정한다
+  useEffect(() => {
+    if (!tgWaiting) return
+    const timer = window.setInterval(() => { void loadTelegramStatus() }, 3000)
+    const stop = window.setTimeout(() => window.clearInterval(timer), 90_000)
+    return () => {
+      window.clearInterval(timer)
+      window.clearTimeout(stop)
+    }
+  }, [tgWaiting])
+
+  const connectTelegram = async () => {
+    if (tgBusy) return
+    setTgBusy(true)
+    try {
+      const res = await fetch('/api/telegram/link', { method: 'POST' })
+      if (!res.ok) return
+      const data = (await res.json().catch(() => ({}))) as { link_url?: string }
+      if (data.link_url) {
+        setTgWaiting(true)
+        window.location.href = data.link_url // 모바일: 텔레그램 앱으로 전환
+      }
+    } catch {
+      // 재시도 가능하므로 조용히 유지
+    } finally {
+      setTgBusy(false)
+    }
+  }
+
+  const unlinkTelegram = async () => {
+    if (tgBusy) return
+    if (!window.confirm('텔레그램 알림 연결을 해제할까요?')) return
+    setTgBusy(true)
+    try {
+      const res = await fetch('/api/telegram/link', { method: 'DELETE' })
+      if (res.ok) {
+        setTgLinked(false)
+        setTgUsername(null)
+        setTgWaiting(false)
+      }
+    } finally {
+      setTgBusy(false)
+    }
+  }
 
   const openWithdraw = () => {
     setWithdrawError(null)
@@ -80,6 +157,14 @@ export default function MyPage() {
           알림<span className={styles.testBadgeInline}>테스트 데이터</span>
         </div>
         <div className={styles.menuGroup}>
+          {tgConfigured ? (
+            <RowButton
+              icon={<Send className='size-[18px]' />}
+              label={tgLinked ? '텔레그램 알림' : '텔레그램 알림 연결'}
+              value={tgLinked ? (tgUsername ? `@${tgUsername}` : '연결됨') : tgWaiting ? '연결 대기 중...' : undefined}
+              onClick={() => (tgLinked ? void unlinkTelegram() : void connectTelegram())}
+            />
+          ) : null}
           <ToggleRow icon={<Bell className='size-[18px]' />} label='분석 완료 알림' on={notif.analysisDone} onClick={() => setNotif((n) => ({ ...n, analysisDone: !n.analysisDone }))} />
           <ToggleRow icon={<TrendingDown className='size-[18px]' />} label='급락 종목 알림' on={notif.plungeAlert} onClick={() => setNotif((n) => ({ ...n, plungeAlert: !n.plungeAlert }))} />
           <ToggleRow icon={<Megaphone className='size-[18px]' />} label='마케팅 정보 수신' on={notif.marketing} onClick={() => setNotif((n) => ({ ...n, marketing: !n.marketing }))} />
@@ -135,11 +220,12 @@ function RowLink({ href, icon, label, value, danger }: { href: string; icon: Rea
   )
 }
 
-function RowButton({ icon, label, danger, onClick }: { icon: ReactNode; label: string; danger?: boolean; onClick?: () => void }) {
+function RowButton({ icon, label, value, danger, onClick }: { icon: ReactNode; label: string; value?: string; danger?: boolean; onClick?: () => void }) {
   return (
     <button type='button' className={styles.menuItem} onClick={onClick}>
       <span className={cn(styles.miIco, danger && styles.danger)}>{icon}</span>
       <span className={cn(styles.miLabel, danger && styles.danger)}>{label}</span>
+      {value ? <span className={styles.miValue}>{value}</span> : null}
       <span className={styles.miArrow}><ChevronRight className='size-4' /></span>
     </button>
   )
