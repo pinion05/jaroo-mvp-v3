@@ -32,7 +32,18 @@ export async function createDeepScanCanonicalResponse(
     let refundedCredits = 0
     if (charge && charge.amount > 0) {
       const { refundDeepScanCredits } = await import('@/lib/payments/deepscan-entitlement')
-      const refunded = await refundDeepScanCredits(charge.userId, charge.amount, charge.ref ?? undefined)
+      let refunded = false
+      try {
+        refunded = await refundDeepScanCredits(charge.userId, charge.amount, charge.ref ?? undefined)
+      } catch (refundError) {
+        // RPC 호출 자체의 reject도 수동 정산 추적 대상이다 (리뷰 P2).
+        console.error('[deepscan] credit refund call rejected — 수동 정산 필요', {
+          userId: charge.userId,
+          amount: charge.amount,
+          ref: charge.ref,
+          refundError,
+        })
+      }
       if (refunded) {
         refundedCredits = charge.amount
       } else {
@@ -45,7 +56,6 @@ export async function createDeepScanCanonicalResponse(
       }
     }
 
-    const baseMessage = error instanceof Error ? error.message : 'deepscan builder failed'
     if (refundedCredits > 0) {
       // §6-6: 사용자에게는 실패 + 차감 취소를 한국어로 안내한다. 원문 예외는 로그로만 남긴다.
       console.error('[deepscan] builder failed (credits refunded)', { status, refundedCredits, error })
@@ -62,13 +72,16 @@ export async function createDeepScanCanonicalResponse(
         { status },
       )
     }
+
+    // §7: 인프라 원문(영문 진단·업스트림 응답 본문)은 로그로만 남기고 화면에는 한국어 공통 문구를 내린다 (리뷰 P2).
+    console.error('[deepscan] builder failed', { status, error })
     return NextResponse.json(
       {
         ok: false,
         data: null,
         count: 0,
         error: {
-          message: baseMessage,
+          message: '딥스캔에 일시적인 문제가 생겼어요. 잠시 후 다시 시도해 주세요.',
         },
       },
       { status },
