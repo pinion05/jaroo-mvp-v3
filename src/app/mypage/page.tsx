@@ -73,14 +73,22 @@ export default function MyPage() {
     setTgBusy(true)
     try {
       const res = await fetch('/api/telegram/link', { method: 'POST' })
-      if (!res.ok) return
+      // 실패 사유를 반드시 알린다 — 무반응은 유저가 원인을 알 수 없다 (리뷰 nit → 유저 실측 반영)
+      if (res.status === 503) {
+        window.alert('텔레그램 연동이 아직 활성화되지 않았어요. 서버 설정을 확인해주세요.')
+      } else if (res.status === 401) {
+        window.alert('로그인이 만료되었어요. 다시 로그인한 뒤 시도해주세요.')
+      } else if (res.status === 403) {
+        window.alert('보안 검증에 실패했어요. 페이지를 새로고침한 뒤 다시 시도해주세요.')
+      } else if (!res.ok) {
+        window.alert('일시적인 문제가 생겼어요. 잠시 후 다시 시도해주세요.')
+        return
+      }
       const data = (await res.json().catch(() => ({}))) as { link_url?: string }
       if (data.link_url) {
         setTgWaiting(true)
         window.location.href = data.link_url // 모바일: 텔레그램 앱으로 전환
       }
-    } catch {
-      // 재시도 가능하므로 조용히 유지
     } finally {
       setTgBusy(false)
     }
