@@ -29,7 +29,7 @@ function isWebhookSecretValid(received: string | null, expected: string): boolea
 
 /** "/start abc123" → "abc123" (인자 없으면 null) */
 function parseStartToken(text: string): string | null {
-  if (!text.startsWith('/start')) return null
+  if (text !== '/start' && !text.startsWith('/start ')) return null // "/startabc" 오인 방지 (리뷰 nit)
   const rest = text.slice('/start'.length).trim()
   return rest || null
 }
@@ -39,6 +39,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'telegram-unconfigured' }, { status: 503 })
   }
   const expectedSecret = getTelegramWebhookSecret()
+  if (!expectedSecret) {
+    // 시크릿 미설정 배포: 401 대신 503 — 텔레그램 재시도 루프 방지 (리뷰 minor)
+    return NextResponse.json({ error: 'telegram-unconfigured' }, { status: 503 })
+  }
   if (!isWebhookSecretValid(req.headers.get('x-telegram-bot-api-secret-token'), expectedSecret)) {
     return NextResponse.json({ error: 'forbidden' }, { status: 401 })
   }
@@ -126,13 +130,15 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true })
   }
 
-  const { error: markUsedError } = await admin
+  // 토큰을 재사용 불가하게 소각한다 — update 대신 delete로: 사용 완료 행 잔존과
+  // 동시 /start 레이스 이중소모 문제를 동시에 제거한다 (리뷰 minor 2건).
+  const { error: consumeError } = await admin
     .from('telegram_link_tokens')
-    .update({ used_at: nowIso })
+    .delete()
     .eq('token', token)
-  if (markUsedError) {
-    console.error('[telegram/webhook] token mark-used failed', markUsedError)
-    // 연결 자체는 성공. 토큰 소모 실패는 TTL(10분)이 있어 위험 낮음 — 로그만.
+  if (consumeError) {
+    console.error('[telegram/webhook] token consume failed', consumeError)
+    // 연결 자체는 성공. 미소각 토큰은 10분 TTL과 POST 재발급 정리로 무력화된다.
   }
 
   await sendTelegramMessage(

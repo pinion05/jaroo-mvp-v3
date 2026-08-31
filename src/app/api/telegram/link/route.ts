@@ -1,5 +1,7 @@
 import { randomBytes } from 'node:crypto'
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
+
+import { originAllowedForStateChange } from '@/lib/http-origin-guard'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { resolveApiUserId, NO_STORE_PRIVATE_HEADERS } from '@/lib/supabase/api-auth'
 import { getTelegramBotUsername, hasTelegramBotConfig } from '@/lib/telegram/config'
@@ -47,7 +49,11 @@ export async function GET() {
   )
 }
 
-export async function POST() {
+export async function POST(req: NextRequest) {
+  // 상태 변경 라우트 공통 2차 계층 CSRF 방어 (이슈 #224 E3, portfolio/account 컨벤션)
+  if (!originAllowedForStateChange(req)) {
+    return NextResponse.json({ error: 'forbidden-origin' }, { status: 403, headers: NO_STORE_PRIVATE_HEADERS })
+  }
   const auth = await resolveApiUserId('telegram/link')
   if (auth.status === 'unavailable') {
     return NextResponse.json({ error: 'auth-unavailable' }, { status: 503, headers: NO_STORE_PRIVATE_HEADERS })
@@ -88,7 +94,10 @@ export async function POST() {
   )
 }
 
-export async function DELETE() {
+export async function DELETE(req: NextRequest) {
+  if (!originAllowedForStateChange(req)) {
+    return NextResponse.json({ error: 'forbidden-origin' }, { status: 403, headers: NO_STORE_PRIVATE_HEADERS })
+  }
   const auth = await resolveApiUserId('telegram/link')
   if (auth.status === 'unavailable') {
     return NextResponse.json({ error: 'auth-unavailable' }, { status: 503, headers: NO_STORE_PRIVATE_HEADERS })

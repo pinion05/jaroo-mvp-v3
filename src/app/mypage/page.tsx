@@ -58,7 +58,10 @@ export default function MyPage() {
   useEffect(() => {
     if (!tgWaiting) return
     const timer = window.setInterval(() => { void loadTelegramStatus() }, 3000)
-    const stop = window.setTimeout(() => window.clearInterval(timer), 90_000)
+    const stop = window.setTimeout(() => {
+      window.clearInterval(timer)
+      setTgWaiting(false) // 90초 경과 — "연결 대기 중" 무기한 잔존 방지 (리뷰 nit)
+    }, 90_000)
     return () => {
       window.clearInterval(timer)
       window.clearTimeout(stop)
