@@ -2,6 +2,7 @@
 
 import type { JarooDeepScanPayload } from '../../packages/contracts/src/deepscan'
 
+import { Target } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 type DeepScanRecoveryForecastCardProps = {
@@ -18,7 +19,7 @@ function parsePercent(value: string | null | undefined) {
 
 // 신뢰도(높음/보통/낮음) → 색상 톤. core 엔진 confidence.level 매핑과 동일 어휘.
 function confidenceTone(label: string | undefined | null) {
-  if (label === '높음') return { badge: 'bg-[#E8F5EE] text-[#1A9D55]', dot: 'bg-[#1A9D55]' }
+  if (label === '높음') return { badge: 'bg-[#EEF0F3] text-[#0F1419]', dot: 'bg-[#0F1419]' }
   if (label === '보통') return { badge: 'bg-[#E8F0FB] text-[#2B6BE6]', dot: 'bg-[#2B6BE6]' }
   return { badge: 'bg-[#F1F3F6] text-[#97A0AE]', dot: 'bg-[#97A0AE]' }
 }
@@ -57,7 +58,7 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
       aria-label='원금회수 예측'
     >
       <div className='flex items-center gap-3 border-b border-[#EFF1F4] px-4 py-4'>
-        <div className='flex size-9 items-center justify-center rounded-[10px] bg-[#0F1419] text-[16px]'>🎯</div>
+        <div className='flex size-9 items-center justify-center rounded-[10px] bg-[#0F1419] text-white'><Target className='size-[16px]' aria-hidden /></div>
         <div className='flex-1'>
           <div className='text-[10px] text-[#97A0AE]'>손실 구간</div>
           <h2 className='text-[14px] font-bold text-[#0F1419]'>원금회수 예측</h2>

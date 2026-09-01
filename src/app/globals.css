@@ -82,11 +82,13 @@
   --jaroo-danger: #c23938;
   --jaroo-danger-soft: #f8d7d8;
   --jaroo-danger-ghost: #fff5f5;
-  --jaroo-success: #2d7d46;
-  --jaroo-success-soft: #d8efdf;
-  --jaroo-success-ghost: #f4fbf6;
+  --jaroo-success: #0f1419;
+  --jaroo-success-soft: #eef0f3;
+  --jaroo-success-ghost: #f7f8f9;
   /* Korean market convention: profit/rise is red, loss/fall is blue. */
   --jaroo-profit: #d83a42;
+  --jaroo-profit-soft: #fbe6e7;
+  --jaroo-profit-ghost: #fdf2f3;
   --jaroo-profit-soft: #fbe6e7;
   --jaroo-loss: #2b6be6;
   --jaroo-loss-soft: #e6f0fe;

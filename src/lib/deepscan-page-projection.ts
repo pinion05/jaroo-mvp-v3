@@ -111,7 +111,7 @@ function resolveHeroStatusToneClass(payload: JarooDeepScanPayload) {
   }
 
   if (payload.hero.score >= 67) {
-    return 'text-[color:var(--jaroo-success)]'
+    return 'text-[color:var(--jaroo-profit)]'
   }
 
   if (payload.hero.score >= 55) {

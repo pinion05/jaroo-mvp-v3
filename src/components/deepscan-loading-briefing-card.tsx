@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useMemo } from 'react'
+import { BarChart3, Calendar, Flame, Landmark, Target, Telescope, TrendingUp, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import type {
@@ -195,12 +196,13 @@ export function TodayBriefingItem({
 }: {
   at: number
   elapsedSeconds: number
-  icon: string
+  icon: LucideIcon
   question: string
   data: ReactNode
   meaning: ReactNode
   forceReady?: boolean
 }) {
+  const Icon = icon
   const isVisible = forceReady || elapsedSeconds >= at
   const isContentReady = isDeepScanBriefingItemContentReady({
     elapsedSeconds,
@@ -212,7 +214,7 @@ export function TodayBriefingItem({
   return (
     <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-item='true'>
       <div className={styles.todayBriefQuestionRow}>
-        <span className={styles.todayBriefIcon} aria-hidden='true'>{icon}</span>
+        <span className={styles.todayBriefIcon} aria-hidden='true'><Icon className='size-[13px]' /></span>
         <span className={styles.todayBriefQuestion}>{question}</span>
       </div>
       <div className={cn(styles.todayBriefBody, isVisible ? styles.todayBriefBodyIn : undefined)}>
@@ -285,7 +287,7 @@ export function TodayMarketBriefing({
   return (
     <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-item='true'>
       <div className={styles.todayBriefQuestionRow}>
-        <span className={styles.todayBriefIcon} aria-hidden='true'>🏛️</span>
+        <span className={styles.todayBriefIcon} aria-hidden='true'><Landmark className='size-[13px]' /></span>
         <span className={styles.todayBriefQuestion}>오늘 시장 속에서는?</span>
       </div>
       <div className={cn(styles.todayBriefBody, isVisible ? styles.todayBriefBodyIn : undefined)}>
@@ -504,9 +506,9 @@ export function TodayBriefingCard({
       </div>
 
       <div className={styles.todayBriefList} ref={todayBriefListRef}>
-        <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='🗓️' question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
-        <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='📈' question='단기 흐름은요?' data={<span className={shortStreak.direction === 'up' ? styles.todayUp : shortStreak.direction === 'down' ? styles.todayDown : styles.todayBlue}>{streakLabel}</span>} meaning={shortStreak.direction === 'up' ? '짧게 봐도 흐름이 살아나고 있어요.' : shortStreak.direction === 'down' ? '단기적으로는 숨 고르기가 이어지고 있어요.' : '아직 한쪽 방향으로 강하게 기울지는 않았어요.'} />
-        <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='🎯' question='내 자리는 어디쯤일까요?' data={<span className={financialToneClass(positionPct)}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
+        <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Calendar} question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
+        <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={TrendingUp} question='단기 흐름은요?' data={<span className={shortStreak.direction === 'up' ? styles.todayUp : shortStreak.direction === 'down' ? styles.todayDown : styles.todayBlue}>{streakLabel}</span>} meaning={shortStreak.direction === 'up' ? '짧게 봐도 흐름이 살아나고 있어요.' : shortStreak.direction === 'down' ? '단기적으로는 숨 고르기가 이어지고 있어요.' : '아직 한쪽 방향으로 강하게 기울지는 않았어요.'} />
+        <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Target} question='내 자리는 어디쯤일까요?' data={<span className={financialToneClass(positionPct)}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
         <TodayMarketBriefing
           at={briefStartSeconds[3]}
           elapsedSeconds={elapsedSeconds}
@@ -517,15 +519,15 @@ export function TodayBriefingCard({
           secondPct={briefingSnapshot?.market?.nasdaq?.changePct ?? briefingSnapshot?.market?.kosdaq?.changePct ?? null}
           stockPct={quote?.changePct ?? briefingModel.latestRow?.changePct ?? null}
         />
-        <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='📊' question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
-        <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='🔥' question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
+        <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={BarChart3} question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
+        <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Flame} question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
         {consensus ? (
           <article
             className={cn(styles.todayBriefItem, (forceReady || elapsedSeconds >= consensusAt) ? styles.todayBriefItemIn : undefined, styles.todayBriefConsensusItem)}
             data-today-briefing-item='true'
           >
             <div className={styles.todayBriefQuestionRow}>
-              <span className={styles.todayBriefIcon} aria-hidden='true'>🔭</span>
+              <span className={styles.todayBriefIcon} aria-hidden='true'><Telescope className='size-[13px]' /></span>
               <span className={styles.todayBriefQuestion}>애널리스트 목표가는 어디쯤일까?</span>
             </div>
             {forceReady || elapsedSeconds >= consensusAt + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS ? (

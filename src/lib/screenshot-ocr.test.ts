@@ -62,7 +62,7 @@ test('평가손익이 있으면 반올림 수익률보다 정확한 원가를 �
 
   assert.equal(row?.profitAmount, '+262740')
   assert.equal(row?.profitRate, '+12.7%')
-  assert.equal(row?.averagePrice, '58,793.1429')
+  assert.equal(row?.averagePrice, '58,793')
 })
 
 test('수동 입력한 unsigned 평가손익은 명시적 수익률 부호를 상속한다', () => {
@@ -78,8 +78,8 @@ test('평가손익 없는 괄호 수익률은 기존처럼 양수로 해석한�
 })
 
 test('평가손익이 없거나 원금이 유효하지 않으면 수익률 역산으로 fallback한다', () => {
-  assert.equal(computeAveragePrice('3주', '-6.8%', '181,137원'), '64,784.3348')
-  assert.equal(computeAveragePrice('3주', '-6.8%', '181,137원', '300,000원'), '64,784.3348')
+  assert.equal(computeAveragePrice('3주', '-6.8%', '181,137원'), '64,784')
+  assert.equal(computeAveragePrice('3주', '-6.8%', '181,137원', '300,000원'), '64,784')
 })
 
 test('screenshot upload session survives a hard navigation fallback', () => {

@@ -412,7 +412,7 @@ export function DeepScanLoadingScreen({
             return (
               <article key={card.key} className={cn(styles.narrativeCard, cardSettled ? undefined : styles.narrativeCardPending)}>
                 <div className={styles.narrativeHead}>
-                  <span className={cn(styles.narrativeAvatar, card.placeholder && !card.teamKey ? styles.narrativeAvatarPending : undefined)} aria-hidden='true'>{card.placeholder && !card.teamKey ? <Loader2 className={styles.narrativeSpinner} aria-hidden /> : card.avatar}</span>
+                  <span className={cn(styles.narrativeAvatar, card.placeholder && !card.teamKey ? styles.narrativeAvatarPending : undefined)} aria-hidden='true'>{card.placeholder && !card.teamKey ? <Loader2 className={styles.narrativeSpinner} aria-hidden /> : typeof card.avatar === 'function' ? <card.avatar className='size-[18px]' aria-hidden /> : card.avatar}</span>
                   <div className={styles.narrativeNameWrap}>
                     <strong>{card.placeholder && !card.teamKey ? <span className={styles.narrativeTitleSkeleton} aria-hidden='true' /> : card.analystName}</strong>
                     <span>{card.placeholder && !card.teamKey ? <span className={styles.narrativeDescriptionSkeleton} aria-hidden='true' /> : card.description}</span>

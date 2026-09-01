@@ -229,12 +229,12 @@ test('home holdings builder는 applied row의 OCR evaluation/profit를 실데이
   assert.equal(holding?.pnl, '+199,999원')
   assert.equal(holding?.centerScore, '+24.9%')
   assert.equal(holding?.heatmapChange, undefined)
-  assert.equal(holding?.metaLine, '종목코드 005930 · 평단 80,000원 · 평가금액 999,999원 · 현재가 99,999.9원')
+  assert.equal(holding?.metaLine, '종목코드 005930 · 평단 80,000원 · 평가금액 999,999원 · 현재가 100,000원')
   assert.deepEqual(holding?.metrics, [
     { label: '보유 수량', value: '10주', tone: 'neutral' },
     { label: '수익률', value: '+24.9%', tone: 'positive' },
     { label: '평가 금액', value: '999,999원', tone: 'neutral' },
-    { label: '현재가', value: '99,999.9원', tone: 'neutral' },
+    { label: '현재가', value: '100,000원', tone: 'neutral' },
   ])
 })
 
@@ -571,12 +571,12 @@ test('applied home portfolio handoff는 미국 종목 OCR 평단의 KRW 통화 �
 
     assert.equal(session?.rows[0]?.averagePriceCurrency, 'KRW')
     assert.equal(holding?.averagePriceCurrency, 'KRW')
-    assert.equal(holding?.averagePrice, '79,577.3278원')
+    assert.equal(holding?.averagePrice, '79,577원')
     assert.equal(holding?.evaluationAmount, '3,156,013원')
     assert.equal(holding?.change, '-15.5%')
     assert.equal(holding?.badge, '손실 중')
     assert.equal(holding?.badgeTone, 'red')
-    assert.equal(holding?.metaLine, '티커 PYPL · 종목코드 US70450Y1038 · 평단 79,577.3278원 · 평가금액 3,156,013원 · 현재가 67,242.842원')
+    assert.equal(holding?.metaLine, '티커 PYPL · 종목코드 US70450Y1038 · 평단 79,577원 · 평가금액 3,156,013원 · 현재가 67,243원')
   } finally {
     restoreWindow()
   }

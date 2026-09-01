@@ -276,7 +276,7 @@ export function buildDeepScanViewModel(holding: HomeHolding): DeepScanViewModel 
   const statusText = `${holding.change} · ${holding.shares}`
   const statusToneClass =
     changeValue !== null && changeValue >= 0
-      ? 'text-[color:var(--jaroo-success)]'
+      ? 'text-[color:var(--jaroo-profit)]'
       : changeValue !== null && changeValue <= -20
         ? 'text-[color:var(--jaroo-danger)]'
         : 'text-[color:var(--jaroo-warning)]'
@@ -288,13 +288,13 @@ export function buildDeepScanViewModel(holding: HomeHolding): DeepScanViewModel 
         : '이번 주 미풍 — 회복 확인 중'
   const weekSignalTone =
     changeValue !== null && changeValue >= 0
-      ? 'text-[color:var(--jaroo-success)]'
+      ? 'text-[color:var(--jaroo-profit)]'
       : changeValue !== null && changeValue <= -20
         ? 'text-[color:var(--jaroo-danger)]'
         : 'text-[color:var(--jaroo-warning)]'
   const weekBadgeClass =
     changeValue !== null && changeValue >= 0
-      ? 'bg-[color:var(--jaroo-success-soft)] text-[color:var(--jaroo-success)]'
+      ? 'bg-[color:var(--jaroo-profit-soft)] text-[color:var(--jaroo-profit)]'
       : changeValue !== null && changeValue <= -20
         ? 'bg-[color:var(--jaroo-danger-soft)] text-[color:var(--jaroo-danger)]'
         : 'bg-[color:var(--jaroo-warning-soft)] text-[color:var(--jaroo-warning)]'

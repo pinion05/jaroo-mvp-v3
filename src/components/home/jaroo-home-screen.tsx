@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState, type MouseEvent } from 'react'
+import { Search, Bell } from 'lucide-react'
 import { Cell, Pie, PieChart } from 'recharts'
 import { AuthHomeStatus } from '@/components/auth/auth-home-status'
 import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
@@ -269,7 +270,7 @@ function formatSignedKrw(value: number | null) {
     return '-'
   }
 
-  const sign = value > 0 ? '+' : value < 0 ? '-' : ''
+  const sign = value > 0 ? '+' : value < 0 ? '−' : ''
   return `${sign}${Math.abs(Math.round(value)).toLocaleString('ko-KR')}원`
 }
 
@@ -279,7 +280,7 @@ function formatSignedMoneyValue(value: number | null, currency: 'KRW' | 'USD') {
   }
 
   if (currency === 'USD') {
-    const sign = value > 0 ? '+' : value < 0 ? '-' : ''
+    const sign = value > 0 ? '+' : value < 0 ? '−' : ''
     return `${sign}$${Math.abs(value).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
   }
 
@@ -291,7 +292,7 @@ function formatSignedRate(value: number | null) {
     return '-'
   }
 
-  const sign = value > 0 ? '+' : value < 0 ? '-' : ''
+  const sign = value > 0 ? '+' : value < 0 ? '−' : ''
   return `${sign}${Math.abs(value).toFixed(1)}%`
 }
 
@@ -388,8 +389,8 @@ export function buildHomeV2Summary(holdings: HomeHolding[], isAppliedPortfolio: 
         name: item.name,
         dot: item.donutColor,
         badge: positive ? '순풍' : danger ? '역풍' : '미풍',
-        badgeBackground: positive ? '#EAF3DE' : danger ? '#FCEBEB' : '#f0efe8',
-        badgeColor: positive ? '#3B6D11' : danger ? '#A32D2D' : '#888',
+        badgeBackground: positive ? '#FBE6E7' : danger ? '#FCEBEB' : '#f0efe8',
+        badgeColor: positive ? '#A8323A' : danger ? '#A32D2D' : '#888',
         description: positive
           ? `${item.name}는 현재 ${item.change}로 인식됐어요. 수익 구간 대응 전략을 이어서 볼 수 있어요.`
           : danger
@@ -549,11 +550,11 @@ function StockCard({
           </div>
           {item.actionHref ? (
             <Link href={item.actionHref} className={styles.scanBtn} onClick={(event) => onAction(item, event)}>
-              🔍 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
+              <Search className='inline-block size-[13px]' aria-hidden /> 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
             </Link>
           ) : (
             <button type='button' className={styles.scanBtn}>
-              🔍 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
+              <Search className='inline-block size-[13px]' aria-hidden /> 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
             </button>
           )}
           <button
@@ -1114,7 +1115,7 @@ export function JarooHomeScreen() {
           <div className={styles.topActions}>
             <Link href='/screenshot' className={styles.tbtn} aria-label='스크린샷 추가'>＋</Link>
             <button type='button' className={styles.tbtn} aria-label='알림' onClick={() => setOpenSheet('momentum')}>
-              🔔<span className={styles.dot} />
+              <Bell className='inline-block size-[14px]' aria-hidden /><span className={styles.dot} />
             </button>
           </div>
         </header>

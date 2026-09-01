@@ -20,7 +20,7 @@ const tabs: Array<{ id: ShareTab; label: string }> = [
 ]
 
 const windClasses: Record<ShareCardWind, string> = {
-  순풍: 'bg-[color:var(--jaroo-success-ghost)] text-[color:var(--jaroo-success)]',
+  순풍: 'bg-[color:var(--jaroo-profit-ghost)] text-[color:var(--jaroo-profit)]',
   미풍: 'bg-[color:var(--jaroo-secondary)] text-[color:var(--jaroo-muted)]',
   역풍: 'bg-[color:var(--jaroo-danger-soft)] text-[color:var(--jaroo-danger)]',
 }
@@ -75,9 +75,9 @@ function PortfolioShareCard({ selected, onSelect }: { selected: boolean; onSelec
             <div className='flex items-center justify-between gap-3'>
               <p className='text-[13px] font-bold tracking-[-0.02em] text-[color:var(--jaroo-ink)]'>Jaroo.</p>
               <div className='flex items-center gap-1.5'>
-                <span className='size-2 rounded-full bg-[color:var(--jaroo-success)]' />
-                <span className='text-xs font-medium text-[color:var(--jaroo-success)]'>{sharePortfolioCard.momentumLabel}</span>
-                <Badge className='rounded-md bg-[color:var(--jaroo-success-ghost)] px-2 py-0.5 text-[10px] text-[color:var(--jaroo-success)]'>
+                <span className='size-2 rounded-full bg-[color:var(--jaroo-profit)]' />
+                <span className='text-xs font-medium text-[color:var(--jaroo-profit)]'>{sharePortfolioCard.momentumLabel}</span>
+                <Badge className='rounded-md bg-[color:var(--jaroo-profit-ghost)] px-2 py-0.5 text-[10px] text-[color:var(--jaroo-profit)]'>
                   {sharePortfolioCard.momentumDetail}
                 </Badge>
               </div>

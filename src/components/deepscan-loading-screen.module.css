@@ -9,8 +9,8 @@
   --ds-cream: #fff8ec;
   --ds-amber: #854f0b;
   --ds-amber-soft: #faeeda;
-  --ds-green: #3b6d11;
-  --ds-green-soft: #eaf3de;
+  --ds-green: #a8323a;
+  --ds-green-soft: #fbe6e7;
   --ds-red: #b84545;
   --ds-skeleton-shimmer-duration: 4.2s;
   --ds-member-pulse-duration: 4s;
@@ -1816,7 +1816,7 @@
   --ds-blue: #2b6be6;
   --ds-blue-soft: #e6f0fe;
   --ds-blue-border: #cfe0ff;
-  --ds-green: #1a9d55;
+  --ds-green: #a8323a;
   --ds-green-soft: #e5f3eb;
   --ds-red: #e5484d;
   --ds-amber: #b8860b;
@@ -2139,7 +2139,7 @@
 
 .narrativeTonePositive {
   background: var(--ds-green-soft);
-  color: #1a7340;
+  color: #a8323a;
 }
 
 .narrativeToneWarning {
@@ -2192,7 +2192,7 @@
 }
 
 .completionCardReady {
-  border-color: rgba(26, 157, 85, 0.2);
+  border-color: rgba(168, 50, 58, 0.2);
   background: linear-gradient(180deg, #f8fdfb 0%, #fff 100%);
 }
 

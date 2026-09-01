@@ -509,7 +509,7 @@ export const etfAnalysis = {
     eyebrow: '섹터 비중',
     items: [
       { label: '전기전자', value: 31.2, barWidth: 31, tone: 'var(--jaroo-primary)' },
-      { label: '금융', value: 14.1, barWidth: 14, tone: 'var(--jaroo-success)' },
+      { label: '금융', value: 14.1, barWidth: 14, tone: '#7E97BD' },
       { label: '화학', value: 10.3, barWidth: 10, tone: 'var(--jaroo-warning)' },
       { label: '자동차', value: 8.4, barWidth: 8, tone: 'var(--jaroo-danger)' },
       { label: '바이오', value: 7.1, barWidth: 7, tone: '#534AB7' },
@@ -637,7 +637,7 @@ export const shareStockCards: ShareCardStock[] = [
     status: '수익 중',
     performanceTone: 'positive',
     wind: '순풍',
-    dot: '#1D9E75',
+    dot: '#7E97BD',
   },
   {
     name: 'KODEX 200',

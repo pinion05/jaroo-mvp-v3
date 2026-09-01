@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import type { JarooDeepScanCommitteeAxis } from '../../packages/contracts/src/deepscan'
 import {
   Activity,
@@ -110,7 +111,7 @@ export type CommitteeTeamDefinition = {
   key: LoadingStageKey
   analystName: string
   description: string
-  avatar: string
+  avatar: LucideIcon
   members: CommitteeTeamMemberDefinition[]
 }
 export type NarrativeCard = {
@@ -118,7 +119,7 @@ export type NarrativeCard = {
   teamKey?: LoadingStageKey
   analystName: string
   description: string
-  avatar: string
+  avatar: string | LucideIcon
   body: string
   tags: Array<{ text: string; tone: NarrativeTone }>
   statusLabel: string
@@ -187,7 +188,7 @@ export const committeeTeams: readonly CommitteeTeamDefinition[] = [
     key: 'fundamentalTeam',
     analystName: '가치·기본 팀',
     description: '가치 분석가 · 성장 전략가 · 재무 감사관',
-    avatar: '🏛️',
+    avatar: Landmark,
     members: [
       { sourceMemberKey: ['valuation', 'valuation'], sourceTitle: ['밸류에이션', '가격/NAV 단서', 'Valuation'], alias: '가치 분석가' },
       { sourceMemberKey: ['profitability', 'growth'], sourceTitle: ['수익성/기본체력', '상품 구조/운용 품질', 'Growth'], alias: '성장 전략가' },
@@ -198,7 +199,7 @@ export const committeeTeams: readonly CommitteeTeamDefinition[] = [
     key: 'marketTeam',
     analystName: '시장·차트 팀',
     description: '차트 마스터 · 수급 추적기 · 모멘텀 스카우터',
-    avatar: '📈',
+    avatar: TrendingUp,
     members: [
       { sourceMemberKey: ['priceLocation', 'momentum'], sourceTitle: ['가격 위치', 'Momentum'], alias: '차트 마스터' },
       { sourceMemberKey: ['avgPriceGap', 'estimate-revision'], sourceTitle: ['평단 격차', 'Revision'], alias: '수급 추적기' },
@@ -209,7 +210,7 @@ export const committeeTeams: readonly CommitteeTeamDefinition[] = [
     key: 'contextTeam',
     analystName: '심리·환경 팀',
     description: '심리 분석AI · 산업 전문가 · 이벤트 스캐너',
-    avatar: '🧠',
+    avatar: Brain,
     members: [
       { sourceMemberKey: ['holdingCompleteness', 'financial-safety'], sourceTitle: ['입력 완성도', 'Safety'], alias: '심리 분석AI' },
       { sourceMemberKey: ['upsideBuffer', 'ownership-flow'], sourceTitle: ['상방 버퍼', '상하방 여지', 'Ownership'], alias: '산업 전문가' },
