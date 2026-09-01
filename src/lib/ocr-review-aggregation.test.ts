@@ -67,5 +67,5 @@ test('aggregateResolvedOcrReviewRows sums profitAmount and derives exact merged 
 
   assert.equal(aggregated?.profitAmount, '-20722')
   assert.equal(aggregated?.evaluationAmount, '305,628')
-  assert.equal(aggregated?.profitRate, '-6.3496%')
+  assert.equal(aggregated?.profitRate, '−6.3%')
 })

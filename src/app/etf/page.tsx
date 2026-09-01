@@ -39,7 +39,7 @@ function scrollEtfContentToTop() {
 function scenarioToneClass(tone: EtfScenarioTone) {
   switch (tone) {
     case 'positive':
-      return 'text-[color:var(--jaroo-success)]'
+      return 'text-[color:var(--jaroo-profit)]'
     case 'warning':
       return 'text-[#854F0B]'
     default:
@@ -50,7 +50,7 @@ function scenarioToneClass(tone: EtfScenarioTone) {
 function valueToneClass(tone: EtfValueTone) {
   switch (tone) {
     case 'positive':
-      return 'text-[color:var(--jaroo-success)]'
+      return 'text-[color:var(--jaroo-profit)]'
     case 'danger':
       return 'text-[color:var(--jaroo-danger)]'
     default:
@@ -154,11 +154,11 @@ export default function EtfPage() {
 
           <button
             type='button'
-            className='flex w-full items-center gap-2 rounded-[18px] bg-[color:var(--jaroo-success-ghost)] px-4 py-3 text-left'
+            className='flex w-full items-center gap-2 rounded-[18px] bg-[color:var(--jaroo-profit-ghost)] px-4 py-3 text-left'
           >
-            <span className='size-2 rounded-full bg-[color:var(--jaroo-success)]' />
-            <span className='flex-1 text-[12px] font-medium text-[color:#3B6D11]'>{etfAnalysis.momentum.label}</span>
-            <Badge className='rounded-[8px] bg-[#C0DD97] px-2 py-0.5 text-[10px] font-medium text-[color:#3B6D11]'>
+            <span className='size-2 rounded-full bg-[color:var(--jaroo-profit)]' />
+            <span className='flex-1 text-[12px] font-medium text-[color:#A8323A]'>{etfAnalysis.momentum.label}</span>
+            <Badge className='rounded-[8px] bg-[#FBE6E7] px-2 py-0.5 text-[10px] font-medium text-[color:#A8323A]'>
               {etfAnalysis.momentum.badge}
             </Badge>
           </button>

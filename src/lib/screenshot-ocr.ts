@@ -257,16 +257,12 @@ export function parseOcrProfitRate(value: string) {
 }
 
 export function formatComputedNumber(value: number) {
-  const roundedValue = Number(value.toFixed(4))
-
-  if (!Number.isFinite(roundedValue)) {
+  // §5-4: 평단·금액·수량은 정수 반올림 (비율은 별도 formatter 사용)
+  if (!Number.isFinite(value)) {
     return ''
   }
 
-  return roundedValue.toLocaleString('ko-KR', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 4,
-  })
+  return Math.round(value).toLocaleString('ko-KR')
 }
 
 export function computeAveragePrice(

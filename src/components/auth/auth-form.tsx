@@ -142,7 +142,7 @@ export function AuthForm({ mode }: AuthFormProps) {
       </div>
 
       {errorMessage ? <p className='rounded-2xl bg-[color:var(--jaroo-danger-ghost)] px-3 py-2 text-xs leading-5 text-[color:var(--jaroo-danger)]' aria-live='polite'>{errorMessage}</p> : null}
-      {infoMessage ? <p className='rounded-2xl bg-[color:var(--jaroo-success-ghost)] px-3 py-2 text-xs leading-5 text-[color:var(--jaroo-success)]' aria-live='polite'>{infoMessage}</p> : null}
+      {infoMessage ? <p className='rounded-2xl bg-[#EEF0F3] px-3 py-2 text-xs leading-5 text-[#0F1419]' aria-live='polite'>{infoMessage}</p> : null}
 
       <button type='button' onClick={handleGoogle} disabled={pending || !termsAgreed} className='flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[#d8e0ea] bg-white text-sm font-semibold text-[color:var(--jaroo-ink)] transition hover:bg-[#f3f5f8] disabled:cursor-not-allowed disabled:opacity-45'>
         <GoogleIcon />

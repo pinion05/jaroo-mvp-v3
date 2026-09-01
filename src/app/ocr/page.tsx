@@ -222,7 +222,7 @@ function OcrResultDesignStyles() {
       .jaroo-ocr-lead b{color:#0F1419;font-weight:600}
       .jaroo-ocr-ok-card{background:#fff;border-radius:14px;border:.5px solid #E8EAEE;box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;margin-bottom:12px}
       .jaroo-ocr-ok-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border:0;background:transparent;width:100%;text-align:left;cursor:pointer}
-      .jaroo-ocr-ok-check{width:22px;height:22px;border-radius:50%;background:#E5F3EB;display:flex;align-items:center;justify-content:center;font-size:12px;color:#1A7340;flex-shrink:0}
+      .jaroo-ocr-ok-check{width:22px;height:22px;border-radius:50%;background:#EEF0F3;display:flex;align-items:center;justify-content:center;font-size:12px;color:#0F1419;flex-shrink:0}
       .jaroo-ocr-ok-title{flex:1;font-size:13.5px;font-weight:600;color:#0F1419}
       .jaroo-ocr-ok-names{font-size:11px;color:#97A0AE;margin-top:2px;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:225px}
       .jaroo-ocr-ok-arrow{font-size:11px;color:#97A0AE;transition:transform .25s}

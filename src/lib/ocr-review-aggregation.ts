@@ -65,7 +65,7 @@ function computeMergedProfitRate(rows: OcrReviewRow[], evaluationAmount: number,
   if (profitAmount !== null) {
     const principal = evaluationAmount - profitAmount
     if (Number.isFinite(principal) && principal > 0) {
-      return `${formatSignedComputedNumber((profitAmount / principal) * 100)}%`
+      return `${profitAmount > 0 ? '+' : ''}${((profitAmount / principal) * 100).toFixed(1).replace('-', '−')}%`
     }
   }
 
@@ -94,7 +94,7 @@ function computeMergedProfitRate(rows: OcrReviewRow[], evaluationAmount: number,
     return ''
   }
 
-  return `${formatComputedNumber(((evaluationAmount / principal) - 1) * 100)}%`
+  return `${(((evaluationAmount / principal) - 1) * 100) > 0 ? '+' : ''}${(((evaluationAmount / principal) - 1) * 100).toFixed(1).replace('-', '−')}%`
 }
 
 function computeWeightedAveragePrice(rows: OcrReviewRow[]) {

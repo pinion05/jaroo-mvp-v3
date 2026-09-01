@@ -78,7 +78,7 @@ test('home summary는 환율이 있으면 혼합 KRW/USD 손익을 KRW로 정규
   assert.equal(summary.badge, '손실')
   assert.equal(summary.badgeTone, 'red')
   assert.equal(summary.totalPnl, -1_300_000)
-  assert.equal(summary.totalPnlText, '-1,300,000원')
+  assert.equal(summary.totalPnlText, '−1,300,000원')
   assert.equal(summary.totalEvaluationText, '13,700,000원')
 })
 

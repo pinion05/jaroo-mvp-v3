@@ -17,7 +17,9 @@ const shareCardSource = readFileSync('src/app/sharecard/page.tsx', 'utf8')
 test('국내 금융 관례용 수익·손실 색상 토큰을 일반 성공·오류 색상과 분리한다', () => {
   assert.match(globals, /--jaroo-profit:\s*#d83a42/i)
   assert.match(globals, /--jaroo-loss:\s*#2b6be6/i)
-  assert.match(globals, /--jaroo-success:\s*#2d7d46/i)
+  // §7: 초록 제거 — 일반 성공은 중립 먹색, 금융 긍정은 profit(빨강) 토큰으로 분리
+  assert.match(globals, /--jaroo-success:\s*#0f1419/i)
+  assert.doesNotMatch(globals, /#(1a9d55|2d7d46|3b6d11|1a7340|1d9e75)/i)
   assert.match(globals, /--jaroo-danger:\s*#c23938/i)
 })
 

@@ -123,7 +123,7 @@ function scenarioWidth(scenario: Pick<JarooDeepScanStrategyScenario, 'probabilit
 }
 
 function toneClasses(tone: ScenarioView['tone']) {
-  if (tone === 'green') return { dot: 'bg-[#1A9D55]', bar: 'bg-[#1A9D55]', text: 'text-[#1A9D55]' }
+  if (tone === 'green') return { dot: 'bg-[#E5484D]', bar: 'bg-[#E5484D]', text: 'text-[#A8323A]' }
   if (tone === 'red') return { dot: 'bg-[#E5484D]', bar: 'bg-[#E5484D]', text: 'text-[#E5484D]' }
   return { dot: 'bg-[#2B6BE6]', bar: 'bg-[#2B6BE6]', text: 'text-[#2B6BE6]' }
 }
@@ -139,7 +139,7 @@ function formatConsensusPrice(value: number | null | undefined) {
 }
 
 function axisStatusTone(status: string) {
-  if (status.includes('우세')) return 'text-[#1A9D55]'
+  if (status.includes('우세')) return 'text-[#A8323A]'
   if (status.includes('경계')) return 'text-[#E5484D]'
   return 'text-[#5A6473]'
 }
