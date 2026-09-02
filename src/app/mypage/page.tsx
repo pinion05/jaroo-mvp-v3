@@ -54,6 +54,21 @@ export default function MyPage() {
     void loadTelegramStatus()
   }, [])
 
+  // 내 종목 관리 개수 — 실데이터 (/api/portfolio)
+  const [holdingsCount, setHoldingsCount] = useState<number | null>(null)
+  useEffect(() => {
+    void (async () => {
+      try {
+        const res = await fetch('/api/portfolio')
+        if (!res.ok) return
+        const payload = (await res.json().catch(() => ({}))) as { rows?: unknown[] }
+        setHoldingsCount(Array.isArray(payload.rows) ? payload.rows.length : 0)
+      } catch {
+        // 개수 조회 실패 시 값 미표시
+      }
+    })()
+  }, [])
+
   // 연결 대기 중 폴링 — 유저가 텔레그램에서 시작을 누르면 webhook 이 연결을 확정한다
   useEffect(() => {
     if (!tgWaiting) return
@@ -156,9 +171,9 @@ export default function MyPage() {
         <PaymentsStatusCards />
 
         {/* 포트폴리오 */}
-        <div className={styles.menuLabel}>포트폴리오<span className={styles.testBadgeInline}>테스트 데이터</span></div>
+        <div className={styles.menuLabel}>포트폴리오</div>
         <div className={styles.menuGroup}>
-          <RowLink href='/mypage/watchlist' icon={<ListChecks className='size-[18px]' />} label='내 종목 관리' value={`${T.watchlistCount}종목`} />
+          <RowLink href='/mypage/watchlist' icon={<ListChecks className='size-[18px]' />} label='내 종목 관리' value={holdingsCount === null ? undefined : `${holdingsCount}종목`} />
           <RowLink href='/screenshot' icon={<Camera className='size-[18px]' />} label='스크린샷으로 종목 추가' />
           <RowLink href='/mypage/history' icon={<History className='size-[18px]' />} label='분석 기록' />
         </div>

@@ -173,6 +173,13 @@
 .down {
   color: var(--jaroo-loss);
 }
+.retryText {
+  margin-left: 6px;
+  font-weight: 600;
+  color: #0f1419;
+  text-decoration: underline;
+}
+
 .mngDel {
   width: 26px;
   height: 26px;
