@@ -231,7 +231,7 @@ function isCanonicalPortfolioSimulationBlock(block: unknown) {
     && hasRequiredNumberFields(block, ['beforeScore', 'afterScore'])
 }
 
-function isCanonicalPayload(payload: unknown): payload is JarooDeepScanPayload {
+export function isCanonicalPayload(payload: unknown): payload is JarooDeepScanPayload {
   const record = asRecord(payload)
   const metadata = asRecord(record?.metadata)
   const inputValidity = asRecord(metadata?.inputValidity)
@@ -306,9 +306,12 @@ export function buildDeepScanCanonicalQuery(targetSession: DeepScanCanonicalTarg
 export async function fetchDeepScanCanonicalPayload(
   targetSession: DeepScanCanonicalTargetSession,
   fetcher: typeof fetch = fetch,
+  options?: { refresh?: boolean },
 ) {
   const query = buildDeepScanCanonicalQuery(targetSession).toString()
-  const response = await fetcher(`/api/deepscan?${query}`, { cache: 'no-store' })
+  // refresh=1 — 스냅샷 캐시를 무시하고 새로 분석한다(과금 발생)
+  const suffix = options?.refresh ? '&refresh=1' : ''
+  const response = await fetcher(`/api/deepscan?${query}${suffix}`, { cache: 'no-store' })
   const payload = await response.json()
 
   if (!response.ok && payload && typeof payload === 'object' && 'error' in payload) {
