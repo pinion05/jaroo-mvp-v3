@@ -47,6 +47,8 @@ export type DeepScanLoadingScreenProps = {
   inlineResults?: ReactNode
   errorNotice?: { title: string; body: string } | null
   onRetry?: () => void
+  /** 결과 화면 최상단 안내(스냅샷 출처 바 등) — 헤더와 본문 사이에 렌더 */
+  headerNotice?: ReactNode
 }
 
 export type CommitteeMemberState = 'done' | 'active' | 'wait'

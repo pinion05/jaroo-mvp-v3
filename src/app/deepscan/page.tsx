@@ -774,16 +774,16 @@ export default function DeepScanPage() {
 
   return (
     <div className='flex h-full w-full justify-center bg-white'>
-      {resultsReady && payload && snapshotCacheInfo?.hit ? (
-        <SnapshotProvenanceBar
-          scannedAt={snapshotCacheInfo.scannedAt}
-          savedCredits={snapshotCacheInfo.savedCredits}
-          driftPct={snapshotPriceDriftPct ?? null}
-          onRefresh={handleExplicitRefresh}
-        />
-      ) : null}
       <DeepScanLoadingScreen
         className='w-full overflow-hidden'
+        headerNotice={resultsReady && payload && snapshotCacheInfo?.hit ? (
+          <SnapshotProvenanceBar
+            scannedAt={snapshotCacheInfo.scannedAt}
+            savedCredits={snapshotCacheInfo.savedCredits}
+            driftPct={snapshotPriceDriftPct ?? null}
+            onRefresh={handleExplicitRefresh}
+          />
+        ) : null}
         name={requestSeed.holding.name}
         introMention={introMention}
         identifier={identifier}

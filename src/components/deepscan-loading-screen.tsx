@@ -102,6 +102,7 @@ export function DeepScanLoadingScreen({
   inlineResults,
   errorNotice,
   onRetry,
+  headerNotice,
 }: DeepScanLoadingScreenProps) {
   const isError = Boolean(errorNotice)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
@@ -320,6 +321,8 @@ export function DeepScanLoadingScreen({
           <span className={styles.headerProgressTime}>{isError ? '실패' : resultsReadyForDisplay ? '완료' : formatElapsedTime(elapsedSeconds)}</span>
         </div>
       </header>
+
+      {headerNotice ? <div className={cn(styles.body, styles.headerNoticeSlot)}>{headerNotice}</div> : null}
 
       <div className={styles.body}>
         {isError ? (
