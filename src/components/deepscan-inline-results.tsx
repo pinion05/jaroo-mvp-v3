@@ -17,12 +17,6 @@ type DeepScanInlineResultsProps = {
   payload: JarooDeepScanPayload
   requestSeed?: DeepScanCanonicalTargetSession | null
   target?: DeepScanTargetInput | null
-  /** 스냅샷 캐시 표식(metadata.deepScanCache) — 히트 시 출처 바를 띄운다 */
-  snapshotCacheInfo?: { hit: boolean; scannedAt: string; savedCredits?: number } | null
-  /** 무료 시세로 계산한 가격 드리프트(%, 부호 유지) */
-  snapshotPriceDriftPct?: number | null
-  /** 명시적 재분석 — 캐시 무시 + 크레딧 사용 확인 후 새 스캔 */
-  onExplicitRefresh?: () => void
 }
 
 type ScenarioView = {
@@ -174,9 +168,6 @@ export function DeepScanInlineResults({
   payload,
   requestSeed,
   target,
-  snapshotCacheInfo,
-  snapshotPriceDriftPct,
-  onExplicitRefresh,
 }: DeepScanInlineResultsProps) {
   const exchangeProduct = isExchangeProductPayload(payload)
   const name = firstNonEmpty(payload.input.instrument.name, target?.name, requestSeed?.holding.name) ?? '선택 종목'
@@ -211,14 +202,6 @@ export function DeepScanInlineResults({
 
   return (
     <section className='space-y-3 pb-2' aria-label='딥스캔 v7 실제 결과'>
-      {snapshotCacheInfo?.hit ? (
-        <SnapshotProvenanceBar
-          scannedAt={snapshotCacheInfo.scannedAt}
-          savedCredits={snapshotCacheInfo.savedCredits}
-          driftPct={snapshotPriceDriftPct ?? null}
-          onRefresh={onExplicitRefresh}
-        />
-      ) : null}
       <article className='overflow-hidden rounded-[16px] border border-[#E8EAEE] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]' aria-label='AI 종합 결론'>
         <div className='flex items-center gap-3 border-b border-[#EFF1F4] px-4 py-4'>
           <div className='flex size-9 items-center justify-center rounded-[10px] bg-[#0F1419] text-[12px] font-black text-white'>AI</div>
@@ -371,7 +354,7 @@ function formatSnapshotAge(scannedAt: string): string {
   return `${Math.round(hours / 24)}일 전`
 }
 
-function SnapshotProvenanceBar({
+export function SnapshotProvenanceBar({
   scannedAt,
   savedCredits,
   driftPct,

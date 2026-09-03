@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LineChart } from 'lucide-react'
 import { DeepScanInlineResults } from '@/components/deepscan-inline-results'
 import { DeepScanLoadingScreen, type LoadingStageKey } from '@/components/deepscan-loading-screen'
+import { SnapshotProvenanceBar } from '@/components/deepscan-inline-results'
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import { computePriceDriftPct, extractSnapshotPriceBasis } from '@/lib/deepscan-snapshot-policy'
@@ -773,6 +774,14 @@ export default function DeepScanPage() {
 
   return (
     <div className='flex h-full w-full justify-center bg-white'>
+      {resultsReady && payload && snapshotCacheInfo?.hit ? (
+        <SnapshotProvenanceBar
+          scannedAt={snapshotCacheInfo.scannedAt}
+          savedCredits={snapshotCacheInfo.savedCredits}
+          driftPct={snapshotPriceDriftPct ?? null}
+          onRefresh={handleExplicitRefresh}
+        />
+      ) : null}
       <DeepScanLoadingScreen
         className='w-full overflow-hidden'
         name={requestSeed.holding.name}
@@ -802,9 +811,6 @@ export default function DeepScanPage() {
             payload={payload}
             requestSeed={requestSeed}
             target={target}
-            snapshotCacheInfo={snapshotCacheInfo}
-            snapshotPriceDriftPct={snapshotPriceDriftPct}
-            onExplicitRefresh={handleExplicitRefresh}
           /> : null}
         errorNotice={fetchState === 'error' ? requestErrorNotice : null}
         onRetry={handleRetry}
