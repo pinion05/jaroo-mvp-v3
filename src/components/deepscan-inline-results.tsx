@@ -1,5 +1,6 @@
 'use client'
-import { useState } from 'react'
+import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import type {
@@ -293,16 +294,92 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
           <br />
           매번 확인하지 않으셔도, <b className='font-semibold text-white'>바뀌는 순간에만</b> 알려드릴게요.
         </p>
-        {/* 워치 미구현 — 표시 전용 버튼(지시사항 워치 전환 🟡). 기능 연결 전까지 동작 없음. */}
-        <button
-          type='button'
-          className='mt-3 w-full rounded-[11px] bg-white px-3 py-[13px] text-[13.5px] font-bold text-[#0F1419]'
-        >
-          지켜보기 시작
-        </button>
+        <WatchToggleButton
+          code={firstNonEmpty(payload.input.instrument.code, target?.code, target?.ticker) ?? ''}
+          name={name}
+          market={firstNonEmpty(payload.input.instrument.market, target?.market) ?? undefined}
+        />
         <p className='mt-[9px] text-center text-[10.5px] text-white/40'>며칠간 무료 · 언제든 그만둘 수 있어요</p>
       </article>
       <p className='px-2 pb-2 text-center text-[10px] leading-4 text-[#97A0AE]'>AI 분석은 데이터 기반 참고 자료예요. 투자 권유나 수익 보장이 아닙니다.</p>
     </section>
+  )
+}
+
+
+type WatchToggleProps = { code: string; name: string; market?: string }
+
+// '지켜보기 시작/그만두기' 토글 — 마운트 시 내 워치 목록을 조회해 상태를 표시한다.
+function WatchToggleButton({ code, name, market }: WatchToggleProps) {
+  const [watching, setWatching] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [pending, setPending] = useState(false)
+
+  useEffect(() => {
+    if (!code) return
+    let active = true
+    void (async () => {
+      try {
+        const res = await fetch('/api/watch')
+        if (!res.ok) return
+        const payload = (await res.json().catch(() => ({}))) as { rows?: { code: string }[] }
+        if (!active) return
+        setWatching((payload.rows ?? []).some((row) => row.code === code))
+      } catch {
+        // 조회 실패 시 미감시 상태로 시작 (등록 시 서버가 진실을 판정)
+      } finally {
+        if (active) setLoaded(true)
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [code])
+
+  if (!code) return null
+
+  const toggle = async () => {
+    if (pending) return
+    if (watching && !window.confirm(`${name} 지켜보기를 그만둘까요?`)) return
+    setPending(true)
+    try {
+      const res = watching
+        ? await fetch(`/api/watch?code=${encodeURIComponent(code)}`, { method: 'DELETE' })
+        : await fetch('/api/watch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, name, market }),
+          })
+      if (res.ok) {
+        setWatching(!watching)
+      } else {
+        const payload = (await res.json().catch(() => ({}))) as { error?: string }
+        window.alert(payload.error ?? '일시적인 문제예요. 잠시 후 다시 시도해주세요.')
+      }
+    } catch {
+      window.alert('네트워크 상태를 확인한 뒤 다시 시도해주세요.')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <button
+      type='button'
+      onClick={() => void toggle()}
+      disabled={pending || !loaded}
+      className={`mt-3 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-[11px] px-3 py-[13px] text-[13.5px] font-bold transition-colors active:scale-[0.99] disabled:cursor-default disabled:opacity-60 ${
+        watching ? 'bg-white/10 text-white/85' : 'bg-white text-[#0F1419]'
+      }`}
+    >
+      {pending ? (
+        <Loader2 className='size-4 animate-spin' aria-hidden />
+      ) : watching ? (
+        <EyeOff className='size-4' aria-hidden />
+      ) : (
+        <Eye className='size-4' aria-hidden />
+      )}
+      {pending ? '잠시만 기다려주세요…' : watching ? '지켜보는 중입니다 · 그만두기' : '지켜보기 시작'}
+    </button>
   )
 }
