@@ -174,6 +174,10 @@ export type JarooDeepScanHeroBlock = DeepScanBlockMeta & {
   score: number
   scoreLabel: string
   scoreDelta: string
+  /** 근거 요약(구조화) — 구형 페이로드에는 없어 화면은 폴백 표시한다 */
+  evidenceFacts?: string[]
+  /** 주의 문구(구조화, '주의:' 접두 없음) */
+  evidenceCautions?: string[]
 }
 
 export type JarooDeepScanCommitteeBlock = DeepScanBlockMeta & {

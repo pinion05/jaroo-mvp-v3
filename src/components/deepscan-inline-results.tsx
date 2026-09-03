@@ -1,5 +1,5 @@
 'use client'
-import { Eye, EyeOff, Loader2 } from 'lucide-react'
+import { Check, Eye, EyeOff, Loader2, TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 
@@ -177,6 +177,13 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
     ? payload.hero.body
     : payload.hero.fallback?.label || payload.hero.error?.message || `${name} 분석 결과를 일부만 표시하고 있어요.`
   const summary = exchangeProduct ? sanitizeExchangeProductCopy(rawSummary) : rawSummary
+  // 구조화된 근거(신형 payload) — 없으면 플레인 본문 폴백
+  const heroEvidence = Array.isArray(payload.hero.evidenceFacts) && payload.hero.evidenceFacts.length > 0
+    ? {
+        facts: payload.hero.evidenceFacts.slice(0, 8),
+        cautions: (Array.isArray(payload.hero.evidenceCautions) ? payload.hero.evidenceCautions : []).slice(0, 3),
+      }
+    : null
   const facts = exchangeProduct
     ? [
         ['ETF 기준', payload.strategy.targetPriceText || 'NAV·구성 확인'],
@@ -201,7 +208,31 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
           <div className='mx-auto mt-3 flex w-[122px] gap-1'>{Array.from({ length: 5 }, (_, index) => <span key={index} className={cn('h-[6px] flex-1 rounded-full', index < strength.active ? 'bg-[#E5484D]' : 'bg-[#E8EAEE]')} />)}</div>
           <p className='mt-2 text-[11px] text-[#5A6473]'>{strength.helper}</p>
         </div>
-        <p className='border-t border-[#EFF1F4] px-4 py-4 text-[13px] leading-6 text-[#0F1419]'>{summary}</p>
+        {heroEvidence ? (
+          <div className='border-t border-[#EFF1F4] px-4 py-4'>
+            <div className='text-[10px] text-[#97A0AE]'>확인한 근거</div>
+            <div className='mt-2 flex flex-wrap gap-1.5'>
+              {heroEvidence.facts.map((fact) => (
+                <span key={fact} className='inline-flex items-center gap-1 rounded-full border border-[#E8EAEE] bg-[#F7F8FA] px-2.5 py-1 text-[12px] leading-4 text-[#0F1419]'>
+                  <Check className='size-3.5 shrink-0 text-[#5A6473]' aria-hidden />
+                  {fact}
+                </span>
+              ))}
+            </div>
+            {heroEvidence.cautions.length > 0 ? (
+              <div className='mt-3 space-y-1.5'>
+                {heroEvidence.cautions.map((caution) => (
+                  <div key={caution} className='flex items-start gap-1.5 rounded-[8px] bg-[#FAEEDA] px-2.5 py-1.5 text-[12px] leading-4 text-[#854F0B]'>
+                    <TriangleAlert className='mt-px size-3.5 shrink-0' aria-hidden />
+                    <span>{caution}</span>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : (
+          <p className='border-t border-[#EFF1F4] px-4 py-4 text-[13px] leading-6 text-[#0F1419]'>{summary}</p>
+        )}
         <div className='grid grid-cols-3 border-t border-[#EFF1F4]'>
           {facts.map(([label, value]) => (
             <div key={label} className='border-r border-[#EFF1F4] px-3 py-3 last:border-r-0'>

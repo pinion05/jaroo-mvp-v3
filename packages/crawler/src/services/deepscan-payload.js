@@ -2484,12 +2484,14 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
       instrumentName: evidence.instrument?.name ?? null,
     });
     const heroBodyParts = [...evidence.topFacts];
+    const heroCautions = [...evidence.topRisks.slice(0, 2)];
 
-    for (const risk of evidence.topRisks.slice(0, 2)) {
+    for (const risk of heroCautions) {
       heroBodyParts.push(`주의: ${risk}`);
     }
     if (evidence.pageCoverage.availableCount === 0 && !heroBodyParts.some((part) => part.includes('국내 리포트 페이지 근거 없음'))) {
       heroBodyParts.push('주의: 국내 리포트 페이지 근거 없음');
+      heroCautions.push('국내 리포트 페이지 근거 없음');
     }
     if (heroBodyParts.length === 0 && evidence.missingSources.length > 0) {
       heroBodyParts.push(`누락 소스: ${evidence.missingSources.join(', ')}`);
@@ -2509,6 +2511,12 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
         : createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'hero', combinedSourceRefs), fallback: blockFallback })),
       headline: llmCommitteeBlocked || llmCommitteePartialError ? `${input.instrument.name} 국내 DeepScan 위원회 재시도 필요` : `${input.instrument.name} 국내 DeepScan ${scored.hero.score}점`,
       body: llmCommitteeBlocked || llmCommitteePartialError ? '일부 국내 위원이 LLM 응답 확보에 실패해 축/종합 점수를 보류했습니다. 성공한 위원 판단과 실패 슬롯을 함께 확인하세요.' : heroBodyParts.join(' · '),
+      ...(llmCommitteeBlocked || llmCommitteePartialError
+        ? {}
+        : {
+            evidenceFacts: [...evidence.topFacts],
+            evidenceCautions: [...heroCautions],
+          }),
       statusText: llmCommitteeBlocked || llmCommitteePartialError ? '부분 오류' : scored.hero.statusText,
       score: llmCommitteeBlocked || llmCommitteePartialError ? 0 : scored.hero.score,
       scoreLabel: llmCommitteeBlocked || llmCommitteePartialError ? 'N/A' : `${scored.hero.scoreLabel} · ${scored.hero.score} / 100`,
