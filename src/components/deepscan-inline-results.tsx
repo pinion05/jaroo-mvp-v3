@@ -1,5 +1,5 @@
 'use client'
-import { Check, Eye, EyeOff, Loader2, TriangleAlert } from 'lucide-react'
+import { Check, Eye, EyeOff, History, Loader2, TriangleAlert } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 
@@ -17,6 +17,12 @@ type DeepScanInlineResultsProps = {
   payload: JarooDeepScanPayload
   requestSeed?: DeepScanCanonicalTargetSession | null
   target?: DeepScanTargetInput | null
+  /** 스냅샷 캐시 표식(metadata.deepScanCache) — 히트 시 출처 바를 띄운다 */
+  snapshotCacheInfo?: { hit: boolean; scannedAt: string; savedCredits?: number } | null
+  /** 무료 시세로 계산한 가격 드리프트(%, 부호 유지) */
+  snapshotPriceDriftPct?: number | null
+  /** 명시적 재분석 — 캐시 무시 + 크레딧 사용 확인 후 새 스캔 */
+  onExplicitRefresh?: () => void
 }
 
 type ScenarioView = {
@@ -164,7 +170,14 @@ function DetailSection({ n, title, meta, children }: DetailSectionProps) {
     </section>
   )
 }
-export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScanInlineResultsProps) {
+export function DeepScanInlineResults({
+  payload,
+  requestSeed,
+  target,
+  snapshotCacheInfo,
+  snapshotPriceDriftPct,
+  onExplicitRefresh,
+}: DeepScanInlineResultsProps) {
   const exchangeProduct = isExchangeProductPayload(payload)
   const name = firstNonEmpty(payload.input.instrument.name, target?.name, requestSeed?.holding.name) ?? '선택 종목'
   const strength = buildStrength(payload)
@@ -198,6 +211,14 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
 
   return (
     <section className='space-y-3 pb-2' aria-label='딥스캔 v7 실제 결과'>
+      {snapshotCacheInfo?.hit ? (
+        <SnapshotProvenanceBar
+          scannedAt={snapshotCacheInfo.scannedAt}
+          savedCredits={snapshotCacheInfo.savedCredits}
+          driftPct={snapshotPriceDriftPct ?? null}
+          onRefresh={onExplicitRefresh}
+        />
+      ) : null}
       <article className='overflow-hidden rounded-[16px] border border-[#E8EAEE] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]' aria-label='AI 종합 결론'>
         <div className='flex items-center gap-3 border-b border-[#EFF1F4] px-4 py-4'>
           <div className='flex size-9 items-center justify-center rounded-[10px] bg-[#0F1419] text-[12px] font-black text-white'>AI</div>
@@ -337,6 +358,65 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
   )
 }
 
+
+
+/** 스냅샷 출처 바 — 캐시 히트 사실·절약 크레딧·가격 드리프트·명시적 재분석 진입점 */
+function formatSnapshotAge(scannedAt: string): string {
+  const scannedMs = Date.parse(scannedAt)
+  if (!Number.isFinite(scannedMs)) return '최근'
+  const minutes = Math.max(0, Math.round((Date.now() - scannedMs) / 60000))
+  if (minutes < 60) return `${minutes}분 전`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours}시간 전`
+  return `${Math.round(hours / 24)}일 전`
+}
+
+function SnapshotProvenanceBar({
+  scannedAt,
+  savedCredits,
+  driftPct,
+  onRefresh,
+}: {
+  scannedAt: string
+  savedCredits?: number
+  driftPct: number | null
+  onRefresh?: () => void
+}) {
+  const driftAlert = driftPct != null && Math.abs(driftPct) >= 5
+  const driftText =
+    driftPct == null ? '' : `${driftPct > 0 ? '+' : ''}${driftPct.toFixed(1)}%`
+  return (
+    <aside
+      className='rounded-[10px] border border-[#E8EAEE] bg-[#F7F8FA] px-3 py-2.5'
+      aria-label='최근 분석 결과 안내'
+    >
+      <div className='flex items-center gap-2'>
+        <History className='size-4 shrink-0 text-[#5A6473]' aria-hidden />
+        <div className='min-w-0 flex-1 text-[11.5px] leading-4 text-[#5A6473]'>
+          {formatSnapshotAge(scannedAt)}에 분석한 결과를 그대로 보여드려요
+          {typeof savedCredits === 'number' && savedCredits > 0 ? (
+            <span className='font-semibold text-[#0F1419]'> · {savedCredits}크레딧을 아꼈어요</span>
+          ) : null}
+        </div>
+        {onRefresh ? (
+          <button
+            type='button'
+            onClick={onRefresh}
+            className='shrink-0 cursor-pointer rounded-full border border-[#D5D8DD] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#0F1419] transition-colors hover:bg-[#F0F1F3] active:scale-[0.98]'
+          >
+            다시 분석하기
+          </button>
+        ) : null}
+      </div>
+      {driftAlert ? (
+        <div className='mt-2 flex items-start gap-1.5 rounded-[8px] bg-[#FAEEDA] px-2.5 py-1.5 text-[12px] leading-4 text-[#854F0B]'>
+          <TriangleAlert className='mt-px size-3.5 shrink-0' aria-hidden />
+          <span>분석 이후 가격이 {driftText} 움직였어요 — 다시 분석하면 최신 상태가 반영돼요.</span>
+        </div>
+      ) : null}
+    </aside>
+  )
+}
 
 type WatchToggleProps = { code: string; name: string; market?: string }
 

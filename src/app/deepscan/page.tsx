@@ -9,6 +9,7 @@ import { DeepScanInlineResults } from '@/components/deepscan-inline-results'
 import { DeepScanLoadingScreen, type LoadingStageKey } from '@/components/deepscan-loading-screen'
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
+import { computePriceDriftPct, extractSnapshotPriceBasis } from '@/lib/deepscan-snapshot-policy'
 import { type LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
 import { fetchLoadingProxyJson } from '@/lib/loading-fetch-retry'
 import { resolveDeepScanPageCacheState } from '@/lib/deepscan-page-projection'
@@ -70,6 +71,9 @@ export default function DeepScanPage() {
   const activeTargetKey = useDeepScanStore((state) => state.activeTargetKey)
   const lastSuccessful = useDeepScanStore((state) => state.lastSuccessful)
   const startRequest = useDeepScanStore((state) => state.startRequest)
+  // 명시적 재분석(스냅샷 캐시 무시) — 에포크 변경이 fetch effect를 재실행한다
+  const [refreshEpoch, setRefreshEpoch] = useState(0)
+  const pendingRefreshRef = useRef(false)
   const finishSuccess = useDeepScanStore((state) => state.finishSuccess)
   const updateActivePayload = useDeepScanStore((state) => state.updateActivePayload)
   const finishError = useDeepScanStore((state) => state.finishError)
@@ -472,7 +476,9 @@ export default function DeepScanPage() {
         const nextPayload = await fetchDeepScanCanonicalPayload(
           requestSeed,
           (input, init) => fetch(input, { ...init, signal: controller.signal }),
+          { refresh: pendingRefreshRef.current },
         )
+        pendingRefreshRef.current = false
 
         if (controller.signal.aborted || targetKeyRef.current !== requestedTargetKey) {
           return
@@ -509,7 +515,7 @@ export default function DeepScanPage() {
         abandonInFlight()
       }
     }
-  }, [abandonInFlight, appendArrivedLoadingStageKeys, finishError, finishSuccess, markDeepScanLoadingSuccess, requestSeed, requestStatus, targetKey])
+  }, [abandonInFlight, appendArrivedLoadingStageKeys, finishError, finishSuccess, markDeepScanLoadingSuccess, refreshEpoch, requestSeed, requestStatus, targetKey])
 
   useEffect(() => {
     const llmCommittee = payload?.metadata.llmCommittee
@@ -606,6 +612,15 @@ export default function DeepScanPage() {
     const container = document.querySelector<HTMLElement>("[data-slot='jaroo-shell-main']")
     container?.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  // 명시적 재분석 — 스냅샷 캐시를 무시하고 새 스캔(크레딧 사용)을 돈다
+  const handleExplicitRefresh = useCallback(() => {
+    if (requestStatus === 'loading') return
+    if (!window.confirm('다시 분석할까요? 딥스캔 크레딧이 사용돼요.')) return
+    pendingRefreshRef.current = true
+    setRefreshEpoch((epoch) => epoch + 1)
+    startRequest()
+  }, [requestStatus, startRequest])
 
   const handleRetry = useCallback(() => {
     setLoadingSequence(createDeepScanLoadingSequence(targetKey))
@@ -732,6 +747,14 @@ export default function DeepScanPage() {
     targetCurrentPrice: target?.currentPrice,
     briefingCurrentPrice: activeLoadingBriefingSnapshot?.quote?.currentPrice,
   })
+
+  // 스냅샷 캐시 표식 + 가격 드리프트 프로브 — 무료 시세로 '재분석이 필요한 정도'를 감지한다
+  const snapshotCacheInfo = payload?.metadata.deepScanCache ?? null
+  const snapshotPriceBasis = extractSnapshotPriceBasis(payload)
+  const snapshotPriceDriftPct =
+    snapshotCacheInfo?.hit && snapshotPriceBasis != null && loadingCurrentPrice != null
+      ? computePriceDriftPct(snapshotPriceBasis, loadingCurrentPrice)
+      : null
   const loadingCurrentPriceCurrency = target?.currentPriceCurrency
     ?? normalizeQuoteCurrency(activeLoadingBriefingSnapshot?.quote?.currency ?? undefined)
     ?? activeLoadingQuickQuote?.currentPriceCurrency
@@ -775,7 +798,14 @@ export default function DeepScanPage() {
         visibleStageCount={visibleStageCount}
         arrivedStageKeys={arrivedStageKeys}
         resultsReady={resultsReady}
-        inlineResults={resultsReady && payload ? <DeepScanInlineResults payload={payload} requestSeed={requestSeed} target={target} /> : null}
+        inlineResults={resultsReady && payload ? <DeepScanInlineResults
+            payload={payload}
+            requestSeed={requestSeed}
+            target={target}
+            snapshotCacheInfo={snapshotCacheInfo}
+            snapshotPriceDriftPct={snapshotPriceDriftPct}
+            onExplicitRefresh={handleExplicitRefresh}
+          /> : null}
         errorNotice={fetchState === 'error' ? requestErrorNotice : null}
         onRetry={handleRetry}
         backHref='/home'

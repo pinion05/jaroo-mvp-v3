@@ -7,6 +7,15 @@ import {
 } from '@/lib/deepscan-runtime/build-payload'
 import { recordDeepScanPayloadPerf } from '@/lib/deepscan-runtime/perf-trace'
 import { hasTossServerConfig } from '@/lib/payments/config'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import {
+  buildSnapshotCacheAnnotatedPayload,
+  extractSnapshotPriceBasis,
+  isSnapshotFresh,
+  resolveDeepScanSnapshotKey,
+} from '@/lib/deepscan-snapshot-policy'
+import { lookupDeepScanSnapshot, saveDeepScanSnapshot } from '@/lib/deepscan-snapshot-store'
+import type { JarooDeepScanPayload } from '../../../../packages/contracts/src/deepscan'
 
 export const runtime = 'nodejs'
 
@@ -18,12 +27,16 @@ export async function createDeepScanCanonicalResponse(
   searchParams: URLSearchParams,
   builder: typeof buildDeepScanPayloadFromSearchParams = buildDeepScanPayloadFromSearchParams,
   charge?: { userId: string; amount: number; ref?: string | null } | null,
+  onPayload?: (payload: JarooDeepScanPayload) => void | Promise<void>,
 ) {
   const startedAt = new Date()
 
   try {
     const payload = await builder(searchParams)
     void recordDeepScanPayloadPerf(payload, { route: 'api/deepscan', startedAt }).catch(() => undefined)
+    if (onPayload) {
+      await onPayload(payload)
+    }
     return NextResponse.json(payload)
   } catch (error) {
     const status = error instanceof CrawlerDeepScanRequestError ? error.status : 400
@@ -98,6 +111,36 @@ export async function GET(request: NextRequest) {
     return createDeepScanCanonicalResponse(searchParams)
   }
 
+  // 스냅샷 캐시 — 기본 경로(재열람)는 최근 결과를 즉시 돌려준다(과금 0·대기 0).
+  // 갱신은 명시적 refresh=1(다시 분석) 요청만 허용한다.
+  const refreshRequested = searchParams.get('refresh') === '1'
+  const snapshotKey = resolveDeepScanSnapshotKey({
+    code: searchParams.get('code'),
+    ticker: searchParams.get('ticker'),
+  })
+  if (!refreshRequested && snapshotKey) {
+    try {
+      const supabase = await createSupabaseServerClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user) {
+        const snapshot = await lookupDeepScanSnapshot(user.id, snapshotKey)
+        if (snapshot && isSnapshotFresh(snapshot.scannedAt)) {
+          return NextResponse.json(
+            buildSnapshotCacheAnnotatedPayload(snapshot.payload, {
+              scannedAt: snapshot.scannedAt,
+              chargedCredits: snapshot.chargedCredits,
+            }),
+          )
+        }
+      }
+    } catch (cacheError) {
+      // 캐시 조회 실패는 정상 스캔 경로를 막지 않는다
+      console.error('[deepscan-snapshot] lookup failed — 정상 경로로 진행', cacheError)
+    }
+  }
+
   const { authorizeDeepScanRun } = await import('@/lib/payments/deepscan-entitlement')
   const gate = await authorizeDeepScanRun(searchParams.get('code') ?? searchParams.get('ticker') ?? undefined)
   if (gate.status === 'auth-required') {
@@ -129,5 +172,18 @@ export async function GET(request: NextRequest) {
   const charge = gate.status === 'allowed' && gate.charged > 0 && gate.userId
     ? { userId: gate.userId, amount: gate.charged, ref: targetRef }
     : null
-  return createDeepScanCanonicalResponse(searchParams, undefined, charge)
+  // 스캔 성공 시 (user_id, 종목) 스냅샷 저장 — 저장 실패는 응답에 영향 없음
+  const snapshotUserId = gate.userId ?? null
+  const onSnapshotReady = (payload: JarooDeepScanPayload): void => {
+    if (!snapshotUserId || !snapshotKey) return
+    void saveDeepScanSnapshot({
+      userId: snapshotUserId,
+      targetKey: snapshotKey,
+      market: searchParams.get('market'),
+      payload,
+      priceBasis: extractSnapshotPriceBasis(payload),
+      chargedCredits: gate.status === 'allowed' ? gate.charged : 0,
+    })
+  }
+  return createDeepScanCanonicalResponse(searchParams, undefined, charge, onSnapshotReady)
 }

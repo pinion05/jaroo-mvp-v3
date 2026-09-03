@@ -259,6 +259,13 @@ export type JarooDeepScanMetadata = {
   degraded: boolean
   errorCode?: string
   debugId: string
+  /** 스냅샷 캐시 정보 — 명시적 히트/미스를 화면에 알린다 */
+  deepScanCache?: {
+    hit: boolean
+    scannedAt: string
+    /** 캐시 재사용으로 아낀 크레딧(기록된 값이 있을 때만) */
+    savedCredits?: number
+  }
   inputValidity: JarooDeepScanInputValidity
   sourceRefs: DeepScanSourceRef[]
   blockStatus: JarooDeepScanBlockStatus
