@@ -107,17 +107,17 @@ export async function createDeepScanCanonicalResponse(
 // 꺼진 환경(로컬 dev·테스트 러너)에서는 아예 로드하지 않는다.
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
-  if (!hasTossServerConfig()) {
-    return createDeepScanCanonicalResponse(searchParams)
-  }
 
   // 스냅샷 캐시 — 기본 경로(재열람)는 최근 결과를 즉시 돌려준다(과금 0·대기 0).
   // 갱신은 명시적 refresh=1(다시 분석) 요청만 허용한다.
+  // ⚠️ 과금 시스템(Toss) 설정 여부와 무관하게 가장 먼저 판정한다 —
+  //    미과금 환경(운영 체험 기간 등)에서 캐시가 죽는 결함(이슈: 캐시히트 안 됨)의 수정.
   const refreshRequested = searchParams.get('refresh') === '1'
   const snapshotKey = resolveDeepScanSnapshotKey({
     code: searchParams.get('code'),
     ticker: searchParams.get('ticker'),
   })
+  let sessionUserId: string | null = null
   if (!refreshRequested && snapshotKey) {
     try {
       const supabase = await createSupabaseServerClient()
@@ -125,6 +125,7 @@ export async function GET(request: NextRequest) {
         data: { user },
       } = await supabase.auth.getUser()
       if (user) {
+        sessionUserId = user.id
         const snapshot = await lookupDeepScanSnapshot(user.id, snapshotKey)
         if (snapshot && isSnapshotFresh(snapshot.scannedAt)) {
           return NextResponse.json(
@@ -139,6 +140,19 @@ export async function GET(request: NextRequest) {
       // 캐시 조회 실패는 정상 스캔 경로를 막지 않는다
       console.error('[deepscan-snapshot] lookup failed — 정상 경로로 진행', cacheError)
     }
+  }
+
+  // 미과금 환경(결제 연동 꺼짐) — 무과금 직행. 세션 유저의 스냅샷은 여기서도
+  // 저장한다(chargedCredits=0). 다음 재열람이 히트되어 체험 기간 UX·비용 모두 절감.
+  if (!hasTossServerConfig()) {
+    const unpaidUserId = sessionUserId ?? (await resolveDeepScanSessionUserId())
+    const unpaidSnapshotSaver = makeSnapshotSaver(unpaidUserId, 0)
+    return createDeepScanCanonicalResponse(
+      searchParams,
+      undefined,
+      null,
+      unpaidSnapshotSaver ? (payload) => unpaidSnapshotSaver(payload, snapshotKey, searchParams) : undefined,
+    )
   }
 
   const { authorizeDeepScanRun } = await import('@/lib/payments/deepscan-entitlement')
@@ -173,17 +187,40 @@ export async function GET(request: NextRequest) {
     ? { userId: gate.userId, amount: gate.charged, ref: targetRef }
     : null
   // 스캔 성공 시 (user_id, 종목) 스냅샷 저장 — 저장 실패는 응답에 영향 없음
-  const snapshotUserId = gate.userId ?? null
-  const onSnapshotReady = (payload: JarooDeepScanPayload): void => {
-    if (!snapshotUserId || !snapshotKey) return
+  const paidSnapshotSaver = makeSnapshotSaver(gate.userId ?? null, gate.status === 'allowed' ? gate.charged : 0)
+  return createDeepScanCanonicalResponse(
+    searchParams,
+    undefined,
+    charge,
+    paidSnapshotSaver ? (payload) => paidSnapshotSaver(payload, snapshotKey, searchParams) : undefined,
+  )
+}
+
+/** 세션 유저 id — 게이트 밖 경로(무과금 직행)에서 스냅샷 귀속용 */
+async function resolveDeepScanSessionUserId(): Promise<string | null> {
+  try {
+    const supabase = await createSupabaseServerClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    return user?.id ?? null
+  } catch {
+    return null
+  }
+}
+
+/** 스냅샷 저장 클로저 — 유저가 없으면(게스트 등) 저장하지 않는다 */
+function makeSnapshotSaver(userId: string | null, chargedCredits: number) {
+  if (!userId) return null
+  return (payload: JarooDeepScanPayload, snapshotKey: string | null, searchParams: URLSearchParams): void => {
+    if (!snapshotKey) return
     void saveDeepScanSnapshot({
-      userId: snapshotUserId,
+      userId,
       targetKey: snapshotKey,
       market: searchParams.get('market'),
       payload,
       priceBasis: extractSnapshotPriceBasis(payload),
-      chargedCredits: gate.status === 'allowed' ? gate.charged : 0,
+      chargedCredits,
     })
   }
-  return createDeepScanCanonicalResponse(searchParams, undefined, charge, onSnapshotReady)
 }
