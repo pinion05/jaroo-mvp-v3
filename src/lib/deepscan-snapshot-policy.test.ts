@@ -2,13 +2,14 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
+  buildSnapshotCacheAnnotatedPayload,
   computePriceDriftPct,
   extractSnapshotPriceBasis,
   isSnapshotFresh,
   resolveDeepScanSnapshotKey,
   DEEPSCAN_PRICE_DRIFT_ALERT_PCT,
   DEEPSCAN_SNAPSHOT_TTL_MS,
-} from './deepscan-snapshot-store'
+} from './deepscan-snapshot-policy'
 
 test('resolveDeepScanSnapshotKey — KR 코드 우선, US 티커 대문자 정규화', () => {
   assert.equal(resolveDeepScanSnapshotKey({ code: '005930' }), '005930')
@@ -50,4 +51,18 @@ test('드리프트 임계값은 5% — 프로브 배너와 계약 일치', () =>
   assert.equal(DEEPSCAN_PRICE_DRIFT_ALERT_PCT, 5)
   assert.equal(Math.abs(computePriceDriftPct(100, 104.9)!) < DEEPSCAN_PRICE_DRIFT_ALERT_PCT, true)
   assert.equal(Math.abs(computePriceDriftPct(100, 105.1)!) >= DEEPSCAN_PRICE_DRIFT_ALERT_PCT, true)
+})
+
+test('buildSnapshotCacheAnnotatedPayload — 히트 표식을 얹되 원본은 오염하지 않는다', () => {
+  const original = {
+    strategy: { currentPriceText: '250,500원' },
+    metadata: { generatedAt: '2026-09-04T00:00:00Z', version: 'test' },
+  } as never as Parameters<typeof buildSnapshotCacheAnnotatedPayload>[0]
+  const annotated = buildSnapshotCacheAnnotatedPayload(original, { scannedAt: '2026-09-04T09:00:00Z', chargedCredits: 10 })
+  const annotatedZero = buildSnapshotCacheAnnotatedPayload(original, { scannedAt: '2026-09-04T09:00:00Z', chargedCredits: 0 })
+
+  assert.deepEqual(annotated.metadata.deepScanCache, { hit: true, scannedAt: '2026-09-04T09:00:00Z', savedCredits: 10 })
+  assert.equal(annotatedZero.metadata.deepScanCache?.savedCredits, undefined)
+  assert.equal(original.metadata.deepScanCache, undefined) // 원본 불변
+  assert.equal(annotated.strategy.currentPriceText, '250,500원') // 나머지 블록 보존
 })

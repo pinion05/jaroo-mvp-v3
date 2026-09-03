@@ -9,12 +9,12 @@ import { recordDeepScanPayloadPerf } from '@/lib/deepscan-runtime/perf-trace'
 import { hasTossServerConfig } from '@/lib/payments/config'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import {
+  buildSnapshotCacheAnnotatedPayload,
   extractSnapshotPriceBasis,
   isSnapshotFresh,
-  lookupDeepScanSnapshot,
   resolveDeepScanSnapshotKey,
-  saveDeepScanSnapshot,
-} from '@/lib/deepscan-snapshot-store'
+} from '@/lib/deepscan-snapshot-policy'
+import { lookupDeepScanSnapshot, saveDeepScanSnapshot } from '@/lib/deepscan-snapshot-store'
 import type { JarooDeepScanPayload } from '../../../../packages/contracts/src/deepscan'
 
 export const runtime = 'nodejs'
@@ -127,18 +127,12 @@ export async function GET(request: NextRequest) {
       if (user) {
         const snapshot = await lookupDeepScanSnapshot(user.id, snapshotKey)
         if (snapshot && isSnapshotFresh(snapshot.scannedAt)) {
-          const cachedPayload: JarooDeepScanPayload = {
-            ...snapshot.payload,
-            metadata: {
-              ...snapshot.payload.metadata,
-              deepScanCache: {
-                hit: true,
-                scannedAt: snapshot.scannedAt,
-                savedCredits: snapshot.chargedCredits > 0 ? snapshot.chargedCredits : undefined,
-              },
-            },
-          }
-          return NextResponse.json(cachedPayload)
+          return NextResponse.json(
+            buildSnapshotCacheAnnotatedPayload(snapshot.payload, {
+              scannedAt: snapshot.scannedAt,
+              chargedCredits: snapshot.chargedCredits,
+            }),
+          )
         }
       }
     } catch (cacheError) {
