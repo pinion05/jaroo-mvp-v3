@@ -2971,3 +2971,8 @@
     transform: none;
   }
 }
+
+/* 스냅샷 출처 바 슬롯 — 본문 패딩 재사용, 하단 여백만 제거(아래 본문이 자체 상단 패딩을 가짐) */
+.headerNoticeSlot {
+  padding-bottom: 0;
+}
