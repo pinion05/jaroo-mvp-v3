@@ -596,10 +596,11 @@ export default function OcrPage() {
     let isCancelled = false
     const mergedState = mergeResolvedRowsWithExistingReviewRows(resolvedRows, reviewRows, instrumentCandidatesByRowId)
     const unresolvedRows = getRowsNeedingInstrumentResolution(resolvedRows, mergedState.rows, mergedState.candidatesByRowId)
+    const mergedRowIds = new Set(mergedState.rows.map((row) => row.id))
 
     setReviewRows(mergedState.rows)
     replaceCandidates(mergedState.candidatesByRowId)
-    setExpandedRowId((current) => (current && mergedState.candidatesByRowId[current]?.length > 1 ? current : null))
+    setExpandedRowId((current) => (current && mergedRowIds.has(current) ? current : null))
 
     if (unresolvedRows.length === 0) {
       const hasFailedRowsAwaitingManualReview = mergedState.rows.some(
@@ -630,13 +631,7 @@ export default function OcrPage() {
           ...mergedState.candidatesByRowId,
           ...result.candidatesByRowId,
         })
-        setExpandedRowId((current) => {
-          const nextCandidatesByRowId = {
-            ...mergedState.candidatesByRowId,
-            ...result.candidatesByRowId,
-          }
-          return current && nextCandidatesByRowId[current]?.length > 1 ? current : null
-        })
+        setExpandedRowId((current) => (current && mergedRowIds.has(current) ? current : null))
         setResolveStatus('success')
       })
       .catch(async (error) => {
@@ -648,7 +643,7 @@ export default function OcrPage() {
 
         setReviewRows(applyInstrumentResolutionFailure(mergedState.rows))
         replaceCandidates(mergedState.candidatesByRowId)
-        setExpandedRowId((current) => (current && mergedState.candidatesByRowId[current]?.length > 1 ? current : null))
+        setExpandedRowId((current) => (current && mergedRowIds.has(current) ? current : null))
         setResolveStatus('error', error instanceof Error ? error.message : '종목 확인에 실패했어요.')
       })
 
