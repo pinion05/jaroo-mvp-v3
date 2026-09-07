@@ -279,24 +279,40 @@ export function computeAveragePrice(
   }
 
   const parsedProfitAmount = parseOcrNumber(profitAmount)
-  if (parsedProfitAmount !== null) {
-    const principalFromAmount = parsedEvaluationAmount - parsedProfitAmount
-    if (Number.isFinite(principalFromAmount) && principalFromAmount > 0) {
-      return formatComputedNumber(principalFromAmount / parsedQuantity)
-    }
-  }
-
+  const principalFromAmount = parsedProfitAmount !== null ? parsedEvaluationAmount - parsedProfitAmount : null
   const parsedProfitRate = parseOcrProfitRate(profitRate)
-  if (parsedProfitRate === null) {
+  const principalDivisor = parsedProfitRate !== null ? 1 + (parsedProfitRate / 100) : null
+  const principalFromRate = principalDivisor !== null && Number.isFinite(principalDivisor) && principalDivisor > 0
+    ? parsedEvaluationAmount / principalDivisor
+    : null
+
+  const principal = (() => {
+    if (principalFromAmount !== null && Number.isFinite(principalFromAmount) && principalFromAmount > 0) {
+      if (principalFromRate !== null) {
+        // 부호 정렬: 파이프라인 정규화(normalizeOcrProfitRate)가 손익금액 부호를 rate에 상속하므로,
+        // 비교 시에도 rate 부호를 손익금액에 맞춰 정렬한다. 잡아야 할 오독은 부호가 아니라 크기(배수) 어긋남이다.
+        const alignedRateSign = parsedProfitAmount !== null && parsedProfitAmount !== 0 && parsedProfitRate !== null && Math.sign(parsedProfitRate) !== Math.sign(parsedProfitAmount)
+          ? -parsedProfitRate
+          : parsedProfitRate
+        const alignedDivisor = alignedRateSign !== null ? 1 + (alignedRateSign / 100) : null
+        const alignedPrincipalFromRate = alignedDivisor !== null && Number.isFinite(alignedDivisor) && alignedDivisor > 0
+          ? parsedEvaluationAmount / alignedDivisor
+          : null
+
+        if (alignedPrincipalFromRate !== null && Math.abs(principalFromAmount - alignedPrincipalFromRate) > Math.abs(principalFromAmount) * 0.05) {
+          return null
+        }
+      }
+      return principalFromAmount
+    }
+    return principalFromRate
+  })()
+
+  if (principal === null || !Number.isFinite(principal)) {
     return ''
   }
 
-  const principalDivisor = 1 + (parsedProfitRate / 100)
-  if (!Number.isFinite(principalDivisor) || principalDivisor <= 0) {
-    return ''
-  }
-
-  const averagePrice = (parsedEvaluationAmount / principalDivisor) / parsedQuantity
+  const averagePrice = principal / parsedQuantity
   return Number.isFinite(averagePrice) && averagePrice > 0 ? formatComputedNumber(averagePrice) : ''
 }
 
@@ -331,6 +347,78 @@ function normalizeInstrumentCode(value: unknown) {
   return normalized.length > 0 ? normalized : undefined
 }
 
+function detectOcrCurrencyHint(value: string): 'KRW' | 'USD' | undefined {
+  const normalizedValue = value.trim().toUpperCase()
+
+  if (/\$|USD/.test(normalizedValue)) {
+    return 'USD'
+  }
+
+  if (/₩|KRW|원/.test(value)) {
+    return 'KRW'
+  }
+
+  return undefined
+}
+
+// 직접 판독된 평단(averagePrice)·수량·평가금액이 모두 있으면 파생 손익금액(eval − qty×avg)의 부호와
+// 모델이 판독한 손익금액의 부호를 대조한다. 무부호 금액을 항상 +로 내놓는 모델 특성(gemma 계열 실측)
+// 때문에 색상만으로 손실을 표현한 한국 앱 화면에서 부호가 반전되는 것을 산술로 교정한다.
+//  - 통화 기호 충돌(예: 평가금액 원화 + 평단 달러) 시 산술이 무의미하므로 건드리지 않는다.
+//  - 부호만 어긋나면 부호만 뒤집고, 크기까지 5% 이상 어긋나면 판독 자체를 불신해 빈 값으로 둔다.
+function reconcileProfitAmountSignWithAveragePrice(
+  profitAmount: string,
+  quantity: string,
+  evaluationAmount: string,
+  averagePrice: string,
+) {
+  const parsedProfitAmount = parseOcrNumber(profitAmount)
+  const parsedQuantity = parseOcrNumber(quantity)
+  const parsedEvaluationAmount = parseOcrNumber(evaluationAmount)
+  const parsedAveragePrice = parseOcrNumber(averagePrice)
+
+  if (
+    parsedProfitAmount === null
+    || parsedProfitAmount === 0
+    || parsedQuantity === null
+    || parsedQuantity === 0
+    || parsedEvaluationAmount === null
+    || parsedEvaluationAmount <= 0
+    || parsedAveragePrice === null
+    || parsedAveragePrice <= 0
+  ) {
+    return profitAmount
+  }
+
+  const evaluationCurrency = detectOcrCurrencyHint(evaluationAmount)
+  const averagePriceCurrency = detectOcrCurrencyHint(averagePrice)
+
+  if (evaluationCurrency && averagePriceCurrency && evaluationCurrency !== averagePriceCurrency) {
+    return profitAmount
+  }
+
+  const derivedPrincipal = parsedQuantity * parsedAveragePrice
+  const derivedProfitAmount = parsedEvaluationAmount - derivedPrincipal
+
+  // 파산 초과 손실(손실 > 원금)만 불가능하다. 손실이 평가금액보다 큰 딥로스(예: -74%)는 정상 범위다.
+  if (!Number.isFinite(derivedProfitAmount) || derivedProfitAmount === 0) {
+    return profitAmount
+  }
+
+  if (derivedProfitAmount < 0 && Math.abs(derivedProfitAmount) >= derivedPrincipal) {
+    return profitAmount
+  }
+
+  if (Math.sign(parsedProfitAmount) === Math.sign(derivedProfitAmount)) {
+    return profitAmount
+  }
+
+  if (Math.abs(Math.abs(parsedProfitAmount) - Math.abs(derivedProfitAmount)) > Math.abs(derivedProfitAmount) * 0.05) {
+    return ''
+  }
+
+  return `${derivedProfitAmount < 0 ? '-' : '+'}${Math.abs(parsedProfitAmount)}`
+}
 export function sanitizeOcrRows(input: unknown): OcrRow[] {
   if (!Array.isArray(input)) {
     return []
@@ -343,10 +431,15 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
       const quantity = typeof item.quantity === 'string' ? item.quantity.trim() : ''
       const rawProfitRate = typeof item.profitRate === 'string' ? item.profitRate.trim() : ''
       const rawProfitAmount = typeof item.profitAmount === 'string' ? item.profitAmount.trim() : ''
-      const profitAmount = normalizeOcrProfitAmount(rawProfitAmount, rawProfitRate)
-      const profitRate = normalizeOcrProfitRate(rawProfitRate, profitAmount)
       const evaluationAmount = typeof item.evaluationAmount === 'string' ? item.evaluationAmount.trim() : ''
       const averagePrice = typeof item.averagePrice === 'string' ? item.averagePrice.trim() : ''
+      const profitAmount = reconcileProfitAmountSignWithAveragePrice(
+        normalizeOcrProfitAmount(rawProfitAmount, rawProfitRate),
+        quantity,
+        evaluationAmount,
+        averagePrice,
+      )
+      const profitRate = normalizeOcrProfitRate(rawProfitRate, profitAmount)
       const code = normalizeInstrumentCode(item.code)
       const ticker = normalizeInstrumentCode(item.ticker)
       const resolvedName = typeof item.resolvedName === 'string' ? item.resolvedName.trim() : undefined
