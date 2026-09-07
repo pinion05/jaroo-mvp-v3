@@ -64,6 +64,15 @@ test('OCR schema requires signed row-level profitAmount', () => {
   assert.equal(rowSchema.required.includes('profitAmount'), true)
 })
 
+test('OCR schema allows optional direct averagePrice and prompt guards purchase-price confusion', () => {
+  const rowSchema = OCR_SCHEMA.schema.properties.rows.items
+
+  assert.equal(rowSchema.properties.averagePrice.type, 'string')
+  assert.equal((rowSchema.required as readonly string[]).includes('averagePrice'), false)
+  assert.match(OCR_SYSTEM_PROMPT, /매입가, 매입단가, 평단, 평균단가/)
+  assert.match(OCR_SYSTEM_PROMPT, /Never use a per-share purchase price/)
+})
+
 test('OCR prompt carries P/L amount sign into unsigned parenthesized return', () => {
   assert.match(OCR_SYSTEM_PROMPT, /profitAmount/)
   assert.match(OCR_SYSTEM_PROMPT, /-13,263[^\n]*\(6\.8%\)[\s\S]*-6\.8%/)

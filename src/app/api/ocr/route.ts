@@ -36,6 +36,7 @@ export const OCR_SCHEMA = {
             evaluationAmount: { type: 'string' },
             code: { type: 'string' },
             ticker: { type: 'string' },
+            averagePrice: { type: 'string' },
           },
           required: ['name', 'quantity', 'profitAmount', 'profitRate', 'evaluationAmount'],
         },
@@ -65,7 +66,7 @@ Return ONLY valid JSON matching the provided schema.
 Never output markdown, prose, explanations, code fences, or extra keys.
 Top-level object must be exactly {"rows": [...]}.
 Every row must contain the 5 required string fields: name, quantity, profitAmount, profitRate, evaluationAmount.
-You may additionally include code and/or ticker when they are visibly shown in the same row.
+You may additionally include code, ticker, and/or averagePrice when they are visibly shown in the same row.
 Do not add any other fields.
 If a value is unreadable or not visible, use an empty string.
 If there are no holdings rows, return {"rows": []}.
@@ -78,6 +79,7 @@ Field rules:
 - evaluationAmount: holding evaluation/market value as shown, for example "1,234,000원", "$845.12", "2,500".
 - code: local stock code/security code when visibly shown, for example "005930". Otherwise use "".
 - ticker: market ticker when visibly shown, for example "AAPL". Otherwise use "".
+- averagePrice: per-share average purchase price when visibly shown (labels such as 매입가, 매입단가, 평단, 평균단가, Avg Price), for example "71,500", "$150.20". Otherwise use "".
 
 OCR guidance:
 - The screenshot may contain Korean labels such as 종목명, 보유수량, 수익률, 평가금액, 평가금, 평가손익, 잔고, 보유종목.
@@ -92,10 +94,23 @@ OCR guidance:
   "-13,263 (6.8%)" means profitAmount "-13,263" and profitRate "-6.8%".
   "+262,740 (12.7%)" means profitAmount "+262,740" and profitRate "+12.7%".
 - If the parenthesized percentage has no sign, inherit the sign from the visible profitAmount or the loss/profit color.
+- Many Korean brokerage apps show amounts and percentages with NO sign, using color instead: red means profit (+), blue means loss (-).
+  The color rule applies to EVERY unsigned numeric field in the row, including both profitAmount and profitRate.
+  In that case infer the sign from the color (or from any signed field in the same row) and ALWAYS emit an explicit leading sign.
+  An unsigned "1,234,567" shown in red must be returned as "+1,234,567" with its unsigned "5.4%" as "+5.4%";
+  an unsigned amount or percentage shown in blue must be returned with a leading "-", for example "-1,234,567" and "-5.4%".
 - evaluationAmount must map to the row-level valuation/market value amount, not profit/loss amount, principal, or a totals summary.
+- Never use a per-share purchase price (매입가/평단/매입단가) or a total purchase amount (매입금액/총매입) as evaluationAmount.
+  If the row shows a purchase price but no row-level valuation, leave evaluationAmount "" and put the per-share price in averagePrice.
 - If the same row appears twice due to sticky headers or repeated sections, keep one row only.`
 
-const DEFAULT_OCR_MODEL = 'google/gemini-2.0-flash-lite-001'
+// reasoning 계열 모델이 completion 예산을 사고(reasoning)에 소진해 JSON이 잘리는 사고 방지.
+// 벤치마크(2026-09-07, 잔고 스크린샷 9종) 기준 8192에서 reasoning 모델도 finish=stop 완성.
+// reasoning 없는 모델은 필요한 만큼만 쓰고 조기 종료하므로 cap 상양은 비용에 영향이 없다.
+const OCR_MAX_COMPLETION_TOKENS = 8192
+// 벤치마크(2026-09-07, 잔고 스크린샷 9종 30행) 기준 gemma-4-31b가 26b-a4b와 동일 장당 비용에 필드 정확도 +9pp.
+// gemini-2.0-flash-lite-001은 OpenRouter에서 단종(No endpoints found)되어 기본값으로 부적합.
+const DEFAULT_OCR_MODEL = 'google/gemma-4-31b-it'
 const DEFAULT_OCR_FALLBACK_MODELS = [
   'qwen/qwen3-vl-8b-instruct',
   'google/gemma-4-26b-a4b-it',
@@ -184,7 +199,7 @@ function buildOpenRouterOcrBody(options: {
   return {
     model: options.model,
     temperature: 0,
-    max_tokens: 1024,
+    max_tokens: OCR_MAX_COMPLETION_TOKENS,
     ...(options.useJsonSchema
       ? {
           response_format: {
