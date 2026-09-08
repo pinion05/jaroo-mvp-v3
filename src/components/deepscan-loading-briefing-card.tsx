@@ -66,14 +66,22 @@ export function BackControl({ onBack, backHref }: Pick<DeepScanLoadingScreenProp
 }
 
 
-export function TargetPriceFanChart({
+/** 목표가가 현재가보다 높으면 profit(빨강), 낮으면 loss(파랑) — 같으면 무톤 */
+function consensusToneOf(consensus: NonNullable<LoadingQuickFact['consensus']>): 'profit' | 'loss' | null {
+  if (!isFiniteNumber(consensus.targetPriceValue) || !isFiniteNumber(consensus.currentPriceValue) || consensus.targetPriceValue === consensus.currentPriceValue) return null
+  return consensus.targetPriceValue > consensus.currentPriceValue ? 'profit' : 'loss'
+}
+
+function TargetPriceFanChart({
   consensus,
   dailyCloses,
   seedKey,
+  tone,
 }: {
   consensus: NonNullable<LoadingQuickFact['consensus']>
   dailyCloses?: Array<number | null | undefined>
   seedKey?: string
+  tone?: 'profit' | 'loss' | null
 }) {
   const geometry = useMemo(() => {
     const current = consensus.currentPriceValue
@@ -97,19 +105,22 @@ export function TargetPriceFanChart({
     return null
   }
 
+  const averageToneClass = tone === 'profit' ? styles.consensusFanTargetPathProfit : tone === 'loss' ? styles.consensusFanTargetPathLoss : styles.consensusFanTargetPath
   const curveClass: Record<'high' | 'average' | 'low', string> = {
     high: styles.consensusFanHighPath,
-    average: styles.consensusFanTargetPath,
+    average: averageToneClass,
     low: styles.consensusFanLowPath,
   }
+  const averageDotClass = tone === 'profit' ? styles.consensusFanTargetDotProfit : tone === 'loss' ? styles.consensusFanTargetDotLoss : styles.consensusFanTargetDot
   const dotClass: Record<'high' | 'average' | 'low', string> = {
     high: styles.consensusFanHighDot,
-    average: styles.consensusFanTargetDot,
+    average: averageDotClass,
     low: styles.consensusFanLowDot,
   }
+  const averageLegendClass = tone === 'profit' ? styles.consensusFanLegendTargetProfit : tone === 'loss' ? styles.consensusFanLegendTargetLoss : styles.consensusFanLegendTarget
   const legendClass: Record<'high' | 'average' | 'low', string> = {
     high: styles.consensusFanLegendHigh,
-    average: styles.consensusFanLegendTarget,
+    average: averageLegendClass,
     low: styles.consensusFanLegendLow,
   }
   const legendLabel: Record<'high' | 'average' | 'low', string> = {
@@ -521,7 +532,9 @@ export function TodayBriefingCard({
         />
         <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={BarChart3} question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
         <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Flame} question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
-        {consensus ? (
+        {consensus ? (() => {
+          const consensusTone = consensusToneOf(consensus)
+          return (
           <article
             className={cn(styles.todayBriefItem, (forceReady || elapsedSeconds >= consensusAt) ? styles.todayBriefItemIn : undefined, styles.todayBriefConsensusItem)}
             data-today-briefing-item='true'
@@ -532,14 +545,14 @@ export function TodayBriefingCard({
             </div>
             {forceReady || elapsedSeconds >= consensusAt + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS ? (
               <div className={styles.consensusInsight}>
-                <div className={styles.consensusChartTop}>
+                <div className={cn(styles.consensusChartTop, consensusTone === 'profit' ? styles.consensusToneProfit : consensusTone === 'loss' ? styles.consensusToneLoss : undefined)}>
                   <div>
                     <span className={styles.consensusEyebrow}>{consensus.analystCountLabel ?? 'TARGET VIEW'}</span>
                     <strong>{consensus.targetPriceLabel}</strong>
                   </div>
                   {consensus.upsideLabel ? <span>{consensus.upsideLabel}</span> : null}
                 </div>
-                <TargetPriceFanChart consensus={consensus} dailyCloses={dailyCloses} seedKey={seedKey} />
+                <TargetPriceFanChart consensus={consensus} dailyCloses={dailyCloses} seedKey={seedKey} tone={consensusTone} />
                 <dl className={styles.consensusStats}>
                   {consensus.currentPriceLabel ? (<div className={styles.consensusStat}><dt>현재가</dt><dd>{consensus.currentPriceLabel}</dd></div>) : null}
                   {consensus.opinionLabel ? (<div className={styles.consensusStat}><dt>투자의견</dt><dd>{consensus.opinionLabel}</dd></div>) : null}
@@ -550,7 +563,8 @@ export function TodayBriefingCard({
               </div>
             ) : null}
           </article>
-        ) : null}
+          )
+        })() : null}
       </div>
     </section>
   )
