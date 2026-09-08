@@ -971,6 +971,49 @@
   white-space: nowrap;
 }
 
+/* 목표가 방향 톤 — 현재가보다 높으면 빨강, 낮으면 파랑 (기본 블록보다 나중에 와야 승리) */
+.consensusToneProfit strong {
+  color: var(--ds-red);
+}
+
+.consensusToneLoss strong {
+  color: var(--ds-blue);
+}
+
+.consensusToneProfit > span {
+  background: var(--ds-green-soft);
+  color: var(--ds-red);
+}
+
+.consensusToneLoss > span {
+  background: var(--ds-blue-soft);
+  color: var(--ds-blue);
+}
+
+.consensusFanTargetPathProfit {
+  stroke: var(--ds-red);
+}
+
+.consensusFanTargetPathLoss {
+  stroke: var(--ds-blue);
+}
+
+.consensusFanTargetDotProfit {
+  fill: var(--ds-red);
+}
+
+.consensusFanTargetDotLoss {
+  fill: var(--ds-blue);
+}
+
+.consensusFanLegendTargetProfit i {
+  border-top-color: var(--ds-red);
+}
+
+.consensusFanLegendTargetLoss i {
+  border-top-color: var(--ds-blue);
+}
+
 .consensusLineChart {
   position: relative;
   overflow: hidden;
