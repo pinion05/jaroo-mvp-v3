@@ -41,6 +41,10 @@ export type DeepScanLoadingScreenProps = {
   visibleStageCount?: number
   arrivedStageKeys?: LoadingStageKey[]
   resultsReady?: boolean
+  /** 스냅샷 캐시 재사용 여부 — 완료 카드 문구를 '실제 분석 도착' 대신 '저장 결과 불러오기'로 바꾼다 */
+  snapshotCacheHit?: boolean
+  /** 캐시된 스냅샷의 원본 분석 시각(ISO) */
+  snapshotScannedAt?: string
   className?: string
   onBack?: () => void
   backHref?: string

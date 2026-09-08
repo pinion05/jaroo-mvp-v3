@@ -816,6 +816,8 @@ export default function DeepScanPage() {
         visibleStageCount={visibleStageCount}
         arrivedStageKeys={arrivedStageKeys}
         resultsReady={resultsReady}
+        snapshotCacheHit={snapshotCacheInfo?.hit === true}
+        snapshotScannedAt={snapshotCacheInfo?.scannedAt}
         inlineResults={resultsReady && payload ? <DeepScanInlineResults
             payload={payload}
             requestSeed={requestSeed}

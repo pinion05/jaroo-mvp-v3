@@ -38,6 +38,18 @@ import {
   TODAY_BRIEFING_ITEM_SELECTOR,
 } from './deepscan-loading-types'
 
+/** 스냅샷 저장 시각(ISO) → '9월 8일' 라벨. 파싱 실패 시 null. */
+export function formatScannedAtLabel(scannedAt: string | undefined): string | null {
+  if (!scannedAt) {
+    return null
+  }
+  const date = new Date(scannedAt)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  return new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric' }).format(date)
+}
+
 export function formatElapsedTime(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
@@ -354,7 +366,25 @@ export function buildCommitteeTeamBody(
   }
 }
 
-export function buildCompletionState(resultsReady: boolean, elapsedSeconds: number): CompletionState {
+export function buildCompletionState(
+  resultsReady: boolean,
+  elapsedSeconds: number,
+  snapshotCacheHit = false,
+  snapshotScannedAt?: string,
+): CompletionState {
+  if (resultsReady && snapshotCacheHit) {
+    // 스냅샷 캐시 재사용 — 새 분석처럼 꾸미지 않고 저장 결과임을 명시한다.
+    const scannedLabel = formatScannedAtLabel(snapshotScannedAt)
+    return {
+      ready: true,
+      eyebrow: '불러오기 완료',
+      title: '저장해둔 분석 결과를 불러왔어요',
+      body: scannedLabel
+        ? `${scannedLabel}에 분석한 저장 결과를 즉시 불러왔습니다. 아래 결과 카드에서 이어서 확인하세요.`
+        : '저장된 분석 결과를 즉시 불러왔습니다. 아래 결과 카드에서 이어서 확인하세요.',
+    }
+  }
+
   if (resultsReady) {
     return {
       ready: true,
