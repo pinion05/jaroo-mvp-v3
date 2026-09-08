@@ -105,19 +105,33 @@ function TargetPriceFanChart({
     return null
   }
 
-  const averageToneClass = tone === 'profit' ? styles.consensusFanTargetPathProfit : tone === 'loss' ? styles.consensusFanTargetPathLoss : styles.consensusFanTargetPath
+  // 기본 클래스를 유지한 채 톤 클래스를 겹친다 — 톤 단독이면 fill:none·애니메이션 등이 유실돼
+  // path에 SVG 기본 검정 fill이 채워지는 문제가 생긴다.
+  const averageToneClass = cn(
+    styles.consensusFanTargetPath,
+    tone === 'profit' && styles.consensusFanTargetPathProfit,
+    tone === 'loss' && styles.consensusFanTargetPathLoss,
+  )
   const curveClass: Record<'high' | 'average' | 'low', string> = {
     high: styles.consensusFanHighPath,
     average: averageToneClass,
     low: styles.consensusFanLowPath,
   }
-  const averageDotClass = tone === 'profit' ? styles.consensusFanTargetDotProfit : tone === 'loss' ? styles.consensusFanTargetDotLoss : styles.consensusFanTargetDot
+  const averageDotClass = cn(
+    styles.consensusFanTargetDot,
+    tone === 'profit' && styles.consensusFanTargetDotProfit,
+    tone === 'loss' && styles.consensusFanTargetDotLoss,
+  )
   const dotClass: Record<'high' | 'average' | 'low', string> = {
     high: styles.consensusFanHighDot,
     average: averageDotClass,
     low: styles.consensusFanLowDot,
   }
-  const averageLegendClass = tone === 'profit' ? styles.consensusFanLegendTargetProfit : tone === 'loss' ? styles.consensusFanLegendTargetLoss : styles.consensusFanLegendTarget
+  const averageLegendClass = cn(
+    styles.consensusFanLegendTarget,
+    tone === 'profit' && styles.consensusFanLegendTargetProfit,
+    tone === 'loss' && styles.consensusFanLegendTargetLoss,
+  )
   const legendClass: Record<'high' | 'average' | 'low', string> = {
     high: styles.consensusFanLegendHigh,
     average: averageLegendClass,
