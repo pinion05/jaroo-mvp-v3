@@ -96,6 +96,8 @@ export function DeepScanLoadingScreen({
   visibleStageCount = 1,
   arrivedStageKeys = [],
   resultsReady = false,
+  snapshotCacheHit = false,
+  snapshotScannedAt,
   className,
   onBack,
   backHref = '/home',
@@ -195,7 +197,7 @@ export function DeepScanLoadingScreen({
     () => buildSequentialNarrativeCards(timelineNarrativeCards, teamSummaries, resultsReadyForDisplay),
     [resultsReadyForDisplay, teamSummaries, timelineNarrativeCards],
   )
-  const completionState = buildCompletionState(resultsReadyForDisplay, elapsedSeconds)
+  const completionState = buildCompletionState(resultsReadyForDisplay, elapsedSeconds, snapshotCacheHit, snapshotScannedAt)
   const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReadyForDisplay)
   const isTeamBridgeVisible = Boolean(teamBridgeState)
   const shouldAdvanceTimeline = shouldAdvanceDeepScanTimeline({ resultsReadyForDisplay, elapsedSeconds, sequenceCompleteSeconds: TEAM_SEQUENCE_COMPLETE_SECONDS })
@@ -351,7 +353,7 @@ export function DeepScanLoadingScreen({
           ) : (
             <h2 className={styles.introTitle}>세 분석가가 {exchangeProduct ? 'ETF를' : '종목을'}<br />차례로 살펴보고 있어요</h2>
           )}
-          <p className={styles.introBody}>{resultsReadyForDisplay ? '실제 응답이 도착했어요. 아래 결과 카드가 바로 이어집니다.' : '완료 신호가 오면 기다림 없이 이 화면 아래에 결과가 이어집니다.'}</p>
+          <p className={styles.introBody}>{resultsReadyForDisplay ? (snapshotCacheHit ? '저장해둔 분석 결과를 불러왔어요. 아래 결과 카드가 바로 이어집니다.' : '실제 응답이 도착했어요. 아래 결과 카드가 바로 이어집니다.') : '완료 신호가 오면 기다림 없이 이 화면 아래에 결과가 이어집니다.'}</p>
         </section>
 
         <TodayBriefingCard
