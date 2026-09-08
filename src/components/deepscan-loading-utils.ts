@@ -505,9 +505,16 @@ export function getTeamSummaryState(card: NarrativeCard, teamSummaries: Partial<
   }
 }
 
-export function buildNarrativeFallbackSummary(card: NarrativeCard, summaryFailed: boolean) {
-  if (card.placeholder || !card.complete) {
+export function buildNarrativeFallbackSummary(card: NarrativeCard, summaryFailed: boolean, resultsReady = false) {
+  if (card.placeholder) {
     return null
+  }
+  if (!card.complete) {
+    // 위원 응답이 영구 종결된 뒤(캐시 스토어 만료·서버 오류)에는 미도착 사실을
+    // 문구로 표시한다 — 종결 전에는 기존과 같이 스켈레톤이 담당한다.
+    return resultsReady
+      ? `${card.analystName}의 일부 위원 응답을 받지 못했어요. 도착한 응답만 결과에 반영했어요.`
+      : null
   }
 
   if (summaryFailed) {

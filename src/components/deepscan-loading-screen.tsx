@@ -395,7 +395,7 @@ export function DeepScanLoadingScreen({
               summaryFailed,
               summaryText,
             } = getTeamSummaryState(card, teamSummaries)
-            const fallbackSummaryText = buildNarrativeFallbackSummary(card, Boolean(summaryFailed))
+            const fallbackSummaryText = buildNarrativeFallbackSummary(card, Boolean(summaryFailed), resultsReadyForDisplay)
             const resolvedSummaryText = summaryText ?? fallbackSummaryText
             const summaryCollapsible = Boolean(summaryText && shouldCollapseTeamSummaryText(summaryText))
             const summaryExpanded = Boolean(card.teamKey && expandedTeamSummaries.has(card.teamKey))
