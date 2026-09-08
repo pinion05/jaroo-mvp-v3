@@ -44,6 +44,7 @@ import {
   buildLoadingTradingVolume,
   createDeepScanLoadingSequence,
   createDeepScanLoadingStageArrival,
+  allCommitteeLoadingStageKeys,
   extractLoadingStageKeysFromCommitteeAxes,
   extractLoadingStageKeysFromCommitteeResults,
   hasCollectedDeepScanEvidence,
@@ -547,6 +548,14 @@ export default function DeepScanPage() {
               ? extractLoadingStageKeysFromCommitteeResults(body.results)
               : extractLoadingStageKeysFromCommitteeAxes(body.committeeAxes),
           )
+        }
+
+        if (body.status === 'not_found' || body.status === 'error') {
+          // 위원회 상태 스토어가 만료된 캐시 스냅샷(또는 서버 측 위원회 실패) —
+          // 더 도착할 데이터가 없다. 캐시된 부분 결과를 즉시 도착 처리하지 않으면
+          // 팀 카드 스켈레톤이 영구 유지된다.
+          markDeepScanLoadingSuccess(requestedTargetKey)
+          appendArrivedLoadingStageKeys(requestedTargetKey, allCommitteeLoadingStageKeys())
         }
 
         updateActivePayload((currentPayload: JarooDeepScanPayload) => {
