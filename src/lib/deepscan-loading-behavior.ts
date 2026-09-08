@@ -69,3 +69,30 @@ export function shouldShowDeepScanSummarySkeleton({
 }): boolean {
   return !placeholder && !resolvedSummaryText
 }
+
+// ─── 팀 요약 키워드 강조 ──────────────────────────────────────────────────────
+
+export type DeepScanEmphasisSegment = {
+  text: string
+  bold: boolean
+}
+
+/**
+ * 요약 문장의 `**키워드**` 마크다운을 세그먼트 배열로 분해한다.
+ * 짝이 맞는 쌍만 굵게 처리하고, 닫히지 않은 `**`는 별표를 걷어낸다 —
+ * 미완성 마크다운이 화면에 그대로 노출되지 않게 하기 위함.
+ */
+export function parseDeepScanEmphasisSegments(text: string): DeepScanEmphasisSegment[] {
+  if (!text.includes('**')) {
+    return [{ text, bold: false }]
+  }
+
+  const parts = text.split(/\*\*(.+?)\*\*/g)
+  if (parts.length === 1) {
+    return [{ text: text.replace(/\*\*/g, ''), bold: false }]
+  }
+
+  return parts
+    .map((part, index) => ({ text: part, bold: index % 2 === 1 }))
+    .filter((segment) => segment.text.length > 0)
+}
