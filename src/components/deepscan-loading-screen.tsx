@@ -192,8 +192,8 @@ export function DeepScanLoadingScreen({
     [elapsedSeconds, orderedNarrativeCards, resultsReadyForDisplay],
   )
   const sequentialNarrativeCards = useMemo(
-    () => buildSequentialNarrativeCards(timelineNarrativeCards, teamSummaries),
-    [teamSummaries, timelineNarrativeCards],
+    () => buildSequentialNarrativeCards(timelineNarrativeCards, teamSummaries, resultsReadyForDisplay),
+    [resultsReadyForDisplay, teamSummaries, timelineNarrativeCards],
   )
   const completionState = buildCompletionState(resultsReadyForDisplay, elapsedSeconds)
   const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReadyForDisplay)

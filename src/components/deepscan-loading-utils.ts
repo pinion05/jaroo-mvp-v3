@@ -528,24 +528,24 @@ export function buildNarrativeFallbackSummary(card: NarrativeCard, summaryFailed
   return null
 }
 
-export function hasNarrativeLoadingSkeleton(card: NarrativeCard, teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>) {
+export function hasNarrativeLoadingSkeleton(card: NarrativeCard, teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>, resultsReady = false) {
   if (card.placeholder) {
     return true
   }
 
   const { summaryText, summaryFailed } = getTeamSummaryState(card, teamSummaries)
-  const fallbackSummary = buildNarrativeFallbackSummary(card, Boolean(summaryFailed))
+  const fallbackSummary = buildNarrativeFallbackSummary(card, Boolean(summaryFailed), resultsReady)
 
   return !summaryText && !fallbackSummary
 }
 
-export function buildSequentialNarrativeCards(cards: NarrativeCard[], teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>) {
+export function buildSequentialNarrativeCards(cards: NarrativeCard[], teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>, resultsReady = false) {
   const sequentialCards: NarrativeCard[] = []
 
   for (const card of cards) {
     sequentialCards.push(card)
 
-    if (hasNarrativeLoadingSkeleton(card, teamSummaries)) {
+    if (hasNarrativeLoadingSkeleton(card, teamSummaries, resultsReady)) {
       break
     }
   }
