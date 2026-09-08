@@ -1,7 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 
-import { buildConsensusFanGeometry } from '@/lib/deepscan-target-price-paths'
+import {
+  DEFAULT_TARGET_PRICE_FAN_STEPS,
+  buildConsensusFanGeometry,
+  buildProjectionPath,
+} from '@/lib/deepscan-target-price-paths'
 
 test('buildConsensusFanGeometry returns null when current or average target is not positive/finite', () => {
   assert.equal(buildConsensusFanGeometry({ currentPrice: 0, averageTarget: 100 }), null)
@@ -109,4 +113,50 @@ test('buildConsensusFanGeometry sets recentPath null when fewer than 2 valid clo
   const none = buildConsensusFanGeometry({ currentPrice: 100, averageTarget: 120, recentCloses: [null, undefined], seed: 's' })
   assert.ok(none)
   assert.equal(none!.recentPath, null)
+})
+
+test('buildProjectionPath pins both endpoints exactly and stays finite/positive', () => {
+  const path = buildProjectionPath({ currentPrice: 186300, targetPrice: 274621, seed: 'celltrion' })
+  assert.equal(path.length, DEFAULT_TARGET_PRICE_FAN_STEPS + 1)
+  assert.equal(path[0], 186300)
+  assert.equal(path[path.length - 1], 274621)
+  for (const value of path) {
+    assert.ok(Number.isFinite(value) && value > 0, `path value must be finite/positive, got ${value}`)
+  }
+})
+
+test('buildProjectionPath returns [] for invalid prices', () => {
+  assert.deepEqual(buildProjectionPath({ currentPrice: 0, targetPrice: 100 }), [])
+  assert.deepEqual(buildProjectionPath({ currentPrice: 100, targetPrice: -1 }), [])
+  assert.deepEqual(buildProjectionPath({ currentPrice: Number.NaN, targetPrice: 100 }), [])
+})
+
+test('buildProjectionPath is deterministic per seed and varies across seeds', () => {
+  const a = buildProjectionPath({ currentPrice: 100, targetPrice: 120, seed: 'a' })
+  const b = buildProjectionPath({ currentPrice: 100, targetPrice: 120, seed: 'a' })
+  const c = buildProjectionPath({ currentPrice: 100, targetPrice: 120, seed: 'b' })
+  assert.deepEqual(a, b)
+  assert.notDeepEqual(a, c)
+})
+
+test('projection curve is not a straight line — interior has direction changes', () => {
+  const g = buildConsensusFanGeometry({
+    currentPrice: 186300,
+    averageTarget: 274621,
+    volatility: 0.02,
+    seed: 'celltrion',
+  })
+  assert.ok(g)
+  const pathD = g!.curves.find((c) => c.key === 'average')!.pathD
+  const ys = [...pathD.matchAll(/[ML]([\d.]+) ([\d.]+)/g)].map((m) => Number(m[2]))
+  assert.ok(ys.length >= DEFAULT_TARGET_PRICE_FAN_STEPS, 'path should have one point per step')
+  let reversals = 0
+  for (let i = 2; i < ys.length; i += 1) {
+    const d1 = ys[i - 1] - ys[i - 2]
+    const d2 = ys[i] - ys[i - 1]
+    if (d1 * d2 < 0) {
+      reversals += 1
+    }
+  }
+  assert.ok(reversals >= 3, `projection should wiggle like a real chart, got ${reversals} reversals`)
 })
