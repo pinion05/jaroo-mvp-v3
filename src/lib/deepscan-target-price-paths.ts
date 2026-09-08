@@ -1,32 +1,23 @@
 /**
- * Random-walk simulation for the DeepScan target-price fan chart.
+ * Projection path synthesis for the DeepScan target-price fan chart.
  *
  * The analyst target price is a single future point estimate, so there is no
- * realized path to chart. We instead synthesize many plausible paths from the
- * current price toward the target price using geometric Brownian motion, then
- * collapse them into quantile bands (a "cone of uncertainty").
+ * realized path to chart. We draw one plausible geometric-Brownian-motion
+ * random walk from the current price toward the target price and bridge-
+ * correct it so both endpoints are pinned exactly:
  *
- * The simulation is deterministic given the same seed so the fan shape is
- * stable across re-renders and refreshes (no flicker).
+ *   log S(t) = log S0 + drift·t + B(t) − (t/T)·B(T)
+ *
+ * (a Brownian bridge in log space). The bridge variance peaks mid-horizon and
+ * vanishes at both ends, so the path reads like a real chart instead of the
+ * noise-free exponential a quantile median would produce.
+ *
+ * The path is deterministic given the same seed so the shape is stable across
+ * re-renders and refreshes (no flicker).
  */
-
-/** Per-step quantile bands derived from simulated paths. */
-export type TargetPriceFanBands = {
-  /** number of forward steps (excludes the t=0 anchor = current price) */
-  steps: number
-  /** lower band values, length === steps + 1 (index 0 === current price) */
-  lower: number[]
-  /** median band values, length === steps + 1 */
-  median: number[]
-  /** upper band values, length === steps + 1 */
-  upper: number[]
-}
 
 /** Default forward horizon in trading steps (~3 months). */
 export const DEFAULT_TARGET_PRICE_FAN_STEPS = 60
-
-/** Default number of simulated paths. More paths = smoother bands + tighter median convergence to the target. */
-export const DEFAULT_TARGET_PRICE_FAN_PATHS = 128
 
 /**
  * Default per-step (daily) volatility when real price history is unavailable.
@@ -34,7 +25,7 @@ export const DEFAULT_TARGET_PRICE_FAN_PATHS = 128
  */
 export const DEFAULT_TARGET_PRICE_DAILY_VOLATILITY = 0.025
 
-export type SimulateTargetPricePathsInput = {
+export type TargetPriceProjectionInput = {
   currentPrice: number
   targetPrice: number
   steps?: number
@@ -45,12 +36,17 @@ export type SimulateTargetPricePathsInput = {
 }
 
 /**
- * Simulate `paths` geometric-Brownian-motion paths from currentPrice toward
- * targetPrice over `steps` intervals. Each returned path has length
- * `steps + 1`; index 0 is the current price, the final index is the realized
- * terminal value (which scatters around the target by construction).
+ * Draw one deterministic plausible projection path from currentPrice to
+ * targetPrice over `steps` intervals. Returns `[]` when either price is not
+ * positive/finite.
+ *
+ * Path length is `steps + 1`; index 0 is exactly the current price and the
+ * final index is exactly the target price. Interior points carry seeded
+ * Gaussian walk noise whose bridge correction `−(t/T)·B(T)` pins the terminal
+ * value — unlike a multi-path quantile median, whose noise cancels into a
+ * near-straight exponential curve.
  */
-export function simulateTargetPricePaths(input: SimulateTargetPricePathsInput): number[][] {
+export function buildProjectionPath(input: TargetPriceProjectionInput): number[] {
   const { currentPrice, targetPrice } = input
   if (!Number.isFinite(currentPrice) || currentPrice <= 0) {
     return []
@@ -60,62 +56,31 @@ export function simulateTargetPricePaths(input: SimulateTargetPricePathsInput): 
   }
 
   const steps = clampPositiveInteger(input.steps, DEFAULT_TARGET_PRICE_FAN_STEPS)
-  const pathCount = clampPositiveInteger(input.paths, DEFAULT_TARGET_PRICE_FAN_PATHS)
   const sigma = Number.isFinite(input.volatility) && (input.volatility as number) > 0
     ? (input.volatility as number)
     : DEFAULT_TARGET_PRICE_DAILY_VOLATILITY
   const seed = input.seed?.length ? input.seed : `${currentPrice}|${targetPrice}`
 
-  // Drift so the geometric mean path converges to the target: the median of
-  // ln(S_T) lands on ln(targetPrice).
   const drift = (Math.log(targetPrice) - Math.log(currentPrice)) / steps
   const rng = mulberry32(hashString(seed))
 
-  const paths: number[][] = []
-  for (let p = 0; p < pathCount; p += 1) {
-    const path = new Array<number>(steps + 1)
-    path[0] = currentPrice
-    let value = currentPrice
-    for (let t = 1; t <= steps; t += 1) {
-      const z = gaussian(rng)
-      value = value * Math.exp(drift - 0.5 * sigma * sigma + sigma * z)
-      if (!Number.isFinite(value) || value <= 0) {
-        // guard against pathological RNG tails
-        value = path[t - 1]
-      }
-      path[t] = value
-    }
-    paths.push(path)
+  // Cumulative log noise B(t); the bridge correction subtracts (t/T)·B(T).
+  const logNoise = new Array<number>(steps)
+  let cum = 0
+  for (let t = 0; t < steps; t += 1) {
+    cum += sigma * gaussian(rng)
+    logNoise[t] = cum
   }
 
-  return paths
-}
-
-/**
- * Reduce simulated paths to quantile bands (lower / median / upper) at every
- * step. Lower/upper default to the 10th/90th percentile.
- */
-export function buildTargetPriceFanBands(paths: number[][]): TargetPriceFanBands | null {
-  if (paths.length === 0) {
-    return null
+  const path = new Array<number>(steps + 1)
+  path[0] = currentPrice
+  for (let t = 1; t <= steps; t += 1) {
+    const value = currentPrice * Math.exp(drift * t + logNoise[t - 1] - (cum * t) / steps)
+    path[t] = Number.isFinite(value) && value > 0 ? value : path[t - 1]
   }
-  const steps = paths[0].length - 1
-  if (steps < 1) {
-    return null
-  }
-
-  const lower: number[] = []
-  const median: number[] = []
-  const upper: number[] = []
-
-  for (let t = 0; t <= steps; t += 1) {
-    const column = paths.map((path) => path[t]).sort((a, b) => a - b)
-    lower.push(quantile(column, 0.1))
-    median.push(quantile(column, 0.5))
-    upper.push(quantile(column, 0.9))
-  }
-
-  return { steps, lower, median, upper }
+  // exp/log round-trip leaves ~1e-10 relative error; pin the terminal exactly.
+  path[steps] = targetPrice
+  return path
 }
 
 /**
@@ -149,7 +114,7 @@ export function estimateDailyVolatility(
 // ---------------------------------------------------------------------------
 // Multi-endpoint fan geometry
 //
-// Maps one median projection curve per active target-price endpoint (평균 /
+// Maps one bridged projection curve per active target-price endpoint (평균 /
 // 최고 / 최저) into the SVG pixel space used by the loading-screen consensus
 // chart. Pure + deterministic so it can be unit-tested with node:test
 // (the .tsx component itself cannot be imported there due to its CSS-module
@@ -231,16 +196,15 @@ export function buildConsensusFanGeometry(input: ConsensusFanGeometryInput): Con
     ? (input.volatility as number)
     : DEFAULT_TARGET_PRICE_DAILY_VOLATILITY
 
-  // Simulate a deterministic median path per endpoint.
+  // Draw one deterministic bridged projection path per endpoint.
   const perEndpoint = endpoints.map((ep) => {
-    const paths = simulateTargetPricePaths({
+    const path = buildProjectionPath({
       currentPrice,
       targetPrice: ep.price,
       volatility,
       seed: `${baseSeed}|${ep.key}`,
     })
-    const bands = buildTargetPriceFanBands(paths)
-    return { key: ep.key, price: ep.price, median: bands ? bands.median : null }
+    return { key: ep.key, price: ep.price, path: path.length > 0 ? path : null }
   })
 
   // Recent closes → left-third sparkline of real price action. Collected early
@@ -253,15 +217,15 @@ export function buildConsensusFanGeometry(input: ConsensusFanGeometryInput): Con
   // so the sparkline, curves and dots all fit inside the plot area.
   const extentValues: number[] = [currentPrice, ...recentCloses, ...endpoints.map((e) => e.price)]
   for (const pe of perEndpoint) {
-    if (pe.median) {
-      extentValues.push(...pe.median)
+    if (pe.path) {
+      extentValues.push(...pe.path)
     }
   }
   const minValue = Math.min(...extentValues)
   const maxValue = Math.max(...extentValues)
   const range = maxValue - minValue || Math.max(1, maxValue * 0.02)
 
-  const stepCount = perEndpoint[0].median?.length ?? 0
+  const stepCount = perEndpoint[0].path?.length ?? 0
   // The current-price line spans the LEFT THIRD of the plot; the projection
   // curves fan out from `fanStart` (≈1/3 in) to `right`, so the chart reads as
   // a short current-price line that splits into 최저/평균/최고 projections.
@@ -294,10 +258,10 @@ export function buildConsensusFanGeometry(input: ConsensusFanGeometryInput): Con
   const curves: ConsensusFanCurve[] = []
   for (const key of renderOrder) {
     const pe = perEndpoint.find((p) => p.key === key)
-    if (!pe || !pe.median || pe.median.length === 0) {
+    if (!pe || !pe.path || pe.path.length === 0) {
       continue
     }
-    const median = pe.median
+    const median = pe.path
     const n = median.length
     const endpointY = round(yAt(pe.price))
     const lastMedianY = yAt(median[n - 1])
@@ -324,24 +288,6 @@ export function buildConsensusFanGeometry(input: ConsensusFanGeometryInput): Con
 
 function clampPositiveInteger(value: unknown, fallback: number): number {
   return typeof value === 'number' && Number.isFinite(value) && value >= 1 ? Math.floor(value) : fallback
-}
-
-/** Linear-interpolated percentile of a pre-sorted ascending array. */
-function quantile(sorted: number[], p: number): number {
-  if (sorted.length === 0) {
-    return Number.NaN
-  }
-  if (sorted.length === 1) {
-    return sorted[0]
-  }
-  const pos = clamp(p, 0, 1) * (sorted.length - 1)
-  const lo = Math.floor(pos)
-  const hi = Math.ceil(pos)
-  if (lo === hi) {
-    return sorted[lo]
-  }
-  const frac = pos - lo
-  return sorted[lo] * (1 - frac) + sorted[hi] * frac
 }
 
 function clamp(value: number, min: number, max: number): number {
