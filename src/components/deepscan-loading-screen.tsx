@@ -1,11 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import {
   shouldAdvanceDeepScanTimeline,
   shouldDisplayDeepScanReadyResults,
+  parseDeepScanEmphasisSegments,
   shouldShowDeepScanSummarySkeleton,
 } from '@/lib/deepscan-loading-behavior'
 import { buildDeepScanReturnRateDisplay } from '@/lib/deepscan-loading-metrics'
@@ -431,7 +432,9 @@ export function DeepScanLoadingScreen({
                     </div>
                   ) : (
                     <div className={styles.narrativeSummaryTextWrap}>
-                      <p className={cn(styles.narrativeText, styles.narrativeTextSummarized)} id={summaryTextId}>{displaySummaryText}</p>
+                      <p className={cn(styles.narrativeText, styles.narrativeTextSummarized)} id={summaryTextId}>{parseDeepScanEmphasisSegments(displaySummaryText ?? '').map((segment, index) => segment.bold
+                        ? <strong key={index} className={styles.narrativeTextStrong}>{segment.text}</strong>
+                        : <Fragment key={index}>{segment.text}</Fragment>)}</p>
                       {summaryCollapsible && card.teamKey ? (
                         <button
                           type='button'

@@ -6,6 +6,7 @@ import {
   isDeepScanBriefingItemContentReady,
   isDeepScanInlineResultsReady,
   isHiddenDeepScanLoadingQuickFact,
+  parseDeepScanEmphasisSegments,
   shouldAdvanceDeepScanTimeline,
   shouldDisplayDeepScanReadyResults,
   shouldShowDeepScanSummarySkeleton,
@@ -66,4 +67,17 @@ test('DeepScan loading helpers expose behavior without source-token coupling', (
   assert.equal(shouldShowDeepScanSummarySkeleton({ placeholder: false, resolvedSummaryText: '' }), true)
   assert.equal(shouldShowDeepScanSummarySkeleton({ placeholder: true, resolvedSummaryText: '' }), false)
   assert.equal(shouldShowDeepScanSummarySkeleton({ placeholder: false, resolvedSummaryText: '요약 완료' }), false)
+})
+
+test('팀 요약 **키워드** 강조 파싱 — 쌍만 굵게, 미완성 별표는 제거', () => {
+  assert.deepEqual(
+    parseDeepScanEmphasisSegments('지금 구간은 평단 대비 **수익권**이라 안정적이에요.'),
+    [{ text: '지금 구간은 평단 대비 ', bold: false }, { text: '수익권', bold: true }, { text: '이라 안정적이에요.', bold: false }],
+  )
+  assert.deepEqual(parseDeepScanEmphasisSegments('강조 없는 문장'), [{ text: '강조 없는 문장', bold: false }])
+  assert.deepEqual(parseDeepScanEmphasisSegments('닫히지 않은 **별표 문장'), [{ text: '닫히지 않은 별표 문장', bold: false }])
+  assert.deepEqual(
+    parseDeepScanEmphasisSegments('**목표가까지** 여력은 크고 **거래량**은 감소 중이에요.'),
+    [{ text: '목표가까지', bold: true }, { text: ' 여력은 크고 ', bold: false }, { text: '거래량', bold: true }, { text: '은 감소 중이에요.', bold: false }],
+  )
 })
