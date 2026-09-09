@@ -80,3 +80,26 @@ export async function saveDeepScanSnapshot(input: {
   return true
 }
 
+/** 스냅샷 위원회 병합 갱신 — payload 컬럼만 업데이트(market·크레딧·scanned_at 보존).
+ *  실패해도 폴링 응답에는 영향을 주지 않는다(호출처가 void로 감쌈). */
+export async function updateSnapshotCommitteePayload(
+  userId: string,
+  targetKey: string,
+  payload: JarooDeepScanPayload,
+): Promise<boolean> {
+  const client = createSnapshotServiceClient()
+  if (!client) return false
+  if (!isCanonicalPayload(payload)) return false
+
+  const { error } = await client
+    .from('deepscan_snapshots')
+    .update({ payload })
+    .eq('user_id', userId)
+    .eq('target_key', targetKey)
+  if (error) {
+    console.error('[deepscan-snapshot] committee writeback failed', { targetKey, error: error.message })
+    return false
+  }
+  return true
+}
+
