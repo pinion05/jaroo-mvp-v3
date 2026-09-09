@@ -11,6 +11,7 @@ import type { DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import type { DeepScanTargetInput } from '@/lib/workflow-types'
 
 import { cn } from '@/lib/utils'
+import { WatchAlertLevelSelector } from '@/components/watch-alert-level'
 import { DeepScanRecoveryForecastCard } from '@/components/deepscan-recovery-forecast-card'
 
 type DeepScanInlineResultsProps = {
@@ -323,6 +324,9 @@ export function DeepScanInlineResults({
           name={name}
           market={firstNonEmpty(payload.input.instrument.market, target?.market) ?? undefined}
         />
+        <div className='mt-3 rounded-[12px] bg-white/[0.06] px-3.5 py-3'>
+          <WatchAlertLevelSelector compact tone="dark" />
+        </div>
         <p className='mt-[9px] text-center text-[10.5px] text-white/40'>며칠간 무료 · 언제든 그만둘 수 있어요</p>
       </article>
       <p className='px-2 pb-2 text-center text-[10px] leading-4 text-[#97A0AE]'>AI 분석은 데이터 기반 참고 자료예요. 투자 권유나 수익 보장이 아닙니다.</p>
