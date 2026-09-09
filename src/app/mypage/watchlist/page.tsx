@@ -4,6 +4,7 @@ import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { Plus, Trash2 } from 'lucide-react'
 import { SpecFrame } from '@/components/spec/spec-frame'
+import { WatchManageSection } from '@/components/watch-manage-section'
 import { cn } from '@/lib/utils'
 import { removePortfolioItemFromList, usePortfolioStore } from '@/lib/stores/use-portfolio-store'
 import {
@@ -121,6 +122,7 @@ export default function WatchlistPage() {
   return (
     <SpecFrame backHref='/mypage' title='내 종목 관리' showBottomNav>
       <div className={styles.body}>
+        <WatchManageSection />
         {initialLoading && items.length === 0 ? (
           <div className={styles.subLabel}>종목을 불러오는 중이에요…</div>
         ) : items.length === 0 ? (
