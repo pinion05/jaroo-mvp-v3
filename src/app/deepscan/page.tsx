@@ -10,7 +10,7 @@ import { DeepScanLoadingScreen, type LoadingStageKey } from '@/components/deepsc
 import { SnapshotProvenanceBar } from '@/components/deepscan-inline-results'
 import { JarooShell } from '@/components/jaroo-shell'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
-import { computePriceDriftPct, extractSnapshotPriceBasis } from '@/lib/deepscan-snapshot-policy'
+import { computePriceDriftPct, extractSnapshotPriceBasis, resolveDeepScanSnapshotKey } from '@/lib/deepscan-snapshot-policy'
 import { type LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
 import { fetchLoadingProxyJson } from '@/lib/loading-fetch-retry'
 import { resolveDeepScanPageCacheState } from '@/lib/deepscan-page-projection'
@@ -123,6 +123,8 @@ export default function DeepScanPage() {
   }, [setDeepScanTarget, target])
 
   const targetKey = useMemo(() => (target ? getDeepScanTargetKey(target) : null), [target])
+  // 스냅샷 키(code|ticker) — 위원회 쓰래백이 갱신할 스냅샷 행 지정에 쓴다.
+  const snapshotKey = useMemo(() => (target ? resolveDeepScanSnapshotKey({ code: target.code, ticker: target.ticker }) : null), [target])
 // 스펙 spec_v7 §4 인트로 멘트(손익 5단계). 판정 = 손익액 ÷ 전체 포트폴리오 평가액(즉시 데이터, 금액 미표시).
   // 분모 우선순위: ① 적용 포트폴리오 세션(OCR 평가액 합산) ② 서버 포트폴리오 합산(재방문 세션 부재 폴백).
   // 둘 다 없으면 null → 기존 안내 문구.
@@ -533,7 +535,7 @@ export default function DeepScanPage() {
 
     const poll = async () => {
       try {
-        const response = await fetch(`/api/deepscan/committee-status?requestId=${encodeURIComponent(llmCommittee.requestId)}`, { cache: 'no-store' })
+        const response = await fetch(`/api/deepscan/committee-status?requestId=${encodeURIComponent(llmCommittee.requestId)}${snapshotKey ? `&snapshotKey=${encodeURIComponent(snapshotKey)}` : ''}`, { cache: 'no-store' })
         const body = (await response.json()) as DeepScanCommitteeStatusResponse
 
         if (stopped || !body.ok || body.requestId !== llmCommittee.requestId) {
@@ -616,7 +618,7 @@ export default function DeepScanPage() {
         clearTimeout(timeoutId)
       }
     }
-  }, [appendArrivedLoadingStageKeys, arrivedLoadingStages.targetKey, fetchState, markDeepScanLoadingSuccess, payload, targetKey, updateActivePayload])
+  }, [appendArrivedLoadingStageKeys, arrivedLoadingStages.targetKey, fetchState, markDeepScanLoadingSuccess, payload, snapshotKey, targetKey, updateActivePayload])
 
   const scrollContentToTop = () => {
     const container = document.querySelector<HTMLElement>("[data-slot='jaroo-shell-main']")
