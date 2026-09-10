@@ -833,3 +833,30 @@ test('KR committee debug artifacts are non-throwing, sanitized, and omit duplica
     else process.env.DEEPSCAN_KR_LLM_ENABLE = originalEnabled;
   }
 });
+
+test('KR_MEMBER_NUMERIC_OWNERSHIP — 9멤버 모두 소유 도메인을 가지고 tag가 서로 유일하다', async () => {
+  const { KR_MEMBER_NUMERIC_OWNERSHIP, KR_MEMBER_SPECS } = await import('../src/services/deepscan-kr-committee-runtime.js');
+  const memberKeys = Object.keys(KR_MEMBER_SPECS);
+  assert.equal(Object.keys(KR_MEMBER_NUMERIC_OWNERSHIP).length, memberKeys.length);
+  for (const memberKey of memberKeys) {
+    const spec = KR_MEMBER_NUMERIC_OWNERSHIP[memberKey];
+    assert.ok(spec, `${memberKey} 소유권 누락`);
+    assert.ok(spec.tag && spec.tag.length > 0, `${memberKey} tag 누락`);
+    assert.ok(spec.owns && spec.owns.length > 0, `${memberKey} owns 누락`);
+  }
+  const tags = memberKeys.map((key) => KR_MEMBER_NUMERIC_OWNERSHIP[key].tag);
+  assert.equal(new Set(tags).size, tags.length, 'tag 중복 — 소유권 배타성 깨짐');
+});
+
+test('systemPrompt — 소유 도메인은 digits 허용, 타 위원 도메인은 reserved로 금지된다', async () => {
+  const { KR_MEMBER_NUMERIC_OWNERSHIP, systemPrompt } = await import('../src/services/deepscan-kr-committee-runtime.js');
+  const valuationPrompt = systemPrompt('valuation');
+  assert.match(valuationPrompt, /Numeric citation ownership/);
+  assert.match(valuationPrompt, /PER, PBR, and EV\/EBITDA multiples/);
+  assert.match(valuationPrompt, /upsideBuffer=target price\/target gap %/);
+  assert.doesNotMatch(valuationPrompt, /valuation=PER\/PBR/);
+  // 모든 멤버 프롬프트에 공용 앵커(현재가 1회 허용) 예외가 들어간다
+  for (const memberKey of Object.keys(KR_MEMBER_NUMERIC_OWNERSHIP)) {
+    assert.match(systemPrompt(memberKey), /bare current price once as context/);
+  }
+});

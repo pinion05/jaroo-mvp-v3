@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   DEFAULT_COMMITTEE_LLM_MODEL,
+  detectDuplicateNumericCitations,
   getCommitteeProgress,
   scoreCommitteeMembersProgressive,
 } from '../../../deepscan-runtime-core/src/committee-llm.js';
@@ -144,6 +145,51 @@ const ETF_MEMBER_PROMPT_GUIDANCE = Object.freeze({
   holdingCompleteness: 'For ETF/ETN inputs, judge whether quantity, average price, current price, timestamps, and ETF product facts are complete enough for the current screen.',
 });
 
+
+// 숫자 인용 소유권(출력 소유권) — 위원 간 동일 수치 중복 인용 방지.
+// 원인 분석(2026-09-10): 9위원이 sharedContext를 공유하고 가격계열 멤버 슬라이스는 서로의
+// 부분집합이라(숫자 토큰 94~100% 공유) valuation·upsideBuffer·avgPriceGap·priceLocation이
+// 같은 목표가/평단/수익률 수치를 이유 문장에 반복 인용했다. 각 수치 도메인의 유일 소유자를
+// 지정하고, 소유자만 이유 문장에 해당 숫자를 인용한다. 태그는 다른 멤버 프롬프트의
+// 'reserved' 요약에 재사용된다 — tag는 멤버 간 유일해야 한다.
+export const KR_MEMBER_NUMERIC_OWNERSHIP = Object.freeze({
+  profitability: {
+    tag: 'ROE/profit margins/revenue-profit growth',
+    owns: 'ROE, operating/net profit margins, and revenue or operating-profit growth rates (valuationSnapshot.roe, financialSnapshot)',
+  },
+  valuation: {
+    tag: 'PER/PBR/EV-EBITDA multiples',
+    owns: 'PER, PBR, and EV/EBITDA multiples (valuationSnapshot, excluding roe)',
+  },
+  ownershipStability: {
+    tag: 'shareholder stakes & changes',
+    owns: 'shareholder stake percentages and stake-change figures (ownershipSnapshot)',
+  },
+  trend: {
+    tag: 'period returns/relative strength',
+    owns: 'period return windows such as 1M/3M/6M/1Y and relative strength (relativeReturnSnapshot, styleAnalysisSnapshot)',
+  },
+  consensusMomentum: {
+    tag: 'disclosure events/revision & analyst counts',
+    owns: 'disclosure event counts and risk grades (disclosureAnalysis) plus consensus revision direction/percentage and analyst counts (consensusSnapshot.revision*, recommendation*)',
+  },
+  priceLocation: {
+    tag: 'quote range/volume position',
+    owns: 'market quote-location context such as day or 52-week range and volume (currentQuote)',
+  },
+  avgPriceGap: {
+    tag: 'avg-price gap/unrealized P&L',
+    owns: 'average buy price, average-price gap percentage, and unrealized P&L amount/return (holding, marketSnapshot.averagePriceGapPct, marketSnapshot.evaluation*)',
+  },
+  upsideBuffer: {
+    tag: 'target price/target gap %',
+    owns: 'consensus target price, target gap percentage, and highest/lowest target prices (consensusSnapshot.target*)',
+  },
+  holdingCompleteness: {
+    tag: 'quantity/page coverage',
+    owns: 'holding quantity and page coverage ratio (holding.quantity, pageCoverage)',
+  },
+});
 function getInstrumentMarket(evidence) {
   return normalizeText(evidence?.instrument?.market ?? evidence?.market)?.toUpperCase() ?? null;
 }
@@ -870,7 +916,27 @@ function buildMemberDump(memberKey, input, evidence, sources) {
   }
 }
 
-function systemPrompt(memberKey) {
+/**
+ * 멤버별 숫자 인용 소유권 프롬프트 라인. 소유 도메인은 digits 인용을 허용하고,
+ * 타 위원 소유 도메인(tag 목록)은 정성 서술만 허용한다. 현재가 단일 숫자는
+ * 공용 앵커로 전원 1회 허용한다(산식 맥락 유지).
+ */
+function numericOwnershipLines(memberKey) {
+  const ownershipSpec = KR_MEMBER_NUMERIC_OWNERSHIP[memberKey];
+  if (!ownershipSpec) return [];
+  const reservedByOthers = Object.entries(KR_MEMBER_NUMERIC_OWNERSHIP)
+    .filter(([key]) => key !== memberKey)
+    .map(([key, spec]) => `${key}=${spec.tag}`)
+    .join(', ');
+  return [
+    `Numeric citation ownership — to keep committee opinions non-redundant, your reason may cite digits ONLY for your owned domain: ${ownershipSpec.owns}.`,
+    `All other numeric domains are owned by other members and must NOT appear as digits in your reason: ${reservedByOthers}. Reason about them qualitatively without digits, or omit them.`,
+    'Exception: any member may cite the bare current price once as context.',
+    'For ETF/ETN inputs, apply the same ownership split to the ETF-reinterpreted domains.',
+  ];
+}
+
+export function systemPrompt(memberKey) {
   const spec = KR_MEMBER_SPECS[memberKey];
   return [
     `You are Jaroo KR DeepScan committee member: ${spec.role}.`,
@@ -879,7 +945,8 @@ function systemPrompt(memberKey) {
     'Prefer memberContext.facts.krFacts when present; it is the source-specific normalized KR slice and should override generic global-shaped assumptions.',
     'Treat package-derived context as supplemental only, never as silent numeric truth.',
     'Treat absent fields as out-of-scope rather than negative evidence; do not request, infer, or mention data that is not present in sharedContext/memberContext.',
-    'Lead with the strongest numeric or concrete evidence that is actually present.',
+    ...numericOwnershipLines(memberKey),
+    'Lead with the strongest numeric or concrete evidence that is actually present; the numeric citation ownership below decides which of those numbers you may print.',
     'If sharedContext.instrument.market or memberContext.facts.instrument.market is ETF or ETN, or sharedContext.instrument.kind/memberContext.facts.instrument.kind is etf/etn, treat the instrument as an exchange-traded product, not an operating company.',
     'For ETF/ETN, do not mention missing individual-stock facts such as PER, PBR, ROE, corporate profitability, shareholder stability, analyst recommendation, or target price unless the input explicitly provides those facts as applicable.',
     'For ETF/ETN, absence of shareholder, constituent, or analyst-target data is not positive or negative evidence by itself; say only what can be judged from current quote, average-price gap, trend, liquidity, page coverage, NAV/premium-discount, constituents, or sector weights that are actually present.',
@@ -1022,7 +1089,11 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
     },
   });
 
-  writeJson(logDir, 'summary.json', { requestId, errors, results });
+  const duplicateNumericCitations = detectDuplicateNumericCitations(results);
+  writeJson(logDir, 'summary.json', { requestId, errors, results, duplicateNumericCitations });
+  if (duplicateNumericCitations.length > 0) {
+    console.warn(`[deepscan-kr-committee] duplicate numeric citations requestId=${requestId} count=${duplicateNumericCitations.length}`, duplicateNumericCitations.slice(0, 5));
+  }
 
   return {
     requestId,
