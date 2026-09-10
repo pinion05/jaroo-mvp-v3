@@ -974,7 +974,15 @@
   letter-spacing: -0.04em;
 }
 
-.consensusChartTop > span {
+.consensusUpsideList {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.consensusUpsideList > span {
   flex: 0 0 auto;
   padding: 3px 8px;
   border-radius: 999px;

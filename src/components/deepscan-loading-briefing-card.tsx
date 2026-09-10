@@ -565,6 +565,12 @@ export function TodayBriefingCard({
         <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Flame} question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
         {consensus ? (() => {
           const consensusTone = consensusToneOf(consensus)
+          const averageUpsidePct = isFiniteNumber(chartAveragePriceValue) && chartAveragePriceValue > 0 && isFiniteNumber(consensus.targetPriceValue) && consensus.targetPriceValue > 0
+            ? (consensus.targetPriceValue / chartAveragePriceValue - 1) * 100
+            : null
+          const averageUpsideLabel = averageUpsidePct !== null
+            ? `${averageUpsidePct > 0 ? '+' : ''}${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 }).format(averageUpsidePct)}%`
+            : null
           return (
           <article
             className={cn(styles.todayBriefItem, (forceReady || elapsedSeconds >= consensusAt) ? styles.todayBriefItemIn : undefined, styles.todayBriefConsensusItem)}
@@ -581,7 +587,10 @@ export function TodayBriefingCard({
                     <span className={styles.consensusEyebrow}>{consensus.analystCountLabel ?? 'TARGET VIEW'}</span>
                     <strong>{consensus.targetPriceLabel}</strong>
                   </div>
-                  {consensus.upsideLabel ? <span>{consensus.upsideLabel}</span> : null}
+                  <div className={styles.consensusUpsideList}>
+                    {consensus.upsideLabel ? <span>현재가 대비 {consensus.upsideLabel}</span> : null}
+                    {averageUpsideLabel ? <span>평단 대비 {averageUpsideLabel}</span> : null}
+                  </div>
                 </div>
                 <TargetPriceFanChart
                   consensus={consensus}
