@@ -77,11 +77,15 @@ function TargetPriceFanChart({
   dailyCloses,
   seedKey,
   tone,
+  averagePrice,
+  averageLabel,
 }: {
   consensus: NonNullable<LoadingQuickFact['consensus']>
   dailyCloses?: Array<number | null | undefined>
   seedKey?: string
   tone?: 'profit' | 'loss' | null
+  averagePrice?: number | null
+  averageLabel?: string
 }) {
   const geometry = useMemo(() => {
     const current = consensus.currentPriceValue
@@ -95,11 +99,12 @@ function TargetPriceFanChart({
       averageTarget: target,
       highTarget: consensus.highTargetValue,
       lowTarget: consensus.lowTargetValue,
+      averagePrice,
       recentCloses: dailyCloses,
       volatility,
       seed: seedKey ?? `${current}|${target}`,
     })
-  }, [consensus.currentPriceValue, consensus.targetPriceValue, consensus.highTargetValue, consensus.lowTargetValue, dailyCloses, seedKey])
+  }, [consensus.currentPriceValue, consensus.targetPriceValue, consensus.highTargetValue, consensus.lowTargetValue, dailyCloses, seedKey, averagePrice])
 
   if (!geometry) {
     return null
@@ -153,6 +158,15 @@ function TargetPriceFanChart({
         ) : (
           <line className={styles.consensusFanCurrentLine} x1={geometry.leftX} y1={geometry.currentY} x2={geometry.fanStartX} y2={geometry.currentY} />
         )}
+        {geometry.averagePriceY !== null ? (
+          <line
+            className={styles.consensusFanAvgLine}
+            x1={geometry.leftX}
+            y1={geometry.averagePriceY}
+            x2={geometry.rightX}
+            y2={geometry.averagePriceY}
+          />
+        ) : null}
         {geometry.curves.map((curve) => (
           <path key={`path-${curve.key}`} className={curveClass[curve.key]} d={curve.pathD} pathLength={1} />
         ))}
@@ -162,6 +176,9 @@ function TargetPriceFanChart({
       </svg>
       <div className={styles.consensusFanLegend}>
         <span className={styles.consensusFanLegendCurrent}><i />현재가</span>
+        {geometry.averagePriceY !== null ? (
+          <span className={styles.consensusFanLegendAvgPrice}><i />{averageLabel ?? '내 평단'}</span>
+        ) : null}
         {legendOrder.filter((key) => activeKeys.has(key)).map((key) => (
           <span key={`legend-${key}`} className={legendClass[key]}><i />{legendLabel[key]}</span>
         ))}
@@ -566,7 +583,14 @@ export function TodayBriefingCard({
                   </div>
                   {consensus.upsideLabel ? <span>{consensus.upsideLabel}</span> : null}
                 </div>
-                <TargetPriceFanChart consensus={consensus} dailyCloses={dailyCloses} seedKey={seedKey} tone={consensusTone} />
+                <TargetPriceFanChart
+                  consensus={consensus}
+                  dailyCloses={dailyCloses}
+                  seedKey={seedKey}
+                  tone={consensusTone}
+                  averagePrice={chartAveragePriceValue}
+                  averageLabel={chartAverageLabel}
+                />
                 <dl className={styles.consensusStats}>
                   {consensus.currentPriceLabel ? (<div className={styles.consensusStat}><dt>현재가</dt><dd>{consensus.currentPriceLabel}</dd></div>) : null}
                   {consensus.opinionLabel ? (<div className={styles.consensusStat}><dt>투자의견</dt><dd>{consensus.opinionLabel}</dd></div>) : null}
