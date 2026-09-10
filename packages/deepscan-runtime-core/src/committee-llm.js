@@ -722,6 +722,9 @@ export function detectDuplicateNumericCitations(results, options = {}) {
       const value = Number(normalized)
       if (!Number.isFinite(value)) continue
       if (value < 10 && !hasPercent && !normalized.includes('.')) continue
+      // 연도(1900~2100, 4자리, %/소수 없음)는 기간 맥락이라 어느 위원이든 인용한다 —
+      // 소유권 위반 신호가 아니므로 지표 노이즈로 제외한다.
+      if (!hasPercent && !normalized.includes('.') && normalized.length === 4 && value >= 1900 && value <= 2100) continue
       tokens.add(hasPercent ? `${normalized}%` : normalized)
     }
     if (tokens.size > 0) tokensByMember.set(memberKey, tokens)

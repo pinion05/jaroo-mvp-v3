@@ -57,3 +57,11 @@ test('이유가 없거나 깨진 결과는 무시한다', () => {
   assert.equal(dups.length, 2)
   assert.deepEqual(dups.map((d) => d.token).sort(), ['15.3%', '67800'])
 })
+
+test('연도(1900~2100 4자리)는 기간 맥락이라 중복으로 세지 않는다', () => {
+  const results = {
+    a: { reason: '2026년 상반기 매출이 감소했습니다.' },
+    b: { reason: '2026년 실적 둔화와 2025년 대비 흐름을 확인했습니다.' },
+  }
+  assert.deepEqual(detectDuplicateNumericCitations(results), [])
+})
