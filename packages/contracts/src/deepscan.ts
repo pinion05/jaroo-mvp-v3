@@ -119,6 +119,12 @@ export type JarooDeepScanCommitteeAxis = {
   members: JarooDeepScanCommitteeMember[]
 }
 
+export type JarooDeepScanConsensusBroker = {
+  name: string
+  targetPrice: number
+  date?: string | null
+}
+
 export type JarooDeepScanConsensusStructured = {
   targetPrice?: number | null
   targetGapPct?: number | null
@@ -128,6 +134,7 @@ export type JarooDeepScanConsensusStructured = {
   highestTargetPrice?: number | null
   lowestTargetPrice?: number | null
   opinionSummary?: string | null
+  brokers?: JarooDeepScanConsensusBroker[] | null
   currency?: string | null
 }
 

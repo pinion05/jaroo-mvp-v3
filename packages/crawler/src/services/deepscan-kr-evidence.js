@@ -521,6 +521,24 @@ function isConsensusOpinionRow(row) {
   const estimator = normalizeText(row?.추정기관 ?? row?.기관 ?? row?.broker ?? row?.증권사);
   return estimator ? /consensus|컨센서스/i.test(estimator) : false;
 }
+// 증권사별 목표가 상세({ name, targetPrice, date }) 목록을 검증·정규화한다.
+// 네이버 폴백 합성 행의 analystBrokers(증권사명·발표일·최신 목표가)가 유일한 공급원이다.
+function normalizeAnalystBrokers(list) {
+  if (!Array.isArray(list)) {
+    return null;
+  }
+
+  const brokers = list
+    .map((entry) => ({
+      name: normalizeEvidenceText(entry?.name),
+      targetPrice: normalizeNumber(entry?.targetPrice),
+      date: normalizeEvidenceText(entry?.date),
+    }))
+    .filter((entry) => entry.name !== null && entry.targetPrice !== null && entry.targetPrice > 0)
+    .map((entry) => ({ name: entry.name, targetPrice: entry.targetPrice, date: entry.date }));
+
+  return brokers.length > 0 ? brokers : null;
+}
 
 function extractAnalystTargetStats(opinionPage) {
   // 네이버 폴백 합성 행은 증권사별 집계(최고/최저/증권사 수)를 요약 필드로 이미 갖고 있다.
@@ -541,6 +559,7 @@ function extractAnalystTargetStats(opinionPage) {
       analystCount: syntheticSummary.count,
       highestTargetPrice: syntheticSummary.highest,
       lowestTargetPrice: syntheticSummary.lowest,
+      brokers: normalizeAnalystBrokers(opinionPage?.analystBrokers),
     };
   }
 
@@ -559,13 +578,23 @@ function extractAnalystTargetStats(opinionPage) {
       analystCount: null,
       highestTargetPrice: null,
       lowestTargetPrice: null,
+      brokers: null,
     };
   }
+
+  const rowBrokers = brokerRows
+    .map((item) => ({
+      name: normalizeEvidenceText(item.row?.추정기관 ?? item.row?.기관 ?? item.row?.broker ?? item.row?.증권사),
+      targetPrice: item.targetPrice,
+      date: normalizeEvidenceText(item.row?.날짜 ?? item.row?.작성일 ?? item.row?.발표일 ?? item.row?.writeDate),
+    }))
+    .filter((entry) => entry.name !== null);
 
   return {
     analystCount: brokerRows.length > 0 ? brokerRows.length : null,
     highestTargetPrice: targetPrices.length > 1 ? Math.max(...targetPrices) : null,
     lowestTargetPrice: targetPrices.length > 1 ? Math.min(...targetPrices) : null,
+    brokers: rowBrokers.length > 0 ? rowBrokers : null,
   };
 }
 
@@ -686,6 +715,7 @@ function extractConsensusSnapshot(consensusPage, opinionPage, currentPrice, opti
     recommendationCounts: null,
     analystCount: analystTargetStats.analystCount,
     highestTargetPrice: analystTargetStats.highestTargetPrice,
+    analystBrokers: normalizeAnalystBrokers(opinionPage?.analystBrokers) ?? analystTargetStats.brokers,
     lowestTargetPrice: analystTargetStats.lowestTargetPrice,
     revisionDirection: resolveRevisionDirection(revisionPct),
     revisionPct,

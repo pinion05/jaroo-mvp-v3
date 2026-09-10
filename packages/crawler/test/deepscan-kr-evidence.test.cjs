@@ -191,6 +191,7 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
     analystCount: null,
     highestTargetPrice: null,
     lowestTargetPrice: null,
+    analystBrokers: null,
     revisionDirection: 'unknown',
     revisionPct: null,
   });
@@ -1103,4 +1104,65 @@ test('buildDeepScanKrEvidencePacket uses ETF snapshot close price as a quote fal
   assert.equal(packet.sourceCoverage.hasCurrentQuote, true);
   assert.equal(packet.marketSnapshot.averagePriceGapPct, ((84235 - 58828.75) / 58828.75) * 100);
   assert.equal(packet.missingSources.includes('current-quote'), false);
+});
+
+test('buildDeepScanKrEvidencePacket carries naver fallback analyst brokers into the consensus snapshot', async () => {
+  const service = await import('../src/services/deepscan-kr-evidence.js');
+
+  const packet = service.buildDeepScanKrEvidencePacket(
+    {
+      instrument: {
+        code: '005930',
+        name: '삼성전자',
+      },
+      holding: {
+        shares: '12',
+        averagePrice: '71000',
+      },
+      selectedAt: '2026-04-15T00:00:00.000Z',
+    },
+    {
+      slim: {
+        code: '005930',
+        company: { code: '005930', name: '삼성전자' },
+        pages: {
+          opinion: {
+            sourceLabel: 'naver-fallback',
+            asOfText: '2026.09.09',
+            targetPrice: 100000,
+            추정기관: 'consensus',
+            증권사수: 3,
+            최고목표주가: 110000,
+            최저목표주가: 90000,
+            analystBrokers: [
+              { name: '미래에셋증권', targetPrice: 110000, date: '2026-09-07' },
+              { name: '현대차증권', targetPrice: 90000, date: '2026-08-05' },
+              { name: '깨진항목', targetPrice: -5, date: '2026-08-01' },
+              { name: '', targetPrice: 95000, date: '2026-08-02' },
+            ],
+            rows: [{ '투자의견(점수)': 4.0, 목표주가: 100000 }],
+          },
+        },
+      },
+      quotes: {
+        items: [
+          {
+            market: 'KR',
+            code: '005930',
+            price: 85200,
+            currency: 'KRW',
+            asOf: null,
+            source: 'krx',
+            status: 'ok',
+          },
+        ],
+      },
+    },
+  );
+
+  assert.deepEqual(packet.consensusSnapshot.analystBrokers, [
+    { name: '미래에셋증권', targetPrice: 110000, date: '2026-09-07' },
+    { name: '현대차증권', targetPrice: 90000, date: '2026-08-05' },
+  ]);
+  assert.equal(packet.consensusSnapshot.analystCount, 3);
 });

@@ -1100,6 +1100,7 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
       analystOpinionRows: makeSlimV12Fact(slimPayload.pages?.opinion?.analystOpinions?.rows ?? [], { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions.rows' }),
       analystCount: makeSlimV12Fact(evidence.consensusSnapshot?.analystCount ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinations.brokerCount' }),
       highestTargetPrice: makeSlimV12Fact(evidence.consensusSnapshot?.highestTargetPrice ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가(최고)' }),
+      consensusBrokers: makeSlimV12Fact(evidence.consensusSnapshot?.analystBrokers ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystBrokers' }),
       lowestTargetPrice: makeSlimV12Fact(evidence.consensusSnapshot?.lowestTargetPrice ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가(최저)' }),
     },
     profitability: {

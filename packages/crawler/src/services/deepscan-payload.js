@@ -2108,6 +2108,16 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
   const consensusLowestTargetPrice = typeof consensusSnapshot.lowestTargetPrice === 'number' && Number.isFinite(consensusSnapshot.lowestTargetPrice)
     ? consensusSnapshot.lowestTargetPrice
     : null;
+  const consensusBrokers = Array.isArray(consensusSnapshot.analystBrokers)
+    ? consensusSnapshot.analystBrokers
+      .map((entry) => ({
+        name: typeof entry?.name === 'string' ? entry.name.trim() : '',
+        targetPrice: typeof entry?.targetPrice === 'number' && Number.isFinite(entry.targetPrice) ? entry.targetPrice : null,
+        date: typeof entry?.date === 'string' && entry.date.trim() ? entry.date.trim() : null,
+      }))
+      .filter((entry) => entry.name && entry.targetPrice !== null && entry.targetPrice > 0)
+      .slice(0, 40)
+    : null;
   const disclosureAnalysis = evidence.disclosureAnalysis ?? null;
   const disclosureInsightBody = buildDisclosureInsightBody(disclosureAnalysis);
   const items = [
@@ -2164,6 +2174,7 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
             highestTargetPrice: consensusHighestTargetPrice,
             lowestTargetPrice: consensusLowestTargetPrice,
             opinionSummary: consensusOpinionSummary,
+            brokers: consensusBrokers && consensusBrokers.length > 0 ? consensusBrokers : null,
             currency: evidence.currentQuote?.currency ?? 'KRW',
           },
         }]
