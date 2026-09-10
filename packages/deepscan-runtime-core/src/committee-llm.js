@@ -698,3 +698,45 @@ export async function scoreCommitteeMembersProgressive({ memberKeys, shared, mem
 
   return snapshot
 }
+
+/**
+ * 중복 수치 인용 감지(검증 메트릭) — 위원 간 이유 문장에 같은 숫자가 반복된 건수를 센다.
+ * 출력 소유권 프롬프트의 준수율을 측정하는 디버그 지표이며, 결과 자체는 재작성하지 않는다.
+ *
+ * 규칙:
+ *  - 숫자 토큰: /[\d][\d,]*\.?\d*%?/ — 콤마 제거 후 비교('487,045' === '487045').
+ *  - '%' 유무는 다른 토큰으로 취급('15' !== '15%').
+ *  - 값이 10 미만인 소수점 없는 정수는 노이즈(건수·페이지 수 등)로 무시, 단 '%'·소수는 유지.
+ *  - 소유자 1명만 인용하면 정상 — 2명 이상이 같은 토큰을 쓸 때만 보고한다.
+ */
+export function detectDuplicateNumericCitations(results, options = {}) {
+  const tokensByMember = new Map()
+  for (const [memberKey, result] of Object.entries(results ?? {})) {
+    const reason = result && typeof result === 'object' ? result.reason : null
+    if (typeof reason !== 'string' || !reason.trim()) continue
+    const tokens = new Set()
+    for (const raw of reason.match(/[\d][\d,]*\.?\d*%?/g) ?? []) {
+      const hasPercent = raw.endsWith('%')
+      const normalized = (hasPercent ? raw.slice(0, -1) : raw).replace(/,/g, '')
+      if (!normalized || normalized === '.') continue
+      const value = Number(normalized)
+      if (!Number.isFinite(value)) continue
+      if (value < 10 && !hasPercent && !normalized.includes('.')) continue
+      tokens.add(hasPercent ? `${normalized}%` : normalized)
+    }
+    if (tokens.size > 0) tokensByMember.set(memberKey, tokens)
+  }
+
+  const tokenOwners = new Map()
+  for (const [memberKey, tokens] of tokensByMember) {
+    for (const token of tokens) {
+      if (!tokenOwners.has(token)) tokenOwners.set(token, [])
+      tokenOwners.get(token).push(memberKey)
+    }
+  }
+
+  return Array.from(tokenOwners.entries())
+    .filter(([, members]) => members.length >= 2)
+    .map(([token, members]) => ({ token, members: members.sort() }))
+    .sort((a, b) => b.members.length - a.members.length || a.token.localeCompare(b.token))
+}
