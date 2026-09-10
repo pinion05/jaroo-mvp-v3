@@ -160,3 +160,25 @@ test('projection curve is not a straight line — interior has direction changes
   }
   assert.ok(reversals >= 3, `projection should wiggle like a real chart, got ${reversals} reversals`)
 })
+
+test('buildConsensusFanGeometry draws the average-price dotted line inside the plot', () => {
+  const g = buildConsensusFanGeometry({ currentPrice: 100, averageTarget: 120, lowTarget: 80, highTarget: 160, averagePrice: 90, seed: 's' })
+  assert.ok(g)
+  assert.ok(g.averagePriceY !== null)
+  assert.ok(g.averagePriceY! >= 18 && g.averagePriceY! <= 100)
+  // 평단이 현재가와 같으면 현재가 선과 동일한 y
+  const same = buildConsensusFanGeometry({ currentPrice: 100, averageTarget: 120, averagePrice: 100, seed: 's' })
+  assert.equal(same!.averagePriceY, same!.currentY)
+  // 평단이 멀리 있어도 공유 y축에 포함돼 선이 잘리지 않는다
+  const far = buildConsensusFanGeometry({ currentPrice: 100, averageTarget: 120, averagePrice: 20, seed: 's' })
+  assert.ok(far!.averagePriceY !== null)
+})
+
+test('buildConsensusFanGeometry omits the average-price line when absent or invalid', () => {
+  const none = buildConsensusFanGeometry({ currentPrice: 100, averageTarget: 120, seed: 's' })
+  assert.equal(none!.averagePriceY, null)
+  const zero = buildConsensusFanGeometry({ currentPrice: 100, averageTarget: 120, averagePrice: 0, seed: 's' })
+  assert.equal(zero!.averagePriceY, null)
+  const nan = buildConsensusFanGeometry({ currentPrice: 100, averageTarget: 120, averagePrice: Number.NaN, seed: 's' })
+  assert.equal(nan!.averagePriceY, null)
+})

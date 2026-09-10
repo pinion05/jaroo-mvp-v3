@@ -823,6 +823,12 @@
   animation: consensus-current-reveal 0.6s 1.8s ease-out forwards;
 }
 
+.consensusFanAvgLine {
+  stroke: var(--ds-muted);
+  stroke-dasharray: 3 3;
+  stroke-width: 1;
+}
+
 .consensusFanTargetPath {
   fill: none;
   stroke: var(--ds-blue);
@@ -891,6 +897,7 @@
 }
 
 .consensusFanLegendCurrent,
+.consensusFanLegendAvgPrice,
 .consensusFanLegendTarget {
   display: inline-flex;
   align-items: center;
@@ -898,6 +905,13 @@
 }
 
 .consensusFanLegendCurrent i {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top: 1.5px dashed var(--ds-muted);
+}
+
+.consensusFanLegendAvgPrice i {
   display: inline-block;
   width: 14px;
   height: 0;

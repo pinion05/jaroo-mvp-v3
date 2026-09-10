@@ -137,6 +137,8 @@ export type ConsensusFanGeometryInput = {
   averageTarget: number
   highTarget?: number | null
   lowTarget?: number | null
+  /** 사용자의 평단(내 평단). 주면 공유 y축에 포함돼 전 폭 점선으로 렌더된다. */
+  averagePrice?: number | null
   /** Recent close prices (oldest→newest); rendered as a left-third sparkline of real price action. */
   recentCloses?: Array<number | null | undefined>
   /** Per-step (daily) volatility; falls back to the default when not finite. */
@@ -159,6 +161,8 @@ export type ConsensusFanGeometry = {
    * when their target is absent/non-positive.
    */
   curves: ConsensusFanCurve[]
+  /** 내 평단 점선의 y좌표. 평단이 없으면 null(선 렌더 생략). */
+  averagePriceY: number | null
 }
 
 /**
@@ -215,7 +219,15 @@ export function buildConsensusFanGeometry(input: ConsensusFanGeometryInput): Con
 
   // Shared y-extent across current + recent closes + endpoints + medians,
   // so the sparkline, curves and dots all fit inside the plot area.
-  const extentValues: number[] = [currentPrice, ...recentCloses, ...endpoints.map((e) => e.price)]
+  const averagePrice = Number.isFinite(input.averagePrice) && (input.averagePrice as number) > 0
+    ? (input.averagePrice as number)
+    : null
+  const extentValues: number[] = [
+    currentPrice,
+    ...recentCloses,
+    ...endpoints.map((e) => e.price),
+    ...(averagePrice !== null ? [averagePrice] : []),
+  ]
   for (const pe of perEndpoint) {
     if (pe.path) {
       extentValues.push(...pe.path)
@@ -236,6 +248,7 @@ export function buildConsensusFanGeometry(input: ConsensusFanGeometryInput): Con
   const round = (v: number) => Math.round(v * 10) / 10
 
   const currentY = round(yAt(currentPrice))
+  const averagePriceY = averagePrice !== null ? round(yAt(averagePrice)) : null
 
   // Left-third sparkline of recent closes, evenly mapped left→fanStart and
   // anchored so its tail lands exactly on currentY, joining the fan at the split.
@@ -281,7 +294,7 @@ export function buildConsensusFanGeometry(input: ConsensusFanGeometryInput): Con
     return null
   }
 
-  return { leftX: left, rightX: right, fanStartX: round(fanStart), currentY, recentPath, curves }
+  return { leftX: left, rightX: right, fanStartX: round(fanStart), currentY, recentPath, curves, averagePriceY }
 }
 
 // --- internals ---
