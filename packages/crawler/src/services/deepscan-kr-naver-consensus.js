@@ -208,15 +208,19 @@ async function fetchNaverBrokerTargetStats(code, timeoutMs = 12000) {
     }
 
     if (latestByBroker.size === 0) {
-      return { analystCount: 0, highestTargetPrice: null, lowestTargetPrice: null, averageTargetPrice: null };
+      return { analystCount: 0, highestTargetPrice: null, lowestTargetPrice: null, averageTargetPrice: null, brokers: [] };
     }
 
-    const goals = [...latestByBroker.values()].map((entry) => entry.goalPrice);
+    const brokers = [...latestByBroker.entries()]
+      .map(([name, entry]) => ({ name, targetPrice: entry.goalPrice, date: entry.writeDate }))
+      .sort((a, b) => (a.date < b.date ? 1 : a.date > b.date ? -1 : 0));
+    const goals = brokers.map((entry) => entry.targetPrice);
     return {
-      analystCount: latestByBroker.size,
+      analystCount: brokers.length,
       highestTargetPrice: goals.length > 1 ? Math.max(...goals) : null,
       lowestTargetPrice: goals.length > 1 ? Math.min(...goals) : null,
       averageTargetPrice: Math.round(goals.reduce((sum, value) => sum + value, 0) / goals.length),
+      brokers,
     };
   } catch {
     return null;
@@ -250,6 +254,9 @@ async function buildNaverConsensusSyntheticRow(code) {
           최고목표주가: brokerStats.highestTargetPrice,
           최저목표주가: brokerStats.lowestTargetPrice,
           증권사수: brokerStats.analystCount,
+          ...(Array.isArray(brokerStats.brokers) && brokerStats.brokers.length > 0
+            ? { analystBrokers: brokerStats.brokers }
+            : {}),
         }
       : {}),
     rows: [{ '투자의견(점수)': fallback.score ?? null, 목표주가: fallback.targetPrice }],

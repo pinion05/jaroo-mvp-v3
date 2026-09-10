@@ -412,6 +412,7 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
         highestTargetPrice: null,
         lowestTargetPrice: null,
         opinionSummary: '매수 의견이 우세해요',
+        brokers: null,
         currency: 'KRW',
       },
     },
@@ -1301,4 +1302,39 @@ test('buildJarooDeepScanPayload uses ETF-native payload when kind is etf and mar
 
   const allStrings = collectStrings(payload).join('\n');
   assert.doesNotMatch(allStrings, /목표가 조회 실패|사업 품질|밸류에이션|기업 실적|PER|PBR/);
+});
+
+test('buildJarooDeepScanPayload persists broker target details in the consensus structured mirror', async () => {
+  const publicApi = await import('../src/index.js');
+
+  const sources = createStrongKrSources();
+  sources.slim.pages.opinion = {
+    ...sources.slim.pages.opinion,
+    sourceLabel: 'naver-fallback',
+    asOfText: '2026.09.09',
+    증권사수: 2,
+    최고목표주가: 110000,
+    최저목표주가: 90000,
+    analystBrokers: [
+      { name: '미래에셋증권', targetPrice: 110000, date: '2026-09-07' },
+      { name: '현대차증권', targetPrice: 90000, date: '2026-08-05' },
+      { name: '깨진항목', targetPrice: 0, date: '2026-08-01' },
+    ],
+  };
+
+  const payload = await publicApi.buildJarooDeepScanPayload({
+    instrument: { name: '삼성전자', code: '005930', market: 'KR' },
+    holding: { shares: '12', averagePrice: '71000', evaluationAmount: '1022400' },
+    selectedAt: '2026-04-15T00:00:00.000Z',
+    sources,
+  });
+
+  const item = payload.insights.items.find((entry) => entry.sourceLabel === '증권사 의견');
+  assert.ok(item, '증권사 의견 인사이트 없음');
+  assert.equal(item.consensus.analystCount, 2);
+  assert.deepEqual(item.consensus.brokers, [
+    { name: '미래에셋증권', targetPrice: 110000, date: '2026-09-07' },
+    { name: '현대차증권', targetPrice: 90000, date: '2026-08-05' },
+  ]);
+  assert.match(item.body, /증권사 2곳/);
 });
