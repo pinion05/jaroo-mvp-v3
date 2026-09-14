@@ -15,6 +15,7 @@ import {
   resolveDeepScanSnapshotKey,
 } from '@/lib/deepscan-snapshot-policy'
 import { lookupDeepScanSnapshot, saveDeepScanSnapshot } from '@/lib/deepscan-snapshot-store'
+import { recordScanHistory } from '@/lib/deepscan-history-store'
 import type { JarooDeepScanPayload } from '../../../../packages/contracts/src/deepscan'
 
 export const runtime = 'nodejs'
@@ -218,6 +219,18 @@ function makeSnapshotSaver(userId: string | null, chargedCredits: number) {
       userId,
       targetKey: snapshotKey,
       market: searchParams.get('market'),
+      payload,
+      priceBasis: extractSnapshotPriceBasis(payload),
+      chargedCredits,
+    })
+    // 기록 원장 append — 스냅샷(최신 1건 캐시)과 달리 스캔마다 1행 남긴다.
+    const rawInput = buildRawInputFromSearchParams(searchParams)
+    void recordScanHistory({
+      userId,
+      targetKey: snapshotKey,
+      market: rawInput.instrument.market ?? null,
+      stockName: rawInput.instrument.name ?? null,
+      targetInput: rawInput,
       payload,
       priceBasis: extractSnapshotPriceBasis(payload),
       chargedCredits,
