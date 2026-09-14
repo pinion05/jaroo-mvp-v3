@@ -8,7 +8,7 @@ import {
   extractOpenRouterErrorMessage,
   extractOpenRouterErrorStatus,
   toPublicOcrErrorMessage,
-} from './route'
+} from './shared'
 
 test('OpenRouter가 HTTP 200으로 error payload를 내려도 메시지를 추출한다', () => {
   const message = extractOpenRouterErrorMessage({
