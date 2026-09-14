@@ -265,6 +265,16 @@
   color: #c2c8d0;
   flex-shrink: 0;
 }
+.recBtn {
+  display: block;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  font: inherit;
+}
+.recBtn:active {
+  background: #f7f9fb;
+}
 
 /* 준비 중(soon) 페이지 */
 .soonWrap {
