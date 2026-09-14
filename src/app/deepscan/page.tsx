@@ -132,10 +132,13 @@ export default function DeepScanPage() {
     () => (readAppliedHomePortfolio()?.rows ?? []).reduce((sum, row) => sum + (parseOcrNumber(row.evaluationAmount ?? '') ?? 0), 0),
     [],
   )
-  const [introPortfolioTotal, setIntroPortfolioTotal] = useState<number | null>(null)
+  const [introFetchedTotal, setIntroFetchedTotal] = useState<number | null>(null)
+  // 세션 합계가 있으면 즉시 파생값으로 사용하고, 없을 때만 서버 조회로 채운다.
+  // 이펙트 본문의 동기 setState(연쇄 렌더 — react-hooks lint)를 피하기 위해
+  // 세션 우선 판정은 렌더 시점 파생으로 옮겼다.
+  const introPortfolioTotal = introSessionTotal > 0 ? introSessionTotal : introFetchedTotal
   useEffect(() => {
     if (introSessionTotal > 0) {
-      setIntroPortfolioTotal(introSessionTotal)
       return
     }
     let cancelled = false
@@ -150,7 +153,7 @@ export default function DeepScanPage() {
           0,
         )
         if (total > 0) {
-          setIntroPortfolioTotal(total)
+          setIntroFetchedTotal(total)
         }
       })
       .catch(() => undefined)
