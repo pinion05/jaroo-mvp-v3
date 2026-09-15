@@ -325,7 +325,7 @@ export const homeHoldings: HomeHolding[] = [
     actionLabel: 'ETF 분석',
     actionSubLabel: '섹터 구성 + 회복 시나리오',
     actionCredits: undefined,
-    actionHref: '/deepscan',
+    actionHref: '/etf',
   },
 ]
 
@@ -1585,7 +1585,9 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
       actionLabel: kind === 'etf' ? 'ETF 분석' : '딥스캔',
       actionSubLabel: kind === 'etf' ? '섹터 구성 + 회복 시나리오' : '세 팀이 분석해요',
       actionCredits: undefined,
-      actionHref: '/deepscan',
+      // ETF는 /etf 실데이터 분석으로, 주식은 기존 딥스캔으로. 둘 다
+      // shouldUseDeepScanLoadingHandoff가 로딩 핸드오프를 이어준다.
+      actionHref: kind === 'etf' ? '/etf' : '/deepscan',
     }
   })
 }
