@@ -1,11 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import { isEtfLedgerPayload, recordEtfHistory } from '@/lib/etf-history-store'
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 
 // /api/etf/profile — 크롤러 etf-profile 수집기 프록시.
 // 공개 시세성 데이터(네이버+위세리포트)라 세션을 요구하지 않되,
 // 무인증 크롤러 릴레이가 되지 않도록 IP 레이트리밋 + 코드 검증 + 타임아웃을 건다
 // (코드 감사 B2 교훈 — /api/deepscan/slim 사건과 동일한 방어).
+//
+// 부수 효과: 세션(쿠키)이 있는 호출자에 한해 조회 성공 시마다 ETF 기록 원장에
+// 1행 append한다(deepscan 스캔 성공 시 recordScanHistory와 같은 패턴).
+// payload는 상류 응답을 그대로 저장하므로 클라이언트 위조 여지가 없고,
+// 기록 실패는 void로 삼켜 조회 응답에 영향을 주지 않는다.
 
 export const ETF_PROFILE_RATE_LIMIT_MAX = 30 // 화면 진입당 1회 호출 기준, 탐색 여유 포함
 export const ETF_PROFILE_RATE_LIMIT_WINDOW_MS = 5 * 60_000
@@ -42,6 +49,30 @@ function resolveClientKey(request: NextRequest): string {
 }
 
 const NO_STORE_HEADERS = { 'cache-control': 'no-store' } as const
+
+/** 세션 유저 id — 원장 기록용(게스트는 기록하지 않는다). 조회 성공 경로에서만 호출. */
+async function resolveOptionalUserId(): Promise<string | null> {
+  try {
+    const supabase = await createSupabaseServerClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    return user?.id ?? null
+  } catch {
+    return null
+  }
+}
+
+/** 원장 append — 조회 응답을 지연시키지 않는다(void). payload는 상류 200 본문 그대로. */
+function appendEtfHistory(userId: string, rawBody: string): void {
+  try {
+    const profile = JSON.parse(rawBody)?.data
+    if (!isEtfLedgerPayload(profile)) return
+    void recordEtfHistory({ userId, profile })
+  } catch {
+    // 원장 파싱 실패는 조회 성공 응답과 무관하다
+  }
+}
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code')?.trim() ?? ''
@@ -82,6 +113,10 @@ export async function GET(request: NextRequest) {
         { status: 502, headers: NO_STORE_HEADERS },
       )
     }
+
+    const userId = await resolveOptionalUserId()
+    if (userId) appendEtfHistory(userId, body)
+
     return new NextResponse(body, {
       status: 200,
       headers: {
