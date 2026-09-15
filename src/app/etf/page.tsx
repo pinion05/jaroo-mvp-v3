@@ -96,10 +96,11 @@ function EtfProductCard({ vm }: { vm: EtfViewModel }) {
       ) : null}
 
       {hasDetail ? (
-        <div className='border-t border-[#EFF1F4] px-4 py-3'>
+        <div className='border-t border-[#EFF1F4] px-4 py-4'>
+          <div className='mb-1 text-[10px] text-[#97A0AE]'>상세 정보</div>
           <div className='divide-y divide-[#EFF1F4]'>
             {vm.basicInfo.items.map((item) => (
-              <div key={item.label} className='flex items-center justify-between py-2.5 first:pt-1.5 last:pb-1.5'>
+              <div key={item.label} className='flex items-center justify-between py-3 first:pt-2 last:pb-0'>
                 <span className='text-[12px] text-[#97A0AE]'>{item.label}</span>
                 <span className='text-[13px] font-bold text-[#0F1419]'>{item.value}</span>
               </div>
