@@ -510,3 +510,10 @@ export function resolveEtfPageTarget(input: {
   `polygon-yahoo/us/market/indicators`(I:SPX·I:IXIC)를 병렬 조회해 market.sp500/nasdaq를 실음.
   카드는 기존 sp500/nasdaq 키 분기 재사용. 지표 실패는 market {} 폴백(관용).
   공유 라우트라 미국 주식 딥스캔에도 동일 적용.
+
+- 헤드풀 브라우저 수집(2026-09-16 추가): quoteSummary 보강층(상품정보·구성종목 Top10)에
+  **Playwright 헤드풀 경로 폴백** 추가 — 직접 fetch가 Yahoo 엣지 차단(429)이면 실제 Chromium으로
+  finance.yahoo.com 페이지 컨텍스트에서 절대 query1 URL + credentials include로 crumb→quoteSummary
+  수집(실측: 상대경로는 404, crumb 없으면 엣지 429 — 절대경로+쿠키 조합이 통과 열쇠).
+  디스플레이 없는 컨테이너는 headless 폴백. 라이브 검증: VOO 프로필에 Vanguard·연 0.03%·
+  1.76조 달러·NAV $702.62·구성 10종(NVDA 7.55%…) 채워짐 → /etf 카드 렌더 확인.
