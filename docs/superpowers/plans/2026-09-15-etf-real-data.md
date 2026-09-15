@@ -504,3 +504,9 @@ export function resolveEtfPageTarget(input: {
 - 단위: 크롤러 6종(계약·NOT_ETF·관용) + 웹 9종(타깃·브리핑 URL·USD 표기·원장 가드·라벨) — 전체 웹 507/507·크롤러 15/15·lint·typecheck 0
 - 라이브 E2E(VOO): 홈 카드→'ETF 분석'→/etf(세션) → 달러 시세·차트·52주 88%($580.93~$714.95)·수익률(1Y +15.67%)·리스크(변동성 15.9%·MDD −19.0%·샤프 0.81) → 원장(target_key VOO·market us) → 기록 탡 'ETF · 미국' → 재진입 캐시 배너. AAPL은 400 거부.
 - 로컬 제약: 개발 IP가 Yahoo 스로틀 중이라 구성종목·상품정보 보강층이 notice 폴백으로 실증됨(프로덕션은 별도 IP·저빈도라 동작 예상 — 배포 후 확인 필요).
+
+- 미국 시장 브리핑(2026-09-16 추가): '오늘 시장 속에서는?' 행이 미국 종목에서도 코스피/코스닥 대신
+  **S&P 500·NASDAQ**로 표시된다 — 웹 briefing-snapshot의 US 경로가 크롤러
+  `polygon-yahoo/us/market/indicators`(I:SPX·I:IXIC)를 병렬 조회해 market.sp500/nasdaq를 실음.
+  카드는 기존 sp500/nasdaq 키 분기 재사용. 지표 실패는 market {} 폴백(관용).
+  공유 라우트라 미국 주식 딥스캔에도 동일 적용.
