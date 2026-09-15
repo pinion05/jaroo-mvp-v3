@@ -9,6 +9,9 @@ const PERIOD_TRADING_DAYS = { m1: 21, m3: 63, m6: 126, y1: 252 } as const
 
 const ANNUALIZATION_TRADING_DAYS = 252
 const RISK_FREE_RATE = 0.035
+// 상수 로그수익률(단조 상승 시계열)에서 부동소수점 잔차가 std를 1e-17 수준으로
+// 만들어 샤프가 폭발하는 함정 방지 — 이 미만은 변동성 0으로 본다.
+const ZERO_VOLATILITY_EPSILON = 1e-12
 
 export type EtfMetrics = {
   returns: { m1: number | null; m3: number | null; m6: number | null; y1: number | null }
@@ -65,7 +68,8 @@ export function computeEtfMetrics(daily: Array<{ date: string; close: number }> 
     logReturns.push(Math.log(closes[index] / closes[index - 1]))
   }
   const std = sampleStd(logReturns)
-  const volatilityAnnPct = std == null ? null : std * Math.sqrt(ANNUALIZATION_TRADING_DAYS) * 100
+  const volatilityAnnPct =
+    std == null ? null : std < ZERO_VOLATILITY_EPSILON ? 0 : std * Math.sqrt(ANNUALIZATION_TRADING_DAYS) * 100
 
   let runningMax = closes[0]
   let mddPct = 0
