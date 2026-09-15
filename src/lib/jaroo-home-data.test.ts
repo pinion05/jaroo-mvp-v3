@@ -749,6 +749,8 @@ test('ETF and ETN home actions route to /etf, stocks keep /deepscan', () => {
   // 게스트 픽스처 ETF 카드(KODEX 200)도 같은 액션으로 /etf에 들어간다
   assert.equal(homeHoldings.find((holding) => holding.market === 'ETF')?.actionHref, '/etf')
   assert.equal(stockHolding?.actionHref, '/deepscan')
+  assert.equal(stockHolding?.actionLabel, '딥스캔 분석')
+  assert.equal(stockHolding?.actionSubLabel, '세 팀이 분석해요')
 })
 
 test('home market score uses market indicators instead of portfolio PnL heuristics', () => {
