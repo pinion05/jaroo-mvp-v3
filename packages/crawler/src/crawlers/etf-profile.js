@@ -115,6 +115,14 @@ async function fetchNaverJson(url, { fetchImpl, timeoutMs }) {
   }
 }
 
+export class NotAnEtfError extends Error {
+  constructor(code) {
+    super(`not an ETF instrument: ${code}`);
+    this.name = 'NotAnEtfError';
+    this.code = 'NOT_ETF';
+  }
+}
+
 export async function fetchEtfProfile(code, options = {}) {
   const normalizedCode = normalizeCode(code);
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -134,6 +142,14 @@ export async function fetchEtfProfile(code, options = {}) {
 
   if (!naverPrice) {
     throw new Error(`etf profile unavailable: naver price missing for ${normalizedCode}`);
+  }
+
+  // ETF 전용 신호(nav/iNav/운용사)가 전혀 없으면 상장 주식 코드 — ETF 프로필로
+  // 내보내면 안 된다(QA ISSUE-001: 주식 코드가 ok:true 프로필로 반환됨).
+  const hasEtfSignal =
+    naverPrice.nav != null || naverPrice.inav != null || Boolean(String(naverPrice.issuerNameKo ?? '').trim());
+  if (!hasEtfSignal) {
+    throw new NotAnEtfError(normalizedCode);
   }
 
   return buildEtfProfile({ code: normalizedCode, snapshot, naverPrice, naverComponent });

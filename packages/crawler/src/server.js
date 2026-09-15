@@ -3167,7 +3167,18 @@ const endpointDefinitions = [
     params: ['code'],
     query: [],
     count: (data) => Array.isArray(data?.holdings) ? data.holdings.length : 0,
-    handler: async (req) => fetchEtfProfile(req.params.code),
+    handler: async (req) => {
+      try {
+        return await fetchEtfProfile(req.params.code);
+      } catch (error) {
+        if (error?.code === 'NOT_ETF') {
+          throw new HttpError(400, 'not_an_etf_code', {
+            message: 'ETF 코드가 아니에요. 한국 상장 ETF(6자리) 코드를 사용해주세요.',
+          });
+        }
+        throw error;
+      }
+    },
   },
   {
     id: 'krx-market-snapshot',

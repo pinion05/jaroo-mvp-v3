@@ -66,6 +66,16 @@ export async function GET(request: NextRequest) {
       signal: AbortSignal.timeout(ETF_PROFILE_UPSTREAM_TIMEOUT_MS),
     })
     const body = await upstream.text()
+    if (upstream.status === 400) {
+      // 상류(크롤러)가 판정한 'ETF 아님' 등 클라이언트 오류는 400으로 통과시킨다.
+      return new NextResponse(body, {
+        status: 400,
+        headers: {
+          'content-type': upstream.headers.get('content-type') ?? 'application/json; charset=utf-8',
+          ...NO_STORE_HEADERS,
+        },
+      })
+    }
     if (!upstream.ok) {
       return NextResponse.json(
         { ok: false, data: null, error: { message: 'ETF 정보를 가져오지 못했어요. 잠시 후 다시 시도해주세요.' } },
