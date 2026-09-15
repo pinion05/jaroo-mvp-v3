@@ -236,3 +236,9 @@ export {
 };
 
 export { buildEtfProfile, fetchEtfProfile } from './crawlers/etf-profile.js';
+export {
+  buildUsEtfProfile,
+  extractPolygonSeries,
+  extractPolygonTickerDetails,
+  fetchUsEtfProfile,
+} from './crawlers/us-etf-profile.js';

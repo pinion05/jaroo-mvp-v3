@@ -164,3 +164,43 @@ test('buildEtfViewModel omits missing product fields instead of rendering empty 
   assert.deepEqual(vm.basicInfo.items, [])
   assert.equal(vm.header.tracking, '')
 })
+
+// ── 미국 ETF 달러 표기 (2026-09-16) ──────────────────────────────
+
+test('buildEtfViewModel formats US ETF money as dollars (price·평단·손익·AUM·NAV)', () => {
+  const usProfile: EtfProfileJson = {
+    schemaVersion: 'jaroo-etf-profile-v1',
+    code: 'VOO',
+    name: 'Vanguard S&P 500 ETF',
+    market: 'us',
+    ok: true,
+    currency: 'USD',
+    quote: { changePct: -0.46 },
+    product: {
+      issuerName: 'Vanguard',
+      baseIndexName: null,
+      totalFeePct: 0.03,
+      firstSettleDate: null,
+      aum: 1_756_880_437_248,
+      nav: 702.62,
+      deviationPct: null,
+    },
+    returns: null,
+    holdings: [{ rank: 1, code: 'NVDA', name: 'NVIDIA Corp', weightPct: 7.55, changePct: null }],
+    daily: null,
+  }
+
+  const vm = buildEtfViewModel({
+    profile: usProfile,
+    quote: { price: 699.3, changePct: -0.46 },
+    holding: { shares: 10, averagePrice: 480 },
+    metrics: null,
+  })
+
+  assert.equal(vm.hero.price, '$699.3')
+  assert.equal(vm.hero.averagePrice, '평단 $480')
+  // (699.3 − 480) × 10주 = +$2,193
+  assert.equal(vm.hero.profitAmount, '+$2,193')
+  assert.ok(vm.hero.stats.some((stat) => stat.label === '순자산' && stat.value === '1.76조 달러'))
+  assert.ok(vm.basicInfo.items.some((item) => item.label === 'NAV' && item.value === '$702.62'))
+})

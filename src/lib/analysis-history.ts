@@ -37,9 +37,10 @@ export function mergeAnalysisHistory(
   ].sort((a, b) => (a.scannedAt < b.scannedAt ? 1 : a.scannedAt > b.scannedAt ? -1 : 0))
 }
 
-/** ETF 행 시장 라벨 — 원장 market은 'kospi'|'kosdaq' 소문자로 저장된다. */
+/** ETF 행 시장 라벨 — 원장 market은 'kospi'|'kosdaq'|'us' 소문자로 저장된다. */
 export function etfMarketLabel(market: string | null): string {
   if (market === 'kospi') return '코스피'
   if (market === 'kosdaq') return '코스닥'
+  if (market === 'us') return '미국'
   return market ?? '—'
 }

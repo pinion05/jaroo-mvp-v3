@@ -45,8 +45,17 @@ export function isValidEtfProfileCode(code: string | null | undefined): boolean 
   return KR_ETF_CODE_PATTERN.test((code ?? '').trim())
 }
 
+/** 미국 ETF 티커(1~5자 알파벳) — code 파라미터로 들어오면 US 수집기로 디스패치한다. */
+export function isUsEtfProfileSymbol(code: string | null | undefined): boolean {
+  return /^[A-Za-z]{1,5}$/.test((code ?? '').trim())
+}
+
 export function buildEtfProfileUpstreamUrl(baseUrl: string, code: string): string {
   return buildCrawlerUrl(baseUrl, `/api/source/naver-wisereport/kr/etf/${encodeURIComponent(code)}/profile`)
+}
+
+export function buildUsEtfProfileUpstreamUrl(baseUrl: string, symbol: string): string {
+  return buildCrawlerUrl(baseUrl, `/api/source/yahoo/us/etf/${encodeURIComponent(symbol.toUpperCase())}/profile`)
 }
 
 function resolveClientKey(request: NextRequest): string {
@@ -93,9 +102,11 @@ export function buildEtfProfileCacheBody(
 
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code')?.trim() ?? ''
-  if (!isValidEtfProfileCode(code)) {
+  const isKr = isValidEtfProfileCode(code)
+  const isUs = !isKr && isUsEtfProfileSymbol(code)
+  if (!isKr && !isUs) {
     return NextResponse.json(
-      { ok: false, data: null, error: { message: '한국 상장 ETF 코드(6자리)를 입력해주세요.' } },
+      { ok: false, data: null, error: { message: '한국 상장 ETF 코드(6자리) 또는 미국 상장 ETF 티커(예: VOO)를 입력해주세요.' } },
       { status: 400, headers: NO_STORE_HEADERS },
     )
   }
@@ -128,7 +139,11 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const upstreamUrl = buildEtfProfileUpstreamUrl(getCrawlerBaseUrl(), code)
+  // 한국(6자리 코드)은 naver-wisereport 수집기, 미국(티커)은 yahoo 수집기로 디스패치.
+  // 캐시·원장·refresh 계약은 두 시장 공통(target_key = 코드/티커).
+  const upstreamUrl = isKr
+    ? buildEtfProfileUpstreamUrl(getCrawlerBaseUrl(), code)
+    : buildUsEtfProfileUpstreamUrl(getCrawlerBaseUrl(), code)
   try {
     const upstream = await fetch(upstreamUrl, {
       cache: 'no-store',

@@ -25,15 +25,19 @@ test('query etf target without optional holding still resolves', () => {
   if (result.status === 'ok') assert.equal(result.holding, null)
 })
 
-test('non-etf kind and us market are rejected', () => {
+test('non-etf kind and malformed codes are rejected (US ETF tickers are accepted since 2026-09-16)', () => {
   assert.equal(
     resolveEtfPageTarget({ searchParams: new URLSearchParams('code=005930&kind=stock'), readSession: () => null }).status,
     'invalid',
   )
-  assert.equal(
-    resolveEtfPageTarget({ searchParams: new URLSearchParams('ticker=SPY&kind=etf&market=nasdaq'), readSession: () => null })
-      .status,
-    'invalid',
+  // 미국 ETF 티커는 이제 ok — market 'us'로 내려온다
+  const usTarget = resolveEtfPageTarget({
+    searchParams: new URLSearchParams('ticker=SPY&kind=etf&market=nasdaq'),
+    readSession: () => null,
+  })
+  assert.deepEqual(
+    usTarget.status === 'ok' ? { code: usTarget.code, market: usTarget.market } : usTarget.status,
+    { code: 'SPY', market: 'us' },
   )
   assert.equal(
     resolveEtfPageTarget({ searchParams: new URLSearchParams('code=12345&kind=etf'), readSession: () => null }).status,

@@ -30,6 +30,7 @@ import {
   getTickerNames,
   getCurrentQuotes,
   fetchEtfProfile,
+  fetchUsEtfProfile,
   getDartDisclosures,
   getUSConsensus,
   getUSFilings,
@@ -3174,6 +3175,28 @@ const endpointDefinitions = [
         if (error?.code === 'NOT_ETF') {
           throw new HttpError(400, 'not_an_etf_code', {
             message: 'ETF 코드가 아니에요. 한국 상장 ETF(6자리) 코드를 사용해주세요.',
+          });
+        }
+        throw error;
+      }
+    },
+  },
+  {
+    id: 'us-etf-profile',
+    resource: 'etf.profile.us',
+    description: '미국 ETF 프로필 — Yahoo 차트(시세·2년 일봉)·검색(ETF 판별)·quoteSummary(구성종목·보수·AUM)를 병합합니다.',
+    primaryPath: buildDataSourcePath('yahoo', '/us/etf/:symbol/profile'),
+    dataSources: ['yahoo'],
+    params: ['symbol'],
+    query: [],
+    count: (data) => Array.isArray(data?.holdings) ? data.holdings.length : 0,
+    handler: async (req) => {
+      try {
+        return await fetchUsEtfProfile(req.params.symbol);
+      } catch (error) {
+        if (error?.code === 'NOT_ETF') {
+          throw new HttpError(400, 'not_an_etf_code', {
+            message: 'ETF 심볼이 아니에요. 미국 상장 ETF 티커(예: VOO)를 사용해주세요.',
           });
         }
         throw error;

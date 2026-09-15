@@ -18,8 +18,10 @@ export type EtfProfileJson = {
   schemaVersion: 'jaroo-etf-profile-v1'
   code: string
   name: string
-  market: 'kospi' | 'kosdaq'
+  market: 'kospi' | 'kosdaq' | 'us'
   ok: true
+  /** 미국 ETF는 'USD'(기본 KRW — 필드 부재 시 원화) */
+  currency?: 'KRW' | 'USD'
   quote?: { changePct: number | null } | null
   product: {
     issuerName: string | null
@@ -48,9 +50,20 @@ const MINUS = '−'
 
 const krw = (value: number) => `${Math.round(value).toLocaleString('ko-KR')}원`
 
+// 미국 ETF 달러 표기 — 가격은 소수 2자리(미국 주식 관례)
+const usd = (value: number) => `$${value.toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+
+type EtfMoneyFormatter = (value: number) => string
+
+const moneyFormatter = (currency: EtfProfileJson['currency']): EtfMoneyFormatter =>
+  currency === 'USD' ? usd : krw
+
 const signedPct = (value: number) => `${value >= 0 ? '+' : MINUS}${Math.abs(value).toFixed(2)}%`
 
-const trillionText = (aum: number) => `${(aum / 1_000_000_000_000).toFixed(1)}조원`
+const trillionText = (aum: number, currency: EtfProfileJson['currency']) =>
+  currency === 'USD'
+    ? `${(aum / 1_000_000_000_000).toFixed(2)}조 달러`
+    : `${(aum / 1_000_000_000_000).toFixed(1)}조원`
 
 export type EtfHeroStat = { label: string; value: string }
 
@@ -99,9 +112,9 @@ export type EtfViewModel = {
   dividendInfo: EtfNoticeBlock
 }
 
-function buildHeroStats(product: EtfProfileJson['product']): EtfHeroStat[] {
+function buildHeroStats(product: EtfProfileJson['product'], currency: EtfProfileJson['currency']): EtfHeroStat[] {
   const stats: EtfHeroStat[] = []
-  if (product.aum != null) stats.push({ label: '순자산', value: trillionText(product.aum) })
+  if (product.aum != null) stats.push({ label: '순자산', value: trillionText(product.aum, currency) })
   if (product.totalFeePct != null) stats.push({ label: '총보수', value: `연 ${product.totalFeePct.toFixed(2)}%` })
   if (product.firstSettleDate) {
     stats.push({ label: '설정일', value: product.firstSettleDate.slice(0, 7).replace('-', '.') })
@@ -130,7 +143,7 @@ function buildReturnsBlock(metrics: EtfMetrics | null | undefined): EtfReturnsBl
   }
 }
 
-function buildRiskBlock(metrics: EtfMetrics | null | undefined): EtfRiskBlock {
+function buildRiskBlock(metrics: EtfMetrics | null | undefined, money: EtfMoneyFormatter): EtfRiskBlock {
   if (!metrics) {
     return noticeBlock('source-pending', '리스크 지표는 일봉이 1년치 쌓이면 계산해드려요')
   }
@@ -159,14 +172,14 @@ function buildRiskBlock(metrics: EtfMetrics | null | undefined): EtfRiskBlock {
       },
       {
         label: '52주 범위',
-        value: week52 ? `${krw(week52.low)} ~ ${krw(week52.high)}` : '--',
+        value: week52 ? `${money(week52.low)} ~ ${money(week52.high)}` : '--',
         subtitle: '종가 기준 최저·최고',
       },
     ],
   }
 }
 
-function buildScenarioBlock(price: number, metrics: EtfMetrics | null | undefined): EtfScenarioBlock {
+function buildScenarioBlock(price: number, metrics: EtfMetrics | null | undefined, money: EtfMoneyFormatter): EtfScenarioBlock {
   const week52 = metrics?.week52
   if (!week52 || !(week52.high > week52.low) || !Number.isFinite(price)) {
     return noticeBlock('source-pending', '일봉 데이터가 부족해 52주 위치를 계산할 수 있어요')
@@ -182,8 +195,8 @@ function buildScenarioBlock(price: number, metrics: EtfMetrics | null | undefine
       positionPct,
       positionText: `${rounded}%`,
       headline,
-      highText: krw(week52.high),
-      lowText: krw(week52.low),
+      highText: money(week52.high),
+      lowText: money(week52.low),
       note: 'ETF엔 애널리스트 목표가가 없어 52주 범위 위치로 판단해요',
     },
   }
@@ -210,11 +223,11 @@ function buildHoldingsBlock(profile: EtfProfileJson): EtfHoldingsBlock {
   }
 }
 
-function buildBasicInfoItems(product: EtfProfileJson['product']): EtfBasicInfoItem[] {
+function buildBasicInfoItems(product: EtfProfileJson['product'], money: EtfMoneyFormatter): EtfBasicInfoItem[] {
   const items: EtfBasicInfoItem[] = []
   if (product.issuerName) items.push({ label: '운용사', value: product.issuerName })
   if (product.baseIndexName) items.push({ label: '기준지수', value: product.baseIndexName })
-  if (product.nav != null) items.push({ label: 'NAV', value: krw(product.nav) })
+  if (product.nav != null) items.push({ label: 'NAV', value: money(product.nav) })
   if (product.deviationPct != null) items.push({ label: 'NAV 괴리율', value: signedPct(product.deviationPct) })
   return items
 }
@@ -227,6 +240,8 @@ export function buildEtfViewModel(input: {
 }): EtfViewModel {
   const { profile, quote, holding, metrics = null } = input
   const product = profile.product
+  const currency = profile.currency
+  const money = moneyFormatter(currency)
 
   const profit =
     holding && holding.averagePrice > 0
@@ -244,13 +259,15 @@ export function buildEtfViewModel(input: {
     },
     hero: {
       name: profile.name,
-      price: krw(quote.price),
+      price: money(quote.price),
       change: quote.changePct == null ? null : signedPct(quote.changePct),
-      averagePrice: holding ? `평단 ${krw(holding.averagePrice)}` : null,
+      averagePrice: holding ? `평단 ${money(holding.averagePrice)}` : null,
       profitAmount: profit
-        ? `${profit.amount >= 0 ? '+' : MINUS}${Math.abs(Math.round(profit.amount)).toLocaleString('ko-KR')}원`
+        ? currency === 'USD'
+          ? `${profit.amount >= 0 ? '+' : MINUS}$${Math.abs(profit.amount).toLocaleString('en-US', { maximumFractionDigits: 2 })}`
+          : `${profit.amount >= 0 ? '+' : MINUS}${Math.abs(Math.round(profit.amount)).toLocaleString('ko-KR')}원`
         : null,
-      stats: buildHeroStats(product),
+      stats: buildHeroStats(product, currency),
     },
     momentum:
       quote.changePct == null
@@ -259,12 +276,12 @@ export function buildEtfViewModel(input: {
             label: quote.changePct >= 0 ? '최근 거래일 상승 — 순풍' : '최근 거래일 하락 — 역풍',
             badge: quote.changePct >= 0 ? '↗' : '↘',
           },
-    scenario: buildScenarioBlock(quote.price, metrics),
+    scenario: buildScenarioBlock(quote.price, metrics, money),
     returns: buildReturnsBlock(metrics),
-    basicInfo: { items: buildBasicInfoItems(product) },
+    basicInfo: { items: buildBasicInfoItems(product, money) },
     sectorWeights: noticeBlock('source-pending', '섹터 비중은 구성종목 매핑 준비 중이에요'),
     topHoldings: buildHoldingsBlock(profile),
-    riskMetrics: buildRiskBlock(metrics),
+    riskMetrics: buildRiskBlock(metrics, money),
     peers: noticeBlock('planned', '유사 ETF 비교는 출시 후 제공될 예정이에요'),
     dividendInfo: noticeBlock('planned', '배당 정보는 출시 후 제공될 예정이에요'),
   }

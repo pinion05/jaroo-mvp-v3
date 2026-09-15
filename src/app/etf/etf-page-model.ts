@@ -24,7 +24,7 @@ export type EtfPageState =
       phase: 'ready'
       vm: EtfViewModel
       briefing: LoadingBriefingSnapshot
-      market: 'kospi' | 'kosdaq'
+      market: 'kospi' | 'kosdaq' | 'us'
       holding: { shares: number; averagePrice: number } | null
       /** 재열람 캐시 히트 — 원장에 저장된 분석 시각. fresh 수집이면 null. */
       restoredAt: string | null
@@ -36,8 +36,8 @@ type EtfPageOkTarget = Extract<EtfPageTarget, { status: 'ok' }>
 export type { EtfPageOkTarget }
 
 // 홈 딥스캔 세션(holding 필드가 '100주'/'101,400원' 같은 표시 문자열)을
-// etf-target 계약(숫자 holding)으로 바꾼다. 한국 6자리 코드가 없는 홀딩
-// (미국 ETF 등)은 빈 코드로 내려 가드가 invalid로 판정하게 한다.
+// etf-target 계약(숫자 holding)으로 바꾼다. 한국 6자리 코드가 없는 홀딩은
+// 대문자 티커(identifierTicker — 미국 ETF)로 내려 market 가드가 판정하게 한다.
 export type DeepScanSnapshotLike = {
   holding?: {
     id?: number
@@ -53,21 +53,27 @@ export type DeepScanSnapshotLike = {
   } | null
 } | null
 
+const US_TICKER_PATTERN = /^[A-Za-z]{1,5}$/
+
 export function buildEtfSessionFromDeepScanSnapshot(snapshot: DeepScanSnapshotLike): EtfTargetSessionLike | null {
   const holding = snapshot?.holding
   if (!holding || holding.id === -1 || holding.name === '종목 미선택') {
     return null
   }
 
-  const code = normalizeDeepScanCode(holding.identifierCode ?? holding.code ?? undefined) ?? ''
+  const krCode = normalizeDeepScanCode(holding.identifierCode ?? holding.code ?? undefined) ?? ''
+  const usTicker =
+    !krCode && US_TICKER_PATTERN.test(String(holding.identifierTicker ?? ''))
+      ? String(holding.identifierTicker).trim().toUpperCase()
+      : ''
   const shares = parseOcrNumber(holding.shares ?? '')
   const averagePrice = parseOcrNumber(holding.averagePrice ?? '')
 
   return {
-    code,
-    name: holding.name ?? code,
+    code: krCode || usTicker,
+    name: holding.name ?? (krCode || usTicker),
     kind: holding.kind,
-    market: holding.marketTone ?? holding.market,
+    market: krCode ? (holding.marketTone ?? holding.market) : 'us',
     holding: shares !== null && averagePrice !== null ? { shares, averagePrice } : null,
   }
 }
@@ -84,7 +90,11 @@ export function createInitialEtfPageState(target: EtfPageTarget): EtfPageState {
 }
 
 // 딥스캔 로딩 화면이 쓰는 것과 동일 엔드포인트 — ETF 코드에서도 시세·일봉·시장이 온다.
-export function buildEtfPageBriefingUrl(code: string) {
+// 미국 ETF는 ticker+market=US 변형(브리핑 라우트의 미국 경로 — polygon 기반).
+export function buildEtfPageBriefingUrl(code: string, market: 'kr' | 'us' = 'kr') {
+  if (market === 'us') {
+    return `/api/deepscan/briefing-snapshot?ticker=${encodeURIComponent(code)}&market=US`
+  }
   return `/api/deepscan/briefing-snapshot?code=${encodeURIComponent(code)}`
 }
 
