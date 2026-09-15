@@ -29,6 +29,7 @@ import {
   getMarketSnapshot,
   getTickerNames,
   getCurrentQuotes,
+  fetchEtfProfile,
   getDartDisclosures,
   getUSConsensus,
   getUSFilings,
@@ -3155,6 +3156,28 @@ const endpointDefinitions = [
       }, {
         includeNaverQuoteContext: parseBooleanQuery(req.query.includeContext),
       });
+    },
+  },
+  {
+    id: 'etf-profile',
+    resource: 'etf.profile',
+    description: '한국 ETF 프로필 — 네이버 구성종목/기본정보와 위세리포트 상품정보를 병합합니다.',
+    primaryPath: buildDataSourcePath('naver-wisereport', '/kr/etf/:code/profile'),
+    dataSources: ['naver-finance', 'wisereport'],
+    params: ['code'],
+    query: [],
+    count: (data) => Array.isArray(data?.holdings) ? data.holdings.length : 0,
+    handler: async (req) => {
+      try {
+        return await fetchEtfProfile(req.params.code);
+      } catch (error) {
+        if (error?.code === 'NOT_ETF') {
+          throw new HttpError(400, 'not_an_etf_code', {
+            message: 'ETF 코드가 아니에요. 한국 상장 ETF(6자리) 코드를 사용해주세요.',
+          });
+        }
+        throw error;
+      }
     },
   },
   {
