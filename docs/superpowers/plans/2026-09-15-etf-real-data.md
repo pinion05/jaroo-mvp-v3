@@ -445,3 +445,21 @@ export function resolveEtfPageTarget(input: {
 
 - 스펙 커버리지: §4 아키텍처(Task 2·3·4·6·7) · §5 전 행(Task 1·5·6·8·9 + Task 10 스펙 갱신) · §7 오류 처리(Task 2 가드·Task 4·6 에러 상태) · §8 테스트(각 태스크 TDD + Task 10 스모크) — 커버. 단, 가중 목표가의 2단계 구현은 실행 불가능한 전제(페이지 로드 내 N회 13페이지 크롤)로 확인되어 3단계 이관으로 스펙을 갱신한다(Task 10).
 - 타입 일관성: `EtfProfileJson`(Task 1) = 크롤러 응답(Task 3) = 프록시 전달(Task 4). `EtfNoticeReason` 3종은 Task 1·5·6에서 동일 문자열.
+
+## 후속 작업: ETF 조회 기록 원장(별도 테이블) — 2026-09-15 추가
+
+#265 2단계 완료 후 사용자 요청("etf 는 분석본이 db에 업로드가 잘 되고있음?")으로 ETF 조회 이력의
+저장·로드 경로를 추가했다. 설계 결정: `deepscan_scan_history.payload`는 읽기 경로에서
+`isCanonicalPayload`(JarooDeepScanPayload) 가드가 ETF payload를 거부하므로 단일 테이블 재사용은
+봉쇄된다 → **별도 테이블 `etf_scan_history`**(스키마 분리, 원장 패턴은 deepscan과 동일).
+
+- [x] 마이그레이션 `20260915140000_create_etf_scan_history.sql` — RLS deny-all·서비스 롤 전용, (user_id, scanned_at desc) 인덱스. `supabase db push`로 원격 dev 적용.
+- [x] `src/lib/etf-history-store.ts` — record(append+prune 30건)/list/getById. 읽기 가드 `isEtfLedgerPayload`(jaroo-etf-profile-v1). price_basis=일봉 마지막 종가. charged_credits=0(무과금).
+- [x] `/api/etf/profile` GET 성공 시 세션(쿠키) 있으면 원장 append — payload는 상류 응답 그대로라 클라이언트 위조 불가, 실패는 void로 조회 응답 무영향. 게스트는 미기록(deepscan과 동일).
+- [x] `GET /api/etf/history`(목록) · `GET /api/etf/history/[id]`(상세, uuid·본인·계약 가드 → 404) — deepscan history 라우트 미러.
+- [x] 기록 탭(/mypage/history) — 두 원장을 `mergeAnalysisHistory`(scannedAt 내림차순)로 병합. ETF 행은 파란 점 + 'ETF · 코스피/코스닥' 배지, 탭 → `/etf?code=` 재진입(공개 시세성 데이터라 매번 실시간 재수집 — 스냅샷 복원 불필요). 딥스캔 행은 기존 A안(타깃 복원→스냅샷 캐시 히트) 유지.
+- [x] 단위 테스트: etf-history-store 순수 함수 6종(계약 가드·기준가) + analysis-history 병합 4종.
+- [x] E2E(라이브): /etf 방문 → DB 행(payload 300일봉·30 구성종목·price_basis 104,275) → 기록 탭 병합 렌더(ETF 행+딥스캔 행) → ETF 행 탭 → /etf 재진입. 목록/상세/404 API 경로 확인.
+- 알려진 의미론: 조회 성공마다 append(deepscan의 스캔마다 append와 동일) — 같은 ETF 재방문 시 행이 중복 쌓임. 동일 코드 근접 중복 제거(예: 10분 윈도)는 후속 과제.
+
+게이트: lint 0 errors(기존 warning만) · typecheck 0 · 웹 376/378(타이밍 민감 #298·wisereport-kr-v123 격리 시 통과) · 신규 단위 10/10.
