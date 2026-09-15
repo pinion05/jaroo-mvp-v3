@@ -61,8 +61,8 @@ function EtfResultCardShell({
           ETF
         </div>
         <div className='min-w-0 flex-1'>
-          <div className='text-[10px] text-[#97A0AE]'>{eyebrow}</div>
-          <h2 className='text-[14px] font-bold text-[#0F1419]'>{title}</h2>
+          <div className='mb-[3px] text-[10px] leading-[13px] text-[#97A0AE]'>{eyebrow}</div>
+          <h2 className='text-[15px] font-bold leading-[19px] text-[#0F1419]'>{title}</h2>
         </div>
         {badge ? <span className='shrink-0 rounded-[6px] bg-[#EEF0F3] px-2 py-1 text-[10px] font-bold text-[#0F1419]'>{badge}</span> : null}
       </div>
