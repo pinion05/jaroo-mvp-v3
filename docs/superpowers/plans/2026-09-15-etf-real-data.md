@@ -390,7 +390,8 @@ export function resolveEtfPageTarget(input: {
 - 에러: quotes 실패 시 status-union 에러카드 문구("시세를 가져오지 못했어요"), 재시도 버튼
 - 2단계(Task 9)에서 notice 블록을 실데이터로 하나씩 교체
 
-- [ ] **Step 1~5**: TDD(상태머신) → 구현 → `npm run lint && npm run typecheck && npm test` → 커밋 `feat(etf): /etf 실데이터 전환 — 픽스처 제거·사유 카드`
+- [x] **Step 1~5**: TDD(상태머신) → 구현 → `npm run lint && npm run typecheck && npm run test` → 커밋 `feat(etf): /etf 실데이터 전환 — 픽스처 제거·사유 카드`
+  - 구현 중 결정 사항: quotes/current에 등락률이 없어 크롤러가 profile.quote.changePct(네이버 prevChangeRate)를 내림. 크롤러 400(NOT_ETF)은 invalid 상태로 매핑. 딥스캔 플레이스홀더 세션('종목 미선택')은 empty로 처리. 브라우저 검증 완료(실시세·평단·손익·사유 카드·invalid/empty 상태·픽스처 문자열 부재).
 
 ### Task 7: 홈 ETF 카드 → /etf 액션 연결
 
@@ -399,7 +400,8 @@ export function resolveEtfPageTarget(input: {
 - Test: `src/lib/etf/home-etf-action.test.ts`
 
 **핵심**: kind==='etf' 홀딩의 action을 ① sessionStorage에 `buildDeepScanTargetSession(holding)` 저장(기존 딥스캔 패턴, :1206 참조) ② `actionHref='/etf'` — `deepscan-navigation.ts`가 이미 핸드오프 지원. 게스트 픽스처 카드(id 4 KODEX 200)도 동일 액션 부여.
-- [ ] **Step 1~5**: TDD → 커밋 `feat(etf): 홈 ETF 카드 /etf 진입 연결`
+- [x] **Step 1~5**: TDD → 커밋 `feat(etf): 홈 ETF 카드 /etf 진입 연결`
+  - 기존 jaroo-home-data.test.ts의 ETF 액션 테스트를 갱신(신규 파일 대신). 게스트 픽스처 카드 포함. 브라우저에서 세션 복원 → 실데이터 렌더 확인.
 
 ---
 
