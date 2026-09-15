@@ -9,8 +9,13 @@
   --ds-cream: #fff8ec;
   --ds-amber: #854f0b;
   --ds-amber-soft: #faeeda;
-  --ds-green: #a8323a;
-  --ds-green-soft: #fbe6e7;
+  /* --ds-rise*: 국내 금융 관례(상승=빨강)의 상승 계열. 예전 이름 --ds-green*은
+     값이 빨강이라 오해를 샀다 — 완료 성공 초록(emerald) 분리와 함께 개명. */
+  --ds-rise: #a8323a;
+  --ds-rise-soft: #fbe6e7;
+  /* 완료·성공 뱃지용 초록/어두운 초록 조합 */
+  --ds-emerald: #1e7a43;
+  --ds-emerald-soft: #e6f6ec;
   --ds-red: #b84545;
   --ds-skeleton-shimmer-duration: 4.2s;
   --ds-member-pulse-duration: 4s;
@@ -1003,7 +1008,7 @@
 }
 
 .consensusToneProfit > span {
-  background: var(--ds-green-soft);
+  background: var(--ds-rise-soft);
   color: var(--ds-red);
 }
 
@@ -1157,7 +1162,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--ds-amber), var(--ds-green));
+  background: linear-gradient(90deg, var(--ds-amber), var(--ds-rise));
 }
 
 .consensusSkeletonFact {
@@ -1297,7 +1302,7 @@
 }
 
 .elapsedTimerDone .elapsedLabel {
-  color: var(--ds-green);
+  color: var(--ds-emerald);
 }
 
 .elapsedSubLabel {
@@ -1554,8 +1559,8 @@
 }
 
 .stepDone {
-  background: var(--ds-green-soft);
-  color: var(--ds-green);
+  background: var(--ds-emerald-soft);
+  color: var(--ds-emerald);
 }
 
 .stepActive {
@@ -1663,8 +1668,8 @@
 }
 
 .memberDone {
-  background: var(--ds-green-soft);
-  color: var(--ds-green);
+  background: var(--ds-emerald-soft);
+  color: var(--ds-emerald);
   border-color: #c0dd97;
 }
 
@@ -1817,8 +1822,8 @@
 }
 
 .badgeDone {
-  background: var(--ds-green-soft);
-  color: var(--ds-green);
+  background: var(--ds-emerald-soft);
+  color: var(--ds-emerald);
 }
 
 .badgeWarning {
@@ -1881,8 +1886,11 @@
   --ds-blue: #2b6be6;
   --ds-blue-soft: #e6f0fe;
   --ds-blue-border: #cfe0ff;
-  --ds-green: #a8323a;
-  --ds-green-soft: #e5f3eb;
+  /* 상승(국내 관례 빨강)과 완료(초록)를 값 이름 그대로 분리 */
+  --ds-rise: #a8323a;
+  --ds-rise-soft: #fbe6e7;
+  --ds-emerald: #1e7a43;
+  --ds-emerald-soft: #e6f6ec;
   --ds-red: #e5484d;
   --ds-amber: #b8860b;
   --ds-amber-soft: #fef3e3;
@@ -1979,7 +1987,7 @@
 }
 
 .headerProgressDone .headerProgressFill {
-  background: linear-gradient(90deg, var(--ds-green), #4bd582);
+  background: linear-gradient(90deg, var(--ds-emerald), #4bd582);
 }
 
 .headerProgressError .headerProgressFill {
@@ -2203,8 +2211,14 @@
 }
 
 .narrativeTonePositive {
-  background: var(--ds-green-soft);
-  color: #a8323a;
+  background: var(--ds-emerald-soft);
+  color: var(--ds-emerald);
+}
+
+/* 금융 상승(퀵팩트) 전용 — 국내 관례 빨강. 완료 초록(narrativeTonePositive)과 분리 */
+.narrativeToneRise {
+  background: var(--ds-rise-soft);
+  color: var(--ds-rise);
 }
 
 .narrativeToneWarning {
@@ -2572,7 +2586,7 @@
   align-items: center;
   gap: 5px;
   margin-bottom: 9px;
-  color: var(--ds-green);
+  color: var(--ds-rise);
   font-size: 10px;
   font-weight: 700;
 }
@@ -2581,7 +2595,7 @@
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: var(--ds-green);
+  background: var(--ds-rise);
   animation: pulse 1.6s ease-in-out infinite;
 }
 
