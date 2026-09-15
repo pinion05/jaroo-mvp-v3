@@ -2,251 +2,278 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Badge } from '@/components/ui/badge'
-import { Button, buttonVariants } from '@/components/ui/button'
-import { Card } from '@/components/ui/card'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ChartPie, Coins, ListChecks, Scale, ShieldAlert, Telescope } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
+
 import { EtfDataNoticeCard } from '@/components/etf-data-notice-card'
-import { JarooShell } from '@/components/jaroo-shell'
+import { BackControl, TodayBriefingCard } from '@/components/deepscan-loading-briefing-card'
+import { financialToneClass, formatNumber, formatSignedPercent } from '@/components/deepscan-loading-utils'
+import styles from '@/components/deepscan-loading-screen.module.css'
 import {
+  buildEtfPageBriefingUrl,
   buildEtfPageProfileUrl,
-  buildEtfPageQuoteUrl,
   buildEtfPageState,
   createInitialEtfPageState,
   isNotAnEtfProfileStatus,
+  parseEtfBriefingSnapshotResponse,
   parseEtfProfileResponse,
-  parseEtfQuoteResponse,
   resolveEtfPageTargetFromWindow,
   type EtfPageState,
 } from './etf-page-model'
-import { getFinancialValueTextClass } from '@/lib/financial-value-tone'
-import { type EtfTab, type EtfViewModel } from '@/lib/etf/etf-view-model'
+import type { EtfNoticeReason, EtfViewModel } from '@/lib/etf/etf-view-model'
+import type { LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
 import { cn } from '@/lib/utils'
 
-const tabs: Array<{ id: EtfTab; label: string }> = [
-  { id: 'overview', label: '개요' },
-  { id: 'holdings', label: '구성' },
-  { id: 'risk', label: '리스크' },
-]
+// 딥스캔 결과 화면(deepscan-loading-screen 셸 + TodayBriefingCard + 결과 카드 문법)과
+// 같은 구조를 그대로 재사용한다 — ETF 버전은 시세 브리핑 + 상품 정보 + 사유 명시 카드로 구성.
 
-const nextTabMap: Record<EtfTab, EtfTab> = {
-  overview: 'holdings',
-  holdings: 'risk',
-  risk: 'overview',
+const MARKET_LABEL: Record<string, string> = {
+  kospi: 'KOSPI',
+  kosdaq: 'KOSDAQ',
 }
 
-const nextLabelMap: Record<EtfTab, string> = {
-  overview: '구성 보기 →',
-  holdings: '리스크 보기 →',
-  risk: '개요 보기 →',
+function formatShares(shares: number) {
+  return `${formatNumber(shares)}주`
 }
 
-function scrollEtfContentToTop() {
-  if (typeof document === 'undefined') return
-
-  const scrollContainer = document.querySelector<HTMLElement>("[data-slot='jaroo-shell-main']")
-  scrollContainer?.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-function EtfStatusCard({ title, body }: { title: string; body: string }) {
+function EtfResultCardShell({
+  eyebrow,
+  title,
+  badge,
+  children,
+}: {
+  eyebrow: string
+  title: string
+  badge?: string
+  children: React.ReactNode
+}) {
   return (
-    <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-5 text-center shadow-none'>
-      <p className='text-[14px] font-medium text-[color:var(--jaroo-ink)]'>{title}</p>
-      <p className='mt-2 text-[12px] leading-relaxed text-[color:var(--jaroo-muted)]'>{body}</p>
-      <Link
-        href='/home'
-        className={buttonVariants({
-          className:
-            'mt-4 inline-flex h-11 rounded-[14px] bg-[color:var(--jaroo-primary)] px-4 text-[13px] font-semibold text-white hover:bg-[color:var(--jaroo-primary-strong)]',
-        })}
-      >
-        홈으로 가기
-      </Link>
-    </Card>
+    <article className='overflow-hidden rounded-[16px] border border-[#E8EAEE] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]'>
+      <div className='flex items-center gap-3 border-b border-[#EFF1F4] px-4 py-4'>
+        <div className='flex size-9 items-center justify-center rounded-[10px] bg-[#0F1419] text-[12px] font-black text-white'>
+          ETF
+        </div>
+        <div className='min-w-0 flex-1'>
+          <div className='text-[10px] text-[#97A0AE]'>{eyebrow}</div>
+          <h2 className='text-[14px] font-bold text-[#0F1419]'>{title}</h2>
+        </div>
+        {badge ? <span className='shrink-0 rounded-[6px] bg-[#EEF0F3] px-2 py-1 text-[10px] font-bold text-[#0F1419]'>{badge}</span> : null}
+      </div>
+      {children}
+    </article>
   )
 }
 
-function EtfHeroCard({ vm }: { vm: EtfViewModel }) {
+function EtfProductCard({ vm }: { vm: EtfViewModel }) {
+  const stats = vm.hero.stats
+  const hasDetail = vm.basicInfo.items.length > 0
+  const headline = vm.header.tracking.replace(' 추종', '') || vm.header.issuer || '상품 정보 확인 중'
+
   return (
-    <Card className='rounded-[26px] border-0 bg-[linear-gradient(135deg,var(--jaroo-primary-strong),var(--jaroo-primary))] p-5 text-white shadow-none'>
-      <p className='text-[11px] text-white/60'>ETF 분석</p>
-      <h1 className='mt-1 text-[19px] font-medium text-white'>{vm.hero.name}</h1>
-      <p className='mt-1 text-[34px] leading-none font-medium text-white'>{vm.hero.price}</p>
-      <div className='mt-3 flex flex-wrap items-center gap-2'>
-        {vm.hero.change ? (
-          <span className={cn('rounded-[8px] bg-white/95 px-2 py-1 text-[13px] font-medium', getFinancialValueTextClass(vm.hero.change))}>
-            {vm.hero.change}
-          </span>
-        ) : null}
-        {vm.hero.averagePrice ? <span className='text-[11px] text-white/65'>{vm.hero.averagePrice}</span> : null}
-        {vm.hero.profitAmount ? <span className='text-[11px] text-white/65'>· {vm.hero.profitAmount}</span> : null}
+    <EtfResultCardShell eyebrow='상품 정보' title='기본 정보'>
+      <div className='px-4 py-5 text-center'>
+        <div className='text-[10px] text-[#97A0AE]'>기준지수</div>
+        <div className='mt-1 text-[28px] font-black leading-none text-[#0F1419]'>{headline}</div>
+        {vm.header.issuer ? <p className='mt-2 text-[12px] text-[#5A6473]'>{vm.header.issuer} 운용</p> : null}
       </div>
-      {vm.hero.stats.length ? (
-        <div className='mt-5 grid grid-cols-3 gap-4'>
-          {vm.hero.stats.map((item) => (
-            <div key={item.label}>
-              <p className='text-[10px] text-white/50'>{item.label}</p>
-              <p className='mt-1 text-[12px] font-medium text-white/90'>{item.value}</p>
+
+      {stats.length > 0 ? (
+        <div className='grid grid-cols-3 border-t border-[#EFF1F4]'>
+          {stats.map((item) => (
+            <div key={item.label} className='border-r border-[#EFF1F4] px-3 py-3 last:border-r-0'>
+              <div className='text-[10px] text-[#97A0AE]'>{item.label}</div>
+              <div className='mt-1 text-[13px] font-bold text-[#0F1419]'>{item.value}</div>
             </div>
           ))}
         </div>
       ) : null}
-    </Card>
-  )
-}
 
-function EtfMomentumRow({ momentum }: { momentum: EtfViewModel['momentum'] }) {
-  const toneClass =
-    momentum.badge === '↗'
-      ? 'text-[color:var(--jaroo-profit)]'
-      : momentum.badge === '↘'
-        ? 'text-[color:var(--jaroo-danger)]'
-        : 'text-[color:var(--jaroo-muted)]'
-
-  return (
-    <div className='flex w-full items-center gap-2 rounded-[18px] bg-[color:var(--jaroo-secondary)] px-4 py-3'>
-      <span className={cn('size-2 rounded-full', momentum.badge === '↗' ? 'bg-[color:var(--jaroo-profit)]' : 'bg-[color:var(--jaroo-muted)]')} />
-      <span className={cn('flex-1 text-[12px] font-medium', toneClass)}>{momentum.label}</span>
-      <Badge className='rounded-[8px] bg-white px-2 py-0.5 text-[10px] font-medium text-[color:var(--jaroo-ink)]'>
-        {momentum.badge}
-      </Badge>
-    </div>
-  )
-}
-
-function EtfReadyContent({ vm }: { vm: EtfViewModel }) {
-  const [tab, setTab] = useState<EtfTab>('overview')
-
-  const handleTabChange = (nextTab: EtfTab) => {
-    setTab(nextTab)
-    requestAnimationFrame(() => scrollEtfContentToTop())
-  }
-
-  const subtitle = [vm.header.issuer, vm.header.tracking].filter(Boolean).join(' · ')
-
-  return (
-    <JarooShell
-      title={
-        <div className='flex items-baseline gap-1.5'>
-          <span className='truncate text-[14px] font-medium text-[color:var(--jaroo-ink)]'>{vm.header.name}</span>
-          <span className='text-[11px] font-normal text-[color:var(--jaroo-muted)]'>{vm.header.code}</span>
-        </div>
-      }
-      subtitle={subtitle || undefined}
-      backHref='/home'
-      showBottomNav
-      action={
-        <Link
-          href='/sharecard'
-          className={buttonVariants({
-            variant: 'outline',
-            className:
-              'h-8 rounded-[10px] border-[color:#B5D4F4] bg-[color:#E6F1FB] px-3 text-[11px] font-medium text-[color:var(--jaroo-primary)] hover:bg-[color:#D9EAFB]',
-          })}
-        >
-          공유
-        </Link>
-      }
-      bottomNav={
-        <div className='sticky bottom-0 z-20 border-t border-[color:var(--jaroo-border)] bg-white/95 px-4 py-3 backdrop-blur'>
-          <div className='grid grid-cols-[1fr,1.35fr] gap-2'>
-            <Button
-              type='button'
-              variant='outline'
-              onClick={() => handleTabChange(nextTabMap[tab])}
-              className='h-12 rounded-[16px] border-[color:var(--jaroo-border)] bg-white text-[13px] font-medium text-[color:var(--jaroo-muted)] hover:bg-[color:var(--jaroo-secondary)]'
-            >
-              {nextLabelMap[tab]}
-            </Button>
-            <Link
-              href='/sharecard'
-              className={buttonVariants({
-                className:
-                  'h-12 rounded-[16px] bg-[color:var(--jaroo-primary)] px-4 text-[13px] font-semibold text-white hover:bg-[color:var(--jaroo-primary-strong)]',
-              })}
-            >
-              결과 공유하기
-            </Link>
+      {hasDetail ? (
+        <div className='border-t border-[#EFF1F4] px-4 py-3'>
+          <div className='divide-y divide-[#EFF1F4]'>
+            {vm.basicInfo.items.map((item) => (
+              <div key={item.label} className='flex items-center justify-between py-2.5 first:pt-1.5 last:pb-1.5'>
+                <span className='text-[12px] text-[#97A0AE]'>{item.label}</span>
+                <span className='text-[13px] font-bold text-[#0F1419]'>{item.value}</span>
+              </div>
+            ))}
           </div>
         </div>
-      }
-    >
-      <Tabs value={tab} onValueChange={(value) => handleTabChange(value as EtfTab)} className='gap-4'>
-        <div className='sticky top-0 z-10 -mx-4 border-b border-[color:var(--jaroo-border)] bg-white/95 px-4 backdrop-blur'>
-          <TabsList variant='line' className='grid h-auto w-full grid-cols-3 rounded-none bg-transparent p-0'>
-            {tabs.map((item) => (
-              <TabsTrigger
-                key={item.id}
-                value={item.id}
-                className='rounded-none border-b-2 border-transparent px-0 py-3 text-[13px] font-normal text-[color:var(--jaroo-muted)] after:hidden data-active:border-[color:var(--jaroo-primary)] data-active:font-medium data-active:text-[color:var(--jaroo-primary)]'
-              >
-                {item.label}
-              </TabsTrigger>
-            ))}
-          </TabsList>
+      ) : null}
+    </EtfResultCardShell>
+  )
+}
+
+function EtfNoticeSection({
+  eyebrow,
+  reason,
+  message,
+  icon: Icon,
+}: {
+  eyebrow: string
+  reason: EtfNoticeReason
+  message: string
+  icon: LucideIcon
+}) {
+  return <EtfDataNoticeCard eyebrow={eyebrow} reason={reason} message={message} icon={Icon} />
+}
+
+function EtfShareCard() {
+  return (
+    <article className='rounded-[16px] bg-[#0F1419] px-4 py-[18px] text-white'>
+      <h3 className='text-[14.5px] font-bold tracking-[-0.2px]'>분석 결과를 공유해보세요</h3>
+      <p className='mt-1.5 text-[12px] leading-[1.65] text-white/60'>
+        오늘 기준 시세와 상품 정보를 한 장의 카드로 정리해드려요.
+      </p>
+      <Link
+        href='/sharecard'
+        className='mt-3 flex w-full items-center justify-center rounded-[11px] bg-white px-3 py-[13px] text-[13.5px] font-bold text-[#0F1419] transition-colors active:scale-[0.99]'
+      >
+        결과 공유하기
+      </Link>
+      <Link
+        href='/home'
+        className='mt-2 flex w-full items-center justify-center rounded-[11px] bg-white/10 px-3 py-[11px] text-[12.5px] font-semibold text-white/85 transition-colors active:scale-[0.99]'
+      >
+        홈으로 가기
+      </Link>
+    </article>
+  )
+}
+
+function EtfGuideStateCard({
+  title,
+  body,
+  ctaLabel,
+  ctaHref,
+  onCta,
+}: {
+  title: string
+  body: string
+  ctaLabel: string
+  ctaHref?: string
+  onCta?: () => void
+}) {
+  const ctaClass =
+    'mt-4 flex h-[46px] w-full items-center justify-center rounded-[14px] bg-[#185fa5] text-[14px] font-extrabold text-white transition hover:bg-[#0c447c]'
+
+  return (
+    <article className='overflow-hidden rounded-[16px] border border-[#E8EAEE] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]'>
+      <div className='flex items-center gap-3 border-b border-[#EFF1F4] px-4 py-4'>
+        <div className='flex size-9 items-center justify-center rounded-[10px] bg-[#0F1419] text-[12px] font-black text-white'>
+          ETF
         </div>
+        <div className='min-w-0 flex-1'>
+          <div className='text-[10px] text-[#97A0AE]'>ETF 분석</div>
+          <h2 className='text-[14px] font-bold text-[#0F1419]'>{title}</h2>
+        </div>
+      </div>
+      <div className='px-4 py-4'>
+        <p className='text-[13px] leading-6 text-[#5A6473]'>{body}</p>
+        {ctaHref ? (
+          <Link href={ctaHref} className={ctaClass}>
+            {ctaLabel}
+          </Link>
+        ) : (
+          <button type='button' onClick={onCta} className={ctaClass}>
+            {ctaLabel}
+          </button>
+        )}
+      </div>
+    </article>
+  )
+}
 
-        <TabsContent value='overview' className='mt-0 space-y-3'>
-          <EtfHeroCard vm={vm} />
-          <EtfMomentumRow momentum={vm.momentum} />
-          <EtfDataNoticeCard
-            eyebrow='추천 시나리오'
-            reason={vm.scenario.notice.reason}
-            message={vm.scenario.notice.message}
-          />
-          <EtfDataNoticeCard eyebrow='기간별 수익률' reason={vm.returns.notice.reason} message={vm.returns.notice.message} />
-          <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
-            <p className='text-[10px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>기본 정보</p>
-            {vm.basicInfo.items.length ? (
-              <div className='mt-2'>
-                {vm.basicInfo.items.map((item) => (
-                  <div
-                    key={item.label}
-                    className='flex items-center justify-between border-b border-[color:var(--jaroo-border)] py-2 last:border-b-0'
-                  >
-                    <p className='text-[12px] text-[color:var(--jaroo-muted)]'>{item.label}</p>
-                    <p className='text-[12px] font-medium text-[color:var(--jaroo-ink)]'>{item.value}</p>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <p className='mt-2 text-[12px] text-[color:var(--jaroo-muted)]'>상품 정보를 가져오지 못했어요.</p>
-            )}
-          </Card>
-        </TabsContent>
+function EtfReadyBody({
+  vm,
+  briefing,
+  sharesText,
+}: {
+  vm: EtfViewModel
+  briefing: LoadingBriefingSnapshot
+  sharesText: string | null
+}) {
+  const quote = briefing.quote
+  const changePct = quote?.changePct ?? null
+  const volumeText = typeof quote?.volume === 'number' ? formatNumber(quote.volume) : null
 
-        <TabsContent value='holdings' className='mt-0 space-y-3'>
-          <EtfDataNoticeCard
-            eyebrow='섹터 비중'
-            reason={vm.sectorWeights.notice.reason}
-            message={vm.sectorWeights.notice.message}
-          />
-          <EtfDataNoticeCard
-            eyebrow='구성종목 Top 10'
-            reason={vm.topHoldings.notice.reason}
-            message={vm.topHoldings.notice.message}
-          />
-        </TabsContent>
+  return (
+    <>
+      <section className={styles.intro} aria-label='ETF 분석 안내'>
+        <p className={styles.introGreet}>
+          {new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date())}
+        </p>
+        <h2 className={styles.introTitle}>
+          ETF 흐름과 구성을<br />정리해드렸어요
+        </h2>
+        <p className={styles.introBody}>오늘 장 기준 시세와 상품 정보를 먼저 보여드려요. 구성·리스크는 소스 연결 후 이어집니다.</p>
+      </section>
 
-        <TabsContent value='risk' className='mt-0 space-y-3'>
-          <EtfDataNoticeCard
-            eyebrow='리스크 지표'
-            reason={vm.riskMetrics.notice.reason}
-            message={vm.riskMetrics.notice.message}
-          />
-          <EtfDataNoticeCard
-            eyebrow='유사 ETF 비교'
-            reason={vm.peers.notice.reason}
-            message={vm.peers.notice.message}
-          />
-          <EtfDataNoticeCard
-            eyebrow='배당 정보'
-            reason={vm.dividendInfo.notice.reason}
-            message={vm.dividendInfo.notice.message}
-          />
-        </TabsContent>
-      </Tabs>
-    </JarooShell>
+      <TodayBriefingCard
+        currentPriceText={vm.hero.price}
+        currentPriceCurrency='KRW'
+        averagePriceText={vm.hero.averagePrice ? vm.hero.averagePrice.replace('평단 ', '') : null}
+        averagePriceCurrency='KRW'
+        sharesText={sharesText}
+        profitRateText={null}
+        profitAmountText={null}
+        forceReady
+        elapsedSeconds={600}
+        briefingSnapshot={briefing}
+        tradingVolumeText={volumeText}
+      />
+
+      <EtfProductCard vm={vm} />
+
+      <EtfNoticeSection
+        eyebrow='추천 시나리오'
+        reason={vm.scenario.notice.reason}
+        message={vm.scenario.notice.message}
+        icon={Telescope}
+      />
+      <EtfNoticeSection
+        eyebrow='구성 종목 Top 10'
+        reason={vm.topHoldings.notice.reason}
+        message={vm.topHoldings.notice.message}
+        icon={ListChecks}
+      />
+      <EtfNoticeSection
+        eyebrow='섹터 비중'
+        reason={vm.sectorWeights.notice.reason}
+        message={vm.sectorWeights.notice.message}
+        icon={ChartPie}
+      />
+      <EtfNoticeSection
+        eyebrow='기간별 수익률'
+        reason={vm.returns.notice.reason}
+        message={vm.returns.notice.message}
+        icon={Telescope}
+      />
+      <EtfNoticeSection
+        eyebrow='리스크 지표'
+        reason={vm.riskMetrics.notice.reason}
+        message={vm.riskMetrics.notice.message}
+        icon={ShieldAlert}
+      />
+      <EtfNoticeSection
+        eyebrow='유사 ETF 비교'
+        reason={vm.peers.notice.reason}
+        message={vm.peers.notice.message}
+        icon={Scale}
+      />
+      <EtfNoticeSection
+        eyebrow='배당 정보'
+        reason={vm.dividendInfo.notice.reason}
+        message={vm.dividendInfo.notice.message}
+        icon={Coins}
+      />
+
+      <EtfShareCard />
+
+      <p className='px-2 pb-2 text-center text-[10px] leading-4 text-[#97A0AE]'>
+        표시된 데이터는 네이버 금융·위세리포트 기준 실데이터예요. 투자 권유나 수익 보장이 아닙니다.
+      </p>
+    </>
   )
 }
 
@@ -269,8 +296,8 @@ export default function EtfPage() {
       }
 
       try {
-        const [quotesResponse, profileResponse] = await Promise.all([
-          fetch(buildEtfPageQuoteUrl(target.code), { cache: 'no-store' }),
+        const [briefingResponse, profileResponse] = await Promise.all([
+          fetch(buildEtfPageBriefingUrl(target.code), { cache: 'no-store' }),
           fetch(buildEtfPageProfileUrl(target.code), { cache: 'no-store' }),
         ])
         if (loadSeqRef.current !== seq) {
@@ -280,15 +307,15 @@ export default function EtfPage() {
           setState({ phase: 'invalid' })
           return
         }
-        const [quotesBody, profileBody] = await Promise.all([
-          quotesResponse.json().catch(() => null),
+        const [briefingBody, profileBody] = await Promise.all([
+          briefingResponse.json().catch(() => null),
           profileResponse.json().catch(() => null),
         ])
         if (loadSeqRef.current !== seq) {
           return
         }
         setState(
-          buildEtfPageState(target, parseEtfQuoteResponse(quotesBody, target.code), parseEtfProfileResponse(profileBody)),
+          buildEtfPageState(target, parseEtfBriefingSnapshotResponse(briefingBody), parseEtfProfileResponse(profileBody)),
         )
       } catch {
         if (loadSeqRef.current !== seq) {
@@ -306,54 +333,88 @@ export default function EtfPage() {
     setRetryCount((count) => count + 1)
   }, [])
 
-  if (state.phase === 'ready') {
-    return <EtfReadyContent vm={state.vm} />
-  }
+  const ready = state.phase === 'ready' ? state : null
+  const vm = ready?.vm
+  const briefing = ready?.briefing
+  const quote = briefing?.quote ?? null
+  const changePct = quote?.changePct ?? null
 
-  if (state.phase === 'loading') {
-    return (
-      <JarooShell title='ETF 분석' backHref='/home' showBottomNav={false}>
-        <div className='flex min-h-[320px] items-center justify-center'>
-          <p className='text-[13px] text-[color:var(--jaroo-muted)]'>ETF 정보를 불러오는 중이에요…</p>
-        </div>
-      </JarooShell>
-    )
-  }
-
-  if (state.phase === 'empty') {
-    return (
-      <JarooShell title='ETF 분석' backHref='/home' showBottomNav={false}>
-        <EtfStatusCard
-          title='분석할 ETF가 선택되지 않았어요'
-          body='홈에서 보유 중인 ETF 카드의 "ETF 분석"을 누르면 구성·리스크를 분석해요.'
-        />
-      </JarooShell>
-    )
-  }
-
-  if (state.phase === 'invalid') {
-    return (
-      <JarooShell title='ETF 분석' backHref='/home' showBottomNav={false}>
-        <EtfStatusCard
-          title='한국 상장 ETF만 분석할 수 있어요'
-          body='지금은 국내 ETF(6자리 코드)만 지원해요. 미국 ETF나 일반 주식은 딥스캔을 이용해주세요.'
-        />
-      </JarooShell>
-    )
-  }
+  const headerName = vm?.header.name ?? 'ETF 분석'
+  const headerTargetLine = vm
+    ? [
+        MARKET_LABEL[ready?.market ?? 'kospi'],
+        vm.header.code,
+        ready?.holding ? `보유 ${formatShares(ready.holding.shares)}` : null,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : '분석 대상 확인 중'
 
   return (
-    <JarooShell title='ETF 분석' backHref='/home' showBottomNav={false}>
-      <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-5 text-center shadow-none'>
-        <p className='text-[14px] font-medium text-[color:var(--jaroo-ink)]'>{state.message}</p>
-        <Button
-          type='button'
-          onClick={retry}
-          className='mt-4 h-11 rounded-[14px] bg-[color:var(--jaroo-primary)] px-4 text-[13px] font-semibold text-white hover:bg-[color:var(--jaroo-primary-strong)]'
-        >
-          다시 시도
-        </Button>
-      </Card>
-    </JarooShell>
+    <div className='flex h-full w-full justify-center bg-white'>
+      <div className={cn(styles.loadingCard, 'w-full overflow-hidden')}>
+        <header className={styles.topBar}>
+          <div className={styles.topBarRow}>
+            <BackControl backHref='/home' />
+            <div className={styles.stockIdentity}>
+              <h1 className={styles.stockName}>{headerName}</h1>
+              <p className={styles.stockCode}>{headerTargetLine}</p>
+            </div>
+            <div className={styles.stockPriceBox}>
+              <p className={styles.stockPrice}>{vm?.hero.price ?? '현재가 확인 중'}</p>
+              <p className={cn(styles.stockChange, financialToneClass(changePct))}>
+                <span className={styles.returnRateContext}>전일 대비</span> {changePct == null ? '확인 중' : formatSignedPercent(changePct)}
+              </p>
+            </div>
+          </div>
+        </header>
+
+        <div className={styles.body}>
+          {state.phase === 'loading' ? (
+            <div className='flex min-h-[280px] items-center justify-center'>
+              <p className='flex items-center gap-1.5 text-[12px] font-bold text-[#5A6473]'>
+                <span className='size-[5px] animate-pulse rounded-full bg-[#185fa5]' />
+                ETF 정보를 불러오는 중이에요
+              </p>
+            </div>
+          ) : null}
+
+          {state.phase === 'empty' ? (
+            <EtfGuideStateCard
+              title='분석할 ETF가 없습니다'
+              body='홈에서 보유 중인 ETF 카드를 고르면 오늘 장 시세와 구성·리스크를 한 흐름으로 보여드려요.'
+              ctaLabel='홈에서 ETF 선택하기'
+              ctaHref='/home'
+            />
+          ) : null}
+
+          {state.phase === 'invalid' ? (
+            <EtfGuideStateCard
+              title='한국 상장 ETF만 분석할 수 있어요'
+              body='지금은 국내 ETF(6자리 코드)만 지원해요. 미국 ETF나 일반 주식은 딥스캔으로 분석할 수 있어요.'
+              ctaLabel='홈으로 가기'
+              ctaHref='/home'
+            />
+          ) : null}
+
+          {state.phase === 'error' ? (
+            <EtfGuideStateCard
+              title='정보를 가져오지 못했어요'
+              body={state.message}
+              ctaLabel='다시 시도'
+              onCta={retry}
+            />
+          ) : null}
+
+          {ready && vm ? (
+            <EtfReadyBody
+              vm={vm}
+              briefing={ready.briefing}
+              sharesText={ready.holding ? formatShares(ready.holding.shares) : null}
+            />
+          ) : null}
+        </div>
+      </div>
+    </div>
   )
 }

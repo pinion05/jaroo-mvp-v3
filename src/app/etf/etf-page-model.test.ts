@@ -6,8 +6,8 @@ import {
   buildEtfSessionFromDeepScanSnapshot,
   createInitialEtfPageState,
   isNotAnEtfProfileStatus,
+  parseEtfBriefingSnapshotResponse,
   parseEtfProfileResponse,
-  parseEtfQuoteResponse,
 } from './etf-page-model'
 import { resolveEtfPageTarget } from '@/lib/etf/etf-target'
 import type { EtfProfileJson } from '@/lib/etf/etf-view-model'
@@ -35,13 +35,22 @@ const profileFixture: EtfProfileJson = {
 
 const okTarget = { status: 'ok' as const, code: '069500', name: 'KODEX 200', holding: { shares: 100, averagePrice: 101_400 } }
 
-const quotesBody = {
+const briefingBody = {
   ok: true,
   data: {
-    items: [
-      { market: 'KR', code: '005930', price: 60_000 },
-      { market: 'KR', code: '069500', price: 104_275, asOf: '2026-09-15T20:20:19+09:00' },
+    asOf: '2026-09-15T20:20:19+09:00',
+    quote: {
+      currentPrice: 104_275,
+      changePct: -1.08,
+      currency: 'KRW',
+      asOf: '2026-09-15T20:20:19+09:00',
+      volume: 26_504_024,
+    },
+    daily: [
+      { date: '2026-09-12', close: 105_410, changePct: 0.3 },
+      { date: '2026-09-15', close: 104_275, changePct: -1.08 },
     ],
+    market: { kospi: { value: 6_627.26, changePct: -0.85 }, kosdaq: { value: 2_100.5, changePct: -1.2 } },
   },
 }
 
@@ -105,15 +114,18 @@ test('buildEtfSessionFromDeepScanSnapshot keeps stock and US ETF sessions for th
   assert.equal(buildEtfSessionFromDeepScanSnapshot({ holding: null }), null)
 })
 
-test('parseEtfQuoteResponse picks the matching item and rejects unusable payloads', () => {
-  assert.deepEqual(parseEtfQuoteResponse(quotesBody, '069500'), {
-    price: 104_275,
-    asOf: '2026-09-15T20:20:19+09:00',
-  })
-  assert.equal(parseEtfQuoteResponse(quotesBody, '999999'), null)
-  assert.equal(parseEtfQuoteResponse({ ok: true, data: { items: [] } }, '069500'), null)
-  assert.equal(parseEtfQuoteResponse({ ok: false }, '069500'), null)
-  assert.equal(parseEtfQuoteResponse({ ok: true, data: { items: [{ code: '069500', price: 0 }] } }, '069500'), null)
+test('parseEtfBriefingSnapshotResponse extracts snapshot, price and asOf, rejecting unusable payloads', () => {
+  const briefing = parseEtfBriefingSnapshotResponse(briefingBody)
+  assert.ok(briefing)
+  assert.equal(briefing.price, 104_275)
+  assert.equal(briefing.asOf, '2026-09-15T20:20:19+09:00')
+  assert.equal(briefing.snapshot.daily?.length, 2)
+  assert.equal(briefing.snapshot.quote?.changePct, -1.08)
+
+  assert.equal(parseEtfBriefingSnapshotResponse({ ok: true, data: { quote: { currentPrice: 0 } } }), null)
+  assert.equal(parseEtfBriefingSnapshotResponse({ ok: true, data: { quote: null } }), null)
+  assert.equal(parseEtfBriefingSnapshotResponse({ ok: false, data: null }), null)
+  assert.equal(parseEtfBriefingSnapshotResponse(null), null)
 })
 
 test('parseEtfProfileResponse accepts only the etf profile envelope', () => {
@@ -132,6 +144,9 @@ test('isNotAnEtfProfileStatus maps only crawler 400 to the invalid page state', 
 })
 
 test('buildEtfPageState distinguishes quote/profile failures and builds ready view model', () => {
+  const briefing = parseEtfBriefingSnapshotResponse(briefingBody)
+  assert.ok(briefing)
+
   const quoteError = buildEtfPageState(okTarget, null, profileFixture)
   assert.equal(quoteError.phase, 'error')
   if (quoteError.phase === 'error') assert.match(quoteError.message, /시세/)
@@ -140,12 +155,16 @@ test('buildEtfPageState distinguishes quote/profile failures and builds ready vi
   assert.equal(profileError.phase, 'error')
   if (profileError.phase === 'error') assert.match(profileError.message, /상품 정보/)
 
-  const ready = buildEtfPageState(okTarget, { price: 104_275, asOf: '2026-09-15T20:20:19+09:00' }, profileFixture)
+  const ready = buildEtfPageState(okTarget, briefing, profileFixture)
   assert.equal(ready.phase, 'ready')
   if (ready.phase === 'ready') {
-    // 시세는 quotes에서, 등락률은 profile.quote에서 합성한다
+    // 시세는 브리핑 스냅샷에서, 등락률은 profile.quote에서 합성한다
     assert.equal(ready.vm.hero.price, '104,275원')
     assert.equal(ready.vm.hero.change, '−1.08%')
     assert.equal(ready.vm.hero.profitAmount, '+287,500원')
+    // 페이지 렌더에 필요한 보조 정보도 상태에 실린다
+    assert.equal(ready.market, 'kospi')
+    assert.deepEqual(ready.holding, { shares: 100, averagePrice: 101_400 })
+    assert.equal(ready.briefing.daily?.length, 2)
   }
 })

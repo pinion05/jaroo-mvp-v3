@@ -1,9 +1,11 @@
 // /etf 페이지 상태머신 + 외부 계약 어댑터 (스펙 2026-09-15 Task 6).
 // 페이지 컴포넌트는 이 모듈의 순수 함수로 상태를 전이시킨다:
-//   target(ok/empty/invalid) → 초기상태 → fetch 결과(quotes·profile) → ready/error
-// 시세(가격)는 quotes/current에서, 전일 대비 등락률은 etf-profile의 quote.changePct에서 합성한다.
+//   target(ok/empty/invalid) → 초기상태 → fetch 결과(브리핑 스냅샷·profile) → ready/error
+// 시세·일봉 차트·시장 지표는 딥스캔과 같은 briefing-snapshot 소스를 쓰고
+// (TodayBriefingCard 재사용), 전일 대비 등락률은 profile.quote.changePct에서 합성한다.
 
 import { normalizeDeepScanCode } from '@/app/deepscan/deepscan-page-fetchers'
+import type { LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
 import { resolveEtfPageTarget, type EtfPageTarget, type EtfTargetSessionLike } from '@/lib/etf/etf-target'
@@ -16,7 +18,13 @@ export type EtfPageState =
   | { phase: 'empty' }
   | { phase: 'invalid' }
   | { phase: 'error'; message: string }
-  | { phase: 'ready'; vm: EtfViewModel }
+  | {
+      phase: 'ready'
+      vm: EtfViewModel
+      briefing: LoadingBriefingSnapshot
+      market: 'kospi' | 'kosdaq'
+      holding: { shares: number; averagePrice: number } | null
+    }
 
 type EtfPageOkTarget = Extract<EtfPageTarget, { status: 'ok' }>
 
@@ -68,8 +76,9 @@ export function createInitialEtfPageState(target: EtfPageTarget): EtfPageState {
   }
 }
 
-export function buildEtfPageQuoteUrl(code: string) {
-  return `/api/quotes/current?codes=${encodeURIComponent(code)}`
+// 딥스캔 로딩 화면이 쓰는 것과 동일 엔드포인트 — ETF 코드에서도 시세·일봉·시장이 온다.
+export function buildEtfPageBriefingUrl(code: string) {
+  return `/api/deepscan/briefing-snapshot?code=${encodeURIComponent(code)}`
 }
 
 export function buildEtfPageProfileUrl(code: string) {
@@ -82,20 +91,20 @@ export function isNotAnEtfProfileStatus(status: number): boolean {
   return status === 400
 }
 
-export function parseEtfQuoteResponse(body: unknown, code: string): EtfPageQuote | null {
-  const items = (body as { data?: { items?: unknown } } | null)?.data?.items
-  if (!Array.isArray(items)) {
+export type EtfBriefingQuote = EtfPageQuote & { snapshot: LoadingBriefingSnapshot }
+
+export function parseEtfBriefingSnapshotResponse(body: unknown): EtfBriefingQuote | null {
+  const data = (body as { data?: LoadingBriefingSnapshot } | null)?.data
+  const price = data?.quote?.currentPrice
+  if (typeof price !== 'number' || !Number.isFinite(price) || price <= 0) {
     return null
   }
 
-  const item = items.find(
-    (entry) => normalizeDeepScanCode((entry as { code?: string | null }).code ?? undefined) === code,
-  ) as { price?: unknown; asOf?: unknown } | undefined
-  if (typeof item?.price !== 'number' || !Number.isFinite(item.price) || item.price <= 0) {
-    return null
+  return {
+    price,
+    asOf: typeof data?.quote?.asOf === 'string' ? data.quote.asOf : (typeof data?.asOf === 'string' ? data.asOf : undefined),
+    snapshot: data ?? {},
   }
-
-  return { price: item.price, asOf: typeof item.asOf === 'string' ? item.asOf : undefined }
 }
 
 export function parseEtfProfileResponse(body: unknown): EtfProfileJson | null {
@@ -105,10 +114,10 @@ export function parseEtfProfileResponse(body: unknown): EtfProfileJson | null {
 
 export function buildEtfPageState(
   target: EtfPageOkTarget,
-  quote: EtfPageQuote | null,
+  briefing: (EtfPageQuote & { snapshot?: LoadingBriefingSnapshot }) | null,
   profile: EtfProfileJson | null,
 ): EtfPageState {
-  if (!quote) {
+  if (!briefing) {
     return { phase: 'error', message: '시세를 가져오지 못했어요. 잠시 후 다시 시도해주세요.' }
   }
   if (!profile) {
@@ -117,9 +126,12 @@ export function buildEtfPageState(
 
   return {
     phase: 'ready',
+    briefing: briefing.snapshot ?? {},
+    market: profile.market,
+    holding: target.holding,
     vm: buildEtfViewModel({
       profile,
-      quote: { ...quote, changePct: profile.quote?.changePct ?? null },
+      quote: { price: briefing.price, asOf: briefing.asOf, changePct: profile.quote?.changePct ?? null },
       holding: target.holding,
     }),
   }
