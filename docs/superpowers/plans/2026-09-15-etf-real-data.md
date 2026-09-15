@@ -392,6 +392,7 @@ export function resolveEtfPageTarget(input: {
 
 - [x] **Step 1~5**: TDD(상태머신) → 구현 → `npm run lint && npm run typecheck && npm run test` → 커밋 `feat(etf): /etf 실데이터 전환 — 픽스처 제거·사유 카드`
   - 구현 중 결정 사항: quotes/current에 등락률이 없어 크롤러가 profile.quote.changePct(네이버 prevChangeRate)를 내림. 크롤러 400(NOT_ETF)은 invalid 상태로 매핑. 딥스캔 플레이스홀더 세션('종목 미선택')은 empty로 처리. 브라우저 검증 완료(실시세·평단·손익·사유 카드·invalid/empty 상태·픽스처 문자열 부재).
+  - **2026-09-15 재디자인(사용자 지시)**: "기존 JSX 유지"는 철회 — /etf는 **딥스캔 결과 화면과 동일 구조를 직접 재사용**한다. 딥스캔 로딩 스크린 셸(module.css topBar·intro) + `TodayBriefingCard`(시세·평단·3개월 일봉 차트·시장 브리핑 재사용, 시세 소스를 quotes/current → `/api/deepscan/briefing-snapshot`으로 교체) + 결과 카드 문법(16px 카드·#E8EAEE 보더·다크 칩 헤더). 탭 구조는 제거하고 단일 흐름으로.
 
 ### Task 7: 홈 ETF 카드 → /etf 액션 연결
 
