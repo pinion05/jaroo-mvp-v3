@@ -363,26 +363,29 @@ function EtfReadyBody({
         tradingVolumeText={volumeText}
       />
 
-      <EtfProductCard vm={vm} />
+      {/* 결과 카드 묶음 — 카드 사이 12px 리듬 (브리핑 카드와도 동일 간격) */}
+      <div className='mt-3 flex flex-col gap-3'>
+        <EtfProductCard vm={vm} />
 
-      {vm.scenario.notice ? (
-        <EtfNoticeSection
-          eyebrow='시나리오 · 52주 위치'
-          reason={vm.scenario.notice.reason}
-          message={vm.scenario.notice.message}
-          icon={Telescope}
-        />
-      ) : (
-        <EtfScenarioCard scenario={vm.scenario.scenario!} priceText={vm.hero.price} />
-      )}
+        {vm.scenario.notice ? (
+          <EtfNoticeSection
+            eyebrow='시나리오 · 52주 위치'
+            reason={vm.scenario.notice.reason}
+            message={vm.scenario.notice.message}
+            icon={Telescope}
+          />
+        ) : (
+          <EtfScenarioCard scenario={vm.scenario.scenario!} priceText={vm.hero.price} />
+        )}
 
-      <EtfReturnsCard vm={vm} />
-      <EtfHoldingsCard vm={vm} />
-      <EtfRiskCard vm={vm} />
+        <EtfReturnsCard vm={vm} />
+        <EtfHoldingsCard vm={vm} />
+        <EtfRiskCard vm={vm} />
 
-      <EtfShareCard />
+        <EtfShareCard />
+      </div>
 
-      <p className='px-2 pb-2 text-center text-[10px] leading-4 text-[#97A0AE]'>
+      <p className='mt-3 px-2 pb-2 text-center text-[10px] leading-4 text-[#97A0AE]'>
         {market === 'us'
           ? '표시된 데이터는 Polygon·Yahoo Finance 기준 실데이터예요. 투자 권유나 수익 보장이 아닙니다.'
           : '표시된 데이터는 네이버 금융·위세리포트 기준 실데이터예요. 투자 권유나 수익 보장이 아닙니다.'}
