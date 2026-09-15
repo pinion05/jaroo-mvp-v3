@@ -170,3 +170,25 @@ test('fetchEtfProfile throws when naver price fails entirely', async () => {
     /etf profile unavailable/i,
   );
 });
+
+// Regression: ISSUE-001 — 주식 코드가 ok:true ETF 프로필로 반환되던 결함
+// Found by /qa on 2026-09-15
+// Report: .gstack/qa-reports/qa-report-localhost-3000-2026-09-15.md
+test('fetchEtfProfile rejects stock codes without ETF signals (NotAnEtfError)', async () => {
+  const { fetchEtfProfile } = await import('../src/crawlers/etf-profile.js');
+
+  const stockPriceFixture = {
+    itemname: '삼성전자',
+    nowPrice: 60_000,
+    // nav/inav/issuerNameKo 부재 = ETF 아님
+  };
+
+  await assert.rejects(
+    () =>
+      fetchEtfProfile('005930', {
+        fetchImpl: async () => ({ ok: true, json: async () => stockPriceFixture }),
+        fetchSnapshot: async () => null,
+      }),
+    (error) => error.code === 'NOT_ETF' && error.name === 'NotAnEtfError',
+  );
+});
