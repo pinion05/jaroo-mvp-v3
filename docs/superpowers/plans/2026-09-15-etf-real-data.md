@@ -457,9 +457,27 @@ export function resolveEtfPageTarget(input: {
 - [x] `src/lib/etf-history-store.ts` — record(append+prune 30건)/list/getById. 읽기 가드 `isEtfLedgerPayload`(jaroo-etf-profile-v1). price_basis=일봉 마지막 종가. charged_credits=0(무과금).
 - [x] `/api/etf/profile` GET 성공 시 세션(쿠키) 있으면 원장 append — payload는 상류 응답 그대로라 클라이언트 위조 불가, 실패는 void로 조회 응답 무영향. 게스트는 미기록(deepscan과 동일).
 - [x] `GET /api/etf/history`(목록) · `GET /api/etf/history/[id]`(상세, uuid·본인·계약 가드 → 404) — deepscan history 라우트 미러.
-- [x] 기록 탭(/mypage/history) — 두 원장을 `mergeAnalysisHistory`(scannedAt 내림차순)로 병합. ETF 행은 파란 점 + 'ETF · 코스피/코스닥' 배지, 탭 → `/etf?code=` 재진입(공개 시세성 데이터라 매번 실시간 재수집 — 스냅샷 복원 불필요). 딥스캔 행은 기존 A안(타깃 복원→스냅샷 캐시 히트) 유지.
+- [x] 기록 탭(/mypage/history) — 두 원장을 `mergeAnalysisHistory`(scannedAt 내림차순)로 병합. ETF 행은 파란 점 + 'ETF · 코스피/코스닥' 배지, 탭 → `/etf?code=` 재진입(후속 작업 2부터 TTL 내 재열람 캐시 히트). 딥스캔 행은 기존 A안(타깃 복원→스냅샷 캐시 히트) 유지.
 - [x] 단위 테스트: etf-history-store 순수 함수 6종(계약 가드·기준가) + analysis-history 병합 4종.
 - [x] E2E(라이브): /etf 방문 → DB 행(payload 300일봉·30 구성종목·price_basis 104,275) → 기록 탭 병합 렌더(ETF 행+딥스캔 행) → ETF 행 탭 → /etf 재진입. 목록/상세/404 API 경로 확인.
-- 알려진 의미론: 조회 성공마다 append(deepscan의 스캔마다 append와 동일) — 같은 ETF 재방문 시 행이 중복 쌓임. 동일 코드 근접 중복 제거(예: 10분 윈도)는 후속 과제.
+- 알려진 의미론 → **해결(후속 작업 2의 재열람 캐시)**: 초판에는 조회 성공마다 append돼 같은 ETF 재방문 시 행이 중복 쌓였다. 단일종목 딥스캔의 재열람 패턴(스냅샷 캐시힉 + "다시 분석하기")을 이식해 구조적으로 해소했다(아래).
 
 게이트: lint 0 errors(기존 warning만) · typecheck 0 · 웹 376/378(타이밍 민감 #298·wisereport-kr-v123 격리 시 통과) · 신규 단위 10/10.
+
+## 후속 작업 2: ETF 재열람 캐시 — "이미 분석한 결과" 복원 + 다시 분석하기 (2026-09-15 추가)
+
+사용자 지적("단일종목은 이미 분석한 값을 다시 불러왔다고 명시하고 다시 분석하기 버튼도 있다 — 이것을 참고해")으로
+딥스캔의 스냅샷 캐시 A안을 ETF에 동일 문법으로 이식했다.
+
+- [x] `/api/etf/profile` 재열람 캐시 — 세션 호출자의 원장 최신 행(`lookupLatestEtfAnalysis`)이
+  TTL 24h(`isSnapshotFresh` 재사용) 안이면 상류 없이 반환 + `cache: { hit, scannedAt }` 표식.
+  **캐시 히트는 원장에 새 행을 남기지 않는다** → 재방문 중복행 문제 해소.
+  갱신은 명시적 `refresh=1`('다시 분석하기')만 — deepscan GET 라우트와 같은 계약.
+- [x] 페이지 모델 — `parseEtfProfileCacheInfo`, ready 상태에 `restoredAt`·`analysisDriftPct`
+  (캐시된 분석의 마지막 일봉 종가 vs live 브리핑 시세, `computePriceDriftPct` 재사용).
+- [x] /etf UI — 딥스캔 결과 화면의 `SnapshotProvenanceBar`를 **컴포넌트 그대로 재사용**
+  ("{N}분 전에 분석한 결과를 그대로 보여드려요" + '다시 분석하기' 필 버튼 + |drift|≥5% 앰버 경고).
+  ETF는 무과금이라 크레딧 확인 다이얼로그 없이 즉시 갱신하고, 갱신 실패 시 기존 분석 화면을 유지한다.
+- [x] 테스트 — 페이지 모델 2종(캐시 표식 파싱·restoredAt/drift 주입) + 라우트 순수 계약 2종(`buildEtfProfileCacheBody`).
+- [x] E2E(라이브): 재방문 → "11분 전에 분석한 결과…" 배너 + 원장 행수 불변(5→5) → '다시 분석하기' →
+  `refresh=1` fresh 수집 + 배너 소멸 + 새 행 append. 배너 시각 검증(아이콘·필 버튼·여백 정상).
