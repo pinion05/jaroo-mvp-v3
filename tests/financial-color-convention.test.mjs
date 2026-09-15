@@ -50,7 +50,8 @@ test('병합·충돌 검토·ETF·공유 카드의 손익 숫자도 공통 부�
   // 결과 화면 문법을 재사용한다 — 남은 실데이터 손익 숫자(전일 대비 등락)는 딥스캔 계열의
   // 공통 부호 판별(financialToneClass)로 검사한다 (스펙 2026-09-15 D7).
   assert.match(etfSource, /financialToneClass\(changePct\)/)
-  assert.match(shareCardSource, /getFinancialValueTextClass\(sharePortfolioCard\.totalPnl\)/)
+  // /sharecard 총손익은 2026-09-16 실데이터화 이후 포트폴리오 카드 모델(card.totalPnl)을 쓴다.
+  assert.match(shareCardSource, /getFinancialValueTextClass\(card\.totalPnl\)/)
 })
 
 test('DeepScan 완료 뱃지는 초록 조합, 금융 상승 뱃지는 국내 관례 빨강 조합을 쓴다', () => {
