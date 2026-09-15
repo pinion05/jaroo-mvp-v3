@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import { buildEtfViewModel, type EtfProfileJson } from './etf-view-model'
+import { computeEtfMetrics } from './etf-metrics'
 
 const profile: EtfProfileJson = {
   schemaVersion: 'jaroo-etf-profile-v1',
@@ -69,14 +70,63 @@ test('buildEtfViewModel loss formatting uses U+2212 and rounded integers', () =>
 
 test('buildEtfViewModel marks unavailable blocks with explicit reasons', () => {
   const vm = buildEtfViewModel({ profile, quote: { price: 104_275, changePct: 0 }, holding: null })
-  assert.equal(vm.scenario.notice.reason, 'source-absent')
-  assert.match(vm.scenario.notice.message, /애널리스트 목표가/)
-  assert.equal(vm.returns.notice.reason, 'source-pending')
+  // 일봉 지표 없음(260행 미만) → 시나리오·수익률·리스크는 소스 준비 중 사유
+  assert.equal(vm.scenario.notice?.reason, 'source-pending')
+  assert.match(vm.scenario.notice?.message ?? '', /52주 위치/)
+  assert.equal(vm.returns.notice?.reason, 'source-pending')
+  assert.equal(vm.riskMetrics.notice?.reason, 'source-pending')
   assert.equal(vm.sectorWeights.notice.reason, 'source-pending')
-  assert.equal(vm.topHoldings.notice.reason, 'source-pending')
-  assert.equal(vm.riskMetrics.notice.reason, 'source-pending')
+  assert.equal(vm.topHoldings.notice?.reason, 'source-pending')
   assert.equal(vm.peers.notice.reason, 'planned')
   assert.equal(vm.dividendInfo.notice.reason, 'planned')
+})
+
+test('buildEtfViewModel fills returns·risk·scenario from metrics and holdings from profile', () => {
+  const metrics = computeEtfMetrics(
+    Array.from({ length: 260 }, (_, index) => ({
+      date: `2025-${String((index % 12) + 1).padStart(2, '0')}-15`,
+      close: index < 200 ? 100 + index : 300 - index / 2,
+    })),
+  )
+  assert.ok(metrics, 'fixture must satisfy the 260-row minimum')
+
+  const vm = buildEtfViewModel({
+    profile: {
+      ...profile,
+      holdings: [
+        { rank: 1, code: '005930', name: '삼성전자', weightPct: 32.63, changePct: null },
+        { rank: 2, code: '000660', name: 'SK하이닉스', weightPct: 27.07, changePct: null },
+      ],
+    },
+    quote: { price: 150_000, changePct: 0 },
+    holding: null,
+    metrics,
+  })
+
+  // 기간별 수익률 — 실 items
+  assert.equal(vm.returns.notice, null)
+  assert.deepEqual(
+    vm.returns.items?.map((item) => item.label),
+    ['1개월', '3개월', '6개월', '1년'],
+  )
+
+  // 리스크 — 4칸 팩트
+  assert.equal(vm.riskMetrics.notice, null)
+  assert.equal(vm.riskMetrics.items?.length, 4)
+  assert.ok(vm.riskMetrics.items?.some((item) => item.label === '샤프지수'))
+
+  // 시나리오 — 52주 위치 + 애널리스트 목표가 부재 사유(D7)
+  assert.equal(vm.scenario.notice, null)
+  assert.ok(vm.scenario.scenario)
+  assert.match(vm.scenario.scenario.positionText, /^\d+%/)
+  assert.match(vm.scenario.scenario.note, /애널리스트 목표가/)
+
+  // 구성 종목 — 상위 10개 + 비중 바
+  assert.equal(vm.topHoldings.notice, null)
+  assert.equal(vm.topHoldings.items?.length, 2)
+  assert.equal(vm.topHoldings.items?.[0].weightText, '32.63%')
+  assert.equal(vm.topHoldings.items?.[0].weightBarPct, 100)
+  assert.match(vm.topHoldings.summary ?? '', /네이버/)
 })
 
 test('buildEtfViewModel without changePct hides change badge and keeps momentum neutral', () => {

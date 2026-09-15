@@ -9,6 +9,7 @@ import type { LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
 import { resolveEtfPageTarget, type EtfPageTarget, type EtfTargetSessionLike } from '@/lib/etf/etf-target'
+import { computeEtfMetrics } from '@/lib/etf/etf-metrics'
 import { buildEtfViewModel, type EtfProfileJson, type EtfViewModel } from '@/lib/etf/etf-view-model'
 
 export type EtfPageQuote = { price: number; asOf?: string }
@@ -133,6 +134,7 @@ export function buildEtfPageState(
       profile,
       quote: { price: briefing.price, asOf: briefing.asOf, changePct: profile.quote?.changePct ?? null },
       holding: target.holding,
+      metrics: computeEtfMetrics(profile.daily),
     }),
   }
 }

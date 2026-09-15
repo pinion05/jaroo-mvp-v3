@@ -2,7 +2,14 @@
 
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { ChartPie, Coins, ListChecks, Scale, ShieldAlert, Telescope } from 'lucide-react'
+import {
+  ChartPie,
+  Coins,
+  ListChecks,
+  Scale,
+  ShieldAlert,
+  Telescope,
+} from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
 import { EtfDataNoticeCard } from '@/components/etf-data-notice-card'
@@ -20,7 +27,7 @@ import {
   resolveEtfPageTargetFromWindow,
   type EtfPageState,
 } from './etf-page-model'
-import type { EtfNoticeReason, EtfViewModel } from '@/lib/etf/etf-view-model'
+import type { EtfNoticeReason, EtfScenario, EtfViewModel } from '@/lib/etf/etf-view-model'
 import type { LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
 import { cn } from '@/lib/utils'
 
@@ -89,10 +96,11 @@ function EtfProductCard({ vm }: { vm: EtfViewModel }) {
       ) : null}
 
       {hasDetail ? (
-        <div className='border-t border-[#EFF1F4] px-4 py-3'>
+        <div className='border-t border-[#EFF1F4] px-4 py-4'>
+          <div className='mb-1 text-[10px] text-[#97A0AE]'>상세 정보</div>
           <div className='divide-y divide-[#EFF1F4]'>
             {vm.basicInfo.items.map((item) => (
-              <div key={item.label} className='flex items-center justify-between py-2.5 first:pt-1.5 last:pb-1.5'>
+              <div key={item.label} className='flex items-center justify-between py-3 first:pt-2 last:pb-0'>
                 <span className='text-[12px] text-[#97A0AE]'>{item.label}</span>
                 <span className='text-[13px] font-bold text-[#0F1419]'>{item.value}</span>
               </div>
@@ -116,6 +124,136 @@ function EtfNoticeSection({
   icon: LucideIcon
 }) {
   return <EtfDataNoticeCard eyebrow={eyebrow} reason={reason} message={message} icon={Icon} />
+}
+
+// 시나리오 카드 — 52주 범위 위치 (가중 목표가 3단계 이관, 스펙 Self-Review)
+function EtfScenarioCard({ scenario, priceText }: { scenario: EtfScenario; priceText: string }) {
+  return (
+    <EtfResultCardShell eyebrow='시나리오' title='52주 범위 위치' badge={scenario.headline}>
+      <div className='px-4 py-5 text-center'>
+        <div className='text-[10px] text-[#97A0AE]'>52주 범위에서</div>
+        <div className='mt-1 text-[28px] font-black leading-none text-[#0F1419]'>{scenario.positionText}</div>
+        <div className='mx-auto mt-3 h-[5px] w-[200px] overflow-hidden rounded-full bg-[#EFF1F4]'>
+          <div className='h-full rounded-full bg-[#E5484D]' style={{ width: `${scenario.positionPct}%` }} />
+        </div>
+        <div className='mx-auto mt-1.5 flex w-[200px] justify-between text-[10px] text-[#97A0AE]'>
+          <span>저점 {scenario.lowText}</span>
+          <span>고점 {scenario.highText}</span>
+        </div>
+      </div>
+      <div className='grid grid-cols-3 border-t border-[#EFF1F4]'>
+        {[
+          ['현재가', priceText],
+          ['52주 최저', scenario.lowText],
+          ['52주 최고', scenario.highText],
+        ].map(([label, value]) => (
+          <div key={label} className='border-r border-[#EFF1F4] px-3 py-3 last:border-r-0'>
+            <div className='text-[10px] text-[#97A0AE]'>{label}</div>
+            <div className='mt-1 text-[13px] font-bold text-[#0F1419]'>{value}</div>
+          </div>
+        ))}
+      </div>
+      <p className='border-t border-[#EFF1F4] px-4 py-3 text-[10px] leading-4 text-[#97A0AE]'>{scenario.note}</p>
+    </EtfResultCardShell>
+  )
+}
+
+function EtfReturnsCard({ vm }: { vm: EtfViewModel }) {
+  if (vm.returns.notice || !vm.returns.items) {
+    return (
+      <EtfNoticeSection
+        eyebrow='기간별 수익률'
+        reason={vm.returns.notice!.reason}
+        message={vm.returns.notice!.message}
+        icon={Telescope}
+      />
+    )
+  }
+
+  return (
+    <EtfResultCardShell eyebrow='수익률' title='기간별 수익률'>
+      <div className='grid grid-cols-4'>
+        {vm.returns.items.map((item, index) => (
+          <div key={item.label} className={cn('px-3 py-4', index < vm.returns.items!.length - 1 && 'border-r border-[#EFF1F4]')}>
+            <div className='text-[10px] text-[#97A0AE]'>{item.label}</div>
+            <div className={cn('mt-1 text-[13px] font-bold', financialToneClass(item.value))}>{item.value}</div>
+          </div>
+        ))}
+      </div>
+    </EtfResultCardShell>
+  )
+}
+
+function EtfHoldingsCard({ vm }: { vm: EtfViewModel }) {
+  if (vm.topHoldings.notice || !vm.topHoldings.items) {
+    return (
+      <EtfNoticeSection
+        eyebrow='구성 종목 Top 10'
+        reason={vm.topHoldings.notice!.reason}
+        message={vm.topHoldings.notice!.message}
+        icon={ListChecks}
+      />
+    )
+  }
+
+  const items = vm.topHoldings.items
+  return (
+    <EtfResultCardShell eyebrow='구성' title='구성 종목 Top 10' badge={`상위 ${items.length}개`}>
+      <div className='px-4 py-3'>
+        <div className='space-y-3'>
+          {items.map((holding) => (
+            <div key={`${holding.rank}-${holding.code}`}>
+              <div className='mb-1 flex items-center gap-2 text-[13px]'>
+                <span className='size-2 shrink-0 rounded-full bg-[#2B6BE6]' />
+                <span className='min-w-0 truncate font-bold text-[#0F1419]'>{holding.name}</span>
+                <span className='shrink-0 text-[10px] text-[#97A0AE]'>{holding.code}</span>
+                <span className='ml-auto shrink-0 font-bold text-[#5A6473]'>{holding.weightText}</span>
+              </div>
+              <div className='h-[5px] overflow-hidden rounded-full bg-[#EFF1F4]'>
+                <div className='h-full rounded-full bg-[#2B6BE6]' style={{ width: `${holding.weightBarPct}%` }} />
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <p className='border-t border-[#EFF1F4] px-4 py-3 text-[10px] leading-4 text-[#97A0AE]'>{vm.topHoldings.summary}</p>
+    </EtfResultCardShell>
+  )
+}
+
+function EtfRiskCard({ vm }: { vm: EtfViewModel }) {
+  if (vm.riskMetrics.notice || !vm.riskMetrics.items) {
+    return (
+      <EtfNoticeSection
+        eyebrow='리스크 지표'
+        reason={vm.riskMetrics.notice!.reason}
+        message={vm.riskMetrics.notice!.message}
+        icon={ShieldAlert}
+      />
+    )
+  }
+
+  const items = vm.riskMetrics.items
+  return (
+    <EtfResultCardShell eyebrow='리스크' title='리스크 지표'>
+      <div className='grid grid-cols-2'>
+        {items.map((item, index) => (
+          <div
+            key={item.label}
+            className={cn(
+              'border-[#EFF1F4] px-4 py-3',
+              index % 2 === 0 && 'border-r',
+              index < items.length - (items.length % 2 === 0 ? 2 : 1) && 'border-b',
+            )}
+          >
+            <div className='text-[10px] text-[#97A0AE]'>{item.label}</div>
+            <div className='mt-1 text-[14px] font-bold text-[#0F1419]'>{item.value}</div>
+            <div className='mt-0.5 text-[10px] text-[#97A0AE]'>{item.subtitle}</div>
+          </div>
+        ))}
+      </div>
+    </EtfResultCardShell>
+  )
 }
 
 function EtfShareCard() {
@@ -225,36 +363,26 @@ function EtfReadyBody({
 
       <EtfProductCard vm={vm} />
 
-      <EtfNoticeSection
-        eyebrow='추천 시나리오'
-        reason={vm.scenario.notice.reason}
-        message={vm.scenario.notice.message}
-        icon={Telescope}
-      />
-      <EtfNoticeSection
-        eyebrow='구성 종목 Top 10'
-        reason={vm.topHoldings.notice.reason}
-        message={vm.topHoldings.notice.message}
-        icon={ListChecks}
-      />
+      {vm.scenario.notice ? (
+        <EtfNoticeSection
+          eyebrow='시나리오 · 52주 위치'
+          reason={vm.scenario.notice.reason}
+          message={vm.scenario.notice.message}
+          icon={Telescope}
+        />
+      ) : (
+        <EtfScenarioCard scenario={vm.scenario.scenario!} priceText={vm.hero.price} />
+      )}
+
+      <EtfReturnsCard vm={vm} />
+      <EtfHoldingsCard vm={vm} />
       <EtfNoticeSection
         eyebrow='섹터 비중'
         reason={vm.sectorWeights.notice.reason}
         message={vm.sectorWeights.notice.message}
         icon={ChartPie}
       />
-      <EtfNoticeSection
-        eyebrow='기간별 수익률'
-        reason={vm.returns.notice.reason}
-        message={vm.returns.notice.message}
-        icon={Telescope}
-      />
-      <EtfNoticeSection
-        eyebrow='리스크 지표'
-        reason={vm.riskMetrics.notice.reason}
-        message={vm.riskMetrics.notice.message}
-        icon={ShieldAlert}
-      />
+      <EtfRiskCard vm={vm} />
       <EtfNoticeSection
         eyebrow='유사 ETF 비교'
         reason={vm.peers.notice.reason}
