@@ -5,10 +5,14 @@
 import { fetchWiseReportEtfSnapshot } from './wisereport-etf.js';
 
 const NAVER_DOMESTIC_DETAIL_BASE = 'https://stock.naver.com/api/domestic/detail';
+const NAVER_M_STOCK_API_BASE = 'https://m.stock.naver.com/api';
 const BROWSER_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36';
 const DEFAULT_ETF_PROFILE_TIMEOUT_MS = 10_000;
 const HOLDINGS_LIMIT = 30;
+// 일봉: m.stock price API는 pageSize 상한 60 — 5페이지(≈300거래일)로 1년치 확보
+const DAILY_PRICE_PAGE_SIZE = 60;
+const DAILY_PRICE_PAGES = 5;
 
 function normalizeCode(code) {
   const match = String(code ?? '').trim().match(/^\d{6}$/);
@@ -81,7 +85,7 @@ function buildProduct({ snapshot, naverPrice }) {
   };
 }
 
-export function buildEtfProfile({ code, snapshot = null, naverPrice = null, naverComponent = null }) {
+export function buildEtfProfile({ code, snapshot = null, naverPrice = null, naverComponent = null, daily = null }) {
   const normalizedCode = normalizeCode(code);
   const name = String(snapshot?.product?.name || naverPrice?.itemname || normalizedCode);
 
@@ -96,8 +100,38 @@ export function buildEtfProfile({ code, snapshot = null, naverPrice = null, nave
     product: buildProduct({ snapshot, naverPrice }),
     returns: buildReturns(snapshot),
     holdings: buildHoldings(naverComponent),
-    daily: null, // 2단계에서 naver chart 일봉 추가
+    daily: Array.isArray(daily) && daily.length > 0 ? daily : null,
   };
+}
+
+function parseNaverMoneyNumber(value) {
+  if (value == null || value === '') return null;
+  const parsed = Number(String(value).replaceAll(',', ''));
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+}
+
+// m.stock.naver.com price 페이지네이션(최신순)을 과거→최신 오름차순 일봉으로 묶는다.
+// 빈 페이지가 오면 조기 종료 — 실패는 관용(null)으로: 프로필 전체를 죽이지 않는다.
+async function fetchNaverDailyHistory(code, { fetchImpl, timeoutMs }) {
+  const rows = [];
+  for (let page = 1; page <= DAILY_PRICE_PAGES; page += 1) {
+    const pageRows = await fetchNaverJson(
+      `${NAVER_M_STOCK_API_BASE}/stock/${code}/price?page=${page}&pageSize=${DAILY_PRICE_PAGE_SIZE}`,
+      { fetchImpl, timeoutMs },
+    ).catch(() => null);
+    if (!Array.isArray(pageRows) || pageRows.length === 0) break;
+
+    for (const row of pageRows) {
+      const close = parseNaverMoneyNumber(row?.closePrice);
+      if (typeof row?.localTradedAt === 'string' && row.localTradedAt && close !== null) {
+        rows.push({ date: row.localTradedAt, close });
+      }
+    }
+    if (pageRows.length < DAILY_PRICE_PAGE_SIZE) break;
+  }
+
+  if (rows.length === 0) return null;
+  return rows.sort((left, right) => left.date.localeCompare(right.date));
 }
 
 async function fetchNaverJson(url, { fetchImpl, timeoutMs }) {
@@ -131,7 +165,7 @@ export async function fetchEtfProfile(code, options = {}) {
   const timeoutMs = options.timeoutMs ?? DEFAULT_ETF_PROFILE_TIMEOUT_MS;
   const fetchSnapshot = options.fetchSnapshot ?? fetchWiseReportEtfSnapshot;
 
-  const [naverPrice, naverComponent, snapshot] = await Promise.all([
+  const [naverPrice, naverComponent, snapshot, dailyHistory] = await Promise.all([
     fetchNaverJson(`${NAVER_DOMESTIC_DETAIL_BASE}/${normalizedCode}/price`, { fetchImpl, timeoutMs }).catch(
       () => null,
     ),
@@ -140,6 +174,7 @@ export async function fetchEtfProfile(code, options = {}) {
       timeoutMs,
     }).catch(() => null),
     fetchSnapshot(normalizedCode).catch(() => null),
+    fetchNaverDailyHistory(normalizedCode, { fetchImpl, timeoutMs }).catch(() => null),
   ]);
 
   if (!naverPrice) {
@@ -154,5 +189,5 @@ export async function fetchEtfProfile(code, options = {}) {
     throw new NotAnEtfError(normalizedCode);
   }
 
-  return buildEtfProfile({ code: normalizedCode, snapshot, naverPrice, naverComponent });
+  return buildEtfProfile({ code: normalizedCode, snapshot, naverPrice, naverComponent, daily: dailyHistory });
 }

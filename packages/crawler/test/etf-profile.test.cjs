@@ -188,6 +188,69 @@ test('fetchEtfProfile throws when naver price fails entirely', async () => {
   );
 });
 
+test('fetchEtfProfile collects ~1y daily closes from m.stock naver price pages (Task 9)', async () => {
+  const { fetchEtfProfile } = await import('../src/crawlers/etf-profile.js');
+
+  const requestedUrls = [];
+  // 5페이지 × 60행 (newest-first, 콤마 포함 문자열 시세) — page 5는 20행.
+  const pageRow = (n) => ({
+    localTradedAt: `2026-${String(10 - n).padStart(2, '0')}-15`,
+    closePrice: `${(1000 + n).toLocaleString('en-US')}`,
+  });
+  const fetchImpl = async (url) => {
+    requestedUrls.push(url);
+    if (url.includes('/detail/')) {
+      return { ok: true, json: async () => (url.endsWith('/price') ? naverPriceFixture : naverComponentFixture) };
+    }
+    const page = Number(new URL(url).searchParams.get('page'));
+    const rows = page < 5 ? Array.from({ length: 60 }, (_, i) => pageRow(page + (i % 3))) : [];
+    return { ok: true, json: async () => rows };
+  };
+
+  const profile = await fetchEtfProfile('069500', {
+    fetchImpl,
+    fetchSnapshot: async () => null,
+  });
+
+  assert.equal(profile.ok, true);
+  assert.ok(Array.isArray(profile.daily));
+  // 빈 페이지(5)에서 조기 종료 — 4페이지分 240행
+  assert.equal(profile.daily.length, 240);
+  // 오름차순(과거→최신) 정렬 + 콤마 제거 파싱
+  const first = profile.daily[0];
+  const last = profile.daily[profile.daily.length - 1];
+  assert.ok(first.date < last.date, `expected ascending, got ${first.date}..${last.date}`);
+  assert.equal(typeof last.close, 'number');
+  assert.ok(requestedUrls.some((url) => url.includes('m.stock.naver.com/api/stock/069500/price')));
+});
+
+test('fetchEtfProfile tolerates daily history failure (daily: null)', async () => {
+  const { fetchEtfProfile } = await import('../src/crawlers/etf-profile.js');
+
+  const fetchImpl = async (url) => {
+    if (url.includes('/price?page=') || url.includes('/price?')) {
+      if (url.includes('m.stock.naver.com')) {
+        throw new Error('history down');
+      }
+    }
+    if (url.endsWith('/price')) {
+      return { ok: true, json: async () => naverPriceFixture };
+    }
+    if (url.endsWith('/ETFComponent')) {
+      return { ok: true, json: async () => naverComponentFixture };
+    }
+    throw new Error(`unexpected url: ${url}`);
+  };
+
+  const profile = await fetchEtfProfile('069500', {
+    fetchImpl,
+    fetchSnapshot: async () => snapshotFixture,
+  });
+
+  assert.equal(profile.ok, true);
+  assert.equal(profile.daily, null);
+});
+
 // Regression: ISSUE-001 — 주식 코드가 ok:true ETF 프로필로 반환되던 결함
 // Found by /qa on 2026-09-15
 // Report: .gstack/qa-reports/qa-report-localhost-3000-2026-09-15.md
