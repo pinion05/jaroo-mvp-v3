@@ -14,6 +14,7 @@ import type { LucideIcon } from 'lucide-react'
 
 import { EtfDataNoticeCard } from '@/components/etf-data-notice-card'
 import { BackControl, TodayBriefingCard } from '@/components/deepscan-loading-briefing-card'
+import { SnapshotProvenanceBar } from '@/components/deepscan-inline-results'
 import { financialToneClass, formatNumber, formatSignedPercent } from '@/components/deepscan-loading-utils'
 import styles from '@/components/deepscan-loading-screen.module.css'
 import {
@@ -23,6 +24,7 @@ import {
   createInitialEtfPageState,
   isNotAnEtfProfileStatus,
   parseEtfBriefingSnapshotResponse,
+  parseEtfProfileCacheInfo,
   parseEtfProfileResponse,
   resolveEtfPageTargetFromWindow,
   type EtfPageState,
@@ -408,7 +410,9 @@ function EtfReadyBody({
 export default function EtfPage() {
   const [state, setState] = useState<EtfPageState>({ phase: 'loading' })
   const [retryCount, setRetryCount] = useState(0)
+  const [refreshing, setRefreshing] = useState(false)
   const loadSeqRef = useRef(0)
+  const targetRef = useRef<Parameters<typeof buildEtfPageState>[0] | null>(null)
 
   useEffect(() => {
     const seq = loadSeqRef.current + 1
@@ -417,11 +421,13 @@ export default function EtfPage() {
     const run = async () => {
       const target = resolveEtfPageTargetFromWindow()
       if (target.status !== 'ok') {
+        targetRef.current = null
         if (loadSeqRef.current === seq) {
           setState(createInitialEtfPageState(target))
         }
         return
       }
+      targetRef.current = target
 
       try {
         const [briefingResponse, profileResponse] = await Promise.all([
@@ -443,7 +449,12 @@ export default function EtfPage() {
           return
         }
         setState(
-          buildEtfPageState(target, parseEtfBriefingSnapshotResponse(briefingBody), parseEtfProfileResponse(profileBody)),
+          buildEtfPageState(
+            target,
+            parseEtfBriefingSnapshotResponse(briefingBody),
+            parseEtfProfileResponse(profileBody),
+            parseEtfProfileCacheInfo(profileBody),
+          ),
         )
       } catch {
         if (loadSeqRef.current !== seq) {
@@ -460,6 +471,41 @@ export default function EtfPage() {
     setState({ phase: 'loading' })
     setRetryCount((count) => count + 1)
   }, [])
+
+  // 명시적 재분석('다시 분석하기') — 재열람 캐시를 무시하고 fresh 수집을 돈다.
+  // ETF는 무과금이라 deepscan과 달리 크레딧 확인 다이얼로그가 없다.
+  // 실패 시 지금 화면(캐시된 분석)을 그대로 유지한다.
+  const handleExplicitRefresh = useCallback(() => {
+    const target = targetRef.current
+    if (!target || refreshing) return
+    const seq = loadSeqRef.current
+    setRefreshing(true)
+    void (async () => {
+      try {
+        const [briefingResponse, profileResponse] = await Promise.all([
+          fetch(buildEtfPageBriefingUrl(target.code), { cache: 'no-store' }),
+          fetch(buildEtfPageProfileUrl(target.code, { refresh: true }), { cache: 'no-store' }),
+        ])
+        if (loadSeqRef.current !== seq || !profileResponse.ok) return
+        const [briefingBody, profileBody] = await Promise.all([
+          briefingResponse.json().catch(() => null),
+          profileResponse.json().catch(() => null),
+        ])
+        if (loadSeqRef.current !== seq) return
+        const next = buildEtfPageState(
+          target,
+          parseEtfBriefingSnapshotResponse(briefingBody),
+          parseEtfProfileResponse(profileBody),
+          parseEtfProfileCacheInfo(profileBody),
+        )
+        if (next.phase === 'ready') setState(next)
+      } catch {
+        // 갱신 실패 — 기존 분석 화면 유지
+      } finally {
+        if (loadSeqRef.current === seq) setRefreshing(false)
+      }
+    })()
+  }, [refreshing])
 
   const ready = state.phase === 'ready' ? state : null
   const vm = ready?.vm
@@ -535,11 +581,20 @@ export default function EtfPage() {
           ) : null}
 
           {ready && vm ? (
-            <EtfReadyBody
-              vm={vm}
-              briefing={ready.briefing}
-              sharesText={ready.holding ? formatShares(ready.holding.shares) : null}
-            />
+            <>
+              {ready.restoredAt ? (
+                <SnapshotProvenanceBar
+                  scannedAt={ready.restoredAt}
+                  driftPct={ready.analysisDriftPct}
+                  onRefresh={handleExplicitRefresh}
+                />
+              ) : null}
+              <EtfReadyBody
+                vm={vm}
+                briefing={ready.briefing}
+                sharesText={ready.holding ? formatShares(ready.holding.shares) : null}
+              />
+            </>
           ) : null}
         </div>
       </div>

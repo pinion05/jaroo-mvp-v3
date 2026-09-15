@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 
 import { createSupabaseServerClient } from '@/lib/supabase/server'
-import { isEtfLedgerPayload, recordEtfHistory } from '@/lib/etf-history-store'
+import { isEtfLedgerPayload, lookupLatestEtfAnalysis, recordEtfHistory } from '@/lib/etf-history-store'
+import { isSnapshotFresh } from '@/lib/deepscan-snapshot-policy'
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 
 // /api/etf/profile — 크롤러 etf-profile 수집기 프록시.
@@ -9,7 +10,12 @@ import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 // 무인증 크롤러 릴레이가 되지 않도록 IP 레이트리밋 + 코드 검증 + 타임아웃을 건다
 // (코드 감사 B2 교훈 — /api/deepscan/slim 사건과 동일한 방어).
 //
-// 부수 효과: 세션(쿠키)이 있는 호출자에 한해 조회 성공 시마다 ETF 기록 원장에
+// 재열람 캐시(deepscan 스냅샷 A안과 같은 문법): 세션 호출자의 최근 분석(원장 최신 행)이
+// TTL 안에 있으면 상류 없이 그대로 돌려주고 응답에 cache.hit 표식을 얹는다 — 화면은
+// "이미 분석한 결과" 배너 + '다시 분석하기'로 갱신(refresh=1)할 수 있다.
+// 캐시 히트는 원장에 새 행을 남기지 않는다(기록은 실제 fresh 수집 시에만).
+//
+// 부수 효과: 세션(쿠키)이 있는 호출자에 한해 fresh 조회 성공 시마다 ETF 기록 원장에
 // 1행 append한다(deepscan 스캔 성공 시 recordScanHistory와 같은 패턴).
 // payload는 상류 응답을 그대로 저장하므로 클라이언트 위조 여지가 없고,
 // 기록 실패는 void로 삼켜 조회 응답에 영향을 주지 않는다.
@@ -74,6 +80,17 @@ function appendEtfHistory(userId: string, rawBody: string): void {
   }
 }
 
+/** 캐시 히트 응답 본문 — 원장 payload에 cache 표식을 얹은 복사본 (deepscan의
+ *  buildSnapshotCacheAnnotatedPayload와 같은 계약). 화면은 cache.hit으로
+ *  "이미 분석한 결과" 배너를 띄운다. */
+export function buildEtfProfileCacheBody(
+  profile: unknown,
+  scannedAt: string,
+): { ok: true; data: unknown; cache: { hit: true; scannedAt: string } } | null {
+  if (!isEtfLedgerPayload(profile)) return null
+  return { ok: true, data: profile, cache: { hit: true, scannedAt } }
+}
+
 export async function GET(request: NextRequest) {
   const code = request.nextUrl.searchParams.get('code')?.trim() ?? ''
   if (!isValidEtfProfileCode(code)) {
@@ -88,6 +105,27 @@ export async function GET(request: NextRequest) {
       { ok: false, data: null, error: { message: '요청이 너무 많아요. 잠시 후 다시 시도해주세요.' } },
       { status: 429, headers: NO_STORE_HEADERS },
     )
+  }
+
+  // 재열람 캐시 — 명시적 갱신(refresh=1, '다시 분석하기')만 캐시를 무시한다.
+  const refreshRequested = request.nextUrl.searchParams.get('refresh') === '1'
+  let sessionUserId: string | null = null
+  if (!refreshRequested) {
+    sessionUserId = await resolveOptionalUserId()
+    if (sessionUserId) {
+      try {
+        const latest = await lookupLatestEtfAnalysis(sessionUserId, code)
+        if (latest && isSnapshotFresh(latest.scannedAt)) {
+          const cacheBody = buildEtfProfileCacheBody(latest.payload, latest.scannedAt)
+          if (cacheBody) {
+            return NextResponse.json(cacheBody, { headers: NO_STORE_HEADERS })
+          }
+        }
+      } catch (cacheError) {
+        // 캐시 조회 실패는 정상 수집 경로를 막지 않는다
+        console.error('[etf-profile] analysis cache lookup failed — 정상 경로로 진행', cacheError)
+      }
+    }
   }
 
   const upstreamUrl = buildEtfProfileUpstreamUrl(getCrawlerBaseUrl(), code)
@@ -114,7 +152,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const userId = await resolveOptionalUserId()
+    const userId = sessionUserId ?? (await resolveOptionalUserId())
     if (userId) appendEtfHistory(userId, body)
 
     return new NextResponse(body, {

@@ -7,6 +7,7 @@ import {
   createInitialEtfPageState,
   isNotAnEtfProfileStatus,
   parseEtfBriefingSnapshotResponse,
+  parseEtfProfileCacheInfo,
   parseEtfProfileResponse,
 } from './etf-page-model'
 import { resolveEtfPageTarget } from '@/lib/etf/etf-target'
@@ -166,5 +167,46 @@ test('buildEtfPageState distinguishes quote/profile failures and builds ready vi
     assert.equal(ready.market, 'kospi')
     assert.deepEqual(ready.holding, { shares: 100, averagePrice: 101_400 })
     assert.equal(ready.briefing.daily?.length, 2)
+    // fresh 수집(캐시 표식 없음)은 복원 배너 없음
+    assert.equal(ready.restoredAt, null)
+    assert.equal(ready.analysisDriftPct, null)
   }
+})
+
+test('parseEtfProfileCacheInfo reads only explicit cache-hit markers', () => {
+  assert.deepEqual(parseEtfProfileCacheInfo({ cache: { hit: true, scannedAt: '2026-09-15T14:53:14.250Z' } }), {
+    scannedAt: '2026-09-15T14:53:14.250Z',
+  })
+  // fresh 응답(표식 없음)·miss 표식·불완전 표식은 전부 null
+  assert.equal(parseEtfProfileCacheInfo({ ok: true, data: profileFixture }), null)
+  assert.equal(parseEtfProfileCacheInfo({ cache: { hit: false, scannedAt: 'x' } }), null)
+  assert.equal(parseEtfProfileCacheInfo({ cache: { hit: true, scannedAt: '' } }), null)
+  assert.equal(parseEtfProfileCacheInfo(null), null)
+})
+
+test('buildEtfPageState annotates cache hits with restoredAt and price drift vs live quote', () => {
+  const briefing = parseEtfBriefingSnapshotResponse(briefingBody)
+  assert.ok(briefing)
+  const cachedProfile: EtfProfileJson = {
+    ...profileFixture,
+    // 분석 시점 종가 99,000 vs live 104,275 → 드리프트 +5.32%
+    daily: [
+      { date: '2026-09-12', close: 98_500 },
+      { date: '2026-09-14', close: 99_000 },
+    ],
+  }
+
+  const restored = buildEtfPageState(okTarget, briefing, cachedProfile, { scannedAt: '2026-09-15T14:53:14.250Z' })
+  assert.equal(restored.phase, 'ready')
+  if (restored.phase === 'ready') {
+    assert.equal(restored.restoredAt, '2026-09-15T14:53:14.250Z')
+    assert.ok(restored.analysisDriftPct != null)
+    assert.ok(Math.abs(restored.analysisDriftPct - ((104_275 - 99_000) / 99_000) * 100) < 1e-9)
+    // 캐시된 일봉으로 지표를 계산한다(52주 블록은 daily 부족으로 notice 폴백)
+    assert.equal(restored.vm.header.code, '069500')
+  }
+
+  // 일봉 없는 캐시 분석은 드리프트 기준가가 없어 null
+  const noDaily = buildEtfPageState(okTarget, briefing, { ...profileFixture, daily: null }, { scannedAt: 't' })
+  if (noDaily.phase === 'ready') assert.equal(noDaily.analysisDriftPct, null)
 })

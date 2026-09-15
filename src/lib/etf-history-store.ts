@@ -170,3 +170,25 @@ export async function getEtfHistoryById(
     scannedAt: String(data.scanned_at ?? ''),
   }
 }
+
+/** 코드별 최근 분석(스냅샷 대용) — 신선도 판정은 호출처(deepscan과 같은 TTL 정책).
+ *  원장의 (user, code) 최신 행을 읽는다. 재열람 캐시 히트·가격 드리프트 기준으로 쓴다. */
+export async function lookupLatestEtfAnalysis(
+  userId: string,
+  code: string,
+): Promise<{ payload: EtfProfileJson; scannedAt: string } | null> {
+  const client = createEtfHistoryServiceClient()
+  if (!client) return null
+
+  const { data, error } = await client
+    .from('etf_scan_history')
+    .select('payload, scanned_at')
+    .eq('user_id', userId)
+    .eq('target_key', code)
+    .order('scanned_at', { ascending: false })
+    .limit(1)
+    .maybeSingle()
+  if (error || !data) return null
+  if (!isEtfLedgerPayload(data.payload)) return null
+  return { payload: data.payload, scannedAt: String(data.scanned_at ?? '') }
+}
