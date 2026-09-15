@@ -1,13 +1,18 @@
-// /etf 화면의 뷰모델 — 실데이터(quotes·profile·holding)를 화면 표기 문자열로 맵핑한다.
-// 채울 수 없는 블록은 reason을 명시하는 notice 블록으로 내려가고, 페이지가
+// /etf 화면의 뷰모델 — 실데이터(quotes·profile·holding·metrics)를 화면 표기 문자열로 맵핑한다.
+// 채울 수 없는 블록은 reason을 명시하는 notice로 내려가고, 페이지가
 // EtfDataNoticeCard로 렌더한다 (스펙 2026-09-15 D7).
+// 2단계(Task 9)부터 일봉 지표·구성종목은 실데이터 items로 내려온다.
 // 표기 규칙: 평단·금액 정수 반올림, 손실 부호 −(U+2212), 천 단위 ko-KR 구분.
+
+import type { EtfMetrics } from './etf-metrics'
 
 export type EtfTab = 'overview' | 'holdings' | 'risk'
 export type EtfValueTone = 'danger' | 'positive' | 'neutral'
 export type EtfScenarioTone = 'positive' | 'primary' | 'warning'
 
 export type EtfNoticeReason = 'source-absent' | 'source-pending' | 'planned'
+
+export type EtfNotice = { reason: EtfNoticeReason; message: string }
 
 export type EtfProfileJson = {
   schemaVersion: 'jaroo-etf-profile-v1'
@@ -51,6 +56,28 @@ export type EtfHeroStat = { label: string; value: string }
 
 export type EtfBasicInfoItem = { label: string; value: string }
 
+export type EtfReturnItem = { label: string; value: string; tone: EtfValueTone }
+export type EtfReturnsBlock = { notice: null; items: EtfReturnItem[] } | EtfNoticeBlock
+
+export type EtfHoldingItem = { rank: number; code: string; name: string; weightText: string; weightBarPct: number }
+export type EtfHoldingsBlock =
+  | { notice: null; items: EtfHoldingItem[]; summary: string }
+  | { notice: EtfNotice; items: null; summary: null }
+
+export type EtfRiskItem = { label: string; value: string; subtitle: string }
+export type EtfRiskBlock = { notice: null; items: EtfRiskItem[] } | EtfNoticeBlock
+
+// 시나리오 블록 = 52주 범위 위치(가중 목표가는 3단계 이관, 스펙 Self-Review 참조)
+export type EtfScenario = {
+  positionPct: number // 0=52주 저점, 100=52주 고점
+  positionText: string // '34%'
+  headline: string // '52주 중간 구간' 등
+  highText: string
+  lowText: string
+  note: string // 애널리스트 목표가 부재 사유(D7) — 카드에 항상 표기
+}
+export type EtfScenarioBlock = { notice: null; scenario: EtfScenario } | EtfNoticeBlock
+
 export type EtfViewModel = {
   header: { name: string; code: string; issuer: string; tracking: string }
   hero: {
@@ -62,12 +89,12 @@ export type EtfViewModel = {
     stats: EtfHeroStat[]
   }
   momentum: { label: string; badge: string }
-  scenario: EtfNoticeBlock
-  returns: EtfNoticeBlock
+  scenario: EtfScenarioBlock
+  returns: EtfReturnsBlock
   basicInfo: { items: EtfBasicInfoItem[] }
   sectorWeights: EtfNoticeBlock
-  topHoldings: EtfNoticeBlock
-  riskMetrics: EtfNoticeBlock
+  topHoldings: EtfHoldingsBlock
+  riskMetrics: EtfRiskBlock
   peers: EtfNoticeBlock
   dividendInfo: EtfNoticeBlock
 }
@@ -80,6 +107,107 @@ function buildHeroStats(product: EtfProfileJson['product']): EtfHeroStat[] {
     stats.push({ label: '설정일', value: product.firstSettleDate.slice(0, 7).replace('-', '.') })
   }
   return stats
+}
+
+function buildReturnsBlock(metrics: EtfMetrics | null | undefined): EtfReturnsBlock {
+  if (!metrics) {
+    return noticeBlock('source-pending', '기간별 수익률은 일봉이 1년치 쌓이면 계산해드려요')
+  }
+
+  const entries: Array<{ label: string; value: number | null }> = [
+    { label: '1개월', value: metrics.returns.m1 },
+    { label: '3개월', value: metrics.returns.m3 },
+    { label: '6개월', value: metrics.returns.m6 },
+    { label: '1년', value: metrics.returns.y1 },
+  ]
+  return {
+    notice: null,
+    items: entries.map(({ label, value }) => ({
+      label,
+      value: value == null ? '--' : signedPct(value),
+      tone: value == null ? ('neutral' as const) : value >= 0 ? ('positive' as const) : ('danger' as const),
+    })),
+  }
+}
+
+function buildRiskBlock(metrics: EtfMetrics | null | undefined): EtfRiskBlock {
+  if (!metrics) {
+    return noticeBlock('source-pending', '리스크 지표는 일봉이 1년치 쌓이면 계산해드려요')
+  }
+
+  const vol = metrics.volatilityAnnPct
+  const mdd = metrics.mddPct
+  const sharpe = metrics.sharpe
+  const week52 = metrics.week52
+  return {
+    notice: null,
+    items: [
+      {
+        label: '연 변동성',
+        value: vol == null ? '--' : `${vol.toFixed(1)}%`,
+        subtitle: '일별 등락 기준 연율화',
+      },
+      {
+        label: '최대낙폭 (MDD)',
+        value: mdd == null ? '--' : `${MINUS}${Math.abs(mdd).toFixed(1)}%`,
+        subtitle: '관찰 구간 최고가 대비',
+      },
+      {
+        label: '샤프지수',
+        value: sharpe == null ? '--' : sharpe.toFixed(2),
+        subtitle: '무위험수익률 3.5% 가정',
+      },
+      {
+        label: '52주 범위',
+        value: week52 ? `${krw(week52.low)} ~ ${krw(week52.high)}` : '--',
+        subtitle: '종가 기준 최저·최고',
+      },
+    ],
+  }
+}
+
+function buildScenarioBlock(price: number, metrics: EtfMetrics | null | undefined): EtfScenarioBlock {
+  const week52 = metrics?.week52
+  if (!week52 || !(week52.high > week52.low) || !Number.isFinite(price)) {
+    return noticeBlock('source-pending', '일봉 데이터가 부족해 52주 위치를 계산할 수 있어요')
+  }
+
+  const positionPct = Math.max(0, Math.min(100, ((price - week52.low) / (week52.high - week52.low)) * 100))
+  const rounded = Math.round(positionPct)
+  const headline = rounded >= 80 ? '52주 고점 근처' : rounded <= 20 ? '52주 저점 근처' : '52주 중간 구간'
+
+  return {
+    notice: null,
+    scenario: {
+      positionPct,
+      positionText: `${rounded}%`,
+      headline,
+      highText: krw(week52.high),
+      lowText: krw(week52.low),
+      note: 'ETF엔 애널리스트 목표가가 없어 52주 범위 위치로 판단해요',
+    },
+  }
+}
+
+function buildHoldingsBlock(profile: EtfProfileJson): EtfHoldingsBlock {
+  const holdings = profile.holdings
+  if (!holdings || holdings.length === 0) {
+    return { ...noticeBlock('source-pending', '구성종목은 소스 연결 후 보여줘요'), summary: null }
+  }
+
+  const top = holdings.slice(0, 10)
+  const maxWeight = top[0]?.weightPct ?? 1
+  return {
+    notice: null,
+    items: top.map((holding) => ({
+      rank: holding.rank,
+      code: holding.code,
+      name: holding.name,
+      weightText: `${holding.weightPct.toFixed(2)}%`,
+      weightBarPct: maxWeight > 0 ? Math.round((holding.weightPct / maxWeight) * 100) : 0,
+    })),
+    summary: `상위 ${top.length}개 종목 · 네이버 제공 기준 · 구성등락률은 소스 준비 중`,
+  }
 }
 
 function buildBasicInfoItems(product: EtfProfileJson['product']): EtfBasicInfoItem[] {
@@ -95,8 +223,9 @@ export function buildEtfViewModel(input: {
   profile: EtfProfileJson
   quote: { price: number; changePct: number | null; asOf?: string }
   holding: { shares: number; averagePrice: number } | null
+  metrics?: EtfMetrics | null
 }): EtfViewModel {
-  const { profile, quote, holding } = input
+  const { profile, quote, holding, metrics = null } = input
   const product = profile.product
 
   const profit =
@@ -130,12 +259,12 @@ export function buildEtfViewModel(input: {
             label: quote.changePct >= 0 ? '최근 거래일 상승 — 순풍' : '최근 거래일 하락 — 역풍',
             badge: quote.changePct >= 0 ? '↗' : '↘',
           },
-    scenario: noticeBlock('source-absent', 'ETF에는 애널리스트 목표가·컨센서스가 없어요'),
-    returns: noticeBlock('source-pending', '기간별 수익률은 일봉 데이터 연결 후 제공돼요'),
+    scenario: buildScenarioBlock(quote.price, metrics),
+    returns: buildReturnsBlock(metrics),
     basicInfo: { items: buildBasicInfoItems(product) },
     sectorWeights: noticeBlock('source-pending', '섹터 비중은 구성종목 매핑 준비 중이에요'),
-    topHoldings: noticeBlock('source-pending', '구성종목은 데이터 연결 후 보여줘요'),
-    riskMetrics: noticeBlock('source-pending', '리스크 지표는 일봉 데이터 연결 후 제공돼요'),
+    topHoldings: buildHoldingsBlock(profile),
+    riskMetrics: buildRiskBlock(metrics),
     peers: noticeBlock('planned', '유사 ETF 비교는 출시 후 제공될 예정이에요'),
     dividendInfo: noticeBlock('planned', '배당 정보는 출시 후 제공될 예정이에요'),
   }
