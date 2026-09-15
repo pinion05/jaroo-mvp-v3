@@ -417,7 +417,8 @@ export function resolveEtfPageTarget(input: {
 **Interfaces:**
 - Produces: `computeEtfMetrics(daily: Array<{date,close}>) → { returns:{m1,m3,m6,y1}, volatilityAnnPct, mddPct, sharpe, week52:{high,low} } | null` (일봉 <260개면 null). 계산: 변동성=일별 로그수익률 std×√252, MDD=누적최고가 대비 최대낙폭, 샤프=(연환산 수익률−3.5% 무위험)/변동성, 수익률=기간별 단순 수익률. 순수 함수 — 크롤러 daily(Task 3) 소비.
 
-- [ ] **Step 1~5**: TDD(고정 시계열 fixture로 수치 검증) → 커밋 `feat(etf): 일봉 기반 수익률·리스크 지표 산출`
+- [x] **Step 1~5**: TDD(고정 시계열 fixture로 수치 검증) → 커밋 `feat(etf): 일봉 기반 수익률·리스크 지표 산출`
+  - 구현 중 결정: 상수 로그수익률(단조 상승)에서 FP 잔차로 std가 0이 아니게 나와 샤프가 폭발하는 함정 → 영변동성 엡실론(1e-12) 가드 추가. 테스트 2건은 구현이 아니라 테스트 계산이 틀렸었음(slice(-252) 오프바이원, 샤프식 우선순위).
 
 ### Task 9: 2단계 페이지 wiring
 
@@ -428,14 +429,17 @@ export function resolveEtfPageTarget(input: {
 - Test: view-model 테스트 확장
 
 **핵심**: ①returns/riskMetrics = `computeEtfMetrics(profile.daily)` ②topHoldings = `profile.holdings` + 구성 코드 일괄 quotes(상위 10개, `/api/quotes/current?codes=a,b,c...`) ③시나리오 블록 = "52주 범위 위치"(현재가가 (P−low)/(high−low) 상위 X%) — **가중 목표가는 3단계 이관**(근거: 구성종목별 slim 크롤 13페이지×N건은 페이지 로드에 부적합, 경량 컨센서스 소스 확보 과제 — #265 기록). 괴리율은 product.deviationPct.
-- [ ] **Step 1~5**: TDD → 커밋 `feat(etf): 2단계 — 구성종목·수익률·리스크 실데이터화`
+- [x] **Step 1~5**: TDD → 커밋 `feat(etf): 2단계 — 구성종목·수익률·리스크 실데이터화`
+  - 일봉 소스 변경: 네이버 차트 api.stock.naver.com은 1행만 반환 → 브리핑 라우트가 쓰는 `m.stock.naver.com/api/stock/{code}/price` 페이지네이션(60×5페이지=300거래일)으로. 라이브 검증 069500=300행(2025-06-26~).
+  - 구성등락률 열 미제공으로 축소: 계획의 '일괄 quotes로 등락률'은 quotes/current에 등락률 필드가 없어 불가 — 구성 카드는 비중 바 중심으로, 요약행에 사유 명시(D7).
+  - 시나리오 카드에 애널리스트 목표가 부재 사유를 상시 노트로 표기(D7 유지). 브라우저 검증: 52주 위치 58%·변동성 54.6%(데이터상 급등락 년도·정합)·구성/수익률/리스크 실데이터 렌더.
 
 ### Task 10: 마무리 — 검증·기록
 
-- [ ] `npm run lint && npm run typecheck && npm test` 전체 green
-- [ ] 라이브 스모크: `npm run dev` → 홈(ETF 보유 상태) → ETF 카드 → /etf 실데이터 표기·픽스처 수치 잔존 없음(페이지에 "82,770"/"7,673" 문자열 부재 확인)
-- [ ] 이슈 #265에 진행 코멘트(2단계 완료·가중 목표가 3단계 이관 근거) — 한국어
-- [ ] 스펙 §5 시나리오 행 갱신(가중 목표가 → 3단계) + 커밋 `docs(etf): ...`
+- [x] `npm run lint && npm run typecheck && npm test` 전체 green (웹 487/487, 크롤러 9/9, lint·typecheck 0 errors, `next build` exit 0)
+- [x] 라이브 스모크: /etf 실데이터 4종 카드(52주 위치 58%·수익률·구종 Top10·리스크) 렌더 확인, 픽스처 수치("82,770"/"7,673"/"57.6%") 부재 확인. 콘솔 [error] 1건은 dev 서버 잔류 진단으로 확인(프로덕션 빌드 exit 0·런타임 무결).
+- [x] 이슈 #265에 진행 코멘트(2단계 완료·가중 목표가 3단계 이관 근거) — 한국어
+- [x] 스펙 §5 시나리오·구성종목 행 갱신(52주 위치 교체·가중 목표가 3단계 이관·구성등락률 미제공 사유) + 커밋 `docs(etf): ...`
 
 ## Self-Review 결과
 
