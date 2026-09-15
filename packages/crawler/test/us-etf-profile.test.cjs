@@ -113,6 +113,7 @@ test('fetchUsEtfProfile merges polygon ohlc+details+quoteSummary and tolerates q
     fetchImpl: yahoo.impl,
     fetchOhlc: async () => polygonOhlcFixture,
     fetchTickerDetails: async () => detailsFixture,
+    fetchQuoteSummaryViaBrowser: async () => null,
   });
 
   assert.equal(profile.ok, true);
@@ -126,6 +127,7 @@ test('fetchUsEtfProfile merges polygon ohlc+details+quoteSummary and tolerates q
     fetchImpl: degraded.impl,
     fetchOhlc: async () => polygonOhlcFixture,
     fetchTickerDetails: async () => detailsFixture,
+    fetchQuoteSummaryViaBrowser: async () => null,
   });
   assert.equal(profile2.ok, true);
   assert.equal(profile2.name, 'Vanguard S&P 500 ETF'); // polygon details는 살아있음
@@ -143,6 +145,7 @@ test('fetchUsEtfProfile rejects non-ETF instrument types from polygon details (N
       fetchImpl: yahoo.impl,
       fetchOhlc: async () => polygonOhlcFixture,
       fetchTickerDetails: async () => stockDetails,
+      fetchQuoteSummaryViaBrowser: async () => null,
     }),
     (error) => error.code === 'NOT_ETF' && error.name === 'NotAnEtfError',
   );
@@ -165,7 +168,28 @@ test('fetchUsEtfProfile throws when polygon daily is unavailable', async () => {
       fetchImpl: yahoo.impl,
       fetchOhlc: async () => ({ series: [], meta: { status: 'missing' } }),
       fetchTickerDetails: async () => detailsFixture,
+      fetchQuoteSummaryViaBrowser: async () => null,
     }),
     /polygon daily missing/,
   );
+});
+
+
+test('fetchUsEtfProfile falls back to the headful browser path when direct Yahoo fetch is blocked', async () => {
+  const { fetchUsEtfProfile } = await import('../src/crawlers/us-etf-profile.js');
+  // 직접 경로 전부 429 차단 상황
+  const blocked = createYahooFetchImpl({ quoteSummary: { quoteSummary: { result: [] } } });
+  const blockedImpl = async () => ({ ok: false, status: 429, json: async () => { throw new Error('429') } });
+
+  const profile = await fetchUsEtfProfile('VOO', {
+    fetchImpl: blockedImpl,
+    fetchOhlc: async () => polygonOhlcFixture,
+    fetchTickerDetails: async () => detailsFixture,
+    fetchQuoteSummaryViaBrowser: async () => quoteSummaryFixture.quoteSummary.result[0],
+  });
+
+  assert.equal(profile.ok, true);
+  assert.equal(profile.product.issuerName, 'Vanguard');
+  assert.ok(Math.abs(profile.product.totalFeePct - 0.03) < 1e-9);
+  assert.equal(profile.holdings.length, 2);
 });

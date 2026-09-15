@@ -203,6 +203,57 @@ export class NotAnEtfError extends Error {
   }
 }
 
+/**
+ * 헤드풀 브라우저 경로 — 상품정보(운용사·보수·AUM·NAV)·구성종목 Top10 수집.
+ * Node fetch는 Yahoo TLS 지문 차단(429)을 받지만 실제 Chromium은 통과한다.
+ * finance.yahoo.com 페이지 컨텍스트에서 동일 origin fetch로 crumb→quoteSummary를
+ * 실행한다(실제 사이트가 쓰는 방식). 디스플레이 없는 컨테이너에선 headful 기동이
+ * 실패하므로 headless 폴백을 건다.
+ */
+export async function fetchYahooQuoteSummaryViaBrowser(symbol, { timeoutMs = DEFAULT_US_ETF_PROFILE_TIMEOUT_MS } = {}) {
+  const { chromium } = await import('playwright');
+  let browser;
+  try {
+    browser = await chromium.launch({ headless: false });
+  } catch {
+    browser = await chromium.launch({ headless: true });
+  }
+
+  try {
+    const context = await browser.newContext({
+      userAgent: BROWSER_USER_AGENT,
+      locale: 'en-US',
+      viewport: { width: 1280, height: 900 },
+    });
+    const page = await context.newPage();
+    await page.goto(`https://finance.yahoo.com/quote/${encodeURIComponent(symbol)}`, {
+      waitUntil: 'domcontentloaded',
+      timeout: timeoutMs,
+    });
+
+    const payload = await page.evaluate(async (symbolToFetch) => {
+      // 절대 query1 URL + credentials 포함이어야 엣지를 통과한다(실제 사이트 방식).
+      // 상대경로(/v1/...)는 finance.yahoo.com 호스트로 못 박혀 404가 난다.
+      const crumb = (
+        await fetch('https://query1.finance.yahoo.com/v1/test/getcrumb', { credentials: 'include' }).then((response) => response.text())
+      ).trim();
+      if (!crumb || crumb.length >= 30) return null;
+      const response = await fetch(
+        `https://query1.finance.yahoo.com/v10/finance/quoteSummary/${encodeURIComponent(symbolToFetch)}` +
+          `?modules=fundProfile,topHoldings,summaryDetail,defaultKeyStatistics&crumb=${encodeURIComponent(crumb)}`,
+        { credentials: 'include' },
+      );
+      if (!response.ok) return null;
+      return response.json();
+    }, symbol);
+
+    const result = Array.isArray(payload?.quoteSummary?.result) ? payload.quoteSummary.result[0] : null;
+    return result ?? null;
+  } finally {
+    await browser.close().catch(() => undefined);
+  }
+}
+
 export async function fetchUsEtfProfile(symbol, options = {}) {
   const normalizedSymbol = normalizeSymbol(symbol);
   const fetchImpl = options.fetchImpl ?? fetch;
@@ -211,6 +262,7 @@ export async function fetchUsEtfProfile(symbol, options = {}) {
   const fetchTickerDetails =
     options.fetchTickerDetails ??
     (async (ticker) => polygonFetch(`/v3/reference/tickers/${encodeURIComponent(ticker)}`, { cacheTTL: 24 * 60 * 60_000 }));
+  const fetchQuoteSummaryViaBrowser = options.fetchQuoteSummaryViaBrowser ?? fetchYahooQuoteSummaryViaBrowser;
 
   const [ohlc, detailsPayload] = await Promise.all([
     fetchOhlc(normalizedSymbol, { limit: DAILY_LIMIT }).catch(() => null),
@@ -229,6 +281,8 @@ export async function fetchUsEtfProfile(symbol, options = {}) {
     throw new NotAnEtfError(normalizedSymbol);
   }
 
+  // 상품정보·구성종목(quoteSummary) — 직접 fetch가 지문 차단으로 실패하면
+  // 헤드풀 브라우저 경로로 재시도한다. 둘 다 실패해도 프로필은 관용 폴백.
   const quoteSummary = await fetchYahooCrumb({ fetchImpl, timeoutMs })
     .then(({ cookie, crumb }) =>
       fetchYahooJson(
@@ -239,9 +293,11 @@ export async function fetchUsEtfProfile(symbol, options = {}) {
     )
     .then((payload) => {
       const result = Array.isArray(payload?.quoteSummary?.result) ? payload.quoteSummary.result[0] : null;
-      return result ?? null;
+      return result ?? Promise.reject(new Error('quoteSummary empty'));
     })
-    .catch(() => null); // crumb/quoteSummary 실패는 관용 — 채운 것만 내려간다
+    .catch(() =>
+      fetchQuoteSummaryViaBrowser(normalizedSymbol, { timeoutMs }).catch(() => null),
+    );
 
   return buildUsEtfProfile({ symbol: normalizedSymbol, polygon, details, quoteSummary });
 }
