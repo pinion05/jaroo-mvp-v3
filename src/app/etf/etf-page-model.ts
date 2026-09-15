@@ -6,6 +6,7 @@
 
 import { normalizeDeepScanCode } from '@/app/deepscan/deepscan-page-fetchers'
 import type { LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
+import { computePriceDriftPct } from '@/lib/deepscan-snapshot-policy'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
 import { resolveEtfPageTarget, type EtfPageTarget, type EtfTargetSessionLike } from '@/lib/etf/etf-target'
@@ -25,9 +26,14 @@ export type EtfPageState =
       briefing: LoadingBriefingSnapshot
       market: 'kospi' | 'kosdaq'
       holding: { shares: number; averagePrice: number } | null
+      /** 재열람 캐시 히트 — 원장에 저장된 분석 시각. fresh 수집이면 null. */
+      restoredAt: string | null
+      /** 캐시된 분석 기준가 vs live 시세의 가격 드리프트(%) — 캐시 히트 시에만. */
+      analysisDriftPct: number | null
     }
 
 type EtfPageOkTarget = Extract<EtfPageTarget, { status: 'ok' }>
+export type { EtfPageOkTarget }
 
 // 홈 딥스캔 세션(holding 필드가 '100주'/'101,400원' 같은 표시 문자열)을
 // etf-target 계약(숫자 holding)으로 바꾼다. 한국 6자리 코드가 없는 홀딩
@@ -82,8 +88,22 @@ export function buildEtfPageBriefingUrl(code: string) {
   return `/api/deepscan/briefing-snapshot?code=${encodeURIComponent(code)}`
 }
 
-export function buildEtfPageProfileUrl(code: string) {
-  return `/api/etf/profile?code=${encodeURIComponent(code)}`
+export function buildEtfPageProfileUrl(code: string, options?: { refresh?: boolean }) {
+  const base = `/api/etf/profile?code=${encodeURIComponent(code)}`
+  return options?.refresh ? `${base}&refresh=1` : base
+}
+
+// 재열람 캐시 표식 — /api/etf/profile이 세션 원장의 최근 분석(TTL 내)을 돌려줄 때
+// 얹는다(deepscan metadata.deepScanCache와 같은 계약). deepscan과 달리 ETF는
+// 무과금이라 savedCredits 표식이 없다.
+export type EtfProfileCacheInfo = { scannedAt: string }
+
+export function parseEtfProfileCacheInfo(body: unknown): EtfProfileCacheInfo | null {
+  const cache = (body as { cache?: { hit?: unknown; scannedAt?: unknown } } | null)?.cache
+  if (!cache || cache.hit !== true || typeof cache.scannedAt !== 'string' || !cache.scannedAt) {
+    return null
+  }
+  return { scannedAt: cache.scannedAt }
 }
 
 // /api/etf/profile의 400은 크롤러 NOT_ETF 판정(주식 코드 등)뿐이다 —
@@ -117,6 +137,7 @@ export function buildEtfPageState(
   target: EtfPageOkTarget,
   briefing: (EtfPageQuote & { snapshot?: LoadingBriefingSnapshot }) | null,
   profile: EtfProfileJson | null,
+  cacheInfo?: EtfProfileCacheInfo | null,
 ): EtfPageState {
   if (!briefing) {
     return { phase: 'error', message: '시세를 가져오지 못했어요. 잠시 후 다시 시도해주세요.' }
@@ -125,11 +146,14 @@ export function buildEtfPageState(
     return { phase: 'error', message: 'ETF 상품 정보를 가져오지 못했어요. 잠시 후 다시 시도해주세요.' }
   }
 
+  const lastClose = profile.daily?.[profile.daily.length - 1]?.close ?? null
   return {
     phase: 'ready',
     briefing: briefing.snapshot ?? {},
     market: profile.market,
     holding: target.holding,
+    restoredAt: cacheInfo?.scannedAt ?? null,
+    analysisDriftPct: cacheInfo ? computePriceDriftPct(lastClose, briefing.price) : null,
     vm: buildEtfViewModel({
       profile,
       quote: { price: briefing.price, asOf: briefing.asOf, changePct: profile.quote?.changePct ?? null },
