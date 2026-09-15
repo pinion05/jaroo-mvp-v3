@@ -550,7 +550,8 @@ function StockCard({
           </div>
           {item.actionHref ? (
             <Link href={item.actionHref} className={styles.scanBtn} onClick={(event) => onAction(item, event)}>
-              <Search className='inline-block size-[13px]' aria-hidden /> 딥스캔 분석 <span className={styles.sub}>세 팀이 분석해요</span>
+              <Search className='inline-block size-[13px]' aria-hidden /> {item.actionLabel}{' '}
+              <span className={styles.sub}>{item.actionSubLabel}</span>
             </Link>
           ) : (
             <button type='button' className={styles.scanBtn}>

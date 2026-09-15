@@ -1582,7 +1582,7 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
         { label: '평가 금액', value: evaluationAmount ?? '-', tone: 'neutral' },
         { label: '현재가', value: currentPriceText ?? '-', tone: 'neutral' },
       ],
-      actionLabel: kind === 'etf' ? 'ETF 분석' : '딥스캔',
+      actionLabel: kind === 'etf' ? 'ETF 분석' : '딥스캔 분석',
       actionSubLabel: kind === 'etf' ? '섹터 구성 + 회복 시나리오' : '세 팀이 분석해요',
       actionCredits: undefined,
       // ETF는 /etf 실데이터 분석으로, 주식은 기존 딥스캔으로. 둘 다
