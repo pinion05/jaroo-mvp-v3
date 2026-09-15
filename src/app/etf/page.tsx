@@ -3,10 +3,7 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
-  ChartPie,
-  Coins,
   ListChecks,
-  Scale,
   ShieldAlert,
   Telescope,
 } from 'lucide-react'
@@ -378,25 +375,7 @@ function EtfReadyBody({
 
       <EtfReturnsCard vm={vm} />
       <EtfHoldingsCard vm={vm} />
-      <EtfNoticeSection
-        eyebrow='섹터 비중'
-        reason={vm.sectorWeights.notice.reason}
-        message={vm.sectorWeights.notice.message}
-        icon={ChartPie}
-      />
       <EtfRiskCard vm={vm} />
-      <EtfNoticeSection
-        eyebrow='유사 ETF 비교'
-        reason={vm.peers.notice.reason}
-        message={vm.peers.notice.message}
-        icon={Scale}
-      />
-      <EtfNoticeSection
-        eyebrow='배당 정보'
-        reason={vm.dividendInfo.notice.reason}
-        message={vm.dividendInfo.notice.message}
-        icon={Coins}
-      />
 
       <EtfShareCard />
 
