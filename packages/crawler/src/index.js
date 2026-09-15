@@ -234,3 +234,5 @@ export {
   fetchWiseReportEtfSnapshot,
   parseWiseReportEtfSnapshotHtml,
 };
+
+export { buildEtfProfile, fetchEtfProfile } from './crawlers/etf-profile.js';

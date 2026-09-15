@@ -29,6 +29,7 @@ import {
   getMarketSnapshot,
   getTickerNames,
   getCurrentQuotes,
+  fetchEtfProfile,
   getDartDisclosures,
   getUSConsensus,
   getUSFilings,
@@ -3156,6 +3157,17 @@ const endpointDefinitions = [
         includeNaverQuoteContext: parseBooleanQuery(req.query.includeContext),
       });
     },
+  },
+  {
+    id: 'etf-profile',
+    resource: 'etf.profile',
+    description: '한국 ETF 프로필 — 네이버 구성종목/기본정보와 위세리포트 상품정보를 병합합니다.',
+    primaryPath: buildDataSourcePath('naver-wisereport', '/kr/etf/:code/profile'),
+    dataSources: ['naver-finance', 'wisereport'],
+    params: ['code'],
+    query: [],
+    count: (data) => Array.isArray(data?.holdings) ? data.holdings.length : 0,
+    handler: async (req) => fetchEtfProfile(req.params.code),
   },
   {
     id: 'krx-market-snapshot',
