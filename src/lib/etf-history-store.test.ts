@@ -80,3 +80,14 @@ test('EtfHistoryDetailRow — 원장 상세 계약이 payload를 EtfProfileJson�
   }
   assert.equal(row.payload.schemaVersion, 'jaroo-etf-profile-v1')
 })
+
+test('isEtfLedgerPayload — 미국 ETF(market us·티커 코드)도 원장 계약을 통과한다', () => {
+  const usProfile = {
+    ...validProfile,
+    code: 'VOO',
+    name: 'Vanguard S&P 500 ETF',
+    market: 'us',
+    currency: 'USD',
+  }
+  assert.equal(isEtfLedgerPayload(usProfile), true)
+})

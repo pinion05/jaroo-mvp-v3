@@ -36,6 +36,7 @@ import { cn } from '@/lib/utils'
 const MARKET_LABEL: Record<string, string> = {
   kospi: 'KOSPI',
   kosdaq: 'KOSDAQ',
+  us: 'US',
 }
 
 function formatShares(shares: number) {
@@ -325,10 +326,12 @@ function EtfReadyBody({
   vm,
   briefing,
   sharesText,
+  market,
 }: {
   vm: EtfViewModel
   briefing: LoadingBriefingSnapshot
   sharesText: string | null
+  market: 'kospi' | 'kosdaq' | 'us'
 }) {
   const quote = briefing.quote
   const changePct = quote?.changePct ?? null
@@ -348,9 +351,9 @@ function EtfReadyBody({
 
       <TodayBriefingCard
         currentPriceText={vm.hero.price}
-        currentPriceCurrency='KRW'
+        currentPriceCurrency={market === 'us' ? 'USD' : 'KRW'}
         averagePriceText={vm.hero.averagePrice ? vm.hero.averagePrice.replace('평단 ', '') : null}
-        averagePriceCurrency='KRW'
+        averagePriceCurrency={market === 'us' ? 'USD' : 'KRW'}
         sharesText={sharesText}
         profitRateText={null}
         profitAmountText={null}
@@ -380,7 +383,9 @@ function EtfReadyBody({
       <EtfShareCard />
 
       <p className='px-2 pb-2 text-center text-[10px] leading-4 text-[#97A0AE]'>
-        표시된 데이터는 네이버 금융·위세리포트 기준 실데이터예요. 투자 권유나 수익 보장이 아닙니다.
+        {market === 'us'
+          ? '표시된 데이터는 Polygon·Yahoo Finance 기준 실데이터예요. 투자 권유나 수익 보장이 아닙니다.'
+          : '표시된 데이터는 네이버 금융·위세리포트 기준 실데이터예요. 투자 권유나 수익 보장이 아닙니다.'}
       </p>
     </>
   )
@@ -410,7 +415,7 @@ export default function EtfPage() {
 
       try {
         const [briefingResponse, profileResponse] = await Promise.all([
-          fetch(buildEtfPageBriefingUrl(target.code), { cache: 'no-store' }),
+          fetch(buildEtfPageBriefingUrl(target.code, target.market), { cache: 'no-store' }),
           fetch(buildEtfPageProfileUrl(target.code), { cache: 'no-store' }),
         ])
         if (loadSeqRef.current !== seq) {
@@ -462,7 +467,7 @@ export default function EtfPage() {
     void (async () => {
       try {
         const [briefingResponse, profileResponse] = await Promise.all([
-          fetch(buildEtfPageBriefingUrl(target.code), { cache: 'no-store' }),
+          fetch(buildEtfPageBriefingUrl(target.code, target.market), { cache: 'no-store' }),
           fetch(buildEtfPageProfileUrl(target.code, { refresh: true }), { cache: 'no-store' }),
         ])
         if (loadSeqRef.current !== seq || !profileResponse.ok) return
@@ -572,6 +577,7 @@ export default function EtfPage() {
                 vm={vm}
                 briefing={ready.briefing}
                 sharesText={ready.holding ? formatShares(ready.holding.shares) : null}
+                market={ready.market}
               />
             </>
           ) : null}

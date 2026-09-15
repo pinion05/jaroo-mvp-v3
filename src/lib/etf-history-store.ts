@@ -38,7 +38,7 @@ export function isEtfLedgerPayload(payload: unknown): payload is EtfProfileJson 
     typeof candidate.code === 'string' &&
     candidate.code.trim().length > 0 &&
     typeof candidate.name === 'string' &&
-    (candidate.market === 'kospi' || candidate.market === 'kosdaq')
+    (candidate.market === 'kospi' || candidate.market === 'kosdaq' || candidate.market === 'us')
   )
 }
 

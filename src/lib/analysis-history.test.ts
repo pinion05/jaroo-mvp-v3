@@ -55,3 +55,7 @@ test('etfMarketLabel — kospi/kosdaq을 한국어 라벨로, 없으면 대시',
   assert.equal(etfMarketLabel('kosdaq'), '코스닥')
   assert.equal(etfMarketLabel(null), '—')
 })
+
+test('etfMarketLabel — 미국 ETF 행은 "미국" 라벨', () => {
+  assert.equal(etfMarketLabel('us'), '미국')
+})

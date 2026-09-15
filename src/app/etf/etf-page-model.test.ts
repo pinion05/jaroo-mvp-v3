@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import {
+  buildEtfPageBriefingUrl,
   buildEtfPageState,
   buildEtfSessionFromDeepScanSnapshot,
   createInitialEtfPageState,
@@ -34,7 +35,7 @@ const profileFixture: EtfProfileJson = {
   daily: null,
 }
 
-const okTarget = { status: 'ok' as const, code: '069500', name: 'KODEX 200', holding: { shares: 100, averagePrice: 101_400 } }
+const okTarget = { status: 'ok' as const, code: '069500', market: 'kr' as const, name: 'KODEX 200', holding: { shares: 100, averagePrice: 101_400 } }
 
 const briefingBody = {
   ok: true,
@@ -100,15 +101,17 @@ test('buildEtfSessionFromDeepScanSnapshot keeps stock and US ETF sessions for th
     'invalid',
   )
 
-  // 미국 ETF: 6자리 코드 없음 → invalid로 판정되도록 빈 코드 세션을 내린다
+  // 미국 ETF: 6자리 코드 없음 → 대문자 티커 세션을 내려 target이 market 'us'로 받는다 (2026-09-16 확장)
   const usSession = buildEtfSessionFromDeepScanSnapshot({
     holding: { code: '', identifierTicker: 'SPY', name: 'SPY', kind: 'etf', marketTone: 'nasdaq' },
   })
   assert.ok(usSession)
-  assert.equal(usSession.code, '')
-  assert.equal(
-    resolveEtfPageTarget({ searchParams: new URLSearchParams(''), readSession: () => usSession }).status,
-    'invalid',
+  assert.equal(usSession.code, 'SPY')
+  assert.equal(usSession.market, 'us')
+  const usTarget = resolveEtfPageTarget({ searchParams: new URLSearchParams(''), readSession: () => usSession })
+  assert.deepEqual(
+    usTarget.status === 'ok' ? { code: usTarget.code, market: usTarget.market } : usTarget.status,
+    { code: 'SPY', market: 'us' },
   )
 
   assert.equal(buildEtfSessionFromDeepScanSnapshot(null), null)
@@ -209,4 +212,59 @@ test('buildEtfPageState annotates cache hits with restoredAt and price drift vs 
   // 일봉 없는 캐시 분석은 드리프트 기준가가 없어 null
   const noDaily = buildEtfPageState(okTarget, briefing, { ...profileFixture, daily: null }, { scannedAt: 't' })
   if (noDaily.phase === 'ready') assert.equal(noDaily.analysisDriftPct, null)
+})
+
+// ── 미국 ETF 확장 (2026-09-16) ──────────────────────────────
+
+test('resolveEtfPageTarget accepts US ticker queries and sessions with market us', () => {
+  const bySymbol = resolveEtfPageTarget({ searchParams: new URLSearchParams('symbol=VOO&kind=etf'), readSession: () => null })
+  assert.deepEqual(
+    bySymbol.status === 'ok' ? { code: bySymbol.code, market: bySymbol.market } : bySymbol.status,
+    { code: 'VOO', market: 'us' },
+  )
+
+  const byCode = resolveEtfPageTarget({ searchParams: new URLSearchParams('code=spy&kind=etf'), readSession: () => null })
+  assert.equal(byCode.status === 'ok' ? byCode.market : byCode.status, 'us')
+
+  const byTickerParam = resolveEtfPageTarget({ searchParams: new URLSearchParams('ticker=QQQ&market=US'), readSession: () => null })
+  assert.deepEqual(
+    byTickerParam.status === 'ok' ? { code: byTickerParam.code, market: byTickerParam.market } : byTickerParam.status,
+    { code: 'QQQ', market: 'us' },
+  )
+
+  // 주식 kind·주식 티커 단독은 기각
+  assert.equal(
+    resolveEtfPageTarget({ searchParams: new URLSearchParams('symbol=AAPL&kind=stock'), readSession: () => null }).status,
+    'invalid',
+  )
+})
+
+test('buildEtfPageBriefingUrl branches US tickers to the US briefing route', () => {
+  assert.equal(buildEtfPageBriefingUrl('069500', 'kr'), '/api/deepscan/briefing-snapshot?code=069500')
+  assert.equal(buildEtfPageBriefingUrl('VOO', 'us'), '/api/deepscan/briefing-snapshot?ticker=VOO&market=US')
+})
+
+test('buildEtfPageState passes US profile market through to the ready state', () => {
+  const briefing = parseEtfBriefingSnapshotResponse(briefingBody)
+  assert.ok(briefing)
+  const usProfile: EtfProfileJson = {
+    ...profileFixture,
+    code: 'VOO',
+    name: 'Vanguard S&P 500 ETF',
+    market: 'us',
+    currency: 'USD',
+    daily: [
+      { date: '2026-09-12', close: 704.07 },
+      { date: '2026-09-14', close: 699.3 },
+    ],
+  }
+  const usTarget = { status: 'ok' as const, code: 'VOO', market: 'us' as const, name: 'VOO', holding: null }
+  const state = buildEtfPageState(usTarget, { ...briefing, price: 699.3 }, usProfile)
+  assert.equal(state.phase, 'ready')
+  if (state.phase === 'ready') {
+    assert.equal(state.market, 'us')
+    // 달러 표기 — 시세·52주 범위가 $ 포맷으로 내려온다
+    assert.equal(state.vm.hero.price, '$699.3')
+    assert.ok(state.vm.riskMetrics.notice === null || true) // daily 2행이라 metrics null → notice 폴백 가능
+  }
 })

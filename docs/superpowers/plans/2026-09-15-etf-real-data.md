@@ -481,3 +481,26 @@ export function resolveEtfPageTarget(input: {
 - [x] 테스트 — 페이지 모델 2종(캐시 표식 파싱·restoredAt/drift 주입) + 라우트 순수 계약 2종(`buildEtfProfileCacheBody`).
 - [x] E2E(라이브): 재방문 → "11분 전에 분석한 결과…" 배너 + 원장 행수 불변(5→5) → '다시 분석하기' →
   `refresh=1` fresh 수집 + 배너 소멸 + 새 행 append. 배너 시각 검증(아이콘·필 버튼·여백 정상).
+
+## 후속 작업 3: 미국 ETF 지원 — 리소스 조사·스키마 통합·실측 QA (2026-09-16 추가)
+
+한국 ETF와 같은 공식(상태 조사 → 공개 API 실증 → 계약 확장 → 실측)으로 미국 ETF를 /etf에 편입했다.
+
+### 리소스 조사 결과 (실측)
+- FMP v3/stable ETF 엔드포인트 — **레거시 키 폐쇄(2025-08-31 이전 구독자 전용)** → 사용 불가
+- Yahoo chart v8 — Node fetch TLS 지문으로 429 차단(curl은 통과) → 일봉 소스 부적합
+- **최종 조합**: Polygon aggs(약 2년 일봉·키 필요) + Polygon ticker details(`type:'ETF'` 판별·명칭·통화) + Yahoo quoteSummary(쿠키+crumb — 운용사·보수·AUM·NAV·구성 Top10 보강, 무키)
+- 함정 발견: `packages/crawler/.env`의 **빈 키 할당이 root .env.local 실제 키를 덮어썼음**(나중 env 파일 우선) — 빈 줄 제거로 해결. Railway/prod env 점검(G5) 시 재확인 필요.
+
+### 계약·스키마 통합
+- `jaroo-etf-profile-v1`에 `market:'us'`·`currency?:'KRW'|'USD'`(기본 KRW) 확장 — 스키마 버전 유지
+- **etf_scan_history 재사용(신규 마이그레이션 불필요)** — target_key=티커(VOO), market='us'; 읽기 가드(isEtfLedgerPayload)만 확장
+- 크롤러 라우트 `us-etf-profile`(yahoo/us/etf/:symbol/profile) — NOT_ETF(AAPL→400)·관용 규칙(quoteSummary 실패 시 일봉·판별·명칭만)은 한국판 미러
+- 웹: /api/etf/profile이 code 6자리(KR)/티커(US) 디스패치 — 캐시·원장·refresh 계약 공유
+- 뷰모델 달러 표기(시세·평단·손익·52주·NAV·AUM '조 달러'), 브리핑 카드 currentPriceCurrency 전달, 시장별 면책 소스 표기 분기
+- etf-target US 분기(?symbol=·code=티커·ticker=, 세션 identifierTicker), 기록 탭 'ETF · 미국' 라벨
+
+### 검증
+- 단위: 크롤러 6종(계약·NOT_ETF·관용) + 웹 9종(타깃·브리핑 URL·USD 표기·원장 가드·라벨) — 전체 웹 507/507·크롤러 15/15·lint·typecheck 0
+- 라이브 E2E(VOO): 홈 카드→'ETF 분석'→/etf(세션) → 달러 시세·차트·52주 88%($580.93~$714.95)·수익률(1Y +15.67%)·리스크(변동성 15.9%·MDD −19.0%·샤프 0.81) → 원장(target_key VOO·market us) → 기록 탡 'ETF · 미국' → 재진입 캐시 배너. AAPL은 400 거부.
+- 로컬 제약: 개발 IP가 Yahoo 스로틀 중이라 구성종목·상품정보 보강층이 notice 폴백으로 실증됨(프로덕션은 별도 IP·저빈도라 동작 예상 — 배포 후 확인 필요).
