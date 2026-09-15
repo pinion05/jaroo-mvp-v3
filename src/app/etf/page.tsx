@@ -1,14 +1,26 @@
 'use client'
 
 import Link from 'next/link'
-import { useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Button, buttonVariants } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { EtfDataNoticeCard } from '@/components/etf-data-notice-card'
 import { JarooShell } from '@/components/jaroo-shell'
+import {
+  buildEtfPageProfileUrl,
+  buildEtfPageQuoteUrl,
+  buildEtfPageState,
+  createInitialEtfPageState,
+  isNotAnEtfProfileStatus,
+  parseEtfProfileResponse,
+  parseEtfQuoteResponse,
+  resolveEtfPageTargetFromWindow,
+  type EtfPageState,
+} from './etf-page-model'
 import { getFinancialValueTextClass } from '@/lib/financial-value-tone'
-import { etfAnalysis, type EtfScenarioTone, type EtfTab, type EtfValueTone } from '@/lib/jaroo-data'
+import { type EtfTab, type EtfViewModel } from '@/lib/etf/etf-view-model'
 import { cn } from '@/lib/utils'
 
 const tabs: Array<{ id: EtfTab; label: string }> = [
@@ -36,55 +48,73 @@ function scrollEtfContentToTop() {
   scrollContainer?.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
-function scenarioToneClass(tone: EtfScenarioTone) {
-  switch (tone) {
-    case 'positive':
-      return 'text-[color:var(--jaroo-profit)]'
-    case 'warning':
-      return 'text-[#854F0B]'
-    default:
-      return 'text-[color:var(--jaroo-primary)]'
-  }
-}
-
-function valueToneClass(tone: EtfValueTone) {
-  switch (tone) {
-    case 'positive':
-      return 'text-[color:var(--jaroo-profit)]'
-    case 'danger':
-      return 'text-[color:var(--jaroo-danger)]'
-    default:
-      return 'text-[color:var(--jaroo-ink)]'
-  }
-}
-
-function EtfBottomFooter({ tab, onSwitch }: { tab: EtfTab; onSwitch: () => void }) {
+function EtfStatusCard({ title, body }: { title: string; body: string }) {
   return (
-    <div className='sticky bottom-0 z-20 border-t border-[color:var(--jaroo-border)] bg-white/95 px-4 py-3 backdrop-blur'>
-      <div className='grid grid-cols-[1fr,1.35fr] gap-2'>
-        <Button
-          type='button'
-          variant='outline'
-          onClick={onSwitch}
-          className='h-12 rounded-[16px] border-[color:var(--jaroo-border)] bg-white text-[13px] font-medium text-[color:var(--jaroo-muted)] hover:bg-[color:var(--jaroo-secondary)]'
-        >
-          {nextLabelMap[tab]}
-        </Button>
-        <Link
-          href='/sharecard'
-          className={buttonVariants({
-            className:
-              'h-12 rounded-[16px] bg-[color:var(--jaroo-primary)] px-4 text-[13px] font-semibold text-white hover:bg-[color:var(--jaroo-primary-strong)]',
-          })}
-        >
-          결과 공유하기
-        </Link>
+    <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-5 text-center shadow-none'>
+      <p className='text-[14px] font-medium text-[color:var(--jaroo-ink)]'>{title}</p>
+      <p className='mt-2 text-[12px] leading-relaxed text-[color:var(--jaroo-muted)]'>{body}</p>
+      <Link
+        href='/home'
+        className={buttonVariants({
+          className:
+            'mt-4 inline-flex h-11 rounded-[14px] bg-[color:var(--jaroo-primary)] px-4 text-[13px] font-semibold text-white hover:bg-[color:var(--jaroo-primary-strong)]',
+        })}
+      >
+        홈으로 가기
+      </Link>
+    </Card>
+  )
+}
+
+function EtfHeroCard({ vm }: { vm: EtfViewModel }) {
+  return (
+    <Card className='rounded-[26px] border-0 bg-[linear-gradient(135deg,var(--jaroo-primary-strong),var(--jaroo-primary))] p-5 text-white shadow-none'>
+      <p className='text-[11px] text-white/60'>ETF 분석</p>
+      <h1 className='mt-1 text-[19px] font-medium text-white'>{vm.hero.name}</h1>
+      <p className='mt-1 text-[34px] leading-none font-medium text-white'>{vm.hero.price}</p>
+      <div className='mt-3 flex flex-wrap items-center gap-2'>
+        {vm.hero.change ? (
+          <span className={cn('rounded-[8px] bg-white/95 px-2 py-1 text-[13px] font-medium', getFinancialValueTextClass(vm.hero.change))}>
+            {vm.hero.change}
+          </span>
+        ) : null}
+        {vm.hero.averagePrice ? <span className='text-[11px] text-white/65'>{vm.hero.averagePrice}</span> : null}
+        {vm.hero.profitAmount ? <span className='text-[11px] text-white/65'>· {vm.hero.profitAmount}</span> : null}
       </div>
+      {vm.hero.stats.length ? (
+        <div className='mt-5 grid grid-cols-3 gap-4'>
+          {vm.hero.stats.map((item) => (
+            <div key={item.label}>
+              <p className='text-[10px] text-white/50'>{item.label}</p>
+              <p className='mt-1 text-[12px] font-medium text-white/90'>{item.value}</p>
+            </div>
+          ))}
+        </div>
+      ) : null}
+    </Card>
+  )
+}
+
+function EtfMomentumRow({ momentum }: { momentum: EtfViewModel['momentum'] }) {
+  const toneClass =
+    momentum.badge === '↗'
+      ? 'text-[color:var(--jaroo-profit)]'
+      : momentum.badge === '↘'
+        ? 'text-[color:var(--jaroo-danger)]'
+        : 'text-[color:var(--jaroo-muted)]'
+
+  return (
+    <div className='flex w-full items-center gap-2 rounded-[18px] bg-[color:var(--jaroo-secondary)] px-4 py-3'>
+      <span className={cn('size-2 rounded-full', momentum.badge === '↗' ? 'bg-[color:var(--jaroo-profit)]' : 'bg-[color:var(--jaroo-muted)]')} />
+      <span className={cn('flex-1 text-[12px] font-medium', toneClass)}>{momentum.label}</span>
+      <Badge className='rounded-[8px] bg-white px-2 py-0.5 text-[10px] font-medium text-[color:var(--jaroo-ink)]'>
+        {momentum.badge}
+      </Badge>
     </div>
   )
 }
 
-export default function EtfPage() {
+function EtfReadyContent({ vm }: { vm: EtfViewModel }) {
   const [tab, setTab] = useState<EtfTab>('overview')
 
   const handleTabChange = (nextTab: EtfTab) => {
@@ -92,15 +122,17 @@ export default function EtfPage() {
     requestAnimationFrame(() => scrollEtfContentToTop())
   }
 
+  const subtitle = [vm.header.issuer, vm.header.tracking].filter(Boolean).join(' · ')
+
   return (
     <JarooShell
       title={
         <div className='flex items-baseline gap-1.5'>
-          <span className='truncate text-[14px] font-medium text-[color:var(--jaroo-ink)]'>{etfAnalysis.header.name}</span>
-          <span className='text-[11px] font-normal text-[color:var(--jaroo-muted)]'>{etfAnalysis.header.code}</span>
+          <span className='truncate text-[14px] font-medium text-[color:var(--jaroo-ink)]'>{vm.header.name}</span>
+          <span className='text-[11px] font-normal text-[color:var(--jaroo-muted)]'>{vm.header.code}</span>
         </div>
       }
-      subtitle={`${etfAnalysis.header.issuer} · ${etfAnalysis.header.tracking}`}
+      subtitle={subtitle || undefined}
       backHref='/home'
       showBottomNav
       action={
@@ -115,7 +147,29 @@ export default function EtfPage() {
           공유
         </Link>
       }
-      bottomNav={<EtfBottomFooter tab={tab} onSwitch={() => handleTabChange(nextTabMap[tab])} />}
+      bottomNav={
+        <div className='sticky bottom-0 z-20 border-t border-[color:var(--jaroo-border)] bg-white/95 px-4 py-3 backdrop-blur'>
+          <div className='grid grid-cols-[1fr,1.35fr] gap-2'>
+            <Button
+              type='button'
+              variant='outline'
+              onClick={() => handleTabChange(nextTabMap[tab])}
+              className='h-12 rounded-[16px] border-[color:var(--jaroo-border)] bg-white text-[13px] font-medium text-[color:var(--jaroo-muted)] hover:bg-[color:var(--jaroo-secondary)]'
+            >
+              {nextLabelMap[tab]}
+            </Button>
+            <Link
+              href='/sharecard'
+              className={buttonVariants({
+                className:
+                  'h-12 rounded-[16px] bg-[color:var(--jaroo-primary)] px-4 text-[13px] font-semibold text-white hover:bg-[color:var(--jaroo-primary-strong)]',
+              })}
+            >
+              결과 공유하기
+            </Link>
+          </div>
+        </div>
+      }
     >
       <Tabs value={tab} onValueChange={(value) => handleTabChange(value as EtfTab)} className='gap-4'>
         <div className='sticky top-0 z-10 -mx-4 border-b border-[color:var(--jaroo-border)] bg-white/95 px-4 backdrop-blur'>
@@ -133,229 +187,173 @@ export default function EtfPage() {
         </div>
 
         <TabsContent value='overview' className='mt-0 space-y-3'>
-          <Card className='rounded-[26px] border-0 bg-[linear-gradient(135deg,var(--jaroo-primary-strong),var(--jaroo-primary))] p-5 text-white shadow-none'>
-            <p className='text-[11px] text-white/60'>{etfAnalysis.hero.eyebrow}</p>
-            <h1 className='mt-1 text-[19px] font-medium text-white'>{etfAnalysis.hero.name}</h1>
-            <p className='mt-1 text-[34px] leading-none font-medium text-white'>{etfAnalysis.hero.price}</p>
-            <div className='mt-3 flex items-center gap-2'>
-              <span className={cn('rounded-[8px] bg-white/95 px-2 py-1 text-[13px] font-medium', getFinancialValueTextClass(etfAnalysis.hero.change))}>{etfAnalysis.hero.change}</span>
-              <span className='text-[11px] text-white/40'>·</span>
-              <span className='text-[11px] text-white/65'>{etfAnalysis.hero.averagePrice}</span>
-            </div>
-            <div className='mt-5 grid grid-cols-3 gap-4'>
-              {etfAnalysis.hero.stats.map((item) => (
-                <div key={item.label}>
-                  <p className='text-[10px] text-white/50'>{item.label}</p>
-                  <p className='mt-1 text-[12px] font-medium text-white/90'>{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <button
-            type='button'
-            className='flex w-full items-center gap-2 rounded-[18px] bg-[color:var(--jaroo-profit-ghost)] px-4 py-3 text-left'
-          >
-            <span className='size-2 rounded-full bg-[color:var(--jaroo-profit)]' />
-            <span className='flex-1 text-[12px] font-medium text-[color:#A8323A]'>{etfAnalysis.momentum.label}</span>
-            <Badge className='rounded-[8px] bg-[#FBE6E7] px-2 py-0.5 text-[10px] font-medium text-[color:#A8323A]'>
-              {etfAnalysis.momentum.badge}
-            </Badge>
-          </button>
-
+          <EtfHeroCard vm={vm} />
+          <EtfMomentumRow momentum={vm.momentum} />
+          <EtfDataNoticeCard
+            eyebrow='추천 시나리오'
+            reason={vm.scenario.notice.reason}
+            message={vm.scenario.notice.message}
+          />
+          <EtfDataNoticeCard eyebrow='기간별 수익률' reason={vm.returns.notice.reason} message={vm.returns.notice.message} />
           <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
-            <p className='text-[10px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>{etfAnalysis.scenario.eyebrow}</p>
-            <div className='mt-3 flex items-end gap-3'>
-              <div>
-                <p className='text-[28px] leading-none font-medium text-[color:var(--jaroo-primary)]'>{etfAnalysis.scenario.wind}</p>
-                <p className='mt-1 text-[12px] text-[color:var(--jaroo-primary)]'>{etfAnalysis.scenario.subtitle}</p>
+            <p className='text-[10px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>기본 정보</p>
+            {vm.basicInfo.items.length ? (
+              <div className='mt-2'>
+                {vm.basicInfo.items.map((item) => (
+                  <div
+                    key={item.label}
+                    className='flex items-center justify-between border-b border-[color:var(--jaroo-border)] py-2 last:border-b-0'
+                  >
+                    <p className='text-[12px] text-[color:var(--jaroo-muted)]'>{item.label}</p>
+                    <p className='text-[12px] font-medium text-[color:var(--jaroo-ink)]'>{item.value}</p>
+                  </div>
+                ))}
               </div>
-              <div className='ml-auto text-right'>
-                <p className='text-[28px] leading-none font-medium text-[color:var(--jaroo-primary)]'>
-                  {etfAnalysis.scenario.probability}
-                </p>
-                <p className='mt-1 text-[10px] text-[color:var(--jaroo-muted)]'>가능성</p>
-              </div>
-            </div>
-            <div className='mt-4 h-1 rounded-full bg-[color:var(--jaroo-secondary)]'>
-              <div
-                className='h-full rounded-full bg-[color:var(--jaroo-primary)]'
-                style={{ width: `${etfAnalysis.scenario.probabilityValue}%` }}
-              />
-            </div>
-            <p className='mt-2 text-[11px] text-[color:var(--jaroo-muted)]'>{etfAnalysis.scenario.target}</p>
-            <div className='mt-4 grid grid-cols-3 gap-2'>
-              {etfAnalysis.scenario.options.map((option) => (
-                <div
-                  key={option.label}
-                  className={cn(
-                    'rounded-[14px] px-3 py-3 text-center',
-                    option.active
-                      ? 'border border-[color:#B5D4F4] bg-[color:#E6F1FB]'
-                      : 'bg-[color:#F8F8F8]',
-                  )}
-                >
-                  <p className={cn('text-[11px] font-medium', scenarioToneClass(option.tone))}>{option.label}</p>
-                  <p className='mt-1 text-[10px] text-[color:var(--jaroo-muted)]'>{option.period}</p>
-                  <p className={cn('mt-1 text-[12px] font-medium', scenarioToneClass(option.tone))}>{option.probability}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
-            <p className='text-[10px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>{etfAnalysis.returns.eyebrow}</p>
-            <div className='mt-3 grid grid-cols-4 gap-2'>
-              {etfAnalysis.returns.items.map((item) => (
-                <div key={item.label} className='rounded-[14px] bg-[color:#F8F8F8] px-2 py-3 text-center'>
-                  <p className='text-[10px] text-[color:var(--jaroo-muted)]'>{item.label}</p>
-                  <p className={cn('mt-1 text-[13px] font-medium', valueToneClass(item.tone))}>{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
-            <p className='text-[10px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>{etfAnalysis.basicInfo.eyebrow}</p>
-            <div className='mt-2'>
-              {etfAnalysis.basicInfo.items.map((item) => (
-                <div
-                  key={item.label}
-                  className='flex items-center justify-between border-b border-[color:var(--jaroo-border)] py-2 last:border-b-0'
-                >
-                  <p className='text-[12px] text-[color:var(--jaroo-muted)]'>{item.label}</p>
-                  <p className='text-[12px] font-medium text-[color:var(--jaroo-ink)]'>{item.value}</p>
-                </div>
-              ))}
-            </div>
+            ) : (
+              <p className='mt-2 text-[12px] text-[color:var(--jaroo-muted)]'>상품 정보를 가져오지 못했어요.</p>
+            )}
           </Card>
         </TabsContent>
 
         <TabsContent value='holdings' className='mt-0 space-y-3'>
-          <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
-            <p className='text-[10px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>{etfAnalysis.sectorWeights.eyebrow}</p>
-            <div className='mt-2'>
-              {etfAnalysis.sectorWeights.items.map((item) => (
-                <div
-                  key={item.label}
-                  className='flex items-center gap-2.5 border-b border-[color:var(--jaroo-border)] py-3 last:border-b-0'
-                >
-                  <span className='size-2 rounded-full' style={{ backgroundColor: item.tone }} />
-                  <p className='min-w-0 flex-1 text-[12px] text-[color:#555]'>{item.label}</p>
-                  <div className='h-1 flex-[1.8] rounded-full bg-[color:var(--jaroo-secondary)]'>
-                    <div
-                      className='h-full rounded-full'
-                      style={{ width: `${item.barWidth}%`, backgroundColor: item.fillTone ?? item.tone }}
-                    />
-                  </div>
-                  <p className='min-w-[38px] text-right text-[12px] font-medium text-[color:var(--jaroo-ink)]'>
-                    {item.value}%
-                  </p>
-                </div>
-              ))}
-            </div>
-          </Card>
-
-          <div>
-            <p className='mb-2 px-0.5 text-[11px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>
-              {etfAnalysis.topHoldings.eyebrow}
-            </p>
-            <Card className='overflow-hidden rounded-[24px] border border-[color:var(--jaroo-border)] p-0 shadow-none'>
-              <div className='grid grid-cols-[26px,1fr,54px,64px] items-center gap-2 border-b border-[color:var(--jaroo-border)] bg-[color:#F8F8F8] px-4 py-3'>
-                <span className='text-[10px] text-[color:var(--jaroo-muted)]'>#</span>
-                <span className='text-[10px] text-[color:var(--jaroo-muted)]'>종목명</span>
-                <span className='text-right text-[10px] text-[color:var(--jaroo-muted)]'>비중</span>
-                <span className='text-right text-[10px] text-[color:var(--jaroo-muted)]'>등락률</span>
-              </div>
-              {etfAnalysis.topHoldings.items.map((item) => (
-                <div
-                  key={item.code}
-                  className='grid grid-cols-[26px,1fr,54px,64px] items-center gap-2 border-b border-[color:var(--jaroo-border)] px-4 py-3 last:border-b-0'
-                >
-                  <span className='text-[11px] text-[color:#BBB]'>{item.rank}</span>
-                  <div className='min-w-0'>
-                    <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{item.name}</p>
-                    <p className='mt-0.5 text-[10px] text-[color:#BBB]'>{item.code}</p>
-                  </div>
-                  <span className='text-right text-[12px] font-medium text-[color:var(--jaroo-primary)]'>{item.weight}</span>
-                  <span className={cn('text-right text-[11px]', getFinancialValueTextClass(item.change))}>{item.change}</span>
-                </div>
-              ))}
-              <div className='border-t border-[color:var(--jaroo-border)] px-4 py-3 text-center text-[11px] text-[color:var(--jaroo-muted)]'>
-                {etfAnalysis.topHoldings.summary}
-              </div>
-            </Card>
-          </div>
+          <EtfDataNoticeCard
+            eyebrow='섹터 비중'
+            reason={vm.sectorWeights.notice.reason}
+            message={vm.sectorWeights.notice.message}
+          />
+          <EtfDataNoticeCard
+            eyebrow='구성종목 Top 10'
+            reason={vm.topHoldings.notice.reason}
+            message={vm.topHoldings.notice.message}
+          />
         </TabsContent>
 
         <TabsContent value='risk' className='mt-0 space-y-3'>
-          <div>
-            <p className='mb-2 px-0.5 text-[11px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>
-              {etfAnalysis.riskMetrics.eyebrow}
-            </p>
-            <div className='grid grid-cols-2 gap-2'>
-              {etfAnalysis.riskMetrics.items.map((item) => (
-                <div key={item.label} className='rounded-[18px] bg-[color:#F8F8F8] p-4'>
-                  <p className='text-[11px] text-[color:var(--jaroo-muted)]'>{item.label}</p>
-                  <p className={cn('mt-1 text-[24px] font-medium', valueToneClass(item.tone))}>{item.value}</p>
-                  <p className='mt-1 text-[10px] text-[color:var(--jaroo-muted)]'>{item.subtitle}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          <div>
-            <p className='mb-2 px-0.5 text-[11px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>
-              {etfAnalysis.peers.eyebrow}
-            </p>
-            <Card className='overflow-hidden rounded-[24px] border border-[color:var(--jaroo-border)] p-0 shadow-none'>
-              <div className='grid grid-cols-[1fr,64px,60px] items-center gap-2 border-b border-[color:var(--jaroo-border)] bg-[color:#F8F8F8] px-4 py-3'>
-                <span className='text-[10px] text-[color:var(--jaroo-muted)]'>ETF명</span>
-                <span className='text-right text-[10px] text-[color:var(--jaroo-muted)]'>순자산</span>
-                <span className='text-right text-[10px] text-[color:var(--jaroo-muted)]'>1년 수익</span>
-              </div>
-              {etfAnalysis.peers.items.map((item) => (
-                <div
-                  key={item.name}
-                  className={cn(
-                    'grid grid-cols-[1fr,64px,60px] items-center gap-2 border-b border-[color:var(--jaroo-border)] px-4 py-3 last:border-b-0',
-                    item.current && 'bg-[color:#F0F7FF]',
-                  )}
-                >
-                  <div className='min-w-0'>
-                    <div className='flex items-center gap-1.5'>
-                      <p className='truncate text-[13px] font-medium text-[color:var(--jaroo-ink)]'>{item.name}</p>
-                      {item.current ? (
-                        <Badge className='rounded-[6px] bg-[color:#E6F1FB] px-1.5 py-0.5 text-[9px] font-medium text-[color:var(--jaroo-primary)]'>
-                          현재
-                        </Badge>
-                      ) : null}
-                    </div>
-                    <p className='mt-0.5 text-[10px] text-[color:#BBB]'>{item.issuer}</p>
-                  </div>
-                  <span className='text-right text-[11px] text-[color:var(--jaroo-muted)]'>{item.aum}</span>
-                  <span className={cn('text-right text-[12px] font-medium', getFinancialValueTextClass(item.return1y))}>{item.return1y}</span>
-                </div>
-              ))}
-            </Card>
-          </div>
-
-          <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-4 shadow-none'>
-            <p className='text-[10px] tracking-[0.04em] text-[color:var(--jaroo-muted)]'>{etfAnalysis.dividendInfo.eyebrow}</p>
-            <div className='mt-2'>
-              {etfAnalysis.dividendInfo.items.map((item) => (
-                <div
-                  key={item.label}
-                  className='flex items-center justify-between border-b border-[color:var(--jaroo-border)] py-2 last:border-b-0'
-                >
-                  <p className='text-[12px] text-[color:var(--jaroo-muted)]'>{item.label}</p>
-                  <p className={cn('text-[12px] font-medium', valueToneClass(item.tone ?? 'neutral'))}>{item.value}</p>
-                </div>
-              ))}
-            </div>
-          </Card>
+          <EtfDataNoticeCard
+            eyebrow='리스크 지표'
+            reason={vm.riskMetrics.notice.reason}
+            message={vm.riskMetrics.notice.message}
+          />
+          <EtfDataNoticeCard
+            eyebrow='유사 ETF 비교'
+            reason={vm.peers.notice.reason}
+            message={vm.peers.notice.message}
+          />
+          <EtfDataNoticeCard
+            eyebrow='배당 정보'
+            reason={vm.dividendInfo.notice.reason}
+            message={vm.dividendInfo.notice.message}
+          />
         </TabsContent>
       </Tabs>
+    </JarooShell>
+  )
+}
+
+export default function EtfPage() {
+  const [state, setState] = useState<EtfPageState>({ phase: 'loading' })
+  const [retryCount, setRetryCount] = useState(0)
+  const loadSeqRef = useRef(0)
+
+  useEffect(() => {
+    const seq = loadSeqRef.current + 1
+    loadSeqRef.current = seq
+
+    const run = async () => {
+      const target = resolveEtfPageTargetFromWindow()
+      if (target.status !== 'ok') {
+        if (loadSeqRef.current === seq) {
+          setState(createInitialEtfPageState(target))
+        }
+        return
+      }
+
+      try {
+        const [quotesResponse, profileResponse] = await Promise.all([
+          fetch(buildEtfPageQuoteUrl(target.code), { cache: 'no-store' }),
+          fetch(buildEtfPageProfileUrl(target.code), { cache: 'no-store' }),
+        ])
+        if (loadSeqRef.current !== seq) {
+          return
+        }
+        if (isNotAnEtfProfileStatus(profileResponse.status)) {
+          setState({ phase: 'invalid' })
+          return
+        }
+        const [quotesBody, profileBody] = await Promise.all([
+          quotesResponse.json().catch(() => null),
+          profileResponse.json().catch(() => null),
+        ])
+        if (loadSeqRef.current !== seq) {
+          return
+        }
+        setState(
+          buildEtfPageState(target, parseEtfQuoteResponse(quotesBody, target.code), parseEtfProfileResponse(profileBody)),
+        )
+      } catch {
+        if (loadSeqRef.current !== seq) {
+          return
+        }
+        setState({ phase: 'error', message: '시세를 가져오지 못했어요. 잠시 후 다시 시도해주세요.' })
+      }
+    }
+
+    void run()
+  }, [retryCount])
+
+  const retry = useCallback(() => {
+    setState({ phase: 'loading' })
+    setRetryCount((count) => count + 1)
+  }, [])
+
+  if (state.phase === 'ready') {
+    return <EtfReadyContent vm={state.vm} />
+  }
+
+  if (state.phase === 'loading') {
+    return (
+      <JarooShell title='ETF 분석' backHref='/home' showBottomNav={false}>
+        <div className='flex min-h-[320px] items-center justify-center'>
+          <p className='text-[13px] text-[color:var(--jaroo-muted)]'>ETF 정보를 불러오는 중이에요…</p>
+        </div>
+      </JarooShell>
+    )
+  }
+
+  if (state.phase === 'empty') {
+    return (
+      <JarooShell title='ETF 분석' backHref='/home' showBottomNav={false}>
+        <EtfStatusCard
+          title='분석할 ETF가 선택되지 않았어요'
+          body='홈에서 보유 중인 ETF 카드의 "ETF 분석"을 누르면 구성·리스크를 분석해요.'
+        />
+      </JarooShell>
+    )
+  }
+
+  if (state.phase === 'invalid') {
+    return (
+      <JarooShell title='ETF 분석' backHref='/home' showBottomNav={false}>
+        <EtfStatusCard
+          title='한국 상장 ETF만 분석할 수 있어요'
+          body='지금은 국내 ETF(6자리 코드)만 지원해요. 미국 ETF나 일반 주식은 딥스캔을 이용해주세요.'
+        />
+      </JarooShell>
+    )
+  }
+
+  return (
+    <JarooShell title='ETF 분석' backHref='/home' showBottomNav={false}>
+      <Card className='rounded-[24px] border border-[color:var(--jaroo-border)] p-5 text-center shadow-none'>
+        <p className='text-[14px] font-medium text-[color:var(--jaroo-ink)]'>{state.message}</p>
+        <Button
+          type='button'
+          onClick={retry}
+          className='mt-4 h-11 rounded-[14px] bg-[color:var(--jaroo-primary)] px-4 text-[13px] font-semibold text-white hover:bg-[color:var(--jaroo-primary-strong)]'
+        >
+          다시 시도
+        </Button>
+      </Card>
     </JarooShell>
   )
 }

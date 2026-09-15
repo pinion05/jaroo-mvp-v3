@@ -708,8 +708,8 @@ test('home holdings builder maps manual KR/US market selections to home market t
   assert.equal(usHolding?.marketTone, 'nasdaq')
 })
 
-test('ETF and ETN home actions route to the shared DeepScan loading layout', () => {
-  const [etfHolding, etnHolding] = buildHomeHoldingsFromPortfolioItems([
+test('ETF and ETN home actions route to /etf, stocks keep /deepscan', () => {
+  const [etfHolding, etnHolding, stockHolding] = buildHomeHoldingsFromPortfolioItems([
     {
       name: 'KODEX 200',
       code: '069500',
@@ -730,13 +730,25 @@ test('ETF and ETN home actions route to the shared DeepScan loading layout', () 
       averagePrice: 12000,
       averagePriceCurrency: 'KRW',
     },
+    {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KOSPI',
+      marketTone: 'kospi',
+      kind: 'stock',
+      quantity: 10,
+      averagePrice: 60000,
+      averagePriceCurrency: 'KRW',
+    },
   ])
 
   assert.equal(etfHolding?.actionLabel, 'ETF 분석')
-  assert.equal(etfHolding?.actionHref, '/deepscan')
+  assert.equal(etfHolding?.actionHref, '/etf')
   assert.equal(etnHolding?.actionLabel, 'ETF 분석')
-  assert.equal(etnHolding?.actionHref, '/deepscan')
-  assert.equal(homeHoldings.find((holding) => holding.market === 'ETF')?.actionHref, '/deepscan')
+  assert.equal(etnHolding?.actionHref, '/etf')
+  // 게스트 픽스처 ETF 카드(KODEX 200)도 같은 액션으로 /etf에 들어간다
+  assert.equal(homeHoldings.find((holding) => holding.market === 'ETF')?.actionHref, '/etf')
+  assert.equal(stockHolding?.actionHref, '/deepscan')
 })
 
 test('home market score uses market indicators instead of portfolio PnL heuristics', () => {

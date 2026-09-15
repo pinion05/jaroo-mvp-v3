@@ -46,6 +46,8 @@ test('OCR 검토와 업로드 예시도 같은 국내 금융 색상 토큰을 �
 test('병합·충돌 검토·ETF·공유 카드의 손익 숫자도 공통 부호 판별을 사용한다', () => {
   assert.match(mergeSource, /getFinancialValueTextClass\(row\.profitRateText\)/)
   assert.match(conflictSource, /getFinancialValueTextClass\(candidate\.profitRate\)/)
-  assert.match(etfSource, /getFinancialValueTextClass\(item\.return1y\)/)
+  // /etf 유사 ETF 비교(return1y)는 1단계에서 사유 명시 카드로 대체됨 — 남은 실데이터
+  // 손익 숫자인 hero 등락률만 규약 검사한다 (스펙 2026-09-15 D7).
+  assert.match(etfSource, /getFinancialValueTextClass\(vm\.hero\.change\)/)
   assert.match(shareCardSource, /getFinancialValueTextClass\(sharePortfolioCard\.totalPnl\)/)
 })

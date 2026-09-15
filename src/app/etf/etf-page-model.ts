@@ -1,0 +1,133 @@
+// /etf 페이지 상태머신 + 외부 계약 어댑터 (스펙 2026-09-15 Task 6).
+// 페이지 컴포넌트는 이 모듈의 순수 함수로 상태를 전이시킨다:
+//   target(ok/empty/invalid) → 초기상태 → fetch 결과(quotes·profile) → ready/error
+// 시세(가격)는 quotes/current에서, 전일 대비 등락률은 etf-profile의 quote.changePct에서 합성한다.
+
+import { normalizeDeepScanCode } from '@/app/deepscan/deepscan-page-fetchers'
+import { parseOcrNumber } from '@/lib/screenshot-ocr'
+import { resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
+import { resolveEtfPageTarget, type EtfPageTarget, type EtfTargetSessionLike } from '@/lib/etf/etf-target'
+import { buildEtfViewModel, type EtfProfileJson, type EtfViewModel } from '@/lib/etf/etf-view-model'
+
+export type EtfPageQuote = { price: number; asOf?: string }
+
+export type EtfPageState =
+  | { phase: 'loading' }
+  | { phase: 'empty' }
+  | { phase: 'invalid' }
+  | { phase: 'error'; message: string }
+  | { phase: 'ready'; vm: EtfViewModel }
+
+type EtfPageOkTarget = Extract<EtfPageTarget, { status: 'ok' }>
+
+// 홈 딥스캔 세션(holding 필드가 '100주'/'101,400원' 같은 표시 문자열)을
+// etf-target 계약(숫자 holding)으로 바꾼다. 한국 6자리 코드가 없는 홀딩
+// (미국 ETF 등)은 빈 코드로 내려 가드가 invalid로 판정하게 한다.
+export type DeepScanSnapshotLike = {
+  holding?: {
+    id?: number
+    code?: string | null
+    identifierCode?: string | null
+    identifierTicker?: string | null
+    name?: string
+    kind?: string
+    market?: string
+    marketTone?: string
+    shares?: string
+    averagePrice?: string
+  } | null
+} | null
+
+export function buildEtfSessionFromDeepScanSnapshot(snapshot: DeepScanSnapshotLike): EtfTargetSessionLike | null {
+  const holding = snapshot?.holding
+  if (!holding || holding.id === -1 || holding.name === '종목 미선택') {
+    return null
+  }
+
+  const code = normalizeDeepScanCode(holding.identifierCode ?? holding.code ?? undefined) ?? ''
+  const shares = parseOcrNumber(holding.shares ?? '')
+  const averagePrice = parseOcrNumber(holding.averagePrice ?? '')
+
+  return {
+    code,
+    name: holding.name ?? code,
+    kind: holding.kind,
+    market: holding.marketTone ?? holding.market,
+    holding: shares !== null && averagePrice !== null ? { shares, averagePrice } : null,
+  }
+}
+
+export function createInitialEtfPageState(target: EtfPageTarget): EtfPageState {
+  switch (target.status) {
+    case 'ok':
+      return { phase: 'loading' }
+    case 'empty':
+      return { phase: 'empty' }
+    default:
+      return { phase: 'invalid' }
+  }
+}
+
+export function buildEtfPageQuoteUrl(code: string) {
+  return `/api/quotes/current?codes=${encodeURIComponent(code)}`
+}
+
+export function buildEtfPageProfileUrl(code: string) {
+  return `/api/etf/profile?code=${encodeURIComponent(code)}`
+}
+
+// /api/etf/profile의 400은 크롤러 NOT_ETF 판정(주식 코드 등)뿐이다 —
+// 다른 말로 래핑하지 않으므로 상태코드만 보고 invalid 페이지 상태로 매핑할 수 있다.
+export function isNotAnEtfProfileStatus(status: number): boolean {
+  return status === 400
+}
+
+export function parseEtfQuoteResponse(body: unknown, code: string): EtfPageQuote | null {
+  const items = (body as { data?: { items?: unknown } } | null)?.data?.items
+  if (!Array.isArray(items)) {
+    return null
+  }
+
+  const item = items.find(
+    (entry) => normalizeDeepScanCode((entry as { code?: string | null }).code ?? undefined) === code,
+  ) as { price?: unknown; asOf?: unknown } | undefined
+  if (typeof item?.price !== 'number' || !Number.isFinite(item.price) || item.price <= 0) {
+    return null
+  }
+
+  return { price: item.price, asOf: typeof item.asOf === 'string' ? item.asOf : undefined }
+}
+
+export function parseEtfProfileResponse(body: unknown): EtfProfileJson | null {
+  const data = (body as { data?: unknown } | null)?.data as EtfProfileJson | null | undefined
+  return data && data.schemaVersion === 'jaroo-etf-profile-v1' && data.ok === true ? data : null
+}
+
+export function buildEtfPageState(
+  target: EtfPageOkTarget,
+  quote: EtfPageQuote | null,
+  profile: EtfProfileJson | null,
+): EtfPageState {
+  if (!quote) {
+    return { phase: 'error', message: '시세를 가져오지 못했어요. 잠시 후 다시 시도해주세요.' }
+  }
+  if (!profile) {
+    return { phase: 'error', message: 'ETF 상품 정보를 가져오지 못했어요. 잠시 후 다시 시도해주세요.' }
+  }
+
+  return {
+    phase: 'ready',
+    vm: buildEtfViewModel({
+      profile,
+      quote: { ...quote, changePct: profile.quote?.changePct ?? null },
+      holding: target.holding,
+    }),
+  }
+}
+
+export function resolveEtfPageTargetFromWindow(): EtfPageTarget {
+  return resolveEtfPageTarget({
+    searchParams: new URLSearchParams(typeof window === 'undefined' ? '' : window.location.search),
+    readSession: () => buildEtfSessionFromDeepScanSnapshot(resolveDeepScanTargetSession()),
+  })
+}

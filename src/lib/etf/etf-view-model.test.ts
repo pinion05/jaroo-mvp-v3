@@ -47,7 +47,7 @@ test('buildEtfViewModel maps quotes+holding+profile into hero and basicInfo with
   assert.equal(byLabel.get('운용사'), '삼성자산운용')
   assert.equal(byLabel.get('기준지수'), '코스피 200')
   assert.equal(byLabel.get('NAV'), '104,100원')
-  assert.equal(byLabel.get('NAV 괴리율'), '0.02%')
+  assert.equal(byLabel.get('NAV 괴리율'), '+0.02%')
 })
 
 test('buildEtfViewModel without holding hides profit fields (guest)', () => {
@@ -77,6 +77,23 @@ test('buildEtfViewModel marks unavailable blocks with explicit reasons', () => {
   assert.equal(vm.riskMetrics.notice.reason, 'source-pending')
   assert.equal(vm.peers.notice.reason, 'planned')
   assert.equal(vm.dividendInfo.notice.reason, 'planned')
+})
+
+test('buildEtfViewModel without changePct hides change badge and keeps momentum neutral', () => {
+  const vm = buildEtfViewModel({ profile, quote: { price: 104_275, changePct: null }, holding: null })
+  assert.equal(vm.hero.change, null)
+  assert.equal(vm.momentum.badge, '·')
+  assert.match(vm.momentum.label, /등락/)
+})
+
+test('buildEtfViewModel formats NAV deviation with U+2212 for discount', () => {
+  const vm = buildEtfViewModel({
+    profile: { ...profile, product: { ...profile.product, deviationPct: -0.24 } },
+    quote: { price: 104_275, changePct: 0 },
+    holding: null,
+  })
+  const byLabel = new Map(vm.basicInfo.items.map((item) => [item.label, item.value]))
+  assert.equal(byLabel.get('NAV 괴리율'), '−0.24%')
 })
 
 test('buildEtfViewModel omits missing product fields instead of rendering empty rows', () => {

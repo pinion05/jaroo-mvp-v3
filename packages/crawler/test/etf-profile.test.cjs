@@ -11,6 +11,7 @@ const naverPriceFixture = {
   deviationRate: 0.24,
   deviationSign: '-',
   nowPrice: 104_275,
+  prevChangeRate: -1.08,
 };
 
 const naverComponentFixture = [
@@ -82,6 +83,22 @@ test('buildEtfProfile merges naver price, wisereport snapshot, and naver compone
   // 기간별 수익률은 위세리포트 스냅샷에서
   assert.deepEqual(profile.returns, { m1: 1.2, m3: 3.4, m6: null, y1: -5.6 });
   assert.equal(profile.daily, null);
+  // 전일 대비 등락률은 네이버 price의 prevChangeRate에서 (quotes API엔 등락률이 없다)
+  assert.deepEqual(profile.quote, { changePct: -1.08 });
+});
+
+test('buildEtfProfile maps quote.changePct to null when prevChangeRate is absent', async () => {
+  const { buildEtfProfile } = await import('../src/crawlers/etf-profile.js');
+
+  const profile = buildEtfProfile({
+    code: '069500',
+    snapshot: null,
+    naverPrice: { ...naverPriceFixture, prevChangeRate: null },
+    naverComponent: null,
+  });
+
+  assert.equal(profile.ok, true);
+  assert.deepEqual(profile.quote, { changePct: null });
 });
 
 test('buildEtfProfile tolerates missing snapshot (naver-only) and caps holdings at 30', async () => {

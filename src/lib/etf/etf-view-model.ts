@@ -15,6 +15,7 @@ export type EtfProfileJson = {
   name: string
   market: 'kospi' | 'kosdaq'
   ok: true
+  quote?: { changePct: number | null } | null
   product: {
     issuerName: string | null
     baseIndexName: string | null
@@ -55,7 +56,7 @@ export type EtfViewModel = {
   hero: {
     name: string
     price: string
-    change: string
+    change: string | null
     averagePrice: string | null
     profitAmount: string | null
     stats: EtfHeroStat[]
@@ -86,13 +87,13 @@ function buildBasicInfoItems(product: EtfProfileJson['product']): EtfBasicInfoIt
   if (product.issuerName) items.push({ label: '운용사', value: product.issuerName })
   if (product.baseIndexName) items.push({ label: '기준지수', value: product.baseIndexName })
   if (product.nav != null) items.push({ label: 'NAV', value: krw(product.nav) })
-  if (product.deviationPct != null) items.push({ label: 'NAV 괴리율', value: `${product.deviationPct.toFixed(2)}%` })
+  if (product.deviationPct != null) items.push({ label: 'NAV 괴리율', value: signedPct(product.deviationPct) })
   return items
 }
 
 export function buildEtfViewModel(input: {
   profile: EtfProfileJson
-  quote: { price: number; changePct: number; asOf?: string }
+  quote: { price: number; changePct: number | null; asOf?: string }
   holding: { shares: number; averagePrice: number } | null
 }): EtfViewModel {
   const { profile, quote, holding } = input
@@ -115,17 +116,20 @@ export function buildEtfViewModel(input: {
     hero: {
       name: profile.name,
       price: krw(quote.price),
-      change: signedPct(quote.changePct),
+      change: quote.changePct == null ? null : signedPct(quote.changePct),
       averagePrice: holding ? `평단 ${krw(holding.averagePrice)}` : null,
       profitAmount: profit
         ? `${profit.amount >= 0 ? '+' : MINUS}${Math.abs(Math.round(profit.amount)).toLocaleString('ko-KR')}원`
         : null,
       stats: buildHeroStats(product),
     },
-    momentum: {
-      label: quote.changePct >= 0 ? '최근 거래일 상승 — 순풍' : '최근 거래일 하락 — 역풍',
-      badge: quote.changePct >= 0 ? '↗' : '↘',
-    },
+    momentum:
+      quote.changePct == null
+        ? { label: '최근 등락 정보를 가져오지 못했어요', badge: '·' }
+        : {
+            label: quote.changePct >= 0 ? '최근 거래일 상승 — 순풍' : '최근 거래일 하락 — 역풍',
+            badge: quote.changePct >= 0 ? '↗' : '↘',
+          },
     scenario: noticeBlock('source-absent', 'ETF에는 애널리스트 목표가·컨센서스가 없어요'),
     returns: noticeBlock('source-pending', '기간별 수익률은 일봉 데이터 연결 후 제공돼요'),
     basicInfo: { items: buildBasicInfoItems(product) },
