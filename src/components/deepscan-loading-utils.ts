@@ -279,6 +279,10 @@ export function narrativeToneClass(tone: NarrativeTone) {
     return styles.narrativeTonePositive
   }
 
+  if (tone === 'rise') {
+    return styles.narrativeToneRise
+  }
+
   if (tone === 'warning') {
     return styles.narrativeToneWarning
   }
@@ -292,7 +296,8 @@ export function narrativeToneClass(tone: NarrativeTone) {
 
 export function quickFactToneToNarrativeTone(tone: LoadingQuickFact['tone']): NarrativeTone {
   if (tone === 'positive') {
-    return 'positive'
+    // 퀵팩트 positive는 시세 상승·컨센서스 긍정 등 금융 의미다 — 국내 관례(상승=빨강)의 rise 계열로.
+    return 'rise'
   }
 
   if (tone === 'warning') {

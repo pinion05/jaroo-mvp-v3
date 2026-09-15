@@ -107,7 +107,9 @@ export type LoadingQuickFact = {
 export type LoadingStageKey = 'fundamentalTeam' | 'marketTeam' | 'contextTeam'
 export type PlaceholderStageKey = `pendingStage${number}`
 export type NarrativeCardKey = LoadingStageKey | PlaceholderStageKey
-export type NarrativeTone = 'positive' | 'warning' | 'neutral' | 'info'
+// NarrativeTone — 뱃지 색 계열:
+//   positive: 완료·성공 (초록/어두운 초록) · rise: 국내 금융 상승 (빨강 — quickFact 전용)
+export type NarrativeTone = 'positive' | 'rise' | 'warning' | 'neutral' | 'info'
 export type CommitteeTeamMemberDefinition = {
   sourceMemberKey?: string | string[]
   sourceTitle: string | string[]

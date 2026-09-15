@@ -52,3 +52,15 @@ test('병합·충돌 검토·ETF·공유 카드의 손익 숫자도 공통 부�
   assert.match(etfSource, /financialToneClass\(changePct\)/)
   assert.match(shareCardSource, /getFinancialValueTextClass\(sharePortfolioCard\.totalPnl\)/)
 })
+
+test('DeepScan 완료 뱃지는 초록 조합, 금융 상승 뱃지는 국내 관례 빨강 조합을 쓴다', () => {
+  // 2026-09-16 사용자 결정: '요약 완료' 등 완료·성공 뱃지는 초록/어두운 초록(emerald).
+  // globals §7(초록 제거)는 손익 숫자·일반 성공 토큰에만 적용 — 상태 뱃지는 예외로 분리.
+  assert.match(deepScanStyles, /\.narrativeTonePositive\s*\{[^}]*--ds-emerald-soft[^}]*--ds-emerald/s)
+  assert.match(deepScanStyles, /\.(stepDone|memberDone|badgeDone)\s*\{[^}]*--ds-emerald-soft[^}]*--ds-emerald/s)
+  // 퀵팩트 positive(시세 상승·컨센서스 긍정)는 상승 계열(rise=빨강)로 매핑된다
+  assert.match(deepScanStyles, /\.narrativeToneRise\s*\{[^}]*--ds-rise-soft[^}]*--ds-rise/s)
+  assert.match(deepScanStyles, /\.consensusToneProfit > span\s*\{[^}]*--ds-rise-soft/s)
+  // 오해를 부른 기존 토큰(값은 빨강) 정의는 제거돼야 한다(주석 언급은 허용)
+  assert.doesNotMatch(deepScanStyles, /--ds-green(-soft)?\s*:/)
+})
