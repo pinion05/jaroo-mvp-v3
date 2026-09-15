@@ -91,6 +91,8 @@ export function buildEtfProfile({ code, snapshot = null, naverPrice = null, nave
     name,
     market: mapMarket(snapshot),
     ok: true,
+    // quotes/current엔 등락률이 없어서 전일 대비는 네이버 price의 prevChangeRate로 내린다
+    quote: { changePct: toFiniteNumber(naverPrice?.prevChangeRate) },
     product: buildProduct({ snapshot, naverPrice }),
     returns: buildReturns(snapshot),
     holdings: buildHoldings(naverComponent),
