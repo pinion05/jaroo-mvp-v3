@@ -114,7 +114,7 @@ test('DeepScanInlineResults folds detail behind 자세히 보기 without numbere
 
   assert.match(markup, /자세히 보기/)
   assert.match(markup, /aria-expanded="false"/)
-  assert.match(markup, /추천 행동 · 목표가 근거/)
+  assert.match(markup, /추천 시나리오 · 목표가 근거/)
   assert.doesNotMatch(markup, /세 팀 의견/)
   assert.match(markup, /목표가 근거/)
   assert.match(markup, /증권사 12개/)
@@ -135,6 +135,40 @@ test('DeepScanInlineResults colors target prices below the current price blue', 
   assert.match(markup, /jaroo-loss\)\][^<]*>13,000원/)
   assert.match(markup, /jaroo-loss\)\][^<]*>12,500원/)
   assert.match(markup, /jaroo-profit\)\][^<]*>18,500원/)
+})
+
+test('DeepScanInlineResults colors the strength label and gauge by the agreed tone rule', () => {
+  const neutralPlus = basePayload()
+  neutralPlus.hero = { ...neutralPlus.hero, score: 58 }
+  const neutralPlusMarkup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload: neutralPlus }))
+  assert.match(neutralPlusMarkup, /중립\+/)
+  assert.match(neutralPlusMarkup, /leading-none text-\[color:var\(--jaroo-flat\)\][^>]*>중립\+</)
+  assert.match(neutralPlusMarkup, /bg-\[color:var\(--jaroo-flat\)\]/)
+
+  const neutral = basePayload()
+  neutral.hero = { ...neutral.hero, score: 48 }
+  const neutralMarkup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload: neutral }))
+  assert.match(neutralMarkup, /leading-none text-\[color:var\(--jaroo-flat\)\][^>]*>중립</)
+
+  const caution = basePayload()
+  caution.hero = { ...caution.hero, score: 30 }
+  const cautionMarkup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload: caution }))
+  assert.match(cautionMarkup, /leading-none text-\[#2B6BE6\][^>]*>주의</)
+  assert.doesNotMatch(cautionMarkup, /--jaroo-flat/)
+
+  // 기본 payload(score 68)는 강세 — 빨강 유지
+  const bullMarkup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload: basePayload() }))
+  assert.match(bullMarkup, /leading-none text-\[#E5484D\][^>]*>강세</)
+  assert.doesNotMatch(bullMarkup, /--jaroo-flat/)
+})
+
+test('DeepScanInlineResults colors negative upside blue and positive upside red', () => {
+  const payload = basePayload()
+  payload.strategy = { ...payload.strategy, currentPriceText: '20,000원', targetPriceText: '17,500원' }
+  const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
+  // (17,500 / 20,000 - 1) * 100 = −12.5%
+  assert.match(markup, /jaroo-loss\)\][^<]*>−12\.5%/)
+  assert.doesNotMatch(markup, /jaroo-profit\)\][^<]*>−12\.5%/)
 })
 
 test('DeepScanInlineResults hides target-price section and consensus for ETF', () => {

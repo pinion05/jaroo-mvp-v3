@@ -1007,12 +1007,13 @@
   color: var(--ds-blue);
 }
 
-.consensusToneProfit > span {
+/* 대비 수치는 각자 부호 색을 쓴다 — 현재가 대비와 평단 대비가 서로 다른 방향일 수 있다 (기본 블록보다 나중에 와야 승리) */
+.consensusUpsideList > span.consensusUpsideProfit {
   background: var(--ds-rise-soft);
   color: var(--ds-red);
 }
 
-.consensusToneLoss > span {
+.consensusUpsideList > span.consensusUpsideLoss {
   background: var(--ds-blue-soft);
   color: var(--ds-blue);
 }

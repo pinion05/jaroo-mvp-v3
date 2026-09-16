@@ -72,6 +72,19 @@ function consensusToneOf(consensus: NonNullable<LoadingQuickFact['consensus']>):
   return consensus.targetPriceValue > consensus.currentPriceValue ? 'profit' : 'loss'
 }
 
+/** 거래 배수 — 1 미만은 분수 표기(분모 2~5 최근접, 오차 5%p 초과면 소수 유지), 1 이상은 소수 그대로 */
+function formatVolumeRatioLabel(value: number) {
+  if (value >= 1 || value <= 0) return `어제의 ${formatNumber(value)}배`
+  let best: { label: string; err: number } | null = null
+  for (let denominator = 2; denominator <= 5; denominator += 1) {
+    for (let numerator = 1; numerator < denominator; numerator += 1) {
+      const err = Math.abs(numerator / denominator - value)
+      if (best === null || err < best.err) best = { label: `${numerator}/${denominator}배`, err }
+    }
+  }
+  return best !== null && best.err <= 0.05 ? `어제의 ${best.label}` : `어제의 ${formatNumber(value)}배`
+}
+
 function TargetPriceFanChart({
   consensus,
   dailyCloses,
@@ -491,7 +504,7 @@ export function TodayBriefingCard({
     : sameMoneyCurrency ? '현재가와 평단을 맞춰 보는 중이에요.' : '현재가는 달러, 평단은 원화 기준이라 환율 환산 후 비교해야 해요.'
   const todayFlow = briefingModel.todayFlow
   const volumeRatio = briefingModel.volumeRatio
-  const volumeRatioLabel = isFiniteNumber(volumeRatio) ? `어제의 ${formatNumber(volumeRatio)}배` : '거래량 확인 중'
+  const volumeRatioLabel = isFiniteNumber(volumeRatio) ? formatVolumeRatioLabel(volumeRatio) : '거래량 확인 중'
   const volumeMeaning = isFiniteNumber(volumeRatio)
     ? volumeRatio >= 1.3
       ? '평소보다 관심이 붙은 하루예요.'
@@ -588,8 +601,8 @@ export function TodayBriefingCard({
                     <strong>{consensus.targetPriceLabel}</strong>
                   </div>
                   <div className={styles.consensusUpsideList}>
-                    {consensus.upsideLabel ? <span>현재가 대비 {consensus.upsideLabel}</span> : null}
-                    {averageUpsideLabel ? <span>평단 대비 {averageUpsideLabel}</span> : null}
+                    {consensus.upsideLabel ? <span className={consensusTone === 'profit' ? styles.consensusUpsideProfit : consensusTone === 'loss' ? styles.consensusUpsideLoss : undefined}>현재가 대비 {consensus.upsideLabel}</span> : null}
+                    {averageUpsideLabel ? <span className={averageUpsidePct !== null && averageUpsidePct > 0 ? styles.consensusUpsideProfit : averageUpsidePct !== null && averageUpsidePct < 0 ? styles.consensusUpsideLoss : undefined}>평단 대비 {averageUpsideLabel}</span> : null}
                   </div>
                 </div>
                 <TargetPriceFanChart

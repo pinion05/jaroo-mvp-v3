@@ -81,6 +81,13 @@ function buildStrength(payload: JarooDeepScanPayload) {
   return { label: '주의', helper: '방어 우선', active: 1 }
 }
 
+/** 확정 색 규칙 — 강세=빨강, 중립+·중립=녹색(보합 관례), 주의=파랑 */
+function strengthTone(active: number) {
+  if (active >= 4) return { text: 'text-[#E5484D]', bar: 'bg-[#E5484D]' }
+  if (active >= 2) return { text: 'text-[color:var(--jaroo-flat)]', bar: 'bg-[color:var(--jaroo-flat)]' }
+  return { text: 'text-[#2B6BE6]', bar: 'bg-[#2B6BE6]' }
+}
+
 function sanitizeExchangeProductCopy(value: string) {
   return value
     .replace(/ETF\s*특성상\s*개별\s*종목\s*분석과\s*목표가가?\s*없어\s*추가\s*상승\s*여력을\s*판단하기\s*어렵다\.?/gu, 'ETF는 NAV 괴리율과 기초지수 흐름 확인이 추가 판단의 핵심입니다.')
@@ -210,8 +217,8 @@ export function DeepScanInlineResults({
           <div><div className='text-[10px] text-[#97A0AE]'>종합 결론</div><h2 className='text-[14px] font-bold text-[#0F1419]'>세 팀의 의견을 모았어요</h2></div>
         </div>
         <div className='px-4 py-5 text-center'>
-          <div className={cn('text-[28px] font-black leading-none', strength.active <= 1 ? 'text-[#2B6BE6]' : 'text-[#E5484D]')}>{strength.label}</div>
-          <div className='mx-auto mt-3 flex w-[122px] gap-1'>{Array.from({ length: 5 }, (_, index) => <span key={index} className={cn('h-[6px] flex-1 rounded-full', index < strength.active ? 'bg-[#E5484D]' : 'bg-[#E8EAEE]')} />)}</div>
+          <div className={cn('text-[28px] font-black leading-none', strengthTone(strength.active).text)}>{strength.label}</div>
+          <div className='mx-auto mt-3 flex w-[122px] gap-1'>{Array.from({ length: 5 }, (_, index) => <span key={index} className={cn('h-[6px] flex-1 rounded-full', index < strength.active ? strengthTone(strength.active).bar : 'bg-[#E8EAEE]')} />)}</div>
           <p className='mt-2 text-[11px] text-[#5A6473]'>{strength.helper}</p>
         </div>
         {heroEvidence ? (
@@ -243,20 +250,20 @@ export function DeepScanInlineResults({
           {facts.map(([label, value]) => (
             <div key={label} className='border-r border-[#EFF1F4] px-3 py-3 last:border-r-0'>
               <div className='text-[10px] text-[#97A0AE]'>{label}</div>
-              <div className={cn('mt-1 text-[13px] font-bold text-[#0F1419]', label === '상승 여력' && upside !== null && upside > 0 ? 'text-[color:var(--jaroo-profit)]' : undefined)}>{value}</div>
+              <div className={cn('mt-1 text-[13px] font-bold text-[#0F1419]', label === '상승 여력' && upside !== null && upside > 0 ? 'text-[color:var(--jaroo-profit)]' : label === '상승 여력' && upside !== null && upside < 0 ? 'text-[color:var(--jaroo-loss)]' : undefined)}>{value}</div>
             </div>
           ))}
         </div>
         <div className='border-t border-[#EFF1F4]'>
           <button type='button' aria-expanded={detailsOpen} onClick={() => setDetailsOpen((v) => !v)} className='flex w-full items-center gap-2 px-4 py-3.5 text-left'>
             <span className='text-[13px] font-bold text-[#0F1419]'>자세히 보기</span>
-            <span className='text-[10px] text-[#97A0AE]'>{exchangeProduct ? '가능 시나리오 · 가격 근거' : '추천 행동 · 목표가 근거'}</span>
+            <span className='text-[10px] text-[#97A0AE]'>{exchangeProduct ? '가능 시나리오 · 가격 근거' : '추천 시나리오 · 목표가 근거'}</span>
             <svg className={cn('ml-auto size-4 transition-transform duration-200', detailsOpen ? 'rotate-180' : '', 'text-[#5A6473]')} width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'><path d='m6 9 6 6 6-6' /></svg>
           </button>
           <div className={cn('grid transition-[grid-template-rows] duration-300 ease-out', detailsOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
             <div className='overflow-hidden'>
               <div className='space-y-4 border-t border-[#EFF1F4] px-4 py-4 pb-5'>
-                <DetailSection title={exchangeProduct ? '가능 시나리오' : '추천 행동'}>
+                <DetailSection title={exchangeProduct ? '가능 시나리오' : '추천 시나리오'}>
                   <div className='space-y-3'>
                     {scenarios.map((scenario) => {
                       const tone = toneClasses(scenario.tone)

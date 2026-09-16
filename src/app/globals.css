@@ -92,6 +92,8 @@
   --jaroo-profit-soft: #fbe6e7;
   --jaroo-loss: #2b6be6;
   --jaroo-loss-soft: #e6f0fe;
+  /* Neutral (보합) strength reads green — agreed tone rule: 강세=빨강, 중립·중립+=녹색, 주의=파랑 */
+  --jaroo-flat: #1e7a43;
   --jaroo-neutral-soft: #edf1f7;
 }
 
