@@ -6,6 +6,7 @@ export type CurrentQuoteItem = {
   code?: string | null
   ticker?: string | null
   price?: number | null
+  volume?: number | null
   currency?: string | null
   asOf?: string | null
   source?: string | null
@@ -329,6 +330,30 @@ function applyLiveTone(holding: HomeHolding, changeValue: number | null) {
   }
 }
 
+// 거래정지 종목 표시 — 정지 전 종가로 손익은 계산하되, 상태는 '거래 정지'로 고정한다.
+// 정지 판정 근거는 당일 거래량 0(시세는 ok). 모형 목업의 halt 카드 문법(cardTone 'halt')을 따른다.
+function applyHaltedTone(holding: HomeHolding): HomeHolding {
+  const isEtfHolding = holding.kind === 'etf'
+
+  return {
+    ...holding,
+    badge: '거래 정지',
+    badgeTone: 'red',
+    cardTone: 'halt',
+    change: '거래 정지',
+    signalTone: isEtfHolding ? 'etf' : 'halt',
+    centerScore: '정지',
+    centerScoreColor: '#F09595',
+    centerBadge: '거래 정지',
+    centerBadgeTone: 'red',
+    heatmapChange: undefined,
+    heatmapMeta: '거래정지',
+    heatmapBadge: '거래 정지',
+    heatmapBadgeTone: 'red',
+    blink: isEtfHolding ? undefined : true,
+  }
+}
+
 export type HomeHoldingQuoteErrorKind = 'quote-unavailable' | 'fx-required' | 'holding-invalid'
 
 export function shouldTreatQuoteFailureAsErrorCard(
@@ -483,7 +508,7 @@ export function applyCurrentQuotesToHomeHoldings(
       .replace(/ · 현재가 .*$/, '')
     const metaLine = `${baseMetaLine} · 평가금액 ${evaluationAmountText} · 현재가 ${livePriceText}`
 
-    const nextHolding = applyLiveTone({
+    const quotedHolding: HomeHolding = {
       ...holding,
       evaluationAmount: evaluationAmountText,
       metaLine,
@@ -502,7 +527,14 @@ export function applyCurrentQuotesToHomeHoldings(
         livePriceText,
         'neutral',
       ),
-    }, changeValue)
+    }
+    const isHaltedQuote = quoteItem.volume === 0
+    const nextHolding = isHaltedQuote
+      ? applyHaltedTone({
+          ...quotedHolding,
+          metrics: upsertMetric(quotedHolding.metrics, '수익률', '거래 정지', 'neutral'),
+        })
+      : applyLiveTone(quotedHolding, changeValue)
 
     const normalizedWeightValue = convertMoneyAmount(evaluationAmountValue, quoteCurrency, 'KRW', options)
       ?? convertMoneyAmount(rawCostBasisValue, averagePriceCurrency, 'KRW', options)

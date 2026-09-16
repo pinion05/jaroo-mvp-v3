@@ -145,9 +145,16 @@ function derivePerformanceTone(changeValue: number | null): ShareCardPerformance
   return changeValue >= 0 ? 'positive' : 'danger'
 }
 
+// 거래정지 종목 — 홈 파이프라인이 '거래 정지' 상태로 만든 보유(cardTone 'halt')는
+// 순손익률로 바람/톤을 매기지 않고 고정 표기한다(모형 카드 문법과 동일).
+function isHaltedHolding(holding: HomeHolding) {
+  return holding.cardTone === 'halt' || holding.change.trim() === '거래 정지'
+}
+
 export function buildShareStockCards(holdings: HomeHolding[]): ShareCardStock[] {
   return holdings.map((holding) => {
     const changeValue = parseOcrNumber(holding.change)
+    const halted = isHaltedHolding(holding)
 
     return {
       name: holding.name,
@@ -157,8 +164,8 @@ export function buildShareStockCards(holdings: HomeHolding[]): ShareCardStock[] 
       rate: holding.change,
       amount: holding.pnl,
       status: holding.badge,
-      performanceTone: derivePerformanceTone(changeValue),
-      wind: deriveWind(changeValue),
+      performanceTone: halted ? 'neutral' : derivePerformanceTone(changeValue),
+      wind: halted ? '역풍' : deriveWind(changeValue),
       dot: holding.donutColor,
     }
   })
