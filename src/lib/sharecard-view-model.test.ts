@@ -153,3 +153,21 @@ test('포트폴리오 카드 — 전체 손실 구간이면 역풍 라벨을 붙
   assert.equal(card.momentumDetail, '경계 필요 ↓')
   assert.equal(card.totalPnl, '-261,180원')
 })
+
+test('거래정지 보유는 rate를 그대로 표시하고 바람/톤은 고정값을 쓴다', () => {
+  const [card] = buildShareStockCards([
+    makeHolding({
+      name: '유틸렉스',
+      change: '거래 정지',
+      pnl: '-288,200원',
+      badge: '거래 정지',
+      cardTone: 'halt',
+    }),
+  ])
+
+  assert.equal(card.rate, '거래 정지')
+  assert.equal(card.status, '거래 정지')
+  assert.equal(card.amount, '-288,200원')
+  assert.equal(card.wind, '역풍')
+  assert.equal(card.performanceTone, 'neutral')
+})
