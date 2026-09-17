@@ -31,7 +31,6 @@
 │            상위 10개 집중도                          │      badge `상위 ${n}개`
 │               62.4%                                 │   ← 28px black 강조 (집중도)
 │         ████████████░░░░░░░░                         │   ← 5px 게이지, width = 집중도%
-│  1위 삼성전자 21.3% · 2위 SK하이닉스 15.2%            │   ← 상위 2개 요약 캡션(데이터 있을 때만)
 │───────────────────────────────────────────────│
 │ ● 삼성전자      005930              21.30%           │   ← 기존 Top10 리스트 문법 그대로
 │ ● SK하이닉스    000660              15.20%           │      (파란 점 · 이름 · 코드 · 비중 바)
@@ -43,7 +42,7 @@
 **계산·문구 규칙**
 
 - 집중도 = `clamp(0, 100, Σ top10 weightPct)`, 표시는 소수 1자리
-- 상위 요약 캡션: "1위 {이름} {비중}% · 2위 {이름} {비중}%" — 2개 미만이면 있는 만큼만, 0개면 미표시
+- 상위 요약 캡션은 미표시(2026-09-17 사용자 피드백: 바로 아래 Top 10 리스트와 정보 중복)
 - 집중/분산 코멘트: ≥60% "상위 종목 비중이 높은 편이에요" / ≤40% "고르게 분산돼 있어요" / 나머지 "중간 정도로 분산돼 있어요"
 - KR 출처 문구 "네이버 제공 기준" / US "Yahoo Finance 제공 기준" (기존 holdings summary 문구 계승, "구성등락률은 소스 준비 중" 문구는 등락률 미표시로 불필요해져 제거)
 - US는 제공 topHoldings 개수 n 그대로 표시(n < 10이면 캡션·badge `상위 n개`, 집중도 캡션도 n 기준)
@@ -60,7 +59,7 @@
 
 | 파일 | 변경 |
 |---|---|
-| `src/lib/etf/etf-view-model.ts` | `EtfScenario`·`EtfScenarioBlock`·`buildScenarioBlock` 삭제. `EtfHoldingsBlock`에 `headline: { concentrationPct, concentrationText, topSummaryText }` 추가 — 계산은 순수 함수(예: `buildHoldingsHeadline`). holdings summary 문구 규칙 §3 반영 |
+| `src/lib/etf/etf-view-model.ts` | `EtfScenario`·`EtfScenarioBlock`·`buildScenarioBlock` 삭제. `EtfHoldingsBlock`에 `headline: { concentrationPct, concentrationText, concentrationCaptionText, sourceText, commentText }` 추가 — 계산은 순수 함수(예: `buildHoldingsHeadline`). holdings summary 문구 규칙 §3 반영 |
 | `src/app/etf/page.tsx` | `EtfScenarioCard`·`EtfHoldingsCard` 제거 → 통합 카드 1개(가칭 `EtfHoldingsSummaryCard`)를 상품정보 다음에 배치. 시나리오 렌더 분기 제거. 인트로 카피 수정 |
 | `src/lib/etf/etf-view-model.test.ts` (기존 — `src/`·`tests/` 양쪽의 `*.test.ts`를 `run-web-ts-tests`가 수집) | 시나리오 단언 제거·headline 단언으로 교체, 신규 케이스 추가: 집중도 계산·100 초과 clamp·코멘트 3분기·holdings 부재 폴백·US n<10 케이스 |
 

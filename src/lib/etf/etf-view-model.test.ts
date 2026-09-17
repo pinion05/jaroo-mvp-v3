@@ -222,7 +222,6 @@ test('buildHoldingsHeadline sums top-10 concentration with 1-decimal rounding an
   assert.equal(headline.concentrationPct, 44.6)
   assert.equal(headline.concentrationText, '44.6%')
   assert.equal(headline.concentrationCaptionText, '상위 3개 집중도')
-  assert.equal(headline.topSummaryText, '1위 삼성전자 21.3% · 2위 SK하이닉스 15.2%')
   assert.equal(headline.sourceText, '네이버 제공 기준')
   assert.equal(headline.commentText, '중간 정도로 분산돼 있어요')
 })
@@ -247,11 +246,10 @@ test('buildHoldingsHeadline marks even dispersion and counts only the top 10', (
   assert.equal(twelve.concentrationPct, 60)
 })
 
-test('buildHoldingsHeadline uses Yahoo source text for US market and summarizes a single holding', () => {
+test('buildHoldingsHeadline uses Yahoo source text for US market', () => {
   const us = buildHoldingsHeadline(headlineHoldings([8.1]), 'us')
   assert.equal(us.sourceText, 'Yahoo Finance 제공 기준')
   assert.equal(us.concentrationCaptionText, '상위 1개 집중도')
-  assert.equal(us.topSummaryText, '1위 종목1 8.1%')
 })
 
 test('buildEtfViewModel exposes holdings headline on the topHoldings block', () => {
@@ -269,7 +267,6 @@ test('buildEtfViewModel exposes holdings headline on the topHoldings block', () 
   // notice 브랜치 좁히기 — headline은 notice 미블록에만 존재(기존 테스트 관례와 동일)
   assert.equal(vm.topHoldings.notice, null)
   assert.equal(vm.topHoldings.headline.concentrationPct, 59.7)
-  assert.equal(vm.topHoldings.headline.topSummaryText, '1위 삼성전자 32.6% · 2위 SK하이닉스 27.1%')
 })
 
 test('buildEtfViewModel no longer exposes the 52-week scenario block (이슈 #270 D4)', () => {

@@ -72,12 +72,11 @@ export type EtfReturnItem = { label: string; value: string; tone: EtfValueTone }
 export type EtfReturnsBlock = { notice: null; items: EtfReturnItem[] } | EtfNoticeBlock
 
 // 구성 종목 집중도 헤드라인 — 상위 n개 비중 합계와 집중/분산 코멘트(이슈 #270 D3).
-// 요약 캡션은 소수 1자리, 집중도도 소수 1자리로 반올림해 부동소수 오차를 없앤다.
+// 집중도는 소수 1자리로 반올림해 부동소수 오차를 없앤다.
 export type EtfHoldingsHeadline = {
   concentrationPct: number // 0~100 (반올림 소수 1자리)
   concentrationText: string // '62.4%'
   concentrationCaptionText: string // '상위 10개 집중도'
-  topSummaryText: string | null // '1위 삼성전자 21.3% · 2위 SK하이닉스 15.2%' — 0개면 null
   sourceText: string // '네이버 제공 기준' | 'Yahoo Finance 제공 기준'
   commentText: string // 집중/분산 코멘트
 }
@@ -102,13 +101,6 @@ export function buildHoldingsHeadline(
     concentrationPct,
     concentrationText: `${concentrationPct.toFixed(1)}%`,
     concentrationCaptionText: `상위 ${top.length}개 집중도`,
-    topSummaryText:
-      top.length > 0
-        ? top
-            .slice(0, 2)
-            .map((holding, index) => `${index + 1}위 ${holding.name} ${holding.weightPct.toFixed(1)}%`)
-            .join(' · ')
-        : null,
     sourceText: market === 'us' ? 'Yahoo Finance 제공 기준' : '네이버 제공 기준',
     commentText,
   }

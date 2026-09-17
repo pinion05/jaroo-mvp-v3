@@ -150,7 +150,6 @@ function EtfHoldingsSummaryCard({ vm }: { vm: EtfViewModel }) {
         <div className='mx-auto mt-3 h-[5px] w-[200px] overflow-hidden rounded-full bg-[#EFF1F4]'>
           <div className='h-full rounded-full bg-[#2B6BE6]' style={{ width: `${headline.concentrationPct}%` }} />
         </div>
-        {headline.topSummaryText ? <p className='mt-2 text-[12px] text-[#5A6473]'>{headline.topSummaryText}</p> : null}
       </div>
       <div className='border-t border-[#EFF1F4] px-4 py-3'>
         <div className='space-y-3'>
