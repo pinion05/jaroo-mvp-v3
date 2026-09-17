@@ -159,6 +159,7 @@ export {
 } from './data/kr-disclosure-classification-dataset.js';
 
 export {
+  buildEtfMarketCommitteeSnapshot,
   buildJarooDeepScanPayload,
 } from './services/deepscan-payload.js';
 

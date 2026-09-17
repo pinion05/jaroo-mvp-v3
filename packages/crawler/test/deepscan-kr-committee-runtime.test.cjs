@@ -834,6 +834,112 @@ test('KR committee debug artifacts are non-throwing, sanitized, and omit duplica
   }
 });
 
+test('KR committee market-timing subset runs only the three chart/market members for ETF', async () => {
+  const {
+    KR_MARKET_TIMING_MEMBER_KEYS,
+    scoreDeepScanKrCommitteeFromDump,
+  } = await import('../src/services/deepscan-kr-committee-runtime.js');
+  const originalFetch = global.fetch;
+  const originalKey = process.env.OPENROUTER_API_KEY;
+  const originalEnabled = process.env.DEEPSCAN_KR_LLM_ENABLE;
+  const capturedMemberKeys = [];
+
+  process.env.OPENROUTER_API_KEY = 'test-key';
+  process.env.DEEPSCAN_KR_LLM_ENABLE = '1';
+
+  global.fetch = (async (_url, init) => {
+    const body = JSON.parse(String(init?.body ?? '{}'));
+    const userMessage = Array.isArray(body?.messages)
+      ? body.messages.find((message) => message.role === 'user')
+      : null;
+    const content = typeof userMessage?.content === 'string' ? userMessage.content : '';
+    const memberKey = content.match(/"member":"([^"]+)"/)?.[1] ?? 'unknown';
+    capturedMemberKeys.push(memberKey);
+
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            score: 70,
+            reason: `${memberKey} ETF reason`,
+            confidence: 'medium',
+          }),
+        },
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  try {
+    const result = await scoreDeepScanKrCommitteeFromDump({}, {
+      instrument: {
+        code: '226490',
+        name: 'KODEX 코스피',
+        market: 'ETF',
+      },
+      sourceContext: {},
+    }, {
+      instrument: {
+        code: '226490',
+        name: 'KODEX 코스피',
+        market: 'ETF',
+      },
+      currentQuote: { price: 79870, currency: 'KRW' },
+      holding: { shares: 35, averagePrice: 58828.75, hasHoldingContext: true, hasFullSellNowInputs: true },
+      pageCoverage: { totalKnownPages: 14, availablePageIds: ['current-quote'], missingPageIds: [], availableCount: 1 },
+      sourceCoverage: { hasCurrentQuote: true, hasHolding: true, hasPackageResult: false, availableReportPages: [] },
+      reportSignals: {},
+      missingSources: [],
+      sourceLimitations: [],
+      topFacts: [],
+      topRisks: [],
+    }, {}, { memberKeys: KR_MARKET_TIMING_MEMBER_KEYS });
+
+    assert.deepEqual(KR_MARKET_TIMING_MEMBER_KEYS, ['trend', 'consensusMomentum', 'priceLocation']);
+    assert.deepEqual([...capturedMemberKeys].sort(), ['consensusMomentum', 'priceLocation', 'trend']);
+    assert.deepEqual(result.memberKeys, ['trend', 'consensusMomentum', 'priceLocation']);
+    assert.equal(Object.keys(result.results).length, 3);
+    assert.equal(result.status, 'complete');
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY;
+    } else {
+      process.env.OPENROUTER_API_KEY = originalKey;
+    }
+    if (originalEnabled === undefined) {
+      delete process.env.DEEPSCAN_KR_LLM_ENABLE;
+    } else {
+      process.env.DEEPSCAN_KR_LLM_ENABLE = originalEnabled;
+    }
+  }
+});
+
+test('KR committee axes subset exposes only the market-timing axis without composite scores', async () => {
+  const {
+    KR_MARKET_TIMING_MEMBER_KEYS,
+    buildKrCommitteeAxesFromLlmResults,
+  } = await import('../src/services/deepscan-kr-committee-runtime.js');
+
+  const shape = buildKrCommitteeAxesFromLlmResults({
+    instrument: { code: '226490', name: 'KODEX 코스피', market: 'ETF' },
+  }, {
+    trend: { score: 60, reason: 'ETF 흐름 reason', confidence: 'medium' },
+    consensusMomentum: { score: 50, reason: 'ETF 정보 reason', confidence: 'medium' },
+    priceLocation: { score: 80, reason: 'ETF 위치 reason', confidence: 'medium' },
+  }, [], [], { memberKeys: KR_MARKET_TIMING_MEMBER_KEYS });
+
+  assert.deepEqual(shape.axes.map((axis) => axis.label), ['지수/가격 흐름']);
+  assert.deepEqual(shape.axes[0].members.map((member) => member.title), ['지수/가격 흐름', '시장 신호/정보 밀도', '가격 위치']);
+  assert.equal(shape.axes[0].score, 62);
+  assert.match(shape.axes[0].axisStatusText, /3\/3명 반영/);
+  assert.equal(shape.committeeScores, null);
+  assert.equal(shape.hasMemberErrors, false);
+  assert.equal(shape.hasPendingMembers, false);
+});
+
 test('KR_MEMBER_NUMERIC_OWNERSHIP — 9멤버 모두 소유 도메인을 가지고 tag가 서로 유일하다', async () => {
   const { KR_MEMBER_NUMERIC_OWNERSHIP, KR_MEMBER_SPECS } = await import('../src/services/deepscan-kr-committee-runtime.js');
   const memberKeys = Object.keys(KR_MEMBER_SPECS);

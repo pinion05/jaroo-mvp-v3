@@ -2,14 +2,19 @@ import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
 import {
+  buildEtfCommitteeStatusUrl,
+  buildEtfCommitteeUrl,
   buildEtfPageBriefingUrl,
   buildEtfPageState,
   buildEtfSessionFromDeepScanSnapshot,
   createInitialEtfPageState,
   isNotAnEtfProfileStatus,
   parseEtfBriefingSnapshotResponse,
+  parseEtfCommitteeResponse,
+  parseEtfCommitteeStatusResponse,
   parseEtfProfileCacheInfo,
   parseEtfProfileResponse,
+  shouldContinueEtfCommitteePolling,
 } from './etf-page-model'
 import { resolveEtfPageTarget } from '@/lib/etf/etf-target'
 import type { EtfProfileJson } from '@/lib/etf/etf-view-model'
@@ -267,4 +272,129 @@ test('buildEtfPageState passes US profile market through to the ready state', ()
     assert.equal(state.vm.hero.price, '$699.3')
     assert.ok(state.vm.riskMetrics.notice === null || true) // daily 2행이라 metrics null → notice 폴백 가능
   }
+})
+
+// ─── AI 위원회(시장·차트 팀) 상태머신 계약 ───────────────────────────────────
+
+const committeeAxisFixture = {
+  label: '지수/가격 흐름',
+  score: 62,
+  scoreText: '62 / 100',
+  axisStatusText: 'LLM 위원 3/3명 반영',
+  subtitle: '현재가, 지수/가격 흐름, 정보 밀도를 반영한 ETF 신호',
+  avgLabel: '위원 평균 62',
+  members: [
+    { memberKey: 'trend', shortLabel: '흐름', title: '지수/가격 흐름', status: 'success', reason: '최근 1개월 +2.16% 흐름이 우상향이에요.', score: 60, scoreLabel: '60', tone: 'neutral', iconTone: 'blue', error: null },
+    { memberKey: 'consensusMomentum', shortLabel: '정보', title: '시장 신호/정보 밀도', status: 'pending', reason: '이 위원은 추가 LLM 응답을 기다리는 중입니다.', score: null, scoreLabel: '고민중...', tone: 'neutral', iconTone: 'blue', error: null },
+    { memberKey: 'priceLocation', shortLabel: '위치', title: '가격 위치', status: 'error', reason: null, score: null, scoreLabel: 'Error', tone: 'warning', iconTone: 'red', error: { kind: 'llm-upstream-error', message: 'LLM 응답 실패 · 4회 시도' } },
+  ],
+}
+
+test('parseEtfCommitteeResponse maps complete crawler snapshots to ready card state', () => {
+  const state = parseEtfCommitteeResponse({
+    ok: true,
+    code: '226490',
+    memberKeys: ['trend', 'consensusMomentum', 'priceLocation'],
+    requestId: 'kr-committee-226490-1',
+    status: 'complete',
+    axes: [committeeAxisFixture],
+    results: {},
+    errors: [],
+    pending: [],
+    generatedAt: '2026-09-17T10:00:00.000Z',
+    cache: null,
+  })
+
+  assert.equal(state.phase, 'ready')
+  if (state.phase !== 'ready') return
+  assert.equal(state.axisLabel, '지수/가격 흐름')
+  assert.equal(state.axisStatusText, 'LLM 위원 3/3명 반영')
+  assert.equal(state.status, 'complete')
+  assert.equal(state.requestId, 'kr-committee-226490-1')
+  assert.equal(state.scannedAt, null)
+  assert.deepEqual(state.members.map((member) => member.status), ['success', 'pending', 'error'])
+  assert.equal(state.members[0].reason, '최근 1개월 +2.16% 흐름이 우상향이에요.')
+  assert.equal(state.members[2].reason, null)
+})
+
+test('parseEtfCommitteeResponse keeps polling contract for partial shells and error/disabled bodies', () => {
+  const partial = parseEtfCommitteeResponse({
+    ok: true,
+    requestId: 'req-1',
+    status: 'partial',
+    axes: [committeeAxisFixture],
+    cache: null,
+  })
+  assert.equal(shouldContinueEtfCommitteePolling(partial), true)
+
+  const complete = parseEtfCommitteeResponse({
+    ok: true,
+    requestId: 'req-2',
+    status: 'complete',
+    axes: [committeeAxisFixture],
+    cache: null,
+  })
+  assert.equal(shouldContinueEtfCommitteePolling(complete), false)
+
+  const disabled = parseEtfCommitteeResponse({ ok: true, status: 'disabled', axes: [], results: {}, errors: [], pending: [] })
+  assert.equal(disabled.phase, 'disabled')
+
+  const upstreamError = parseEtfCommitteeResponse({ ok: false, error: { code: 'not_an_etf_code', message: 'ETF 코드가 아니에요.' } })
+  assert.equal(upstreamError.phase, 'error')
+  if (upstreamError.phase === 'error') assert.equal(upstreamError.message, 'ETF 코드가 아니에요.')
+
+  const empty = parseEtfCommitteeResponse(null)
+  assert.equal(empty.phase, 'error')
+})
+
+test('parseEtfCommitteeResponse surfaces crawler cache-hit marker as scannedAt', () => {
+  const state = parseEtfCommitteeResponse({
+    ok: true,
+    requestId: 'cached-request',
+    status: 'complete',
+    axes: [committeeAxisFixture],
+    cache: { hit: true, scannedAt: '2026-09-17T09:00:00.000Z' },
+  })
+  assert.equal(state.phase, 'ready')
+  if (state.phase === 'ready') assert.equal(state.scannedAt, '2026-09-17T09:00:00.000Z')
+})
+
+test('parseEtfCommitteeStatusResponse maps committeeAxes from polling or returns null', () => {
+  const state = parseEtfCommitteeStatusResponse({
+    ok: true,
+    requestId: 'req-1',
+    status: 'complete',
+    results: {},
+    errors: [],
+    pending: [],
+    committeeAxes: [committeeAxisFixture],
+  })
+  assert.equal(state?.phase, 'ready')
+  if (state?.phase === 'ready') {
+    assert.equal(state.status, 'complete')
+    assert.equal(state.members.length, 3)
+    assert.equal(state.scannedAt, null)
+  }
+
+  assert.equal(parseEtfCommitteeStatusResponse({ ok: false }), null)
+  assert.equal(parseEtfCommitteeStatusResponse({ ok: true, committeeAxes: [] }), null)
+  assert.equal(parseEtfCommitteeStatusResponse(null), null)
+})
+
+test('buildEtfCommitteeUrl carries code and optional holding context', () => {
+  assert.equal(
+    buildEtfCommitteeUrl('069500', null),
+    '/api/etf/committee?code=069500',
+  )
+  assert.equal(
+    buildEtfCommitteeUrl('069500', { shares: 10, averagePrice: 40000 }),
+    '/api/etf/committee?code=069500&shares=10&averagePrice=40000',
+  )
+})
+
+test('buildEtfCommitteeStatusUrl encodes requestId', () => {
+  assert.equal(
+    buildEtfCommitteeStatusUrl('kr-committee-226490 1'),
+    '/api/etf/committee-status?requestId=kr-committee-226490%201',
+  )
 })

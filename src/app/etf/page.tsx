@@ -14,16 +14,24 @@ import { BackControl, TodayBriefingCard } from '@/components/deepscan-loading-br
 import { SnapshotProvenanceBar } from '@/components/deepscan-inline-results'
 import { financialToneClass, formatNumber, formatSignedPercent } from '@/components/deepscan-loading-utils'
 import styles from '@/components/deepscan-loading-screen.module.css'
+import { EtfAiCommitteeCard } from './etf-ai-committee-card'
+import { EtfResultCardShell } from './etf-result-card-shell'
 import {
+  buildEtfCommitteeStatusUrl,
+  buildEtfCommitteeUrl,
   buildEtfPageBriefingUrl,
   buildEtfPageProfileUrl,
   buildEtfPageState,
   createInitialEtfPageState,
   isNotAnEtfProfileStatus,
   parseEtfBriefingSnapshotResponse,
+  parseEtfCommitteeResponse,
+  parseEtfCommitteeStatusResponse,
   parseEtfProfileCacheInfo,
   parseEtfProfileResponse,
   resolveEtfPageTargetFromWindow,
+  shouldContinueEtfCommitteePolling,
+  type EtfCommitteeState,
   type EtfPageState,
 } from './etf-page-model'
 import type { EtfNoticeReason, EtfViewModel } from '@/lib/etf/etf-view-model'
@@ -41,34 +49,6 @@ const MARKET_LABEL: Record<string, string> = {
 
 function formatShares(shares: number) {
   return `${formatNumber(shares)}주`
-}
-
-function EtfResultCardShell({
-  eyebrow,
-  title,
-  badge,
-  children,
-}: {
-  eyebrow: string
-  title: string
-  badge?: string
-  children: React.ReactNode
-}) {
-  return (
-    <article className='overflow-hidden rounded-[16px] border border-[#E8EAEE] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]'>
-      <div className='flex items-center gap-3 border-b border-[#EFF1F4] px-4 py-4'>
-        <div className='flex size-9 items-center justify-center rounded-[10px] bg-[#0F1419] text-[12px] font-black text-white'>
-          ETF
-        </div>
-        <div className='min-w-0 flex-1'>
-          <div className='mb-[3px] text-[10px] leading-[13px] text-[#97A0AE]'>{eyebrow}</div>
-          <h2 className='text-[15px] font-bold leading-[19px] text-[#0F1419]'>{title}</h2>
-        </div>
-        {badge ? <span className='shrink-0 rounded-[6px] bg-[#EEF0F3] px-2 py-1 text-[10px] font-bold text-[#0F1419]'>{badge}</span> : null}
-      </div>
-      {children}
-    </article>
-  )
 }
 
 function EtfProductCard({ vm }: { vm: EtfViewModel }) {
@@ -307,11 +287,15 @@ function EtfReadyBody({
   briefing,
   sharesText,
   market,
+  committee,
+  onCommitteeRetry,
 }: {
   vm: EtfViewModel
   briefing: LoadingBriefingSnapshot
   sharesText: string | null
   market: 'kospi' | 'kosdaq' | 'us'
+  committee: EtfCommitteeState
+  onCommitteeRetry: () => void
 }) {
   const quote = briefing.quote
   const changePct = quote?.changePct ?? null
@@ -349,6 +333,9 @@ function EtfReadyBody({
 
         {/* 이슈 #270 — 목표가(52주 위치) 자리를 구성 종목 통합 카드로 교체 */}
         <EtfHoldingsSummaryCard vm={vm} />
+
+        {/* 국내 ETF만 — 시장·차트 팀 AI 위원 3명 분석 */}
+        <EtfAiCommitteeCard committee={committee} onRetry={onCommitteeRetry} />
 
         <EtfReturnsCard vm={vm} />
         <EtfRiskCard vm={vm} />
@@ -471,6 +458,77 @@ export default function EtfPage() {
   const quote = briefing?.quote ?? null
   const changePct = quote?.changePct ?? null
 
+  // AI 위원회(국내 ETF 전용) — 프로필 로드와 무관하게 비차단으로 띄운다.
+  const [committee, setCommittee] = useState<EtfCommitteeState>({ phase: 'idle' })
+  const [committeeRetryCount, setCommitteeRetryCount] = useState(0)
+  const handleCommitteeRetry = useCallback(() => {
+    setCommitteeRetryCount((count) => count + 1)
+  }, [])
+
+  const committeeCode = ready && ready.market !== 'us' ? vm?.header.code ?? null : null
+  const committeeHolding = committeeCode ? ready?.holding ?? null : null
+
+  useEffect(() => {
+    if (!committeeCode) {
+      setCommittee({ phase: 'idle' })
+      return
+    }
+
+    let stopped = false
+    let pollTimer: ReturnType<typeof setTimeout> | null = null
+    let pollCount = 0
+    const giveUp = 'AI 위원회 분석을 가져오지 못했어요. 잠시 후 다시 시도해주세요.'
+
+    setCommittee({ phase: 'loading' })
+
+    // partial 셸은 requestId로 완성될 때까지 4초 간격 폴링(딥스캔 위원회 패턴).
+    const poll = (requestId: string) => {
+      if (stopped || pollCount >= 20) return
+      pollCount += 1
+      pollTimer = setTimeout(() => {
+        void (async () => {
+          try {
+            const response = await fetch(buildEtfCommitteeStatusUrl(requestId), { cache: 'no-store' })
+            const body = await response.json().catch(() => null)
+            if (stopped) return
+            const next = parseEtfCommitteeStatusResponse(body)
+            if (next) {
+              setCommittee(next)
+              if (shouldContinueEtfCommitteePolling(next)) poll(requestId)
+            } else {
+              setCommittee({ phase: 'error', message: giveUp })
+            }
+          } catch {
+            if (!stopped) setCommittee({ phase: 'error', message: giveUp })
+          }
+        })()
+      }, 4000)
+    }
+
+    void (async () => {
+      try {
+        const response = await fetch(
+          buildEtfCommitteeUrl(committeeCode, committeeHolding),
+          { cache: 'no-store' },
+        )
+        const body = await response.json().catch(() => null)
+        if (stopped) return
+        const next = parseEtfCommitteeResponse(body)
+        setCommittee(next)
+        if (shouldContinueEtfCommitteePolling(next) && next.phase === 'ready' && next.requestId) {
+          poll(next.requestId)
+        }
+      } catch {
+        if (!stopped) setCommittee({ phase: 'error', message: giveUp })
+      }
+    })()
+
+    return () => {
+      stopped = true
+      if (pollTimer) clearTimeout(pollTimer)
+    }
+  }, [committeeCode, committeeHolding, committeeRetryCount])
+
   const headerName = vm?.header.name ?? 'ETF 분석'
   const headerTargetLine = vm
     ? [
@@ -552,6 +610,8 @@ export default function EtfPage() {
                 briefing={ready.briefing}
                 sharesText={ready.holding ? formatShares(ready.holding.shares) : null}
                 market={ready.market}
+                committee={committee}
+                onCommitteeRetry={handleCommitteeRetry}
               />
             </>
           ) : null}

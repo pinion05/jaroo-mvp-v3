@@ -594,6 +594,7 @@ function createCommitteeProgressSnapshot(job) {
     results: { ...job.results },
     errors: job.errors.map((error) => ({ ...error })),
     pending,
+    memberKeys: [...job.memberKeys],
     completed: Object.keys(job.results).length,
     updatedAt: job.updatedAt,
     softDeadlineMs: job.softDeadlineMs,

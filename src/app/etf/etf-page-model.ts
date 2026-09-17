@@ -179,3 +179,132 @@ export function resolveEtfPageTargetFromWindow(): EtfPageTarget {
     readSession: () => buildEtfSessionFromDeepScanSnapshot(resolveDeepScanTargetSession()),
   })
 }
+
+// ─── AI 위원회(시장·차트 팀) — 국내 ETF 전용 ───────────────────────────────────
+// 크롤러 etf-market-committee 응답/진행 폴링을 카드 뷰 상태로 정규화한다.
+// ETF엔 PER 등 주식형 근거가 없어 시장 타이밍 축 3명(트렌드·시장 신호·가격 위치)만 분석한다.
+
+export type EtfCommitteeMemberView = {
+  memberKey: string
+  title: string
+  status: 'success' | 'pending' | 'error'
+  score: number | null
+  scoreLabel: string
+  reason: string | null
+}
+
+export type EtfCommitteeState =
+  | { phase: 'idle' }
+  | { phase: 'loading' }
+  | {
+      phase: 'ready'
+      axisLabel: string
+      axisStatusText: string
+      members: EtfCommitteeMemberView[]
+      requestId: string | null
+      status: string
+      scannedAt: string | null
+    }
+  | { phase: 'error'; message: string }
+  | { phase: 'disabled'; message: string }
+
+const ETF_COMMITTEE_FALLBACK_ERROR = 'AI 위원회 분석을 가져오지 못했어요. 잠시 후 다시 시도해주세요.'
+
+function parseEtfCommitteeMember(value: unknown): EtfCommitteeMemberView | null {
+  if (!value || typeof value !== 'object') return null
+  const member = value as Record<string, unknown>
+  if (typeof member.title !== 'string' || !member.title) return null
+  const status = member.status === 'success' || member.status === 'pending' ? member.status : 'error'
+  return {
+    memberKey: typeof member.memberKey === 'string' ? member.memberKey : '',
+    title: member.title,
+    status,
+    score: typeof member.score === 'number' && Number.isFinite(member.score) ? member.score : null,
+    scoreLabel: typeof member.scoreLabel === 'string' && member.scoreLabel ? member.scoreLabel : 'N/A',
+    reason: typeof member.reason === 'string' && member.reason.trim() ? member.reason : null,
+  }
+}
+
+function parseEtfCommitteeAxes(
+  axes: unknown,
+): { axisLabel: string; axisStatusText: string; members: EtfCommitteeMemberView[] } | null {
+  if (!Array.isArray(axes) || axes.length === 0) return null
+  const axis = axes[0]
+  if (!axis || typeof axis !== 'object') return null
+  const record = axis as Record<string, unknown>
+  const members = (Array.isArray(record.members) ? record.members : [])
+    .map(parseEtfCommitteeMember)
+    .filter((member): member is EtfCommitteeMemberView => member !== null)
+  if (members.length === 0) return null
+  return {
+    axisLabel: typeof record.label === 'string' && record.label ? record.label : '시장·차트 팀',
+    axisStatusText: typeof record.axisStatusText === 'string' ? record.axisStatusText : '',
+    members,
+  }
+}
+
+function readEtfCommitteeCacheMarker(body: Record<string, unknown>): string | null {
+  const cache = body.cache
+  if (!cache || typeof cache !== 'object' || (cache as { hit?: unknown }).hit !== true) return null
+  const scannedAt = (cache as { scannedAt?: unknown }).scannedAt
+  return typeof scannedAt === 'string' && scannedAt ? scannedAt : null
+}
+
+/** 최초 /api/etf/committee 응답 → 카드 상태. ok:false·disabled·빈 축을 각각 안내 상태로 내린다. */
+export function parseEtfCommitteeResponse(body: unknown): EtfCommitteeState {
+  const record = body as Record<string, unknown> | null
+  if (!record || typeof record !== 'object') {
+    return { phase: 'error', message: ETF_COMMITTEE_FALLBACK_ERROR }
+  }
+  if (record.ok !== true) {
+    const message = (record.error as { message?: unknown } | null | undefined)?.message
+    return { phase: 'error', message: typeof message === 'string' && message ? message : ETF_COMMITTEE_FALLBACK_ERROR }
+  }
+  if (record.status === 'disabled') {
+    return { phase: 'disabled', message: 'AI 위원회가 준비 중이에요. 잠시 후 다시 시도해주세요.' }
+  }
+  const axes = parseEtfCommitteeAxes(record.axes)
+  if (!axes) {
+    return { phase: 'error', message: ETF_COMMITTEE_FALLBACK_ERROR }
+  }
+  return {
+    phase: 'ready',
+    ...axes,
+    requestId: typeof record.requestId === 'string' && record.requestId ? record.requestId : null,
+    status: typeof record.status === 'string' ? record.status : 'unknown',
+    scannedAt: readEtfCommitteeCacheMarker(record),
+  }
+}
+
+/** /api/etf/committee-status 폴링 응답 → 카드 상태. 파싱 실패는 null(이전 상태 유지). */
+export function parseEtfCommitteeStatusResponse(body: unknown): EtfCommitteeState | null {
+  const record = body as Record<string, unknown> | null
+  if (!record || typeof record !== 'object' || record.ok !== true) return null
+  const axes = parseEtfCommitteeAxes(record.committeeAxes)
+  if (!axes) return null
+  return {
+    phase: 'ready',
+    ...axes,
+    requestId: typeof record.requestId === 'string' && record.requestId ? record.requestId : null,
+    status: typeof record.status === 'string' ? record.status : 'unknown',
+    scannedAt: null,
+  }
+}
+
+/** partial 셸은 requestId로 완성될 때까지 폴링한다. */
+export function shouldContinueEtfCommitteePolling(state: EtfCommitteeState): boolean {
+  return state.phase === 'ready' && state.status === 'partial' && Boolean(state.requestId)
+}
+
+export function buildEtfCommitteeUrl(code: string, holding: { shares: number; averagePrice: number } | null): string {
+  const params = new URLSearchParams({ code })
+  if (holding) {
+    params.set('shares', String(holding.shares))
+    params.set('averagePrice', String(holding.averagePrice))
+  }
+  return `/api/etf/committee?${params.toString()}`
+}
+
+export function buildEtfCommitteeStatusUrl(requestId: string): string {
+  return `/api/etf/committee-status?requestId=${encodeURIComponent(requestId)}`
+}

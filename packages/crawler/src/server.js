@@ -7,7 +7,7 @@ import {
   WISEREPORT_KR_V12_PAGES,
   buildDeepScanKrEvidencePacket,
   buildJarooDeepScanPayload,
-  crawlWiseReportGlobal,
+  buildEtfMarketCommitteeSnapshot,  crawlWiseReportGlobal,
   crawlWiseReportGlobalDomainData,
   crawlWiseReportKrPage,
   crawlMarketData,
@@ -3114,7 +3114,9 @@ const endpointDefinitions = [
         return { ok: true, requestId, status: 'not_found', results: {}, errors: [], pending: [] };
       }
 
-      const committeeAxes = buildKrCommitteeAxesFromLlmResults(null, progress.results, progress.errors, progress.pending).axes;
+      const committeeAxes = buildKrCommitteeAxesFromLlmResults(null, progress.results, progress.errors, progress.pending, {
+        memberKeys: progress.memberKeys,
+      }).axes;
 
       return {
         ok: true,
@@ -3179,6 +3181,41 @@ const endpointDefinitions = [
         }
         throw error;
       }
+    },
+  },
+  {
+    id: 'etf-market-committee',
+    resource: 'etf.committee.market',
+    description: '/etf 페이지 AI 위원회 — 시장 타이밍 축 위원(트렌드·시장 신호·가격 위치)만 LLM 분석합니다.',
+    primaryPath: buildDataSourcePath('deepscan', '/kr/etf/:code/committee'),
+    dataSources: ['openrouter', 'wisereport', 'naver-finance', 'opendart'],
+    params: ['code'],
+    query: ['shares(optional)', 'averagePrice(optional)', 'crawlerCacheBypass(optional, 1)'],
+    rawSuccess: true,
+    count: (data) => Array.isArray(data?.axes) ? data.axes.reduce((sum, axis) => sum + (Array.isArray(axis?.members) ? axis.members.length : 0), 0) : 0,
+    handler: async (req) => {
+      const code = parseSingleQueryValue(req.params.code) ?? '';
+      const shares = parseSingleQueryValue(req.query.shares);
+      const averagePrice = parseSingleQueryValue(req.query.averagePrice);
+      const hasHolding = Boolean(shares) || Boolean(averagePrice);
+      const snapshot = await buildEtfMarketCommitteeSnapshot({
+        instrument: {
+          code,
+          market: 'ETF',
+          kind: 'etf',
+        },
+        ...(hasHolding ? { holding: { ...(shares ? { shares } : {}), ...(averagePrice ? { averagePrice } : {}) } } : {}),
+        sourceContext: { from: 'system' },
+        ...(parseSingleQueryValue(req.query.crawlerCacheBypass) === '1'
+          ? { crawlerCache: { bypassCache: true } }
+          : {}),
+      });
+
+      if (snapshot.ok === false && (snapshot.error?.code === 'not_an_etf_code' || snapshot.error?.code === 'input-invalid')) {
+        throw new HttpError(400, snapshot.error.code, { message: snapshot.error.message });
+      }
+
+      return snapshot;
     },
   },
   {

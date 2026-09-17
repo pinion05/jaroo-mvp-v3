@@ -88,6 +88,15 @@ export const KR_MEMBER_SPECS = Object.freeze({
   },
 });
 
+// 시장 타이밍 축 위원만 실행하는 서브셋 — /etf 페이지 AI 위원회(펀더멘털 위원 제외)용.
+export const KR_MARKET_TIMING_MEMBER_KEYS = Object.freeze(['trend', 'consensusMomentum', 'priceLocation']);
+
+// 요청된 멤버 키 필터 — 스펙에 없는 키는 무시하고, 유효한 키가 하나도 없으면 전체(9명)를 돌린다.
+function resolveRequestedCommitteeMemberKeys(requested) {
+  const valid = (Array.isArray(requested) ? requested : []).filter((memberKey) => KR_MEMBER_SPECS[memberKey]);
+  return valid.length > 0 ? valid : Object.keys(KR_MEMBER_SPECS);
+}
+
 const KR_EXCHANGE_PRODUCT_MARKETS = new Set(['ETF', 'ETN']);
 
 const ETF_MEMBER_PRESENTATION_SPECS = Object.freeze({
@@ -1028,11 +1037,11 @@ export function getDeepScanKrCommitteeProgress(requestId) {
   return getCommitteeProgress(requestId);
 }
 
-export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources) {
+export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources, options = {}) {
   const requestId = `kr-committee-${input.instrument.code ?? input.instrument.name ?? randomUUID()}-${Date.now()}`;
   const shared = buildSharedDump(input, evidence, sources);
   const factBank = buildKrFactBank(evidence);
-  const memberKeys = Object.keys(KR_MEMBER_SPECS);
+  const memberKeys = resolveRequestedCommitteeMemberKeys(options.memberKeys);
   const members = Object.fromEntries(memberKeys.map((memberKey) => [memberKey, buildMemberDump(memberKey, input, evidence, sources)]));
   const logDir = join(process.cwd(), '.omx', 'context', 'committee-debug-logs', requestId);
   const debugSources = sources?.disclosures
@@ -1064,13 +1073,19 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
       results: {},
       errors: [{ member: 'all', error: 'OPENROUTER_API_KEY is not configured.' }],
       pending: [],
+      memberKeys,
       status: 'disabled',
       completed: 0,
       softDeadlineMs: 0,
     };
   }
 
-  const softDeadlineMs = parsePositiveInteger(process.env.DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS ?? process.env.DEEPSCAN_LLM_SOFT_DEADLINE_MS, DEFAULT_KR_LLM_SOFT_DEADLINE_MS);
+  const softDeadlineMs = parsePositiveInteger(
+    options.softDeadlineMs
+      ?? process.env.DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS
+      ?? process.env.DEEPSCAN_LLM_SOFT_DEADLINE_MS,
+    DEFAULT_KR_LLM_SOFT_DEADLINE_MS,
+  );
   const { results, errors, pending, status, completed } = await scoreCommitteeMembersProgressive({
     memberKeys,
     shared,
@@ -1105,6 +1120,7 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
       shared,
       members,
     },
+    memberKeys,
     results,
     errors,
     pending,
@@ -1204,46 +1220,53 @@ function axisSubtitle(axisKey, hasErrors, hasPending, evidence) {
       : '덤프 기반 KR 포지션 적합도 점수';
 }
 
-export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErrors = [], llmPending = []) {
+export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErrors = [], llmPending = [], options = {}) {
   const byAxis = {
     businessQuality: ['profitability', 'valuation', 'ownershipStability'],
     marketTiming: ['trend', 'consensusMomentum', 'priceLocation'],
     positionFit: ['avgPriceGap', 'upsideBuffer', 'holdingCompleteness'],
   };
   const allMemberKeys = Object.values(byAxis).flat();
+  const requestedMemberKeys = resolveRequestedCommitteeMemberKeys(options.memberKeys);
+  const requestedSet = new Set(requestedMemberKeys);
+  const isSubsetRun = requestedMemberKeys.length !== allMemberKeys.length;
+  // 서브셋 실행(예: /etf 시장·차트 팀)에서는 요청한 축·위원만 노출한다.
+  const activeAxes = Object.entries(byAxis)
+    .map(([axisKey, axisMemberKeys]) => [axisKey, axisMemberKeys.filter((memberKey) => requestedSet.has(memberKey))])
+    .filter(([, axisMemberKeys]) => axisMemberKeys.length > 0);
   const errorsByMember = normalizeLlmMemberErrors(llmErrors, allMemberKeys);
 
-  const businessAxis = rollupAxis('businessQuality', byAxis.businessQuality, llmResults, errorsByMember, llmPending);
-  const marketAxis = rollupAxis('marketTiming', byAxis.marketTiming, llmResults, errorsByMember, llmPending);
-  const positionAxis = rollupAxis('positionFit', byAxis.positionFit, llmResults, errorsByMember, llmPending);
+  const rolledAxes = activeAxes.map(([axisKey, axisMemberKeys]) => ({
+    axis: rollupAxis(axisKey, axisMemberKeys, llmResults, errorsByMember, llmPending),
+    axisMemberKeys,
+  }));
 
-  const axes = [businessAxis, marketAxis, positionAxis]
-    .map((axis) => ({
+  const axes = rolledAxes.map(({ axis, axisMemberKeys }) => ({
       label: axisLabel(axis.axisKey, evidence),
       score: axis.score,
       scoreText: axis.score === null ? 'N/A' : `${axis.score} / 100`,
       axisStatusText: axis.hasErrors
-        ? `LLM ${axis.validMembers.length}/3 · 오류 ${axis.errorMembers.length}/3`
+        ? `LLM ${axis.validMembers.length}/${axisMemberKeys.length} · 오류 ${axis.errorMembers.length}/${axisMemberKeys.length}`
         : axis.hasPending
           ? axis.validMembers.length === 0
             ? `LLM 위원 응답 대기 중 · ${axis.pendingMembers.length}명 고민중`
-            : `LLM 위원 ${axis.validMembers.length}/3명 반영 · ${axis.pendingMembers.length}명 고민중`
-          : 'LLM 위원 3/3명 반영',
+            : `LLM 위원 ${axis.validMembers.length}/${axisMemberKeys.length}명 반영 · ${axis.pendingMembers.length}명 고민중`
+          : `LLM 위원 ${axisMemberKeys.length}/${axisMemberKeys.length}명 반영`,
       subtitle: axisSubtitle(axis.axisKey, axis.hasErrors, axis.hasPending, evidence),
       avgLabel: axis.score === null ? '위원 평균 N/A' : `위원 평균 ${axis.score}`,
-      members: byAxis[axis.axisKey].map((memberKey) => (
+      members: axisMemberKeys.map((memberKey) => (
         llmResults[memberKey]
           ? buildSuccessMember(memberKey, llmResults[memberKey], evidence)
           : axis.pendingMembers.includes(memberKey)
             ? buildPendingMember(memberKey, evidence)
             : buildErrorMember(memberKey, errorsByMember[memberKey], evidence)
       )),
-    }));
+  }));
 
-  const hasMemberErrors = [businessAxis, marketAxis, positionAxis].some((axis) => axis.hasErrors);
-  const hasPendingMembers = [businessAxis, marketAxis, positionAxis].some((axis) => axis.hasPending);
-  const committeeScores = hasMemberErrors
-    || hasPendingMembers
+  const hasMemberErrors = rolledAxes.some(({ axis }) => axis.hasErrors);
+  const hasPendingMembers = rolledAxes.some(({ axis }) => axis.hasPending);
+  // 서브셋 실행은 미요청 위원이 0점 기본값으로 섞이므로 종합 점수를 계산하지 않는다.
+  const committeeScores = isSubsetRun || hasMemberErrors || hasPendingMembers
     ? null
     : buildKrCommitteeFromMemberScores(Object.fromEntries(Object.entries(llmResults).map(([key, value]) => [key, value.score])));
   return {
@@ -1251,10 +1274,6 @@ export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErro
     committeeScores,
     hasMemberErrors,
     hasPendingMembers,
-    coverage: {
-      businessQuality: businessAxis,
-      marketTiming: marketAxis,
-      positionFit: positionAxis,
-    },
+    coverage: Object.fromEntries(rolledAxes.map(({ axis }) => [axis.axisKey, axis])),
   };
 }

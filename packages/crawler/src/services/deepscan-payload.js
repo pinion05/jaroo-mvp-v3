@@ -15,12 +15,16 @@ import { scoreDeepScanKrEvidence, scoreDeepScanKrFromCommittee } from './deepsca
 import { invokeDeepScanKrPackage } from './deepscan-kr-package-adapter.js';
 import {
   buildKrCommitteeAxesFromLlmResults,
+  KR_MARKET_TIMING_MEMBER_KEYS,
   scoreDeepScanKrCommitteeFromDump,
 } from './deepscan-kr-committee-runtime.js';
 import {
+  buildCrawlerCacheIdentity,
+  buildCrawlerCachePayloadEntry,
   getDefaultCrawlerCacheFreshTtlMs,
   getDefaultCrawlerCacheStaleTtlMs,
   getDefaultSupabaseCrawlerCacheClient,
+  isCacheRowFresh,
   normalizeCrawlerCacheToggle,
   readThroughCrawlerCache,
 } from './supabase-crawler-cache.js';
@@ -2642,6 +2646,137 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
   } catch {
     return createInternalErrorPayload(rawInput);
   }
+}
+
+// ─── /etf 페이지 AI 위원회 — 시장 타이밍 축 3명만 실행 ───────────────────────────
+// ETF엔 PER·애널리스트 컨센서스 등 주식형 근거가 없어 펀더멘털 위원은 제외하고
+// 트렌드·시장 신호·가격 위치 3명만 LLM 분석한다(사용자 요청 2026-09-17).
+// 완성(complete) 결과만 캐시에 저장하고, 소프트데드라인에 걸린 셸은
+// requestId로 /kr/committee-status 폴링해 완성한다(딥스캔과 동일 계약).
+const ETF_COMMITTEE_CACHE_ROUTE = 'etf-market-committee';
+const ETF_COMMITTEE_CACHE_ROUTE_VERSION = 'v1';
+const ETF_COMMITTEE_CACHE_SCHEMA_VERSION = 'etf-committee-market-timing-v1';
+const DEFAULT_ETF_COMMITTEE_SOFT_DEADLINE_MS = 25_000;
+
+function buildEtfCommitteeCacheDescriptor(input) {
+  const hasHolding = input.holding?.shares != null && input.holding?.averagePrice != null;
+
+  return {
+    source: 'deepscan',
+    market: 'KR',
+    targetIdentifier: input.instrument.code,
+    targetDisplayName: input.instrument.name,
+    targetKind: 'etf',
+    route: ETF_COMMITTEE_CACHE_ROUTE,
+    routeVersion: ETF_COMMITTEE_CACHE_ROUTE_VERSION,
+    schemaVersion: ETF_COMMITTEE_CACHE_SCHEMA_VERSION,
+    authScope: 'public',
+    request: {
+      code: input.instrument.code,
+      memberKeys: [...KR_MARKET_TIMING_MEMBER_KEYS],
+      // 보유 맥락 유무가 위원 덤프·점수를 바꾼다 — 캐시 키에 반영한다.
+      hasHolding: hasHolding ? '1' : '0',
+    },
+    metadata: {
+      consumer: 'etf-page',
+      crawler: 'deepscan-kr-committee',
+      memberCount: KR_MARKET_TIMING_MEMBER_KEYS.length,
+    },
+    sourceRefs: [],
+  };
+}
+
+function createEtfCommitteeErrorSnapshot(errorCode, message) {
+  return {
+    ok: false,
+    error: { code: errorCode, message },
+    memberKeys: [...KR_MARKET_TIMING_MEMBER_KEYS],
+    requestId: null,
+    status: 'error',
+    axes: [],
+    results: {},
+    errors: [],
+    pending: [],
+    generatedAt: new Date().toISOString(),
+    cache: null,
+  };
+}
+
+export async function buildEtfMarketCommitteeSnapshot(rawInput = {}) {
+  const input = normalizeInput(rawInput);
+  const code = normalizeText(input.instrument.code);
+  if (!code || !/^\d{6}$/.test(code)) {
+    return createEtfCommitteeErrorSnapshot('input-invalid', '한국 상장 ETF(6자리) 코드가 필요해요.');
+  }
+
+  const { sources } = await resolveKrSourceBundle(rawInput, input);
+  const evidence = buildDeepScanKrEvidencePacket(input, sources);
+  if (!isKrExchangeProductEvidence(evidence)) {
+    return createEtfCommitteeErrorSnapshot('not_an_etf_code', 'ETF 코드가 아니에요. 한국 상장 ETF(6자리) 코드를 사용해주세요.');
+  }
+
+  const cacheClient = getCrawlerCacheClientFromRawInput(rawInput);
+  const cacheOptions = getCrawlerCacheOptions(rawInput);
+  const identity = buildCrawlerCacheIdentity(buildEtfCommitteeCacheDescriptor(input));
+
+  if (cacheClient && !cacheOptions.bypassCache && !cacheOptions.forceRefresh) {
+    try {
+      const cachedRow = await cacheClient.readPayload(identity.cacheKey);
+      if (cachedRow && isCacheRowFresh(cachedRow)) {
+        const cached = getRowPayloadLike(cachedRow);
+        if (cached?.ok === true && cached?.status === 'complete') {
+          return {
+            ...cached,
+            cache: { hit: true, scannedAt: normalizeText(cachedRow.created_at ?? cachedRow.createdAt) ?? null },
+          };
+        }
+      }
+    } catch {
+      // 캐시 조회 실패는 정상 실행 경로를 막지 않는다.
+    }
+  }
+
+  const committee = await scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources, {
+    memberKeys: KR_MARKET_TIMING_MEMBER_KEYS,
+    softDeadlineMs: parsePositiveInteger(
+      process.env.DEEPSCAN_ETF_LLM_SOFT_DEADLINE_MS,
+      DEFAULT_ETF_COMMITTEE_SOFT_DEADLINE_MS,
+    ),
+  });
+  const shape = buildKrCommitteeAxesFromLlmResults(evidence, committee.results, committee.errors, committee.pending, {
+    memberKeys: KR_MARKET_TIMING_MEMBER_KEYS,
+  });
+  const snapshot = {
+    ok: true,
+    code,
+    memberKeys: [...KR_MARKET_TIMING_MEMBER_KEYS],
+    requestId: committee.requestId,
+    status: committee.status,
+    axes: shape.axes,
+    results: committee.results,
+    errors: committee.errors,
+    pending: committee.pending,
+    generatedAt: deriveGeneratedAt(input),
+    cache: null,
+  };
+
+  if (cacheClient && snapshot.status === 'complete') {
+    // partial 셸은 캐시하지 않는다 — 폴링 완성분까지 저장하면 무결성이 깨진다.
+    try {
+      await cacheClient.upsertPayload(buildCrawlerCachePayloadEntry(identity, snapshot, {
+        freshTtlMs: cacheOptions.freshTtlMs,
+        staleTtlMs: cacheOptions.staleTtlMs,
+      }));
+    } catch {
+      // 캐시 저장 실패는 응답에 영향 없음
+    }
+  }
+
+  return snapshot;
+}
+
+function getRowPayloadLike(row) {
+  return row && typeof row === 'object' && row.payload && typeof row.payload === 'object' ? row.payload : null;
 }
 
 export {
