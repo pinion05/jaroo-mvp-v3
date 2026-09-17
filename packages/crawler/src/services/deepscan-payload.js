@@ -2260,12 +2260,13 @@ function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, numeric));
 }
 
-function buildNormalizedScenarioProbabilities(heroScore, hasExplicitRisk, riskSignalCount) {
+// 규칙 기반 시나리오 퍼센트 — 통계 확률이 아니라 히어로 점수(primary)와 리스크 신호 수(risk)의 재표현.
+// 100을 채우는 residual 행('근거 유지')은 의미가 없어 2026-09-17 제거했다.
+function buildScenarioProbabilities(heroScore, hasExplicitRisk, riskSignalCount) {
   const primary = Math.round(clampNumber(heroScore, 5, hasExplicitRisk ? 90 : 95));
   if (!hasExplicitRisk) {
     return {
       primary,
-      support: Math.max(0, 100 - primary),
       risk: null,
     };
   }
@@ -2274,7 +2275,6 @@ function buildNormalizedScenarioProbabilities(heroScore, hasExplicitRisk, riskSi
   const risk = Math.min(desiredRisk, Math.max(0, 100 - primary));
   return {
     primary,
-    support: Math.max(0, 100 - primary - risk),
     risk,
   };
 }
@@ -2291,7 +2291,7 @@ function buildStrategy(input, evidence, scored) {
     ...scored.hero.penalties.map((penalty) => `패널티: ${penalty}`),
   ].slice(0, 4);
 
-  const probabilities = buildNormalizedScenarioProbabilities(
+  const probabilities = buildScenarioProbabilities(
     scored.hero.score,
     hasExplicitRisk,
     Math.max(evidence.missingSources.length, evidence.topRisks.length),
@@ -2308,18 +2308,13 @@ function buildStrategy(input, evidence, scored) {
     currentPriceText,
     targetPriceText: resolveTargetPriceText(evidence),
     scenarioDetails: scenarioDetails.length > 0 ? scenarioDetails : ['확보된 근거가 부족합니다.'],
-    otherScenarios: [
-      {
-        label: '근거 유지',
-        probability: `${probabilities.support}%`,
-        condition: evidence.topFacts[0] ?? '핵심 근거를 다시 확보합니다.',
-      },
-      ...(hasExplicitRisk ? [{
-        label: '리스크 재점검',
-        probability: `${probabilities.risk ?? 0}%`,
-        condition: evidence.topRisks[0] ?? '추가 리스크를 다시 확인합니다.',
-      }] : []),
-    ],
+    otherScenarios: hasExplicitRisk
+      ? [{
+          label: '리스크 재점검',
+          probability: `${probabilities.risk ?? 0}%`,
+          condition: evidence.topRisks[0] ?? '추가 리스크를 다시 확인합니다.',
+        }]
+      : [],
     otherScenarioTags: [getDecisionBandLabel(decisionBand), evidence.currentQuote ? '현재가 확인' : '현재가 없음'],
   };
 }

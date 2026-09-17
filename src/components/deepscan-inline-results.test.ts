@@ -53,6 +53,23 @@ test('DeepScanInlineResults falls back when committee and strategy blocks are un
   assert.match(markup, /전략 원천 차단/)
 })
 
+test('DeepScanInlineResults drops the legacy residual thesis-maintenance scenario row from cached payloads', () => {
+  const payload = basePayload()
+  payload.strategy = {
+    ...payload.strategy,
+    otherScenarios: [
+      { label: '근거 유지', probability: '20%', condition: '현재가 1,755,000원 확인' },
+      { label: '리스크 재점검', probability: '20%', condition: '자본변동 공시 2건 확인' },
+    ],
+  }
+  const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
+
+  assert.doesNotMatch(markup, /근거 유지/)
+  assert.doesNotMatch(markup, /현재가 1,755,000원 확인/)
+  assert.match(markup, /리스크 재점검/)
+  assert.match(markup, /자본변동 공시 2건 확인/)
+})
+
 test('DeepScanInlineResults treats non-numeric price fields as unknown instead of zero', () => {
   const payload = basePayload()
   payload.strategy = {

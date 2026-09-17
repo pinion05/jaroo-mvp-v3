@@ -125,7 +125,11 @@ function buildScenarioViews(payload: JarooDeepScanPayload, exchangeProduct = fal
     tone: 'green',
     recommended: true,
   }
-  const others = (payload.strategy?.otherScenarios ?? []).slice(0, 2).map((scenario, index): ScenarioView => ({
+  // '근거 유지'는 100% 채우기 residual이라 2026-09-17 크롤러 생성에서 제거 — 캐시된 옛 페이로드가 들어와도 렌더하지 않는다.
+  const others = (payload.strategy?.otherScenarios ?? [])
+    .filter((scenario) => scenario.label !== '근거 유지')
+    .slice(0, 2)
+    .map((scenario, index): ScenarioView => ({
     label: exchangeProduct ? sanitizeExchangeProductCopy(scenario.label) : scenario.label,
     probability: scenario.probability,
     condition: exchangeProduct ? sanitizeExchangeProductCopy(scenario.condition) : scenario.condition,

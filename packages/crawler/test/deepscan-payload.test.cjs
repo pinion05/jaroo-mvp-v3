@@ -540,7 +540,8 @@ test('buildJarooDeepScanPayload omits risk-recheck scenario when KR coverage and
   assertCanonicalPayloadShape(payload);
   assert.equal(payload.strategy.scenarioCondition, '추가 리스크 없음');
   assert.equal(payload.strategy.otherScenarios.some((scenario) => scenario.label === '리스크 재점검'), false);
-  assert.equal(payload.strategy.otherScenarios.length, 1);
+  assert.equal(payload.strategy.otherScenarios.some((scenario) => scenario.label === '근거 유지'), false);
+  assert.equal(payload.strategy.otherScenarios.length, 0);
 });
 
 test('buildJarooDeepScanPayload separates source-provided missing target price from source lookup failure', async () => {
@@ -1215,7 +1216,7 @@ test('buildJarooDeepScanPayload returns canonical internal-service-error payload
   }
 });
 
-test('buildJarooDeepScanPayload normalizes KR strategy scenario percentages to 100 with risk scenario', async () => {
+test('buildJarooDeepScanPayload keeps only the risk-recheck scenario and drops the residual thesis-maintenance row', async () => {
   const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
 
   const payload = await buildJarooDeepScanPayload({
@@ -1251,12 +1252,16 @@ test('buildJarooDeepScanPayload normalizes KR strategy scenario percentages to 1
     },
   });
 
-  const percentages = [payload.strategy.scenarioProbability, ...payload.strategy.otherScenarios.map((scenario) => scenario.probability)]
-    .map((value) => Number(String(value).replace(/[^0-9.-]/g, '')));
-  assert.equal(percentages.reduce((sum, value) => sum + value, 0), 100);
+  assert.equal(payload.strategy.otherScenarios.length, 1);
+  assert.equal(payload.strategy.otherScenarios[0].label, '리스크 재점검');
+  const primaryPct = Number(String(payload.strategy.scenarioProbability).replace(/[^0-9.-]/g, ''));
+  const riskPct = Number(String(payload.strategy.otherScenarios[0].probability).replace(/[^0-9.-]/g, ''));
+  assert.ok(primaryPct >= 5 && primaryPct <= 90, `primary out of range: ${primaryPct}`);
+  assert.ok(riskPct >= 10 && riskPct <= 30, `risk out of range: ${riskPct}`);
   assert.equal(payload.strategy.targetPriceText, 'NAV·기초지수·구성종목 기준');
 
   const allStrings = collectStrings(payload).join('\n');
+  assert.doesNotMatch(allStrings, /근거 유지/);
   assert.doesNotMatch(allStrings, /목표가 미제공|증권사 목표가|기업 실적|EPS|PER|PBR/);
 });
 
