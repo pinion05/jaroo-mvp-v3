@@ -62,7 +62,7 @@
 |---|---|
 | `src/lib/etf/etf-view-model.ts` | `EtfScenario`·`EtfScenarioBlock`·`buildScenarioBlock` 삭제. `EtfHoldingsBlock`에 `headline: { concentrationPct, concentrationText, topSummaryText }` 추가 — 계산은 순수 함수(예: `buildHoldingsHeadline`). holdings summary 문구 규칙 §3 반영 |
 | `src/app/etf/page.tsx` | `EtfScenarioCard`·`EtfHoldingsCard` 제거 → 통합 카드 1개(가칭 `EtfHoldingsSummaryCard`)를 상품정보 다음에 배치. 시나리오 렌더 분기 제거. 인트로 카피 수정 |
-| `tests/etf-view-model.test.ts` (신규) | 집중도 계산·100 초과 clamp·코멘트 3분기·holdings 부재 폴백·US n<10 케이스. 기존 `run-web-ts-tests` 대상 |
+| `src/lib/etf/etf-view-model.test.ts` (기존 — `src/`·`tests/` 양쪽의 `*.test.ts`를 `run-web-ts-tests`가 수집) | 시나리오 단언 제거·headline 단언으로 교체, 신규 케이스 추가: 집중도 계산·100 초과 clamp·코멘트 3분기·holdings 부재 폴백·US n<10 케이스 |
 
 ## 5. 차트 기반 AI 분석 방향 검토 문서 (별도 산출물)
 
@@ -87,7 +87,7 @@
 
 ## 7. 검증
 
-- `tests/etf-view-model.test.ts` 신규 + `npm run typecheck`
+- 기존 `src/lib/etf/etf-view-model.test.ts` 갱신(신규 headline 케이스 포함) + `npm run typecheck`
 - 실화면 확인: `/etf?code=069500`(KR) · `/etf?symbol=VOO`(US) 스크린샷 — `verify:screens`에 etf suite가 있으면 함께 통과 확인
 - 인수 기준(이슈 #270 기대동작): ① ETF 결과 카드의 목표가 영역이 구성 종목 콘텐츠로 교체되고 카드 톤앤매너·레이아웃 일관성 유지 ② 차트 기반 AI 분석 방향 검토 결과 문서 완성
 
