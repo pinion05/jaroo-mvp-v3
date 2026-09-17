@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
 
-import { buildEtfViewModel, type EtfProfileJson } from './etf-view-model'
+import { buildEtfViewModel, buildHoldingsHeadline, type EtfProfileJson } from './etf-view-model'
 import { computeEtfMetrics } from './etf-metrics'
 
 const profile: EtfProfileJson = {
@@ -203,4 +203,77 @@ test('buildEtfViewModel formats US ETF money as dollars (price·평단·손익·
   assert.equal(vm.hero.profitAmount, '+$2,193')
   assert.ok(vm.hero.stats.some((stat) => stat.label === '순자산' && stat.value === '1.76조 달러'))
   assert.ok(vm.basicInfo.items.some((item) => item.label === 'NAV' && item.value === '$702.62'))
+})
+
+// ── 구성 종목 집중도 헤드라인 (이슈 #270 D3) ──────────────────────
+
+const headlineHoldings = (weights: number[]) =>
+  weights.map((weightPct, index) => ({
+    rank: index + 1,
+    code: `A${index}`,
+    name: `종목${index + 1}`,
+    weightPct,
+    changePct: null,
+  }))
+
+test('buildHoldingsHeadline sums top-10 concentration with 1-decimal rounding and mid-band comment', () => {
+  const headline = buildHoldingsHeadline(
+    [
+      { rank: 1, code: '005930', name: '삼성전자', weightPct: 21.3, changePct: null },
+      { rank: 2, code: '000660', name: 'SK하이닉스', weightPct: 15.2, changePct: null },
+      { rank: 3, code: '005380', name: '현대차', weightPct: 8.1, changePct: null },
+    ],
+    'kospi',
+  )
+  assert.equal(headline.concentrationPct, 44.6)
+  assert.equal(headline.concentrationText, '44.6%')
+  assert.equal(headline.concentrationCaptionText, '상위 3개 집중도')
+  assert.equal(headline.topSummaryText, '1위 삼성전자 21.3% · 2위 SK하이닉스 15.2%')
+  assert.equal(headline.sourceText, '네이버 제공 기준')
+  assert.equal(headline.commentText, '중간 정도로 분산돼 있어요')
+})
+
+test('buildHoldingsHeadline clamps concentration above 100 and marks concentrated portfolios', () => {
+  const concentrated = buildHoldingsHeadline(headlineHoldings([40, 25]), 'kospi')
+  assert.equal(concentrated.concentrationPct, 65)
+  assert.equal(concentrated.commentText, '상위 종목 비중이 높은 편이에요')
+
+  const clamped = buildHoldingsHeadline(headlineHoldings([60, 50]), 'kospi')
+  assert.equal(clamped.concentrationPct, 100)
+  assert.equal(clamped.concentrationText, '100.0%')
+})
+
+test('buildHoldingsHeadline marks even dispersion and counts only the top 10', () => {
+  const dispersed = buildHoldingsHeadline(headlineHoldings([20, 15]), 'kospi')
+  assert.equal(dispersed.concentrationPct, 35)
+  assert.equal(dispersed.commentText, '고르게 분산돼 있어요')
+
+  const twelve = buildHoldingsHeadline(headlineHoldings([6, 6, 6, 6, 6, 6, 6, 6, 6, 6, 30, 30]), 'kospi')
+  assert.equal(twelve.concentrationCaptionText, '상위 10개 집중도')
+  assert.equal(twelve.concentrationPct, 60)
+})
+
+test('buildHoldingsHeadline uses Yahoo source text for US market and summarizes a single holding', () => {
+  const us = buildHoldingsHeadline(headlineHoldings([8.1]), 'us')
+  assert.equal(us.sourceText, 'Yahoo Finance 제공 기준')
+  assert.equal(us.concentrationCaptionText, '상위 1개 집중도')
+  assert.equal(us.topSummaryText, '1위 종목1 8.1%')
+})
+
+test('buildEtfViewModel exposes holdings headline on the topHoldings block', () => {
+  const vm = buildEtfViewModel({
+    profile: {
+      ...profile,
+      holdings: [
+        { rank: 1, code: '005930', name: '삼성전자', weightPct: 32.63, changePct: null },
+        { rank: 2, code: '000660', name: 'SK하이닉스', weightPct: 27.07, changePct: null },
+      ],
+    },
+    quote: { price: 104_275, changePct: 0 },
+    holding: null,
+  })
+  // notice 브랜치 좁히기 — headline은 notice 미블록에만 존재(기존 테스트 관례와 동일)
+  assert.equal(vm.topHoldings.notice, null)
+  assert.equal(vm.topHoldings.headline.concentrationPct, 59.7)
+  assert.equal(vm.topHoldings.headline.topSummaryText, '1위 삼성전자 32.6% · 2위 SK하이닉스 27.1%')
 })

@@ -72,9 +72,52 @@ export type EtfBasicInfoItem = { label: string; value: string }
 export type EtfReturnItem = { label: string; value: string; tone: EtfValueTone }
 export type EtfReturnsBlock = { notice: null; items: EtfReturnItem[] } | EtfNoticeBlock
 
+// 구성 종목 집중도 헤드라인 — 상위 n개 비중 합계와 집중/분산 코멘트(이슈 #270 D3).
+// 요약 캡션은 소수 1자리, 집중도도 소수 1자리로 반올림해 부동소수 오차를 없앤다.
+export type EtfHoldingsHeadline = {
+  concentrationPct: number // 0~100 (반올림 소수 1자리)
+  concentrationText: string // '62.4%'
+  concentrationCaptionText: string // '상위 10개 집중도'
+  topSummaryText: string | null // '1위 삼성전자 21.3% · 2위 SK하이닉스 15.2%' — 0개면 null
+  sourceText: string // '네이버 제공 기준' | 'Yahoo Finance 제공 기준'
+  commentText: string // 집중/분산 코멘트
+}
+
+const HOLDINGS_HEADLINE_LIMIT = 10
+
+export function buildHoldingsHeadline(
+  holdings: NonNullable<EtfProfileJson['holdings']>,
+  market: EtfProfileJson['market'],
+): EtfHoldingsHeadline {
+  const top = holdings.slice(0, HOLDINGS_HEADLINE_LIMIT)
+  const rawSum = top.reduce((sum, holding) => sum + (Number.isFinite(holding.weightPct) ? holding.weightPct : 0), 0)
+  const concentrationPct = Math.round(Math.max(0, Math.min(100, rawSum)) * 10) / 10
+  const commentText =
+    concentrationPct >= 60
+      ? '상위 종목 비중이 높은 편이에요'
+      : concentrationPct <= 40
+        ? '고르게 분산돼 있어요'
+        : '중간 정도로 분산돼 있어요'
+
+  return {
+    concentrationPct,
+    concentrationText: `${concentrationPct.toFixed(1)}%`,
+    concentrationCaptionText: `상위 ${top.length}개 집중도`,
+    topSummaryText:
+      top.length > 0
+        ? top
+            .slice(0, 2)
+            .map((holding, index) => `${index + 1}위 ${holding.name} ${holding.weightPct.toFixed(1)}%`)
+            .join(' · ')
+        : null,
+    sourceText: market === 'us' ? 'Yahoo Finance 제공 기준' : '네이버 제공 기준',
+    commentText,
+  }
+}
+
 export type EtfHoldingItem = { rank: number; code: string; name: string; weightText: string; weightBarPct: number }
 export type EtfHoldingsBlock =
-  | { notice: null; items: EtfHoldingItem[]; summary: string }
+  | { notice: null; items: EtfHoldingItem[]; summary: string; headline: EtfHoldingsHeadline }
   | { notice: EtfNotice; items: null; summary: null }
 
 export type EtfRiskItem = { label: string; value: string; subtitle: string }
@@ -220,6 +263,7 @@ function buildHoldingsBlock(profile: EtfProfileJson): EtfHoldingsBlock {
       weightBarPct: maxWeight > 0 ? Math.round((holding.weightPct / maxWeight) * 100) : 0,
     })),
     summary: `상위 ${top.length}개 종목 · 네이버 제공 기준 · 구성등락률은 소스 준비 중`,
+    headline: buildHoldingsHeadline(top, profile.market),
   }
 }
 
