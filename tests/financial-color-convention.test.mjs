@@ -59,9 +59,11 @@ test('DeepScan 완료 뱃지는 초록 조합, 금융 상승 뱃지는 국내 �
   // globals §7(초록 제거)는 손익 숫자·일반 성공 토큰에만 적용 — 상태 뱃지는 예외로 분리.
   assert.match(deepScanStyles, /\.narrativeTonePositive\s*\{[^}]*--ds-emerald-soft[^}]*--ds-emerald/s)
   assert.match(deepScanStyles, /\.(stepDone|memberDone|badgeDone)\s*\{[^}]*--ds-emerald-soft[^}]*--ds-emerald/s)
-  // 퀵팩트 positive(시세 상승·컨센서스 긍정)는 상승 계열(rise=빨강)로 매핑된다
+  // 퀵팩트 positive(시세 상승)는 상승 계열(rise=빨강)로 매핑된다
   assert.match(deepScanStyles, /\.narrativeToneRise\s*\{[^}]*--ds-rise-soft[^}]*--ds-rise/s)
-  assert.match(deepScanStyles, /\.consensusToneProfit > span\s*\{[^}]*--ds-rise-soft/s)
+  // 목표가 방향 톤은 부호 색 규칙을 따른다 — 높으면 빨강(--ds-red), 낮으면 파랑
+  assert.match(deepScanStyles, /\.consensusToneProfit strong\s*\{[^}]*--ds-red/s)
+  assert.match(deepScanStyles, /\.consensusToneLoss strong\s*\{[^}]*--ds-blue/s)
   // 오해를 부른 기존 토큰(값은 빨강) 정의는 제거돼야 한다(주석 언급은 허용)
   assert.doesNotMatch(deepScanStyles, /--ds-green(-soft)?\s*:/)
 })
