@@ -8,7 +8,6 @@ import type { EtfMetrics } from './etf-metrics'
 
 export type EtfTab = 'overview' | 'holdings' | 'risk'
 export type EtfValueTone = 'danger' | 'positive' | 'neutral'
-export type EtfScenarioTone = 'positive' | 'primary' | 'warning'
 
 export type EtfNoticeReason = 'source-absent' | 'source-pending' | 'planned'
 
@@ -117,22 +116,11 @@ export function buildHoldingsHeadline(
 
 export type EtfHoldingItem = { rank: number; code: string; name: string; weightText: string; weightBarPct: number }
 export type EtfHoldingsBlock =
-  | { notice: null; items: EtfHoldingItem[]; summary: string; headline: EtfHoldingsHeadline }
-  | { notice: EtfNotice; items: null; summary: null }
+  | { notice: null; items: EtfHoldingItem[]; headline: EtfHoldingsHeadline }
+  | EtfNoticeBlock
 
 export type EtfRiskItem = { label: string; value: string; subtitle: string }
 export type EtfRiskBlock = { notice: null; items: EtfRiskItem[] } | EtfNoticeBlock
-
-// 시나리오 블록 = 52주 범위 위치(가중 목표가는 3단계 이관, 스펙 Self-Review 참조)
-export type EtfScenario = {
-  positionPct: number // 0=52주 저점, 100=52주 고점
-  positionText: string // '34%'
-  headline: string // '52주 중간 구간' 등
-  highText: string
-  lowText: string
-  note: string // 애널리스트 목표가 부재 사유(D7) — 카드에 항상 표기
-}
-export type EtfScenarioBlock = { notice: null; scenario: EtfScenario } | EtfNoticeBlock
 
 export type EtfViewModel = {
   header: { name: string; code: string; issuer: string; tracking: string }
@@ -145,7 +133,6 @@ export type EtfViewModel = {
     stats: EtfHeroStat[]
   }
   momentum: { label: string; badge: string }
-  scenario: EtfScenarioBlock
   returns: EtfReturnsBlock
   basicInfo: { items: EtfBasicInfoItem[] }
   sectorWeights: EtfNoticeBlock
@@ -222,33 +209,10 @@ function buildRiskBlock(metrics: EtfMetrics | null | undefined, money: EtfMoneyF
   }
 }
 
-function buildScenarioBlock(price: number, metrics: EtfMetrics | null | undefined, money: EtfMoneyFormatter): EtfScenarioBlock {
-  const week52 = metrics?.week52
-  if (!week52 || !(week52.high > week52.low) || !Number.isFinite(price)) {
-    return noticeBlock('source-pending', '일봉 데이터가 부족해 52주 위치를 계산할 수 있어요')
-  }
-
-  const positionPct = Math.max(0, Math.min(100, ((price - week52.low) / (week52.high - week52.low)) * 100))
-  const rounded = Math.round(positionPct)
-  const headline = rounded >= 80 ? '52주 고점 근처' : rounded <= 20 ? '52주 저점 근처' : '52주 중간 구간'
-
-  return {
-    notice: null,
-    scenario: {
-      positionPct,
-      positionText: `${rounded}%`,
-      headline,
-      highText: money(week52.high),
-      lowText: money(week52.low),
-      note: 'ETF엔 애널리스트 목표가가 없어 52주 범위 위치로 판단해요',
-    },
-  }
-}
-
 function buildHoldingsBlock(profile: EtfProfileJson): EtfHoldingsBlock {
   const holdings = profile.holdings
   if (!holdings || holdings.length === 0) {
-    return { ...noticeBlock('source-pending', '구성종목은 소스 연결 후 보여줘요'), summary: null }
+    return noticeBlock('source-pending', '구성종목은 소스 연결 후 보여줘요')
   }
 
   const top = holdings.slice(0, 10)
@@ -262,7 +226,6 @@ function buildHoldingsBlock(profile: EtfProfileJson): EtfHoldingsBlock {
       weightText: `${holding.weightPct.toFixed(2)}%`,
       weightBarPct: maxWeight > 0 ? Math.round((holding.weightPct / maxWeight) * 100) : 0,
     })),
-    summary: `상위 ${top.length}개 종목 · 네이버 제공 기준 · 구성등락률은 소스 준비 중`,
     headline: buildHoldingsHeadline(top, profile.market),
   }
 }
@@ -320,7 +283,6 @@ export function buildEtfViewModel(input: {
             label: quote.changePct >= 0 ? '최근 거래일 상승 — 순풍' : '최근 거래일 하락 — 역풍',
             badge: quote.changePct >= 0 ? '↗' : '↘',
           },
-    scenario: buildScenarioBlock(quote.price, metrics, money),
     returns: buildReturnsBlock(metrics),
     basicInfo: { items: buildBasicInfoItems(product, money) },
     sectorWeights: noticeBlock('source-pending', '섹터 비중은 구성종목 매핑 준비 중이에요'),

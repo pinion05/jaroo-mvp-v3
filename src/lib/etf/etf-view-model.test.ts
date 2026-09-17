@@ -70,9 +70,7 @@ test('buildEtfViewModel loss formatting uses U+2212 and rounded integers', () =>
 
 test('buildEtfViewModel marks unavailable blocks with explicit reasons', () => {
   const vm = buildEtfViewModel({ profile, quote: { price: 104_275, changePct: 0 }, holding: null })
-  // 일봉 지표 없음(260행 미만) → 시나리오·수익률·리스크는 소스 준비 중 사유
-  assert.equal(vm.scenario.notice?.reason, 'source-pending')
-  assert.match(vm.scenario.notice?.message ?? '', /52주 위치/)
+  // 일봉 지표 없음(260행 미만) → 수익률·리스크는 소스 준비 중 사유
   assert.equal(vm.returns.notice?.reason, 'source-pending')
   assert.equal(vm.riskMetrics.notice?.reason, 'source-pending')
   assert.equal(vm.sectorWeights.notice.reason, 'source-pending')
@@ -81,7 +79,7 @@ test('buildEtfViewModel marks unavailable blocks with explicit reasons', () => {
   assert.equal(vm.dividendInfo.notice.reason, 'planned')
 })
 
-test('buildEtfViewModel fills returns·risk·scenario from metrics and holdings from profile', () => {
+test('buildEtfViewModel fills returns·risk·holdings from metrics and profile', () => {
   const metrics = computeEtfMetrics(
     Array.from({ length: 260 }, (_, index) => ({
       date: `2025-${String((index % 12) + 1).padStart(2, '0')}-15`,
@@ -115,18 +113,14 @@ test('buildEtfViewModel fills returns·risk·scenario from metrics and holdings 
   assert.equal(vm.riskMetrics.items?.length, 4)
   assert.ok(vm.riskMetrics.items?.some((item) => item.label === '샤프지수'))
 
-  // 시나리오 — 52주 위치 + 애널리스트 목표가 부재 사유(D7)
-  assert.equal(vm.scenario.notice, null)
-  assert.ok(vm.scenario.scenario)
-  assert.match(vm.scenario.scenario.positionText, /^\d+%/)
-  assert.match(vm.scenario.scenario.note, /애널리스트 목표가/)
-
-  // 구성 종목 — 상위 10개 + 비중 바
+  // 구성 종목 — 상위 10개 + 비중 바 + 집중도 헤드라인(이슈 #270)
   assert.equal(vm.topHoldings.notice, null)
   assert.equal(vm.topHoldings.items?.length, 2)
   assert.equal(vm.topHoldings.items?.[0].weightText, '32.63%')
   assert.equal(vm.topHoldings.items?.[0].weightBarPct, 100)
-  assert.match(vm.topHoldings.summary ?? '', /네이버/)
+  assert.equal(vm.topHoldings.headline.concentrationText, '59.7%')
+  assert.equal(vm.topHoldings.headline.concentrationCaptionText, '상위 2개 집중도')
+  assert.equal(vm.topHoldings.headline.sourceText, '네이버 제공 기준')
 })
 
 test('buildEtfViewModel without changePct hides change badge and keeps momentum neutral', () => {
@@ -276,4 +270,9 @@ test('buildEtfViewModel exposes holdings headline on the topHoldings block', () 
   assert.equal(vm.topHoldings.notice, null)
   assert.equal(vm.topHoldings.headline.concentrationPct, 59.7)
   assert.equal(vm.topHoldings.headline.topSummaryText, '1위 삼성전자 32.6% · 2위 SK하이닉스 27.1%')
+})
+
+test('buildEtfViewModel no longer exposes the 52-week scenario block (이슈 #270 D4)', () => {
+  const vm = buildEtfViewModel({ profile, quote: { price: 150_000, changePct: 0 }, holding: null })
+  assert.equal('scenario' in vm, false)
 })

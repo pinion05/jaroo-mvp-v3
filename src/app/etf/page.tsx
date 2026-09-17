@@ -26,7 +26,7 @@ import {
   resolveEtfPageTargetFromWindow,
   type EtfPageState,
 } from './etf-page-model'
-import type { EtfNoticeReason, EtfScenario, EtfViewModel } from '@/lib/etf/etf-view-model'
+import type { EtfNoticeReason, EtfViewModel } from '@/lib/etf/etf-view-model'
 import type { LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
 import { cn } from '@/lib/utils'
 
@@ -126,34 +126,52 @@ function EtfNoticeSection({
   return <EtfDataNoticeCard eyebrow={eyebrow} reason={reason} message={message} icon={Icon} />
 }
 
-// 시나리오 카드 — 52주 범위 위치 (가중 목표가 3단계 이관, 스펙 Self-Review)
-function EtfScenarioCard({ scenario, priceText }: { scenario: EtfScenario; priceText: string }) {
+// 구성 종목 통합 카드 — 이슈 #270. 목표가(52주 위치) 자리를 구성 종목 요약+리스트로 교체.
+// 문법은 기존 결과 카드 그대로: 중앙 강조 + 게이지 + 리스트 + 노트.
+function EtfHoldingsSummaryCard({ vm }: { vm: EtfViewModel }) {
+  if (vm.topHoldings.notice || !vm.topHoldings.items) {
+    return (
+      <EtfNoticeSection
+        eyebrow='구성 종목'
+        reason={vm.topHoldings.notice!.reason}
+        message={vm.topHoldings.notice!.message}
+        icon={ListChecks}
+      />
+    )
+  }
+
+  const items = vm.topHoldings.items
+  const headline = vm.topHoldings.headline
   return (
-    <EtfResultCardShell eyebrow='시나리오' title='52주 범위 위치' badge={scenario.headline}>
+    <EtfResultCardShell eyebrow='구성' title='구성 종목' badge={`상위 ${items.length}개`}>
       <div className='px-4 py-5 text-center'>
-        <div className='text-[10px] text-[#97A0AE]'>52주 범위에서</div>
-        <div className='mt-1 text-[28px] font-black leading-none text-[#0F1419]'>{scenario.positionText}</div>
+        <div className='text-[10px] text-[#97A0AE]'>{headline.concentrationCaptionText}</div>
+        <div className='mt-1 text-[28px] font-black leading-none text-[#0F1419]'>{headline.concentrationText}</div>
         <div className='mx-auto mt-3 h-[5px] w-[200px] overflow-hidden rounded-full bg-[#EFF1F4]'>
-          <div className='h-full rounded-full bg-[#E5484D]' style={{ width: `${scenario.positionPct}%` }} />
+          <div className='h-full rounded-full bg-[#2B6BE6]' style={{ width: `${headline.concentrationPct}%` }} />
         </div>
-        <div className='mx-auto mt-1.5 flex w-[200px] justify-between text-[10px] text-[#97A0AE]'>
-          <span>저점 {scenario.lowText}</span>
-          <span>고점 {scenario.highText}</span>
+        {headline.topSummaryText ? <p className='mt-2 text-[12px] text-[#5A6473]'>{headline.topSummaryText}</p> : null}
+      </div>
+      <div className='border-t border-[#EFF1F4] px-4 py-3'>
+        <div className='space-y-3'>
+          {items.map((holding) => (
+            <div key={`${holding.rank}-${holding.code}`}>
+              <div className='mb-1 flex items-center gap-2 text-[13px]'>
+                <span className='size-2 shrink-0 rounded-full bg-[#2B6BE6]' />
+                <span className='min-w-0 truncate font-bold text-[#0F1419]'>{holding.name}</span>
+                <span className='shrink-0 text-[10px] text-[#97A0AE]'>{holding.code}</span>
+                <span className='ml-auto shrink-0 font-bold text-[#5A6473]'>{holding.weightText}</span>
+              </div>
+              <div className='h-[5px] overflow-hidden rounded-full bg-[#EFF1F4]'>
+                <div className='h-full rounded-full bg-[#2B6BE6]' style={{ width: `${holding.weightBarPct}%` }} />
+              </div>
+            </div>
+          ))}
         </div>
       </div>
-      <div className='grid grid-cols-3 border-t border-[#EFF1F4]'>
-        {[
-          ['현재가', priceText],
-          ['52주 최저', scenario.lowText],
-          ['52주 최고', scenario.highText],
-        ].map(([label, value]) => (
-          <div key={label} className='border-r border-[#EFF1F4] px-3 py-3 last:border-r-0'>
-            <div className='text-[10px] text-[#97A0AE]'>{label}</div>
-            <div className='mt-1 text-[13px] font-bold text-[#0F1419]'>{value}</div>
-          </div>
-        ))}
-      </div>
-      <p className='border-t border-[#EFF1F4] px-4 py-3 text-[10px] leading-4 text-[#97A0AE]'>{scenario.note}</p>
+      <p className='border-t border-[#EFF1F4] px-4 py-3 text-[10px] leading-4 text-[#97A0AE]'>
+        {headline.sourceText} · {headline.commentText}
+      </p>
     </EtfResultCardShell>
   )
 }
@@ -180,43 +198,6 @@ function EtfReturnsCard({ vm }: { vm: EtfViewModel }) {
           </div>
         ))}
       </div>
-    </EtfResultCardShell>
-  )
-}
-
-function EtfHoldingsCard({ vm }: { vm: EtfViewModel }) {
-  if (vm.topHoldings.notice || !vm.topHoldings.items) {
-    return (
-      <EtfNoticeSection
-        eyebrow='구성 종목 Top 10'
-        reason={vm.topHoldings.notice!.reason}
-        message={vm.topHoldings.notice!.message}
-        icon={ListChecks}
-      />
-    )
-  }
-
-  const items = vm.topHoldings.items
-  return (
-    <EtfResultCardShell eyebrow='구성' title='구성 종목 Top 10' badge={`상위 ${items.length}개`}>
-      <div className='px-4 py-3'>
-        <div className='space-y-3'>
-          {items.map((holding) => (
-            <div key={`${holding.rank}-${holding.code}`}>
-              <div className='mb-1 flex items-center gap-2 text-[13px]'>
-                <span className='size-2 shrink-0 rounded-full bg-[#2B6BE6]' />
-                <span className='min-w-0 truncate font-bold text-[#0F1419]'>{holding.name}</span>
-                <span className='shrink-0 text-[10px] text-[#97A0AE]'>{holding.code}</span>
-                <span className='ml-auto shrink-0 font-bold text-[#5A6473]'>{holding.weightText}</span>
-              </div>
-              <div className='h-[5px] overflow-hidden rounded-full bg-[#EFF1F4]'>
-                <div className='h-full rounded-full bg-[#2B6BE6]' style={{ width: `${holding.weightBarPct}%` }} />
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <p className='border-t border-[#EFF1F4] px-4 py-3 text-[10px] leading-4 text-[#97A0AE]'>{vm.topHoldings.summary}</p>
     </EtfResultCardShell>
   )
 }
@@ -346,7 +327,7 @@ function EtfReadyBody({
         <h2 className={styles.introTitle}>
           ETF 흐름과 구성을<br />정리해드렸어요
         </h2>
-        <p className={styles.introBody}>오늘 장 기준 시세와 상품 정보를 먼저 보여드려요. 구성·리스크는 소스 연결 후 이어집니다.</p>
+        <p className={styles.introBody}>오늘 장 기준 시세와 상품·구성·리스크를 한 흐름으로 정리해드려요.</p>
       </section>
 
       <TodayBriefingCard
@@ -367,19 +348,10 @@ function EtfReadyBody({
       <div className='mt-3 flex flex-col gap-3'>
         <EtfProductCard vm={vm} />
 
-        {vm.scenario.notice ? (
-          <EtfNoticeSection
-            eyebrow='시나리오 · 52주 위치'
-            reason={vm.scenario.notice.reason}
-            message={vm.scenario.notice.message}
-            icon={Telescope}
-          />
-        ) : (
-          <EtfScenarioCard scenario={vm.scenario.scenario!} priceText={vm.hero.price} />
-        )}
+        {/* 이슈 #270 — 목표가(52주 위치) 자리를 구성 종목 통합 카드로 교체 */}
+        <EtfHoldingsSummaryCard vm={vm} />
 
         <EtfReturnsCard vm={vm} />
-        <EtfHoldingsCard vm={vm} />
         <EtfRiskCard vm={vm} />
 
         <EtfShareCard />
