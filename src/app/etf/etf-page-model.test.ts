@@ -14,6 +14,7 @@ import {
   parseEtfCommitteeStatusResponse,
   parseEtfProfileCacheInfo,
   parseEtfProfileResponse,
+  presentEtfCommitteeMember,
   shouldContinueEtfCommitteePolling,
 } from './etf-page-model'
 import { resolveEtfPageTarget } from '@/lib/etf/etf-target'
@@ -397,4 +398,40 @@ test('buildEtfCommitteeStatusUrl encodes requestId', () => {
     buildEtfCommitteeStatusUrl('kr-committee-226490 1'),
     '/api/etf/committee-status?requestId=kr-committee-226490%201',
   )
+})
+
+test('presentEtfCommitteeMember maps member verdicts to chat card presentations', () => {
+  const success = presentEtfCommitteeMember({
+    memberKey: 'trend',
+    title: '지수/가격 흐름',
+    status: 'success',
+    score: 40,
+    scoreLabel: '40',
+    reason: '단기 조정과 장기 강세가 혼재된 흐름입니다.',
+  })
+  assert.equal(success.statusLabel, '분석 완료')
+  assert.equal(success.statusTone, 'positive')
+  assert.equal(success.scoreTagText, '40점')
+  assert.equal(success.scoreTone, 'warning') // 55 미만
+  assert.equal(success.bubbleText, '단기 조정과 장기 강세가 혼재된 흐름입니다.')
+  assert.equal(success.skeleton, false)
+
+  const neutral = presentEtfCommitteeMember({ memberKey: 'consensusMomentum', title: '시장 신호/정보 밀도', status: 'success', score: 60, scoreLabel: '60', reason: 'r' })
+  assert.equal(neutral.scoreTone, 'neutral')
+  const positive = presentEtfCommitteeMember({ memberKey: 'priceLocation', title: '가격 위치', status: 'success', score: 75, scoreLabel: '75', reason: 'r' })
+  assert.equal(positive.scoreTone, 'positive')
+
+  const pending = presentEtfCommitteeMember({ memberKey: 'trend', title: '지수/가격 흐름', status: 'pending', score: null, scoreLabel: '고민중...', reason: '이 위원은 추가 LLM 응답을 기다리는 중입니다.' })
+  assert.equal(pending.statusLabel, '고민중')
+  assert.equal(pending.statusTone, 'info')
+  assert.equal(pending.scoreTagText, null)
+  assert.equal(pending.skeleton, true)
+  assert.equal(pending.bubbleText, null)
+
+  const error = presentEtfCommitteeMember({ memberKey: 'priceLocation', title: '가격 위치', status: 'error', score: null, scoreLabel: 'Error', reason: null })
+  assert.equal(error.statusLabel, '응답 실패')
+  assert.equal(error.statusTone, 'warning')
+  assert.equal(error.scoreTagText, null)
+  assert.equal(error.skeleton, false)
+  assert.match(error.bubbleText ?? '', /LLM 응답에 실패했어요/)
 })

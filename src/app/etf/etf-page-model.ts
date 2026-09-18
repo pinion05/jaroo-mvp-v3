@@ -308,3 +308,54 @@ export function buildEtfCommitteeUrl(code: string, holding: { shares: number; av
 export function buildEtfCommitteeStatusUrl(requestId: string): string {
   return `/api/etf/committee-status?requestId=${encodeURIComponent(requestId)}`
 }
+
+// 위원 1명의 채팅 카드 표현(딥스캔 narrativeCard 문법) — 상태 라벨/톤·점수 태그·말풍선 텍스트.
+// 렌더 컴포넌트는 CSS 모듈을 물고 있어 직접 테스트할 수 없으니 여기서 순수 계산을 검증한다.
+export type EtfCommitteeMemberPresentation = {
+  statusLabel: '분석 완료' | '고민중' | '응답 실패'
+  statusTone: 'positive' | 'neutral' | 'info' | 'warning'
+  scoreTagText: string | null
+  scoreTone: 'positive' | 'neutral' | 'info' | 'warning' | null
+  bubbleText: string | null
+  skeleton: boolean
+}
+
+export function presentEtfCommitteeMember(member: EtfCommitteeMemberView): EtfCommitteeMemberPresentation {
+  if (member.status === 'success') {
+    const scoreTone = member.score == null
+      ? null
+      : member.score >= 70
+        ? 'positive'
+        : member.score >= 55
+          ? 'neutral'
+          : 'warning'
+    return {
+      statusLabel: '분석 완료',
+      statusTone: 'positive',
+      scoreTagText: member.score == null ? null : `${member.score}점`,
+      scoreTone,
+      bubbleText: member.reason,
+      skeleton: false,
+    }
+  }
+
+  if (member.status === 'pending') {
+    return {
+      statusLabel: '고민중',
+      statusTone: 'info',
+      scoreTagText: null,
+      scoreTone: null,
+      bubbleText: null,
+      skeleton: true,
+    }
+  }
+
+  return {
+    statusLabel: '응답 실패',
+    statusTone: 'warning',
+    scoreTagText: null,
+    scoreTone: null,
+    bubbleText: 'LLM 응답에 실패했어요. 잠시 후 다시 시도해주세요.',
+    skeleton: false,
+  }
+}
