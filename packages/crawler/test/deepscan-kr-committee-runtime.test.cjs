@@ -940,6 +940,27 @@ test('KR committee axes subset exposes only the market-timing axis without compo
   assert.equal(shape.hasPendingMembers, false);
 });
 
+test('KR committee single-member subset scores the axis by plain average, not partial weights', async () => {
+  const {
+    KR_ETF_PAGE_MEMBER_KEYS,
+    buildKrCommitteeAxesFromLlmResults,
+  } = await import('../src/services/deepscan-kr-committee-runtime.js');
+
+  const shape = buildKrCommitteeAxesFromLlmResults({
+    instrument: { code: '226490', name: 'KODEX 코스피', market: 'ETF' },
+  }, {
+    trend: { score: 70, reason: 'ETF 흐름 reason', confidence: 'medium' },
+  }, [], [], { memberKeys: KR_ETF_PAGE_MEMBER_KEYS });
+
+  assert.deepEqual(KR_ETF_PAGE_MEMBER_KEYS, ['trend']);
+  assert.deepEqual(shape.axes.map((axis) => axis.label), ['지수/가격 흐름']);
+  assert.deepEqual(shape.axes[0].members.map((member) => member.memberKey), ['trend']);
+  // 축 전체 위원이 아니므로 가중합(trend×0.4=28)이 아니라 단순 평균 70이어야 한다.
+  assert.equal(shape.axes[0].score, 70);
+  assert.equal(shape.axes[0].axisStatusText, 'LLM 위원 1/1명 반영');
+  assert.equal(shape.committeeScores, null);
+});
+
 test('KR_MEMBER_NUMERIC_OWNERSHIP — 9멤버 모두 소유 도메인을 가지고 tag가 서로 유일하다', async () => {
   const { KR_MEMBER_NUMERIC_OWNERSHIP, KR_MEMBER_SPECS } = await import('../src/services/deepscan-kr-committee-runtime.js');
   const memberKeys = Object.keys(KR_MEMBER_SPECS);

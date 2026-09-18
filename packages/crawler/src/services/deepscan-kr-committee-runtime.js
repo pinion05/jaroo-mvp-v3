@@ -91,6 +91,9 @@ export const KR_MEMBER_SPECS = Object.freeze({
 // 시장 타이밍 축 위원만 실행하는 서브셋 — /etf 페이지 AI 위원회(펀더멘털 위원 제외)용.
 export const KR_MARKET_TIMING_MEMBER_KEYS = Object.freeze(['trend', 'consensusMomentum', 'priceLocation']);
 
+// /etf 페이지가 실제로 노출하는 위원 — 지수/가격 흐름(trend) 1명만 실행한다(2026-09-18 사용자 요청).
+export const KR_ETF_PAGE_MEMBER_KEYS = Object.freeze(['trend']);
+
 // 요청된 멤버 키 필터 — 스펙에 없는 키는 무시하고, 유효한 키가 하나도 없으면 전체(9명)를 돌린다.
 function resolveRequestedCommitteeMemberKeys(requested) {
   const valid = (Array.isArray(requested) ? requested : []).filter((memberKey) => KR_MEMBER_SPECS[memberKey]);
@@ -1009,7 +1012,7 @@ function averageCompletedScore(memberScores) {
   return Math.max(0, Math.min(100, Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)));
 }
 
-function rollupAxis(axisKey, memberKeys, results, errorsByMember, pendingMembers) {
+function rollupAxis(axisKey, memberKeys, results, errorsByMember, pendingMembers, options = {}) {
   const validMembers = memberKeys.filter((memberKey) => results[memberKey]);
   const pendingSet = new Set(Array.isArray(pendingMembers) ? pendingMembers : []);
   const pendingAxisMembers = memberKeys.filter((memberKey) => pendingSet.has(memberKey));
@@ -1018,6 +1021,8 @@ function rollupAxis(axisKey, memberKeys, results, errorsByMember, pendingMembers
   const hasErrors = errorMembers.length > 0;
   const hasPending = pendingAxisMembers.length > 0;
   const isComplete = validMembers.length === memberKeys.length;
+  // 축 전체 위원이 아니면 가중 점수를 계산할 수 없다(미요청 위원이 0점 기본값으로 섞임) — 단순 평균.
+  const scoreWithFullWeights = options.scoreWithFullWeights !== false;
 
   return {
     axisKey,
@@ -1028,7 +1033,11 @@ function rollupAxis(axisKey, memberKeys, results, errorsByMember, pendingMembers
     omitted: false,
     hasErrors,
     hasPending,
-    score: validMembers.length === 0 ? null : isComplete && !hasErrors ? getAxisScore(axisKey, memberScores) : averageCompletedScore(memberScores),
+    score: validMembers.length === 0
+      ? null
+      : isComplete && !hasErrors && scoreWithFullWeights
+        ? getAxisScore(axisKey, memberScores)
+        : averageCompletedScore(memberScores),
     memberScores,
   };
 }
@@ -1237,7 +1246,9 @@ export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErro
   const errorsByMember = normalizeLlmMemberErrors(llmErrors, allMemberKeys);
 
   const rolledAxes = activeAxes.map(([axisKey, axisMemberKeys]) => ({
-    axis: rollupAxis(axisKey, axisMemberKeys, llmResults, errorsByMember, llmPending),
+    axis: rollupAxis(axisKey, axisMemberKeys, llmResults, errorsByMember, llmPending, {
+      scoreWithFullWeights: axisMemberKeys.length === byAxis[axisKey].length,
+    }),
     axisMemberKeys,
   }));
 

@@ -74,7 +74,7 @@ function withEnv(overrides, run) {
   });
 }
 
-test('buildEtfMarketCommitteeSnapshot completes the market-timing subset for ETF sources', async () => {
+test('buildEtfMarketCommitteeSnapshot runs only the ETF page trend member for ETF sources', async () => {
   const { buildEtfMarketCommitteeSnapshot } = await import('../src/services/deepscan-payload.js');
   const capturedMemberKeys = [];
   const restoreFetch = installMockCommitteeLlm(capturedMemberKeys);
@@ -91,18 +91,20 @@ test('buildEtfMarketCommitteeSnapshot completes the market-timing subset for ETF
       assert.equal(snapshot.ok, true);
       assert.equal(snapshot.code, '226490');
       assert.equal(snapshot.status, 'complete');
-      assert.deepEqual(snapshot.memberKeys, ['trend', 'consensusMomentum', 'priceLocation']);
-      assert.deepEqual([...capturedMemberKeys].sort(), ['consensusMomentum', 'priceLocation', 'trend']);
+      assert.deepEqual(snapshot.memberKeys, ['trend']);
+      assert.deepEqual([...capturedMemberKeys], ['trend']);
       assert.ok(snapshot.requestId);
       assert.deepEqual(snapshot.axes.map((axis) => axis.label), ['지수/가격 흐름']);
       assert.deepEqual(
         snapshot.axes[0].members.map((member) => member.title),
-        ['지수/가격 흐름', '시장 신호/정보 밀도', '가격 위치'],
+        ['지수/가격 흐름'],
       );
-      assert.deepEqual(snapshot.axes[0].members.map((member) => member.status), ['success', 'success', 'success']);
+      assert.deepEqual(snapshot.axes[0].members.map((member) => member.status), ['success']);
+      // 단일 위원 축 점수는 가중합(trend×0.4)이 아니라 그 위원 점수 그대로(평균)다.
+      assert.equal(snapshot.axes[0].score, 70);
       assert.equal(snapshot.cache, null);
       const allStrings = JSON.stringify(snapshot);
-      assert.doesNotMatch(allStrings, /사업 품질|내 포지션 적합도|수익성\/기본체력|밸류에이션/);
+      assert.doesNotMatch(allStrings, /사업 품질|내 포지션 적합도|시장 신호|가격 위치 위원|수익성\/기본체력|밸류에이션/);
     });
   } finally {
     restoreFetch();
@@ -229,8 +231,8 @@ test('buildEtfMarketCommitteeSnapshot skips cache writes for soft-deadline parti
       : null;
     const content = typeof userMessage?.content === 'string' ? userMessage.content : '';
     const memberKey = content.match(/"member":"([^"]+)"/)?.[1] ?? 'unknown';
-    // priceLocation만 늦게 응답 — 소프트데드라인(1ms)에 걸려 partial 셸이 반환된다.
-    if (memberKey === 'priceLocation') {
+    // 유일한 위원(trend)이 늦게 응답 — 소프트데드라인(1ms)에 걸려 partial 셸이 반환된다.
+    if (memberKey === 'trend') {
       await new Promise((resolve) => setTimeout(resolve, 80));
     }
 

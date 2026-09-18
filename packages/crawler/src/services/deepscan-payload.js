@@ -15,7 +15,7 @@ import { scoreDeepScanKrEvidence, scoreDeepScanKrFromCommittee } from './deepsca
 import { invokeDeepScanKrPackage } from './deepscan-kr-package-adapter.js';
 import {
   buildKrCommitteeAxesFromLlmResults,
-  KR_MARKET_TIMING_MEMBER_KEYS,
+  KR_ETF_PAGE_MEMBER_KEYS,
   scoreDeepScanKrCommitteeFromDump,
 } from './deepscan-kr-committee-runtime.js';
 import {
@@ -2673,14 +2673,14 @@ function buildEtfCommitteeCacheDescriptor(input) {
     authScope: 'public',
     request: {
       code: input.instrument.code,
-      memberKeys: [...KR_MARKET_TIMING_MEMBER_KEYS],
+      memberKeys: [...KR_ETF_PAGE_MEMBER_KEYS],
       // 보유 맥락 유무가 위원 덤프·점수를 바꾼다 — 캐시 키에 반영한다.
       hasHolding: hasHolding ? '1' : '0',
     },
     metadata: {
       consumer: 'etf-page',
       crawler: 'deepscan-kr-committee',
-      memberCount: KR_MARKET_TIMING_MEMBER_KEYS.length,
+      memberCount: KR_ETF_PAGE_MEMBER_KEYS.length,
     },
     sourceRefs: [],
   };
@@ -2690,7 +2690,7 @@ function createEtfCommitteeErrorSnapshot(errorCode, message) {
   return {
     ok: false,
     error: { code: errorCode, message },
-    memberKeys: [...KR_MARKET_TIMING_MEMBER_KEYS],
+    memberKeys: [...KR_ETF_PAGE_MEMBER_KEYS],
     requestId: null,
     status: 'error',
     axes: [],
@@ -2737,19 +2737,19 @@ export async function buildEtfMarketCommitteeSnapshot(rawInput = {}) {
   }
 
   const committee = await scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources, {
-    memberKeys: KR_MARKET_TIMING_MEMBER_KEYS,
+    memberKeys: KR_ETF_PAGE_MEMBER_KEYS,
     softDeadlineMs: parsePositiveInteger(
       process.env.DEEPSCAN_ETF_LLM_SOFT_DEADLINE_MS,
       DEFAULT_ETF_COMMITTEE_SOFT_DEADLINE_MS,
     ),
   });
   const shape = buildKrCommitteeAxesFromLlmResults(evidence, committee.results, committee.errors, committee.pending, {
-    memberKeys: KR_MARKET_TIMING_MEMBER_KEYS,
+    memberKeys: KR_ETF_PAGE_MEMBER_KEYS,
   });
   const snapshot = {
     ok: true,
     code,
-    memberKeys: [...KR_MARKET_TIMING_MEMBER_KEYS],
+    memberKeys: [...KR_ETF_PAGE_MEMBER_KEYS],
     requestId: committee.requestId,
     status: committee.status,
     axes: shape.axes,

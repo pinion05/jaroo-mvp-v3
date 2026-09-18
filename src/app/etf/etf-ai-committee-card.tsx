@@ -40,7 +40,7 @@ export function EtfAiCommitteeCard({
             </span>
             <div className={styles.narrativeNameWrap}>
               <strong>시장·차트 팀</strong>
-              <span>지수/가격 흐름 · 시장 신호/정보 밀도 · 가격 위치</span>
+              <span>지수/가격 흐름 AI 위원</span>
             </div>
             <span className={cn(styles.narrativeStatus, narrativeToneClass(committee.phase === 'error' ? 'warning' : 'info'))}>
               {committee.phase === 'error' ? '일시 오류' : '준비 중'}
@@ -64,26 +64,25 @@ export function EtfAiCommitteeCard({
 
   return (
     <section className={styles.narrativeStream} style={{ marginBottom: 0 }} aria-label='AI 위원회 시장·차트 팀 의견'>
-      {loading
-        ? [0, 1, 2].map((index) => (
-            <article key={index} className={cn(styles.narrativeCard, styles.narrativeCardPending)}>
-              <div className={styles.narrativeHead}>
-                <span className={cn(styles.narrativeAvatar, styles.narrativeAvatarPending)} aria-hidden='true'>
-                  <Loader2 className={styles.narrativeSpinner} aria-hidden />
-                </span>
-                <div className={styles.narrativeNameWrap}>
-                  <strong><span className={styles.narrativeTitleSkeleton} aria-hidden='true' /></strong>
-                  <span><span className={styles.narrativeDescriptionSkeleton} aria-hidden='true' /></span>
-                </div>
-                <span className={cn(styles.narrativeStatus, narrativeToneClass('info'))}>분석 중</span>
-              </div>
-              <div className={styles.narrativeBubble}>
-                <div className={styles.narrativeTextSkeleton} aria-hidden='true'>
-                  <span />
-                </div>
-              </div>
-            </article>
-          ))
+      {loading ? (
+        <article className={cn(styles.narrativeCard, styles.narrativeCardPending)}>
+          <div className={styles.narrativeHead}>
+            <span className={cn(styles.narrativeAvatar, styles.narrativeAvatarPending)} aria-hidden='true'>
+              <Loader2 className={styles.narrativeSpinner} aria-hidden />
+            </span>
+            <div className={styles.narrativeNameWrap}>
+              <strong><span className={styles.narrativeTitleSkeleton} aria-hidden='true' /></strong>
+              <span><span className={styles.narrativeDescriptionSkeleton} aria-hidden='true' /></span>
+            </div>
+            <span className={cn(styles.narrativeStatus, narrativeToneClass('info'))}>분석 중</span>
+          </div>
+          <div className={styles.narrativeBubble}>
+            <div className={styles.narrativeTextSkeleton} aria-hidden='true'>
+              <span />
+            </div>
+          </div>
+        </article>
+      )
         : members.map((member) => {
             const presentation = presentEtfCommitteeMember(member)
             const Avatar = MEMBER_AVATARS[member.memberKey] ?? TrendingUp
