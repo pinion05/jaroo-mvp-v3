@@ -382,7 +382,7 @@ function buildKrFactBank(evidence) {
     ownership: snapshotValue(evidence.ownershipSnapshot ?? {}, ['kr_ownership']),
     disclosures: evidence.disclosureAnalysis
       ? snapshotValue(summarizeDisclosureAnalysisCompact(evidence.disclosureAnalysis), ['opendart_disclosures'])
-      : missingFact('OpenDART 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
+      : missingFact('최근 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
     styleFactors: snapshotValue(evidence.styleAnalysisSnapshot ?? {}, ['kr_style_factors']),
     reports: snapshotValue({
       recentReportCount: evidence.reportSignals?.recentReportCount ?? null,
@@ -739,7 +739,7 @@ function buildSharedDump(input, evidence, sources) {
     businessCommentary: presentValue(evidence.businessCommentary ?? {}, ['business_commentary']),
     disclosureAnalysis: evidence.disclosureAnalysis
       ? presentValue(summarizeDisclosureAnalysisCompact(evidence.disclosureAnalysis), ['opendart_disclosures'])
-      : missingFact('OpenDART 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
+      : missingFact('최근 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
     etfProductSnapshot: evidence.etfProductSnapshot
       ? presentValue(evidence.etfProductSnapshot, ['wisereport_etf_snapshot'])
       : missingFact('ETF 상품/구성종목 스냅샷이 없습니다.', ['etf_product_snapshot_missing']),

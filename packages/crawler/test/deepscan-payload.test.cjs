@@ -493,14 +493,14 @@ test('buildJarooDeepScanPayload adds OpenDART disclosure analysis to KR DeepScan
 
   assertCanonicalPayloadShape(payload);
   assert.equal(payload.metadata.degraded, false);
-  assert.match(payload.hero.body, /OpenDART 공시 3건/);
+  assert.match(payload.hero.body, /최근 공시 3건/);
   assert.equal(payload.metadata.sourceRefs.some((ref) => ref.id === 'opendart-disclosures:005930'), true);
   assert.equal(payload.insights.summaryTags.includes('공시 3건'), true);
   const eventScannerMember = payload.committee.axes
     .flatMap((axis) => axis.members)
     .find((member) => member.memberKey === 'consensusMomentum');
   assert.equal(eventScannerMember.title, '이벤트 스캐너');
-  assert.match(eventScannerMember.reason, /OpenDART 공시 3건/);
+  assert.match(eventScannerMember.reason, /최근 공시 3건/);
   assert.match(eventScannerMember.reason, /지분공시 2건/);
   assert.deepEqual(
     payload.insights.items.find((item) => item.sourceLabel === '공시 분석'),
@@ -509,7 +509,7 @@ test('buildJarooDeepScanPayload adds OpenDART disclosure analysis to KR DeepScan
       sourceLabel: '공시 분석',
       date: '2026-06-08',
       label: '공시',
-      title: '삼성전자 최근 OpenDART 공시 흐름',
+      title: '삼성전자 최근 공시 흐름',
       body: '2026-05-12~2026-06-12 공시 3건 · 최대주주등소유주식변동신고서 1건 · 지분/주요주주 2건 · 정기보고서 1건 · 주요 리스크 공시 없음',
       sourceBody: [
         '2026-06-08 · 최대주주등소유주식변동신고서 · 제출:삼성전자 · 지분 변동',

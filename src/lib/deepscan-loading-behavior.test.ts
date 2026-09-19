@@ -6,6 +6,7 @@ import {
   isDeepScanBriefingItemContentReady,
   isDeepScanInlineResultsReady,
   isHiddenDeepScanLoadingQuickFact,
+  normalizeDeepScanDisclosureWording,
   parseDeepScanEmphasisSegments,
   shouldAdvanceDeepScanTimeline,
   shouldDisplayDeepScanReadyResults,
@@ -80,4 +81,32 @@ test('팀 요약 **키워드** 강조 파싱 — 쌍만 굵게, 미완성 별표
     parseDeepScanEmphasisSegments('**목표가까지** 여력은 크고 **거래량**은 감소 중이에요.'),
     [{ text: '목표가까지', bold: true }, { text: ' 여력은 크고 ', bold: false }, { text: '거래량', bold: true }, { text: '은 감소 중이에요.', bold: false }],
   )
+})
+
+test('공시 출처 용어 정규화 — 캐시된 옛 payload의 OpenDART 문구 치환(#267)', () => {
+  // 옛 크롤러 생성문(스냅샷·원장 캐시에 남아 있음)
+  assert.equal(
+    normalizeDeepScanDisclosureWording('최근 OpenDART 공시 12건 확인'),
+    '최근 공시 12건 확인',
+  )
+  assert.equal(
+    normalizeDeepScanDisclosureWording('최근 OpenDART 공시 23건 / 지분공시 16건 확인'),
+    '최근 공시 23건 / 지분공시 16건 확인',
+  )
+  assert.equal(normalizeDeepScanDisclosureWording('최근 OpenDART 공시 없음'), '최근 공시 없음')
+  // 접두사 없는 옛 이벤트 스캐너 사유 문구
+  assert.equal(
+    normalizeDeepScanDisclosureWording('OpenDART 공시 3건, 고위험 1건을 확인했습니다.'),
+    '최근 공시 3건, 고위험 1건을 확인했습니다.',
+  )
+  // 옛 인사이트 제목 — '최근'이 이미 있어도 이중 접두사가 생기지 않는다
+  assert.equal(
+    normalizeDeepScanDisclosureWording('삼성전자 최근 OpenDART 공시 흐름'),
+    '삼성전자 최근 공시 흐름',
+  )
+  // 단독 잔여 OpenDART는 제거하고 공백을 정리한다
+  assert.equal(normalizeDeepScanDisclosureWording('OpenDART disclosures unavailable'), 'disclosures unavailable')
+  // OpenDART가 없으면 원문 그대로
+  assert.equal(normalizeDeepScanDisclosureWording('최근 공시 5건 확인'), '최근 공시 5건 확인')
+  assert.equal(normalizeDeepScanDisclosureWording(''), '')
 })

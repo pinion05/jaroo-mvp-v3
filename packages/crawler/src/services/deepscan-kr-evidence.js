@@ -1304,18 +1304,18 @@ function buildDisclosureFact(disclosureAnalysis) {
 
   const count = disclosureAnalysis.count ?? disclosureAnalysis.totalCount ?? 0;
   if (count === 0) {
-    return '최근 OpenDART 공시 없음';
+    return '최근 공시 없음';
   }
 
   if (disclosureAnalysis.riskCount > 0) {
-    return `최근 OpenDART 공시 ${formatNumber(count)}건 / 주요 리스크 ${formatNumber(disclosureAnalysis.riskCount)}건 확인`;
+    return `최근 공시 ${formatNumber(count)}건 / 주요 리스크 ${formatNumber(disclosureAnalysis.riskCount)}건 확인`;
   }
 
   if (disclosureAnalysis.ownershipCount > 0) {
-    return `최근 OpenDART 공시 ${formatNumber(count)}건 / 지분공시 ${formatNumber(disclosureAnalysis.ownershipCount)}건 확인`;
+    return `최근 공시 ${formatNumber(count)}건 / 지분공시 ${formatNumber(disclosureAnalysis.ownershipCount)}건 확인`;
   }
 
-  return `최근 OpenDART 공시 ${formatNumber(count)}건 확인`;
+  return `최근 공시 ${formatNumber(count)}건 확인`;
 }
 
 function buildDisclosureRisk(disclosureAnalysis) {

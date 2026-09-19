@@ -396,7 +396,7 @@ test('buildDeepScanKrEvidencePacket promotes OpenDART disclosures into structure
   assert.deepEqual(packet.topFacts, [
     '현재가 85,200원 확인',
     '보유 12주 / 평단 71,000원 확인',
-    '최근 OpenDART 공시 4건 / 주요 리스크 1건 확인',
+    '최근 공시 4건 / 주요 리스크 1건 확인',
   ]);
   assert.deepEqual(packet.topRisks, [
     '주의 공시 1건: 소송등의제기ㆍ신청',
@@ -446,7 +446,7 @@ test('buildDeepScanKrEvidencePacket uses canonical disclosure analysis without r
   assert.equal(packet.disclosureAnalysis.riskCount, 1);
   assert.deepEqual(packet.disclosureAnalysis.filings.map((entry) => entry.rceptNo), ['selected-risk']);
   assert.equal(packet.reportSignals.disclosureCount, 1);
-  assert.ok(packet.topFacts.includes('최근 OpenDART 공시 1건 / 주요 리스크 1건 확인'));
+  assert.ok(packet.topFacts.includes('최근 공시 1건 / 주요 리스크 1건 확인'));
 });
 
 test('KR disclosure risk keyword database catches sampled delisting disclosure title variants', async () => {

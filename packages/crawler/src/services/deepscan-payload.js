@@ -1586,7 +1586,7 @@ function buildEventScannerReason(evidence) {
   if (disclosureAnalysis?.available) {
     const totalCount = disclosureAnalysis.count ?? disclosureAnalysis.totalCount ?? 0;
     const disclosureParts = [
-      `OpenDART 공시 ${formatNumber(totalCount)}건`,
+      `최근 공시 ${formatNumber(totalCount)}건`,
       disclosureAnalysis.ownershipCount > 0 ? `지분공시 ${formatNumber(disclosureAnalysis.ownershipCount)}건` : null,
       disclosureAnalysis.correctionCount > 0 ? `정정 ${formatNumber(disclosureAnalysis.correctionCount)}건` : null,
       disclosureAnalysis.dilutionCount > 0 ? `자본변동 ${formatNumber(disclosureAnalysis.dilutionCount)}건` : null,
@@ -1596,7 +1596,7 @@ function buildEventScannerReason(evidence) {
     return `${disclosureParts.join(', ')}을 확인했고 최근 리포트 ${formatNumber(reportCount)}건과 함께 이벤트 신호로 반영했습니다.`;
   }
 
-  return `OpenDART 공시 근거는 없고 컨센서스 ${evidence.reportSignals?.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals?.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${formatNumber(reportCount)}건을 이벤트 신호로 반영했습니다.`;
+  return `최근 공시 근거는 없고 컨센서스 ${evidence.reportSignals?.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals?.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${formatNumber(reportCount)}건을 이벤트 신호로 반영했습니다.`;
 }
 
 function createCommitteeAxes(evidence, scored, packageResult) {
@@ -2210,7 +2210,7 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
           sourceLabel: '공시 분석',
           date: disclosureAnalysis.latestReceiptDate ?? dateLabel,
           label: disclosureAnalysis.riskCount > 0 || disclosureAnalysis.correctionCount > 0 || disclosureAnalysis.dilutionCount > 0 ? '공시주의' : '공시',
-          title: `${input.instrument.name} 최근 OpenDART 공시 흐름`,
+          title: `${input.instrument.name} 최근 공시 흐름`,
           body: disclosureInsightBody,
           ...(buildDisclosureInsightSourceBody(disclosureAnalysis) ? { sourceBody: buildDisclosureInsightSourceBody(disclosureAnalysis) } : {}),
         }]

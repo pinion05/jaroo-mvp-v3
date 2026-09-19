@@ -658,7 +658,7 @@ test('KR committee event scanner prompt and member dump prioritize OpenDART disc
       },
       missingSources: [],
       sourceLimitations: [],
-      topFacts: ['최근 OpenDART 공시 23건 / 지분공시 16건 확인'],
+      topFacts: ['최근 공시 23건 / 지분공시 16건 확인'],
       topRisks: ['정정 공시 3건 확인'],
     }, {
       disclosures: {

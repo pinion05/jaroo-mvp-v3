@@ -96,3 +96,25 @@ export function parseDeepScanEmphasisSegments(text: string): DeepScanEmphasisSeg
     .map((part, index) => ({ text: part, bold: index % 2 === 1 }))
     .filter((segment) => segment.text.length > 0)
 }
+
+// ─── 공시 출처 용어 정규화 ──────────────────────────────────────────────────
+
+/**
+ * 'OpenDART'라는 수집 시스템명을 일반 사용자 화면에서 없앤다(#267, 2026-09-19 합의).
+ * 크롤러 생성문은 '최근 공시'로 교체됐지만 캐시된 옛 스냅샷·원장 payload에는
+ * 옛 문구('최근 OpenDART 공시 N건 확인' 등)가 남아 있어 렌더 시 치환한다.
+ * '최근 OpenDART 공시' → '최근 공시' (이중 접두사 방지), 'OpenDART 공시' → '최근 공시',
+ * 남은 단독 'OpenDART'는 공백 정리와 함께 제거한다.
+ */
+export function normalizeDeepScanDisclosureWording(text: string): string {
+  if (!text.includes('OpenDART')) {
+    return text
+  }
+
+  return text
+    .replace(/최근\s*OpenDART\s*공시/gu, '최근 공시')
+    .replace(/OpenDART\s*공시/gu, '최근 공시')
+    .replace(/\s*OpenDART\s*/gu, ' ')
+    .replace(/\s{2,}/gu, ' ')
+    .trim()
+}

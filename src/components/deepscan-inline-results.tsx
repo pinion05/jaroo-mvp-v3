@@ -8,6 +8,7 @@ import type {
   JarooDeepScanStrategyScenario,
 } from '../../packages/contracts/src/deepscan'
 import type { DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
+import { normalizeDeepScanDisclosureWording } from '@/lib/deepscan-loading-behavior'
 import type { DeepScanTargetInput } from '@/lib/workflow-types'
 
 import { cn } from '@/lib/utils'
@@ -193,11 +194,12 @@ export function DeepScanInlineResults({
   const rawSummary = payload.hero.blockState === 'ok'
     ? payload.hero.body
     : payload.hero.fallback?.label || payload.hero.error?.message || `${name} 분석 결과를 일부만 표시하고 있어요.`
-  const summary = exchangeProduct ? sanitizeExchangeProductCopy(rawSummary) : rawSummary
-  // 구조화된 근거(신형 payload) — 없으면 플레인 본문 폴백
+  const summary = normalizeDeepScanDisclosureWording(exchangeProduct ? sanitizeExchangeProductCopy(rawSummary) : rawSummary)
+  // 구조화된 근거(신형 payload) — 없으면 플레인 본문 폴백.
+  // 옛 캐시 payload의 '최근 OpenDART 공시 …' 문구도 렌더 시 '최근 공시'로 치환한다(#267).
   const heroEvidence = Array.isArray(payload.hero.evidenceFacts) && payload.hero.evidenceFacts.length > 0
     ? {
-        facts: payload.hero.evidenceFacts.slice(0, 8),
+        facts: payload.hero.evidenceFacts.slice(0, 8).map(normalizeDeepScanDisclosureWording),
         cautions: (Array.isArray(payload.hero.evidenceCautions) ? payload.hero.evidenceCautions : []).slice(0, 3),
       }
     : null
@@ -205,12 +207,12 @@ export function DeepScanInlineResults({
     ? [
         ['ETF 기준', payload.strategy.targetPriceText || 'NAV·구성 확인'],
         ['가격 위치', payload.strategy.otherScenarioTags?.[1] ?? '확인 중'],
-        ['근거', evidenceCount > 0 ? `${evidenceCount}개` : payload.insights.summaryTags[0] ?? '확인 중'],
+        ['근거', evidenceCount > 0 ? `${evidenceCount}개` : normalizeDeepScanDisclosureWording(payload.insights.summaryTags[0]) ?? '확인 중'],
       ]
     : [
         ['목표가', payload.strategy.targetPriceText || '확인 중'],
         ['상승 여력', upside === null ? '확인 중' : formatPercent(upside)],
-        ['근거', evidenceCount > 0 ? `${evidenceCount}개` : payload.insights.summaryTags[0] ?? '확인 중'],
+        ['근거', evidenceCount > 0 ? `${evidenceCount}개` : normalizeDeepScanDisclosureWording(payload.insights.summaryTags[0]) ?? '확인 중'],
       ]
 
   return (
