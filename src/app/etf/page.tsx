@@ -3,9 +3,12 @@
 import Link from 'next/link'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import {
+  Info,
+  Layers,
   ListChecks,
   ShieldAlert,
   Telescope,
+  TrendingUp,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 
@@ -57,7 +60,7 @@ function EtfProductCard({ vm }: { vm: EtfViewModel }) {
   const headline = vm.header.tracking.replace(' 추종', '') || vm.header.issuer || '상품 정보 확인 중'
 
   return (
-    <EtfResultCardShell eyebrow='상품 정보' title='기본 정보'>
+    <EtfResultCardShell icon={Info} eyebrow='상품 정보' title='기본 정보'>
       <div className='px-4 py-5 text-center'>
         <div className='text-[10px] text-[#97A0AE]'>기준지수</div>
         <div className='mt-1 text-[28px] font-black leading-none text-[#0F1419]'>{headline}</div>
@@ -123,7 +126,7 @@ function EtfHoldingsSummaryCard({ vm }: { vm: EtfViewModel }) {
   const items = vm.topHoldings.items
   const headline = vm.topHoldings.headline
   return (
-    <EtfResultCardShell eyebrow='구성' title='구성 종목' badge={`상위 ${items.length}개`}>
+    <EtfResultCardShell icon={Layers} eyebrow='구성' title='구성 종목' badge={`상위 ${items.length}개`}>
       <div className='px-4 py-5 text-center'>
         <div className='text-[10px] text-[#97A0AE]'>{headline.concentrationCaptionText}</div>
         <div className='mt-1 text-[28px] font-black leading-none text-[#0F1419]'>{headline.concentrationText}</div>
@@ -168,7 +171,7 @@ function EtfReturnsCard({ vm }: { vm: EtfViewModel }) {
   }
 
   return (
-    <EtfResultCardShell eyebrow='수익률' title='기간별 수익률'>
+    <EtfResultCardShell icon={TrendingUp} eyebrow='수익률' title='기간별 수익률'>
       <div className='grid grid-cols-4'>
         {vm.returns.items.map((item, index) => (
           <div key={item.label} className={cn('px-3 py-4', index < vm.returns.items!.length - 1 && 'border-r border-[#EFF1F4]')}>
@@ -195,7 +198,7 @@ function EtfRiskCard({ vm }: { vm: EtfViewModel }) {
 
   const items = vm.riskMetrics.items
   return (
-    <EtfResultCardShell eyebrow='리스크' title='리스크 지표'>
+    <EtfResultCardShell icon={ShieldAlert} eyebrow='리스크' title='리스크 지표'>
       <div className='grid grid-cols-2'>
         {items.map((item, index) => (
           <div

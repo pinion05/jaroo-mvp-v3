@@ -1,12 +1,17 @@
-// /etf 결과 카드 공통 셸 — page.tsx의 카드들이 같은 문법(머리+배지+본문)을 공유한다.
+// /etf 결과 카드 공통 셸 — page.tsx의 카드들이 같은 문법(아이콘+머리+배지+본문)을 공유한다.
+// 아이콘은 카드별 내용을 나타내는 Lucide 글리프 — 같은 'ETF' 글자 사각형이 한 화면에
+// 4번 반복되어 채움물처럼 보이는 문제(2026-09-19 사용자 지적)로 교체했다.
+import type { LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 
 export function EtfResultCardShell({
+  icon: Icon,
   eyebrow,
   title,
   badge,
   children,
 }: {
+  icon: LucideIcon
   eyebrow: string
   title: string
   badge?: string
@@ -15,8 +20,8 @@ export function EtfResultCardShell({
   return (
     <article className='overflow-hidden rounded-[16px] border border-[#E8EAEE] bg-white shadow-[0_1px_3px_rgba(0,0,0,.04)]'>
       <div className='flex items-center gap-3 border-b border-[#EFF1F4] px-4 py-4'>
-        <div className='flex size-9 items-center justify-center rounded-[10px] bg-[#0F1419] text-[12px] font-black text-white'>
-          ETF
+        <div className='flex size-9 items-center justify-center rounded-[10px] bg-[#0F1419] text-white'>
+          <Icon className='size-[18px]' aria-hidden='true' />
         </div>
         <div className='min-w-0 flex-1'>
           <div className='mb-[3px] text-[10px] leading-[13px] text-[#97A0AE]'>{eyebrow}</div>
