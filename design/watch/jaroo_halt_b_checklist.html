@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jaroo — 거래정지 시안 B (체크리스트형)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Pretendard',sans-serif;-webkit-font-smoothing:antialiased}
+:root{--navy:#0F1419;--navy-soft:#EAF0F8;--up:#E5484D;--down:#2B6BE6;--green:#1A9D55;--amber:#E5A23D;--bg:#F5F6F8;--card:#fff;--line:#E8EAEE;--div:#EFF1F4;--t1:#0F1419;--t2:#5A6473;--t3:#97A0AE;--red-soft:#FCEBEB;--red-text:#A32D2D;--amber-soft:#FFF4DC;--amber-text:#854F0B}
+body{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;align-items:flex-start}
+.frame{background:var(--bg);border-radius:16px;width:340px;height:720px;overflow-y:auto;overflow-x:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative}
+.frame::-webkit-scrollbar{display:none}
+.caption{width:340px;text-align:center;font-size:12px;color:#555;margin-top:8px;font-weight:600}
+svg{display:block}
+
+.head{position:sticky;top:0;z-index:10;background:rgba(245,246,248,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;border-bottom:.5px solid var(--line);display:flex;align-items:center;gap:11px}
+.hb{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--t1);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.ht{font-size:15px;font-weight:600;color:var(--t1)}
+.hbadge{font-size:10px;font-weight:700;color:#fff;background:var(--up);border-radius:999px;padding:2px 8px}
+.body{padding:16px 14px 24px}
+
+.card{overflow:hidden;border-radius:16px;border:1px solid var(--line);background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px}
+.card-head{display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--div);padding:14px 16px}
+.ai-sq{display:flex;width:36px;height:36px;align-items:center;justify-content:center;border-radius:10px;background:var(--navy);color:#fff;flex-shrink:0}
+.card-kicker{font-size:10px;color:var(--t3)}
+.card-title{font-size:14px;font-weight:700;color:var(--t1)}
+
+/* 종목 요약 바 */
+.tk{display:flex;align-items:center;gap:10px;padding:14px 16px}
+.tk-badge{font-size:9.5px;font-weight:700;padding:3px 8px;border-radius:6px;background:var(--red-soft);color:var(--red-text);flex-shrink:0}
+.tk-info{flex:1}
+.tk-name{font-size:14.5px;font-weight:800;color:var(--t1)}
+.tk-meta{font-size:10.5px;color:var(--t3);margin-top:2px}
+.tk-right{text-align:right}
+.tk-pnl{font-size:12.5px;font-weight:700;color:var(--up)}
+.tk-sub{font-size:9.5px;color:var(--t3);margin-top:1px}
+
+/* 진행 바 */
+.prog-wrap{padding:0 16px 14px}
+.prog-top{display:flex;justify-content:space-between;font-size:10px;color:var(--t2);margin-bottom:5px}
+.prog-top b{color:var(--red-text)}
+.prog{height:7px;border-radius:999px;background:var(--div);overflow:hidden;display:flex}
+.prog-r{height:100%;background:var(--up)}
+.prog-a{height:100%;background:var(--amber)}
+.prog-g{height:100%;background:#C9D2DE}
+.legend{display:flex;gap:10px;margin-top:6px;font-size:9px;color:var(--t3)}
+.legend i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:3px;vertical-align:-1px}
+
+/* 체크 그룹 */
+.grp-t{display:flex;align-items:center;gap:7px;padding:11px 16px;border-top:1px solid var(--div);font-size:11px;font-weight:800;color:var(--t1);letter-spacing:.01em}
+.grp-t .gtag{font-size:8.5px;font-weight:700;padding:1.5px 6px;border-radius:4px}
+.gtag.high{background:var(--red-soft);color:var(--red-text)}
+.gtag.med{background:var(--amber-soft);color:var(--amber-text)}
+
+.chk{display:flex;gap:10px;padding:10px 16px;border-top:.5px solid var(--div);align-items:flex-start}
+.chk-box{width:18px;height:18px;border-radius:6px;border:1.5px solid #C9D2DE;flex-shrink:0;margin-top:1px;display:flex;align-items:center;justify-content:center}
+.chk-box.ok{background:var(--navy);border-color:var(--navy);color:#fff}
+.chk-box.alert{background:var(--red-soft);border-color:rgba(229,72,77,.4);color:var(--red-text)}
+.chk-t{font-size:12px;font-weight:700;color:var(--t1)}
+.chk-d{font-size:10px;color:var(--t2);margin-top:2px;line-height:1.5}
+.chk-d a{color:var(--down);text-decoration:none;font-weight:600}
+
+/* 공시 미니 카드 */
+.mini{display:flex;gap:10px;padding:11px 16px;border-top:.5px solid var(--div);align-items:center}
+.mini-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.mini-body{flex:1;min-width:0}
+.mini-t{font-size:11.5px;font-weight:700;color:var(--t1);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mini-d{font-size:9.5px;color:var(--t3);margin-top:1.5px}
+.mini-link{font-size:9.5px;color:var(--down);font-weight:700;flex-shrink:0;text-decoration:none}
+
+.cta{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--div)}
+.cta-btn{flex:1;border:none;border-radius:11px;padding:12px;font-size:12px;font-weight:700}
+.cta-btn.dark{background:var(--navy);color:#fff;box-shadow:0 4px 12px rgba(15,20,25,.28)}
+.cta-btn.ghost{background:#fff;color:var(--t2);border:1px solid var(--line)}
+.foot{font-size:9.5px;color:var(--t3);line-height:1.6;text-align:center;padding:2px 8px 0}
+
+/* 정리매매 안내 (B2) */
+.rr{display:flex;gap:12px;padding:14px 16px;align-items:flex-start}
+.rr-ico{width:40px;height:40px;border-radius:12px;background:var(--red-soft);color:var(--red-text);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.rr-t{font-size:13px;font-weight:800;color:var(--red-text)}
+.rr-d{font-size:11px;color:var(--t2);line-height:1.6;margin-top:3px}
+.kv{display:flex;justify-content:space-between;align-items:center;padding:10px 16px;border-top:.5px solid var(--div);font-size:11.5px}
+.kv-l{color:var(--t2)}
+.kv-v{font-weight:700;color:var(--t1);font-variant-numeric:tabular-nums}
+.kv-v.red{color:var(--up)}
+</style>
+</head>
+<body>
+
+<!-- B1: 확인 체크리스트 -->
+<div>
+<div class="frame">
+  <div class="head">
+    <div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></div>
+    <div class="ht">거래정지 체크리스트</div>
+    <div class="hbadge">확인 필요</div>
+  </div>
+  <div class="body">
+    <div class="card">
+      <div class="card-head">
+        <div class="ai-sq" style="background:var(--up)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/><circle cx="12" cy="12" r="10"/></svg></div>
+        <div style="flex:1">
+          <div class="card-kicker">드래곤플라이 · KOSDAQ · 030350</div>
+          <div class="card-title">지금 확인해야 할 것</div>
+        </div>
+      </div>
+      <div class="tk">
+        <span class="tk-badge">거래정지</span>
+        <div class="tk-info">
+          <div class="tk-name">드래곤플라이</div>
+          <div class="tk-meta">500주 · 평단 1,840원 · 마지막 체결 973원</div>
+        </div>
+        <div class="tk-right">
+          <div class="tk-pnl">−47.1%</div>
+          <div class="tk-sub">평가 486,500원</div>
+        </div>
+      </div>
+      <div class="prog-wrap">
+        <div class="prog-top"><span>공시 리스크 분포</span><b>중요 1 · 확인 2 · 일반 1</b></div>
+        <div class="prog"><span class="prog-r" style="width:25%"></span><span class="prog-a" style="width:50%"></span><span class="prog-g" style="width:25%"></span></div>
+        <div class="legend">
+          <span><i style="background:var(--up)"></i>중요 리스크</span>
+          <span><i style="background:var(--amber)"></i>확인 필요</span>
+          <span><i style="background:#C9D2DE"></i>일반·지분</span>
+        </div>
+      </div>
+
+      <div class="grp-t">🚨 지금 확인 <span class="gtag high">중요 리스크</span></div>
+      <div class="chk">
+        <div class="chk-box alert"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>
+        <div>
+          <div class="chk-t">주권매매거래정지 사유 확인</div>
+          <div class="chk-d">거래소공시 09.19 — <a href="#">DART 원문 보기</a></div>
+        </div>
+      </div>
+      <div class="chk">
+        <div class="chk-box"></div>
+        <div>
+          <div class="chk-t">상장폐지 절차 여부</div>
+          <div class="chk-d">최근 공시에 상폐·정리매매 키워드 없음 — 모니터링 계속</div>
+        </div>
+      </div>
+
+      <div class="grp-t">📌 이어서 확인 <span class="gtag med">확인 필요</span></div>
+      <div class="chk">
+        <div class="chk-box"></div>
+        <div>
+          <div class="chk-t">자본변동 공시 1건 확인</div>
+          <div class="chk-d">주요사항보고 09.18 — 감자·상각 등 지분 가치 영향</div>
+        </div>
+      </div>
+      <div class="chk">
+        <div class="chk-box"></div>
+        <div>
+          <div class="chk-t">정정 공시 여부</div>
+          <div class="chk-d">직전 공시의 정정이 있는지 대조</div>
+        </div>
+      </div>
+
+      <div class="grp-t">📄 최근 공시</div>
+      <div class="mini">
+        <span class="mini-dot" style="background:var(--up)"></span>
+        <div class="mini-body"><div class="mini-t">주권매매거래정지</div><div class="mini-d">거래소공시 · 09.19</div></div>
+        <a class="mini-link" href="#">원문</a>
+      </div>
+      <div class="mini">
+        <span class="mini-dot" style="background:var(--amber)"></span>
+        <div class="mini-body"><div class="mini-t">자본잠식 상각 등 자본변동</div><div class="mini-d">주요사항보고 · 09.18</div></div>
+        <a class="mini-link" href="#">원문</a>
+      </div>
+      <div class="mini">
+        <span class="mini-dot" style="background:#C9D2DE"></span>
+        <div class="mini-body"><div class="mini-t">최대주주 등 주식등의 처분계약</div><div class="mini-d">지분공시 · 09.12</div></div>
+        <a class="mini-link" href="#">원문</a>
+      </div>
+
+      <div class="cta">
+        <button class="cta-btn ghost">전체 공시 보기</button>
+        <button class="cta-btn dark">이 종목 워치하기</button>
+      </div>
+    </div>
+    <div class="foot">AI 분석은 데이터 기반 참고 자료예요. 투자 권유나 수익 보장이 아닙니다.</div>
+  </div>
+</div>
+<div class="caption">B1 · 확인 체크리스트 (공시 그룹별)</div>
+</div>
+
+<!-- B2: 정리매매 진입 상태 -->
+<div>
+<div class="frame">
+  <div class="head">
+    <div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></div>
+    <div class="ht">거래정지 종목</div>
+    <div class="hbadge">정리매매</div>
+  </div>
+  <div class="body">
+    <div class="card">
+      <div class="card-head">
+        <div class="ai-sq" style="background:var(--up)"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>
+        <div style="flex:1">
+          <div class="card-kicker">드래곤플라이 · KOSDAQ · 030350</div>
+          <div class="card-title">정리매매 단계예요</div>
+        </div>
+      </div>
+      <div class="rr">
+        <div class="rr-ico"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg></div>
+        <div>
+          <div class="rr-t">매도 가능 기간이 정해져 있어요</div>
+          <div class="rr-d">정리매매 기간 내에만 판 수 있어요. 기간·가격 제한을 공시에서 꼭 확인하세요.</div>
+        </div>
+      </div>
+      <div class="kv"><span class="kv-l">정리매매 기간</span><span class="kv-v red">09.22 ~ 10.11 (예시)</span></div>
+      <div class="kv"><span class="kv-l">마지막 체결가</span><span class="kv-v">973원</span></div>
+      <div class="kv"><span class="kv-l">보유 / 평단</span><span class="kv-v">500주 · 1,840원</span></div>
+      <div class="kv"><span class="kv-l">평가금액</span><span class="kv-v red">486,500원 (−47.1%)</span></div>
+    </div>
+
+    <div class="card">
+      <div class="grp-t" style="border-top:0">📌 이 기간에 확인할 것</div>
+      <div class="chk">
+        <div class="chk-box"></div>
+        <div><div class="chk-t">정리매매 일정·가격 제한 확인</div><div class="chk-d">거래소 안내 공시 기준</div></div>
+      </div>
+      <div class="chk">
+        <div class="chk-box"></div>
+        <div><div class="chk-t">매도 처리 증권사 확인</div><div class="chk-d">일부 위탁계약은 제한될 수 있어요</div></div>
+      </div>
+      <div class="cta">
+        <button class="cta-btn ghost">전체 공시 보기</button>
+        <button class="cta-btn dark">DART 원문 보기</button>
+      </div>
+    </div>
+    <div class="foot">예시 일정 — 실제 기간은 DART 공시 기준으로 확인하세요.</div>
+  </div>
+</div>
+<div class="caption">B2 · 정리매매 진입 상태 (임계 케이스)</div>
+</div>
+
+</body>
+</html>
