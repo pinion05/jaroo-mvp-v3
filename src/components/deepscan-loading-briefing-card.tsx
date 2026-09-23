@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useMemo } from 'react'
-import { BarChart3, Calendar, Flame, Landmark, Target, Telescope, TrendingUp, type LucideIcon } from 'lucide-react'
+import { BarChart3, Calendar, ChevronLeft, Flame, Landmark, Target, Telescope, TrendingUp, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import type {
@@ -50,17 +50,20 @@ import styles from './deepscan-loading-screen.module.css'
 
 
 export function BackControl({ onBack, backHref }: Pick<DeepScanLoadingScreenProps, 'onBack' | 'backHref'>) {
+  // '←' 텍스트 글리프는 폰트 환경(임베디드 웹뷰 등)에 따라 빈 박스로 렌더링될 수 있어 SVG 아이콘으로 대체한다.
+  const icon = <ChevronLeft className='size-[16px]' aria-hidden />
+
   if (onBack) {
     return (
       <button type='button' className={styles.backButton} onClick={onBack} aria-label='뒤로 가기'>
-        ←
+        {icon}
       </button>
     )
   }
 
   return (
     <Link href={backHref ?? '/home'} className={styles.backButton} aria-label='홈으로 가기'>
-      ←
+      {icon}
     </Link>
   )
 }

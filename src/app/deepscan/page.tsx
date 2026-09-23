@@ -93,6 +93,10 @@ export default function DeepScanPage() {
   const [arrivedLoadingStages, setArrivedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
   const [displayedLoadingStages, setDisplayedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
   const [hydratedTargetKey, setHydratedTargetKey] = useState<string | null>(null)
+  // 하이드레이션 완료 플래그 — 세션 복원 전(SSR 포함)에는 '분석할 종목이 없습니다' 빈 상태를
+  // 띄우지 않는다. 보유 대상이 있는 사용자에게 잘못된 빈 상태가 첫 페인트/웹뷰 잔재로
+  // 보이는 문제(test 배포 피드백 #277) 때문. SSR은 중립 안내 카드만 내린다.
+  const [hydrationChecked, setHydrationChecked] = useState(false)
   // 거래정지 2층 판정 상태(이슈 #276) — 1차 힌트는 홈이 계산한 카드 톤(cardTone 'halt')을
   // 세션 hydration에서, 2차 권위는 퀵시세 당일 거래량(volume 0)에서 나온다.
   const [haltHintTargetKey, setHaltHintTargetKey] = useState<string | null>(null)
@@ -107,6 +111,7 @@ export default function DeepScanPage() {
         if (!cancelled) {
           setHaltHintTargetKey(null)
           setHydratedTargetKey(target ? getDeepScanTargetKey(target) : null)
+          setHydrationChecked(true)
         }
         return
       }
@@ -124,6 +129,7 @@ export default function DeepScanPage() {
         }
         setHaltHintTargetKey(sessionTarget && isHaltedHomeHolding(sessionTarget.holding) ? nextTargetKey : null)
         setHydratedTargetKey(nextTargetKey)
+        setHydrationChecked(true)
       }
     }
 
@@ -686,6 +692,38 @@ export default function DeepScanPage() {
 
 
   const missingTargetTitle = '분석할 종목이 없습니다'
+
+  // 세션 복원 전(SSR·첫 클라이언트 렌더) — 중립 안내만. 빈 상태 판정은 하이드레이션 후.
+  if (!requestSeed && !hydrationChecked) {
+    return (
+      <JarooShell
+        title='DeepScan'
+        subtitle='종목을 선택하면 세 팀이 바로 분석해요'
+        backHref='/home'
+        showBottomNav={false}
+        frameClassName='w-full'
+        mainClassName='space-y-3 bg-white px-3.5 pt-3.5 pb-6'
+      >
+        <section className='rounded-[12px] border-[0.5px] border-[#d7e8f7] bg-[linear-gradient(135deg,rgba(244,248,252,0.98),rgba(255,255,255,0.98))] p-3.5 shadow-[0_8px_20px_rgba(28,85,133,0.05)]'>
+          <div className='flex items-start justify-between gap-3'>
+            <div className='min-w-0'>
+              <p className='flex items-center gap-1.5 text-[12px] font-extrabold text-[#185fa5]'>
+                <span className='size-[5px] animate-pulse rounded-full bg-[#185fa5]' />
+                준비 중
+              </p>
+              <h1 className='mt-1.5 text-[16px] font-extrabold leading-[1.3] tracking-[-0.01em] text-[#111]'>
+                분석 대상을 확인하고 있어요
+              </h1>
+            </div>
+            <div className='grid size-9 shrink-0 place-items-center rounded-[10px] bg-[#e6f1fb] text-[#185fa5]'>
+              <LineChart className='size-[18px]' aria-hidden />
+            </div>
+          </div>
+          <p className='mt-2 text-[13px] leading-[1.6] text-[#555]'>잠시만 기다려 주세요.</p>
+        </section>
+      </JarooShell>
+    )
+  }
 
   if (!requestSeed) {
     return (
