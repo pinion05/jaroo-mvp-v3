@@ -114,11 +114,12 @@ function resolveHeroStatusToneClass(payload: JarooDeepScanPayload) {
     return 'text-[color:var(--jaroo-profit)]'
   }
 
-  if (payload.hero.score >= 55) {
-    return 'text-[color:var(--jaroo-primary)]'
+  // #266 확정 규칙: 중립+(55~66)·중립은 녹색(보합 관례), 주의는 파랑 — 인라인 결과 카드와 동일 규칙으로 정렬.
+  if (payload.hero.score >= 45) {
+    return 'text-[color:var(--jaroo-flat)]'
   }
 
-  return 'text-[color:var(--jaroo-warning)]'
+  return 'text-[color:var(--jaroo-loss)]'
 }
 
 export function buildDeepScanPageHeader(

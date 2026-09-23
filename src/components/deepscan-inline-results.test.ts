@@ -170,12 +170,12 @@ test('DeepScanInlineResults colors the strength label and gauge by the agreed to
   const caution = basePayload()
   caution.hero = { ...caution.hero, score: 30 }
   const cautionMarkup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload: caution }))
-  assert.match(cautionMarkup, /leading-none text-\[#2B6BE6\][^>]*>주의</)
+  assert.match(cautionMarkup, /leading-none text-\[color:var\(--jaroo-loss\)\][^>]*>주의</)
   assert.doesNotMatch(cautionMarkup, /--jaroo-flat/)
 
   // 기본 payload(score 68)는 강세 — 빨강 유지
   const bullMarkup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload: basePayload() }))
-  assert.match(bullMarkup, /leading-none text-\[#E5484D\][^>]*>강세</)
+  assert.match(bullMarkup, /leading-none text-\[color:var\(--jaroo-profit\)\][^>]*>강세</)
   assert.doesNotMatch(bullMarkup, /--jaroo-flat/)
 })
 
