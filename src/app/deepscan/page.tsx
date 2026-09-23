@@ -7,8 +7,14 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LineChart } from 'lucide-react'
 import { DeepScanInlineResults } from '@/components/deepscan-inline-results'
 import { DeepScanLoadingScreen, type LoadingStageKey } from '@/components/deepscan-loading-screen'
+import { DeepScanHaltScreen } from '@/components/deepscan-halt-screen'
 import { SnapshotProvenanceBar } from '@/components/deepscan-inline-results'
 import { JarooShell } from '@/components/jaroo-shell'
+import {
+  DEEPSCAN_HALT_CHECK_TIMEOUT_MS,
+  isHaltedHomeHolding,
+  resolveDeepScanHaltVerdict,
+} from '@/lib/deepscan-halt'
 import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import { computePriceDriftPct, extractSnapshotPriceBasis, resolveDeepScanSnapshotKey } from '@/lib/deepscan-snapshot-policy'
 import { type LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
@@ -87,6 +93,10 @@ export default function DeepScanPage() {
   const [arrivedLoadingStages, setArrivedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
   const [displayedLoadingStages, setDisplayedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
   const [hydratedTargetKey, setHydratedTargetKey] = useState<string | null>(null)
+  // 거래정지 2층 판정 상태(이슈 #276) — 1차 힌트는 홈이 계산한 카드 톤(cardTone 'halt')을
+  // 세션 hydration에서, 2차 권위는 퀵시세 당일 거래량(volume 0)에서 나온다.
+  const [haltHintTargetKey, setHaltHintTargetKey] = useState<string | null>(null)
+  const [haltCheckExpiredTargetKey, setHaltCheckExpiredTargetKey] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -95,6 +105,7 @@ export default function DeepScanPage() {
       const hydratedTarget = buildDeepScanTargetInputFromSession(sessionTarget)
       if (!hydratedTarget) {
         if (!cancelled) {
+          setHaltHintTargetKey(null)
           setHydratedTargetKey(target ? getDeepScanTargetKey(target) : null)
         }
         return
@@ -111,6 +122,7 @@ export default function DeepScanPage() {
         if (!target || getDeepScanTargetKey(target) !== nextTargetKey) {
           setDeepScanTarget(nextTarget)
         }
+        setHaltHintTargetKey(sessionTarget && isHaltedHomeHolding(sessionTarget.holding) ? nextTargetKey : null)
         setHydratedTargetKey(nextTargetKey)
       }
     }
@@ -125,6 +137,31 @@ export default function DeepScanPage() {
   const targetKey = useMemo(() => (target ? getDeepScanTargetKey(target) : null), [target])
   // 스냅샷 키(code|ticker) — 위원회 쓰래백이 갱신할 스냅샷 행 지정에 쓴다.
   const snapshotKey = useMemo(() => (target ? resolveDeepScanSnapshotKey({ code: target.code, ticker: target.ticker }) : null), [target])
+
+  // 거래정지 판정 — 퀵시세 미도착 시 제한 시간 뒤 fail-open(기존 플로우)으로 돌아간다.
+  const activeQuickQuoteForHalt = loadingQuickQuote?.targetKey === targetKey ? loadingQuickQuote : null
+  const haltVerdict = useMemo(() => resolveDeepScanHaltVerdict({
+    targetKey,
+    isUsTarget: isDeepScanUsTarget(target),
+    instrumentKind: target?.kind ?? null,
+    haltHint: haltHintTargetKey !== null && haltHintTargetKey === targetKey,
+    quickQuoteVolume: activeQuickQuoteForHalt?.tradingVolume,
+    checkExpired: haltCheckExpiredTargetKey !== null && haltCheckExpiredTargetKey === targetKey,
+  }), [activeQuickQuoteForHalt, haltCheckExpiredTargetKey, haltHintTargetKey, target, targetKey])
+
+  useEffect(() => {
+    if (!targetKey) {
+      return
+    }
+
+    const timeoutId = setTimeout(() => {
+      setHaltCheckExpiredTargetKey(targetKey)
+    }, DEEPSCAN_HALT_CHECK_TIMEOUT_MS)
+
+    return () => {
+      clearTimeout(timeoutId)
+    }
+  }, [targetKey])
 // 스펙 spec_v7 §4 인트로 멘트(손익 5단계). 판정 = 손익액 ÷ 전체 포트폴리오 평가액(즉시 데이터, 금액 미표시).
   // 분모 우선순위: ① 적용 포트폴리오 세션(OCR 평가액 합산) ② 서버 포트폴리오 합산(재방문 세션 부재 폴백).
   // 둘 다 없으면 null → 기존 안내 문구.
@@ -351,12 +388,12 @@ export default function DeepScanPage() {
       shouldStartRequest,
       targetKey,
       hydratedTargetKey,
-    })) {
+    }) || haltVerdict !== 'active') {
       return
     }
 
     startRequest()
-  }, [hydratedTargetKey, shouldStartRequest, startRequest, targetKey])
+  }, [hydratedTargetKey, shouldStartRequest, startRequest, targetKey, haltVerdict])
 
   useEffect(() => {
     const quickQuoteUrl = buildLoadingQuickQuoteUrl(target)
@@ -409,7 +446,7 @@ export default function DeepScanPage() {
 
   useEffect(() => {
     const snapshotUrl = buildLoadingBriefingSnapshotUrl(target)
-    if (!snapshotUrl || !targetKey || loadingBriefingSnapshot?.targetKey === targetKey) {
+    if (!snapshotUrl || !targetKey || loadingBriefingSnapshot?.targetKey === targetKey || haltVerdict === 'halted') {
       return
     }
 
@@ -438,7 +475,7 @@ export default function DeepScanPage() {
     return () => {
       controller.abort()
     }
-  }, [loadingBriefingSnapshot?.targetKey, target, targetKey])
+  }, [haltVerdict, loadingBriefingSnapshot?.targetKey, target, targetKey])
 
   useEffect(() => {
     if (!isDeepScanUsTarget(target) || !targetKey || loadingMarketSnapshot?.targetKey === targetKey) {
@@ -470,7 +507,7 @@ export default function DeepScanPage() {
   }, [loadingMarketSnapshot?.targetKey, target, targetKey])
 
   useEffect(() => {
-    if (!requestSeed || !targetKey || requestStatus !== 'loading') {
+    if (!requestSeed || !targetKey || requestStatus !== 'loading' || haltVerdict === 'halted') {
       return
     }
 
@@ -522,7 +559,7 @@ export default function DeepScanPage() {
         abandonInFlight()
       }
     }
-  }, [abandonInFlight, appendArrivedLoadingStageKeys, finishError, finishSuccess, markDeepScanLoadingSuccess, refreshEpoch, requestSeed, requestStatus, targetKey])
+  }, [abandonInFlight, appendArrivedLoadingStageKeys, finishError, finishSuccess, haltVerdict, markDeepScanLoadingSuccess, refreshEpoch, requestSeed, requestStatus, targetKey])
 
   useEffect(() => {
     const llmCommittee = payload?.metadata.llmCommittee
@@ -631,19 +668,21 @@ export default function DeepScanPage() {
   // 명시적 재분석 — 스냅샷 캐시를 무시하고 새 스캔(크레딧 사용)을 돈다
   const handleExplicitRefresh = useCallback(() => {
     if (requestStatus === 'loading') return
+    if (haltVerdict === 'halted') return
     if (!window.confirm('다시 분석할까요? 딥스캔 크레딧이 사용돼요.')) return
     pendingRefreshRef.current = true
     setRefreshEpoch((epoch) => epoch + 1)
     startRequest()
-  }, [requestStatus, startRequest])
+  }, [haltVerdict, requestStatus, startRequest])
 
   const handleRetry = useCallback(() => {
+    if (haltVerdict === 'halted') return
     setLoadingSequence(createDeepScanLoadingSequence(targetKey))
     setArrivedLoadingStages(createDeepScanLoadingStageArrival(targetKey))
     setDisplayedLoadingStages(createDeepScanLoadingStageArrival(targetKey))
     startRequest()
     scrollContentToTop()
-  }, [startRequest, targetKey])
+  }, [haltVerdict, startRequest, targetKey])
 
 
   const missingTargetTitle = '분석할 종목이 없습니다'
@@ -785,6 +824,29 @@ export default function DeepScanPage() {
   const identifier = [requestSeed.holding.ticker, requestSeed.holding.code]
     .filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index)
     .join(' · ')
+
+  // 거래정지 종목 — 일반 딥스캔(세 팀 분석) 대신 공시 중심 거래정지 화면으로 대체한다.
+  // 스캔 시작은 이미 위 게이트(haltVerdict !== 'active')에서 차단돼 크레딧이 쓰이지 않는다.
+  if (haltVerdict === 'halted') {
+    return (
+      <div className='flex h-full w-full justify-center bg-white'>
+        <DeepScanHaltScreen
+          className='w-full overflow-hidden'
+          name={requestSeed.holding.name}
+          code={target?.code}
+          identifier={identifier}
+          market={requestSeed.holding.market}
+          lastTradedPrice={loadingCurrentPrice ?? null}
+          currency={loadingCurrentPriceCurrency}
+          quantity={target?.quantity}
+          averagePrice={target?.averagePrice}
+          averagePriceCurrency={target?.averagePriceCurrency}
+          fallbackProfitRatePct={target?.currentProfitRate ?? undefined}
+          backHref='/home'
+        />
+      </div>
+    )
+  }
 
   return (
     <div className='flex h-full w-full justify-center bg-white'>
