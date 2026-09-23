@@ -891,6 +891,23 @@
   animation: consensus-point-reveal 0.4s 2.1s ease-out forwards;
 }
 
+/* 현재가 위치 닷 — 부채꼴 분기점. 목표가 닷과 같은 규격, 색만 현재가 회색. */
+.consensusFanCurrentDot {
+  fill: var(--ds-muted);
+  stroke: #fff;
+  stroke-width: 1.4;
+  opacity: 0;
+  animation: consensus-point-reveal 0.4s 2.1s ease-out forwards;
+}
+
+.consensusFanCurrentDotHalo {
+  fill: none;
+  stroke: var(--ds-muted);
+  stroke-width: 1;
+  opacity: 0;
+  animation: consensus-halo-reveal 0.4s 2.1s ease-out forwards;
+}
+
 .consensusFanLegend {
   display: flex;
   align-items: center;
@@ -2985,6 +3002,12 @@
   }
 }
 
+@keyframes consensus-halo-reveal {
+  to {
+    opacity: 0.35;
+  }
+}
+
 @keyframes today-chart-draw {
   to {
     stroke-dashoffset: 0;
@@ -3021,6 +3044,8 @@
   .consensusFanLowPath,
   .consensusFanCurrentLine,
   .consensusFanCurrentPath,
+  .consensusFanCurrentDot,
+  .consensusFanCurrentDotHalo,
   .consensusFanTargetDot,
   .consensusFanHighDot,
   .consensusFanLowDot {
@@ -3031,10 +3056,15 @@
   .todayChartArea,
   .todayChartDot,
   .todayChartRing,
+  .consensusFanCurrentDot,
   .consensusFanTargetDot,
   .consensusFanHighDot,
   .consensusFanLowDot {
     opacity: 1;
+  }
+
+  .consensusFanCurrentDotHalo {
+    opacity: 0.35;
   }
 
   .todayChartLine,
