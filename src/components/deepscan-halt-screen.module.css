@@ -1,0 +1,598 @@
+/* 거래정지 화면 — 채택 시안 design/watch/jaroo_halt_min.html 포팅(이슈 #276).
+   기존 딥스캔 카드 언어(16px 라운드 · #E8EAEE 보더 · navy 스퀘어 아이콘 · facts 그리드) 계승.
+   금융 데이터 색은 전역 토큰(플러스=--jaroo-profit 빨강 / 마이너스=--jaroo-loss 파랑, #266/#275),
+   리스크 표기 색은 화면 로컬 토큰으로 분리한다. */
+
+.haltScreen {
+  --halt-danger: #c23938;
+  --halt-danger-strong: #e5484d;
+  --halt-danger-soft: #f8d7d8;
+  --halt-caution-text: #9a5a09;
+  --halt-caution-soft: #faeeda;
+  --halt-amber: #e5a23d;
+  --halt-gray: #97a0ae;
+  --halt-ink: #0f1419;
+  --halt-sub: #5a6473;
+  --halt-line: #e8eaee;
+  --halt-div: #eff1f4;
+
+  background: #f4f8fb;
+  width: 100%;
+  min-height: 100%;
+  height: 100%;
+  overflow-y: auto;
+  overflow-x: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.haltScreen::-webkit-scrollbar {
+  display: none;
+}
+
+.topBar {
+  padding: max(14px, env(safe-area-inset-top)) 16px 12px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.96);
+  border-bottom: 0.5px solid var(--halt-div);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  backdrop-filter: blur(12px);
+}
+
+.topBarIdentity {
+  min-width: 0;
+  flex: 1;
+}
+
+.topBarName {
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+  color: var(--halt-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.topBarMeta {
+  margin-top: 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--halt-gray);
+}
+
+.topBarBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--halt-danger-soft);
+  background: #fff;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--halt-danger);
+  flex-shrink: 0;
+}
+
+.topBarBadge i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--halt-danger);
+}
+
+.main {
+  padding: 16px 16px 32px;
+  position: relative;
+  /* 플렉스 컬럼 자식이 찌그러지지 않게 한다 — overflow-x:hidden을 주면
+     min-height:auto 바닥이 풀려 내용이 545px로 압축된다(컨테이너가 이미 x축 클리핑). */
+  flex-shrink: 0;
+}
+
+.main::before {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  left: -80px;
+  right: -80px;
+  top: -160px;
+  height: 320px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, rgba(24, 95, 165, 0.18), rgba(24, 95, 165, 0) 68%);
+}
+
+/* ── 히어로 카드 ── */
+.hero {
+  position: relative;
+  overflow: hidden;
+  border-radius: 28px;
+  border: 1px solid var(--halt-div);
+  background: #fff;
+  padding: 20px;
+  box-shadow: 0 16px 36px rgba(24, 95, 165, 0.1);
+}
+
+.hero::after {
+  content: '';
+  pointer-events: none;
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 112px;
+  background: linear-gradient(135deg, #f4f8fc 0%, #e6f1fb 100%);
+}
+
+.heroTop {
+  position: relative;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  border: 1px solid var(--halt-danger-soft);
+  background: #fff;
+  padding: 4px 12px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--halt-danger);
+}
+
+.pill i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--halt-danger);
+}
+
+.heroTitle {
+  position: relative;
+  margin-top: 14px;
+  font-size: 23px;
+  font-weight: 900;
+  /* 한글 자소 상단이 잘리지 않게 시안(1.15)보다 여유를 둔다 */
+  line-height: 1.35;
+  letter-spacing: -0.03em;
+  color: var(--halt-ink);
+}
+
+.heroIcon {
+  position: relative;
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  display: grid;
+  place-items: center;
+  border-radius: 16px;
+  background: var(--halt-danger-soft);
+  color: var(--halt-danger);
+}
+
+.heroCopy {
+  position: relative;
+  margin-top: 14px;
+  max-width: 280px;
+  font-size: 14px;
+  line-height: 24px;
+  color: #6e7d91;
+}
+
+.heroStats {
+  position: relative;
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+
+.hstat {
+  border-radius: 16px;
+  border: 1px solid var(--halt-div);
+  background: #f4f8fb;
+  padding: 12px;
+}
+
+.hstat b {
+  display: block;
+  font-size: 15px;
+  font-weight: 900;
+  line-height: 1;
+  color: var(--halt-ink);
+}
+
+.hstatDanger b {
+  color: var(--halt-danger);
+}
+
+.hstat span {
+  display: block;
+  margin-top: 4px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #6e7d91;
+}
+
+/* ── 결과 카드 공통 ── */
+.card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--halt-line);
+  background: #fff;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  margin-top: 12px;
+}
+
+.cardHead {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  border-bottom: 1px solid var(--halt-div);
+  padding: 16px;
+}
+
+.emoSq {
+  display: flex;
+  width: 36px;
+  height: 36px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--halt-ink);
+  color: #fff;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+.cardKicker {
+  font-size: 10px;
+  color: var(--halt-gray);
+}
+
+.cardTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--halt-ink);
+  margin-top: 2px;
+}
+
+.headBadge {
+  border-radius: 6px;
+  padding: 4px 8px;
+  font-size: 10px;
+  font-weight: 700;
+  background: var(--halt-danger-soft);
+  color: var(--halt-danger);
+  flex-shrink: 0;
+}
+
+.headBadgeBlue {
+  background: #e8f0fb;
+  color: #2b6be6;
+}
+
+.headBadgeCaution {
+  background: var(--halt-caution-soft);
+  color: var(--halt-caution-text);
+}
+
+.headBadgeNeutral {
+  background: var(--halt-div);
+  color: var(--halt-sub);
+}
+
+.headBadgeDataLoss {
+  background: var(--jaroo-loss-soft);
+  color: var(--jaroo-loss);
+}
+
+.headBadgeDataProfit {
+  background: var(--jaroo-profit-soft);
+  color: var(--jaroo-profit);
+}
+
+/* facts 그리드 */
+.facts {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  border-top: 1px solid var(--halt-div);
+}
+
+.fact {
+  border-bottom: 1px solid var(--halt-div);
+  border-right: 1px solid var(--halt-div);
+  padding: 12px 16px;
+}
+
+.fact:nth-child(2n) {
+  border-right: 0;
+}
+
+.fact:nth-last-child(-n+2) {
+  border-bottom: 0;
+}
+
+.factLabel {
+  font-size: 10px;
+  color: var(--halt-gray);
+}
+
+.factValue {
+  margin-top: 4px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--halt-ink);
+}
+
+.factValueProfit {
+  color: var(--jaroo-profit);
+}
+
+.factValueLoss {
+  color: var(--jaroo-loss);
+}
+
+.summary {
+  border-top: 1px solid var(--halt-div);
+  padding: 16px;
+  font-size: 13px;
+  line-height: 24px;
+  color: var(--halt-ink);
+}
+
+/* 행 목록 */
+.rowsTitle {
+  border-top: 1px solid var(--halt-div);
+  padding: 16px 16px 12px;
+  font-size: 10px;
+  color: var(--halt-gray);
+}
+
+.mrow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 0 16px 10px;
+}
+
+.mrowDot {
+  width: 8px;
+  height: 8px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: var(--halt-ink);
+}
+
+.mrowDotRed {
+  background: var(--halt-danger-strong);
+}
+
+.mrowDotAmber {
+  background: var(--halt-amber);
+}
+
+.mrowDotGray {
+  background: var(--halt-gray);
+}
+
+.mrowLabel {
+  font-weight: 700;
+  color: var(--halt-ink);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mrowSub {
+  color: var(--halt-sub);
+  font-size: 10px;
+  flex-shrink: 0;
+}
+
+.mrowRight {
+  margin-left: auto;
+  font-weight: 700;
+  color: var(--halt-sub);
+  flex-shrink: 0;
+}
+
+.mrowLink {
+  color: #2b6be6;
+  text-decoration: none;
+  font-weight: 700;
+}
+
+/* 대처 행 */
+.act {
+  display: flex;
+  gap: 10px;
+  padding: 0 16px 12px;
+  align-items: flex-start;
+}
+
+.actNum {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex-shrink: 0;
+  margin-top: 1px;
+  border-radius: 999px;
+  background: var(--halt-ink);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 800;
+}
+
+.actNumRed {
+  background: var(--halt-danger-strong);
+}
+
+.actTitle {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--halt-ink);
+  line-height: 1.4;
+}
+
+.actDesc {
+  margin-top: 2px;
+  font-size: 11px;
+  line-height: 18px;
+  color: var(--halt-sub);
+}
+
+.actDescLink {
+  color: #2b6be6;
+  text-decoration: none;
+  font-weight: 600;
+}
+
+.disclaimer {
+  border-top: 1px solid var(--halt-div);
+  padding: 12px 16px;
+  font-size: 10px;
+  line-height: 16px;
+  color: var(--halt-gray);
+}
+
+/* 심각도 블록 — 4단계 게이지 */
+.sev {
+  padding: 20px 16px;
+  text-align: center;
+}
+
+.sevLabel {
+  font-size: 28px;
+  font-weight: 900;
+  /* 한글 글리프 상하단이 잘리지 않게 여유를 둔다 */
+  line-height: 1.35;
+}
+
+.sevLabelDanger {
+  color: var(--halt-danger-strong);
+}
+
+.sevLabelCaution,
+.sevLabelAttention {
+  color: var(--halt-amber);
+}
+
+.sevLabelNeutral {
+  color: var(--halt-gray);
+}
+
+.sevMeters {
+  display: flex;
+  gap: 4px;
+  width: 132px;
+  margin: 12px auto 0;
+}
+
+.sevMeter {
+  position: relative;
+  height: 6px;
+  flex: 1;
+  border-radius: 999px;
+  background: var(--halt-line);
+}
+
+.sevMeterOn::after {
+  content: '';
+  position: absolute;
+  top: -9px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-left: 4px solid transparent;
+  border-right: 4px solid transparent;
+  border-top: 5px solid currentColor;
+}
+
+.sevHelper {
+  margin-top: 10px;
+  font-size: 11px;
+  color: var(--halt-sub);
+}
+
+/* 버튼 */
+.cta {
+  display: flex;
+  gap: 8px;
+  padding: 12px 16px 16px;
+}
+
+.ctaFirst {
+  border-top: 1px solid var(--halt-div);
+  padding: 16px;
+}
+
+.btn {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 40px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  text-decoration: none;
+}
+
+.btnPrimary {
+  background: #185fa5;
+  color: #fff;
+}
+
+.btnPrimary:hover {
+  background: #0c447c;
+}
+
+.btnPrimary:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.btnOutline {
+  border-color: var(--halt-div);
+  background: #fff;
+  color: var(--halt-ink);
+}
+
+/* 공시 카드 상태 */
+.stateRow {
+  padding: 16px;
+  font-size: 12px;
+  line-height: 20px;
+  color: var(--halt-sub);
+  border-top: 1px solid var(--halt-div);
+}
+
+.retryButton {
+  margin-top: 8px;
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 10px;
+  border: 1px solid var(--halt-div);
+  background: #fff;
+  color: var(--halt-ink);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
