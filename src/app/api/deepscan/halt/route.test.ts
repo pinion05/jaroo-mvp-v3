@@ -180,17 +180,103 @@ test('handleHaltDisclosuresRequest — TTL 내 재요청은 업스트림을 다�
   assert.equal(fetchCount, 2)
 })
 
-test('handleHaltDisclosuresRequest — 업스트림 실패는 502 한국어 안내', async () => {
+test('handleHaltDisclosuresRequest — 업스트림 실패는 1회 재시도 후 502 한국어 안내', async () => {
   clearHaltDisclosuresCache()
 
-  const fetcher: typeof fetch = async () => jsonResponse({ ok: false }, 500)
+  let fetchCount = 0
+  const fetcher: typeof fetch = async () => {
+    fetchCount += 1
+    return jsonResponse({ ok: false }, 500)
+  }
   const response = await handleHaltDisclosuresRequest(haltRequest('030350'), {
     fetcher,
     cacheTtlMs: 0,
+    retryDelayMs: 0,
   })
 
   assert.equal(response.status, 502)
+  assert.equal(fetchCount, 2)
   const body = (await response.json()) as { ok: boolean; error: { message: string } }
   assert.equal(body.ok, false)
   assert.equal(body.error.message, '거래정지 공시 정보를 불러오지 못했어요.')
+})
+
+// 타임아웃까지 대기하다 abort 시그널을 존중해 거부하는 업스트림 fetch 목.
+function hangingFetcher(onCall?: (call: number) => void): typeof fetch {
+  let call = 0
+  return ((input, init) => {
+    call += 1
+    onCall?.(call)
+    return new Promise<Response>((resolve, reject) => {
+      const timer = setTimeout(() => {
+        cleanup()
+        resolve(jsonResponse(crawlerFilingsPayload()))
+      }, 400)
+      const signal = (init as RequestInit | undefined)?.signal
+      const onAbort = () => {
+        cleanup()
+        reject(Object.assign(new Error('The operation was aborted'), { name: 'AbortError' }))
+      }
+      const cleanup = () => {
+        clearTimeout(timer)
+        if (signal instanceof AbortSignal) {
+          signal.removeEventListener('abort', onAbort)
+        }
+      }
+      if (signal instanceof AbortSignal) {
+        if (signal.aborted) {
+          onAbort()
+          return
+        }
+        signal.addEventListener('abort', onAbort, { once: true })
+      }
+    })
+  }) as typeof fetch
+}
+
+test('handleHaltDisclosuresRequest — 첫 시도 타임아웃, 재시도 성공이면 200', async () => {
+  clearHaltDisclosuresCache()
+
+  // 1차: 타임아웃(100ms)보다 오래 걸려 중단 → 2차: 즉시 성공
+  let firstCallDone = false
+  const fetcher: typeof fetch = (input, init) => {
+    if (firstCallDone) {
+      return Promise.resolve(jsonResponse(crawlerFilingsPayload()))
+    }
+    firstCallDone = true
+    return hangingFetcher()(input, init)
+  }
+
+  const response = await handleHaltDisclosuresRequest(haltRequest('030350'), {
+    fetcher,
+    cacheTtlMs: 0,
+    timeoutMs: 100,
+    retryDelayMs: 0,
+  })
+
+  assert.equal(response.status, 200)
+  const body = (await response.json()) as { ok: boolean; data: { summary: { totalCount: number } } }
+  assert.equal(body.ok, true)
+  assert.equal(body.data.summary.totalCount, 3)
+})
+
+test('handleHaltDisclosuresRequest — 두 시도 모두 타임아웃이면 504', async () => {
+  clearHaltDisclosuresCache()
+
+  let fetchCount = 0
+  const response = await handleHaltDisclosuresRequest(haltRequest('030350'), {
+    fetcher: hangingFetcher(() => {
+      fetchCount += 1
+    }),
+    cacheTtlMs: 0,
+    timeoutMs: 100,
+    retryDelayMs: 0,
+  })
+
+  assert.equal(response.status, 504)
+  assert.equal(fetchCount, 2)
+  const body = (await response.json()) as { ok: boolean; error: { code: string; message: string } }
+  assert.equal(body.ok, false)
+  assert.equal(body.error.code, 'upstream-timeout')
+  assert.equal(body.error.message, '거래정지 공시 정보 요청이 시간 초과됐어요.')
 })
