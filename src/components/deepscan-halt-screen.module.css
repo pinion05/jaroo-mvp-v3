@@ -114,20 +114,12 @@
   overflow: hidden;
   border-radius: 28px;
   border: 1px solid var(--halt-div);
-  background: #fff;
+  /* 상단 워시는 요소 배경 레이어로 그린다. ::after 오버레이(시안 jaroo_halt_min.html)는
+     position:relative 콘텐츠들보다 DOM 순서가 늦어 위에 페인트되며, 불투명 그라디언트라
+     필·타이틀 첫 줄을 통째로 가렸다(test 배포 피드백 #277/#278). */
+  background: linear-gradient(135deg, #f4f8fc 0%, #e6f1fb 100%) left top / 100% 112px no-repeat, #fff;
   padding: 20px;
   box-shadow: 0 16px 36px rgba(24, 95, 165, 0.1);
-}
-
-.hero::after {
-  content: '';
-  pointer-events: none;
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 0;
-  height: 112px;
-  background: linear-gradient(135deg, #f4f8fc 0%, #e6f1fb 100%);
 }
 
 .heroTop {

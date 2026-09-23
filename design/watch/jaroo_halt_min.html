@@ -27,8 +27,7 @@ svg{display:block}
 .main::before{content:'';pointer-events:none;position:absolute;left:-80px;right:-80px;top:-160px;height:320px;border-radius:50%;background:radial-gradient(circle at 50% 50%,rgba(24,95,165,0.18),rgba(24,95,165,0) 68%)}
 
 /* ── 히어로 카드 (deepscan/page.tsx 대기 화면과 동일 구조) ── */
-.hero{position:relative;overflow:hidden;border-radius:28px;border:1px solid var(--jaroo-border);background:#fff;padding:20px;box-shadow:0 16px 36px rgba(24,95,165,0.10)}
-.hero::after{content:'';pointer-events:none;position:absolute;left:0;right:0;top:0;height:112px;background:linear-gradient(135deg,#f4f8fc 0%,#e6f1fb 100%)}
+.hero{position:relative;overflow:hidden;border-radius:28px;border:1px solid var(--jaroo-border);background:linear-gradient(135deg,#f4f8fc 0%,#e6f1fb 100%) left top / 100% 112px no-repeat,#fff;padding:20px;box-shadow:0 16px 36px rgba(24,95,165,0.10)}
 .hero-top{position:relative;display:flex;align-items:flex-start;justify-content:space-between;gap:16px}
 .pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;border:1px solid var(--jaroo-border);background:#fff;padding:4px 12px;font-size:11px;font-weight:600;color:var(--jaroo-primary)}
 .pill i{width:6px;height:6px;border-radius:50%;background:var(--jaroo-primary)}
