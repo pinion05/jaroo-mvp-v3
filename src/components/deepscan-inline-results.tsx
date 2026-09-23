@@ -82,11 +82,12 @@ function buildStrength(payload: JarooDeepScanPayload) {
   return { label: '주의', helper: '방어 우선', active: 1 }
 }
 
-/** 확정 색 규칙 — 강세=빨강, 중립+·중립=녹색(보합 관례), 주의=파랑 */
+/** 확정 색 규칙 — 강세=빨강, 중립+·중립=녹색(보합 관례), 주의=파랑.
+ *  #266 규율: 데이터 색은 토큰(--jaroo-profit/--jaroo-loss/--jaroo-flat)만 쓴다 — 헥스 직접 지정 금지. */
 function strengthTone(active: number) {
-  if (active >= 4) return { text: 'text-[#E5484D]', bar: 'bg-[#E5484D]' }
+  if (active >= 4) return { text: 'text-[color:var(--jaroo-profit)]', bar: 'bg-[color:var(--jaroo-profit)]' }
   if (active >= 2) return { text: 'text-[color:var(--jaroo-flat)]', bar: 'bg-[color:var(--jaroo-flat)]' }
-  return { text: 'text-[#2B6BE6]', bar: 'bg-[#2B6BE6]' }
+  return { text: 'text-[color:var(--jaroo-loss)]', bar: 'bg-[color:var(--jaroo-loss)]' }
 }
 
 function sanitizeExchangeProductCopy(value: string) {
@@ -145,9 +146,10 @@ function scenarioWidth(scenario: Pick<JarooDeepScanStrategyScenario, 'probabilit
 }
 
 function toneClasses(tone: ScenarioView['tone']) {
-  if (tone === 'green') return { dot: 'bg-[#E5484D]', bar: 'bg-[#E5484D]', text: 'text-[#A8323A]' }
-  if (tone === 'red') return { dot: 'bg-[#E5484D]', bar: 'bg-[#E5484D]', text: 'text-[#E5484D]' }
-  return { dot: 'bg-[#2B6BE6]', bar: 'bg-[#2B6BE6]', text: 'text-[#2B6BE6]' }
+  // #266: 시나리오도 데이터 색 토큰 사용 — green 톤(긍정)=빨강, red 톤(부정)=빨강(강조), blue=파랑
+  if (tone === 'green') return { dot: 'bg-[color:var(--jaroo-profit)]', bar: 'bg-[color:var(--jaroo-profit)]', text: 'text-[#A8323A]' }
+  if (tone === 'red') return { dot: 'bg-[color:var(--jaroo-profit)]', bar: 'bg-[color:var(--jaroo-profit)]', text: 'text-[color:var(--jaroo-profit)]' }
+  return { dot: 'bg-[color:var(--jaroo-loss)]', bar: 'bg-[color:var(--jaroo-loss)]', text: 'text-[color:var(--jaroo-loss)]' }
 }
 
 function findConsensus(payload: JarooDeepScanPayload) {
