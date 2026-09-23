@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useMemo } from 'react'
-import { BarChart3, Calendar, ChevronLeft, Flame, Landmark, Target, Telescope, TrendingUp, type LucideIcon } from 'lucide-react'
+import { BarChart3, Calendar, ChartCandlestick, ChevronLeft, Flame, Target, Telescope, TrendingUp, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import type {
@@ -189,6 +189,9 @@ function TargetPriceFanChart({
         {geometry.curves.map((curve) => (
           <circle key={`dot-${curve.key}`} className={dotClass[curve.key]} cx={geometry.rightX} cy={curve.dotY} r='3.6' />
         ))}
+        {/* 현재가 위치 포인트 — 좌측 현재가 선이 끝나고 부채꼴로 갈라지는 분기점(#267). 곡선 위에 얹는다. */}
+        <circle className={styles.consensusFanCurrentDotHalo} cx={geometry.fanStartX} cy={geometry.currentY} r='7.5' />
+        <circle className={styles.consensusFanCurrentDot} cx={geometry.fanStartX} cy={geometry.currentY} r='3.6' />
       </svg>
       <div className={styles.consensusFanLegend}>
         <span className={styles.consensusFanLegendCurrent}><i />현재가</span>
@@ -345,7 +348,7 @@ export function TodayMarketBriefing({
   return (
     <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-item='true'>
       <div className={styles.todayBriefQuestionRow}>
-        <span className={styles.todayBriefIcon} aria-hidden='true'><Landmark className='size-[13px]' /></span>
+        <span className={styles.todayBriefIcon} aria-hidden='true'><ChartCandlestick className='size-[13px]' /></span>
         <span className={styles.todayBriefQuestion}>오늘 시장 속에서는?</span>
       </div>
       <div className={cn(styles.todayBriefBody, isVisible ? styles.todayBriefBodyIn : undefined)}>
