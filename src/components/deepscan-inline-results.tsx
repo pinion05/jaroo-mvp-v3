@@ -8,7 +8,7 @@ import type {
   JarooDeepScanStrategyScenario,
 } from '../../packages/contracts/src/deepscan'
 import type { DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
-import { normalizeDeepScanDisclosureWording } from '@/lib/deepscan-loading-behavior'
+import { isMissingKrPageNotice, normalizeDeepScanDisclosureWording, stripMissingKrPageNotice } from '@/lib/deepscan-loading-behavior'
 import type { DeepScanTargetInput } from '@/lib/workflow-types'
 
 import { cn } from '@/lib/utils'
@@ -122,8 +122,8 @@ function buildScenarioViews(payload: JarooDeepScanPayload, exchangeProduct = fal
     label: exchangeProduct ? sanitizeExchangeProductCopy(payload.strategy?.scenarioLabel || '기준 시나리오') : payload.strategy?.scenarioLabel || '보유 유지',
     probability: payload.strategy?.scenarioProbability || '--',
     condition: exchangeProduct
-      ? sanitizeExchangeProductCopy([payload.strategy?.scenarioCondition, payload.strategy?.scenarioPeriod].filter(Boolean).join(' · ') || '조건 확인 중')
-      : [payload.strategy?.scenarioCondition, payload.strategy?.scenarioPeriod].filter(Boolean).join(' · ') || '조건 확인 중',
+      ? sanitizeExchangeProductCopy(stripMissingKrPageNotice([payload.strategy?.scenarioCondition, payload.strategy?.scenarioPeriod].filter(Boolean).join(' · ')) || '조건 확인 중')
+      : stripMissingKrPageNotice([payload.strategy?.scenarioCondition, payload.strategy?.scenarioPeriod].filter(Boolean).join(' · ')) || '조건 확인 중',
     tone: 'green',
     recommended: true,
   }
@@ -134,7 +134,7 @@ function buildScenarioViews(payload: JarooDeepScanPayload, exchangeProduct = fal
     .map((scenario, index): ScenarioView => ({
     label: exchangeProduct ? sanitizeExchangeProductCopy(scenario.label) : scenario.label,
     probability: scenario.probability,
-    condition: exchangeProduct ? sanitizeExchangeProductCopy(scenario.condition) : scenario.condition,
+    condition: stripMissingKrPageNotice(exchangeProduct ? sanitizeExchangeProductCopy(scenario.condition) : scenario.condition) || '조건 확인 중',
     tone: index === 0 ? 'blue' : 'red',
   }))
   return [primary, ...others]
@@ -196,13 +196,13 @@ export function DeepScanInlineResults({
   const rawSummary = payload.hero.blockState === 'ok'
     ? payload.hero.body
     : payload.hero.fallback?.label || payload.hero.error?.message || `${name} 분석 결과를 일부만 표시하고 있어요.`
-  const summary = normalizeDeepScanDisclosureWording(exchangeProduct ? sanitizeExchangeProductCopy(rawSummary) : rawSummary)
+  const summary = stripMissingKrPageNotice(normalizeDeepScanDisclosureWording(exchangeProduct ? sanitizeExchangeProductCopy(rawSummary) : rawSummary))
   // 구조화된 근거(신형 payload) — 없으면 플레인 본문 폴백.
   // 옛 캐시 payload의 '최근 OpenDART 공시 …' 문구도 렌더 시 '최근 공시'로 치환한다(#267).
   const heroEvidence = Array.isArray(payload.hero.evidenceFacts) && payload.hero.evidenceFacts.length > 0
     ? {
         facts: payload.hero.evidenceFacts.slice(0, 8).map(normalizeDeepScanDisclosureWording),
-        cautions: (Array.isArray(payload.hero.evidenceCautions) ? payload.hero.evidenceCautions : []).slice(0, 3),
+        cautions: (Array.isArray(payload.hero.evidenceCautions) ? payload.hero.evidenceCautions : []).slice(0, 3).filter((caution) => !isMissingKrPageNotice(caution)),
       }
     : null
   const facts = exchangeProduct

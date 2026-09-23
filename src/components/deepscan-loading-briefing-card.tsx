@@ -625,7 +625,13 @@ export function TodayBriefingCard({
                   {consensus.highTargetLabel ? (<div className={styles.consensusStat}><dt>최고</dt><dd>{consensus.highTargetLabel}</dd></div>) : null}
                   {consensus.lowTargetLabel ? (<div className={styles.consensusStat}><dt>최저</dt><dd>{consensus.lowTargetLabel}</dd></div>) : null}
                 </dl>
-                {consensus.summary ? <p className={styles.consensusSummary}>{consensus.summary}</p> : null}
+                {consensus.summary ? (
+                  <p className={cn(
+                    styles.consensusSummary,
+                    // 투자의견 요약 톤(#266 데이터 색 규율): 매수 우세=빨강, 의견 갈림=중립. 신중 등 나머지는 기존 파랑.
+                    consensus.summary.includes('매수') ? styles.consensusSummaryProfit : consensus.summary.includes('갈리') ? styles.consensusSummaryNeutral : undefined,
+                  )}>{consensus.summary}</p>
+                ) : null}
               </div>
             ) : null}
           </article>

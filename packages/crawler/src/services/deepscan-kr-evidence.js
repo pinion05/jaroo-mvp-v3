@@ -1543,9 +1543,9 @@ function buildTopRisks({ currentQuote, holding, pageCoverage, sourceCoverage, is
 
   if (pageCoverage.availableCount === 0) {
     risks.push('KR 리포트 페이지 근거 없음');
-  } else if (pageCoverage.missingPageIds.length > 0) {
-    risks.push(`미확보 KR 페이지 ${pageCoverage.missingPageIds.length}건`);
   }
+  // '미확보 KR 페이지 N건'은 내부 페이지 커버리지 정보라 사용자 노출에서 제외(2026-09-23) —
+  // 커버리지 수치는 pageCoverage 필드로 그대로 남는다.
 
   return risks.slice(0, 3);
 }

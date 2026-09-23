@@ -216,7 +216,8 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
     '보유 12주 / 평단 71,000원 확인',
     'KR 리포트 페이지 6/11 확보',
   ]);
-  assert.deepEqual(packet.topRisks, ['미확보 KR 페이지 5건']);
+  // '미확보 KR 페이지 N건'은 2026-09-23 노출 제거로 더 이상 리스크에 못 올라온다.
+  assert.deepEqual(packet.topRisks, []);
 });
 
 test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a direct quote item while keeping safe defaults for missing sources', async () => {
@@ -904,7 +905,6 @@ test('buildDeepScanKrEvidencePacket ignores unknown slim page keys, counts recen
   assert.deepEqual(packet.topRisks, [
     '현재가 근거 없음',
     'KR 보유 맥락 없음',
-    '미확보 KR 페이지 10건',
   ]);
 });
 

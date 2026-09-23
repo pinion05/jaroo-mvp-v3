@@ -981,7 +981,8 @@
 .consensusEyebrow {
   display: block;
   margin-bottom: 3px;
-  color: var(--ds-blue);
+  /* '증권사 N곡' 등 출처 카운트 — 데이터 색이 아닌 일반 텍스트라 잉크색(#266 규율) */
+  color: var(--ds-ink);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.03em;
@@ -1142,6 +1143,17 @@
   font-size: 12px;
   font-weight: 850;
   line-height: 1.35;
+}
+
+/* 투자의견 요약 톤 — 매수 우세=빨강(국내 관례), 의견 갈림=중립(#266 데이터 색 규율). 신중 등은 기본 파랑 유지 */
+.consensusSummaryProfit {
+  background: var(--ds-rise-soft);
+  color: var(--ds-red);
+}
+
+.consensusSummaryNeutral {
+  background: #f2f3f6;
+  color: var(--ds-mid);
 }
 
 .consensusRangeRow {
@@ -2250,8 +2262,9 @@
 }
 
 .narrativeToneInfo {
-  background: var(--ds-blue-soft);
-  color: var(--ds-blue);
+  /* 정보 확인 계열 배지 — 파랑은 마이너스 전용(#266 규율)이라 중립 확인은 초록으로 */
+  background: var(--ds-emerald-soft);
+  color: var(--ds-emerald);
 }
 
 .quickFactsCard,

@@ -118,3 +118,28 @@ export function normalizeDeepScanDisclosureWording(text: string): string {
     .replace(/\s{2,}/gu, ' ')
     .trim()
 }
+
+// ─── '미확보 KR 페이지' 노출 제거 ───────────────────────────────────────────
+
+/**
+ * '미확보 KR 페이지 N건'은 내부 페이지 커버리지 정보라 화면에 내보내지 않는다
+ * (2026-09-23 요청). 크롤러 생성단에서 제거됐지만 캐시된 옛 스냅샷·원장 payload에
+ * 남아 있어 렌더 시에도 걸러낸다.
+ */
+export function isMissingKrPageNotice(text: string): boolean {
+  return text.includes('미확보 KR 페이지')
+}
+
+/** 본문·조건 문장에서 해당 배지 문구만 제거하고 남는 구분자·'주의:' 꼬리를 정리한다. */
+export function stripMissingKrPageNotice(text: string): string {
+  if (!isMissingKrPageNotice(text)) {
+    return text
+  }
+
+  return text
+    .replace(/(?:주의:\s*)?미확보\s*KR\s*페이지\s*\d+건(?:\s*건)?/gu, '')
+    .replace(/(^\s*·\s*)|(\s*·\s*$)/gu, '')
+    .replace(/주의:\s*$/u, '')
+    .replace(/\s{2,}/gu, ' ')
+    .trim()
+}
