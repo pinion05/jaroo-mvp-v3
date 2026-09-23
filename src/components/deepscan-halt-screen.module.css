@@ -36,12 +36,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  background: rgba(255, 255, 255, 0.96);
+  /* 캔버스색과 동일한 불투명 배경 — 흰 바가 캔버스 위에 '떠 있는/잘린' 느낌을 준다는
+     test 배포 피드백(#277). 반투명+blur 대신 캔버스와 한 덩어리로 이어지게 한다. */
+  background: #f4f8fb;
   border-bottom: 0.5px solid var(--halt-div);
   position: sticky;
   top: 0;
   z-index: 10;
-  backdrop-filter: blur(12px);
 }
 
 .topBarIdentity {
