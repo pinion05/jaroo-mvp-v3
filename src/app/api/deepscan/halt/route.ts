@@ -16,7 +16,13 @@ import {
 // 함께 내린다. 분류 규칙은 크롤러의 deepscan-kr-disclosure-risk-keywords.js(9개 리스크
 // 그룹, critical/high/medium)를 그대로 재사용해 단일 진실 소스를 유지한다.
 
-const HALT_DISCLOSURE_TIMEOUT_MS = 6_000
+// 업스트림(DART 공시) 타임아웃. 크롤러가 corpCode.xml(3.6MB, 24h 캐시)을 콜드 다운로드하는
+// 순간이 가장 느린 경로라 기존 6초보다 2배 여유를 둔다.
+const HALT_DISCLOSURE_TIMEOUT_MS = 12_000
+// 업스트림 실패 시 재시도 1회(총 2회 시도). 첫 시도가 corp 콜드 다운로드 등 일회성 지연에
+// 걸려도 재시도 시점엔 크롤러 캐시가 웜이라 즉시 성공한다(2026-09-23 실측 분석).
+const HALT_DISCLOSURE_ATTEMPTS = 2
+const HALT_DISCLOSURE_RETRY_DELAY_MS = 500
 const HALT_DISCLOSURE_CACHE_TTL_MS = 300_000
 const HALT_DISCLOSURE_WINDOW_DAYS = 90
 const HALT_DISCLOSURE_PAGE_COUNT = 50
@@ -45,6 +51,7 @@ type HaltDisclosuresRequestOptions = {
   fetcher?: typeof fetch
   timeoutMs?: number
   cacheTtlMs?: number
+  retryDelayMs?: number
   now?: () => number
 }
 
@@ -217,6 +224,34 @@ function jsonError(status: number, code: string, message: string) {
   return NextResponse.json({ ok: false, error: { code, message } }, { status })
 }
 
+function resolveHaltRetryDelayMs(options: HaltDisclosuresRequestOptions) {
+  const configured = options.retryDelayMs
+  return configured !== undefined && Number.isFinite(configured) && configured >= 0 ? configured : HALT_DISCLOSURE_RETRY_DELAY_MS
+}
+
+// 재시도 사이 대기. 클라이언트가 도중에 끊으면 바로 깨어난다(요청 신호 존중).
+function waitForHaltRetryDelay(delayMs: number, signal?: AbortSignal) {
+  if (delayMs <= 0) {
+    return Promise.resolve()
+  }
+
+  return new Promise<void>((resolve) => {
+    const finish = () => {
+      clearTimeout(timer)
+      signal?.removeEventListener('abort', onAbort)
+      resolve()
+    }
+    const onAbort = () => finish()
+    const timer = setTimeout(finish, delayMs)
+
+    if (signal?.aborted) {
+      finish()
+      return
+    }
+    signal?.addEventListener('abort', onAbort, { once: true })
+  })
+}
+
 function jsonSuccess(body: HaltDisclosuresSuccessBody, cacheTtlMs: number) {
   return NextResponse.json(body, {
     headers: cacheTtlMs > 0
@@ -244,20 +279,37 @@ export async function handleHaltDisclosuresRequest(request: NextRequest, options
   }
 
   try {
-    let inflight = haltDisclosuresInflight.get(code)
-    if (!inflight) {
-      const upstreamUrl = buildHaltDisclosuresUpstreamUrl(getCrawlerBaseUrl(), code)
-      inflight = fetchHaltDisclosuresUpstream(upstreamUrl, fetcher, timeoutMs, request.signal)
-        .then((payload) => ({ ok: true as const, data: classifyHaltFilings(payload, code) }))
-        .finally(() => {
-          haltDisclosuresInflight.delete(code)
-        })
-      haltDisclosuresInflight.set(code, inflight)
+    let body: HaltDisclosuresSuccessBody | null = null
+    let lastError: unknown = null
+
+    for (let attempt = 1; attempt <= HALT_DISCLOSURE_ATTEMPTS && !request.signal.aborted; attempt += 1) {
+      try {
+        let inflight = haltDisclosuresInflight.get(code)
+        if (!inflight) {
+          const upstreamUrl = buildHaltDisclosuresUpstreamUrl(getCrawlerBaseUrl(), code)
+          inflight = fetchHaltDisclosuresUpstream(upstreamUrl, fetcher, timeoutMs, request.signal)
+            .then((payload) => ({ ok: true as const, data: classifyHaltFilings(payload, code) }))
+            .finally(() => {
+              haltDisclosuresInflight.delete(code)
+            })
+          haltDisclosuresInflight.set(code, inflight)
+        }
+
+        body = await inflight
+        break
+      } catch (error) {
+        lastError = error
+        if (attempt < HALT_DISCLOSURE_ATTEMPTS && !request.signal.aborted) {
+          await waitForHaltRetryDelay(resolveHaltRetryDelayMs(options), request.signal)
+        }
+      }
     }
 
-    const body = await inflight
     if (request.signal.aborted) {
       return jsonError(499, 'client-abort', 'request aborted')
+    }
+    if (!body) {
+      throw lastError
     }
 
     if (cacheTtlMs > 0) {
