@@ -15,7 +15,7 @@ import {
   isHaltedHomeHolding,
   resolveDeepScanHaltVerdict,
 } from '@/lib/deepscan-halt'
-import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
+import { DeepScanApiError, fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
 import { computePriceDriftPct, extractSnapshotPriceBasis, resolveDeepScanSnapshotKey } from '@/lib/deepscan-snapshot-policy'
 import { type LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
 import { fetchLoadingProxyJson } from '@/lib/loading-fetch-retry'
@@ -75,6 +75,7 @@ export default function DeepScanPage() {
   const setDeepScanTarget = useDeepScanStore((state) => state.setTarget)
   const requestStatus = useDeepScanStore((state) => state.requestStatus)
   const errorMessage = useDeepScanStore((state) => state.errorMessage)
+  const errorCode = useDeepScanStore((state) => state.errorCode)
   const activePayload = useDeepScanStore((state) => state.activePayload)
   const activeTargetKey = useDeepScanStore((state) => state.activeTargetKey)
   const lastSuccessful = useDeepScanStore((state) => state.lastSuccessful)
@@ -552,7 +553,10 @@ export default function DeepScanPage() {
         }
 
         settled = true
-        finishError(error instanceof Error ? error.message : 'DeepScan 데이터를 표시할 수 없어요. 잠시 후 다시 시도해주세요.')
+        finishError(
+          error instanceof Error ? error.message : 'DeepScan 데이터를 표시할 수 없어요. 잠시 후 다시 시도해주세요.',
+          error instanceof DeepScanApiError ? error.code : null,
+        )
       }
     }
 
@@ -853,11 +857,19 @@ export default function DeepScanPage() {
     ?? (requestSeed.holding.market === 'US' ? 'USD' : undefined)
   const loadingQuickFacts = buildLoadingQuickFacts(payload, activeLoadingQuickQuote, activeLoadingBriefingSnapshot, requestSeed.holding.name, requestSeed.holding.market, requestSeed.holding.kind)
   const evidenceCollected = hasCollectedDeepScanEvidence(payload)
-  const requestErrorNotice = {
-    badge: '오류',
-    title: 'DeepScan 데이터를 표시할 수 없어요',
-    body: errorMessage ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
-  }
+  // 크레딧 부족(402)은 일시적 오류가 아니다 — 재시도 대신 크레딧 문구와 충전 CTA로 안내한다.
+  const isCreditShortage = fetchState === 'error' && errorCode === 'insufficient-credits'
+  const requestErrorNotice = isCreditShortage
+    ? {
+        badge: '크레딧 부족',
+        title: '딥스캔 크레딧이 부족해요',
+        body: errorMessage ?? '마이페이지에서 크레딧을 충전한 뒤 다시 시도해주세요.',
+      }
+    : {
+        badge: '오류',
+        title: 'DeepScan 데이터를 표시할 수 없어요',
+        body: errorMessage ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
+      }
 
   const identifier = [requestSeed.holding.ticker, requestSeed.holding.code]
     .filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index)
@@ -929,7 +941,8 @@ export default function DeepScanPage() {
             target={target}
           /> : null}
         errorNotice={fetchState === 'error' ? requestErrorNotice : null}
-        onRetry={handleRetry}
+        onRetry={isCreditShortage ? undefined : handleRetry}
+        errorPrimaryAction={isCreditShortage ? { label: '충전하러 가기', href: '/mypage/credit' } : undefined}
         backHref='/home'
       />
     </div>
