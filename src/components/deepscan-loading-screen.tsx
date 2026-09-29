@@ -105,6 +105,7 @@ export function DeepScanLoadingScreen({
   inlineResults,
   errorNotice,
   onRetry,
+  errorPrimaryAction,
   headerNotice,
 }: DeepScanLoadingScreenProps) {
   const isError = Boolean(errorNotice)
@@ -333,13 +334,17 @@ export function DeepScanLoadingScreen({
             <div className={styles.errorHead}>
               <span className={styles.errorIcon} aria-hidden='true'>!</span>
               <div>
-                <span className={styles.errorEyebrow}>분석 요청 실패</span>
+                <span className={styles.errorEyebrow}>
+                  {errorNotice?.badge && errorNotice.badge !== '오류' ? errorNotice.badge : '분석 요청 실패'}
+                </span>
                 <h2 className={styles.errorTitle}>{errorNotice?.title ?? 'DeepScan 데이터를 표시할 수 없어요'}</h2>
               </div>
             </div>
             <p className={styles.errorBody}>{errorNotice?.body ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.'}</p>
             <div className={styles.errorActions}>
-              {onRetry ? (
+              {errorPrimaryAction ? (
+                <Link href={errorPrimaryAction.href} className={styles.errorRetryButton}>{errorPrimaryAction.label}</Link>
+              ) : onRetry ? (
                 <button type='button' className={styles.errorRetryButton} onClick={onRetry}>다시 시도</button>
               ) : null}
               <Link href={backHref} className={styles.errorBackLink}>다른 종목 선택</Link>

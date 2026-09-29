@@ -303,6 +303,20 @@ export function buildDeepScanCanonicalQuery(targetSession: DeepScanCanonicalTarg
   return searchParams
 }
 
+// /api/deepscan 실패 응답 — 서버 안내 문구(§6-6)와 error.code(예: insufficient-credits),
+// HTTP status를 함께 실어 UI가 오류 종류별로 분기할 수 있게 한다.
+export class DeepScanApiError extends Error {
+  readonly code: string
+  readonly status: number
+
+  constructor(message: string, code: string, status: number) {
+    super(message)
+    this.name = 'DeepScanApiError'
+    this.code = code
+    this.status = status
+  }
+}
+
 export async function fetchDeepScanCanonicalPayload(
   targetSession: DeepScanCanonicalTargetSession,
   fetcher: typeof fetch = fetch,
@@ -315,10 +329,14 @@ export async function fetchDeepScanCanonicalPayload(
   const payload = await response.json()
 
   if (!response.ok && payload && typeof payload === 'object' && 'error' in payload) {
-    const message = (payload as { error?: { message?: string } }).error?.message
-    if (message) {
+    const errorBody = (payload as { error?: { message?: string; code?: string } }).error
+    if (errorBody?.message) {
       // 서버 안내(크레딧 부족·로그인·환불 안내 등)를 화면까지 전달한다 (§6-6).
-      throw new Error(String(message))
+      throw new DeepScanApiError(
+        String(errorBody.message),
+        String(errorBody.code ?? 'unknown'),
+        response.status,
+      )
     }
   }
 

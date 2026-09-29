@@ -49,8 +49,10 @@ export type DeepScanLoadingScreenProps = {
   onBack?: () => void
   backHref?: string
   inlineResults?: ReactNode
-  errorNotice?: { title: string; body: string } | null
+  errorNotice?: { badge?: string; title: string; body: string } | null
   onRetry?: () => void
+  /** 재시도가 무의미한 오류(크레딧 부족 등)의 1차 액션 — 링크 버튼으로 렌더 */
+  errorPrimaryAction?: { label: string; href: string }
   /** 결과 화면 최상단 안내(스냅샷 출처 바 등) — 헤더와 본문 사이에 렌더 */
   headerNotice?: ReactNode
 }
