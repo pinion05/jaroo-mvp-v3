@@ -2085,6 +2085,10 @@
 
 .errorRetryButton {
   height: 46px;
+  /* button 요소와 Link(a) 양쪽에서 쓰므로 정렬을 스타일이 직접 보장한다 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 14px;
   background: var(--ds-blue);
@@ -2092,6 +2096,7 @@
   font-size: 14px;
   font-weight: 800;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .errorBackLink {

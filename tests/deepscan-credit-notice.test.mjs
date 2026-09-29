@@ -56,3 +56,12 @@ test('딥스캔 로딩 화면 오류 카드가 primary 링크 액션을 지원�
   // 1차 액션이 있으면 '다시 시도' 대신 링크 버튼이 렌더된다
   assert.match(source, /errorPrimaryAction \? \(/)
 })
+
+test('오류 카드 1차 액션 버튼은 링크(a)에도 텍스트가 가운데 정렬된다', () => {
+  // errorPrimaryAction은 Link(a)로 렌더된다 — 버튼 전용 스타일을 그대로 쓰면
+  // a 태그는 기본 왼쪽 정렬이라 글자가 쏠린다(2026-09-29 jaroo.kr 시각 QA).
+  const css = read('src/components/deepscan-loading-screen.module.css')
+  const rule = css.match(/\.errorRetryButton \{[^}]+\}/)?.[0] ?? ''
+  assert.match(rule, /justify-content:\s*center/)
+  assert.match(rule, /align-items:\s*center/)
+})
