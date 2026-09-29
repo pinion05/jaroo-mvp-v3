@@ -81,19 +81,25 @@ function normalizeHaltCode(value: string | null) {
   return match ? match[0] : null
 }
 
-function formatLocalDate(date: Date) {
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}-${month}-${day}`
+// KRX 공시 조회 창은 서울 증시 기준 — 실행 머신 타임존(운영 UTC, CI UTC)과 무관하게
+// Asia/Seoul 달력일로 포맷한다. 프로세스 로컬 타임존을 쓰면 UTC 환경에서 창이 하루 앞으로 밀린다.
+const haltKstDateFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Seoul',
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+})
+
+function formatKstDate(date: Date) {
+  return haltKstDateFormatter.format(date)
 }
 
 export function buildHaltDisclosuresUpstreamUrl(baseUrl: string, code: string, now = Date.now()) {
   const toDate = new Date(now)
   const fromDate = new Date(now - HALT_DISCLOSURE_WINDOW_DAYS * 24 * 60 * 60 * 1000)
   const search = new URLSearchParams({
-    from: formatLocalDate(fromDate),
-    to: formatLocalDate(toDate),
+    from: formatKstDate(fromDate),
+    to: formatKstDate(toDate),
     pageCount: String(HALT_DISCLOSURE_PAGE_COUNT),
     sort: 'date',
     sortMth: 'desc',
