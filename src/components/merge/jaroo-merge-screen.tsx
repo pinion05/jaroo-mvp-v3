@@ -11,6 +11,8 @@ import { hydratePortfolioItemsWithCurrentQuotes } from '@/lib/home-quote-bootstr
 import { getFinancialValueTextClass } from '@/lib/financial-value-tone'
 import {
   buildMergeRowsFromReviewRows,
+  fillMissingAveragePricesFromQuotes,
+  markMissingAveragePriceErrors,
   persistAppliedPortfolioFromMergeRows,
 } from '@/lib/ocr-portfolio-apply'
 import { syncPortfolioToServer } from '@/lib/portfolio-sync'
@@ -89,8 +91,26 @@ export default function JarooMergeScreen() {
       return
     }
 
-    setMergeRows(buildMergeRowsFromReviewRows(reviewRows))
-  }, [mergeRows.length, reviewRows, router, setMergeRows])
+    let isCancelled = false
+    setApplyStatus('loading')
+
+    // 평단이 화면에 없는 행은 현재 시세로 역산해 채운 뒤 병합 행을 만든다(스키마 축소, 2026-09-29).
+    void (async () => {
+      const filledRows = await fillMissingAveragePricesFromQuotes(reviewRows)
+      const nextMergeRows = markMissingAveragePriceErrors(buildMergeRowsFromReviewRows(filledRows))
+
+      if (isCancelled) {
+        return
+      }
+
+      setMergeRows(nextMergeRows)
+      setApplyStatus('idle')
+    })()
+
+    return () => {
+      isCancelled = true
+    }
+  }, [mergeRows.length, reviewRows, router, setApplyStatus, setMergeRows])
 
   const applicableHoldings = useMemo(() => getApplicableConfirmedHoldings(mergeRows), [mergeRows])
   const normalizedItems = useMemo(

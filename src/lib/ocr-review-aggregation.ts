@@ -1,5 +1,4 @@
 import {
-  computeAveragePrice,
   formatComputedNumber,
   normalizeStockName,
   parseOcrNumber,
@@ -54,6 +53,7 @@ function sumParsedProfitAmounts(rows: OcrReviewRow[]) {
 
 function formatSignedComputedNumber(value: number) {
   const normalizedValue = Number(value.toFixed(4))
+
   if (!Number.isFinite(normalizedValue)) {
     return ''
   }
@@ -61,40 +61,115 @@ function formatSignedComputedNumber(value: number) {
   return `${normalizedValue > 0 ? '+' : ''}${normalizedValue}`
 }
 
-function computeMergedProfitRate(rows: OcrReviewRow[], evaluationAmount: number, profitAmount: number | null) {
-  if (profitAmount !== null) {
-    const principal = evaluationAmount - profitAmount
-    if (Number.isFinite(principal) && principal > 0) {
-      return `${profitAmount > 0 ? '+' : ''}${((profitAmount / principal) * 100).toFixed(1).replace('-', '−')}%`
-    }
+function formatMergedRate(rate: number) {
+  return `${rate > 0 ? '+' : ''}${rate.toFixed(1).replace('-', '−')}%`
+}
+
+// OCR 스키마 축소(2026-09-29) 이후 평가금액·손익금액은 더 이상 모델이 뽑지 않는다.
+// 평단·수량이 있으면 원금(qty×avg) 기반으로 평가금액·손익·병합 수익률을 유도하고,
+// 수동 입력·레거시 행의 명시값(explicit)이 있으면 그것을 우선한다.
+function computeRowPrincipal(row: OcrReviewRow) {
+  const quantity = parseOcrNumber(row.quantity)
+  const averagePrice = parseOcrNumber(row.averagePrice)
+
+  if (quantity === null || quantity <= 0 || averagePrice === null || averagePrice <= 0) {
+    return null
   }
 
-  const principalValues = rows.map((row) => {
-    const rowEvaluationAmount = parseOcrNumber(row.evaluationAmount)
-    const rowProfitRate = parseOcrProfitRate(row.profitRate)
+  const principal = quantity * averagePrice
 
-    if (rowEvaluationAmount === null || rowProfitRate === null) {
+  return Number.isFinite(principal) && principal > 0 ? principal : null
+}
+
+function deriveEvaluationAmountFromPrincipals(rows: OcrReviewRow[]) {
+  const values = rows.map((row) => {
+    const principal = computeRowPrincipal(row)
+
+    if (principal === null) {
       return null
     }
 
-    const divisor = 1 + (rowProfitRate / 100)
-    if (!Number.isFinite(divisor) || divisor === 0) {
-      return null
-    }
-
-    return rowEvaluationAmount / divisor
+    const rate = parseOcrProfitRate(row.profitRate)
+    return principal * (1 + ((rate ?? 0) / 100))
   })
 
-  if (!principalValues.every((value): value is number => value !== null)) {
-    return ''
+  return values.every((value): value is number => value !== null)
+    ? values.reduce((sum, value) => sum + value, 0)
+    : null
+}
+
+function deriveProfitAmountFromPrincipals(rows: OcrReviewRow[]) {
+  const values = rows.map((row) => {
+    const principal = computeRowPrincipal(row)
+
+    if (principal === null) {
+      return null
+    }
+
+    const rate = parseOcrProfitRate(row.profitRate)
+    return principal * ((rate ?? 0) / 100)
+  })
+
+  return values.every((value): value is number => value !== null)
+    ? values.reduce((sum, value) => sum + value, 0)
+    : null
+}
+
+function computeMergedProfitRate(rows: OcrReviewRow[], evaluationAmount: number | null, profitAmount: number | null) {
+  if (evaluationAmount !== null && profitAmount !== null) {
+    const principal = evaluationAmount - profitAmount
+
+    if (Number.isFinite(principal) && principal > 0) {
+      return formatMergedRate((profitAmount / principal) * 100)
+    }
   }
 
-  const principal = principalValues.reduce((sum, value) => sum + value, 0)
-  if (!Number.isFinite(principal) || principal === 0) {
-    return ''
+  if (evaluationAmount !== null) {
+    const principalValues = rows.map((row) => {
+      const rowEvaluationAmount = parseOcrNumber(row.evaluationAmount)
+      const rowProfitRate = parseOcrProfitRate(row.profitRate)
+
+      if (rowEvaluationAmount === null || rowProfitRate === null) {
+        return null
+      }
+
+      const divisor = 1 + (rowProfitRate / 100)
+
+      if (!Number.isFinite(divisor) || divisor === 0) {
+        return null
+      }
+
+      return rowEvaluationAmount / divisor
+    })
+
+    if (principalValues.every((value): value is number => value !== null)) {
+      const principal = principalValues.reduce((sum, value) => sum + value, 0)
+
+      if (Number.isFinite(principal) && principal !== 0) {
+        return formatMergedRate(((evaluationAmount / principal) - 1) * 100)
+      }
+    }
   }
 
-  return `${(((evaluationAmount / principal) - 1) * 100) > 0 ? '+' : ''}${(((evaluationAmount / principal) - 1) * 100).toFixed(1).replace('-', '−')}%`
+  const principalRateValues = rows.map((row) => {
+    const principal = computeRowPrincipal(row)
+    const rate = parseOcrProfitRate(row.profitRate)
+
+    return principal === null || rate === null ? null : (principal * rate) / 100
+  })
+
+  if (principalRateValues.every((value): value is number => value !== null)) {
+    const totalWeightedRate = principalRateValues.reduce((sum, value) => sum + value, 0)
+    const totalPrincipal = rows
+      .map((row) => computeRowPrincipal(row))
+      .reduce((sum: number, value) => (value === null ? sum : sum + value), 0)
+
+    if (Number.isFinite(totalPrincipal) && totalPrincipal > 0) {
+      return formatMergedRate((totalWeightedRate / totalPrincipal) * 100)
+    }
+  }
+
+  return ''
 }
 
 function computeWeightedAveragePrice(rows: OcrReviewRow[]) {
@@ -136,6 +211,29 @@ function toAccountDetail(row: OcrReviewRow): OcrReviewAccountDetail {
   }
 }
 
+// 단일 행도 평가금액·손익금액이 비어 있으면 평단 기반으로 유도해 검수 UI·스냅샷이 비어 보이지 않게 한다.
+function deriveSnapshotFields(row: OcrReviewRow): Partial<OcrReviewRow> {
+  const patch: Partial<OcrReviewRow> = {}
+
+  if (!row.evaluationAmount.trim()) {
+    const derivedEvaluationAmount = deriveEvaluationAmountFromPrincipals([row])
+
+    if (derivedEvaluationAmount !== null) {
+      patch.evaluationAmount = formatComputedNumber(derivedEvaluationAmount)
+    }
+  }
+
+  if (!row.profitAmount?.trim()) {
+    const derivedProfitAmount = deriveProfitAmountFromPrincipals([row])
+
+    if (derivedProfitAmount !== null) {
+      patch.profitAmount = formatSignedComputedNumber(derivedProfitAmount)
+    }
+  }
+
+  return patch
+}
+
 function aggregateGroup(rows: OcrReviewRow[]): AggregatedOcrReviewRow {
   const orderedRows = [...rows].sort((left, right) => {
     const leftIndex = left.rowIndex ?? Number.MAX_SAFE_INTEGER
@@ -148,6 +246,7 @@ function aggregateGroup(rows: OcrReviewRow[]): AggregatedOcrReviewRow {
     const single = primary ?? rows[0]
     return {
       ...(single as OcrReviewRow),
+      ...deriveSnapshotFields(single),
       sourceRowIds: single ? [single.id] : [],
       accountDetails: single ? [toAccountDetail(single)] : [],
       isAccountMerged: false,
@@ -155,17 +254,31 @@ function aggregateGroup(rows: OcrReviewRow[]): AggregatedOcrReviewRow {
   }
 
   const quantity = sumParsed(orderedRows, 'quantity')
-  const evaluationAmount = sumParsed(orderedRows, 'evaluationAmount')
-  const profitAmount = sumParsedProfitAmounts(orderedRows)
+  const explicitEvaluationAmount = sumParsed(orderedRows, 'evaluationAmount')
+  const explicitProfitAmount = sumParsedProfitAmounts(orderedRows)
+  const derivedEvaluationAmount = explicitEvaluationAmount !== null ? null : deriveEvaluationAmountFromPrincipals(orderedRows)
+  const derivedProfitAmount = explicitProfitAmount !== null ? null : deriveProfitAmountFromPrincipals(orderedRows)
   const quantityText = quantity === null ? primary.quantity : formatComputedNumber(quantity)
-  const evaluationAmountText = evaluationAmount === null ? primary.evaluationAmount : formatComputedNumber(evaluationAmount)
-  const profitAmountText = profitAmount === null ? primary.profitAmount : formatSignedComputedNumber(profitAmount)
-  const profitRateText = evaluationAmount === null
-    ? primary.profitRate
-    : computeMergedProfitRate(orderedRows, evaluationAmount, profitAmount) || primary.profitRate
+  const evaluationAmountText =
+    explicitEvaluationAmount !== null
+      ? formatComputedNumber(explicitEvaluationAmount)
+      : derivedEvaluationAmount !== null
+        ? formatComputedNumber(derivedEvaluationAmount)
+        : primary.evaluationAmount
+  const profitAmountText =
+    explicitProfitAmount !== null
+      ? formatSignedComputedNumber(explicitProfitAmount)
+      : derivedProfitAmount !== null
+        ? formatSignedComputedNumber(derivedProfitAmount)
+        : primary.profitAmount
+  const profitRateText =
+    computeMergedProfitRate(orderedRows, explicitEvaluationAmount, explicitProfitAmount)
+    || (derivedEvaluationAmount !== null
+      ? computeMergedProfitRate(orderedRows, derivedEvaluationAmount, derivedProfitAmount)
+      : '')
+    || primary.profitRate
   const averagePriceText =
     computeWeightedAveragePrice(orderedRows)
-    || computeAveragePrice(quantityText, profitRateText, evaluationAmountText, profitAmountText ?? '')
     || primary.averagePrice
 
   return {

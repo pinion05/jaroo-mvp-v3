@@ -14,6 +14,10 @@ export type OpenRouterResponse = {
   }
 }
 
+// 스키마 축소(2026-09-29): 평가금액·손익금액 추출을 제거했다. 잔고 화면의 거래량·거래대금·
+// 매입금액 등 큰 무부호 숫자가 evaluationAmount 슬롯에 덤프되는 오독이 반복돼 프롬프트 배제로는
+// 못 막았고, 정보적으로도 평단·수량·수익률이 있으면 유도 가능한 중복 필드였다.
+// 평단이 안 보이는 행은 적용 시점에 현재가 역산(ocr-portfolio-apply)으로 채운다.
 export const OCR_SCHEMA = {
   name: 'ocr_rows_response',
   strict: true,
@@ -29,14 +33,12 @@ export const OCR_SCHEMA = {
           properties: {
             name: { type: 'string' },
             quantity: { type: 'string' },
-            profitAmount: { type: 'string' },
             profitRate: { type: 'string' },
-            evaluationAmount: { type: 'string' },
+            averagePrice: { type: 'string' },
             code: { type: 'string' },
             ticker: { type: 'string' },
-            averagePrice: { type: 'string' },
           },
-          required: ['name', 'quantity', 'profitAmount', 'profitRate', 'evaluationAmount'],
+          required: ['name', 'quantity', 'profitRate'],
         },
       },
     },
@@ -63,8 +65,8 @@ export const OCR_SYSTEM_PROMPT = `You are an OCR extraction engine for Korean an
 Return ONLY valid JSON matching the provided schema.
 Never output markdown, prose, explanations, code fences, or extra keys.
 Top-level object must be exactly {"rows": [...]}.
-Every row must contain the 5 required string fields: name, quantity, profitAmount, profitRate, evaluationAmount.
-You may additionally include code, ticker, and/or averagePrice when they are visibly shown in the same row.
+Every row must contain the 3 required string fields: name, quantity, profitRate.
+You may additionally include averagePrice, code, and/or ticker when they are visibly shown in the same row.
 Do not add any other fields.
 If a value is unreadable or not visible, use an empty string.
 If there are no holdings rows, return {"rows": []}.
@@ -72,34 +74,27 @@ If there are no holdings rows, return {"rows": []}.
 Field rules:
 - name: stock/security name as shown in the screenshot. Preserve Korean or English text.
 - quantity: holding quantity as shown. Keep units if visible, for example "12주", "5 shares", "1,000".
-- profitAmount: signed row-level profit/loss amount, not market value, for example "+262,740원", "-13,263원", "+$25.30".
 - profitRate: signed profit/loss percentage, for example "+12.4%", "-3.18%", "0%".
-- evaluationAmount: holding evaluation/market value as shown, for example "1,234,000원", "$845.12", "2,500".
+- averagePrice: per-share average purchase price when visibly shown (labels such as 매입가, 매입단가, 평단, 평균단가, 평균가격, Avg Price), for example "71,500", "$150.20". Otherwise use "".
 - code: local stock code/security code when visibly shown, for example "005930". Otherwise use "".
 - ticker: market ticker when visibly shown, for example "AAPL". Otherwise use "".
-- averagePrice: per-share average purchase price when visibly shown (labels such as 매입가, 매입단가, 평단, 평균단가, Avg Price), for example "71,500", "$150.20". Otherwise use "".
 
 OCR guidance:
-- The screenshot may contain Korean labels such as 종목명, 보유수량, 수익률, 평가금액, 평가금, 평가손익, 잔고, 보유종목.
-- The screenshot may also contain English labels such as Name, Qty, Shares, P/L, Return, Profit Rate, Valuation, Market Value, Amount.
+- The screenshot may contain Korean labels such as 종목명, 보유수량, 수익률, 평단, 매입평균가격, 보유종목.
+- The screenshot may also contain English labels such as Name, Qty, Shares, Return, Profit Rate, Avg Price.
 - Extract only actual holding rows from the portfolio/list area.
 - Ignore totals, headers, footers, tabs, buttons, timestamps, ads, and account summary text unless they are part of a row.
 - Do not infer hidden values. Use only what is visible.
-- Quantity must map to the user's holding count, not price or valuation.
-- profitAmount must map to the signed row-level profit/loss amount, not evaluationAmount.
-- profitRate must map to the row-level return percentage, not profitAmount.
-- Korean brokerage rows often show a signed profitAmount followed by an unsigned percentage in parentheses.
-  "-13,263 (6.8%)" means profitAmount "-13,263" and profitRate "-6.8%".
-  "+262,740 (12.7%)" means profitAmount "+262,740" and profitRate "+12.7%".
-- If the parenthesized percentage has no sign, inherit the sign from the visible profitAmount or the loss/profit color.
-- Many Korean brokerage apps show amounts and percentages with NO sign, using color instead: red means profit (+), blue means loss (-).
-  The color rule applies to EVERY unsigned numeric field in the row, including both profitAmount and profitRate.
+- Quantity must map to the user's holding count, not price, valuation, or trading volume.
+- Never use trading volume (거래량, 거래대금, 체결량, Volume) for any field. Volume is the number of shares traded in the market, not the number held by the user.
+- Never use a total purchase amount (매입금액, 총매입) or a row-level valuation as averagePrice. averagePrice is always the per-share price.
+- Korean brokerage rows often show a signed profit/loss amount followed by an unsigned percentage in parentheses.
+  "-13,263 (6.8%)" means the row is a loss: return profitRate "-6.8%".
+  "+262,740 (12.7%)" means the row is a profit: return profitRate "+12.7%".
+- If the percentage has no sign, inherit the sign from any signed amount shown in the same row.
+- Many Korean brokerage apps show percentages with NO sign, using color instead: red means profit (+), blue means loss (-).
   In that case infer the sign from the color (or from any signed field in the same row) and ALWAYS emit an explicit leading sign.
-  An unsigned "1,234,567" shown in red must be returned as "+1,234,567" with its unsigned "5.4%" as "+5.4%";
-  an unsigned amount or percentage shown in blue must be returned with a leading "-", for example "-1,234,567" and "-5.4%".
-- evaluationAmount must map to the row-level valuation/market value amount, not profit/loss amount, principal, or a totals summary.
-- Never use a per-share purchase price (매입가/평단/매입단가) or a total purchase amount (매입금액/총매입) as evaluationAmount.
-  If the row shows a purchase price but no row-level valuation, leave evaluationAmount "" and put the per-share price in averagePrice.
+  An unsigned "5.4%" shown in red must be returned as "+5.4%"; an unsigned "5.4%" shown in blue must be returned as "-5.4%".
 - If the same row appears twice due to sticky headers or repeated sections, keep one row only.`
 
 // reasoning 계열 모델이 completion 예산을 사고(reasoning)에 소진해 JSON이 잘리는 사고 방지.

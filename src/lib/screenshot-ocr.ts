@@ -347,78 +347,6 @@ function normalizeInstrumentCode(value: unknown) {
   return normalized.length > 0 ? normalized : undefined
 }
 
-function detectOcrCurrencyHint(value: string): 'KRW' | 'USD' | undefined {
-  const normalizedValue = value.trim().toUpperCase()
-
-  if (/\$|USD/.test(normalizedValue)) {
-    return 'USD'
-  }
-
-  if (/₩|KRW|원/.test(value)) {
-    return 'KRW'
-  }
-
-  return undefined
-}
-
-// 직접 판독된 평단(averagePrice)·수량·평가금액이 모두 있으면 파생 손익금액(eval − qty×avg)의 부호와
-// 모델이 판독한 손익금액의 부호를 대조한다. 무부호 금액을 항상 +로 내놓는 모델 특성(gemma 계열 실측)
-// 때문에 색상만으로 손실을 표현한 한국 앱 화면에서 부호가 반전되는 것을 산술로 교정한다.
-//  - 통화 기호 충돌(예: 평가금액 원화 + 평단 달러) 시 산술이 무의미하므로 건드리지 않는다.
-//  - 부호만 어긋나면 부호만 뒤집고, 크기까지 5% 이상 어긋나면 판독 자체를 불신해 빈 값으로 둔다.
-function reconcileProfitAmountSignWithAveragePrice(
-  profitAmount: string,
-  quantity: string,
-  evaluationAmount: string,
-  averagePrice: string,
-) {
-  const parsedProfitAmount = parseOcrNumber(profitAmount)
-  const parsedQuantity = parseOcrNumber(quantity)
-  const parsedEvaluationAmount = parseOcrNumber(evaluationAmount)
-  const parsedAveragePrice = parseOcrNumber(averagePrice)
-
-  if (
-    parsedProfitAmount === null
-    || parsedProfitAmount === 0
-    || parsedQuantity === null
-    || parsedQuantity === 0
-    || parsedEvaluationAmount === null
-    || parsedEvaluationAmount <= 0
-    || parsedAveragePrice === null
-    || parsedAveragePrice <= 0
-  ) {
-    return profitAmount
-  }
-
-  const evaluationCurrency = detectOcrCurrencyHint(evaluationAmount)
-  const averagePriceCurrency = detectOcrCurrencyHint(averagePrice)
-
-  if (evaluationCurrency && averagePriceCurrency && evaluationCurrency !== averagePriceCurrency) {
-    return profitAmount
-  }
-
-  const derivedPrincipal = parsedQuantity * parsedAveragePrice
-  const derivedProfitAmount = parsedEvaluationAmount - derivedPrincipal
-
-  // 파산 초과 손실(손실 > 원금)만 불가능하다. 손실이 평가금액보다 큰 딥로스(예: -74%)는 정상 범위다.
-  if (!Number.isFinite(derivedProfitAmount) || derivedProfitAmount === 0) {
-    return profitAmount
-  }
-
-  if (derivedProfitAmount < 0 && Math.abs(derivedProfitAmount) >= derivedPrincipal) {
-    return profitAmount
-  }
-
-  if (Math.sign(parsedProfitAmount) === Math.sign(derivedProfitAmount)) {
-    return profitAmount
-  }
-
-  if (Math.abs(Math.abs(parsedProfitAmount) - Math.abs(derivedProfitAmount)) > Math.abs(derivedProfitAmount) * 0.05) {
-    return ''
-  }
-
-  return `${derivedProfitAmount < 0 ? '-' : '+'}${Math.abs(parsedProfitAmount)}`
-}
 export function sanitizeOcrRows(input: unknown): OcrRow[] {
   if (!Array.isArray(input)) {
     return []
@@ -430,16 +358,12 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
       const name = typeof item.name === 'string' ? item.name.trim() : ''
       const quantity = typeof item.quantity === 'string' ? item.quantity.trim() : ''
       const rawProfitRate = typeof item.profitRate === 'string' ? item.profitRate.trim() : ''
-      const rawProfitAmount = typeof item.profitAmount === 'string' ? item.profitAmount.trim() : ''
+      // 손익금액·평가금액은 OCR 스키마에서 제거됐다(2026-09-29). 수동 입력·레거시 행만
+      // passthrough하며, 여기서 정규화·역산을 하지 않는다.
+      const profitAmount = typeof item.profitAmount === 'string' ? item.profitAmount.trim() : undefined
       const evaluationAmount = typeof item.evaluationAmount === 'string' ? item.evaluationAmount.trim() : ''
       const averagePrice = typeof item.averagePrice === 'string' ? item.averagePrice.trim() : ''
-      const profitAmount = reconcileProfitAmountSignWithAveragePrice(
-        normalizeOcrProfitAmount(rawProfitAmount, rawProfitRate),
-        quantity,
-        evaluationAmount,
-        averagePrice,
-      )
-      const profitRate = normalizeOcrProfitRate(rawProfitRate, profitAmount)
+      const profitRate = normalizeOcrProfitRate(rawProfitRate, profitAmount ?? '')
       const code = normalizeInstrumentCode(item.code)
       const ticker = normalizeInstrumentCode(item.ticker)
       const resolvedName = typeof item.resolvedName === 'string' ? item.resolvedName.trim() : undefined
@@ -455,10 +379,10 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
       return {
         name,
         quantity,
-        profitAmount,
+        profitAmount: profitAmount || undefined,
         profitRate,
         evaluationAmount,
-        averagePrice: averagePrice || computeAveragePrice(quantity, profitRate, evaluationAmount, profitAmount),
+        averagePrice,
         code,
         ticker,
         resolvedName,
@@ -469,7 +393,7 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
         resolvedKind,
       }
     })
-    .filter((item) => item.name.length > 0 || item.quantity.length > 0 || Boolean(item.profitAmount) || item.profitRate.length > 0 || item.evaluationAmount.length > 0)
+    .filter((item) => item.name.length > 0 || item.quantity.length > 0 || item.profitRate.length > 0 || item.evaluationAmount.length > 0)
 }
 
 export function sanitizeOcrInstrumentCandidates(input: unknown): OcrInstrumentCandidate[] {

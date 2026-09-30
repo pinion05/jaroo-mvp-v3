@@ -69,3 +69,28 @@ test('aggregateResolvedOcrReviewRows sums profitAmount and derives exact merged 
   assert.equal(aggregated?.evaluationAmount, '305,628')
   assert.equal(aggregated?.profitRate, '−6.3%')
 })
+
+test('aggregateResolvedOcrReviewRows는 평가금액·손익금액 없이 평단 기반으로 지표를 유도한다', () => {
+  const [aggregated] = aggregateResolvedOcrReviewRows([
+    row({ id: 'a', quantity: '10', averagePrice: '100', profitRate: '+10%', evaluationAmount: '', profitAmount: undefined }),
+    row({ id: 'b', quantity: '30', averagePrice: '200', profitRate: '-5%', evaluationAmount: '', profitAmount: undefined }),
+  ])
+
+  // 원금 1,000 + 6,000 = 7,000 · 손익 +100 − 300 = −200 · 평가 6,800 · 가중 수익률 −200/7,000
+  assert.equal(aggregated?.quantity, '40')
+  assert.equal(aggregated?.averagePrice, '175')
+  assert.equal(aggregated?.profitAmount, '-200')
+  assert.equal(aggregated?.evaluationAmount, '6,800')
+  assert.equal(aggregated?.profitRate, '−2.9%')
+})
+
+test('aggregateResolvedOcrReviewRows는 단일 행의 평가금액·손익을 평단에서 유도한다', () => {
+  const [aggregated] = aggregateResolvedOcrReviewRows([
+    row({ id: 'solo', quantity: '3', averagePrice: '64800', profitRate: '-6.8%', evaluationAmount: '', profitAmount: undefined }),
+  ])
+
+  // 원금 194,400 · 평가 194,400×0.932 = 181,180.8 → 181,181 · 손익 −13,219.2
+  assert.equal(aggregated?.isAccountMerged, false)
+  assert.equal(aggregated?.evaluationAmount, '181,181')
+  assert.equal(aggregated?.profitAmount, '-13219.2')
+})

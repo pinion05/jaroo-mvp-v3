@@ -4,7 +4,13 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
 import { MergeResultRowCard } from './jaroo-merge-screen'
-import { buildAppliedHomePortfolioRowsFromConfirmedHoldings, buildMergeRowsFromReviewRows, prepareMergeRowsForApply } from '@/lib/ocr-portfolio-apply'
+import {
+  buildAppliedHomePortfolioRowsFromConfirmedHoldings,
+  buildMergeRowsFromReviewRows,
+  deriveAveragePriceFromCurrentPrice,
+  fillMissingAveragePricesFromQuotes,
+  markMissingAveragePriceErrors,
+} from '@/lib/ocr-portfolio-apply'
 import type { OcrReviewRow } from '@/lib/workflow-types'
 
 function createReviewRow(overrides: Partial<OcrReviewRow> = {}): OcrReviewRow {
@@ -28,68 +34,69 @@ function createReviewRow(overrides: Partial<OcrReviewRow> = {}): OcrReviewRow {
   }
 }
 
-test('prepareMergeRowsForApply는 averagePrice가 비어 있으면 apply 직전에 1회 보강한다', () => {
-  const rows = [{
-    name: '삼성전자',
-    quantity: '10주',
-    profitRate: '-23.4%',
-    evaluationAmount: '766,000원',
-    averagePrice: ' ',
-  }]
-
-  const preparedRows = prepareMergeRowsForApply(rows)
-
-  assert.notStrictEqual(preparedRows, rows)
-  assert.equal(preparedRows[0]?.averagePrice, '100,000')
-  assert.equal(rows[0]?.averagePrice, ' ')
+test('deriveAveragePriceFromCurrentPrice는 현재가와 수익률로 평단을 역산한다', () => {
+  assert.equal(deriveAveragePriceFromCurrentPrice(76600, -23.4), 76600 / 0.766)
+  assert.equal(deriveAveragePriceFromCurrentPrice(150.2, 20), 150.2 / 1.2)
+  assert.equal(deriveAveragePriceFromCurrentPrice(100, 0), 100)
+  // rate이 없으면 현재가를 평단으로 쓰고, −100%(원금 전멸)이거나 가격이 유효하지 않으면 거절한다
+  assert.equal(deriveAveragePriceFromCurrentPrice(100), 100)
+  assert.equal(deriveAveragePriceFromCurrentPrice(100, -100), null)
+  assert.equal(deriveAveragePriceFromCurrentPrice(0, 10), null)
+  assert.equal(deriveAveragePriceFromCurrentPrice(-5, 10), null)
 })
 
-test('prepareMergeRowsForApply는 평가손익 금액으로 정확한 평단을 보강한다', () => {
-  const [prepared] = prepareMergeRowsForApply([{
-    name: 'SOOP',
-    quantity: '3주',
-    profitAmount: '-13,263원',
-    profitRate: '6.8%',
-    evaluationAmount: '181,137원',
-    averagePrice: '',
-  }])
+test('fillMissingAveragePricesFromQuotes은 평단 미보유 행에 현재가 역산값을 채운다', async () => {
+  const fetcher = (async () => new Response(
+    JSON.stringify({ data: { items: [{ market: 'KR', code: '005930', price: 76600, status: 'ok' }] } }),
+    { status: 200 },
+  )) as unknown as typeof fetch
 
-  assert.equal(prepared?.averagePrice, '64,800')
+  const [filled] = await fillMissingAveragePricesFromQuotes([
+    createReviewRow({ averagePrice: '' }),
+  ], fetcher)
+
+  assert.equal(filled?.averagePrice, '100,000')
 })
 
-test('prepareMergeRowsForApply는 dash/N-A placeholder averagePrice도 apply 직전에 1회 보강한다', () => {
-  const dashRows = [{
-    name: '삼성전자',
-    quantity: '10주',
-    profitRate: '-23.4%',
-    evaluationAmount: '766,000원',
-    averagePrice: '-',
-  }]
-  const naRows = [{
-    name: '삼성전자',
-    quantity: '10주',
-    profitRate: '-23.4%',
-    evaluationAmount: '766,000원',
-    averagePrice: 'N/A',
-  }]
+test('fillMissingAveragePricesFromQuotes은 시세 조회 실패 시 행을 그대로 둔다', async () => {
+  const fetcher = (async () => new Response('{"error":"boom"}', { status: 500 })) as unknown as typeof fetch
 
-  assert.equal(prepareMergeRowsForApply(dashRows)[0]?.averagePrice, '100,000')
-  assert.equal(prepareMergeRowsForApply(naRows)[0]?.averagePrice, '100,000')
+  const [unchanged] = await fillMissingAveragePricesFromQuotes([
+    createReviewRow({ averagePrice: '' }),
+  ], fetcher)
+
+  assert.equal(unchanged?.averagePrice, '')
 })
 
-test('prepareMergeRowsForApply는 기존 averagePrice가 있으면 그대로 유지한다', () => {
-  const rows = [{
-    name: '삼성전자',
-    quantity: '10주',
-    profitRate: '-23.4%',
-    evaluationAmount: '766,000원',
-    averagePrice: '88,000원',
-  }]
+test('fillMissingAveragePricesFromQuotes은 이미 평단이 있으면 조회하지 않는다', async () => {
+  let fetched = false
+  const fetcher = (async () => {
+    fetched = true
+    return new Response('{}', { status: 200 })
+  }) as unknown as typeof fetch
 
-  const preparedRows = prepareMergeRowsForApply(rows)
+  const [unchanged] = await fillMissingAveragePricesFromQuotes([
+    createReviewRow({ averagePrice: '88,000원' }),
+  ], fetcher)
 
-  assert.equal(preparedRows[0]?.averagePrice, '88,000원')
+  assert.equal(fetched, false)
+  assert.equal(unchanged?.averagePrice, '88,000원')
 })
+
+test('markMissingAveragePriceErrors는 보강되지 못한 행만 제외 표시한다', () => {
+  const [readyRow, errorRow] = markMissingAveragePriceErrors([
+    { ...createMergeReadyRow(), averagePriceText: '100,000' },
+    { ...createMergeReadyRow(), averagePriceText: '' },
+  ])
+
+  assert.equal(readyRow?.status, 'ready')
+  assert.equal(errorRow?.status, 'error')
+  assert.equal(errorRow?.errorCode, 'merge-average-price-missing')
+})
+
+function createMergeReadyRow() {
+  return buildMergeRowsFromReviewRows([createReviewRow({ averagePrice: '88,000원' })])[0]!
+}
 
 test('buildMergeRowsFromReviewRows는 정규화할 수 없는 행을 error row로 남긴다', () => {
   const [errorRow] = buildMergeRowsFromReviewRows([
