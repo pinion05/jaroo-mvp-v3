@@ -51,3 +51,8 @@ next-env.d.ts
 
 # supabase
 supabase/.temp/
+
+# local bench/report artifacts (not build targets)
+/artifacts/
+/.gstack/
+/.reports/
