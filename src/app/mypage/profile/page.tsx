@@ -3,7 +3,6 @@
 import { useEffect, useState } from 'react'
 import { Camera } from 'lucide-react'
 import { SpecFrame } from '@/components/spec/spec-frame'
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import styles from '../detail.module.css'
 
 export default function ProfileEditPage() {
@@ -31,10 +30,14 @@ export default function ProfileEditPage() {
     setSaved(false)
     setError(null)
     try {
-      const supabase = createSupabaseBrowserClient()
-      const { error } = await supabase.auth.updateUser({ data: { display_name: name.trim() } })
-      if (error) {
-        setError(error.message || '저장하지 못했어요.')
+      const res = await fetch('/api/account/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ displayName: name.trim() }),
+      })
+      const data = (await res.json().catch(() => null)) as { error?: string } | null
+      if (!res.ok) {
+        setError(data?.error || '저장하지 못했어요.')
       } else {
         setSaved(true)
         setInitial((name || '?').trim().slice(0, 1))

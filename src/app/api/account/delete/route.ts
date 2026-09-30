@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { createSupabaseServiceClient } from '@/lib/supabase/service'
+import { originAllowedForStateChange } from '@/lib/http-origin-guard'
 
 export const runtime = 'nodejs'
 
@@ -10,7 +11,13 @@ const NO_STORE_PRIVATE_HEADERS = { 'Cache-Control': 'no-store, private' }
 // 1) portfolio_holdings 은 auth.users 로의 FK 가 없어(스키마 캡처 테이블) 직접 삭제하고,
 // 2) auth.users 삭제 시 profiles/결제/크레딧·구독 테이블이 ON DELETE CASCADE 로 정리된다.
 // 결제 원장은 회사 보관 의무(전자상거래법) 소지가 있으나 MVP 정책은 전체 삭제 CASCADE 다.
-export async function POST() {
+export async function POST(request: Request) {
+  if (!originAllowedForStateChange(request)) {
+    return NextResponse.json(
+      { error: { code: 'origin_not_allowed', message: '요청을 처리할 수 없어요.' } },
+      { status: 403, headers: NO_STORE_PRIVATE_HEADERS },
+    )
+  }
   const supabase = await createSupabaseServerClient()
   const {
     data: { user },

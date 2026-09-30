@@ -18,7 +18,7 @@ import { isPaymentConfigured } from './server'
 //   - 그 외 → spend_credits RPC 로 1회분 차감(부족 시 insufficient-credits)
 
 export type DeepScanRunGateResult =
-  | { status: 'allowed'; charged: number; proCovered: boolean }
+  | { status: 'allowed'; charged: number; proCovered: boolean; userId?: string }
   | { status: 'auth-required' }
   | { status: 'insufficient-credits'; balance: number; cost: number }
   | { status: 'unavailable' }
@@ -66,7 +66,7 @@ export async function authorizeDeepScanRun(targetRef?: string): Promise<DeepScan
     return { status: 'unavailable' }
   }
   if (subscription?.status === 'active' || subscription?.status === 'past_due') {
-    return { status: 'allowed', charged: 0, proCovered: true }
+    return { status: 'allowed', charged: 0, proCovered: true, userId }
   }
 
   const { data: spent, error: spendError } = await service.rpc('spend_credits', {
@@ -89,5 +89,28 @@ export async function authorizeDeepScanRun(targetRef?: string): Promise<DeepScan
     return { status: 'insufficient-credits', balance: balanceRow?.balance ?? 0, cost: DEEPSCAN_CREDIT_COST }
   }
 
-  return { status: 'allowed', charged: DEEPSCAN_CREDIT_COST, proCovered: false }
+  return { status: 'allowed', charged: DEEPSCAN_CREDIT_COST, proCovered: false, userId }
+}
+
+/**
+ * 선차감 크레딧 환불 (§6-6) — 유저에게 아무것도 전달되지 않은 실패에 사용.
+ * refund_credits RPC(service role 전용)로 잔액 복구 + credit_ledger refund 기록.
+ * 실패하면 false — 호출부는 로그로 수동 정산 추적을 남겨야 한다.
+ */
+export async function refundDeepScanCredits(userId: string, amount: number, ref?: string): Promise<boolean> {
+  if (amount <= 0) {
+    return false
+  }
+  const service = createSupabaseServiceClient()
+  const { data: refunded, error } = await service.rpc('refund_credits', {
+    p_user_id: userId,
+    p_amount: amount,
+    p_reason: 'refund',
+    p_ref: ref ?? null,
+  })
+  if (error) {
+    console.error('[deepscan-gate] refund_credits failed', error)
+    return false
+  }
+  return Boolean(refunded)
 }

@@ -11,7 +11,7 @@ import type {
   UsMarketIndicatorsProxyResponse,
 } from './deepscan-page-types'
 
-function normalizeDeepScanCode(value: string | undefined) {
+export function normalizeDeepScanCode(value: string | undefined) {
   const normalized = value?.trim()
   if (!normalized) {
     return undefined

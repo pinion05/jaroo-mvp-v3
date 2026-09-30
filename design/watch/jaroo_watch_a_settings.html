@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jaroo — 워치 알림 시안 A (설정형)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Pretendard',sans-serif;-webkit-font-smoothing:antialiased}
+:root{--navy:#0F1419;--navy-soft:#EAF0F8;--up:#E5484D;--down:#2B6BE6;--amber:#E5A23D;--bg:#F5F6F8;--card:#fff;--line:#E8EAEE;--t1:#0F1419;--t2:#5A6473;--t3:#97A0AE;--red-soft:#FCEBEB;--amber-soft:#FFF4DC;--amber-text:#854F0B}
+body{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;align-items:flex-start}
+.frame{background:var(--bg);border-radius:16px;width:340px;height:720px;overflow-y:auto;overflow-x:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative}
+.frame::-webkit-scrollbar{display:none}
+.caption{width:340px;text-align:center;font-size:12px;color:#555;margin-top:8px;font-weight:600}
+svg{display:block}
+
+.head{position:sticky;top:0;z-index:10;background:rgba(245,246,248,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;border-bottom:.5px solid var(--line);display:flex;align-items:center;gap:11px}
+.hb{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--t1);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.ht{font-size:15px;font-weight:600;color:var(--t1)}
+.body{padding:18px 16px 24px}
+
+.sub{font-size:12px;color:var(--t2);margin-bottom:14px}
+.label{font-size:11.5px;color:var(--t2);font-weight:600;margin:0 2px 8px;letter-spacing:.01em}
+
+/* 알림 마스터 토글 카드 */
+.master{background:#fff;border:.5px solid var(--line);border-radius:12px;padding:14px;margin-bottom:18px;display:flex;align-items:center;gap:11px}
+.master-ico{width:34px;height:34px;border-radius:10px;background:var(--navy);display:flex;align-items:center;justify-content:center;color:#fff;flex-shrink:0}
+.master-info{flex:1}
+.master-t{font-size:13.5px;font-weight:700;color:var(--t1)}
+.master-d{font-size:10.5px;color:var(--t3);margin-top:2px}
+
+/* 토글 */
+.tg{width:42px;height:24px;border-radius:999px;background:#C9D2DE;position:relative;flex-shrink:0;transition:.15s}
+.tg.on{background:var(--navy)}
+.tg::after{content:'';position:absolute;top:2px;left:2px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(0,0,0,.15);transition:.15s}
+.tg.on::after{left:20px}
+
+/* 세그먼트 */
+.seg{display:flex;background:#E8EAEE;border-radius:11px;padding:3px;margin-bottom:12px}
+.seg-btn{flex:1;border:none;background:transparent;padding:9px 4px;border-radius:9px;font-size:12px;font-weight:600;color:var(--t2)}
+.seg-btn.on{background:#fff;color:var(--t1);box-shadow:0 1px 3px rgba(0,0,0,.08)}
+.seg-n{font-size:9.5px;color:var(--t3);font-weight:500;display:block;margin-top:1px}
+
+/* 기준 설명 카드 */
+.std{background:#fff;border:.5px solid var(--line);border-radius:12px;padding:14px;margin-bottom:18px}
+.std-t{font-size:12.5px;font-weight:700;color:var(--t1);display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.std-d{font-size:10.5px;color:var(--t2);line-height:1.55;margin-bottom:11px}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-size:9.5px;font-weight:600;padding:3px 8px;border-radius:6px}
+.chip.crit{background:var(--red-soft);color:#A32D2D}
+.chip.high{background:var(--amber-soft);color:var(--amber-text)}
+.chip.med{background:var(--navy-soft);color:var(--navy)}
+.std-note{font-size:9.5px;color:var(--t3);margin-top:10px;line-height:1.5}
+
+/* 예시 미리보기 */
+.prev{background:#fff;border:.5px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:18px;display:flex;gap:10px;align-items:flex-start}
+.prev-dot{width:8px;height:8px;border-radius:50%;margin-top:5px;flex-shrink:0}
+.prev-body{flex:1}
+.prev-name{font-size:12.5px;font-weight:700;color:var(--t1)}
+.prev-txt{font-size:10.5px;color:var(--t2);margin-top:2px;line-height:1.45}
+.prev-time{font-size:9.5px;color:var(--t3);margin-top:3px;font-variant-numeric:tabular-nums}
+
+/* 링크 행 */
+.lrow{display:flex;align-items:center;gap:11px;background:#fff;border:.5px solid var(--line);border-radius:12px;padding:13px 14px;margin-bottom:9px}
+.lrow-ico{width:30px;height:30px;border-radius:9px;background:var(--navy-soft);display:flex;align-items:center;justify-content:center;color:var(--navy);flex-shrink:0}
+.lrow-t{flex:1;font-size:13px;font-weight:600;color:var(--t1)}
+.lrow-d{font-size:10px;color:var(--t3);margin-top:1px}
+
+/* 종목별 토글 행 */
+.wrow{background:#fff;border:.5px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:9px}
+.wrow-top{display:flex;align-items:center;gap:10px}
+.wdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.winfo{flex:1;min-width:0}
+.wname{font-size:13.5px;font-weight:600;color:var(--t1)}
+.wmeta{font-size:10.5px;color:var(--t3);margin-top:2px}
+.wrate{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.wrate.up{color:var(--up)}.wrate.down{color:var(--down)}
+.wrow-sub{display:flex;align-items:center;gap:6px;margin-top:9px;padding-top:9px;border-top:.5px solid var(--line)}
+.wbadge{font-size:9.5px;font-weight:600;padding:2px 7px;border-radius:5px;background:var(--red-soft);color:#A32D2D}
+.wbadge.n{background:var(--navy-soft);color:var(--navy)}
+.wsub-t{flex:1;font-size:10.5px;color:var(--t2)}
+.wsub-d{font-size:9.5px;color:var(--t3)}
+
+.note{font-size:10px;color:var(--t3);line-height:1.6;margin-top:14px}
+</style>
+</head>
+<body>
+
+<!-- A1: 알림 조건 설정 -->
+<div>
+<div class="frame">
+  <div class="head">
+    <div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></div>
+    <div class="ht">워치 알림 설정</div>
+  </div>
+  <div class="body">
+    <div class="master">
+      <div class="master-ico"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg></div>
+      <div class="master-info">
+        <div class="master-t">공시 알림</div>
+        <div class="master-d">내 종목의 새 공시를 알려드려요</div>
+      </div>
+      <div class="tg on"></div>
+    </div>
+
+    <div class="label">알림 조건</div>
+    <div class="seg">
+      <button class="seg-btn on">중요 공시만<span class="seg-n">리스크 공시 우선</span></button>
+      <button class="seg-btn">전체 공시<span class="seg-n">하루에 여러 건 가능</span></button>
+    </div>
+
+    <div class="std">
+      <div class="std-t">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 16v-4"/><path d="M12 8h.01"/></svg>
+        중요 공시 기준
+      </div>
+      <div class="std-d">공시 제목에서 아래 리스크 신호가 감지되면 중요 공시로 분류해요. 나머지는 일반 공시로 표시됩니다.</div>
+      <div class="chips">
+        <span class="chip crit">상장폐지·정리매매</span>
+        <span class="chip high">매매거래정지</span>
+        <span class="chip high">감사의견·감사범위</span>
+        <span class="chip high">부도·회생·자본잠식</span>
+        <span class="chip high">횡령·배임·불성실공시</span>
+        <span class="chip high">보고서 미제출</span>
+        <span class="chip high">거래소 심사·개선기간</span>
+        <span class="chip high">코넥스 지정자문인</span>
+        <span class="chip med">시장안내·투자유의</span>
+      </div>
+      <div class="std-note">· 출처: DART 공시 목록(OpenDART) + 자체 리스크 키워드 분류<br>· 거래정지 종목은 공시로 잡혀 "자본변동 공시 N건 확인" 형태로 알려드려요</div>
+    </div>
+
+    <div class="label">중요 공시 알림 예시</div>
+    <div class="prev">
+      <div class="prev-dot" style="background:#2B6BE6"></div>
+      <div class="prev-body">
+        <div class="prev-name">SFA반도체</div>
+        <div class="prev-txt">자본변동 공시 1건 확인 — 주권매매거래정지</div>
+        <div class="prev-time">거래소공시 · 오전 09:12</div>
+      </div>
+    </div>
+
+    <div class="lrow">
+      <div class="lrow-ico"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="m22 21-6-6"/></svg></div>
+      <div style="flex:1">
+        <div class="lrow-t">종목별 알림 관리</div>
+        <div class="lrow-d">종목마다 알림을 끌 수 있어요</div>
+      </div>
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#C2C8D0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+    </div>
+  </div>
+</div>
+<div class="caption">A1 · 알림 조건 설정 (중요 공시만 / 전체)</div>
+</div>
+
+<!-- A2: 종목별 알림 -->
+<div>
+<div class="frame">
+  <div class="head">
+    <div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></div>
+    <div class="ht">종목별 알림 관리</div>
+  </div>
+  <div class="body">
+    <div class="sub">3종목 보유 중 · 개별로 알림을 끌 수 있어요</div>
+
+    <div class="wrow">
+      <div class="wrow-top">
+        <span class="wdot" style="background:#E5484D"></span>
+        <div class="winfo">
+          <div class="wname">삼성전자</div>
+          <div class="wmeta">KOSPI · 005930 · 1주</div>
+        </div>
+        <div class="wrate up">+31.5%</div>
+      </div>
+      <div class="wrow-sub">
+        <span class="wbadge n">일반 1건</span>
+        <div class="wsub-t">최근 공시 · 분기보고서</div>
+        <div class="wsub-d">05.15</div>
+        <div class="tg on"></div>
+      </div>
+    </div>
+
+    <div class="wrow">
+      <div class="wrow-top">
+        <span class="wdot" style="background:#E5484D"></span>
+        <div class="winfo">
+          <div class="wname">LG디스플레이</div>
+          <div class="wmeta">KOSPI · 034220 · 16주</div>
+        </div>
+        <div class="wrate up">+1.3%</div>
+      </div>
+      <div class="wrow-sub">
+        <span class="wbadge n">일반 2건</span>
+        <div class="wsub-t">최근 공시 · 주요사항보고</div>
+        <div class="wsub-d">05.28</div>
+        <div class="tg on"></div>
+      </div>
+    </div>
+
+    <div class="wrow">
+      <div class="wrow-top">
+        <span class="wdot" style="background:#2B6BE6"></span>
+        <div class="winfo">
+          <div class="wname">SFA반도체</div>
+          <div class="wmeta">KOSDAQ · 036540 · 23주</div>
+        </div>
+        <div class="wrate down">−14.3%</div>
+      </div>
+      <div class="wrow-sub">
+        <span class="wbadge">중요 1건</span>
+        <div class="wsub-t">자본변동 공시 1건 확인</div>
+        <div class="wsub-d">09.16</div>
+        <div class="tg on"></div>
+      </div>
+    </div>
+
+    <div class="note">
+      워치 알림은 마이페이지의 기존 알림(분석 완료·급락 종목·마케팅)과 별개로 동작해요.<br>
+      공시 데이터: OpenDART · 종목 현재가: 네이버 시세
+    </div>
+  </div>
+</div>
+<div class="caption">A2 · 종목별 알림 관리</div>
+</div>
+
+</body>
+</html>

@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jaroo — 거래정지 시안 C (공시 상세 중심)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Pretendard',sans-serif;-webkit-font-smoothing:antialiased}
+:root{--navy:#0F1419;--navy-soft:#EAF0F8;--up:#E5484D;--down:#2B6BE6;--green:#1A9D55;--amber:#E5A23D;--bg:#F5F6F8;--card:#fff;--line:#E8EAEE;--div:#EFF1F4;--t1:#0F1419;--t2:#5A6473;--t3:#97A0AE;--red-soft:#FCEBEB;--red-text:#A32D2D;--amber-soft:#FFF4DC;--amber-text:#854F0B}
+body{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;align-items:flex-start}
+.frame{background:var(--bg);border-radius:16px;width:340px;height:720px;overflow-y:auto;overflow-x:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative}
+.frame::-webkit-scrollbar{display:none}
+.caption{width:340px;text-align:center;font-size:12px;color:#555;margin-top:8px;font-weight:600}
+svg{display:block}
+
+.head{position:sticky;top:0;z-index:10;background:rgba(245,246,248,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;border-bottom:.5px solid var(--line);display:flex;align-items:center;gap:11px}
+.hb{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--t1);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.ht{font-size:15px;font-weight:600;color:var(--t1)}
+.body{padding:16px 14px 24px}
+
+.card{overflow:hidden;border-radius:16px;border:1px solid var(--line);background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.04);margin-bottom:12px}
+
+/* 상단 요약 바 */
+.sum{display:flex;align-items:center;gap:10px;padding:14px 16px;background:linear-gradient(135deg,#FFF7F7, #fff)}
+.sum-badge{font-size:9.5px;font-weight:700;padding:3px 8px;border-radius:6px;background:var(--red-soft);color:var(--red-text);flex-shrink:0}
+.sum-info{flex:1;min-width:0}
+.sum-name{font-size:14.5px;font-weight:800;color:var(--t1)}
+.sum-meta{font-size:10px;color:var(--t3);margin-top:2px}
+.sum-right{text-align:right;flex-shrink:0}
+.sum-pnl{font-size:12.5px;font-weight:700;color:var(--up)}
+.sum-sub{font-size:9.5px;color:var(--t3)}
+
+.sec{font-size:11px;font-weight:700;color:var(--t2);margin:14px 2px 8px;letter-spacing:.01em;display:flex;justify-content:space-between;align-items:center}
+.sec a{font-size:10px;color:var(--down);text-decoration:none;font-weight:600}
+
+/* 공시 확장 카드 */
+.d{border-top:1px solid var(--div)}
+.d-head{display:flex;gap:10px;padding:13px 16px;align-items:flex-start}
+.d-ico{width:30px;height:30px;border-radius:9px;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.d-ico.high{background:var(--red-soft);color:var(--red-text)}
+.d-ico.med{background:var(--amber-soft);color:var(--amber-text)}
+.d-ico.low{background:#F2F3F6;color:var(--t2)}
+.d-body{flex:1;min-width:0}
+.d-top{display:flex;align-items:center;gap:5px}
+.d-name{flex:1;font-size:12.5px;font-weight:800;color:var(--t1);line-height:1.35}
+.d-tag{font-size:8.5px;font-weight:700;padding:2px 6px;border-radius:4px;flex-shrink:0}
+.d-tag.high{background:var(--red-soft);color:var(--red-text)}
+.d-tag.med{background:var(--amber-soft);color:var(--amber-text)}
+.d-tag.low{background:#F2F3F6;color:var(--t2)}
+.d-meta{font-size:9.5px;color:var(--t3);margin-top:3px;font-variant-numeric:tabular-nums}
+.d-meta b{color:var(--t2);font-weight:600}
+.d-go{color:#C2C8D0;flex-shrink:0;margin-top:2px}
+.d-detail{border-top:.5px solid var(--div);background:#FAFBFC;padding:11px 16px}
+.d-kicker{font-size:9px;font-weight:700;color:var(--t3);margin-bottom:5px;letter-spacing:.03em}
+.d-txt{font-size:11px;color:var(--t2);line-height:1.6}
+.d-kws{display:flex;flex-wrap:wrap;gap:4px;margin-top:7px}
+.kw{font-size:8.5px;font-weight:600;padding:2px 6px;border-radius:4px;background:#fff;border:.5px solid rgba(163,45,45,.25);color:var(--red-text)}
+.d-link{display:inline-flex;align-items:center;gap:4px;margin-top:8px;font-size:10px;font-weight:700;color:var(--down);text-decoration:none}
+
+/* 통계 그리드 */
+.stats{display:grid;grid-template-columns:repeat(4,1fr);border-top:1px solid var(--div)}
+.stat{padding:11px 6px;text-align:center}
+.stat+.stat{border-left:1px solid var(--div)}
+.stat-v{font-size:15px;font-weight:800;color:var(--t1);font-variant-numeric:tabular-nums}
+.stat-v.red{color:var(--up)}
+.stat-v.amber{color:var(--amber-text)}
+.stat-l{font-size:8.5px;color:var(--t3);margin-top:3px}
+
+/* 무엇을 하는지 (시나리오 대체 블록) */
+.what{padding:13px 16px;border-top:1px solid var(--div)}
+.what-t{font-size:10px;color:var(--t3);margin-bottom:8px}
+.wrow{display:flex;gap:8px;align-items:flex-start;margin-bottom:8px}
+.wrow:last-child{margin-bottom:0}
+.w-dot{width:7px;height:7px;border-radius:50%;margin-top:4px;flex-shrink:0}
+.w-txt{font-size:11px;color:var(--t1);line-height:1.55}
+.w-txt b{font-weight:700}
+
+.cta{display:flex;gap:8px;padding:14px 16px;border-top:1px solid var(--div)}
+.cta-btn{flex:1;border:none;border-radius:11px;padding:12px;font-size:12px;font-weight:700}
+.cta-btn.dark{background:var(--navy);color:#fff;box-shadow:0 4px 12px rgba(15,20,25,.28)}
+.cta-btn.ghost{background:#fff;color:var(--t2);border:1px solid var(--line)}
+.foot{font-size:9.5px;color:var(--t3);line-height:1.6;text-align:center;padding:2px 8px 0}
+</style>
+</head>
+<body>
+
+<!-- C1: 공시 상세 중심 -->
+<div>
+<div class="frame">
+  <div class="head">
+    <div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></div>
+    <div class="ht">거래정지 · 공시 상세</div>
+  </div>
+  <div class="body">
+    <div class="card">
+      <div class="sum">
+        <span class="sum-badge">거래정지</span>
+        <div class="sum-info">
+          <div class="sum-name">드래곤플라이</div>
+          <div class="sum-meta">KOSDAQ · 030350 · 500주 · 평단 1,840원</div>
+        </div>
+        <div class="sum-right">
+          <div class="sum-pnl">−47.1%</div>
+          <div class="sum-sub">마지막 체결 973원</div>
+        </div>
+      </div>
+      <div class="stats">
+        <div class="stat"><div class="stat-v red">1</div><div class="stat-l">중요 리스크</div></div>
+        <div class="stat"><div class="stat-v amber">2</div><div class="stat-l">확인 필요</div></div>
+        <div class="stat"><div class="stat-v">1</div><div class="stat-l">지분 변동</div></div>
+        <div class="stat"><div class="stat-v">4</div><div class="stat-l">총 공시</div></div>
+      </div>
+    </div>
+
+    <div class="sec">최근 90일 공시 <a href="#">전체보기</a></div>
+    <div class="card">
+      <div class="d">
+        <div class="d-head">
+          <div class="d-ico high"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>
+          <div class="d-body">
+            <div class="d-top"><span class="d-name">주권매매거래정지</span><span class="d-tag high">중요 리스크</span></div>
+            <div class="d-meta"><b>거래소공시</b> · 09.19 접수 · 한국거래소</div>
+          </div>
+          <svg class="d-go" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+        <div class="d-detail">
+          <div class="d-kicker">감지된 리스크 신호</div>
+          <div class="d-txt">매매거래정지 공시는 정지 사유·기간을 포함해요. 상장폐지 절차 개시 여부가 핵심 확인 포인트예요.</div>
+          <div class="d-kws">
+            <span class="kw">매매거래정지</span>
+            <span class="kw">상장폐지 여부</span>
+          </div>
+          <a class="d-link" href="#">DART 원문 보기 <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17 17 7"/><path d="M7 7h10v10"/></svg></a>
+        </div>
+      </div>
+
+      <div class="d">
+        <div class="d-head">
+          <div class="d-ico med"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/></svg></div>
+          <div class="d-body">
+            <div class="d-top"><span class="d-name">자본잠식 상각 등 자본변동</span><span class="d-tag med">확인 필요</span></div>
+            <div class="d-meta"><b>주요사항보고</b> · 09.18 접수 · 회사</div>
+          </div>
+          <svg class="d-go" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      </div>
+
+      <div class="d">
+        <div class="d-head">
+          <div class="d-ico low"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg></div>
+          <div class="d-body">
+            <div class="d-top"><span class="d-name">최대주주 등 주식등의 처분계약</span><span class="d-tag low">지분 변동</span></div>
+            <div class="d-meta"><b>지분공시</b> · 09.12 접수 · 최대주주</div>
+          </div>
+          <svg class="d-go" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      </div>
+      <div class="d">
+        <div class="d-head">
+          <div class="d-ico low"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/></svg></div>
+          <div class="d-body">
+            <div class="d-top"><span class="d-name">반기보고서</span><span class="d-tag low">일반</span></div>
+            <div class="d-meta"><b>정기공시</b> · 08.14 접수 · 회사</div>
+          </div>
+          <svg class="d-go" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="what">
+        <div class="what-t">이 페이지에서 할 수 있는 것</div>
+        <div class="wrow"><span class="w-dot" style="background:var(--up)"></span><div class="w-txt"><b>정지 사유 파악</b> — 어떤 공시로 정지됐는지 위에서부터 확인</div></div>
+        <div class="wrow"><span class="w-dot" style="background:var(--amber)"></span><div class="w-txt"><b>상폐 위험 점검</b> — 상장폐지·정리매매 키워드 감지 상태 표시</div></div>
+        <div class="wrow"><span class="w-dot" style="background:var(--down)"></span><div class="w-txt"><b>재개 시 워치</b> — 거래 재개 공시가 뜨면 알림으로 받아보기</div></div>
+      </div>
+      <div class="cta">
+        <button class="cta-btn ghost">전체 공시 보기</button>
+        <button class="cta-btn dark">이 종목 워치하기</button>
+      </div>
+    </div>
+    <div class="foot">AI 분석은 데이터 기반 참고 자료예요. 투자 권유나 수익 보장이 아닙니다.</div>
+  </div>
+</div>
+<div class="caption">C1 · 공시 상세 중심 (딥스캔 결과 대체)</div>
+</div>
+
+<!-- C2: 거래재개 상태 -->
+<div>
+<div class="frame">
+  <div class="head">
+    <div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></div>
+    <div class="ht">거래정지 · 공시 상세</div>
+  </div>
+  <div class="body">
+    <div class="card">
+      <div class="sum">
+        <span class="sum-badge" style="background:var(--amber-soft);color:var(--amber-text)">재개 대기</span>
+        <div class="sum-info">
+          <div class="sum-name">드래곤플라이</div>
+          <div class="sum-meta">KOSDAQ · 030350 · 500주 · 평단 1,840원</div>
+        </div>
+        <div class="sum-right">
+          <div class="sum-pnl" style="color:var(--amber-text)">정지 해제</div>
+          <div class="sum-sub">재개 공시 접수</div>
+        </div>
+      </div>
+      <div class="what">
+        <div class="what-t">상태 변화</div>
+        <div class="wrow"><span class="w-dot" style="background:var(--amber)"></span><div class="w-txt"><b>매매거래정지해제 공시 접수</b> — 다음 거래일부터 정상 거래 가능 (예시)</div></div>
+        <div class="wrow"><span class="w-dot" style="background:var(--down)"></span><div class="w-txt"><b>일반 딥스캔 재개</b> — 거래 재개 후 시세가 쌓이면 세 팀 분석이 다시 의미를 가져요</div></div>
+      </div>
+      <div class="cta">
+        <button class="cta-btn ghost">전체 공시 보기</button>
+        <button class="cta-btn dark" style="background:var(--green)">딥스캔 다시 실행</button>
+      </div>
+    </div>
+    <div class="foot">예시 상태 — 실제 재개 여부는 DART 공시 기준으로 확인하세요.</div>
+  </div>
+</div>
+<div class="caption">C2 · 거래재개 전환 상태</div>
+</div>
+
+</body>
+</html>

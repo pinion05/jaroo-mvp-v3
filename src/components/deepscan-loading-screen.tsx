@@ -1,11 +1,12 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import {
   shouldAdvanceDeepScanTimeline,
   shouldDisplayDeepScanReadyResults,
+  parseDeepScanEmphasisSegments,
   shouldShowDeepScanSummarySkeleton,
 } from '@/lib/deepscan-loading-behavior'
 import { buildDeepScanReturnRateDisplay } from '@/lib/deepscan-loading-metrics'
@@ -74,6 +75,7 @@ import {
 
 export function DeepScanLoadingScreen({
   name = '선택 종목',
+  introMention,
   identifier,
   market,
   instrumentKind,
@@ -95,12 +97,16 @@ export function DeepScanLoadingScreen({
   visibleStageCount = 1,
   arrivedStageKeys = [],
   resultsReady = false,
+  snapshotCacheHit = false,
+  snapshotScannedAt,
   className,
   onBack,
   backHref = '/home',
   inlineResults,
   errorNotice,
   onRetry,
+  errorPrimaryAction,
+  headerNotice,
 }: DeepScanLoadingScreenProps) {
   const isError = Boolean(errorNotice)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
@@ -190,10 +196,10 @@ export function DeepScanLoadingScreen({
     [elapsedSeconds, orderedNarrativeCards, resultsReadyForDisplay],
   )
   const sequentialNarrativeCards = useMemo(
-    () => buildSequentialNarrativeCards(timelineNarrativeCards, teamSummaries),
-    [teamSummaries, timelineNarrativeCards],
+    () => buildSequentialNarrativeCards(timelineNarrativeCards, teamSummaries, resultsReadyForDisplay),
+    [resultsReadyForDisplay, teamSummaries, timelineNarrativeCards],
   )
-  const completionState = buildCompletionState(resultsReadyForDisplay, elapsedSeconds)
+  const completionState = buildCompletionState(resultsReadyForDisplay, elapsedSeconds, snapshotCacheHit, snapshotScannedAt)
   const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReadyForDisplay)
   const isTeamBridgeVisible = Boolean(teamBridgeState)
   const shouldAdvanceTimeline = shouldAdvanceDeepScanTimeline({ resultsReadyForDisplay, elapsedSeconds, sequenceCompleteSeconds: TEAM_SEQUENCE_COMPLETE_SECONDS })
@@ -320,19 +326,25 @@ export function DeepScanLoadingScreen({
         </div>
       </header>
 
+      {headerNotice ? <div className={cn(styles.body, styles.headerNoticeSlot)}>{headerNotice}</div> : null}
+
       <div className={styles.body}>
         {isError ? (
           <section className={styles.errorCard} aria-label='딥스캔 오류'>
             <div className={styles.errorHead}>
               <span className={styles.errorIcon} aria-hidden='true'>!</span>
               <div>
-                <span className={styles.errorEyebrow}>분석 요청 실패</span>
+                <span className={styles.errorEyebrow}>
+                  {errorNotice?.badge && errorNotice.badge !== '오류' ? errorNotice.badge : '분석 요청 실패'}
+                </span>
                 <h2 className={styles.errorTitle}>{errorNotice?.title ?? 'DeepScan 데이터를 표시할 수 없어요'}</h2>
               </div>
             </div>
             <p className={styles.errorBody}>{errorNotice?.body ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.'}</p>
             <div className={styles.errorActions}>
-              {onRetry ? (
+              {errorPrimaryAction ? (
+                <Link href={errorPrimaryAction.href} className={styles.errorRetryButton}>{errorPrimaryAction.label}</Link>
+              ) : onRetry ? (
                 <button type='button' className={styles.errorRetryButton} onClick={onRetry}>다시 시도</button>
               ) : null}
               <Link href={backHref} className={styles.errorBackLink}>다른 종목 선택</Link>
@@ -342,8 +354,12 @@ export function DeepScanLoadingScreen({
           <>
         <section className={styles.intro} aria-label='딥스캔 안내'>
           <p className={styles.introGreet}>{new Intl.DateTimeFormat('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' }).format(new Date())}</p>
-          <h2 className={styles.introTitle}>세 분석가가 {exchangeProduct ? 'ETF를' : '종목을'}<br />차례로 살펴보고 있어요</h2>
-          <p className={styles.introBody}>{resultsReadyForDisplay ? '실제 응답이 도착했어요. 아래 결과 카드가 바로 이어집니다.' : '완료 신호가 오면 기다림 없이 이 화면 아래에 결과가 이어집니다.'}</p>
+          {introMention ? (
+            <h2 className={styles.introTitle}>{introMention}</h2>
+          ) : (
+            <h2 className={styles.introTitle}>세 분석가가 {exchangeProduct ? 'ETF를' : '종목을'}<br />차례로 살펴보고 있어요</h2>
+          )}
+          <p className={styles.introBody}>{resultsReadyForDisplay ? (snapshotCacheHit ? '저장해둔 분석 결과를 불러왔어요. 아래 결과 카드가 바로 이어집니다.' : '실제 응답이 도착했어요. 아래 결과 카드가 바로 이어집니다.') : '완료 신호가 오면 기다림 없이 이 화면 아래에 결과가 이어집니다.'}</p>
         </section>
 
         <TodayBriefingCard
@@ -387,7 +403,7 @@ export function DeepScanLoadingScreen({
               summaryFailed,
               summaryText,
             } = getTeamSummaryState(card, teamSummaries)
-            const fallbackSummaryText = buildNarrativeFallbackSummary(card, Boolean(summaryFailed))
+            const fallbackSummaryText = buildNarrativeFallbackSummary(card, Boolean(summaryFailed), resultsReadyForDisplay)
             const resolvedSummaryText = summaryText ?? fallbackSummaryText
             const summaryCollapsible = Boolean(summaryText && shouldCollapseTeamSummaryText(summaryText))
             const summaryExpanded = Boolean(card.teamKey && expandedTeamSummaries.has(card.teamKey))
@@ -407,7 +423,7 @@ export function DeepScanLoadingScreen({
             return (
               <article key={card.key} className={cn(styles.narrativeCard, cardSettled ? undefined : styles.narrativeCardPending)}>
                 <div className={styles.narrativeHead}>
-                  <span className={cn(styles.narrativeAvatar, card.placeholder && !card.teamKey ? styles.narrativeAvatarPending : undefined)} aria-hidden='true'>{card.placeholder && !card.teamKey ? <Loader2 className={styles.narrativeSpinner} aria-hidden /> : card.avatar}</span>
+                  <span className={cn(styles.narrativeAvatar, card.placeholder && !card.teamKey ? styles.narrativeAvatarPending : undefined)} aria-hidden='true'>{card.placeholder && !card.teamKey ? <Loader2 className={styles.narrativeSpinner} aria-hidden /> : typeof card.avatar === 'string' || card.avatar == null ? card.avatar : <card.avatar className='size-[18px]' aria-hidden />}</span>
                   <div className={styles.narrativeNameWrap}>
                     <strong>{card.placeholder && !card.teamKey ? <span className={styles.narrativeTitleSkeleton} aria-hidden='true' /> : card.analystName}</strong>
                     <span>{card.placeholder && !card.teamKey ? <span className={styles.narrativeDescriptionSkeleton} aria-hidden='true' /> : card.description}</span>
@@ -421,7 +437,9 @@ export function DeepScanLoadingScreen({
                     </div>
                   ) : (
                     <div className={styles.narrativeSummaryTextWrap}>
-                      <p className={cn(styles.narrativeText, styles.narrativeTextSummarized)} id={summaryTextId}>{displaySummaryText}</p>
+                      <p className={cn(styles.narrativeText, styles.narrativeTextSummarized)} id={summaryTextId}>{parseDeepScanEmphasisSegments(displaySummaryText ?? '').map((segment, index) => segment.bold
+                        ? <strong key={index} className={styles.narrativeTextStrong}>{segment.text}</strong>
+                        : <Fragment key={index}>{segment.text}</Fragment>)}</p>
                       {summaryCollapsible && card.teamKey ? (
                         <button
                           type='button'

@@ -147,7 +147,7 @@ function getRowPayload(row) {
   return row.payload;
 }
 
-function isCacheRowFresh(row, now = new Date()) {
+export function isCacheRowFresh(row, now = new Date()) {
   if (!row || row.status !== 'fresh') {
     return false;
   }

@@ -56,7 +56,7 @@ function UploadDesignStyles() {
       .jaroo-upload-lead b{color:#0F1419;font-weight:600}
       .jaroo-upload-ex-card{background:#fff;border-radius:14px;border:.5px solid #E8EAEE;box-shadow:0 1px 3px rgba(0,0,0,.04);padding:14px 16px;margin-bottom:14px}
       .jaroo-upload-ex-head{display:flex;align-items:center;gap:8px;margin-bottom:12px}
-      .jaroo-upload-ex-check{width:20px;height:20px;border-radius:50%;background:#E5F3EB;display:flex;align-items:center;justify-content:center;font-size:11px;color:#1A7340;flex-shrink:0}
+      .jaroo-upload-ex-check{width:20px;height:20px;border-radius:50%;background:#EEF0F3;display:flex;align-items:center;justify-content:center;font-size:11px;color:#0F1419;flex-shrink:0}
       .jaroo-upload-ex-label{font-size:12px;font-weight:600;color:#0F1419}
       .jaroo-upload-ex-mock{background:#F5F6F8;border-radius:10px;padding:4px 12px;margin-bottom:11px}
       .jaroo-upload-ex-row{display:flex;align-items:center;justify-content:space-between;padding:8px 0;border-bottom:.5px solid #E8EAEE}

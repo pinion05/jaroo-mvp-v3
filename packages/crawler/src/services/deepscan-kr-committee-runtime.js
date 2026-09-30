@@ -3,6 +3,7 @@ import { mkdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import {
   DEFAULT_COMMITTEE_LLM_MODEL,
+  detectDuplicateNumericCitations,
   getCommitteeProgress,
   scoreCommitteeMembersProgressive,
 } from '../../../deepscan-runtime-core/src/committee-llm.js';
@@ -87,6 +88,18 @@ export const KR_MEMBER_SPECS = Object.freeze({
   },
 });
 
+// 시장 타이밍 축 위원만 실행하는 서브셋 — /etf 페이지 AI 위원회(펀더멘털 위원 제외)용.
+export const KR_MARKET_TIMING_MEMBER_KEYS = Object.freeze(['trend', 'consensusMomentum', 'priceLocation']);
+
+// /etf 페이지가 실제로 노출하는 위원 — 지수/가격 흐름(trend) 1명만 실행한다(2026-09-18 사용자 요청).
+export const KR_ETF_PAGE_MEMBER_KEYS = Object.freeze(['trend']);
+
+// 요청된 멤버 키 필터 — 스펙에 없는 키는 무시하고, 유효한 키가 하나도 없으면 전체(9명)를 돌린다.
+function resolveRequestedCommitteeMemberKeys(requested) {
+  const valid = (Array.isArray(requested) ? requested : []).filter((memberKey) => KR_MEMBER_SPECS[memberKey]);
+  return valid.length > 0 ? valid : Object.keys(KR_MEMBER_SPECS);
+}
+
 const KR_EXCHANGE_PRODUCT_MARKETS = new Set(['ETF', 'ETN']);
 
 const ETF_MEMBER_PRESENTATION_SPECS = Object.freeze({
@@ -144,6 +157,51 @@ const ETF_MEMBER_PROMPT_GUIDANCE = Object.freeze({
   holdingCompleteness: 'For ETF/ETN inputs, judge whether quantity, average price, current price, timestamps, and ETF product facts are complete enough for the current screen.',
 });
 
+
+// 숫자 인용 소유권(출력 소유권) — 위원 간 동일 수치 중복 인용 방지.
+// 원인 분석(2026-09-10): 9위원이 sharedContext를 공유하고 가격계열 멤버 슬라이스는 서로의
+// 부분집합이라(숫자 토큰 94~100% 공유) valuation·upsideBuffer·avgPriceGap·priceLocation이
+// 같은 목표가/평단/수익률 수치를 이유 문장에 반복 인용했다. 각 수치 도메인의 유일 소유자를
+// 지정하고, 소유자만 이유 문장에 해당 숫자를 인용한다. 태그는 다른 멤버 프롬프트의
+// 'reserved' 요약에 재사용된다 — tag는 멤버 간 유일해야 한다.
+export const KR_MEMBER_NUMERIC_OWNERSHIP = Object.freeze({
+  profitability: {
+    tag: 'ROE/profit margins/revenue-profit growth',
+    owns: 'ROE, operating/net profit margins, and revenue or operating-profit growth rates (valuationSnapshot.roe, financialSnapshot)',
+  },
+  valuation: {
+    tag: 'PER/PBR/EV-EBITDA multiples',
+    owns: 'PER, PBR, and EV/EBITDA multiples (valuationSnapshot, excluding roe)',
+  },
+  ownershipStability: {
+    tag: 'shareholder stakes & changes',
+    owns: 'shareholder stake percentages and stake-change figures (ownershipSnapshot)',
+  },
+  trend: {
+    tag: 'period returns/relative strength',
+    owns: 'period return windows such as 1M/3M/6M/1Y and relative strength (relativeReturnSnapshot, styleAnalysisSnapshot)',
+  },
+  consensusMomentum: {
+    tag: 'disclosure events/revision & analyst counts',
+    owns: 'disclosure event counts and risk grades (disclosureAnalysis) plus consensus revision direction/percentage and analyst counts (consensusSnapshot.revision*, recommendation*)',
+  },
+  priceLocation: {
+    tag: 'quote range/volume position',
+    owns: 'market quote-location context such as day or 52-week range and volume (currentQuote)',
+  },
+  avgPriceGap: {
+    tag: 'avg-price gap/unrealized P&L',
+    owns: 'average buy price, average-price gap percentage, and unrealized P&L amount/return (holding, marketSnapshot.averagePriceGapPct, marketSnapshot.evaluation*)',
+  },
+  upsideBuffer: {
+    tag: 'target price/target gap %',
+    owns: 'consensus target price, target gap percentage, and highest/lowest target prices (consensusSnapshot.target*)',
+  },
+  holdingCompleteness: {
+    tag: 'quantity/page coverage',
+    owns: 'holding quantity and page coverage ratio (holding.quantity, pageCoverage)',
+  },
+});
 function getInstrumentMarket(evidence) {
   return normalizeText(evidence?.instrument?.market ?? evidence?.market)?.toUpperCase() ?? null;
 }
@@ -324,7 +382,7 @@ function buildKrFactBank(evidence) {
     ownership: snapshotValue(evidence.ownershipSnapshot ?? {}, ['kr_ownership']),
     disclosures: evidence.disclosureAnalysis
       ? snapshotValue(summarizeDisclosureAnalysisCompact(evidence.disclosureAnalysis), ['opendart_disclosures'])
-      : missingFact('OpenDART 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
+      : missingFact('최근 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
     styleFactors: snapshotValue(evidence.styleAnalysisSnapshot ?? {}, ['kr_style_factors']),
     reports: snapshotValue({
       recentReportCount: evidence.reportSignals?.recentReportCount ?? null,
@@ -681,7 +739,7 @@ function buildSharedDump(input, evidence, sources) {
     businessCommentary: presentValue(evidence.businessCommentary ?? {}, ['business_commentary']),
     disclosureAnalysis: evidence.disclosureAnalysis
       ? presentValue(summarizeDisclosureAnalysisCompact(evidence.disclosureAnalysis), ['opendart_disclosures'])
-      : missingFact('OpenDART 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
+      : missingFact('최근 공시 목록이 없습니다.', ['opendart_disclosures_missing']),
     etfProductSnapshot: evidence.etfProductSnapshot
       ? presentValue(evidence.etfProductSnapshot, ['wisereport_etf_snapshot'])
       : missingFact('ETF 상품/구성종목 스냅샷이 없습니다.', ['etf_product_snapshot_missing']),
@@ -870,7 +928,27 @@ function buildMemberDump(memberKey, input, evidence, sources) {
   }
 }
 
-function systemPrompt(memberKey) {
+/**
+ * 멤버별 숫자 인용 소유권 프롬프트 라인. 소유 도메인은 digits 인용을 허용하고,
+ * 타 위원 소유 도메인(tag 목록)은 정성 서술만 허용한다. 현재가 단일 숫자는
+ * 공용 앵커로 전원 1회 허용한다(산식 맥락 유지).
+ */
+function numericOwnershipLines(memberKey) {
+  const ownershipSpec = KR_MEMBER_NUMERIC_OWNERSHIP[memberKey];
+  if (!ownershipSpec) return [];
+  const reservedByOthers = Object.entries(KR_MEMBER_NUMERIC_OWNERSHIP)
+    .filter(([key]) => key !== memberKey)
+    .map(([key, spec]) => `${key}=${spec.tag}`)
+    .join(', ');
+  return [
+    `Numeric citation ownership — to keep committee opinions non-redundant, your reason may cite digits ONLY for your owned domain: ${ownershipSpec.owns}.`,
+    `All other numeric domains are owned by other members and must NOT appear as digits in your reason: ${reservedByOthers}. Reason about them qualitatively without digits, or omit them.`,
+    'Exception: any member may cite the bare current price once as context.',
+    'For ETF/ETN inputs, apply the same ownership split to the ETF-reinterpreted domains.',
+  ];
+}
+
+export function systemPrompt(memberKey) {
   const spec = KR_MEMBER_SPECS[memberKey];
   return [
     `You are Jaroo KR DeepScan committee member: ${spec.role}.`,
@@ -879,7 +957,8 @@ function systemPrompt(memberKey) {
     'Prefer memberContext.facts.krFacts when present; it is the source-specific normalized KR slice and should override generic global-shaped assumptions.',
     'Treat package-derived context as supplemental only, never as silent numeric truth.',
     'Treat absent fields as out-of-scope rather than negative evidence; do not request, infer, or mention data that is not present in sharedContext/memberContext.',
-    'Lead with the strongest numeric or concrete evidence that is actually present.',
+    ...numericOwnershipLines(memberKey),
+    'Lead with the strongest numeric or concrete evidence that is actually present; the numeric citation ownership below decides which of those numbers you may print.',
     'If sharedContext.instrument.market or memberContext.facts.instrument.market is ETF or ETN, or sharedContext.instrument.kind/memberContext.facts.instrument.kind is etf/etn, treat the instrument as an exchange-traded product, not an operating company.',
     'For ETF/ETN, do not mention missing individual-stock facts such as PER, PBR, ROE, corporate profitability, shareholder stability, analyst recommendation, or target price unless the input explicitly provides those facts as applicable.',
     'For ETF/ETN, absence of shareholder, constituent, or analyst-target data is not positive or negative evidence by itself; say only what can be judged from current quote, average-price gap, trend, liquidity, page coverage, NAV/premium-discount, constituents, or sector weights that are actually present.',
@@ -933,7 +1012,7 @@ function averageCompletedScore(memberScores) {
   return Math.max(0, Math.min(100, Math.round(scores.reduce((sum, score) => sum + score, 0) / scores.length)));
 }
 
-function rollupAxis(axisKey, memberKeys, results, errorsByMember, pendingMembers) {
+function rollupAxis(axisKey, memberKeys, results, errorsByMember, pendingMembers, options = {}) {
   const validMembers = memberKeys.filter((memberKey) => results[memberKey]);
   const pendingSet = new Set(Array.isArray(pendingMembers) ? pendingMembers : []);
   const pendingAxisMembers = memberKeys.filter((memberKey) => pendingSet.has(memberKey));
@@ -942,6 +1021,8 @@ function rollupAxis(axisKey, memberKeys, results, errorsByMember, pendingMembers
   const hasErrors = errorMembers.length > 0;
   const hasPending = pendingAxisMembers.length > 0;
   const isComplete = validMembers.length === memberKeys.length;
+  // 축 전체 위원이 아니면 가중 점수를 계산할 수 없다(미요청 위원이 0점 기본값으로 섞임) — 단순 평균.
+  const scoreWithFullWeights = options.scoreWithFullWeights !== false;
 
   return {
     axisKey,
@@ -952,7 +1033,11 @@ function rollupAxis(axisKey, memberKeys, results, errorsByMember, pendingMembers
     omitted: false,
     hasErrors,
     hasPending,
-    score: validMembers.length === 0 ? null : isComplete && !hasErrors ? getAxisScore(axisKey, memberScores) : averageCompletedScore(memberScores),
+    score: validMembers.length === 0
+      ? null
+      : isComplete && !hasErrors && scoreWithFullWeights
+        ? getAxisScore(axisKey, memberScores)
+        : averageCompletedScore(memberScores),
     memberScores,
   };
 }
@@ -961,11 +1046,11 @@ export function getDeepScanKrCommitteeProgress(requestId) {
   return getCommitteeProgress(requestId);
 }
 
-export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources) {
+export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources, options = {}) {
   const requestId = `kr-committee-${input.instrument.code ?? input.instrument.name ?? randomUUID()}-${Date.now()}`;
   const shared = buildSharedDump(input, evidence, sources);
   const factBank = buildKrFactBank(evidence);
-  const memberKeys = Object.keys(KR_MEMBER_SPECS);
+  const memberKeys = resolveRequestedCommitteeMemberKeys(options.memberKeys);
   const members = Object.fromEntries(memberKeys.map((memberKey) => [memberKey, buildMemberDump(memberKey, input, evidence, sources)]));
   const logDir = join(process.cwd(), '.omx', 'context', 'committee-debug-logs', requestId);
   const debugSources = sources?.disclosures
@@ -997,13 +1082,19 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
       results: {},
       errors: [{ member: 'all', error: 'OPENROUTER_API_KEY is not configured.' }],
       pending: [],
+      memberKeys,
       status: 'disabled',
       completed: 0,
       softDeadlineMs: 0,
     };
   }
 
-  const softDeadlineMs = parsePositiveInteger(process.env.DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS ?? process.env.DEEPSCAN_LLM_SOFT_DEADLINE_MS, DEFAULT_KR_LLM_SOFT_DEADLINE_MS);
+  const softDeadlineMs = parsePositiveInteger(
+    options.softDeadlineMs
+      ?? process.env.DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS
+      ?? process.env.DEEPSCAN_LLM_SOFT_DEADLINE_MS,
+    DEFAULT_KR_LLM_SOFT_DEADLINE_MS,
+  );
   const { results, errors, pending, status, completed } = await scoreCommitteeMembersProgressive({
     memberKeys,
     shared,
@@ -1022,7 +1113,11 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
     },
   });
 
-  writeJson(logDir, 'summary.json', { requestId, errors, results });
+  const duplicateNumericCitations = detectDuplicateNumericCitations(results);
+  writeJson(logDir, 'summary.json', { requestId, errors, results, duplicateNumericCitations });
+  if (duplicateNumericCitations.length > 0) {
+    console.warn(`[deepscan-kr-committee] duplicate numeric citations requestId=${requestId} count=${duplicateNumericCitations.length}`, duplicateNumericCitations.slice(0, 5));
+  }
 
   return {
     requestId,
@@ -1034,6 +1129,7 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
       shared,
       members,
     },
+    memberKeys,
     results,
     errors,
     pending,
@@ -1133,46 +1229,55 @@ function axisSubtitle(axisKey, hasErrors, hasPending, evidence) {
       : '덤프 기반 KR 포지션 적합도 점수';
 }
 
-export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErrors = [], llmPending = []) {
+export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErrors = [], llmPending = [], options = {}) {
   const byAxis = {
     businessQuality: ['profitability', 'valuation', 'ownershipStability'],
     marketTiming: ['trend', 'consensusMomentum', 'priceLocation'],
     positionFit: ['avgPriceGap', 'upsideBuffer', 'holdingCompleteness'],
   };
   const allMemberKeys = Object.values(byAxis).flat();
+  const requestedMemberKeys = resolveRequestedCommitteeMemberKeys(options.memberKeys);
+  const requestedSet = new Set(requestedMemberKeys);
+  const isSubsetRun = requestedMemberKeys.length !== allMemberKeys.length;
+  // 서브셋 실행(예: /etf 시장·차트 팀)에서는 요청한 축·위원만 노출한다.
+  const activeAxes = Object.entries(byAxis)
+    .map(([axisKey, axisMemberKeys]) => [axisKey, axisMemberKeys.filter((memberKey) => requestedSet.has(memberKey))])
+    .filter(([, axisMemberKeys]) => axisMemberKeys.length > 0);
   const errorsByMember = normalizeLlmMemberErrors(llmErrors, allMemberKeys);
 
-  const businessAxis = rollupAxis('businessQuality', byAxis.businessQuality, llmResults, errorsByMember, llmPending);
-  const marketAxis = rollupAxis('marketTiming', byAxis.marketTiming, llmResults, errorsByMember, llmPending);
-  const positionAxis = rollupAxis('positionFit', byAxis.positionFit, llmResults, errorsByMember, llmPending);
+  const rolledAxes = activeAxes.map(([axisKey, axisMemberKeys]) => ({
+    axis: rollupAxis(axisKey, axisMemberKeys, llmResults, errorsByMember, llmPending, {
+      scoreWithFullWeights: axisMemberKeys.length === byAxis[axisKey].length,
+    }),
+    axisMemberKeys,
+  }));
 
-  const axes = [businessAxis, marketAxis, positionAxis]
-    .map((axis) => ({
+  const axes = rolledAxes.map(({ axis, axisMemberKeys }) => ({
       label: axisLabel(axis.axisKey, evidence),
       score: axis.score,
       scoreText: axis.score === null ? 'N/A' : `${axis.score} / 100`,
       axisStatusText: axis.hasErrors
-        ? `LLM ${axis.validMembers.length}/3 · 오류 ${axis.errorMembers.length}/3`
+        ? `LLM ${axis.validMembers.length}/${axisMemberKeys.length} · 오류 ${axis.errorMembers.length}/${axisMemberKeys.length}`
         : axis.hasPending
           ? axis.validMembers.length === 0
             ? `LLM 위원 응답 대기 중 · ${axis.pendingMembers.length}명 고민중`
-            : `LLM 위원 ${axis.validMembers.length}/3명 반영 · ${axis.pendingMembers.length}명 고민중`
-          : 'LLM 위원 3/3명 반영',
+            : `LLM 위원 ${axis.validMembers.length}/${axisMemberKeys.length}명 반영 · ${axis.pendingMembers.length}명 고민중`
+          : `LLM 위원 ${axisMemberKeys.length}/${axisMemberKeys.length}명 반영`,
       subtitle: axisSubtitle(axis.axisKey, axis.hasErrors, axis.hasPending, evidence),
       avgLabel: axis.score === null ? '위원 평균 N/A' : `위원 평균 ${axis.score}`,
-      members: byAxis[axis.axisKey].map((memberKey) => (
+      members: axisMemberKeys.map((memberKey) => (
         llmResults[memberKey]
           ? buildSuccessMember(memberKey, llmResults[memberKey], evidence)
           : axis.pendingMembers.includes(memberKey)
             ? buildPendingMember(memberKey, evidence)
             : buildErrorMember(memberKey, errorsByMember[memberKey], evidence)
       )),
-    }));
+  }));
 
-  const hasMemberErrors = [businessAxis, marketAxis, positionAxis].some((axis) => axis.hasErrors);
-  const hasPendingMembers = [businessAxis, marketAxis, positionAxis].some((axis) => axis.hasPending);
-  const committeeScores = hasMemberErrors
-    || hasPendingMembers
+  const hasMemberErrors = rolledAxes.some(({ axis }) => axis.hasErrors);
+  const hasPendingMembers = rolledAxes.some(({ axis }) => axis.hasPending);
+  // 서브셋 실행은 미요청 위원이 0점 기본값으로 섞이므로 종합 점수를 계산하지 않는다.
+  const committeeScores = isSubsetRun || hasMemberErrors || hasPendingMembers
     ? null
     : buildKrCommitteeFromMemberScores(Object.fromEntries(Object.entries(llmResults).map(([key, value]) => [key, value.score])));
   return {
@@ -1180,10 +1285,6 @@ export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErro
     committeeScores,
     hasMemberErrors,
     hasPendingMembers,
-    coverage: {
-      businessQuality: businessAxis,
-      marketTiming: marketAxis,
-      positionFit: positionAxis,
-    },
+    coverage: Object.fromEntries(rolledAxes.map(({ axis }) => [axis.axisKey, axis])),
   };
 }

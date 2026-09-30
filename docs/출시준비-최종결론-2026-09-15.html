@@ -1,0 +1,323 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jaroo MVP 출시 준비 — 최종 결론 (2026-09-15)</title>
+<style>
+:root{--ink:#0F1419;--t2:#5A6473;--t3:#97A0AE;--bg:#F7F8FA;--card:#FFFFFF;--line:#E8EAEE;--red:#E5484D;--blue:#2B6BE6;--redsoft:#FBE6E7;--bluesoft:#F0F4FB}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:-apple-system,BlinkMacSystemFont,'Pretendard','Noto Sans KR',sans-serif;background:var(--bg);color:var(--ink);line-height:1.75;font-size:16px;font-variant-numeric:tabular-nums}
+.wrap{max-width:880px;margin:0 auto;padding:48px 24px 120px}
+header.rep{border-bottom:3px solid var(--ink);padding-bottom:24px;margin-bottom:36px}
+header.rep .kicker{font-size:12px;letter-spacing:.18em;font-weight:800;color:var(--t3);text-transform:uppercase}
+header.rep h1{font-size:30px;font-weight:900;margin:8px 0 12px;letter-spacing:-.02em}
+header.rep .meta{font-size:13px;color:var(--t2)}
+h2{font-size:22px;font-weight:900;margin:56px 0 6px;padding-top:28px;border-top:2px solid var(--line);letter-spacing:-.01em}
+h2 .no{display:inline-block;background:var(--ink);color:#fff;font-size:13px;width:26px;height:26px;border-radius:8px;text-align:center;line-height:26px;margin-right:10px;vertical-align:2px}
+h2 + .lead{color:var(--t2);font-size:14.5px;margin-bottom:18px}
+h3{font-size:17px;font-weight:800;margin:28px 0 10px}
+p{margin:10px 0}
+ul,ol{padding-left:22px;margin:10px 0}
+li{margin:6px 0}
+table{width:100%;border-collapse:collapse;margin:14px 0;font-size:14px;background:var(--card);border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(15,20,25,.06)}
+th{background:var(--ink);color:#fff;text-align:left;padding:10px 12px;font-size:12.5px;font-weight:700}
+td{padding:10px 12px;border-top:1px solid var(--line);vertical-align:top}
+tr:nth-child(even) td{background:#FAFBFC}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:20px 22px;margin:14px 0;box-shadow:0 1px 3px rgba(15,20,25,.04)}
+.tag{display:inline-block;font-size:11px;font-weight:800;padding:2px 10px;border-radius:99px;margin-right:6px;vertical-align:1px;white-space:nowrap}
+.tag.g{background:#E5F3EB;color:#1a7340}.tag.y{background:#FEF3E3;color:#92600A}.tag.r{background:var(--redsoft);color:#A8323A}.tag.b{background:var(--bluesoft);color:#2456A8}.tag.k{background:#EDEFF3;color:#3A4453}
+.note{background:#FEF3E3;border-left:4px solid #E5A144;border-radius:10px;padding:14px 16px;font-size:14px;margin:14px 0}
+.good{background:#E5F3EB;border-left:4px solid #1a7340;border-radius:10px;padding:14px 16px;font-size:14px;margin:14px 0}
+.info{background:var(--bluesoft);border-left:4px solid var(--blue);border-radius:10px;padding:14px 16px;font-size:14px;margin:14px 0}
+.kpi{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;margin:18px 0}
+.kpi .k{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px}
+.kpi .k .n{font-size:26px;font-weight:900;letter-spacing:-.02em}
+.kpi .k .l{font-size:12.5px;color:var(--t3);font-weight:700;margin-top:2px}
+.small{font-size:13px;color:var(--t3)}
+code{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:.88em;background:#F0F2F5;border-radius:6px;padding:1px 6px}
+.evi{font-family:ui-monospace,'SF Mono',Menlo,monospace;font-size:12px;color:var(--t2);background:#F7F8FA;border:1px solid var(--line);border-radius:8px;padding:8px 10px;margin:6px 0;overflow-x:auto;white-space:pre-wrap;word-break:keep-all}
+.dot{display:inline-block;width:9px;height:9px;border-radius:99px;margin-right:6px;vertical-align:1px}
+.dot.r{background:var(--red)}.dot.y{background:#E5A144}.dot.g{background:#1a7340}.dot.b{background:var(--blue)}.dot.k{background:#97A0AE}
+.toc{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:18px 22px;font-size:14.5px}
+.toc a{color:var(--ink);text-decoration:none;font-weight:700}
+.toc a:hover{color:var(--blue)}
+.toc li{margin:8px 0}
+strong{font-weight:800}
+footer{margin-top:72px;padding-top:20px;border-top:2px solid var(--line);font-size:12.5px;color:var(--t3)}
+.roadmap{list-style:none;padding:0;margin:16px 0}
+.roadmap li{position:relative;padding:14px 16px 14px 52px;background:var(--card);border:1px solid var(--line);border-radius:12px;margin:10px 0}
+.roadmap li .st{position:absolute;left:14px;top:16px;width:26px;height:26px;border-radius:8px;background:var(--ink);color:#fff;font-size:13px;font-weight:800;text-align:center;line-height:26px}
+.roadmap li .dur{float:right;font-size:12px;color:var(--t3);font-weight:700;margin-top:3px}
+@media print{body{background:#fff}.wrap{padding:0}}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="rep">
+<div class="kicker">Release Readiness — Final</div>
+<h1>Jaroo MVP 출시 준비 최종 결론</h1>
+<div class="meta">작성일 2026-09-15 · 브랜치 <code>dev</code>(428d813) · 원천: <b>2026-09-14 종합조사보고서 + 당일 재검증(코드 직독 · DNS/HTTP 실측 · CI 이력) + 자기검증(반증 시도 12건)</b><br>
+관련 문서: plans/2026-09-14-mvp-launch-plan.md · 종합조사보고서-2026-09-14.md · payments-toss.md · railway-migration-2026-08-14.md<br>
+<b>2026-09-15 갱신: ETF 실데이터 P2 → MVP 편입 — G11 신설 · 추적 이슈 #265</b></div>
+</header>
+
+<div class="toc">
+<strong>목차</strong>
+<ol>
+<li><a href="#s1">한눈에 보는 결론</a></li>
+<li><a href="#s2">배포 현황 스냅샷 (실측)</a></li>
+<li><a href="#s3">완료된 작업 — 9/14 조사 이후 (실측 검증)</a></li>
+<li><a href="#s4">남은 작업 P0 — 출시 불가</a></li>
+<li><a href="#s5">남은 작업 P1 — 출시 품질</a></li>
+<li><a href="#s6">결정 게이트 (이사님 결정 필요)</a></li>
+<li><a href="#s7">실행 로드맵 · 공수</a></li>
+<li><a href="#s8">자기검증 기록 — 신뢰도 부록</a></li>
+</ol>
+</div>
+
+<h2 id="s1"><span class="no">1</span>한눈에 보는 결론</h2>
+<p class="lead">제품은 기능 개발 단계를 벗어났다. 남은 것은 출시 운영 기반과 의사결정이다.</p>
+
+<div class="kpi">
+<div class="k"><div class="n">3 / 6</div><div class="l">P0 해결 (9/14 이후)</div></div>
+<div class="k"><div class="n">5건</div><div class="l">남은 P0 (신규 1건 포함)</div></div>
+<div class="k"><div class="n">6~10일</div><div class="l">개발 순수 공수 (ETF G11 편입 반영)</div></div>
+<div class="k"><div class="n">주 단위</div><div class="l">유료 출시 캘린더 (외부 의존)</div></div>
+</div>
+
+<div class="card">
+<p><strong>진단 흐름(로그인→OCR→홈→딥스캔), 결제 인프라, 워치 백엔드+알림은 실구현 완료 상태다.</strong> 9/14 종합조사가 잡은 P0 6건 중 3건(CI 게이트, OCR 무보호, 기록 탭 목업)이 당일~익일에 해결됐고, 이번 재검증에서 <strong>배포 브랜치 정합화</strong>가 신규 P0로 추가됐고, 2026-09-15 결정으로 <strong>ETF 실데이터(G11)가 P2에서 MVP 범위로 편입</strong>됐다. 남은 P0 5건과 G11을 합친 순수 개발 공수는 6~10일이지만, <strong>유료 출시 시점은 Toss 자동결제(빌링) 계약과 변호사 검토가 좌우한다</strong>(코드가 아닌 외부 일정). 무료 공개 먼저(D1-B)를 택하면 도메인 이전까지만 끝내도 베타 오픈이 가능하다.</p>
+</div>
+
+<div class="good"><strong>검증 방법 투명성.</strong> 이 문서의 모든 "완료/미완료" 판정은 문서 재독이 아니라 ① 코드 직독 ② DNS·HTTP 라이브 프로브 ③ GitHub Actions 이력 ④ 마이그레이션 파일 확인으로 재확인했다. §8에 반증 시도 기록을 공개한다.</div>
+
+<h2 id="s2"><span class="no">2</span>배포 현황 스냅샷 (실측)</h2>
+<p class="lead">두 도메인이 서로 다른 코드를 서빙 중이다. 이것이 G2(도메인 이전)의 실체다.</p>
+
+<table>
+<thead><tr><th>환경</th><th>판정</th><th>실측 증거 (2026-09-15)</th></tr></thead>
+<tbody>
+<tr>
+<td><code>test.jaroo.kr</code><br><span class="small">Railway</span></td>
+<td><span class="tag g">최신 코드</span></td>
+<td>DNS <code>69.46.46.118</code>(Railway) · 응답 헤더 <code>server: railway-hikari</code><br>
+OCR 가드 배포됨: <code>POST /api/ocr</code> 무인증 → <b>401</b> · 기록 API 존재: <code>/api/deepscan/history</code> → <b>401</b><br>
+<span class="small">= dev HEAD(#264) 내용이 반영 중. 9/14 가드·원장가 이미 살아 있다.</span></td>
+</tr>
+<tr>
+<td><code>jaroo.kr</code><br><span class="small">OCI (1GB, OOM 이력)</span></td>
+<td><span class="tag r">구 코드</span></td>
+<td>DNS <code>158.179.162.98</code>(OCI) · <code>POST /api/ocr</code> → <b>400</b>(가드 없음) · <code>/api/deepscan/history</code> → <b>404</b>(라우트 자체 없음)<br>
+<span class="small">= #262 이전 코드. 8/21 QA 보고서 H-3(7월 빌드 서빙)와 일치.</span></td>
+</tr>
+<tr>
+<td><code>dev</code> 브랜치</td>
+<td><span class="tag g">CI green</span></td>
+<td><code>gh run list</code> 최근 3회(#262·#263·#264, 2026-09-14) 전부 success</td>
+</tr>
+<tr>
+<td><code>master</code> / <code>release</code></td>
+<td><span class="tag y">뒤처짐</span></td>
+<td>master dev 대비 <b>74커밋</b>, release <b>115커밋</b> 뒤짐(release tip = 8/14 문서 커밋에서 정지)<br>
+<span class="small">CI required check 미설정(ci.yml 주석) → 신규 P0 N1의 근거</span></td>
+</tr>
+</tbody>
+</table>
+
+<div class="note"><strong>배포 경로 불일치.</strong> 운영 문서(railway-migration §6.1)는 <code>git push origin release</code>를 배포 절차로 적지만, 실측상 Railway는 dev 최신 내용을 서빙 중이다(아마 <code>railway up</code> 로컬 업로드 배포). 절차 문서와 실제 관행을 정합화하지 않으면 "CI green = 검증 배포"가 master/release에서 성립하지 않는다.</div>
+
+<h2 id="s3"><span class="no">3</span>완료된 작업 — 9/14 조사 이후 (실측 검증)</h2>
+<p class="lead">조사 문서가 잡은 P0 중 절반이 당일에 끝났다. 커밋 메시지가 아니라 동작으로 확인했다.</p>
+
+<table>
+<thead><tr><th>항목</th><th>내용</th><th>검증 증거</th></tr></thead>
+<tbody>
+<tr>
+<td><span class="tag g">G1 해결</span><strong>CI 게이트 복구</strong></td>
+<td>eslint 오류(deepscan/page.tsx effect 내 setState) + 깨진 테스트(buildTargetPriceFanBands import) 수정 → dev CI green. 무검증 배포 상태 종료.</td>
+<td><div class="evi">gh run list: #262 #263 #264 전부 success (2026-09-14)</div></td>
+</tr>
+<tr>
+<td><span class="tag g">B1 해결</span><strong>/api/ocr 남용 가드</strong></td>
+<td>세션 인증(401) · 레이트리밋 · 본문 상한(413) · 30초 타임아웃(504) · origin 차단(403)의 4겹 가드 + 정밀 테스트(유닛 6종·E2E 매트릭스 19종)</td>
+<td><div class="evi">src/app/api/ocr/route.ts — 401/413/504/403 코드 확인
+POST https://test.jaroo.kr/api/ocr (무인증) → 401 실측</div></td>
+</tr>
+<tr>
+<td><span class="tag g">A3 해결</span><strong>"기록" 탭 실데이터화</strong></td>
+<td>deepscan_scan_history 원장(스캔 성공마다 append, 유저당 최근 30건) + 목록/상세 API(본인 소유만) + 마이페이지 기록 탭 실데이터 연결</td>
+<td><div class="evi">migration 20260914130000_create_deepscan_scan_history.sql
+GET /api/deepscan/history → 401(존재+인증 게이트) 실측</div></td>
+</tr>
+</tbody>
+</table>
+
+<h2 id="s4"><span class="no">4</span>남은 작업 P0 — 출시 불가</h2>
+<p class="lead">5건. 이 중 코드 작업은 4건, 나머지 1건(G3의 계약)은 외부 의존이다.</p>
+
+<table>
+<thead><tr><th>#</th><th>갭</th><th>현재 상태 (재검증)</th><th>작업</th><th>공수</th></tr></thead>
+<tbody>
+<tr>
+<td><strong>G2</strong></td>
+<td><strong>프로덕션 도메인 이전</strong></td>
+<td>jaroo.kr이 OCI 구 코드 확정(DNS·404 실측, §2). Railway는 test만.</td>
+<td>DNS 전환(cafe24) · Supabase redirect/URL · Google Console 등록 · 와일드카드 정리 · 로그인→딥스캔 실측 · OCI 폐지</td>
+<td>1~2일<br><span class="small">함정 이력 있음(§7)</span></td>
+</tr>
+<tr>
+<td><strong>G3+E4</strong></td>
+<td><strong>과금 스위치 + 웰컴 크레딧</strong></td>
+<td>deepscan-entitlement.ts:29 — 결제 미설정 시 무료 통과(안전 밸브). 워치 API에 과금 게이팅 전무. 신규 유저 balance row가 없어 게이트 ON 즉시 "결제 벽"(가입 그랜트 트리거 없음 — on_auth_user_created는 profiles만 생성)</td>
+<td>Toss 실키 전환(+빌링 계약) · 딥스캔 게이팅 활성 · 워치 Pro 게이팅 · 웰컴 크레딧/체험(D3) 구현 · 게이트 분기 테스트(미설정/0크레딧/Pro/실패환불)</td>
+<td>1~2일<br><span class="small">+ 계약(외부)</span></td>
+</tr>
+<tr>
+<td><strong>G4</strong></td>
+<td><strong>결제 갱신 cron</strong></td>
+<td>.github/workflows에 ci.yml만 있음(schedule 없음). 워커(/api/payments/cron/tick)는 완성. <span class="small">※ Railway 대시보드 크론은 저장소에서 검증 불가 — 9/14 문서도 부재로 단정</span></td>
+<td>Railway Cron 또는 GHA schedule로 KST 1회 tick + PAYMENTS_CRON_SECRET + 갱신 실패 알림(E2)</td>
+<td>반나절</td>
+</tr>
+<tr>
+<td><strong>G5</strong></td>
+<td><strong>운영 env 체크리스트</strong></td>
+<td>문서 미생성. 변수 40+종, wisereport 쿠키 수동 복원 이슈(QA M-4 심리팀 env 누락 의심과 연결)</td>
+<td>런타임 필수/선택 매트릭스 + Railway 점검표 + 쿠키 갱신 절차</td>
+<td>반나절</td>
+</tr>
+<tr>
+<td><strong>N1</strong><br><span class="small">신규 (재검증 발견)</span></td>
+<td><strong>배포 브랜치·절차 정합화</strong></td>
+<td>master 74커밋·release 115커밋 뒤짐, CI required check 미설정, 배포 문서와 실제 관행 불일치(§2 note)</td>
+<td>dev→master 머지 · required check "verify" 지정 · 배포 절차 문서 갱신(release 폐지 또는 부활 결정)</td>
+<td>반나절</td>
+</tr>
+</tbody>
+</table>
+
+<h2 id="s5"><span class="no">5</span>남은 작업 P1 — 출시 품질</h2>
+<p class="lead">출시 주차 내 처리. 목업 노출 2건과 무인증 프록시는 사용자 신뢰·비용 직격이라 최우선.</p>
+
+<table>
+<thead><tr><th>#</th><th>항목</th><th>상태 (재검증)</th><th>작업</th></tr></thead>
+<tbody>
+<tr><td><strong>A1·A2</strong></td>
+<td><span class="dot r"></span>목업 페이지</td>
+<td>/etf(가짜 KODEX 시세)·/sharecard(가짜 손익 하드코딩 −2,876,300원) 여전히 존재. noindex/robots 없음. <b>test.jaroo.kr/etf → 200 실측</b>(프로덕션 서빙 사실)</td>
+<td>/sharecard는 404 제거(D6). <b>/etf는 G11(MVP 편입) 실데이터화</b> — 완료 전까지 noindex로 가짜 데이터 노출 차단.</td></tr>
+<tr><td><strong>G11</strong><br><span class="small">신규 · 2026-09-15 MVP 편입</span></td><td><span class="dot y"></span>ETF 실데이터 최소 편입</td><td>/etf는 etfAnalysis 하드코딩(KODEX 200 가짜 시세) — 선택 ETF 연결 PR #53 미머지(CLOSED), 스테일 이슈 #23/#70 종료 후 <b>#265</b>로 재계획, 크롤러 ETF 전용 분석 부재(server.js:1025). 진입 경로: 하단탭 없음, debug 네비·/sharecard 링크만</td><td><b>1단계(2~3일)</b>: 홈 ETF 카드→/etf 선택 연결 + 실시간 시세·등락·보유손익 실데이터 + 미지원 탭 숨김. <b>2단계(+2~3일)</b>: 구성종목·리스크 실데이터(소스 확정 — 네이버 내부 API 실증). 배당·비교는 출시 후</td></tr>
+<tr><td><strong>B2</strong></td>
+<td><span class="dot r"></span>/api/deepscan/slim 무방비</td>
+<td>무인증 크롤러 프록시, no-store, 레이트리밋 없음. <code>src/proxy.ts</code>(이 Next.js의 미들웨어)도 세션 갱신만 하고 차단 없음 확인</td>
+<td>인증 또는 레이트리밋 + 캐시. 반나절.</td></tr>
+<tr><td><strong>G6</strong></td>
+<td><span class="dot y"></span>관측성</td>
+<td>Sentry 전무(package.json 확인) · uptime 모니터링 없음 · cron 실패 무음(E2). <span class="small">외부 uptime은 저장소에서 검증 불가</span></td>
+<td>Sentry(또는 Railway 로그 알림) + uptime + tick 실패 시 텔레그램. 반나절~1일.</td></tr>
+<tr><td><strong>QA 재검증</strong></td>
+<td><span class="dot y"></span>8/21 QA 미해결 3건</td>
+<td>H-1 종목 확정 40~75초 지연(#242/#243 이후 재검증 필요) · H-2 특정 증권사 레이아웃 수량·평가금액 미인식 · M-4 심리팀 데이터 미제공(prod env 의심)</td>
+<td>출시 전 QA 리그레이션 1회 + OCR 샘플 8종 재테스트.</td></tr>
+<tr><td><strong>G8</strong></td>
+<td><span class="dot y"></span>법률 <span class="tag b">정정: 축소</span></td>
+<td>약관에 청약철회 조항+고지 약속 이미 존재(terms/page.tsx:92) — 남은 것은 <b>결제 화면 문구 1줄</b>. 변호사 검토는 여전히 베타 오픈 전제</td>
+<td>결제 UI 문구 반영(1시간) + 금융 전문 변호사 1차 검토(외부).</td></tr>
+<tr><td><strong>B3</strong></td>
+<td><span class="dot k"></span>/debug 페이지</td>
+<td>debug/briefing·deepscan prod 서빙(prod 가드 없음 확인)</td>
+<td>prod에서 404 처리. 1시간.</td></tr>
+<tr><td><strong>G7·G9·G10</strong></td>
+<td><span class="dot k"></span>운영 원칙·runbook</td>
+<td>워치 스케줄러 단일 인스턴스 원칙 미문서화 · 워치 UI 범위 미확정(D2) · 백업/쿠키/수동정산 runbook 부재</td>
+<td>문서화 반나절 + D2 결정.</td></tr>
+</tbody>
+</table>
+
+<p class="small">P2(출시 후 명시적 제외): 딥스캔 81초→60초, 워치 풀 스펙 화면(대시보드·버틸근거·물타기 계산기), ETF 고도화 잔여분(배당·비교 — G11 3단계), alert/confirm UX 빚(C2), 거대 모듈 분할(C3), 마이페이지 알림 배지 정리(A4·A5). 배포 전 워킹트리 정리(<code>--full-page</code>, <code>shot-hero.png</code> 미커밋 산물)도 함께.</p>
+
+<h2 id="s6"><span class="no">6</span>결정 게이트 — 이사님 결정 필요</h2>
+<p class="lead">코드로 해결되지 않는 4가지. 권고는 9/14 리뷰와 이번 재검증이 일치한다.</p>
+
+<table>
+<thead><tr><th>#</th><th>결정</th><th>옵션</th><th>권고</th></tr></thead>
+<tbody>
+<tr>
+<td><strong>D1</strong></td>
+<td>출시 방식</td>
+<td>A) 유료 즉시 개시<br>B) 1주 무료 공개(웰컴 크레딧) → 빌링 계약·법률 클리어 후 과금 스위치</td>
+<td><span class="tag g">B</span> 결제 벽+자문업 경계 리스크 동시 노출 회피, 초기 유저 데이터 확보</td>
+</tr>
+<tr>
+<td><strong>D2</strong></td>
+<td>워치 UI 범위</td>
+<td>A) 최소: 구독하면 텔레그램 알림(현 mypage/watchlist CRUD 유지)<br>B) 풀 스펙: 대시보드·버틸근거 4질문·물타기 계산기 포함</td>
+<td><span class="tag g">A</span> 백엔드(배치·3단계 알림·텔레그램)는 완성 — 미구현 화면은 출시 노트에 명시</td>
+</tr>
+<tr>
+<td><strong>D3</strong></td>
+<td>무료 체험 설계</td>
+<td>웰컴 크레딧 N회 / 워치 체험 M일 — 수치 미정</td>
+<td><span class="tag g">제안</span> 딥스캔 3회 + 워치 7일 (E4 구현 전 확정 필요)</td>
+</tr>
+<tr>
+<td><strong>D6</strong><br><span class="small">2026-09-15 결정</span></td>
+<td>목업 페이지 처리</td>
+<td>A) 404 제거<br>B) noindex 유지</td>
+<td><span class="tag g">결정됨</span> /etf는 <b>MVP 편입 — G11 실데이터화</b>(완료 전 noindex), /sharecard는 404 제거 유지</td>
+</tr>
+</tbody>
+</table>
+
+<h2 id="s7"><span class="no">7</span>실행 로드맵 · 공수</h2>
+<p class="lead">합계 6~10일(순수 개발 · 2026-09-15 ETF G11 편입 반영). 유료 출시 캘린더는 외부 의존(계약·검토)이 지배한다.</p>
+
+<ol class="roadmap">
+<li><span class="st">1</span><span class="dur">1~1.5일</span><strong>운영 기반 + 정리</strong><br>
+<span class="small">N1(master 머지·required check) · G5 env 체크리스트 · G6 Sentry/uptime 최소셋 · G4 cron · B2 slim 보호 · A1/A2/B3 목업·debug 정리</span></li>
+<li><span class="st">2</span><span class="dur">1~2일</span><strong>프로덕션 도메인 이전 (G2)</strong><br>
+<span class="small">DNS 전환 → Supabase/Google Console → 로그인→딥스캔 실측 → OCI 폐지. 검증: jaroo.kr에서 신규 라우트 200/401</span></li>
+<li><span class="st">3</span><span class="dur">1~2일 + 계약 병렬</span><strong>과금 활성 (G3+E4) · 법률 마무리 (G8) · ETF 1단계 (G11)</strong><br>
+<span class="small">웰컴 크레딧 그랜트 → 게이팅 활성 → 게이트 분기 테스트 → 테스트카드 실결제 시나리오(결제→차감→환불→tick→past_due). Toss 빌링 계약·변호사 검토는 이 단계와 병렬 진행 · G11 ETF 1단계(홈 ETF 카드 선택 연결 + 실시간 시세 + 가짜 데이터 제거)도 병렬 착수</span></li>
+<li><span class="st">4</span><span class="dur">출시 주차</span><strong>출시 판정</strong><br>
+<span class="small">QA 리그레이션(H-1·H-2·M-4) · D1~D3 확정 · G11 완료 판정(1단계 필수·2단계 범위 결정) · G7/G10 runbook · 위험 수용 서명(이사님 게이트)</span></li>
+</ol>
+
+<div class="note"><strong>공수 추정의 근거와 리스크.</strong> 6~10일(2026-09-15 ETF G11 편입 반영 — 기존 3~5일 + G11 1·2단계 3~5일)은 이 저장소의 자체 이력(reference class) 대비 중위권 밴드다. 특히 G2 도메인 이전은 8/14 test 도메인 구축 당시 cafe24 와일드카드 가로채기·Railway NEXT_PUBLIC 빌드 변수 미주입·Docker 캐시 무효화 등 7단계 예외가 터진 함정 구간이었다 — 동일 함정 재발 가능성을 감안하면 <strong>G2가 일정 미끄러짐 확률 1위</strong>다. 반대로 유료 출시 캘린더는 어차피 Toss 빌링 계약과 변호사 검토(주 단위)가 지배하므로, 개발 공수 단축이 출시일을 당기지는 않는다. <strong>D1-B(무료 공개 먼저)를 택하면 1~2단계 + G11 1단계(합산 4.5~7.5일)로 베타 오픈이 가능하다 — 가짜 데이터 노출 제거가 베타 조건이므로 ETF 1단계를 포함한다.</strong></div>
+
+<h2 id="s8"><span class="no">8</span>자기검증 기록 — 신뢰도 부록</h2>
+<p class="lead">결론 확정 전, 핵심 단정 12건에 반증 시도(consider-the-opposite + 경계 탐침)를 적용했다. 10건 생존, 2건 정정.</p>
+
+<table>
+<thead><tr><th>결과</th><th>항목</th><th>내용</th></tr></thead>
+<tbody>
+<tr>
+<td><span class="tag g">생존·강화</span></td>
+<td>10건</td>
+<td>G2(DNS A레코드로 결정적 증거화) · B1(코드+라이브 401) · A3(라이브 401) · A1/A2(prod 200 실측) · B2(proxy.ts 실독) · B3 · G3 · E4 · CI green · 문서 신뢰성</td>
+</tr>
+<tr>
+<td><span class="tag y">정정 1</span></td>
+<td>G8 청약철회</td>
+<td>"결제 UI 미반영" → 약관에 조항 존재. 남은 작업은 결제 화면 문구 1줄로 축소(§5 반영)</td>
+</tr>
+<tr>
+<td><span class="tag y">정정 2</span></td>
+<td>배포 가설 반증</td>
+<td>"release 브랜치 정지 = Railway 구 코드" 가설을 세웠으나 라이브 탐침(OCR 401)으로 <b>반증</b> — Railway는 dev 최신 코드 서빙 중. 대신 문서-관행 불일치+브랜치 뒤처짐을 신규 P0(N1)로 전환(§4)</td>
+</tr>
+</tbody>
+</table>
+
+<div class="info"><strong>근거 범위 한계(솔직 명시).</strong> "cron 부재(G4)"와 "Sentry/uptime 부재(G6)"는 <b>저장소 기준</b> 참이다. Railway 대시보드 크론·외부 uptime 서비스는 저장소에서 검증할 수 없다(다만 9/14 문서가 Railway 접근 상태에서 작성해 신뢰도 높음). TOSS 키가 테스트키인지는 값 미조회로 확인하지 않았다(시크릿 보호). QA H-1/H-2는 #242/#243 이후 개선 여부를 재실측하지 못했다 — 출시 전 QA 리그레이션 항목으로 지정했다.</div>
+
+<footer>
+Jaroo MVP 출시 준비 최종 결론 · 2026-09-15 · 검증 환경: dev(428d813), 실측 프로브 curl/dig/gh · 생성: ZCode 문서 조사 세션<br>
+선행 문서: docs/종합조사보고서-2026-09-14.md · docs/plans/2026-09-14-mvp-launch-plan.md · docs/코드감사-미구현-품질-2026-09-14.md · .reports/qa-e2e-2026-08-21.md
+</footer>
+
+</div>
+</body>
+</html>

@@ -1,12 +1,13 @@
 import express from 'express';
 import { fileURLToPath } from 'node:url';
+import { buildNaverConsensusSyntheticRow } from './services/deepscan-kr-naver-consensus.js';
 import {
   WISEREPORT_GLOBAL_ROUTES,
   WISEREPORT_KR_PAGES,
   WISEREPORT_KR_V12_PAGES,
   buildDeepScanKrEvidencePacket,
   buildJarooDeepScanPayload,
-  crawlWiseReportGlobal,
+  buildEtfMarketCommitteeSnapshot,  crawlWiseReportGlobal,
   crawlWiseReportGlobalDomainData,
   crawlWiseReportKrPage,
   crawlMarketData,
@@ -28,6 +29,8 @@ import {
   getMarketSnapshot,
   getTickerNames,
   getCurrentQuotes,
+  fetchEtfProfile,
+  fetchUsEtfProfile,
   getDartDisclosures,
   getUSConsensus,
   getUSFilings,
@@ -293,6 +296,10 @@ function buildJarooDeepScanInputFromQuery(req) {
     sourceContext: {
       from: from ?? 'system',
     },
+    // 긴급 캐시 무효화용(운영): ?crawlerCacheBypass=1 → 크롤러 캐시 우회 재수집
+    ...(parseSingleQueryValue(req.query.crawlerCacheBypass) === '1'
+      ? { crawlerCache: { bypassCache: true } }
+      : {}),
   };
 }
 
@@ -1093,6 +1100,10 @@ function buildWiseReportKrSlimFactsV12(slimPayload, evidence, instrumentKind) {
         : makeSlimV12MissingFact({ provider: 'internal', checkedSources: ['targetPrice', 'quotes.currentPrice'], reasonCode: 'target_gap_requires_quote', message: '목표가 괴리율 계산에는 현재가 source가 필요합니다.' }),
       recommendation: makeSlimV12Fact(evidence.consensusSnapshot?.recommendationScore ?? evidence.consensusSnapshot?.recommendation ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].투자의견' }),
       analystOpinionRows: makeSlimV12Fact(slimPayload.pages?.opinion?.analystOpinions?.rows ?? [], { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions.rows' }),
+      analystCount: makeSlimV12Fact(evidence.consensusSnapshot?.analystCount ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinations.brokerCount' }),
+      highestTargetPrice: makeSlimV12Fact(evidence.consensusSnapshot?.highestTargetPrice ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가(최고)' }),
+      consensusBrokers: makeSlimV12Fact(evidence.consensusSnapshot?.analystBrokers ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystBrokers' }),
+      lowestTargetPrice: makeSlimV12Fact(evidence.consensusSnapshot?.lowestTargetPrice ?? null, { provider: 'fnguide', pageId: 'opinion', fieldPath: 'opinion.analystOpinions[].적정주가(최저)' }),
     },
     profitability: {
       revenueLatest: makeSlimV12FinancialFact(evidence.financialSnapshot?.revenueLatest ?? null, financialSource, instrumentKind),
@@ -2446,7 +2457,37 @@ const endpointDefinitions = [
     params: ['code'],
     query: [],
     rawSuccess: true,
-    handler: async (req) => buildWiseReportKrSlimPayloadV12(await getCrawlV12(req.params.code), req.params.code),
+    handler: async (req) => {
+      const rawAggregate = await getCrawlV12(req.params.code);
+      const payload = buildWiseReportKrSlimPayloadV12(rawAggregate, req.params.code);
+      // 컨센서스 폴백(이슈): fnguide 투자의견 페이지 장애 시 네이버 데이터를
+      // opinion 합성 행으로 주입해 목표주가·투자의견 스냅샷을 회복한다.
+      try {
+        const consensusEmpty = !payload.pages?.consensus?.consensusTrend?.rows?.some((row) => /목표/.test(row?.['구분'] ?? ''));
+        const krEvidenceOpinionMissing = !payload.krFacts || JSON.stringify(payload.krFacts).indexOf('targetPrice') < 0;
+        if (consensusEmpty) {
+          const synthetic = await buildNaverConsensusSyntheticRow(req.params.code);
+          if (synthetic) {
+            const opinionPage = { rows: [synthetic] };
+            payload.pages = payload.pages || {};
+            // fnguide 원본이 실패 응답('페이지가 없습니다')일 때만 덮어쓴다.
+            const existingOpinionText = JSON.stringify(payload.pages.opinion ?? {});
+            const isFailurePage = existingOpinionText.indexOf('페이지가 없습니다') >= 0;
+            const hasNoRows = !Array.isArray(payload.pages.opinion?.rows) || payload.pages.opinion.rows.length === 0;
+            if (!payload.pages.opinion || isFailurePage || hasNoRows) {
+              payload.pages.opinion = opinionPage;
+            } else {
+              payload.pages.opinion.rows = [...payload.pages.opinion.rows, synthetic];
+            }
+            console.log(`[naver-consensus-fallback] code=${req.params.code} target=${synthetic.targetPrice} score=${synthetic['투자의견(점수)']}`);
+          }
+        }
+        void krEvidenceOpinionMissing;
+      } catch (fallbackError) {
+        console.warn('[naver-consensus-fallback] 주입 실패(원본 흐름 유지)', fallbackError?.message ?? fallbackError);
+      }
+      return payload;
+    },
   },
   ...WISEREPORT_KR_PAGE_ROUTES.map((route) => ({
     id: route.id,
@@ -3073,7 +3114,9 @@ const endpointDefinitions = [
         return { ok: true, requestId, status: 'not_found', results: {}, errors: [], pending: [] };
       }
 
-      const committeeAxes = buildKrCommitteeAxesFromLlmResults(null, progress.results, progress.errors, progress.pending).axes;
+      const committeeAxes = buildKrCommitteeAxesFromLlmResults(null, progress.results, progress.errors, progress.pending, {
+        memberKeys: progress.memberKeys,
+      }).axes;
 
       return {
         ok: true,
@@ -3116,6 +3159,85 @@ const endpointDefinitions = [
       }, {
         includeNaverQuoteContext: parseBooleanQuery(req.query.includeContext),
       });
+    },
+  },
+  {
+    id: 'etf-profile',
+    resource: 'etf.profile',
+    description: '한국 ETF 프로필 — 네이버 구성종목/기본정보와 위세리포트 상품정보를 병합합니다.',
+    primaryPath: buildDataSourcePath('naver-wisereport', '/kr/etf/:code/profile'),
+    dataSources: ['naver-finance', 'wisereport'],
+    params: ['code'],
+    query: [],
+    count: (data) => Array.isArray(data?.holdings) ? data.holdings.length : 0,
+    handler: async (req) => {
+      try {
+        return await fetchEtfProfile(req.params.code);
+      } catch (error) {
+        if (error?.code === 'NOT_ETF') {
+          throw new HttpError(400, 'not_an_etf_code', {
+            message: 'ETF 코드가 아니에요. 한국 상장 ETF(6자리) 코드를 사용해주세요.',
+          });
+        }
+        throw error;
+      }
+    },
+  },
+  {
+    id: 'etf-market-committee',
+    resource: 'etf.committee.market',
+    description: '/etf 페이지 AI 위원회 — 시장 타이밍 축 위원(트렌드·시장 신호·가격 위치)만 LLM 분석합니다.',
+    primaryPath: buildDataSourcePath('deepscan', '/kr/etf/:code/committee'),
+    dataSources: ['openrouter', 'wisereport', 'naver-finance', 'opendart'],
+    params: ['code'],
+    query: ['shares(optional)', 'averagePrice(optional)', 'crawlerCacheBypass(optional, 1)'],
+    rawSuccess: true,
+    count: (data) => Array.isArray(data?.axes) ? data.axes.reduce((sum, axis) => sum + (Array.isArray(axis?.members) ? axis.members.length : 0), 0) : 0,
+    handler: async (req) => {
+      const code = parseSingleQueryValue(req.params.code) ?? '';
+      const shares = parseSingleQueryValue(req.query.shares);
+      const averagePrice = parseSingleQueryValue(req.query.averagePrice);
+      const hasHolding = Boolean(shares) || Boolean(averagePrice);
+      const snapshot = await buildEtfMarketCommitteeSnapshot({
+        instrument: {
+          code,
+          market: 'ETF',
+          kind: 'etf',
+        },
+        ...(hasHolding ? { holding: { ...(shares ? { shares } : {}), ...(averagePrice ? { averagePrice } : {}) } } : {}),
+        sourceContext: { from: 'system' },
+        ...(parseSingleQueryValue(req.query.crawlerCacheBypass) === '1'
+          ? { crawlerCache: { bypassCache: true } }
+          : {}),
+      });
+
+      if (snapshot.ok === false && (snapshot.error?.code === 'not_an_etf_code' || snapshot.error?.code === 'input-invalid')) {
+        throw new HttpError(400, snapshot.error.code, { message: snapshot.error.message });
+      }
+
+      return snapshot;
+    },
+  },
+  {
+    id: 'us-etf-profile',
+    resource: 'etf.profile.us',
+    description: '미국 ETF 프로필 — Yahoo 차트(시세·2년 일봉)·검색(ETF 판별)·quoteSummary(구성종목·보수·AUM)를 병합합니다.',
+    primaryPath: buildDataSourcePath('yahoo', '/us/etf/:symbol/profile'),
+    dataSources: ['yahoo'],
+    params: ['symbol'],
+    query: [],
+    count: (data) => Array.isArray(data?.holdings) ? data.holdings.length : 0,
+    handler: async (req) => {
+      try {
+        return await fetchUsEtfProfile(req.params.symbol);
+      } catch (error) {
+        if (error?.code === 'NOT_ETF') {
+          throw new HttpError(400, 'not_an_etf_code', {
+            message: 'ETF 심볼이 아니에요. 미국 상장 ETF 티커(예: VOO)를 사용해주세요.',
+          });
+        }
+        throw error;
+      }
     },
   },
   {

@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jaroo — 더 살까 말까</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Pretendard',sans-serif;-webkit-font-smoothing:antialiased}
+:root{--ink:#0F1419;--up:#E5484D;--down:#2B6BE6;--bg:#F5F6F8;--card:#fff;--line:#E8EAEE;--t2:#5A6473;--t3:#97A0AE;--ink-soft:#EEF0F3;}
+body{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;align-items:flex-start}
+.frame{background:var(--bg);border-radius:16px;width:340px;height:800px;overflow-y:auto;overflow-x:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative}
+.frame::-webkit-scrollbar{display:none}
+.caption{width:340px;text-align:center;font-size:12px;color:#555;margin-top:8px;font-weight:600}
+svg{display:block}
+
+.head{position:sticky;top:0;z-index:10;background:rgba(245,246,248,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;border-bottom:.5px solid var(--line);display:flex;align-items:center;gap:11px}
+.hb{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--ink);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.ht{font-size:15px;font-weight:600;color:var(--ink)}
+.body{padding:16px 16px 24px}
+
+.main{background:#fff;border:.5px solid var(--line);border-radius:18px;padding:18px 17px;box-shadow:0 2px 10px rgba(0,0,0,.04);margin-bottom:12px}
+.sl-head{display:flex;align-items:baseline;justify-content:space-between;margin-bottom:12px}
+.sl-q{font-size:13px;font-weight:600;color:var(--t2)}
+.sl-a{font-size:22px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+.sl-a span{font-size:13px;font-weight:600;color:var(--t3);margin-left:1px}
+.sl{width:100%;-webkit-appearance:none;height:6px;border-radius:3px;background:#E4E8EE;outline:none;margin-bottom:7px}
+.sl::-webkit-slider-thumb{-webkit-appearance:none;width:24px;height:24px;border-radius:50%;background:var(--ink);cursor:pointer;box-shadow:0 2px 8px rgba(0,0,0,.25)}
+.sl-foot{display:flex;justify-content:space-between;align-items:center;font-size:10.5px;color:var(--t3)}
+.sl-cost{font-weight:700;color:var(--ink);font-variant-numeric:tabular-nums}
+
+.divider{height:.5px;background:var(--line);margin:16px -17px}
+
+.change{display:flex;align-items:center;gap:12px}
+.ch-side{flex:1;text-align:center}
+.ch-l{font-size:9.5px;color:var(--t3);margin-bottom:5px;font-weight:600}
+.ch-v{font-size:19px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums;line-height:1.15}
+.ch-s{font-size:10px;color:var(--t3);margin-top:3px}
+.ch-arrow{color:#C2C8D0;flex-shrink:0}
+.ch-side.hi{background:var(--ink-soft);border-radius:12px;padding:11px 6px}
+
+.gauge{margin-top:15px}
+.g-top{display:flex;justify-content:space-between;align-items:baseline;font-size:10.5px;color:var(--t3);margin-bottom:6px}
+.g-top b{font-size:13px;color:var(--ink);font-weight:800;font-variant-numeric:tabular-nums}
+.g-bar{height:9px;border-radius:5px;background:#EEF0F3;position:relative;overflow:hidden}
+.g-old{position:absolute;left:0;top:0;bottom:0;background:#D9DEE6;border-radius:5px}
+.g-new{position:absolute;left:0;top:0;bottom:0;background:var(--ink);border-radius:5px;transition:width .2s}
+.g-legend{display:flex;gap:12px;margin-top:7px;font-size:9.5px;color:var(--t3)}
+.g-lg{display:flex;align-items:center;gap:5px}
+.g-sw{width:8px;height:8px;border-radius:2px}
+
+.pros{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px}
+.pc{border-radius:14px;padding:14px 13px}
+.pc.good{background:#FDF2F2;border:.5px solid #F5D5D7}
+.pc.bad{background:#F0F4FB;border:.5px solid #D4E0F2}
+.pc-h{display:flex;align-items:center;gap:6px;font-size:11px;font-weight:700;margin-bottom:9px}
+.pc-h.good{color:#A8323A}
+.pc-h.bad{color:#2456A8}
+.pc-n{font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1.1;margin-bottom:4px}
+.pc-n.good{color:var(--up)}
+.pc-n.bad{color:var(--down)}
+.pc-d{font-size:10px;color:var(--t2);line-height:1.45}
+.pc-was{font-size:9.5px;color:var(--t3);margin-top:5px;padding-top:5px;border-top:.5px dashed rgba(0,0,0,.08)}
+
+.verdict{background:var(--ink);border-radius:14px;padding:14px 15px;color:#fff;margin-bottom:12px;display:flex;align-items:flex-start;gap:10px}
+.v-ico{width:24px;height:24px;border-radius:7px;background:rgba(255,255,255,.13);display:flex;align-items:center;justify-content:center;flex-shrink:0;color:rgba(255,255,255,.9)}
+.v-t{flex:1;font-size:12px;line-height:1.6;color:rgba(255,255,255,.72)}
+.v-t b{color:#fff;font-weight:700}
+
+.more{margin-bottom:11px}
+.more-btn{background:#fff;border:.5px solid var(--line);border-radius:13px;padding:14px 16px;display:flex;align-items:center;gap:10px;cursor:pointer}
+.more-t{font-size:13px;font-weight:700;color:var(--ink);flex-shrink:0}
+.more-s{flex:1;font-size:10.5px;color:var(--t3);text-align:right;min-width:0}
+.more-a{color:var(--t3);transition:transform .3s;flex-shrink:0}
+.more.open .more-a{transform:rotate(180deg)}
+.more-body{max-height:0;overflow:hidden;transition:max-height .4s ease}
+.more.open .more-body{max-height:1800px;margin-top:10px}
+
+/* 접기 내부 — 번호 섹션 */
+.sec{background:#fff;border:.5px solid var(--line);border-radius:13px;padding:15px 16px;margin-bottom:9px}
+.sec-h{display:flex;align-items:center;gap:9px;margin-bottom:12px}
+.sec-n{width:19px;height:19px;border-radius:50%;background:var(--ink);color:#fff;font-size:10.5px;font-weight:800;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.sec-t{flex:1;font-size:13px;font-weight:700;color:var(--ink)}
+.sec-d{font-size:10px;font-weight:700;color:var(--t2);background:var(--ink-soft);padding:3px 8px;border-radius:5px}
+.sec-score{font-size:11px;font-weight:800;color:var(--ink);font-variant-numeric:tabular-nums}
+.sec-lead{font-size:11.5px;color:var(--t2);line-height:1.6;margin-bottom:11px}
+.sec-lead b{color:var(--ink);font-weight:600}
+.sec-tip{font-size:10.5px;color:var(--t2);line-height:1.55;background:#F7F8FA;border-radius:9px;padding:10px 11px;margin-top:10px}
+.sec-tip b{color:var(--ink);font-weight:700}
+
+/* 타이밍 2열 */
+.tw{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.tw-c{border:.5px solid var(--line);border-radius:11px;padding:11px 12px}
+.tw-when{font-size:11.5px;font-weight:800;color:var(--ink);margin-bottom:9px;padding-bottom:8px;border-bottom:.5px solid var(--line)}
+.tw-l{font-size:10.5px;line-height:1.45;padding:4px 0 4px 12px;position:relative;color:var(--t2)}
+.tw-l::before{position:absolute;left:0;font-weight:800;font-size:11px}
+.tw-l.up::before{content:'+';color:#A8323A}
+.tw-l.down::before{content:'−';color:#2456A8}
+
+/* 조건 진행 */
+.dots{display:flex;gap:5px;margin-bottom:11px}
+.dot{flex:1;height:4px;border-radius:2px;background:#E4E8EE}
+.dot.on{background:var(--ink)}
+.ck{display:flex;align-items:flex-start;gap:9px;padding:7px 0}
+.ck-m{width:16px;height:16px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.ck.ok .ck-m{background:#FBE6E7;color:#A8323A}
+.ck.no .ck-m{background:#EEF0F3;color:#97A0AE}
+.ck-t{flex:1;font-size:11.5px;color:var(--t2);line-height:1.5}
+.ck-t b{color:var(--ink);font-weight:700;margin-right:4px}
+.ck.no .ck-t{opacity:.7}
+
+/* 자문 */
+.qz{font-size:11.5px;color:var(--t2);line-height:1.55;padding:10px 12px;background:#F7F8FA;border-radius:9px;margin-bottom:7px}
+.qz b{color:var(--ink);font-weight:700}
+
+.hist{background:#F0F4FB;border:.5px solid #D4E0F2;border-radius:11px;padding:12px 13px;margin-top:11px}
+.hist-h{display:flex;align-items:center;gap:7px;font-size:11.5px;font-weight:700;color:#2456A8;margin-bottom:6px}
+.hist-b{font-size:11px;color:var(--t2);line-height:1.55}
+.hist-b b{color:var(--ink);font-weight:600}
+
+.note{font-size:10.5px;color:var(--t3);line-height:1.6;text-align:center;margin-top:14px}
+</style>
+</head>
+<body>
+
+<div>
+<div class="frame">
+  <div class="head"><div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg></div><div class="ht">SFA반도체 · 더 살까</div></div>
+  <div class="body">
+
+    <div class="main">
+      <div class="sl-head">
+        <span class="sl-q">몇 주 더 살까요?</span>
+        <span class="sl-a" id="qty">20<span>주</span></span>
+      </div>
+      <input type="range" class="sl" id="slider" min="0" max="50" value="20" step="1">
+      <div class="sl-foot">
+        <span>0주</span>
+        <span>필요 자금 <span class="sl-cost" id="cost">195,400원</span></span>
+        <span>50주</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="change">
+        <div class="ch-side">
+          <div class="ch-l">지금 평단</div>
+          <div class="ch-v">11,400</div>
+          <div class="ch-s">23주</div>
+        </div>
+        <div class="ch-arrow"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg></div>
+        <div class="ch-side hi">
+          <div class="ch-l">추가 후 평단</div>
+          <div class="ch-v" id="newAvg">10,642</div>
+          <div class="ch-s" id="newQty">43주</div>
+        </div>
+      </div>
+
+      <div class="gauge">
+        <div class="g-top">
+          <span>본전까지 필요한 상승폭</span>
+          <span><b id="newGap">+8.9%</b></span>
+        </div>
+        <div class="g-bar">
+          <div class="g-old" style="width:100%"></div>
+          <div class="g-new" id="gFill" style="width:53%"></div>
+        </div>
+        <div class="g-legend">
+          <span class="g-lg"><span class="g-sw" style="background:#D9DEE6"></span>지금 +16.7%</span>
+          <span class="g-lg"><span class="g-sw" style="background:#0F1419"></span>추가 후 <span id="gapTxt">+8.9%</span></span>
+        </div>
+      </div>
+    </div>
+
+    <div class="pros">
+      <div class="pc good">
+        <div class="pc-h good">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg>
+          10% 오르면
+        </div>
+        <div class="pc-n good" id="upGain">+45,766원</div>
+        <div class="pc-d">회복이 그만큼 빨라져요</div>
+        <div class="pc-was">지금 그대로면 +22,471원</div>
+      </div>
+      <div class="pc bad">
+        <div class="pc-h bad">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M19 12l-7 7-7-7"/></svg>
+          10% 빠지면
+        </div>
+        <div class="pc-n bad" id="downLoss">−45,766원</div>
+        <div class="pc-d">손실도 그만큼 커져요</div>
+        <div class="pc-was">지금 그대로면 −22,471원</div>
+      </div>
+    </div>
+
+    <div class="verdict">
+      <div class="v-ico"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><path d="M12 9v4M12 17h.01"/></svg></div>
+      <div class="v-t">본전 거리는 <b id="vGap">절반 아래</b>로 줄지만, 최악의 경우 손실은 <b id="vWorst">−108,532원</b>까지 커져요. <b>양쪽이 같이 움직여요.</b></div>
+    </div>
+
+    <div class="more" id="more">
+      <div class="more-btn" onclick="document.getElementById('more').classList.toggle('open')">
+        <span class="more-t">결정하기 전에</span>
+        <span class="more-s">언제 살까 · 조건 · 감당 가능한가</span>
+        <span class="more-a"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></span>
+      </div>
+      <div class="more-body">
+        <!-- 1. 타이밍: 2열 비교 -->
+        <div class="sec">
+          <div class="sec-h"><span class="sec-n">1</span><span class="sec-t">언제 살까</span><span class="sec-d">D-6</span></div>
+          <div class="tw">
+            <div class="tw-c">
+              <div class="tw-when">지금</div>
+              <div class="tw-l up">평단이 바로 내려가요</div>
+              <div class="tw-l down">실적 나쁘면 더 빠져요</div>
+            </div>
+            <div class="tw-c">
+              <div class="tw-when">8/5 실적 후</div>
+              <div class="tw-l up">결과를 알고 결정해요</div>
+              <div class="tw-l down">오르면 비싸게 사요</div>
+            </div>
+          </div>
+          <div class="sec-tip"><b>나눠 사기</b> — 지금 10주, 실적 후 10주로 나누면 어느 쪽이든 덜 아쉬워요</div>
+        </div>
+
+        <!-- 2. 조건: 진행 표시 -->
+        <div class="sec">
+          <div class="sec-h"><span class="sec-n">2</span><span class="sec-t">사도 될 조건인가</span><span class="sec-score">2 / 3</span></div>
+          <div class="dots"><span class="dot on"></span><span class="dot on"></span><span class="dot"></span></div>
+          <div class="ck ok"><span class="ck-m"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="ck-t"><b>업황 회복</b> 후공정 수주 2분기 연속 증가</span></div>
+          <div class="ck ok"><span class="ck-m"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span><span class="ck-t"><b>목표가 여력</b> 13,200원 · 추가 후 평단보다 위</span></div>
+          <div class="ck no"><span class="ck-m"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.4" stroke-linecap="round"><path d="M5 12h14"/></svg></span><span class="ck-t"><b>흑자 전환</b> 8/5 실적에서 확인돼요</span></div>
+        </div>
+
+        <!-- 3. 자금: 자문 -->
+        <div class="sec">
+          <div class="sec-h"><span class="sec-n">3</span><span class="sec-t">감당할 수 있는 돈인가</span></div>
+          <div class="sec-lead">추가 매수는 <b>없어도 되는 돈</b>으로 하는 게 원칙이에요.<br>세 가지만 스스로 물어보세요.</div>
+          <div class="qz">이 <b id="askCost">195,400원</b>이 6개월 안에 꼭 필요한 돈은 아닌가요?</div>
+          <div class="qz">빌린 돈이나 생활비는 아닌가요?</div>
+          <div class="qz">더 빠져도 <b id="askWorst">−108,532원</b>까지 견딜 수 있나요?</div>
+          <div class="hist">
+            <div class="hist-h">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v5h5"/><path d="M3.05 13A9 9 0 1 0 6 5.3L3 8"/></svg>
+              이번이 두 번째예요
+            </div>
+            <div class="hist-b">3월 14일에도 추가 매수하셨어요. <b>12,800 → 11,400원</b>으로 낮췄지만, 그 뒤로 <b>−14.3%</b>가 됐어요.</div>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <div class="note">Jaroo는 추가 매수를 권하지 않아요. 숫자만 정확히 보여드려요.</div>
+  </div>
+</div>
+<div class="caption">더 살까 — 슬라이더 결과를 한 덩어리로</div>
+</div>
+
+<script>
+const AVG=11400, QTY=23, CUR=9770, LOW=8120, BASE_GAP=(AVG-CUR)/CUR*100;
+const f=n=>Math.round(n).toLocaleString('ko-KR');
+function calc(add){
+  const nq=QTY+add;
+  const na=(AVG*QTY+CUR*add)/nq;
+  const gap=(na-CUR)/CUR*100;
+  const cost=CUR*add;
+  const gain=CUR*0.10*nq;
+  const worst=Math.abs((LOW-na)*nq);
+  const ratio=gap/BASE_GAP;
+
+  document.getElementById('qty').innerHTML=add+'<span>주</span>';
+  document.getElementById('cost').textContent=f(cost)+'원';
+  document.getElementById('newAvg').textContent=f(na);
+  document.getElementById('newQty').textContent=nq+'주';
+  document.getElementById('newGap').textContent='+'+gap.toFixed(1)+'%';
+  document.getElementById('gapTxt').textContent='+'+gap.toFixed(1)+'%';
+  document.getElementById('gFill').style.width=(ratio*100)+'%';
+  document.getElementById('upGain').textContent='+'+f(gain)+'원';
+  document.getElementById('downLoss').textContent='−'+f(gain)+'원';
+  document.getElementById('vWorst').textContent='−'+f(worst)+'원';
+  document.getElementById('askCost').textContent=f(cost)+'원';
+  document.getElementById('askWorst').textContent='−'+f(worst)+'원';
+
+  let label;
+  if(add===0) label='그대로';
+  else if(ratio>0.8) label='조금';
+  else if(ratio>0.55) label='크게';
+  else label='절반 아래';
+  document.getElementById('vGap').textContent=label;
+}
+document.getElementById('slider').addEventListener('input',e=>calc(+e.target.value));
+calc(20);
+</script>
+</body>
+</html>

@@ -4,7 +4,7 @@ import { Card } from '@/components/ui/card'
 
 export function JarooDonutSummary() {
   const slices = holdings.map((item, index) => {
-    const palette = ['#E24B4A', '#EF9F27', '#5B7CFA', '#1D9E75', '#185FA5']
+    const palette = ['#E24B4A', '#EF9F27', '#5B7CFA', '#7E97BD', '#185FA5']
     const start = index * 72
     const end = start + 60
     return `${palette[index]} ${start}deg ${end}deg`

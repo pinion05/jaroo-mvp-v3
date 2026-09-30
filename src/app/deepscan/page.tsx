@@ -7,15 +7,24 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LineChart } from 'lucide-react'
 import { DeepScanInlineResults } from '@/components/deepscan-inline-results'
 import { DeepScanLoadingScreen, type LoadingStageKey } from '@/components/deepscan-loading-screen'
+import { DeepScanHaltScreen } from '@/components/deepscan-halt-screen'
+import { SnapshotProvenanceBar } from '@/components/deepscan-inline-results'
 import { JarooShell } from '@/components/jaroo-shell'
-import { fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
+import {
+  DEEPSCAN_HALT_CHECK_TIMEOUT_MS,
+  isHaltedHomeHolding,
+  resolveDeepScanHaltVerdict,
+} from '@/lib/deepscan-halt'
+import { DeepScanApiError, fetchDeepScanCanonicalPayload, type DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
+import { computePriceDriftPct, extractSnapshotPriceBasis, resolveDeepScanSnapshotKey } from '@/lib/deepscan-snapshot-policy'
 import { type LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
 import { fetchLoadingProxyJson } from '@/lib/loading-fetch-retry'
 import { resolveDeepScanPageCacheState } from '@/lib/deepscan-page-projection'
 import { resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
 import { isDeepScanInlineResultsReady } from '@/lib/deepscan-loading-behavior'
 import { resolveDeepScanHydratedTarget, shouldStartDeepScanRequestAfterHydration } from '@/lib/deepscan-target-hydration'
-import { resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
+import { readAppliedHomePortfolio, resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
+import { buildProfitIntroMention } from '@/lib/deepscan-intro-mention'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
 import { getDeepScanTargetKey } from '@/lib/workflow-types'
@@ -41,6 +50,7 @@ import {
   buildLoadingTradingVolume,
   createDeepScanLoadingSequence,
   createDeepScanLoadingStageArrival,
+  allCommitteeLoadingStageKeys,
   extractLoadingStageKeysFromCommitteeAxes,
   extractLoadingStageKeysFromCommitteeResults,
   hasCollectedDeepScanEvidence,
@@ -65,10 +75,14 @@ export default function DeepScanPage() {
   const setDeepScanTarget = useDeepScanStore((state) => state.setTarget)
   const requestStatus = useDeepScanStore((state) => state.requestStatus)
   const errorMessage = useDeepScanStore((state) => state.errorMessage)
+  const errorCode = useDeepScanStore((state) => state.errorCode)
   const activePayload = useDeepScanStore((state) => state.activePayload)
   const activeTargetKey = useDeepScanStore((state) => state.activeTargetKey)
   const lastSuccessful = useDeepScanStore((state) => state.lastSuccessful)
   const startRequest = useDeepScanStore((state) => state.startRequest)
+  // 명시적 재분석(스냅샷 캐시 무시) — 에포크 변경이 fetch effect를 재실행한다
+  const [refreshEpoch, setRefreshEpoch] = useState(0)
+  const pendingRefreshRef = useRef(false)
   const finishSuccess = useDeepScanStore((state) => state.finishSuccess)
   const updateActivePayload = useDeepScanStore((state) => state.updateActivePayload)
   const finishError = useDeepScanStore((state) => state.finishError)
@@ -80,6 +94,14 @@ export default function DeepScanPage() {
   const [arrivedLoadingStages, setArrivedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
   const [displayedLoadingStages, setDisplayedLoadingStages] = useState<DeepScanLoadingStageArrivalState>(() => createDeepScanLoadingStageArrival(null))
   const [hydratedTargetKey, setHydratedTargetKey] = useState<string | null>(null)
+  // 하이드레이션 완료 플래그 — 세션 복원 전(SSR 포함)에는 '분석할 종목이 없습니다' 빈 상태를
+  // 띄우지 않는다. 보유 대상이 있는 사용자에게 잘못된 빈 상태가 첫 페인트/웹뷰 잔재로
+  // 보이는 문제(test 배포 피드백 #277) 때문. SSR은 중립 안내 카드만 내린다.
+  const [hydrationChecked, setHydrationChecked] = useState(false)
+  // 거래정지 2층 판정 상태(이슈 #276) — 1차 힌트는 홈이 계산한 카드 톤(cardTone 'halt')을
+  // 세션 hydration에서, 2차 권위는 퀵시세 당일 거래량(volume 0)에서 나온다.
+  const [haltHintTargetKey, setHaltHintTargetKey] = useState<string | null>(null)
+  const [haltCheckExpiredTargetKey, setHaltCheckExpiredTargetKey] = useState<string | null>(null)
 
   useEffect(() => {
     let cancelled = false
@@ -88,7 +110,9 @@ export default function DeepScanPage() {
       const hydratedTarget = buildDeepScanTargetInputFromSession(sessionTarget)
       if (!hydratedTarget) {
         if (!cancelled) {
+          setHaltHintTargetKey(null)
           setHydratedTargetKey(target ? getDeepScanTargetKey(target) : null)
+          setHydrationChecked(true)
         }
         return
       }
@@ -104,7 +128,9 @@ export default function DeepScanPage() {
         if (!target || getDeepScanTargetKey(target) !== nextTargetKey) {
           setDeepScanTarget(nextTarget)
         }
+        setHaltHintTargetKey(sessionTarget && isHaltedHomeHolding(sessionTarget.holding) ? nextTargetKey : null)
         setHydratedTargetKey(nextTargetKey)
+        setHydrationChecked(true)
       }
     }
 
@@ -116,6 +142,80 @@ export default function DeepScanPage() {
   }, [setDeepScanTarget, target])
 
   const targetKey = useMemo(() => (target ? getDeepScanTargetKey(target) : null), [target])
+  // 스냅샷 키(code|ticker) — 위원회 쓰래백이 갱신할 스냅샷 행 지정에 쓴다.
+  const snapshotKey = useMemo(() => (target ? resolveDeepScanSnapshotKey({ code: target.code, ticker: target.ticker }) : null), [target])
+
+  // 거래정지 판정 — 퀵시세 미도착 시 제한 시간 뒤 fail-open(기존 플로우)으로 돌아간다.
+  const activeQuickQuoteForHalt = loadingQuickQuote?.targetKey === targetKey ? loadingQuickQuote : null
+  const haltVerdict = useMemo(() => resolveDeepScanHaltVerdict({
+    targetKey,
+    isUsTarget: isDeepScanUsTarget(target),
+    instrumentKind: target?.kind ?? null,
+    haltHint: haltHintTargetKey !== null && haltHintTargetKey === targetKey,
+    quickQuoteVolume: activeQuickQuoteForHalt?.tradingVolume,
+    checkExpired: haltCheckExpiredTargetKey !== null && haltCheckExpiredTargetKey === targetKey,
+  }), [activeQuickQuoteForHalt, haltCheckExpiredTargetKey, haltHintTargetKey, target, targetKey])
+
+  useEffect(() => {
+    if (!targetKey) {
+      return
+    }
+
+    const timeoutId = setTimeout(() => {
+      setHaltCheckExpiredTargetKey(targetKey)
+    }, DEEPSCAN_HALT_CHECK_TIMEOUT_MS)
+
+    return () => {
+      clearTimeout(timeoutId)
+    }
+  }, [targetKey])
+// 스펙 spec_v7 §4 인트로 멘트(손익 5단계). 판정 = 손익액 ÷ 전체 포트폴리오 평가액(즉시 데이터, 금액 미표시).
+  // 분모 우선순위: ① 적용 포트폴리오 세션(OCR 평가액 합산) ② 서버 포트폴리오 합산(재방문 세션 부재 폴백).
+  // 둘 다 없으면 null → 기존 안내 문구.
+  const introSessionTotal = useMemo(
+    () => (readAppliedHomePortfolio()?.rows ?? []).reduce((sum, row) => sum + (parseOcrNumber(row.evaluationAmount ?? '') ?? 0), 0),
+    [],
+  )
+  const [introFetchedTotal, setIntroFetchedTotal] = useState<number | null>(null)
+  // 세션 합계가 있으면 즉시 파생값으로 사용하고, 없을 때만 서버 조회로 채운다.
+  // 이펙트 본문의 동기 setState(연쇄 렌더 — react-hooks lint)를 피하기 위해
+  // 세션 우선 판정은 렌더 시점 파생으로 옮겼다.
+  const introPortfolioTotal = introSessionTotal > 0 ? introSessionTotal : introFetchedTotal
+  useEffect(() => {
+    if (introSessionTotal > 0) {
+      return
+    }
+    let cancelled = false
+    void fetch('/api/portfolio')
+      .then((response) => (response.ok ? (response.json() as Promise<{ rows?: Array<{ evaluation_amount: number | null; average_price: number | null; quantity: number | null }> }>) : null))
+      .then((body) => {
+        if (cancelled || !body?.rows?.length) {
+          return
+        }
+        const total = body.rows.reduce(
+          (sum, row) => sum + (row.evaluation_amount ?? (row.average_price ?? 0) * (row.quantity ?? 0)),
+          0,
+        )
+        if (total > 0) {
+          setIntroFetchedTotal(total)
+        }
+      })
+      .catch(() => undefined)
+    return () => {
+      cancelled = true
+    }
+  }, [introSessionTotal])
+  const introMention = useMemo(() => {
+    if (!target || target.kind === 'etf' || introPortfolioTotal === null) {
+      return null
+    }
+    const costBasis = target.quantity * target.averagePrice
+    const evaluation = target.evaluationAmount ?? (typeof target.currentPrice === 'number' ? target.currentPrice * target.quantity : undefined)
+    if (!Number.isFinite(costBasis) || costBasis <= 0 || typeof evaluation !== 'number' || !Number.isFinite(evaluation)) {
+      return null
+    }
+    return buildProfitIntroMention({ name: target.name, profitAmount: evaluation - costBasis, portfolioTotal: introPortfolioTotal })
+  }, [introPortfolioTotal, target])
   const targetKeyRef = useRef(targetKey)
   const requestSeed = useMemo<DeepScanCanonicalTargetSession | null>(
     () =>
@@ -295,12 +395,12 @@ export default function DeepScanPage() {
       shouldStartRequest,
       targetKey,
       hydratedTargetKey,
-    })) {
+    }) || haltVerdict !== 'active') {
       return
     }
 
     startRequest()
-  }, [hydratedTargetKey, shouldStartRequest, startRequest, targetKey])
+  }, [hydratedTargetKey, shouldStartRequest, startRequest, targetKey, haltVerdict])
 
   useEffect(() => {
     const quickQuoteUrl = buildLoadingQuickQuoteUrl(target)
@@ -353,7 +453,7 @@ export default function DeepScanPage() {
 
   useEffect(() => {
     const snapshotUrl = buildLoadingBriefingSnapshotUrl(target)
-    if (!snapshotUrl || !targetKey || loadingBriefingSnapshot?.targetKey === targetKey) {
+    if (!snapshotUrl || !targetKey || loadingBriefingSnapshot?.targetKey === targetKey || haltVerdict === 'halted') {
       return
     }
 
@@ -382,7 +482,7 @@ export default function DeepScanPage() {
     return () => {
       controller.abort()
     }
-  }, [loadingBriefingSnapshot?.targetKey, target, targetKey])
+  }, [haltVerdict, loadingBriefingSnapshot?.targetKey, target, targetKey])
 
   useEffect(() => {
     if (!isDeepScanUsTarget(target) || !targetKey || loadingMarketSnapshot?.targetKey === targetKey) {
@@ -414,7 +514,7 @@ export default function DeepScanPage() {
   }, [loadingMarketSnapshot?.targetKey, target, targetKey])
 
   useEffect(() => {
-    if (!requestSeed || !targetKey || requestStatus !== 'loading') {
+    if (!requestSeed || !targetKey || requestStatus !== 'loading' || haltVerdict === 'halted') {
       return
     }
 
@@ -427,7 +527,9 @@ export default function DeepScanPage() {
         const nextPayload = await fetchDeepScanCanonicalPayload(
           requestSeed,
           (input, init) => fetch(input, { ...init, signal: controller.signal }),
+          { refresh: pendingRefreshRef.current },
         )
+        pendingRefreshRef.current = false
 
         if (controller.signal.aborted || targetKeyRef.current !== requestedTargetKey) {
           return
@@ -451,7 +553,10 @@ export default function DeepScanPage() {
         }
 
         settled = true
-        finishError(error instanceof Error ? error.message : 'DeepScan 데이터를 표시할 수 없어요. 잠시 후 다시 시도해주세요.')
+        finishError(
+          error instanceof Error ? error.message : 'DeepScan 데이터를 표시할 수 없어요. 잠시 후 다시 시도해주세요.',
+          error instanceof DeepScanApiError ? error.code : null,
+        )
       }
     }
 
@@ -464,7 +569,7 @@ export default function DeepScanPage() {
         abandonInFlight()
       }
     }
-  }, [abandonInFlight, appendArrivedLoadingStageKeys, finishError, finishSuccess, markDeepScanLoadingSuccess, requestSeed, requestStatus, targetKey])
+  }, [abandonInFlight, appendArrivedLoadingStageKeys, finishError, finishSuccess, haltVerdict, markDeepScanLoadingSuccess, refreshEpoch, requestSeed, requestStatus, targetKey])
 
   useEffect(() => {
     const llmCommittee = payload?.metadata.llmCommittee
@@ -480,7 +585,7 @@ export default function DeepScanPage() {
 
     const poll = async () => {
       try {
-        const response = await fetch(`/api/deepscan/committee-status?requestId=${encodeURIComponent(llmCommittee.requestId)}`, { cache: 'no-store' })
+        const response = await fetch(`/api/deepscan/committee-status?requestId=${encodeURIComponent(llmCommittee.requestId)}${snapshotKey ? `&snapshotKey=${encodeURIComponent(snapshotKey)}` : ''}`, { cache: 'no-store' })
         const body = (await response.json()) as DeepScanCommitteeStatusResponse
 
         if (stopped || !body.ok || body.requestId !== llmCommittee.requestId) {
@@ -495,6 +600,14 @@ export default function DeepScanPage() {
               ? extractLoadingStageKeysFromCommitteeResults(body.results)
               : extractLoadingStageKeysFromCommitteeAxes(body.committeeAxes),
           )
+        }
+
+        if (body.status === 'not_found' || body.status === 'error') {
+          // 위원회 상태 스토어가 만료된 캐시 스냅샷(또는 서버 측 위원회 실패) —
+          // 더 도착할 데이터가 없다. 캐시된 부분 결과를 즉시 도착 처리하지 않으면
+          // 팀 카드 스켈레톤이 영구 유지된다.
+          markDeepScanLoadingSuccess(requestedTargetKey)
+          appendArrivedLoadingStageKeys(requestedTargetKey, allCommitteeLoadingStageKeys())
         }
 
         updateActivePayload((currentPayload: JarooDeepScanPayload) => {
@@ -555,23 +668,66 @@ export default function DeepScanPage() {
         clearTimeout(timeoutId)
       }
     }
-  }, [appendArrivedLoadingStageKeys, arrivedLoadingStages.targetKey, fetchState, markDeepScanLoadingSuccess, payload, targetKey, updateActivePayload])
+  }, [appendArrivedLoadingStageKeys, arrivedLoadingStages.targetKey, fetchState, markDeepScanLoadingSuccess, payload, snapshotKey, targetKey, updateActivePayload])
 
   const scrollContentToTop = () => {
     const container = document.querySelector<HTMLElement>("[data-slot='jaroo-shell-main']")
     container?.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
+  // 명시적 재분석 — 스냅샷 캐시를 무시하고 새 스캔(크레딧 사용)을 돈다
+  const handleExplicitRefresh = useCallback(() => {
+    if (requestStatus === 'loading') return
+    if (haltVerdict === 'halted') return
+    if (!window.confirm('다시 분석할까요? 딥스캔 크레딧이 사용돼요.')) return
+    pendingRefreshRef.current = true
+    setRefreshEpoch((epoch) => epoch + 1)
+    startRequest()
+  }, [haltVerdict, requestStatus, startRequest])
+
   const handleRetry = useCallback(() => {
+    if (haltVerdict === 'halted') return
     setLoadingSequence(createDeepScanLoadingSequence(targetKey))
     setArrivedLoadingStages(createDeepScanLoadingStageArrival(targetKey))
     setDisplayedLoadingStages(createDeepScanLoadingStageArrival(targetKey))
     startRequest()
     scrollContentToTop()
-  }, [startRequest, targetKey])
+  }, [haltVerdict, startRequest, targetKey])
 
 
   const missingTargetTitle = '분석할 종목이 없습니다'
+
+  // 세션 복원 전(SSR·첫 클라이언트 렌더) — 중립 안내만. 빈 상태 판정은 하이드레이션 후.
+  if (!requestSeed && !hydrationChecked) {
+    return (
+      <JarooShell
+        title='DeepScan'
+        subtitle='종목을 선택하면 세 팀이 바로 분석해요'
+        backHref='/home'
+        showBottomNav={false}
+        frameClassName='w-full'
+        mainClassName='space-y-3 bg-white px-3.5 pt-3.5 pb-6'
+      >
+        <section className='rounded-[12px] border-[0.5px] border-[#d7e8f7] bg-[linear-gradient(135deg,rgba(244,248,252,0.98),rgba(255,255,255,0.98))] p-3.5 shadow-[0_8px_20px_rgba(28,85,133,0.05)]'>
+          <div className='flex items-start justify-between gap-3'>
+            <div className='min-w-0'>
+              <p className='flex items-center gap-1.5 text-[12px] font-extrabold text-[#185fa5]'>
+                <span className='size-[5px] animate-pulse rounded-full bg-[#185fa5]' />
+                준비 중
+              </p>
+              <h1 className='mt-1.5 text-[16px] font-extrabold leading-[1.3] tracking-[-0.01em] text-[#111]'>
+                분석 대상을 확인하고 있어요
+              </h1>
+            </div>
+            <div className='grid size-9 shrink-0 place-items-center rounded-[10px] bg-[#e6f1fb] text-[#185fa5]'>
+              <LineChart className='size-[18px]' aria-hidden />
+            </div>
+          </div>
+          <p className='mt-2 text-[13px] leading-[1.6] text-[#555]'>잠시만 기다려 주세요.</p>
+        </section>
+      </JarooShell>
+    )
+  }
 
   if (!requestSeed) {
     return (
@@ -687,27 +843,75 @@ export default function DeepScanPage() {
     targetCurrentPrice: target?.currentPrice,
     briefingCurrentPrice: activeLoadingBriefingSnapshot?.quote?.currentPrice,
   })
+
+  // 스냅샷 캐시 표식 + 가격 드리프트 프로브 — 무료 시세로 '재분석이 필요한 정도'를 감지한다
+  const snapshotCacheInfo = payload?.metadata.deepScanCache ?? null
+  const snapshotPriceBasis = extractSnapshotPriceBasis(payload)
+  const snapshotPriceDriftPct =
+    snapshotCacheInfo?.hit && snapshotPriceBasis != null && loadingCurrentPrice != null
+      ? computePriceDriftPct(snapshotPriceBasis, loadingCurrentPrice)
+      : null
   const loadingCurrentPriceCurrency = target?.currentPriceCurrency
     ?? normalizeQuoteCurrency(activeLoadingBriefingSnapshot?.quote?.currency ?? undefined)
     ?? activeLoadingQuickQuote?.currentPriceCurrency
     ?? (requestSeed.holding.market === 'US' ? 'USD' : undefined)
   const loadingQuickFacts = buildLoadingQuickFacts(payload, activeLoadingQuickQuote, activeLoadingBriefingSnapshot, requestSeed.holding.name, requestSeed.holding.market, requestSeed.holding.kind)
   const evidenceCollected = hasCollectedDeepScanEvidence(payload)
-  const requestErrorNotice = {
-    badge: '오류',
-    title: 'DeepScan 데이터를 표시할 수 없어요',
-    body: errorMessage ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
-  }
+  // 크레딧 부족(402)은 일시적 오류가 아니다 — 재시도 대신 크레딧 문구와 충전 CTA로 안내한다.
+  const isCreditShortage = fetchState === 'error' && errorCode === 'insufficient-credits'
+  const requestErrorNotice = isCreditShortage
+    ? {
+        badge: '크레딧 부족',
+        title: '딥스캔 크레딧이 부족해요',
+        body: errorMessage ?? '마이페이지에서 크레딧을 충전한 뒤 다시 시도해주세요.',
+      }
+    : {
+        badge: '오류',
+        title: 'DeepScan 데이터를 표시할 수 없어요',
+        body: errorMessage ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
+      }
 
   const identifier = [requestSeed.holding.ticker, requestSeed.holding.code]
     .filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index)
     .join(' · ')
 
+  // 거래정지 종목 — 일반 딥스캔(세 팀 분석) 대신 공시 중심 거래정지 화면으로 대체한다.
+  // 스캔 시작은 이미 위 게이트(haltVerdict !== 'active')에서 차단돼 크레딧이 쓰이지 않는다.
+  if (haltVerdict === 'halted') {
+    return (
+      <div className='flex h-full w-full justify-center bg-white'>
+        <DeepScanHaltScreen
+          className='w-full overflow-hidden'
+          name={requestSeed.holding.name}
+          code={target?.code}
+          identifier={identifier}
+          market={requestSeed.holding.market}
+          lastTradedPrice={loadingCurrentPrice ?? null}
+          currency={loadingCurrentPriceCurrency}
+          quantity={target?.quantity}
+          averagePrice={target?.averagePrice}
+          averagePriceCurrency={target?.averagePriceCurrency}
+          fallbackProfitRatePct={target?.currentProfitRate ?? undefined}
+          backHref='/home'
+        />
+      </div>
+    )
+  }
+
   return (
     <div className='flex h-full w-full justify-center bg-white'>
       <DeepScanLoadingScreen
         className='w-full overflow-hidden'
+        headerNotice={resultsReady && payload && snapshotCacheInfo?.hit ? (
+          <SnapshotProvenanceBar
+            scannedAt={snapshotCacheInfo.scannedAt}
+            savedCredits={snapshotCacheInfo.savedCredits}
+            driftPct={snapshotPriceDriftPct ?? null}
+            onRefresh={handleExplicitRefresh}
+          />
+        ) : null}
         name={requestSeed.holding.name}
+        introMention={introMention}
         identifier={identifier}
         market={requestSeed.holding.market}
         instrumentKind={target?.kind}
@@ -729,9 +933,16 @@ export default function DeepScanPage() {
         visibleStageCount={visibleStageCount}
         arrivedStageKeys={arrivedStageKeys}
         resultsReady={resultsReady}
-        inlineResults={resultsReady && payload ? <DeepScanInlineResults payload={payload} requestSeed={requestSeed} target={target} /> : null}
+        snapshotCacheHit={snapshotCacheInfo?.hit === true}
+        snapshotScannedAt={snapshotCacheInfo?.scannedAt}
+        inlineResults={resultsReady && payload ? <DeepScanInlineResults
+            payload={payload}
+            requestSeed={requestSeed}
+            target={target}
+          /> : null}
         errorNotice={fetchState === 'error' ? requestErrorNotice : null}
-        onRetry={handleRetry}
+        onRetry={isCreditShortage ? undefined : handleRetry}
+        errorPrimaryAction={isCreditShortage ? { label: '충전하러 가기', href: '/mypage/credit' } : undefined}
         backHref='/home'
       />
     </div>

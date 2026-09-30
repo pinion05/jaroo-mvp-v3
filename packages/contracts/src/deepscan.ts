@@ -119,6 +119,12 @@ export type JarooDeepScanCommitteeAxis = {
   members: JarooDeepScanCommitteeMember[]
 }
 
+export type JarooDeepScanConsensusBroker = {
+  name: string
+  targetPrice: number
+  date?: string | null
+}
+
 export type JarooDeepScanConsensusStructured = {
   targetPrice?: number | null
   targetGapPct?: number | null
@@ -128,6 +134,7 @@ export type JarooDeepScanConsensusStructured = {
   highestTargetPrice?: number | null
   lowestTargetPrice?: number | null
   opinionSummary?: string | null
+  brokers?: JarooDeepScanConsensusBroker[] | null
   currency?: string | null
 }
 
@@ -174,6 +181,10 @@ export type JarooDeepScanHeroBlock = DeepScanBlockMeta & {
   score: number
   scoreLabel: string
   scoreDelta: string
+  /** 근거 요약(구조화) — 구형 페이로드에는 없어 화면은 폴백 표시한다 */
+  evidenceFacts?: string[]
+  /** 주의 문구(구조화, '주의:' 접두 없음) */
+  evidenceCautions?: string[]
 }
 
 export type JarooDeepScanCommitteeBlock = DeepScanBlockMeta & {
@@ -255,6 +266,13 @@ export type JarooDeepScanMetadata = {
   degraded: boolean
   errorCode?: string
   debugId: string
+  /** 스냅샷 캐시 정보 — 명시적 히트/미스를 화면에 알린다 */
+  deepScanCache?: {
+    hit: boolean
+    scannedAt: string
+    /** 캐시 재사용으로 아낀 크레딧(기록된 값이 있을 때만) */
+    savedCredits?: number
+  }
   inputValidity: JarooDeepScanInputValidity
   sourceRefs: DeepScanSourceRef[]
   blockStatus: JarooDeepScanBlockStatus

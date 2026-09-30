@@ -159,6 +159,7 @@ export {
 } from './data/kr-disclosure-classification-dataset.js';
 
 export {
+  buildEtfMarketCommitteeSnapshot,
   buildJarooDeepScanPayload,
 } from './services/deepscan-payload.js';
 
@@ -234,3 +235,11 @@ export {
   fetchWiseReportEtfSnapshot,
   parseWiseReportEtfSnapshotHtml,
 };
+
+export { buildEtfProfile, fetchEtfProfile } from './crawlers/etf-profile.js';
+export {
+  buildUsEtfProfile,
+  extractPolygonSeries,
+  extractPolygonTickerDetails,
+  fetchUsEtfProfile,
+} from './crawlers/us-etf-profile.js';

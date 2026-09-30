@@ -85,9 +85,21 @@ function createBriefingFetcher(overrides: Partial<Record<'daily' | 'stockBasic' 
   }) as typeof fetch
 }
 
-function createUsBriefingFetcher(overrides: { ohlc?: Response | Error } = {}) {
+function createUsBriefingFetcher(overrides: { ohlc?: Response | Error; indicators?: Response | Error } = {}) {
   return (async (input: RequestInfo | URL) => {
     const url = String(input)
+    if (url.includes('/api/source/polygon-yahoo/us/market/indicators')) {
+      if (overrides.indicators instanceof Error) {
+        throw overrides.indicators
+      }
+      return overrides.indicators ?? jsonResponse({
+        ok: true,
+        data: {
+          sp500: { ticker: 'I:SPX', close: 7581.59, changePct: -0.5 },
+          nasdaq: { ticker: 'I:IXIC', close: 25984.62, changePct: -0.77 },
+        },
+      })
+    }
     if (!url.includes('/api/source/polygon/us/stocks/TSLA/ohlc')) {
       return jsonResponse({ error: 'unexpected url' }, 404)
     }
@@ -128,6 +140,10 @@ test('briefing snapshot accepts US ticker and maps Polygon OHLC into daily chart
   assert.equal(body.data.daily.length, 3)
   assert.deepEqual(body.data.daily.map((row: { date: string }) => row.date), ['2026-06-01', '2026-06-02', '2026-06-03'])
   assert.equal(body.data.sourceStatus.daily, 'ok')
+  // '오늘 시장 속에서는?' 행 — 미국 시장 지수가 sp500/nasdaq 키로 실린다
+  assert.equal(body.data.market?.sp500?.changePct, -0.5)
+  assert.equal(body.data.market?.nasdaq?.changePct, -0.77)
+  assert.ok(body.data.sources?.includes('us-market-indicators'))
 })
 
 test('buildUsBriefingSnapshotData exposes latest US OHLC quote and previous close', async () => {
@@ -136,6 +152,19 @@ test('buildUsBriefingSnapshotData exposes latest US OHLC quote and previous clos
   assert.equal(snapshot.quote?.currentPrice, 423.7)
   assert.equal(snapshot.quote?.previousClose, 420)
   assert.equal(snapshot.quote?.source, 'polygon-v2-aggs-ticker-range-day')
+})
+
+test('US briefing tolerates market-indicators failure (market {} 폴백)', async () => {
+  clearBriefingSnapshotCache()
+  const snapshot = await buildUsBriefingSnapshotData('TSLA', {
+    fetcher: createUsBriefingFetcher({ indicators: new Error('indicators down') }),
+    timeoutMs: 100,
+    cacheTtlMs: 0,
+  })
+
+  assert.equal(snapshot.quote?.currentPrice, 423.7)
+  assert.deepEqual(snapshot.market ?? {}, {})
+  assert.equal(snapshot.sources?.includes('us-market-indicators'), false)
 })
 
 test('briefing snapshot returns partial response when daily source fails but basic quote is available', async () => {

@@ -9,8 +9,13 @@
   --ds-cream: #fff8ec;
   --ds-amber: #854f0b;
   --ds-amber-soft: #faeeda;
-  --ds-green: #3b6d11;
-  --ds-green-soft: #eaf3de;
+  /* --ds-rise*: 국내 금융 관례(상승=빨강)의 상승 계열. 예전 이름 --ds-green*은
+     값이 빨강이라 오해를 샀다 — 완료 성공 초록(emerald) 분리와 함께 개명. */
+  --ds-rise: #a8323a;
+  --ds-rise-soft: #fbe6e7;
+  /* 완료·성공 뱃지용 초록/어두운 초록 조합 */
+  --ds-emerald: #1e7a43;
+  --ds-emerald-soft: #e6f6ec;
   --ds-red: #b84545;
   --ds-skeleton-shimmer-duration: 4.2s;
   --ds-member-pulse-duration: 4s;
@@ -823,6 +828,12 @@
   animation: consensus-current-reveal 0.6s 1.8s ease-out forwards;
 }
 
+.consensusFanAvgLine {
+  stroke: var(--ds-muted);
+  stroke-dasharray: 3 3;
+  stroke-width: 1;
+}
+
 .consensusFanTargetPath {
   fill: none;
   stroke: var(--ds-blue);
@@ -844,7 +855,7 @@
 
 .consensusFanHighPath {
   fill: none;
-  stroke: var(--ds-green);
+  stroke: var(--ds-red);
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -855,7 +866,7 @@
 
 .consensusFanLowPath {
   fill: none;
-  stroke: var(--ds-red);
+  stroke: var(--ds-blue);
   stroke-width: 1.8;
   stroke-linecap: round;
   stroke-linejoin: round;
@@ -865,7 +876,7 @@
 }
 
 .consensusFanHighDot {
-  fill: var(--ds-green);
+  fill: var(--ds-red);
   stroke: #fff;
   stroke-width: 1.4;
   opacity: 0;
@@ -873,11 +884,28 @@
 }
 
 .consensusFanLowDot {
-  fill: var(--ds-red);
+  fill: var(--ds-blue);
   stroke: #fff;
   stroke-width: 1.4;
   opacity: 0;
   animation: consensus-point-reveal 0.4s 2.1s ease-out forwards;
+}
+
+/* 현재가 위치 닷 — 부채꼴 분기점. 목표가 닷과 같은 규격, 색만 현재가 회색. */
+.consensusFanCurrentDot {
+  fill: var(--ds-muted);
+  stroke: #fff;
+  stroke-width: 1.4;
+  opacity: 0;
+  animation: consensus-point-reveal 0.4s 2.1s ease-out forwards;
+}
+
+.consensusFanCurrentDotHalo {
+  fill: none;
+  stroke: var(--ds-muted);
+  stroke-width: 1;
+  opacity: 0;
+  animation: consensus-halo-reveal 0.4s 2.1s ease-out forwards;
 }
 
 .consensusFanLegend {
@@ -891,6 +919,7 @@
 }
 
 .consensusFanLegendCurrent,
+.consensusFanLegendAvgPrice,
 .consensusFanLegendTarget {
   display: inline-flex;
   align-items: center;
@@ -898,6 +927,13 @@
 }
 
 .consensusFanLegendCurrent i {
+  display: inline-block;
+  width: 14px;
+  height: 0;
+  border-top: 1.5px dashed var(--ds-muted);
+}
+
+.consensusFanLegendAvgPrice i {
   display: inline-block;
   width: 14px;
   height: 0;
@@ -923,7 +959,7 @@
   display: inline-block;
   width: 14px;
   height: 0;
-  border-top: 2px solid var(--ds-green);
+  border-top: 2px solid var(--ds-red);
   border-radius: 2px;
 }
 
@@ -931,7 +967,7 @@
   display: inline-block;
   width: 14px;
   height: 0;
-  border-top: 2px solid var(--ds-red);
+  border-top: 2px solid var(--ds-blue);
   border-radius: 2px;
 }
 
@@ -945,7 +981,8 @@
 .consensusEyebrow {
   display: block;
   margin-bottom: 3px;
-  color: var(--ds-blue);
+  /* '증권사 N곡' 등 출처 카운트 — 데이터 색이 아닌 일반 텍스트라 잉크색(#266 규율) */
+  color: var(--ds-ink);
   font-size: 10px;
   font-weight: 800;
   letter-spacing: 0.03em;
@@ -960,7 +997,15 @@
   letter-spacing: -0.04em;
 }
 
-.consensusChartTop > span {
+.consensusUpsideList {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+
+.consensusUpsideList > span {
   flex: 0 0 auto;
   padding: 3px 8px;
   border-radius: 999px;
@@ -969,6 +1014,50 @@
   font-size: 10px;
   font-weight: 800;
   white-space: nowrap;
+}
+
+/* 목표가 방향 톤 — 현재가보다 높으면 빨강, 낮으면 파랑 (기본 블록보다 나중에 와야 승리) */
+.consensusToneProfit strong {
+  color: var(--ds-red);
+}
+
+.consensusToneLoss strong {
+  color: var(--ds-blue);
+}
+
+/* 대비 수치는 각자 부호 색을 쓴다 — 현재가 대비와 평단 대비가 서로 다른 방향일 수 있다 (기본 블록보다 나중에 와야 승리) */
+.consensusUpsideList > span.consensusUpsideProfit {
+  background: var(--ds-rise-soft);
+  color: var(--ds-red);
+}
+
+.consensusUpsideList > span.consensusUpsideLoss {
+  background: var(--ds-blue-soft);
+  color: var(--ds-blue);
+}
+
+.consensusFanTargetPathProfit {
+  stroke: var(--ds-red);
+}
+
+.consensusFanTargetPathLoss {
+  stroke: var(--ds-blue);
+}
+
+.consensusFanTargetDotProfit {
+  fill: var(--ds-red);
+}
+
+.consensusFanTargetDotLoss {
+  fill: var(--ds-blue);
+}
+
+.consensusFanLegendTargetProfit i {
+  border-top-color: var(--ds-red);
+}
+
+.consensusFanLegendTargetLoss i {
+  border-top-color: var(--ds-blue);
 }
 
 .consensusLineChart {
@@ -1056,6 +1145,17 @@
   line-height: 1.35;
 }
 
+/* 투자의견 요약 톤 — 매수 우세=빨강(국내 관례), 의견 갈림=중립(#266 데이터 색 규율). 신중 등은 기본 파랑 유지 */
+.consensusSummaryProfit {
+  background: var(--ds-rise-soft);
+  color: var(--ds-red);
+}
+
+.consensusSummaryNeutral {
+  background: #f2f3f6;
+  color: var(--ds-mid);
+}
+
 .consensusRangeRow {
   display: flex;
   flex-wrap: wrap;
@@ -1092,7 +1192,7 @@
   display: block;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, var(--ds-amber), var(--ds-green));
+  background: linear-gradient(90deg, var(--ds-amber), var(--ds-rise));
 }
 
 .consensusSkeletonFact {
@@ -1232,7 +1332,7 @@
 }
 
 .elapsedTimerDone .elapsedLabel {
-  color: var(--ds-green);
+  color: var(--ds-emerald);
 }
 
 .elapsedSubLabel {
@@ -1489,8 +1589,8 @@
 }
 
 .stepDone {
-  background: var(--ds-green-soft);
-  color: var(--ds-green);
+  background: var(--ds-emerald-soft);
+  color: var(--ds-emerald);
 }
 
 .stepActive {
@@ -1598,8 +1698,8 @@
 }
 
 .memberDone {
-  background: var(--ds-green-soft);
-  color: var(--ds-green);
+  background: var(--ds-emerald-soft);
+  color: var(--ds-emerald);
   border-color: #c0dd97;
 }
 
@@ -1752,8 +1852,8 @@
 }
 
 .badgeDone {
-  background: var(--ds-green-soft);
-  color: var(--ds-green);
+  background: var(--ds-emerald-soft);
+  color: var(--ds-emerald);
 }
 
 .badgeWarning {
@@ -1816,8 +1916,11 @@
   --ds-blue: #2b6be6;
   --ds-blue-soft: #e6f0fe;
   --ds-blue-border: #cfe0ff;
-  --ds-green: #1a9d55;
-  --ds-green-soft: #e5f3eb;
+  /* 상승(국내 관례 빨강)과 완료(초록)를 값 이름 그대로 분리 */
+  --ds-rise: #a8323a;
+  --ds-rise-soft: #fbe6e7;
+  --ds-emerald: #1e7a43;
+  --ds-emerald-soft: #e6f6ec;
   --ds-red: #e5484d;
   --ds-amber: #b8860b;
   --ds-amber-soft: #fef3e3;
@@ -1914,7 +2017,7 @@
 }
 
 .headerProgressDone .headerProgressFill {
-  background: linear-gradient(90deg, var(--ds-green), #4bd582);
+  background: linear-gradient(90deg, var(--ds-emerald), #4bd582);
 }
 
 .headerProgressError .headerProgressFill {
@@ -1982,6 +2085,10 @@
 
 .errorRetryButton {
   height: 46px;
+  /* button 요소와 Link(a) 양쪽에서 쓰므로 정렬을 스타일이 직접 보장한다 */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   border: 0;
   border-radius: 14px;
   background: var(--ds-blue);
@@ -1989,6 +2096,7 @@
   font-size: 14px;
   font-weight: 800;
   cursor: pointer;
+  text-decoration: none;
 }
 
 .errorBackLink {
@@ -2138,8 +2246,14 @@
 }
 
 .narrativeTonePositive {
-  background: var(--ds-green-soft);
-  color: #1a7340;
+  background: var(--ds-emerald-soft);
+  color: var(--ds-emerald);
+}
+
+/* 금융 상승(퀵팩트) 전용 — 국내 관례 빨강. 완료 초록(narrativeTonePositive)과 분리 */
+.narrativeToneRise {
+  background: var(--ds-rise-soft);
+  color: var(--ds-rise);
 }
 
 .narrativeToneWarning {
@@ -2153,8 +2267,9 @@
 }
 
 .narrativeToneInfo {
-  background: var(--ds-blue-soft);
-  color: var(--ds-blue);
+  /* 정보 확인 계열 배지 — 파랑은 마이너스 전용(#266 규율)이라 중립 확인은 초록으로 */
+  background: var(--ds-emerald-soft);
+  color: var(--ds-emerald);
 }
 
 .quickFactsCard,
@@ -2192,7 +2307,7 @@
 }
 
 .completionCardReady {
-  border-color: rgba(26, 157, 85, 0.2);
+  border-color: rgba(168, 50, 58, 0.2);
   background: linear-gradient(180deg, #f8fdfb 0%, #fff 100%);
 }
 
@@ -2413,9 +2528,13 @@
 .narrativeTextSummarized {
   color: #111827;
   font-size: 13.5px;
-  font-weight: 650;
+  font-weight: 400;
   line-height: 1.68;
   white-space: normal;
+}
+
+.narrativeTextSummarized strong {
+  font-weight: 700;
 }
 
 .narrativeSummaryTextWrap {
@@ -2503,7 +2622,7 @@
   align-items: center;
   gap: 5px;
   margin-bottom: 9px;
-  color: var(--ds-green);
+  color: var(--ds-rise);
   font-size: 10px;
   font-weight: 700;
 }
@@ -2512,7 +2631,7 @@
   width: 6px;
   height: 6px;
   border-radius: 999px;
-  background: var(--ds-green);
+  background: var(--ds-rise);
   animation: pulse 1.6s ease-in-out infinite;
 }
 
@@ -2643,6 +2762,30 @@
   stroke-width: 1.5;
   opacity: 0;
   animation: today-chart-point-reveal 0.45s 5.1s ease-out forwards, today-ring-pulse 1.8s 5.55s ease-in-out infinite;
+}
+
+/* 한국 증시 관습(8/21 handoff §4): 수익=빨강(기본), 손실=파랑. 차트 선·음영·점·링에 적용. */
+.todayChartToneProfit {
+  stroke: var(--jaroo-profit, #d83a42);
+}
+
+.todayChartToneProfit.todayChartArea,
+.todayChartArea.todayChartToneProfit {
+  fill: rgba(216, 58, 66, 0.08);
+}
+
+.todayChartToneLoss {
+  stroke: var(--jaroo-loss, #2b6be6);
+}
+
+.todayChartToneLoss.todayChartArea,
+.todayChartArea.todayChartToneLoss {
+  fill: rgba(43, 107, 230, 0.08);
+}
+
+.todayChartToneLoss.todayChartDot,
+.todayChartDot.todayChartToneLoss {
+  fill: var(--jaroo-loss, #2b6be6);
 }
 
 .todayBriefList {
@@ -2877,6 +3020,12 @@
   }
 }
 
+@keyframes consensus-halo-reveal {
+  to {
+    opacity: 0.35;
+  }
+}
+
 @keyframes today-chart-draw {
   to {
     stroke-dashoffset: 0;
@@ -2913,6 +3062,8 @@
   .consensusFanLowPath,
   .consensusFanCurrentLine,
   .consensusFanCurrentPath,
+  .consensusFanCurrentDot,
+  .consensusFanCurrentDotHalo,
   .consensusFanTargetDot,
   .consensusFanHighDot,
   .consensusFanLowDot {
@@ -2923,10 +3074,15 @@
   .todayChartArea,
   .todayChartDot,
   .todayChartRing,
+  .consensusFanCurrentDot,
   .consensusFanTargetDot,
   .consensusFanHighDot,
   .consensusFanLowDot {
     opacity: 1;
+  }
+
+  .consensusFanCurrentDotHalo {
+    opacity: 0.35;
   }
 
   .todayChartLine,
@@ -2946,4 +3102,9 @@
   .todayBriefMeaning {
     transform: none;
   }
+}
+
+/* 스냅샷 출처 바 슬롯 — 본문 패딩 재사용, 하단 여백만 제거(아래 본문이 자체 상단 패딩을 가짐) */
+.headerNoticeSlot {
+  padding-bottom: 0;
 }

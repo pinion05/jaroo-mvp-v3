@@ -8,7 +8,7 @@ import {
   extractOpenRouterErrorMessage,
   extractOpenRouterErrorStatus,
   toPublicOcrErrorMessage,
-} from './route'
+} from './shared'
 
 test('OpenRouter가 HTTP 200으로 error payload를 내려도 메시지를 추출한다', () => {
   const message = extractOpenRouterErrorMessage({
@@ -57,15 +57,30 @@ test('extractJsonObjectText accepts fenced JSON from schema-free OCR models', ()
   assert.equal(extractJsonObjectText('prefix {"rows":[]} suffix'), '{"rows":[]}')
 })
 
-test('OCR schema requires signed row-level profitAmount', () => {
+test('OCR schema extracts only name/quantity/profitRate with optional 평단·식별자', () => {
   const rowSchema = OCR_SCHEMA.schema.properties.rows.items
+  const properties = rowSchema.properties as Record<string, unknown>
+  const requiredFields = rowSchema.required as readonly string[]
 
-  assert.equal(rowSchema.properties.profitAmount.type, 'string')
-  assert.equal(rowSchema.required.includes('profitAmount'), true)
+  assert.deepEqual([...requiredFields], ['name', 'quantity', 'profitRate'])
+  assert.equal(properties.profitAmount, undefined)
+  assert.equal(properties.evaluationAmount, undefined)
+  assert.equal((properties.averagePrice as { type?: string }).type, 'string')
+  assert.equal(requiredFields.includes('averagePrice'), false)
 })
 
-test('OCR prompt carries P/L amount sign into unsigned parenthesized return', () => {
-  assert.match(OCR_SYSTEM_PROMPT, /profitAmount/)
-  assert.match(OCR_SYSTEM_PROMPT, /-13,263[^\n]*\(6\.8%\)[\s\S]*-6\.8%/)
-  assert.match(OCR_SYSTEM_PROMPT, /\+262,740[^\n]*\(12\.7%\)[\s\S]*\+12\.7%/)
+test('OCR schema allows optional direct averagePrice and prompt guards purchase-price confusion', () => {
+  const rowSchema = OCR_SCHEMA.schema.properties.rows.items
+
+  assert.equal(rowSchema.properties.averagePrice.type, 'string')
+  assert.equal((rowSchema.required as readonly string[]).includes('averagePrice'), false)
+  assert.match(OCR_SYSTEM_PROMPT, /매입가, 매입단가, 평단/)
+  assert.match(OCR_SYSTEM_PROMPT, /Never use a total purchase amount/)
+})
+
+test('OCR prompt은 거래량 오인 방지와 색상 부호 규칙을 유지한다', () => {
+  assert.match(OCR_SYSTEM_PROMPT, /거래량/)
+  assert.match(OCR_SYSTEM_PROMPT, /red means profit \(\+\), blue means loss \(-\)/)
+  assert.match(OCR_SYSTEM_PROMPT, /-13,263 \(6\.8%\)[^\n]*"-6\.8%"/)
+  assert.match(OCR_SYSTEM_PROMPT, /\+262,740 \(12\.7%\)[^\n]*"\+12\.7%"/)
 })

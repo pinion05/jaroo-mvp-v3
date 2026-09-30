@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Jaroo — 워치 시안 C (워치리스트 통합형)</title>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/static/pretendard.css">
+<style>
+*{box-sizing:border-box;margin:0;padding:0;font-family:-apple-system,'Pretendard',sans-serif;-webkit-font-smoothing:antialiased}
+:root{--navy:#0F1419;--navy-soft:#EAF0F8;--up:#E5484D;--down:#2B6BE6;--amber:#E5A23D;--bg:#F5F6F8;--card:#fff;--line:#E8EAEE;--t1:#0F1419;--t2:#5A6473;--t3:#97A0AE;--red-soft:#FCEBEB;--red-text:#A32D2D;--amber-soft:#FFF4DC;--amber-text:#854F0B}
+body{background:#e8e8e8;display:flex;justify-content:center;gap:16px;flex-wrap:wrap;padding:20px;align-items:flex-start}
+.frame{background:var(--bg);border-radius:16px;width:340px;height:720px;overflow-y:auto;overflow-x:hidden;box-shadow:0 4px 24px rgba(0,0,0,.12);position:relative}
+.frame::-webkit-scrollbar{display:none}
+.caption{width:340px;text-align:center;font-size:12px;color:#555;margin-top:8px;font-weight:600}
+svg{display:block}
+
+.head{position:sticky;top:0;z-index:10;background:rgba(245,246,248,.94);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);padding:14px 16px;border-bottom:.5px solid var(--line);display:flex;align-items:center;gap:11px}
+.hb{width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--t1);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.ht{font-size:15px;font-weight:600;color:var(--t1);flex:1}
+.hbell{position:relative;width:28px;height:28px;border-radius:50%;background:#fff;display:flex;align-items:center;justify-content:center;color:var(--t1);box-shadow:0 1px 2px rgba(0,0,0,.04)}
+.hbell-badge{position:absolute;top:-2px;right:-2px;min-width:14px;height:14px;border-radius:999px;background:var(--up);color:#fff;font-size:8px;font-weight:700;display:flex;align-items:center;justify-content:center;padding:0 3px;border:1.5px solid var(--bg)}
+.body{padding:18px 16px 24px}
+
+.sub{font-size:12px;color:var(--t2);margin-bottom:14px}
+.sub b{color:var(--t1);font-weight:700}
+
+/* 종목 카드 + 공시 배너 */
+.s{background:#fff;border:.5px solid var(--line);border-radius:12px;margin-bottom:12px;overflow:hidden}
+.s-top{display:flex;align-items:center;gap:11px;padding:13px 14px}
+.s-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.s-info{flex:1;min-width:0}
+.s-name{font-size:13.5px;font-weight:600;color:var(--t1)}
+.s-meta{font-size:10.5px;color:var(--t3);margin-top:2px}
+.s-right{text-align:right;margin-right:2px}
+.s-rate{font-size:13px;font-weight:700;font-variant-numeric:tabular-nums}
+.s-rate.up{color:var(--up)}.s-rate.down{color:var(--down)}
+.s-scan{margin-top:4px;font-size:9.5px;color:var(--down);font-weight:600;display:inline-flex;align-items:center;gap:3px}
+
+/* 공시 배너 (카드 하단에 붙음) */
+.disc{display:flex;align-items:center;gap:9px;padding:10px 14px;border-top:.5px solid var(--line);background:#FDFBF7}
+.disc-alert{background:var(--red-soft)}
+.disc-ico{width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;color:var(--red-text);background:#fff}
+.disc-ico.gen{color:var(--t2)}
+.disc-body{flex:1;min-width:0}
+.disc-t{font-size:11px;font-weight:700;color:var(--t1);display:flex;align-items:center;gap:5px}
+.disc-tag{font-size:8px;font-weight:700;padding:1.5px 5px;border-radius:4px;background:#fff;color:var(--red-text);border:.5px solid rgba(163,45,45,.25)}
+.disc-tag.gen{color:var(--t2);border-color:var(--line)}
+.disc-d{font-size:10px;color:var(--t2);margin-top:1.5px;line-height:1.4}
+.disc-go{color:#C2C8D0;flex-shrink:0}
+
+/* 하단 안내 카드 */
+.guide{background:#fff;border:.5px solid var(--line);border-radius:12px;padding:14px;margin-top:6px}
+.guide-t{font-size:12.5px;font-weight:700;color:var(--t1);margin-bottom:9px;display:flex;gap:6px;align-items:center}
+.guide-ico{width:22px;height:22px;border-radius:7px;background:var(--navy-soft);display:flex;align-items:center;justify-content:center;color:var(--navy)}
+.g-item{display:flex;gap:9px;align-items:flex-start;padding:7px 0}
+.g-item+.g-item{border-top:.5px solid var(--line)}
+.g-num{width:17px;height:17px;border-radius:50%;background:var(--navy);color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.g-txt{font-size:10.5px;color:var(--t2);line-height:1.5}
+.g-txt b{color:var(--t1);font-weight:600}
+
+/* 추가 버튼 */
+.mng-add{display:flex;align-items:center;justify-content:center;gap:7px;padding:13px;border-radius:12px;border:1px dashed #B8C4D4;background:#fff;color:var(--t2);font-size:12.5px;font-weight:500;margin-top:4px}
+
+.note{font-size:10px;color:var(--t3);line-height:1.6;margin-top:14px}
+</style>
+</head>
+<body>
+
+<!-- C1: 워치리스트 + 공시 배너 -->
+<div>
+<div class="frame">
+  <div class="head">
+    <div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></div>
+    <div class="ht">내 종목 관리</div>
+    <div class="hbell">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9"/><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0"/></svg>
+      <div class="hbell-badge">1</div>
+    </div>
+  </div>
+  <div class="body">
+    <div class="sub"><b>3종목</b> 보유 중 · 중요 공시가 있으면 종목 카드에 바로 표시돼요</div>
+
+    <div class="s">
+      <div class="s-top">
+        <span class="s-dot" style="background:#2B6BE6"></span>
+        <div class="s-info">
+          <div class="s-name">SFA반도체</div>
+          <div class="s-meta">KOSDAQ · 036540 · 23주</div>
+        </div>
+        <div class="s-right">
+          <div class="s-rate down">−14.3%</div>
+          <span class="s-scan"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>딥스캔</span>
+        </div>
+      </div>
+      <div class="disc disc-alert">
+        <div class="disc-ico"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="m21.73 18-8-14a2 2 0 0 0-3.48 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3"/><path d="M12 9v4"/><path d="M12 17h.01"/></svg></div>
+        <div class="disc-body">
+          <div class="disc-t">자본변동 공시 1건 확인 <span class="disc-tag">매매거래정지</span></div>
+          <div class="disc-d">거래소공시 · 09.16 09:12 · DART 원문 보기</div>
+        </div>
+        <svg class="disc-go" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </div>
+    </div>
+
+    <div class="s">
+      <div class="s-top">
+        <span class="s-dot" style="background:#E5484D"></span>
+        <div class="s-info">
+          <div class="s-name">삼성전자</div>
+          <div class="s-meta">KOSPI · 005930 · 1주</div>
+        </div>
+        <div class="s-right">
+          <div class="s-rate up">+31.5%</div>
+          <span class="s-scan"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>딥스캔</span>
+        </div>
+      </div>
+      <div class="disc">
+        <div class="disc-ico gen"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/></svg></div>
+        <div class="disc-body">
+          <div class="disc-t">분기보고서 접수 <span class="disc-tag gen">일반</span></div>
+          <div class="disc-d">정기공시 · 09.15 16:50</div>
+        </div>
+        <svg class="disc-go" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </div>
+    </div>
+
+    <div class="s">
+      <div class="s-top">
+        <span class="s-dot" style="background:#E5484D"></span>
+        <div class="s-info">
+          <div class="s-name">LG디스플레이</div>
+          <div class="s-meta">KOSPI · 034220 · 16주</div>
+        </div>
+        <div class="s-right">
+          <div class="s-rate up">+1.3%</div>
+          <span class="s-scan"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>딥스캔</span>
+        </div>
+      </div>
+      <div class="disc">
+        <div class="disc-ico gen"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22h16a2 2 0 0 0 2-2V4a2 2 0 0 0-2-2H8a2 2 0 0 0-2 2v16a2 2 0 0 1-2 2Zm0 0a2 2 0 0 1-2-2v-9c0-1.1.9-2 2-2h2"/><path d="M18 14h-8"/><path d="M15 18h-5"/></svg></div>
+        <div class="disc-body">
+          <div class="disc-t">주요사항보고 접수 <span class="disc-tag gen">일반</span></div>
+          <div class="disc-d">주요사항보고 · 09.15 10:02</div>
+        </div>
+        <svg class="disc-go" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m9 18 6-6-6-6"/></svg>
+      </div>
+    </div>
+
+    <button class="mng-add">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="M12 5v14"/></svg>
+      스크린샷으로 종목 추가
+    </button>
+  </div>
+</div>
+<div class="caption">C1 · 워치리스트+공시 배너 통합</div>
+</div>
+
+<!-- C2: 캡처 차단 안내 -->
+<div>
+<div class="frame">
+  <div class="head">
+    <div class="hb"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 12H5"/><path d="m12 19-7-7 7-7"/></svg></div>
+    <div class="ht">증권사 캡처 안내</div>
+  </div>
+  <div class="body">
+    <div class="guide">
+      <div class="guide-t">
+        <div class="guide-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M3 9h18"/><path d="m9 21 3-9 3 9"/></svg></div>
+        스크린샷이 안 읽힐 때
+      </div>
+      <div class="g-item">
+        <div class="g-num">1</div>
+        <div class="g-txt"><b>보안 설정 끄기</b> — 일부 증권사 앱은 캡처 차단이 켜져 있어요. 앱 설정에서 화면 캡처 차단을 끄고 다시 시도해보세요.</div>
+      </div>
+      <div class="g-item">
+        <div class="g-num">2</div>
+        <div class="g-txt"><b>공유 버튼 활용</b> — 차단을 끌 수 없다면 증권사 앱의 공유·내보내기 기능으로 이미지를 저장한 뒤 올려주세요.</div>
+      </div>
+      <div class="g-item">
+        <div class="g-num">3</div>
+        <div class="g-txt"><b>받은 이미지 올리기</b> — 다른 사람에게 받은 캡처도 종목명이 선명하면 그대로 인식돼요.</div>
+      </div>
+    </div>
+
+    <div class="guide" style="margin-top:10px">
+      <div class="guide-t">
+        <div class="guide-ico"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg></div>
+        이럴 때 확인해보세요
+      </div>
+      <div class="g-item">
+        <div class="g-num">·</div>
+        <div class="g-txt">KB·키움 앱에서 검정 화면만 캡처됨 → 캡처 차단 설정</div>
+      </div>
+      <div class="g-item">
+        <div class="g-num">·</div>
+        <div class="g-txt">파일은 저장됐는데 종목 인식이 안 됨 → 종목명이 선명한 스크린샷인지 확인</div>
+      </div>
+    </div>
+
+    <div class="note">준비 중 — 증권사별 상세 안내는 순차 추가됩니다.<br>공시 데이터: OpenDART · 현재가: 네이버 시세</div>
+  </div>
+</div>
+<div class="caption">C2 · 증권사 캡처 차단 해제 안내</div>
+</div>
+
+</body>
+</html>

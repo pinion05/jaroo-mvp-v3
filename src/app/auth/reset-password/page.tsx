@@ -2,7 +2,6 @@
 
 import Link from 'next/link'
 import { FormEvent, useEffect, useState } from 'react'
-import { createSupabaseBrowserClient } from '@/lib/supabase/client'
 import { SpecFrame } from '@/components/spec/spec-frame'
 import { cn } from '@/lib/utils'
 import styles from '../../login/login.module.css'
@@ -22,26 +21,28 @@ export default function ResetPasswordPage() {
     let cancelled = false
 
     const establishSession = async () => {
-      const supabase = createSupabaseBrowserClient()
       const params = new URLSearchParams(window.location.search)
 
-      // 이미 만료/실패로 돌아온 링크(error, error_description 파라미터)는 곧바로 만료 안내.
+      // 이미 만료/실패로 돌아온 링크(error 파라미터)는 곧바로 만료 안내.
       if (params.get('error')) {
         if (!cancelled) setPhase('expired')
         return
       }
 
-      // detectSessionInUrl 이 code 를 소비했을 수 있으므로 getSession 먼저, 그래도
-      // 세션이 없고 code 가 남아 있으면 직접 교환한다(이중 교환 오류는 세션 확인으로 흡수).
-      let { data } = await supabase.auth.getSession()
-      if (!data.session) {
-        const code = params.get('code')
-        if (code) {
-          await supabase.auth.exchangeCodeForSession(code)
-          ;({ data } = await supabase.auth.getSession())
-        }
+      // 구버전 메일 링크(페이지로 직행) 호환: 서버 교환 라우트로 보낸다.
+      const code = params.get('code')
+      if (code) {
+        window.location.replace(`/auth/reset-password/confirm?code=${encodeURIComponent(code)}`)
+        return
       }
-      if (!cancelled) setPhase(data.session ? 'ready' : 'expired')
+
+      // 교환이 끝난 뒤에는 세션 쿠키 유무로 단계를 판정한다.
+      try {
+        const me = await (await fetch('/api/auth/me')).json()
+        if (!cancelled) setPhase(me?.user ? 'ready' : 'expired')
+      } catch {
+        if (!cancelled) setPhase('expired')
+      }
     }
 
     void establishSession()
@@ -64,10 +65,14 @@ export default function ResetPasswordPage() {
     }
     setPending(true)
     try {
-      const supabase = createSupabaseBrowserClient()
-      const { error: updateError } = await supabase.auth.updateUser({ password })
-      if (updateError) {
-        setError('비밀번호를 변경하지 못했어요. 링크를 다시 받아서 시도해주세요.')
+      const res = await fetch('/api/account/password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password }),
+      })
+      const data = (await res.json().catch(() => null)) as { error?: string } | null
+      if (!res.ok) {
+        setError(data?.error || '비밀번호를 변경하지 못했어요. 링크를 다시 받아서 시도해주세요.')
         return
       }
       setPhase('done')

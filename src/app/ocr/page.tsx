@@ -21,7 +21,13 @@ import { buildHomeCurrentQuoteQuery } from '@/lib/home-current-quotes'
 import { hydratePortfolioItemsWithCurrentQuotes } from '@/lib/home-quote-bootstrap'
 import { getFinancialValueTone } from '@/lib/financial-value-tone'
 import { aggregateResolvedOcrReviewRows, type AggregatedOcrReviewRow } from '@/lib/ocr-review-aggregation'
-import { buildMergeRowsFromReviewRows, persistAppliedPortfolioFromMergeRows } from '@/lib/ocr-portfolio-apply'
+import {
+  buildMergeRowsFromReviewRows,
+  fillMissingAveragePricesFromQuotes,
+  isMissingAveragePrice,
+  markMissingAveragePriceErrors,
+  persistAppliedPortfolioFromMergeRows,
+} from '@/lib/ocr-portfolio-apply'
 import { syncPortfolioToServer } from '@/lib/portfolio-sync'
 import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
@@ -54,8 +60,9 @@ type ManualEditableField =
   | 'resolvedMarket'
   | 'resolvedKind'
   | 'quantity'
-  | 'profitAmount'
   | 'profitRate'
+  | 'averagePrice'
+  | 'profitAmount'
   | 'evaluationAmount'
 
 type UploadStatus = {
@@ -122,6 +129,8 @@ async function resolveInstrumentRows(rows: OcrSourceRow[]): Promise<OcrIdentifie
 }
 
 function isManualRowComplete(row: OcrReviewRow) {
+  // OCR 스키마 축소(2026-09-29) 이후 적용에 필수인 금전 앵커는 평단이다.
+  // 평가금액+수익률을 수동 입력하면 handleManualFieldChange가 평단을 역산해 채운다.
   return Boolean(
     row.name.trim()
     && (row.resolvedTicker?.trim() || row.resolvedCode?.trim())
@@ -129,7 +138,7 @@ function isManualRowComplete(row: OcrReviewRow) {
     && row.resolvedKind
     && row.quantity.trim()
     && row.profitRate.trim()
-    && row.evaluationAmount.trim(),
+    && !isMissingAveragePrice(row.averagePrice),
   )
 }
 
@@ -222,7 +231,7 @@ function OcrResultDesignStyles() {
       .jaroo-ocr-lead b{color:#0F1419;font-weight:600}
       .jaroo-ocr-ok-card{background:#fff;border-radius:14px;border:.5px solid #E8EAEE;box-shadow:0 1px 3px rgba(0,0,0,.04);overflow:hidden;margin-bottom:12px}
       .jaroo-ocr-ok-head{display:flex;align-items:center;gap:10px;padding:14px 16px;border:0;background:transparent;width:100%;text-align:left;cursor:pointer}
-      .jaroo-ocr-ok-check{width:22px;height:22px;border-radius:50%;background:#E5F3EB;display:flex;align-items:center;justify-content:center;font-size:12px;color:#1A7340;flex-shrink:0}
+      .jaroo-ocr-ok-check{width:22px;height:22px;border-radius:50%;background:#EEF0F3;display:flex;align-items:center;justify-content:center;font-size:12px;color:#0F1419;flex-shrink:0}
       .jaroo-ocr-ok-title{flex:1;font-size:13.5px;font-weight:600;color:#0F1419}
       .jaroo-ocr-ok-names{font-size:11px;color:#97A0AE;margin-top:2px;font-weight:400;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:225px}
       .jaroo-ocr-ok-arrow{font-size:11px;color:#97A0AE;transition:transform .25s}
@@ -596,10 +605,11 @@ export default function OcrPage() {
     let isCancelled = false
     const mergedState = mergeResolvedRowsWithExistingReviewRows(resolvedRows, reviewRows, instrumentCandidatesByRowId)
     const unresolvedRows = getRowsNeedingInstrumentResolution(resolvedRows, mergedState.rows, mergedState.candidatesByRowId)
+    const mergedRowIds = new Set(mergedState.rows.map((row) => row.id))
 
     setReviewRows(mergedState.rows)
     replaceCandidates(mergedState.candidatesByRowId)
-    setExpandedRowId((current) => (current && mergedState.candidatesByRowId[current]?.length > 1 ? current : null))
+    setExpandedRowId((current) => (current && mergedRowIds.has(current) ? current : null))
 
     if (unresolvedRows.length === 0) {
       const hasFailedRowsAwaitingManualReview = mergedState.rows.some(
@@ -630,13 +640,7 @@ export default function OcrPage() {
           ...mergedState.candidatesByRowId,
           ...result.candidatesByRowId,
         })
-        setExpandedRowId((current) => {
-          const nextCandidatesByRowId = {
-            ...mergedState.candidatesByRowId,
-            ...result.candidatesByRowId,
-          }
-          return current && nextCandidatesByRowId[current]?.length > 1 ? current : null
-        })
+        setExpandedRowId((current) => (current && mergedRowIds.has(current) ? current : null))
         setResolveStatus('success')
       })
       .catch(async (error) => {
@@ -648,7 +652,7 @@ export default function OcrPage() {
 
         setReviewRows(applyInstrumentResolutionFailure(mergedState.rows))
         replaceCandidates(mergedState.candidatesByRowId)
-        setExpandedRowId((current) => (current && mergedState.candidatesByRowId[current]?.length > 1 ? current : null))
+        setExpandedRowId((current) => (current && mergedRowIds.has(current) ? current : null))
         setResolveStatus('error', error instanceof Error ? error.message : '종목 확인에 실패했어요.')
       })
 
@@ -749,16 +753,20 @@ export default function OcrPage() {
       quantity: field === 'quantity' ? value : currentRow.quantity,
       profitAmount,
       profitRate,
+      averagePrice: field === 'averagePrice' ? value : currentRow.averagePrice,
       evaluationAmount: field === 'evaluationAmount' ? value : currentRow.evaluationAmount,
     }
 
     nextRow.resolvedMarketTone = inferMarketTone(nextRow.resolvedMarket)
-    nextRow.averagePrice = computeAveragePrice(
-      nextRow.quantity,
-      nextRow.profitRate,
-      nextRow.evaluationAmount,
-      nextRow.profitAmount ?? '',
-    ) || nextRow.averagePrice
+    // 평단을 직접 입력했으면 그 값을 지킨다. 비어 있을 때만 수동 입력한 평가금액·수익률로 역산한다.
+    nextRow.averagePrice = isMissingAveragePrice(nextRow.averagePrice)
+      ? computeAveragePrice(
+          nextRow.quantity,
+          nextRow.profitRate,
+          nextRow.evaluationAmount,
+          nextRow.profitAmount ?? '',
+        ) || nextRow.averagePrice
+      : nextRow.averagePrice
     nextRow.resolutionState = isManualRowComplete(nextRow) ? 'resolved' : 'manual-required'
     patchReviewRow(rowId, nextRow)
   }, [patchReviewRow, reviewRows])
@@ -769,18 +777,22 @@ export default function OcrPage() {
     setExpandedRowId((current) => (current === rowId ? null : current))
   }, [removeReviewRow])
 
-  const handleContinue = () => {
+  const handleContinue = async () => {
     if (!canContinue || !session) {
       return
     }
 
-    setReviewRows(aggregatedRows)
-    setMergeRows(mergeRowsForApply)
     setApplyStatus('loading')
 
     try {
+      // 평단이 화면에 없는 행은 적용 직전에 현재 시세로 역산해 채운다(스키마 축소, 2026-09-29).
+      const filledRows = await fillMissingAveragePricesFromQuotes(aggregatedRows)
+      const nextMergeRows = markMissingAveragePriceErrors(buildMergeRowsFromReviewRows(filledRows))
       const appliedAt = new Date().toISOString()
-      const applyResult = persistAppliedPortfolioFromMergeRows(mergeRowsForApply, appliedAt)
+      const applyResult = persistAppliedPortfolioFromMergeRows(nextMergeRows, appliedAt)
+
+      setReviewRows(filledRows)
+      setMergeRows(nextMergeRows)
 
       if (!applyResult.persisted || applyResult.normalizedItems.length === 0) {
         throw new Error('포트폴리오에 적용할 종목을 찾지 못했어요.')
@@ -972,11 +984,15 @@ export default function OcrPage() {
                                 <input value={editableRow.profitRate} onChange={(event) => handleManualFieldChange(editableRowId, 'profitRate', event.target.value)} />
                               </label>
                               <label className='jaroo-ocr-edit-field'>
+                                <span>평단</span>
+                                <input value={editableRow.averagePrice} onChange={(event) => handleManualFieldChange(editableRowId, 'averagePrice', event.target.value)} placeholder='없으면 적용 시 현재가로 계산' />
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
                                 <span>평가손익</span>
                                 <input value={editableRow.profitAmount ?? ''} onChange={(event) => handleManualFieldChange(editableRowId, 'profitAmount', event.target.value)} />
                               </label>
                               <label className='jaroo-ocr-edit-field full'>
-                                <span>평가 금액</span>
+                                <span>평가 금액 (선택)</span>
                                 <input value={editableRow.evaluationAmount} onChange={(event) => handleManualFieldChange(editableRowId, 'evaluationAmount', event.target.value)} />
                               </label>
                             </div>
@@ -1116,11 +1132,15 @@ export default function OcrPage() {
                                 <input value={row.profitRate} onChange={(event) => handleManualFieldChange(row.id, 'profitRate', event.target.value)} />
                               </label>
                               <label className='jaroo-ocr-edit-field'>
+                                <span>평단</span>
+                                <input value={row.averagePrice} onChange={(event) => handleManualFieldChange(row.id, 'averagePrice', event.target.value)} placeholder='없으면 적용 시 현재가로 계산' />
+                              </label>
+                              <label className='jaroo-ocr-edit-field'>
                                 <span>평가손익</span>
                                 <input value={row.profitAmount ?? ''} onChange={(event) => handleManualFieldChange(row.id, 'profitAmount', event.target.value)} />
                               </label>
                               <label className='jaroo-ocr-edit-field full'>
-                                <span>평가 금액</span>
+                                <span>평가 금액 (선택)</span>
                                 <input value={row.evaluationAmount} onChange={(event) => handleManualFieldChange(row.id, 'evaluationAmount', event.target.value)} />
                               </label>
                             </div>
@@ -1159,7 +1179,7 @@ export default function OcrPage() {
         )}
 
         <div className='jaroo-ocr-footer'>
-          <button type='button' className='jaroo-ocr-apply-btn' onClick={handleContinue} disabled={!canContinue}>
+          <button type='button' className='jaroo-ocr-apply-btn' onClick={() => void handleContinue()} disabled={!canContinue}>
             → {applyStatus === 'loading' ? '적용 중...' : `${applicableApplyCount}개 종목 적용하기`}
           </button>
           <div className='jaroo-ocr-apply-sub'>{applyError || '적용하면 홈에서 분석을 시작할 수 있어요'}</div>

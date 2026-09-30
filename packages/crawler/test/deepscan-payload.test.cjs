@@ -364,7 +364,7 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
   assert.equal(payload.hero.statusText, '우세');
   assert.match(payload.hero.headline, /삼성전자/);
   assert.match(payload.hero.headline, /76/);
-  assert.match(payload.hero.body, /현재가 85200 KRW 확인/);
+  assert.match(payload.hero.body, /현재가 85,200원 확인/);
   assert.equal(payload.hero.fallback, null);
   assert.equal(payload.committee.axes.length, 3);
   assert.equal(payload.committee.axes[0].score, 65);
@@ -379,7 +379,7 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
       date: '2026-04-14',
       label: '거래량',
       title: '삼성전자 거래량',
-      body: '거래량 1234567주 확인',
+      body: '거래량 1,234,567주 확인',
     },
   );
   assert.deepEqual(
@@ -402,7 +402,7 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
       date: '2026-04-14',
       label: '컨센서스',
       title: '삼성전자 증권사 컨센서스',
-      body: '평균 목표가 100000 KRW · 현재가 대비 +17.37% · 매수 의견이 우세해요 · 투자의견 BUY',
+      body: '평균 목표가 100,000원 · 현재가 대비 +17.37% · 매수 의견이 우세해요 · 투자의견 BUY',
       consensus: {
         targetPrice: 100000,
         targetGapPct: 17.370892018779344,
@@ -412,14 +412,15 @@ test('buildJarooDeepScanPayload returns KR evidence-driven payload for valid inp
         highestTargetPrice: null,
         lowestTargetPrice: null,
         opinionSummary: '매수 의견이 우세해요',
+        brokers: null,
         currency: 'KRW',
       },
     },
   );
   assert.equal(payload.strategy.weekSignal, '관찰 지속');
-  assert.equal(payload.strategy.currentPriceText, '85200 KRW');
-  assert.equal(payload.strategy.targetPriceText, '100000 KRW');
-  assert.equal(payload.sellNow.realizedText, '현재가 기준 평가손익 +170400 KRW (+20%). 즉시 매도 판단은 보유 유지입니다.');
+  assert.equal(payload.strategy.currentPriceText, '85,200원');
+  assert.equal(payload.strategy.targetPriceText, '100,000원');
+  assert.equal(payload.sellNow.realizedText, '현재가 기준 평가손익 +170,400원 (+20%). 즉시 매도 판단은 보유 유지입니다.');
   assert.equal(payload.sellNow.rows.length, 4);
   assert.equal(payload.portfolioSimulation.beforeScore, 82);
   assert.equal(payload.portfolioSimulation.afterScore, 84);
@@ -492,14 +493,14 @@ test('buildJarooDeepScanPayload adds OpenDART disclosure analysis to KR DeepScan
 
   assertCanonicalPayloadShape(payload);
   assert.equal(payload.metadata.degraded, false);
-  assert.match(payload.hero.body, /OpenDART 공시 3건/);
+  assert.match(payload.hero.body, /최근 공시 3건/);
   assert.equal(payload.metadata.sourceRefs.some((ref) => ref.id === 'opendart-disclosures:005930'), true);
   assert.equal(payload.insights.summaryTags.includes('공시 3건'), true);
   const eventScannerMember = payload.committee.axes
     .flatMap((axis) => axis.members)
     .find((member) => member.memberKey === 'consensusMomentum');
   assert.equal(eventScannerMember.title, '이벤트 스캐너');
-  assert.match(eventScannerMember.reason, /OpenDART 공시 3건/);
+  assert.match(eventScannerMember.reason, /최근 공시 3건/);
   assert.match(eventScannerMember.reason, /지분공시 2건/);
   assert.deepEqual(
     payload.insights.items.find((item) => item.sourceLabel === '공시 분석'),
@@ -508,7 +509,7 @@ test('buildJarooDeepScanPayload adds OpenDART disclosure analysis to KR DeepScan
       sourceLabel: '공시 분석',
       date: '2026-06-08',
       label: '공시',
-      title: '삼성전자 최근 OpenDART 공시 흐름',
+      title: '삼성전자 최근 공시 흐름',
       body: '2026-05-12~2026-06-12 공시 3건 · 최대주주등소유주식변동신고서 1건 · 지분/주요주주 2건 · 정기보고서 1건 · 주요 리스크 공시 없음',
       sourceBody: [
         '2026-06-08 · 최대주주등소유주식변동신고서 · 제출:삼성전자 · 지분 변동',
@@ -539,7 +540,8 @@ test('buildJarooDeepScanPayload omits risk-recheck scenario when KR coverage and
   assertCanonicalPayloadShape(payload);
   assert.equal(payload.strategy.scenarioCondition, '추가 리스크 없음');
   assert.equal(payload.strategy.otherScenarios.some((scenario) => scenario.label === '리스크 재점검'), false);
-  assert.equal(payload.strategy.otherScenarios.length, 1);
+  assert.equal(payload.strategy.otherScenarios.some((scenario) => scenario.label === '근거 유지'), false);
+  assert.equal(payload.strategy.otherScenarios.length, 0);
 });
 
 test('buildJarooDeepScanPayload separates source-provided missing target price from source lookup failure', async () => {
@@ -764,9 +766,9 @@ test('buildJarooDeepScanPayload keeps position-fit evidence when the handoff use
   const positionFitAxis = payload.committee.axes.find((axis) => axis.label === '포지션 적합도');
   assert.ok(positionFitAxis);
   assert.equal(positionFitAxis.score, 84);
-  assert.match(positionFitAxis.members[0].reason, /현재가 85200 대비 평단 71000/);
+  assert.match(positionFitAxis.members[0].reason, /현재가 85,200 대비 평단 71,000/);
   assert.equal(positionFitAxis.members[2].reason, '보유 수량, 평단, 현재가가 모두 확인되어 즉시 매도 계산이 가능합니다.');
-  assert.match(payload.sellNow.realizedText, /\+170400 KRW/);
+  assert.match(payload.sellNow.realizedText, /\+170,400원/);
 });
 
 test('buildJarooDeepScanPayload uses package-derived KR committee wording when available', async () => {
@@ -814,7 +816,7 @@ test('buildJarooDeepScanPayload uses package-derived KR committee wording when a
   assert.doesNotMatch(reasons[0], /최근 리포트 2건 기준입니다/)
   const marketTimingAxis = payload.committee.axes.find((axis) => axis.label === '시장 타이밍');
   assert.ok(marketTimingAxis);
-  assert.match(marketTimingAxis.members[2].reason, /현재가 85200 KRW와 평단 71000 비교 기준/)
+  assert.match(marketTimingAxis.members[2].reason, /현재가 85,200원 · 평단 71,000원 비교 기준/)
   const positionFitAxis = payload.committee.axes.find((axis) => axis.label === '포지션 적합도');
   assert.ok(positionFitAxis);
   assert.equal(positionFitAxis.members[2].reason, '보유 수량, 평단, 현재가가 모두 확인되어 즉시 매도 계산이 가능합니다.');
@@ -1214,7 +1216,7 @@ test('buildJarooDeepScanPayload returns canonical internal-service-error payload
   }
 });
 
-test('buildJarooDeepScanPayload normalizes KR strategy scenario percentages to 100 with risk scenario', async () => {
+test('buildJarooDeepScanPayload keeps only the risk-recheck scenario and drops the residual thesis-maintenance row', async () => {
   const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
 
   const payload = await buildJarooDeepScanPayload({
@@ -1250,12 +1252,16 @@ test('buildJarooDeepScanPayload normalizes KR strategy scenario percentages to 1
     },
   });
 
-  const percentages = [payload.strategy.scenarioProbability, ...payload.strategy.otherScenarios.map((scenario) => scenario.probability)]
-    .map((value) => Number(String(value).replace(/[^0-9.-]/g, '')));
-  assert.equal(percentages.reduce((sum, value) => sum + value, 0), 100);
+  assert.equal(payload.strategy.otherScenarios.length, 1);
+  assert.equal(payload.strategy.otherScenarios[0].label, '리스크 재점검');
+  const primaryPct = Number(String(payload.strategy.scenarioProbability).replace(/[^0-9.-]/g, ''));
+  const riskPct = Number(String(payload.strategy.otherScenarios[0].probability).replace(/[^0-9.-]/g, ''));
+  assert.ok(primaryPct >= 5 && primaryPct <= 90, `primary out of range: ${primaryPct}`);
+  assert.ok(riskPct >= 10 && riskPct <= 30, `risk out of range: ${riskPct}`);
   assert.equal(payload.strategy.targetPriceText, 'NAV·기초지수·구성종목 기준');
 
   const allStrings = collectStrings(payload).join('\n');
+  assert.doesNotMatch(allStrings, /근거 유지/);
   assert.doesNotMatch(allStrings, /목표가 미제공|증권사 목표가|기업 실적|EPS|PER|PBR/);
 });
 
@@ -1301,4 +1307,39 @@ test('buildJarooDeepScanPayload uses ETF-native payload when kind is etf and mar
 
   const allStrings = collectStrings(payload).join('\n');
   assert.doesNotMatch(allStrings, /목표가 조회 실패|사업 품질|밸류에이션|기업 실적|PER|PBR/);
+});
+
+test('buildJarooDeepScanPayload persists broker target details in the consensus structured mirror', async () => {
+  const publicApi = await import('../src/index.js');
+
+  const sources = createStrongKrSources();
+  sources.slim.pages.opinion = {
+    ...sources.slim.pages.opinion,
+    sourceLabel: 'naver-fallback',
+    asOfText: '2026.09.09',
+    증권사수: 2,
+    최고목표주가: 110000,
+    최저목표주가: 90000,
+    analystBrokers: [
+      { name: '미래에셋증권', targetPrice: 110000, date: '2026-09-07' },
+      { name: '현대차증권', targetPrice: 90000, date: '2026-08-05' },
+      { name: '깨진항목', targetPrice: 0, date: '2026-08-01' },
+    ],
+  };
+
+  const payload = await publicApi.buildJarooDeepScanPayload({
+    instrument: { name: '삼성전자', code: '005930', market: 'KR' },
+    holding: { shares: '12', averagePrice: '71000', evaluationAmount: '1022400' },
+    selectedAt: '2026-04-15T00:00:00.000Z',
+    sources,
+  });
+
+  const item = payload.insights.items.find((entry) => entry.sourceLabel === '증권사 의견');
+  assert.ok(item, '증권사 의견 인사이트 없음');
+  assert.equal(item.consensus.analystCount, 2);
+  assert.deepEqual(item.consensus.brokers, [
+    { name: '미래에셋증권', targetPrice: 110000, date: '2026-09-07' },
+    { name: '현대차증권', targetPrice: 90000, date: '2026-08-05' },
+  ]);
+  assert.match(item.body, /증권사 2곳/);
 });

@@ -256,6 +256,41 @@ export function buildUsOhlcBriefingUpstreamUrl(baseUrl: string, ticker: string, 
   )
 }
 
+/** 미국 시장 지표(S&P 500·나스닥) — 시장 브리핑 행용. 실패 관용: 못 받으면 market {} 폴백. */
+export function buildUsMarketIndicatorsUpstreamUrl(baseUrl: string) {
+  return buildCrawlerUrl(baseUrl, '/api/source/polygon-yahoo/us/market/indicators')
+}
+
+type UsMarketIndicatorsPayload = {
+  data?: {
+    sp500?: { close?: number | null; changePct?: number | null } | null
+    nasdaq?: { close?: number | null; changePct?: number | null } | null
+  } | null
+}
+
+function toUsMarketIndex(row: { close?: number | null; changePct?: number | null } | null | undefined) {
+  const value = typeof row?.close === 'number' && Number.isFinite(row.close) ? row.close : null
+  const changePct = typeof row?.changePct === 'number' && Number.isFinite(row.changePct) ? row.changePct : null
+  if (value == null && changePct == null) return null
+  return { value, changePct }
+}
+
+async function fetchUsMarketIndices(fetchOptions: FetchJsonOptions): Promise<{
+  market: LoadingBriefingSnapshot['market']
+  ok: boolean
+}> {
+  const payload = await fetchJsonWithTimeout<UsMarketIndicatorsPayload>(
+    buildUsMarketIndicatorsUpstreamUrl(getCrawlerBaseUrl()),
+    fetchOptions,
+  ).catch(() => null)
+  const sp500 = toUsMarketIndex(payload?.data?.sp500)
+  const nasdaq = toUsMarketIndex(payload?.data?.nasdaq)
+  if (!sp500 && !nasdaq) {
+    return { market: {}, ok: false }
+  }
+  return { market: { sp500, nasdaq }, ok: true }
+}
+
 function normalizeUsOhlcDailyRows(payload: UsOhlcPayload) {
   const rows = Array.isArray(payload.data?.series)
     ? payload.data.series.map(normalizeUsOhlcRow).filter((row): row is LoadingBriefingDailyRow => Boolean(row))
@@ -376,7 +411,10 @@ export async function buildUsBriefingSnapshotData(
     timeoutMs: options.timeoutMs,
   }
   const upstreamUrl = buildUsOhlcBriefingUpstreamUrl(getCrawlerBaseUrl(), normalizedTicker)
-  const payload = await fetchJsonWithTimeout<UsOhlcPayload>(upstreamUrl, fetchOptions)
+  const [payload, usIndices] = await Promise.all([
+    fetchJsonWithTimeout<UsOhlcPayload>(upstreamUrl, fetchOptions),
+    fetchUsMarketIndices(fetchOptions),
+  ])
   const daily = normalizeUsOhlcDailyRows(payload)
   const latest = getLatestRow(daily)
   const previous = getPreviousRow(daily)
@@ -405,14 +443,16 @@ export async function buildUsBriefingSnapshotData(
       source,
     },
     daily,
-    market: {},
+    // 미국 시장 지수(S&P 500·나스닥) — 카드가 sp500/nasdaq 키를 만나면
+    // '오늘 시장 속에서는?' 행을 나스닥·S&P로 자동 전환한다.
+    market: usIndices.market,
     sourceStatus: {
       daily: 'ok',
       stockBasic: 'ok',
       kospi: 'error',
       kosdaq: 'error',
     },
-    sources: [source],
+    sources: usIndices.ok ? [source, 'us-market-indicators'] : [source],
   }
 }
 

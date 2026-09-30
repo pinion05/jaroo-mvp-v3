@@ -1,13 +1,18 @@
 'use client'
+import { Check, Eye, EyeOff, History, Loader2, TriangleAlert } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import type { ReactNode } from 'react'
 
 import type {
   JarooDeepScanPayload,
   JarooDeepScanStrategyScenario,
 } from '../../packages/contracts/src/deepscan'
 import type { DeepScanCanonicalTargetSession } from '@/lib/deepscan-canonical'
+import { isMissingKrPageNotice, normalizeDeepScanDisclosureWording, stripMissingKrPageNotice } from '@/lib/deepscan-loading-behavior'
 import type { DeepScanTargetInput } from '@/lib/workflow-types'
 
 import { cn } from '@/lib/utils'
+import { WatchAlertLevelSelector } from '@/components/watch-alert-level'
 import { DeepScanRecoveryForecastCard } from '@/components/deepscan-recovery-forecast-card'
 
 type DeepScanInlineResultsProps = {
@@ -61,12 +66,28 @@ function deriveUpside(currentText: string | null | undefined, targetText: string
   return ((target / current) - 1) * 100
 }
 
+/** 애널리스트 목표가의 현재가 대비 색 — 높으면 빨강(상승 여력), 낮으면 파랑(하락 여력) */
+function targetPriceTone(targetPrice: number | null | undefined, currentPrice: number | null) {
+  if (targetPrice == null || !Number.isFinite(targetPrice) || currentPrice === null || currentPrice === 0) return undefined
+  if (targetPrice > currentPrice) return 'text-[color:var(--jaroo-profit)]'
+  if (targetPrice < currentPrice) return 'text-[color:var(--jaroo-loss)]'
+  return undefined
+}
+
 function buildStrength(payload: JarooDeepScanPayload) {
   const score = payload.hero.score
   if (score >= 67) return { label: '강세', helper: '긍정 우세', active: 4 }
   if (score >= 55) return { label: '중립+', helper: '긍정·중립 혼재', active: 3 }
   if (score >= 45) return { label: '중립', helper: '추가 확인 필요', active: 2 }
   return { label: '주의', helper: '방어 우선', active: 1 }
+}
+
+/** 확정 색 규칙 — 강세=빨강, 중립+·중립=녹색(보합 관례), 주의=파랑.
+ *  #266 규율: 데이터 색은 토큰(--jaroo-profit/--jaroo-loss/--jaroo-flat)만 쓴다 — 헥스 직접 지정 금지. */
+function strengthTone(active: number) {
+  if (active >= 4) return { text: 'text-[color:var(--jaroo-profit)]', bar: 'bg-[color:var(--jaroo-profit)]' }
+  if (active >= 2) return { text: 'text-[color:var(--jaroo-flat)]', bar: 'bg-[color:var(--jaroo-flat)]' }
+  return { text: 'text-[color:var(--jaroo-loss)]', bar: 'bg-[color:var(--jaroo-loss)]' }
 }
 
 function sanitizeExchangeProductCopy(value: string) {
@@ -101,15 +122,19 @@ function buildScenarioViews(payload: JarooDeepScanPayload, exchangeProduct = fal
     label: exchangeProduct ? sanitizeExchangeProductCopy(payload.strategy?.scenarioLabel || '기준 시나리오') : payload.strategy?.scenarioLabel || '보유 유지',
     probability: payload.strategy?.scenarioProbability || '--',
     condition: exchangeProduct
-      ? sanitizeExchangeProductCopy([payload.strategy?.scenarioCondition, payload.strategy?.scenarioPeriod].filter(Boolean).join(' · ') || '조건 확인 중')
-      : [payload.strategy?.scenarioCondition, payload.strategy?.scenarioPeriod].filter(Boolean).join(' · ') || '조건 확인 중',
+      ? sanitizeExchangeProductCopy(stripMissingKrPageNotice([payload.strategy?.scenarioCondition, payload.strategy?.scenarioPeriod].filter(Boolean).join(' · ')) || '조건 확인 중')
+      : stripMissingKrPageNotice([payload.strategy?.scenarioCondition, payload.strategy?.scenarioPeriod].filter(Boolean).join(' · ')) || '조건 확인 중',
     tone: 'green',
     recommended: true,
   }
-  const others = (payload.strategy?.otherScenarios ?? []).slice(0, 2).map((scenario, index): ScenarioView => ({
+  // '근거 유지'는 100% 채우기 residual이라 2026-09-17 크롤러 생성에서 제거 — 캐시된 옛 페이로드가 들어와도 렌더하지 않는다.
+  const others = (payload.strategy?.otherScenarios ?? [])
+    .filter((scenario) => scenario.label !== '근거 유지')
+    .slice(0, 2)
+    .map((scenario, index): ScenarioView => ({
     label: exchangeProduct ? sanitizeExchangeProductCopy(scenario.label) : scenario.label,
     probability: scenario.probability,
-    condition: exchangeProduct ? sanitizeExchangeProductCopy(scenario.condition) : scenario.condition,
+    condition: stripMissingKrPageNotice(exchangeProduct ? sanitizeExchangeProductCopy(scenario.condition) : scenario.condition) || '조건 확인 중',
     tone: index === 0 ? 'blue' : 'red',
   }))
   return [primary, ...others]
@@ -121,34 +146,75 @@ function scenarioWidth(scenario: Pick<JarooDeepScanStrategyScenario, 'probabilit
 }
 
 function toneClasses(tone: ScenarioView['tone']) {
-  if (tone === 'green') return { dot: 'bg-[#1A9D55]', bar: 'bg-[#1A9D55]', text: 'text-[#1A9D55]' }
-  if (tone === 'red') return { dot: 'bg-[#E5484D]', bar: 'bg-[#E5484D]', text: 'text-[#E5484D]' }
-  return { dot: 'bg-[#2B6BE6]', bar: 'bg-[#2B6BE6]', text: 'text-[#2B6BE6]' }
+  // #266: 시나리오도 데이터 색 토큰 사용 — green 톤(긍정)=빨강, red 톤(부정)=빨강(강조), blue=파랑
+  if (tone === 'green') return { dot: 'bg-[color:var(--jaroo-profit)]', bar: 'bg-[color:var(--jaroo-profit)]', text: 'text-[#A8323A]' }
+  if (tone === 'red') return { dot: 'bg-[color:var(--jaroo-profit)]', bar: 'bg-[color:var(--jaroo-profit)]', text: 'text-[color:var(--jaroo-profit)]' }
+  return { dot: 'bg-[color:var(--jaroo-loss)]', bar: 'bg-[color:var(--jaroo-loss)]', text: 'text-[color:var(--jaroo-loss)]' }
 }
 
-export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScanInlineResultsProps) {
+function findConsensus(payload: JarooDeepScanPayload) {
+  const items = payload.insights?.items ?? []
+  return items.find((item) => item.consensus && (item.consensus.targetPrice != null || item.consensus.analystCount != null))?.consensus ?? null
+}
+
+function formatConsensusPrice(value: number | null | undefined) {
+  if (value == null || !Number.isFinite(value)) return null
+  return `${Math.round(value).toLocaleString('ko-KR')}원`
+}
+
+type DetailSectionProps = {
+  title: string
+  meta?: string
+  children: ReactNode
+}
+
+function DetailSection({ title, meta, children }: DetailSectionProps) {
+  return (
+    <section>
+      <div className='mb-2.5 flex items-center gap-2'>
+        <span className='text-[12.5px] font-bold text-[#0F1419]'>{title}</span>
+        {meta ? <span className='ml-auto text-[10px] text-[#97A0AE]'>{meta}</span> : null}
+      </div>
+      {children}
+    </section>
+  )
+}
+export function DeepScanInlineResults({
+  payload,
+  requestSeed,
+  target,
+}: DeepScanInlineResultsProps) {
   const exchangeProduct = isExchangeProductPayload(payload)
   const name = firstNonEmpty(payload.input.instrument.name, target?.name, requestSeed?.holding.name) ?? '선택 종목'
   const strength = buildStrength(payload)
   const scenarios = buildScenarioViews(payload, exchangeProduct)
   const upside = exchangeProduct ? null : deriveUpside(payload.strategy.currentPriceText, payload.strategy.targetPriceText)
+  const currentPriceNumber = exchangeProduct ? null : parseMoneyNumber(payload.strategy.currentPriceText)
+  const [detailsOpen, setDetailsOpen] = useState(false)
+  const consensus = exchangeProduct ? null : findConsensus(payload)
   const evidenceCount = payload.metadata.sourceRefs.length || payload.insights.items.length
   const rawSummary = payload.hero.blockState === 'ok'
     ? payload.hero.body
     : payload.hero.fallback?.label || payload.hero.error?.message || `${name} 분석 결과를 일부만 표시하고 있어요.`
-  const summary = exchangeProduct ? sanitizeExchangeProductCopy(rawSummary) : rawSummary
+  const summary = stripMissingKrPageNotice(normalizeDeepScanDisclosureWording(exchangeProduct ? sanitizeExchangeProductCopy(rawSummary) : rawSummary))
+  // 구조화된 근거(신형 payload) — 없으면 플레인 본문 폴백.
+  // 옛 캐시 payload의 '최근 OpenDART 공시 …' 문구도 렌더 시 '최근 공시'로 치환한다(#267).
+  const heroEvidence = Array.isArray(payload.hero.evidenceFacts) && payload.hero.evidenceFacts.length > 0
+    ? {
+        facts: payload.hero.evidenceFacts.slice(0, 8).map(normalizeDeepScanDisclosureWording),
+        cautions: (Array.isArray(payload.hero.evidenceCautions) ? payload.hero.evidenceCautions : []).slice(0, 3).filter((caution) => !isMissingKrPageNotice(caution)),
+      }
+    : null
   const facts = exchangeProduct
     ? [
-        ['현재가', payload.strategy.currentPriceText || '확인 중'],
         ['ETF 기준', payload.strategy.targetPriceText || 'NAV·구성 확인'],
         ['가격 위치', payload.strategy.otherScenarioTags?.[1] ?? '확인 중'],
-        ['근거', evidenceCount > 0 ? `${evidenceCount}개` : payload.insights.summaryTags[0] ?? '확인 중'],
+        ['근거', evidenceCount > 0 ? `${evidenceCount}개` : normalizeDeepScanDisclosureWording(payload.insights.summaryTags[0]) ?? '확인 중'],
       ]
     : [
-        ['현재가', payload.strategy.currentPriceText || '확인 중'],
         ['목표가', payload.strategy.targetPriceText || '확인 중'],
         ['상승 여력', upside === null ? '확인 중' : formatPercent(upside)],
-        ['근거', evidenceCount > 0 ? `${evidenceCount}개` : payload.insights.summaryTags[0] ?? '확인 중'],
+        ['근거', evidenceCount > 0 ? `${evidenceCount}개` : normalizeDeepScanDisclosureWording(payload.insights.summaryTags[0]) ?? '확인 중'],
       ]
 
   return (
@@ -159,42 +225,263 @@ export function DeepScanInlineResults({ payload, requestSeed, target }: DeepScan
           <div><div className='text-[10px] text-[#97A0AE]'>종합 결론</div><h2 className='text-[14px] font-bold text-[#0F1419]'>세 팀의 의견을 모았어요</h2></div>
         </div>
         <div className='px-4 py-5 text-center'>
-          <div className={cn('text-[28px] font-black leading-none', strength.active <= 1 ? 'text-[#E5484D]' : 'text-[#1A9D55]')}>{strength.label}</div>
-          <div className='mx-auto mt-3 flex w-[122px] gap-1'>{Array.from({ length: 5 }, (_, index) => <span key={index} className={cn('h-[6px] flex-1 rounded-full', index < strength.active ? 'bg-[#1A9D55]' : 'bg-[#E8EAEE]')} />)}</div>
+          <div className={cn('text-[28px] font-black leading-none', strengthTone(strength.active).text)}>{strength.label}</div>
+          <div className='mx-auto mt-3 flex w-[122px] gap-1'>{Array.from({ length: 5 }, (_, index) => <span key={index} className={cn('h-[6px] flex-1 rounded-full', index < strength.active ? strengthTone(strength.active).bar : 'bg-[#E8EAEE]')} />)}</div>
           <p className='mt-2 text-[11px] text-[#5A6473]'>{strength.helper}</p>
         </div>
-        <p className='border-t border-[#EFF1F4] px-4 py-4 text-[13px] leading-6 text-[#0F1419]'>{summary}</p>
-        <div className='border-t border-[#EFF1F4] px-4 py-4'>
-          <div className='mb-3 text-[10px] text-[#97A0AE]'>{exchangeProduct ? '가능 시나리오' : '추천 행동'}</div>
-          <div className='space-y-3'>
-            {scenarios.map((scenario) => {
-              const tone = toneClasses(scenario.tone)
-              return (
-                <div key={`${scenario.label}-${scenario.probability}`}>
-                  <div className='mb-1 flex items-center gap-2 text-[13px]'>
-                    <span className={cn('size-2 rounded-full', tone.dot)} />
-                    <span className={cn('font-bold', scenario.recommended ? 'text-[#0F1419]' : 'text-[#5A6473]')}>{scenario.label}</span>
-                    {scenario.recommended ? <span className='rounded-[4px] bg-[#0F1419] px-1.5 py-0.5 text-[9px] font-bold text-white'>{exchangeProduct ? '주요' : '추천'}</span> : null}
-                    <span className='ml-auto font-bold text-[#5A6473]'>{scenario.probability || '--'}</span>
+        {heroEvidence ? (
+          <div className='border-t border-[#EFF1F4] px-4 py-4'>
+            <div className='text-[10px] text-[#97A0AE]'>확인한 근거</div>
+            <div className='mt-2 flex flex-wrap gap-1.5'>
+              {heroEvidence.facts.map((fact) => (
+                <span key={fact} className='inline-flex items-center gap-1 rounded-full border border-[#E8EAEE] bg-[#F7F8FA] px-2.5 py-1 text-[12px] leading-4 text-[#0F1419]'>
+                  <Check className='size-3.5 shrink-0 text-[#5A6473]' aria-hidden />
+                  {fact}
+                </span>
+              ))}
+            </div>
+            {heroEvidence.cautions.length > 0 ? (
+              <div className='mt-3 space-y-1.5'>
+                {heroEvidence.cautions.map((caution) => (
+                  <div key={caution} className='flex items-start gap-1.5 rounded-[8px] bg-[#FAEEDA] px-2.5 py-1.5 text-[12px] leading-4 text-[#854F0B]'>
+                    <TriangleAlert className='mt-px size-3.5 shrink-0' aria-hidden />
+                    <span>{caution}</span>
                   </div>
-                  <div className='h-[5px] overflow-hidden rounded-full bg-[#EFF1F4]'><div className={cn('h-full rounded-full', tone.bar)} style={{ width: scenarioWidth(scenario) }} /></div>
-                  <div className={cn('mt-1 text-[10px]', scenario.tone === 'red' ? tone.text : 'text-[#97A0AE]')}>{scenario.condition}</div>
-                </div>
-              )
-            })}
+                ))}
+              </div>
+            ) : null}
           </div>
-        </div>
-        <div className='grid grid-cols-2 border-t border-[#EFF1F4]'>
+        ) : (
+          <p className='border-t border-[#EFF1F4] px-4 py-4 text-[13px] leading-6 text-[#0F1419]'>{summary}</p>
+        )}
+        <div className='grid grid-cols-3 border-t border-[#EFF1F4]'>
           {facts.map(([label, value]) => (
-            <div key={label} className='border-b border-r border-[#EFF1F4] px-4 py-3 last:border-r-0 [&:nth-child(2n)]:border-r-0 [&:nth-last-child(-n+2)]:border-b-0'>
+            <div key={label} className='border-r border-[#EFF1F4] px-3 py-3 last:border-r-0'>
               <div className='text-[10px] text-[#97A0AE]'>{label}</div>
-              <div className={cn('mt-1 text-[14px] font-bold text-[#0F1419]', label === '상승 여력' && upside !== null && upside > 0 ? 'text-[color:var(--jaroo-profit)]' : undefined)}>{value}</div>
+              <div className={cn('mt-1 text-[13px] font-bold text-[#0F1419]', label === '상승 여력' && upside !== null && upside > 0 ? 'text-[color:var(--jaroo-profit)]' : label === '상승 여력' && upside !== null && upside < 0 ? 'text-[color:var(--jaroo-loss)]' : undefined)}>{value}</div>
             </div>
           ))}
         </div>
+        <div className='border-t border-[#EFF1F4]'>
+          <button type='button' aria-expanded={detailsOpen} onClick={() => setDetailsOpen((v) => !v)} className='flex w-full items-center gap-2 px-4 py-3.5 text-left'>
+            <span className='text-[13px] font-bold text-[#0F1419]'>자세히 보기</span>
+            <span className='text-[10px] text-[#97A0AE]'>{exchangeProduct ? '가능 시나리오 · 가격 근거' : '추천 시나리오 · 목표가 근거'}</span>
+            <svg className={cn('ml-auto size-4 transition-transform duration-200', detailsOpen ? 'rotate-180' : '', 'text-[#5A6473]')} width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='2' strokeLinecap='round' strokeLinejoin='round'><path d='m6 9 6 6 6-6' /></svg>
+          </button>
+          <div className={cn('grid transition-[grid-template-rows] duration-300 ease-out', detailsOpen ? 'grid-rows-[1fr]' : 'grid-rows-[0fr]')}>
+            <div className='overflow-hidden'>
+              <div className='space-y-4 border-t border-[#EFF1F4] px-4 py-4 pb-5'>
+                <DetailSection title={exchangeProduct ? '가능 시나리오' : '추천 시나리오'}>
+                  <div className='space-y-3'>
+                    {scenarios.map((scenario) => {
+                      const tone = toneClasses(scenario.tone)
+                      return (
+                        <div key={`${scenario.label}-${scenario.probability}`}>
+                          <div className='mb-1 flex items-center gap-2 text-[13px]'>
+                            <span className={cn('size-2 rounded-full', tone.dot)} />
+                            <span className={cn('font-bold', scenario.recommended ? 'text-[#0F1419]' : 'text-[#5A6473]')}>{scenario.label}</span>
+                            {scenario.recommended ? <span className='rounded-[4px] bg-[#0F1419] px-1.5 py-0.5 text-[9px] font-bold text-white'>{exchangeProduct ? '주요' : '추천'}</span> : null}
+                            <span className='ml-auto font-bold text-[#5A6473]'>{scenario.probability || '--'}</span>
+                          </div>
+                          <div className='h-[5px] overflow-hidden rounded-full bg-[#EFF1F4]'><div className={cn('h-full rounded-full', tone.bar)} style={{ width: scenarioWidth(scenario) }} /></div>
+                          <div className={cn('mt-1 text-[10px]', scenario.tone === 'red' ? tone.text : 'text-[#97A0AE]')}>{scenario.condition}</div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                </DetailSection>
+                {!exchangeProduct ? (
+                  <DetailSection title='목표가 근거' meta={consensus?.analystCount ? `증권사 ${consensus.analystCount}개` : undefined}>
+                    <div className='overflow-hidden rounded-[12px] border border-[#E8EAEE]'>
+                      <div className='grid grid-cols-2 divide-x divide-[#EFF1F4] border-b border-[#EFF1F4]'>
+                        <div className='px-3 py-3'><div className='text-[10px] text-[#97A0AE]'>현재가</div><div className='mt-1 text-[13px] font-bold text-[#0F1419]'>{payload.strategy.currentPriceText || '확인 중'}</div></div>
+                        <div className='px-3 py-3'><div className='text-[10px] text-[#97A0AE]'>평균 목표가</div><div className={cn('mt-1 text-[13px] font-bold text-[#0F1419]', targetPriceTone(consensus?.targetPrice ?? parseMoneyNumber(payload.strategy.targetPriceText), currentPriceNumber))}>{(formatConsensusPrice(consensus?.targetPrice) ?? payload.strategy.targetPriceText) || '확인 중'}</div></div>
+                      </div>
+                      {consensus?.highestTargetPrice != null || consensus?.lowestTargetPrice != null ? (
+                        <div className='grid grid-cols-2 divide-x divide-[#EFF1F4] border-b border-[#EFF1F4]'>
+                          <div className='px-3 py-2.5'><div className='text-[10px] text-[#97A0AE]'>최고 목표가</div><div className={cn('mt-0.5 text-[12px] font-bold text-[#0F1419]', targetPriceTone(consensus?.highestTargetPrice, currentPriceNumber))}>{formatConsensusPrice(consensus?.highestTargetPrice) ?? '--'}</div></div>
+                          <div className='px-3 py-2.5'><div className='text-[10px] text-[#97A0AE]'>최저 목표가</div><div className={cn('mt-0.5 text-[12px] font-bold text-[#0F1419]', targetPriceTone(consensus?.lowestTargetPrice, currentPriceNumber))}>{formatConsensusPrice(consensus?.lowestTargetPrice) ?? '--'}</div></div>
+                        </div>
+                      ) : null}
+                      {consensus?.opinionSummary ? <div className='px-3 py-2.5 text-[11px] leading-5 text-[#5A6473]'>{consensus.opinionSummary}</div> : null}
+                    </div>
+                  </DetailSection>
+                ) : (
+                  <DetailSection title='가격 근거'>
+                    <div className='overflow-hidden rounded-[12px] border border-[#E8EAEE]'>
+                      <div className='grid grid-cols-2 divide-x divide-[#EFF1F4]'>
+                        <div className='px-3 py-3'><div className='text-[10px] text-[#97A0AE]'>현재가</div><div className='mt-1 text-[12px] font-bold text-[#0F1419]'>{payload.strategy.currentPriceText || '확인 중'}</div></div>
+                        <div className='px-3 py-3'><div className='text-[10px] text-[#97A0AE]'>ETF 기준</div><div className='mt-1 text-[12px] font-bold text-[#0F1419]'>{payload.strategy.targetPriceText || 'NAV·구성 확인'}</div></div>
+                      </div>
+                    </div>
+                  </DetailSection>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       </article>
       <DeepScanRecoveryForecastCard payload={payload} />
+      <article className='rounded-[16px] bg-[#0F1419] px-4 py-[18px] text-white' aria-label='딥스캔 후속 안내'>
+        <div className='mb-2.5 flex items-center gap-2.5'>
+          <div className='flex size-[34px] shrink-0 items-center justify-center rounded-[10px] bg-white/10 text-white/85'>
+            <svg width='18' height='18' viewBox='0 0 24 24' fill='none' stroke='currentColor' strokeWidth='1.9' strokeLinecap='round' strokeLinejoin='round'><path d='M2 12s3-7 10-7 10 7 10 7-3 7-10 7-10-7-10-7z' /><circle cx='12' cy='12' r='3' /></svg>
+          </div>
+          <h3 className='text-[14.5px] font-bold tracking-[-0.2px]'>이 판단, 계속 지켜봐드릴까요?</h3>
+        </div>
+        <p className='text-[12px] leading-[1.65] text-white/60'>
+          오늘 나온 결론은 <b className='font-semibold text-white'>오늘 기준</b>이에요. 실적이 나오거나 상황이 바뀌면 판단도 달라져요.
+          <br />
+          매번 확인하지 않으셔도, <b className='font-semibold text-white'>바뀌는 순간에만</b> 알려드릴게요.
+        </p>
+        <WatchToggleButton
+          code={firstNonEmpty(payload.input.instrument.code, target?.code, target?.ticker) ?? ''}
+          name={name}
+          market={firstNonEmpty(payload.input.instrument.market, target?.market) ?? undefined}
+        />
+        <div className='mt-3 rounded-[12px] bg-white/[0.06] px-3.5 py-3'>
+          <WatchAlertLevelSelector compact tone="dark" />
+        </div>
+        <p className='mt-[9px] text-center text-[10.5px] text-white/40'>며칠간 무료 · 언제든 그만둘 수 있어요</p>
+      </article>
       <p className='px-2 pb-2 text-center text-[10px] leading-4 text-[#97A0AE]'>AI 분석은 데이터 기반 참고 자료예요. 투자 권유나 수익 보장이 아닙니다.</p>
     </section>
+  )
+}
+
+
+
+/** 스냅샷 출처 바 — 캐시 히트 사실·절약 크레딧·가격 드리프트·명시적 재분석 진입점 */
+function formatSnapshotAge(scannedAt: string): string {
+  const scannedMs = Date.parse(scannedAt)
+  if (!Number.isFinite(scannedMs)) return '최근'
+  const minutes = Math.max(0, Math.round((Date.now() - scannedMs) / 60000))
+  if (minutes < 60) return `${minutes}분 전`
+  const hours = Math.round(minutes / 60)
+  if (hours < 24) return `${hours}시간 전`
+  return `${Math.round(hours / 24)}일 전`
+}
+
+export function SnapshotProvenanceBar({
+  scannedAt,
+  savedCredits,
+  driftPct,
+  onRefresh,
+}: {
+  scannedAt: string
+  savedCredits?: number
+  driftPct: number | null
+  onRefresh?: () => void
+}) {
+  const driftAlert = driftPct != null && Math.abs(driftPct) >= 5
+  const driftText =
+    driftPct == null ? '' : `${driftPct > 0 ? '+' : ''}${driftPct.toFixed(1)}%`
+  return (
+    <aside
+      className='rounded-[10px] border border-[#E8EAEE] bg-[#F7F8FA] px-3 py-2.5'
+      aria-label='최근 분석 결과 안내'
+    >
+      <div className='flex items-center gap-2'>
+        <History className='size-4 shrink-0 text-[#5A6473]' aria-hidden />
+        <div className='min-w-0 flex-1 text-[11.5px] leading-4 text-[#5A6473]'>
+          {formatSnapshotAge(scannedAt)}에 분석한 결과를 그대로 보여드려요
+          {typeof savedCredits === 'number' && savedCredits > 0 ? (
+            <span className='font-semibold text-[#0F1419]'> · {savedCredits}크레딧을 아꼈어요</span>
+          ) : null}
+        </div>
+        {onRefresh ? (
+          <button
+            type='button'
+            onClick={onRefresh}
+            className='shrink-0 cursor-pointer rounded-full border border-[#D5D8DD] bg-white px-3 py-1.5 text-[12px] font-semibold text-[#0F1419] transition-colors hover:bg-[#F0F1F3] active:scale-[0.98]'
+          >
+            다시 분석하기
+          </button>
+        ) : null}
+      </div>
+      {driftAlert ? (
+        <div className='mt-2 flex items-start gap-1.5 rounded-[8px] bg-[#FAEEDA] px-2.5 py-1.5 text-[12px] leading-4 text-[#854F0B]'>
+          <TriangleAlert className='mt-px size-3.5 shrink-0' aria-hidden />
+          <span>분석 이후 가격이 {driftText} 움직였어요 — 다시 분석하면 최신 상태가 반영돼요.</span>
+        </div>
+      ) : null}
+    </aside>
+  )
+}
+
+type WatchToggleProps = { code: string; name: string; market?: string }
+
+// '지켜보기 시작/그만두기' 토글 — 마운트 시 내 워치 목록을 조회해 상태를 표시한다.
+function WatchToggleButton({ code, name, market }: WatchToggleProps) {
+  const [watching, setWatching] = useState(false)
+  const [loaded, setLoaded] = useState(false)
+  const [pending, setPending] = useState(false)
+
+  useEffect(() => {
+    if (!code) return
+    let active = true
+    void (async () => {
+      try {
+        const res = await fetch('/api/watch')
+        if (!res.ok) return
+        const payload = (await res.json().catch(() => ({}))) as { rows?: { code: string }[] }
+        if (!active) return
+        setWatching((payload.rows ?? []).some((row) => row.code === code))
+      } catch {
+        // 조회 실패 시 미감시 상태로 시작 (등록 시 서버가 진실을 판정)
+      } finally {
+        if (active) setLoaded(true)
+      }
+    })()
+    return () => {
+      active = false
+    }
+  }, [code])
+
+  if (!code) return null
+
+  const toggle = async () => {
+    if (pending) return
+    if (watching && !window.confirm(`${name} 지켜보기를 그만둘까요?`)) return
+    setPending(true)
+    try {
+      const res = watching
+        ? await fetch(`/api/watch?code=${encodeURIComponent(code)}`, { method: 'DELETE' })
+        : await fetch('/api/watch', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ code, name, market }),
+          })
+      if (res.ok) {
+        setWatching(!watching)
+      } else {
+        const payload = (await res.json().catch(() => ({}))) as { error?: string }
+        window.alert(payload.error ?? '일시적인 문제예요. 잠시 후 다시 시도해주세요.')
+      }
+    } catch {
+      window.alert('네트워크 상태를 확인한 뒤 다시 시도해주세요.')
+    } finally {
+      setPending(false)
+    }
+  }
+
+  return (
+    <button
+      type='button'
+      onClick={() => void toggle()}
+      disabled={pending || !loaded}
+      className={`mt-3 flex w-full cursor-pointer items-center justify-center gap-1.5 rounded-[11px] px-3 py-[13px] text-[13.5px] font-bold transition-colors active:scale-[0.99] disabled:cursor-default disabled:opacity-60 ${
+        watching ? 'bg-white/10 text-white/85' : 'bg-white text-[#0F1419]'
+      }`}
+    >
+      {pending ? (
+        <Loader2 className='size-4 animate-spin' aria-hidden />
+      ) : watching ? (
+        <EyeOff className='size-4' aria-hidden />
+      ) : (
+        <Eye className='size-4' aria-hidden />
+      )}
+      {pending ? '잠시만 기다려주세요…' : watching ? '지켜보는 중입니다 · 그만두기' : '지켜보기 시작'}
+    </button>
   )
 }

@@ -1,4 +1,5 @@
 import type { ComponentType, ReactNode } from 'react'
+import type { LucideIcon } from 'lucide-react'
 import type { JarooDeepScanCommitteeAxis } from '../../packages/contracts/src/deepscan'
 import {
   Activity,
@@ -17,6 +18,8 @@ export type { LoadingBriefingDailyRow, LoadingBriefingSnapshot, MoneyCurrency, J
 
 export type DeepScanLoadingScreenProps = {
   name?: string
+  /** 스펙 spec_v7 §4 손익 인트로 멘트(예: "삼성전자, 거의 본전이네요"). 없으면 기존 안내 문구. */
+  introMention?: string | null
   identifier?: string
   market?: string
   instrumentKind?: string
@@ -38,12 +41,20 @@ export type DeepScanLoadingScreenProps = {
   visibleStageCount?: number
   arrivedStageKeys?: LoadingStageKey[]
   resultsReady?: boolean
+  /** 스냅샷 캐시 재사용 여부 — 완료 카드 문구를 '실제 분석 도착' 대신 '저장 결과 불러오기'로 바꾼다 */
+  snapshotCacheHit?: boolean
+  /** 캐시된 스냅샷의 원본 분석 시각(ISO) */
+  snapshotScannedAt?: string
   className?: string
   onBack?: () => void
   backHref?: string
   inlineResults?: ReactNode
-  errorNotice?: { title: string; body: string } | null
+  errorNotice?: { badge?: string; title: string; body: string } | null
   onRetry?: () => void
+  /** 재시도가 무의미한 오류(크레딧 부족 등)의 1차 액션 — 링크 버튼으로 렌더 */
+  errorPrimaryAction?: { label: string; href: string }
+  /** 결과 화면 최상단 안내(스냅샷 출처 바 등) — 헤더와 본문 사이에 렌더 */
+  headerNotice?: ReactNode
 }
 
 export type CommitteeMemberState = 'done' | 'active' | 'wait'
@@ -98,7 +109,9 @@ export type LoadingQuickFact = {
 export type LoadingStageKey = 'fundamentalTeam' | 'marketTeam' | 'contextTeam'
 export type PlaceholderStageKey = `pendingStage${number}`
 export type NarrativeCardKey = LoadingStageKey | PlaceholderStageKey
-export type NarrativeTone = 'positive' | 'warning' | 'neutral' | 'info'
+// NarrativeTone — 뱃지 색 계열:
+//   positive: 완료·성공 (초록/어두운 초록) · rise: 국내 금융 상승 (빨강 — quickFact 전용)
+export type NarrativeTone = 'positive' | 'rise' | 'warning' | 'neutral' | 'info'
 export type CommitteeTeamMemberDefinition = {
   sourceMemberKey?: string | string[]
   sourceTitle: string | string[]
@@ -108,7 +121,7 @@ export type CommitteeTeamDefinition = {
   key: LoadingStageKey
   analystName: string
   description: string
-  avatar: string
+  avatar: LucideIcon
   members: CommitteeTeamMemberDefinition[]
 }
 export type NarrativeCard = {
@@ -116,7 +129,7 @@ export type NarrativeCard = {
   teamKey?: LoadingStageKey
   analystName: string
   description: string
-  avatar: string
+  avatar: string | LucideIcon
   body: string
   tags: Array<{ text: string; tone: NarrativeTone }>
   statusLabel: string
@@ -185,7 +198,7 @@ export const committeeTeams: readonly CommitteeTeamDefinition[] = [
     key: 'fundamentalTeam',
     analystName: '가치·기본 팀',
     description: '가치 분석가 · 성장 전략가 · 재무 감사관',
-    avatar: '🏛️',
+    avatar: Landmark,
     members: [
       { sourceMemberKey: ['valuation', 'valuation'], sourceTitle: ['밸류에이션', '가격/NAV 단서', 'Valuation'], alias: '가치 분석가' },
       { sourceMemberKey: ['profitability', 'growth'], sourceTitle: ['수익성/기본체력', '상품 구조/운용 품질', 'Growth'], alias: '성장 전략가' },
@@ -196,7 +209,7 @@ export const committeeTeams: readonly CommitteeTeamDefinition[] = [
     key: 'marketTeam',
     analystName: '시장·차트 팀',
     description: '차트 마스터 · 수급 추적기 · 모멘텀 스카우터',
-    avatar: '📈',
+    avatar: TrendingUp,
     members: [
       { sourceMemberKey: ['priceLocation', 'momentum'], sourceTitle: ['가격 위치', 'Momentum'], alias: '차트 마스터' },
       { sourceMemberKey: ['avgPriceGap', 'estimate-revision'], sourceTitle: ['평단 격차', 'Revision'], alias: '수급 추적기' },
@@ -207,7 +220,7 @@ export const committeeTeams: readonly CommitteeTeamDefinition[] = [
     key: 'contextTeam',
     analystName: '심리·환경 팀',
     description: '심리 분석AI · 산업 전문가 · 이벤트 스캐너',
-    avatar: '🧠',
+    avatar: Brain,
     members: [
       { sourceMemberKey: ['holdingCompleteness', 'financial-safety'], sourceTitle: ['입력 완성도', 'Safety'], alias: '심리 분석AI' },
       { sourceMemberKey: ['upsideBuffer', 'ownership-flow'], sourceTitle: ['상방 버퍼', '상하방 여지', 'Ownership'], alias: '산업 전문가' },

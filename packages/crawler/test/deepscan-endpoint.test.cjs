@@ -168,3 +168,18 @@ test('GET explicit-source deepscan path maps thrown errors to a raw canonical in
     definition.handler = originalHandler;
   }
 });
+
+test('etf-market-committee endpoint is registered and rejects malformed codes with 400', async () => {
+  const { endpointDefinitions } = await import('../src/server.js');
+  const definition = endpointDefinitions.find((item) => item.id === 'etf-market-committee');
+
+  assert.ok(definition);
+  assert.equal(definition.primaryPath, '/api/source/deepscan/kr/etf/:code/committee');
+  assert.deepEqual(definition.params, ['code']);
+  assert.deepEqual(definition.query, ['shares(optional)', 'averagePrice(optional)', 'crawlerCacheBypass(optional, 1)']);
+
+  await assert.rejects(
+    () => definition.handler({ params: { code: 'VOO' }, query: {} }),
+    (error) => error.status === 400 && error.message === 'input-invalid',
+  );
+});

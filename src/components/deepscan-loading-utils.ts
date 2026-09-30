@@ -38,6 +38,18 @@ import {
   TODAY_BRIEFING_ITEM_SELECTOR,
 } from './deepscan-loading-types'
 
+/** 스냅샷 저장 시각(ISO) → '9월 8일' 라벨. 파싱 실패 시 null. */
+export function formatScannedAtLabel(scannedAt: string | undefined): string | null {
+  if (!scannedAt) {
+    return null
+  }
+  const date = new Date(scannedAt)
+  if (Number.isNaN(date.getTime())) {
+    return null
+  }
+  return new Intl.DateTimeFormat('ko-KR', { month: 'long', day: 'numeric' }).format(date)
+}
+
 export function formatElapsedTime(totalSeconds: number) {
   const minutes = Math.floor(totalSeconds / 60)
   const seconds = totalSeconds % 60
@@ -267,6 +279,10 @@ export function narrativeToneClass(tone: NarrativeTone) {
     return styles.narrativeTonePositive
   }
 
+  if (tone === 'rise') {
+    return styles.narrativeToneRise
+  }
+
   if (tone === 'warning') {
     return styles.narrativeToneWarning
   }
@@ -280,7 +296,8 @@ export function narrativeToneClass(tone: NarrativeTone) {
 
 export function quickFactToneToNarrativeTone(tone: LoadingQuickFact['tone']): NarrativeTone {
   if (tone === 'positive') {
-    return 'positive'
+    // 퀵팩트 positive는 시세 상승·컨센서스 긍정 등 금융 의미다 — 국내 관례(상승=빨강)의 rise 계열로.
+    return 'rise'
   }
 
   if (tone === 'warning') {
@@ -354,7 +371,25 @@ export function buildCommitteeTeamBody(
   }
 }
 
-export function buildCompletionState(resultsReady: boolean, elapsedSeconds: number): CompletionState {
+export function buildCompletionState(
+  resultsReady: boolean,
+  elapsedSeconds: number,
+  snapshotCacheHit = false,
+  snapshotScannedAt?: string,
+): CompletionState {
+  if (resultsReady && snapshotCacheHit) {
+    // 스냅샷 캐시 재사용 — 새 분석처럼 꾸미지 않고 저장 결과임을 명시한다.
+    const scannedLabel = formatScannedAtLabel(snapshotScannedAt)
+    return {
+      ready: true,
+      eyebrow: '불러오기 완료',
+      title: '저장해둔 분석 결과를 불러왔어요',
+      body: scannedLabel
+        ? `${scannedLabel}에 분석한 저장 결과를 즉시 불러왔습니다. 아래 결과 카드에서 이어서 확인하세요.`
+        : '저장된 분석 결과를 즉시 불러왔습니다. 아래 결과 카드에서 이어서 확인하세요.',
+    }
+  }
+
   if (resultsReady) {
     return {
       ready: true,
@@ -505,9 +540,16 @@ export function getTeamSummaryState(card: NarrativeCard, teamSummaries: Partial<
   }
 }
 
-export function buildNarrativeFallbackSummary(card: NarrativeCard, summaryFailed: boolean) {
-  if (card.placeholder || !card.complete) {
+export function buildNarrativeFallbackSummary(card: NarrativeCard, summaryFailed: boolean, resultsReady = false) {
+  if (card.placeholder) {
     return null
+  }
+  if (!card.complete) {
+    // 위원 응답이 영구 종결된 뒤(캐시 스토어 만료·서버 오류)에는 미도착 사실을
+    // 문구로 표시한다 — 종결 전에는 기존과 같이 스켈레톤이 담당한다.
+    return resultsReady
+      ? `${card.analystName}의 일부 위원 응답을 받지 못했어요. 도착한 응답만 결과에 반영했어요.`
+      : null
   }
 
   if (summaryFailed) {
@@ -521,24 +563,24 @@ export function buildNarrativeFallbackSummary(card: NarrativeCard, summaryFailed
   return null
 }
 
-export function hasNarrativeLoadingSkeleton(card: NarrativeCard, teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>) {
+export function hasNarrativeLoadingSkeleton(card: NarrativeCard, teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>, resultsReady = false) {
   if (card.placeholder) {
     return true
   }
 
   const { summaryText, summaryFailed } = getTeamSummaryState(card, teamSummaries)
-  const fallbackSummary = buildNarrativeFallbackSummary(card, Boolean(summaryFailed))
+  const fallbackSummary = buildNarrativeFallbackSummary(card, Boolean(summaryFailed), resultsReady)
 
   return !summaryText && !fallbackSummary
 }
 
-export function buildSequentialNarrativeCards(cards: NarrativeCard[], teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>) {
+export function buildSequentialNarrativeCards(cards: NarrativeCard[], teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>, resultsReady = false) {
   const sequentialCards: NarrativeCard[] = []
 
   for (const card of cards) {
     sequentialCards.push(card)
 
-    if (hasNarrativeLoadingSkeleton(card, teamSummaries)) {
+    if (hasNarrativeLoadingSkeleton(card, teamSummaries, resultsReady)) {
       break
     }
   }
@@ -633,6 +675,7 @@ export function buildChartGeometry(rows: LoadingBriefingDailyRow[], averagePrice
       areaPath: '',
       lastPoint: { x: 296, y: 36 },
       averageY: 35,
+      isProfit: undefined,
     }
   }
 
@@ -658,8 +701,11 @@ export function buildChartGeometry(rows: LoadingBriefingDailyRow[], averagePrice
   const averageY = isFiniteNumber(averagePriceValue)
     ? Math.round(clamp(bottom - ((averagePriceValue - minValue) / range) * (bottom - top), top, bottom) * 10) / 10
     : 35
-
-  return { hasData: true, linePath, areaPath, lastPoint, averageY }
+  // 지시사항(8/21 handoff §4): 한국 증시 관습 — 수익=빨강, 손실=파랑. 현재가(마지막 종가)와 평단 비교.
+  // 평단을 모르면(null) 수익 여부도 모르므로 기존 기본색(red)을 유지한다.
+  const lastValue = values[values.length - 1]
+  const isProfit = isFiniteNumber(averagePriceValue) && isFiniteNumber(lastValue) ? lastValue >= averagePriceValue : undefined
+  return { hasData: true, linePath, areaPath, lastPoint, averageY, isProfit }
 }
 
 /**

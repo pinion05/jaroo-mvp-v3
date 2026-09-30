@@ -559,3 +559,30 @@ test('home current quote hydrate는 일치하는 quote가 없으면 원본을 �
 
   assert.deepEqual(updated, original)
 })
+
+test('거래량 0 시세는 거래 정지 카드로 표시하고 정지 전 종가로 손익을 계산한다', () => {
+  const [updated] = applyCurrentQuotesToHomeHoldings(
+    [createHolding({
+      name: '유틸렉스',
+      code: '263050',
+      shortName: '유틸렉스',
+      donutLabel: '유틸렉스',
+      shares: '200주',
+      averagePrice: '2,400원',
+      identifierCode: '263050',
+    })],
+    [{ market: 'KR', code: '263050', ticker: null, price: 959, volume: 0, currency: 'KRW', asOf: '2026-09-16T10:11:21+09:00', source: 'naver-finance', status: 'ok' }],
+  )
+
+  assert.equal(updated.cardTone, 'halt')
+  assert.equal(updated.change, '거래 정지')
+  assert.equal(updated.badge, '거래 정지')
+  assert.equal(updated.badgeTone, 'red')
+  assert.equal(updated.centerScore, '정지')
+  assert.equal(updated.signalTone, 'halt')
+  assert.equal(updated.blink, true)
+  assert.equal(updated.heatmapMeta, '거래정지')
+  // 손익은 정지 전 종가 기준: 200주 × (959 - 2,400) = -288,200원
+  assert.equal(updated.pnl, '-288,200원')
+  assert.equal(updated.metrics.some((metric) => metric.label === '수익률' && metric.value === '거래 정지'), true)
+})

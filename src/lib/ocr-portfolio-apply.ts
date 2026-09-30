@@ -1,5 +1,6 @@
 import { buildHomeHoldingsFromPortfolioItems, persistAppliedHomePortfolio, type AppliedHomePortfolioRow } from '@/lib/jaroo-home-data'
-import { computeAveragePrice } from '@/lib/screenshot-ocr'
+import { fetchHomeQuoteResponseWithTimeout } from '@/lib/home-quote-bootstrap'
+import { formatComputedNumber, parseOcrProfitRate } from '@/lib/screenshot-ocr'
 import {
   createMergeRowId,
   getApplicableConfirmedHoldings,
@@ -25,28 +26,151 @@ export function isMissingAveragePrice(value: string) {
   return normalizedValue.toLowerCase().replace(/[./\s]/g, '') === 'na'
 }
 
-export function prepareMergeRowsForApply<T extends { averagePrice: string; quantity: string; profitAmount?: string; profitRate: string; evaluationAmount: string }>(rows: T[]) {
+// 평단이 화면에 없는 행의 적용 시점 보강(2026-09-29): OCR 스키마에서 평가금액·손익금액을
+// 제거하면서 평단 역산 재료가 사라졌다. 적용 게이트가 종목 resolve를 강제하므로 현재 시세는
+// 항상 조회 가능하고, avg = 현재가 ÷ (1 + 수익률/100)로 역산한다. 스크린샷 이후 시세 변동과
+// 수익률 반올림 오차가 묻는 근사값이다.
+export function deriveAveragePriceFromCurrentPrice(currentPrice: number, profitRate?: number) {
+  const divisor = 1 + ((profitRate ?? 0) / 100)
+
+  if (!Number.isFinite(currentPrice) || currentPrice <= 0 || !Number.isFinite(divisor) || divisor <= 0) {
+    return null
+  }
+
+  const averagePrice = currentPrice / divisor
+
+  return Number.isFinite(averagePrice) && averagePrice > 0 ? averagePrice : null
+}
+
+function buildQuoteLookupKeyFromReviewRow(
+  row: Pick<OcrReviewRow, 'resolvedMarketTone' | 'resolvedCode' | 'resolvedTicker' | 'code' | 'ticker'>,
+) {
+  if (row.resolvedMarketTone === 'nasdaq') {
+    return (row.resolvedTicker ?? row.ticker)?.trim().toUpperCase() || undefined
+  }
+
+  return (row.resolvedCode ?? row.code)?.trim() || undefined
+}
+
+const AVERAGE_PRICE_FILL_TIMEOUT_MS = 10_000
+
+export async function fillMissingAveragePricesFromQuotes<T extends OcrReviewRow>(
+  rows: T[],
+  fetcher: typeof fetch = fetch,
+  options: { quoteTimeoutMs?: number } = {},
+): Promise<T[]> {
+  if (rows.every((row) => !isMissingAveragePrice(row.averagePrice))) {
+    return rows
+  }
+
+  const codes = new Set<string>()
+  const tickers = new Set<string>()
+
+  for (const row of rows) {
+    if (!isMissingAveragePrice(row.averagePrice)) {
+      continue
+    }
+
+    const lookupKey = buildQuoteLookupKeyFromReviewRow(row)
+    if (!lookupKey) {
+      continue
+    }
+
+    if (row.resolvedMarketTone === 'nasdaq') {
+      tickers.add(lookupKey)
+    } else {
+      codes.add(lookupKey)
+    }
+  }
+
+  const searchParams = new URLSearchParams()
+  if (codes.size > 0) {
+    searchParams.set('codes', [...codes].join(','))
+  }
+  if (tickers.size > 0) {
+    searchParams.set('tickers', [...tickers].join(','))
+  }
+  const quoteQuery = searchParams.toString()
+
+  if (!quoteQuery) {
+    return rows
+  }
+
+  type QuoteItem = {
+    market?: string | null
+    code?: string | null
+    ticker?: string | null
+    price?: number | null
+    status?: string | null
+  }
+
+  let quoteItems: QuoteItem[]
+
+  try {
+    const response = await fetchHomeQuoteResponseWithTimeout(
+      fetcher,
+      `/api/quotes/current?${quoteQuery}`,
+      { cache: 'no-store' },
+      options.quoteTimeoutMs ?? AVERAGE_PRICE_FILL_TIMEOUT_MS,
+    )
+
+    if (!response.ok) {
+      return rows
+    }
+
+    const payload = await response.json()
+    quoteItems = Array.isArray(payload?.data?.items) ? payload.data.items : []
+  } catch {
+    return rows
+  }
+
+  const pricesByLookupKey = new Map<string, number>()
+
+  for (const item of quoteItems) {
+    const lookupKey = item.market === 'US' ? item.ticker?.trim().toUpperCase() : item.code?.trim()
+
+    if (lookupKey && item.status === 'ok' && typeof item.price === 'number') {
+      pricesByLookupKey.set(lookupKey, item.price)
+    }
+  }
+
   return rows.map((row) => {
     if (!isMissingAveragePrice(row.averagePrice)) {
-      return { ...row }
+      return row
+    }
+
+    const lookupKey = buildQuoteLookupKeyFromReviewRow(row)
+    const currentPrice = lookupKey ? pricesByLookupKey.get(lookupKey) : undefined
+
+    if (typeof currentPrice !== 'number') {
+      return row
+    }
+
+    const averagePrice = deriveAveragePriceFromCurrentPrice(currentPrice, parseOcrProfitRate(row.profitRate) ?? undefined)
+
+    return averagePrice === null ? row : { ...row, averagePrice: formatComputedNumber(averagePrice) }
+  })
+}
+
+// 보강 이후에도 평단이 없는 행(시세 조회 실패 등)은 적용에서 제외한다.
+export function markMissingAveragePriceErrors(rows: MergeRow[]): MergeRow[] {
+  return rows.map((row) => {
+    if (row.status === 'error' || !isMissingAveragePrice(row.averagePriceText)) {
+      return row
     }
 
     return {
       ...row,
-      averagePrice: computeAveragePrice(row.quantity, row.profitRate, row.evaluationAmount, row.profitAmount ?? ''),
+      status: 'error',
+      errorCode: 'merge-average-price-missing',
+      errorMessage: '현재 시세로 평단을 계산하지 못했어요. 평단을 직접 입력한 뒤 다시 시도해주세요.',
     }
   })
 }
 
 export function buildMergeRowsFromReviewRows(rows: OcrReviewRow[]): MergeRow[] {
   return rows.map((row) => {
-    const preparedReviewRow = {
-      ...row,
-      averagePrice: isMissingAveragePrice(row.averagePrice)
-        ? computeAveragePrice(row.quantity, row.profitRate, row.evaluationAmount, row.profitAmount ?? '')
-        : row.averagePrice,
-    }
-    const confirmedHolding = toConfirmedHolding(preparedReviewRow)
+    const confirmedHolding = toConfirmedHolding(row)
     const mergeRow: MergeRow = {
       id: createMergeRowId(row.id, confirmedHolding.displayName),
       sourceRowId: row.id,
@@ -63,7 +187,10 @@ export function buildMergeRowsFromReviewRows(rows: OcrReviewRow[]): MergeRow[] {
       }
     }
 
-    if (!toPortfolioNormalizedItem(confirmedHolding)) {
+    // 평단이 비어 있어도 여기서 error로 만들지 않는다. 적용 시점 보강
+    // (fillMissingAveragePricesFromQuotes)이 채울 수 있고, 채워지지 않으면
+    // markMissingAveragePriceErrors가 그때 제외 표시한다.
+    if (!confirmedHolding.displayName.trim() || typeof confirmedHolding.quantityValue !== 'number') {
       return {
         ...mergeRow,
         status: 'error',

@@ -53,6 +53,23 @@ test('DeepScanInlineResults falls back when committee and strategy blocks are un
   assert.match(markup, /전략 원천 차단/)
 })
 
+test('DeepScanInlineResults drops the legacy residual thesis-maintenance scenario row from cached payloads', () => {
+  const payload = basePayload()
+  payload.strategy = {
+    ...payload.strategy,
+    otherScenarios: [
+      { label: '근거 유지', probability: '20%', condition: '현재가 1,755,000원 확인' },
+      { label: '리스크 재점검', probability: '20%', condition: '자본변동 공시 2건 확인' },
+    ],
+  }
+  const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
+
+  assert.doesNotMatch(markup, /근거 유지/)
+  assert.doesNotMatch(markup, /현재가 1,755,000원 확인/)
+  assert.match(markup, /리스크 재점검/)
+  assert.match(markup, /자본변동 공시 2건 확인/)
+})
+
 test('DeepScanInlineResults treats non-numeric price fields as unknown instead of zero', () => {
   const payload = basePayload()
   payload.strategy = {
@@ -105,4 +122,81 @@ test('DeepScanInlineResults uses ETF-native labels instead of target-price upsid
   assert.doesNotMatch(markup, /증권사 의견/)
   assert.doesNotMatch(markup, />목표가</)
   assert.doesNotMatch(markup, /상승 여력/)
+})
+
+test('DeepScanInlineResults folds detail behind 자세히 보기 without numbered badges or committee axes and hides raw scores', () => {
+  const payload = basePayload()
+  payload.insights.items[0].consensus = { targetPrice: 17500, highestTargetPrice: 18400, lowestTargetPrice: 16200, analystCount: 12, recommendation: '매수', opinionSummary: '상승 여력이 남아 있다는 중론입니다.' }
+  const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
+
+  assert.match(markup, /자세히 보기/)
+  assert.match(markup, /aria-expanded="false"/)
+  assert.match(markup, /추천 시나리오 · 목표가 근거/)
+  assert.doesNotMatch(markup, /세 팀 의견/)
+  assert.match(markup, /목표가 근거/)
+  assert.match(markup, /증권사 12개/)
+  assert.match(markup, /17,500원/)
+  // 목표가가 현재가(14,185원)보다 높으면 빨강 — 평균·최고·최저 모두 적용
+  assert.match(markup, /jaroo-profit\)\][^<]*>17,500원/)
+  assert.match(markup, /jaroo-profit\)\][^<]*>18,400원/)
+  assert.match(markup, /jaroo-profit\)\][^<]*>16,200원/)
+  assert.doesNotMatch(markup, /위원 평균|70점|\/ 100/)
+})
+
+test('DeepScanInlineResults colors target prices below the current price blue', () => {
+  const payload = basePayload()
+  payload.insights.items[0].consensus = { targetPrice: 13000, highestTargetPrice: 18500, lowestTargetPrice: 12500, analystCount: 8, recommendation: '중립' }
+  const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
+
+  // 현재가(14,185원)보다 낮은 평균·최저 목표가는 파랑, 높은 최고 목표가는 빨강
+  assert.match(markup, /jaroo-loss\)\][^<]*>13,000원/)
+  assert.match(markup, /jaroo-loss\)\][^<]*>12,500원/)
+  assert.match(markup, /jaroo-profit\)\][^<]*>18,500원/)
+})
+
+test('DeepScanInlineResults colors the strength label and gauge by the agreed tone rule', () => {
+  const neutralPlus = basePayload()
+  neutralPlus.hero = { ...neutralPlus.hero, score: 58 }
+  const neutralPlusMarkup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload: neutralPlus }))
+  assert.match(neutralPlusMarkup, /중립\+/)
+  assert.match(neutralPlusMarkup, /leading-none text-\[color:var\(--jaroo-flat\)\][^>]*>중립\+</)
+  assert.match(neutralPlusMarkup, /bg-\[color:var\(--jaroo-flat\)\]/)
+
+  const neutral = basePayload()
+  neutral.hero = { ...neutral.hero, score: 48 }
+  const neutralMarkup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload: neutral }))
+  assert.match(neutralMarkup, /leading-none text-\[color:var\(--jaroo-flat\)\][^>]*>중립</)
+
+  const caution = basePayload()
+  caution.hero = { ...caution.hero, score: 30 }
+  const cautionMarkup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload: caution }))
+  assert.match(cautionMarkup, /leading-none text-\[color:var\(--jaroo-loss\)\][^>]*>주의</)
+  assert.doesNotMatch(cautionMarkup, /--jaroo-flat/)
+
+  // 기본 payload(score 68)는 강세 — 빨강 유지
+  const bullMarkup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload: basePayload() }))
+  assert.match(bullMarkup, /leading-none text-\[color:var\(--jaroo-profit\)\][^>]*>강세</)
+  assert.doesNotMatch(bullMarkup, /--jaroo-flat/)
+})
+
+test('DeepScanInlineResults colors negative upside blue and positive upside red', () => {
+  const payload = basePayload()
+  payload.strategy = { ...payload.strategy, currentPriceText: '20,000원', targetPriceText: '17,500원' }
+  const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
+  // (17,500 / 20,000 - 1) * 100 = −12.5%
+  assert.match(markup, /jaroo-loss\)\][^<]*>−12\.5%/)
+  assert.doesNotMatch(markup, /jaroo-profit\)\][^<]*>−12\.5%/)
+})
+
+test('DeepScanInlineResults hides target-price section and consensus for ETF', () => {
+  const payload = basePayload()
+  payload.input.instrument = { name: 'KODEX 코스피', code: '226490', market: 'ETF', kind: 'etf' }
+  payload.insights.items[0].consensus = { targetPrice: 29999, analystCount: 12, recommendation: '매수', highestTargetPrice: 32000 }
+  const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
+
+  assert.match(markup, /가격 근거/)
+  assert.match(markup, /ETF 기준/)
+  assert.doesNotMatch(markup, /목표가 근거/)
+  assert.doesNotMatch(markup, /증권사 12개/)
+  assert.doesNotMatch(markup, /29,999|32,000원/)
 })

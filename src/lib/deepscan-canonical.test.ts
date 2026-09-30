@@ -236,14 +236,25 @@ test('fetchDeepScanCanonicalPayload는 canonical body를 그대로 파싱해 반
   assert.deepEqual(fetched, payload)
 })
 
-test('fetchDeepScanCanonicalPayload는 local proxy failure JSON을 canonical payload와 구분한다', async () => {
+test('fetchDeepScanCanonicalPayload는 서버 안내 메시지를 Error로 전달한다 (§6-6)', async () => {
+  await assert.rejects(
+    fetchDeepScanCanonicalPayload(createTargetSession(), async () => new Response(JSON.stringify({
+      ok: false,
+      data: null,
+      count: 0,
+      error: {
+        message: '딥스캔 분석이 실패했어요. 크레딧은 차감되지 않았어요. 잠시 후 다시 시도해 주세요.',
+      },
+    }), { status: 400 })),
+    /크레딧은 차감되지 않았어요/,
+  )
+})
+
+test('fetchDeepScanCanonicalPayload는 안내 메시지 없는 비-canonical 응답을 null로 구분한다', async () => {
   const fetched = await fetchDeepScanCanonicalPayload(createTargetSession(), async () => new Response(JSON.stringify({
     ok: false,
     data: null,
     count: 0,
-    error: {
-      message: 'network down',
-    },
   }), { status: 400 }))
 
   assert.equal(fetched, null)

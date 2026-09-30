@@ -257,16 +257,12 @@ export function parseOcrProfitRate(value: string) {
 }
 
 export function formatComputedNumber(value: number) {
-  const roundedValue = Number(value.toFixed(4))
-
-  if (!Number.isFinite(roundedValue)) {
+  // §5-4: 평단·금액·수량은 정수 반올림 (비율은 별도 formatter 사용)
+  if (!Number.isFinite(value)) {
     return ''
   }
 
-  return roundedValue.toLocaleString('ko-KR', {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 4,
-  })
+  return Math.round(value).toLocaleString('ko-KR')
 }
 
 export function computeAveragePrice(
@@ -283,24 +279,40 @@ export function computeAveragePrice(
   }
 
   const parsedProfitAmount = parseOcrNumber(profitAmount)
-  if (parsedProfitAmount !== null) {
-    const principalFromAmount = parsedEvaluationAmount - parsedProfitAmount
-    if (Number.isFinite(principalFromAmount) && principalFromAmount > 0) {
-      return formatComputedNumber(principalFromAmount / parsedQuantity)
-    }
-  }
-
+  const principalFromAmount = parsedProfitAmount !== null ? parsedEvaluationAmount - parsedProfitAmount : null
   const parsedProfitRate = parseOcrProfitRate(profitRate)
-  if (parsedProfitRate === null) {
+  const principalDivisor = parsedProfitRate !== null ? 1 + (parsedProfitRate / 100) : null
+  const principalFromRate = principalDivisor !== null && Number.isFinite(principalDivisor) && principalDivisor > 0
+    ? parsedEvaluationAmount / principalDivisor
+    : null
+
+  const principal = (() => {
+    if (principalFromAmount !== null && Number.isFinite(principalFromAmount) && principalFromAmount > 0) {
+      if (principalFromRate !== null) {
+        // 부호 정렬: 파이프라인 정규화(normalizeOcrProfitRate)가 손익금액 부호를 rate에 상속하므로,
+        // 비교 시에도 rate 부호를 손익금액에 맞춰 정렬한다. 잡아야 할 오독은 부호가 아니라 크기(배수) 어긋남이다.
+        const alignedRateSign = parsedProfitAmount !== null && parsedProfitAmount !== 0 && parsedProfitRate !== null && Math.sign(parsedProfitRate) !== Math.sign(parsedProfitAmount)
+          ? -parsedProfitRate
+          : parsedProfitRate
+        const alignedDivisor = alignedRateSign !== null ? 1 + (alignedRateSign / 100) : null
+        const alignedPrincipalFromRate = alignedDivisor !== null && Number.isFinite(alignedDivisor) && alignedDivisor > 0
+          ? parsedEvaluationAmount / alignedDivisor
+          : null
+
+        if (alignedPrincipalFromRate !== null && Math.abs(principalFromAmount - alignedPrincipalFromRate) > Math.abs(principalFromAmount) * 0.05) {
+          return null
+        }
+      }
+      return principalFromAmount
+    }
+    return principalFromRate
+  })()
+
+  if (principal === null || !Number.isFinite(principal)) {
     return ''
   }
 
-  const principalDivisor = 1 + (parsedProfitRate / 100)
-  if (!Number.isFinite(principalDivisor) || principalDivisor <= 0) {
-    return ''
-  }
-
-  const averagePrice = (parsedEvaluationAmount / principalDivisor) / parsedQuantity
+  const averagePrice = principal / parsedQuantity
   return Number.isFinite(averagePrice) && averagePrice > 0 ? formatComputedNumber(averagePrice) : ''
 }
 
@@ -346,11 +358,12 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
       const name = typeof item.name === 'string' ? item.name.trim() : ''
       const quantity = typeof item.quantity === 'string' ? item.quantity.trim() : ''
       const rawProfitRate = typeof item.profitRate === 'string' ? item.profitRate.trim() : ''
-      const rawProfitAmount = typeof item.profitAmount === 'string' ? item.profitAmount.trim() : ''
-      const profitAmount = normalizeOcrProfitAmount(rawProfitAmount, rawProfitRate)
-      const profitRate = normalizeOcrProfitRate(rawProfitRate, profitAmount)
+      // 손익금액·평가금액은 OCR 스키마에서 제거됐다(2026-09-29). 수동 입력·레거시 행만
+      // passthrough하며, 여기서 정규화·역산을 하지 않는다.
+      const profitAmount = typeof item.profitAmount === 'string' ? item.profitAmount.trim() : undefined
       const evaluationAmount = typeof item.evaluationAmount === 'string' ? item.evaluationAmount.trim() : ''
       const averagePrice = typeof item.averagePrice === 'string' ? item.averagePrice.trim() : ''
+      const profitRate = normalizeOcrProfitRate(rawProfitRate, profitAmount ?? '')
       const code = normalizeInstrumentCode(item.code)
       const ticker = normalizeInstrumentCode(item.ticker)
       const resolvedName = typeof item.resolvedName === 'string' ? item.resolvedName.trim() : undefined
@@ -366,10 +379,10 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
       return {
         name,
         quantity,
-        profitAmount,
+        profitAmount: profitAmount || undefined,
         profitRate,
         evaluationAmount,
-        averagePrice: averagePrice || computeAveragePrice(quantity, profitRate, evaluationAmount, profitAmount),
+        averagePrice,
         code,
         ticker,
         resolvedName,
@@ -380,7 +393,7 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
         resolvedKind,
       }
     })
-    .filter((item) => item.name.length > 0 || item.quantity.length > 0 || Boolean(item.profitAmount) || item.profitRate.length > 0 || item.evaluationAmount.length > 0)
+    .filter((item) => item.name.length > 0 || item.quantity.length > 0 || item.profitRate.length > 0 || item.evaluationAmount.length > 0)
 }
 
 export function sanitizeOcrInstrumentCandidates(input: unknown): OcrInstrumentCandidate[] {

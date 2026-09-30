@@ -2,6 +2,34 @@ import { NextRequest, NextResponse } from 'next/server'
 
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 import { recordDeepScanCommitteeProgressPerf } from '@/lib/deepscan-runtime/perf-trace'
+import { buildCommitteeWritebackPayload } from '@/lib/deepscan-committee-writeback'
+import { lookupDeepScanSnapshot, updateSnapshotCommitteePayload } from '@/lib/deepscan-snapshot-store'
+import { createSupabaseServerClient } from '@/lib/supabase/server'
+import type { JarooDeepScanPayload } from '../../../../../packages/contracts/src/deepscan'
+
+/** 위원회 완성 axes를 세션 유저의 스냅샷에 병합 저장한다(가드: 기존보다 의견이 많을 때만). */
+async function writeBackCommitteeAxes(snapshotKey: string, axes: unknown): Promise<void> {
+  try {
+    const supabase = await createSupabaseServerClient()
+    const {
+      data: { user },
+    } = await supabase.auth.getUser()
+    if (!user) return
+
+    const snapshot = await lookupDeepScanSnapshot(user.id, snapshotKey)
+    if (!snapshot) return
+
+    const merged = buildCommitteeWritebackPayload(snapshot.payload as JarooDeepScanPayload, axes)
+    if (!merged) return
+
+    const saved = await updateSnapshotCommitteePayload(user.id, snapshotKey, merged)
+    if (saved) {
+      console.log('[committee-status] snapshot committee writeback ok', { snapshotKey })
+    }
+  } catch (error) {
+    console.error('[committee-status] snapshot committee writeback failed', error)
+  }
+}
 
 export const runtime = 'nodejs'
 
@@ -67,6 +95,12 @@ export async function GET(request: NextRequest) {
 
     if (progress) {
       void recordDeepScanCommitteeProgressPerf(progress, { route: 'api/deepscan/committee-status' }).catch(() => undefined)
+      // 위원회 완성 시점에 스냅샷에 쓰래백한다(원인: 빈 껍데기 스냅샷 고착).
+      // 요청 응답을 막지 않는다 — 실패해도 폴링 응답은 그대로 간다.
+      const snapshotKey = request.nextUrl.searchParams.get('snapshotKey')?.trim()
+      if (progress.status === 'complete' && snapshotKey) {
+        void writeBackCommitteeAxes(snapshotKey, progress.committeeAxes).catch(() => undefined)
+      }
     }
 
     return new NextResponse(body, {

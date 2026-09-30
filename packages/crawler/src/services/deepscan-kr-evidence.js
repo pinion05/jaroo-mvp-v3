@@ -223,7 +223,13 @@ function resolveKnownPageIds(slimSource, slimPages) {
 }
 
 function formatNumber(value) {
-  return Number.isInteger(value) ? String(value) : String(Number(value));
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return String(value);
+  }
+
+  return Number.isInteger(value)
+    ? value.toLocaleString('en-US')
+    : Number(value).toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
 function normalizeLabel(value) {
@@ -515,8 +521,48 @@ function isConsensusOpinionRow(row) {
   const estimator = normalizeText(row?.추정기관 ?? row?.기관 ?? row?.broker ?? row?.증권사);
   return estimator ? /consensus|컨센서스/i.test(estimator) : false;
 }
+// 증권사별 목표가 상세({ name, targetPrice, date }) 목록을 검증·정규화한다.
+// 네이버 폴백 합성 행의 analystBrokers(증권사명·발표일·최신 목표가)가 유일한 공급원이다.
+function normalizeAnalystBrokers(list) {
+  if (!Array.isArray(list)) {
+    return null;
+  }
+
+  const brokers = list
+    .map((entry) => ({
+      name: normalizeEvidenceText(entry?.name),
+      targetPrice: normalizeNumber(entry?.targetPrice),
+      date: normalizeEvidenceText(entry?.date),
+    }))
+    .filter((entry) => entry.name !== null && entry.targetPrice !== null && entry.targetPrice > 0)
+    .map((entry) => ({ name: entry.name, targetPrice: entry.targetPrice, date: entry.date }));
+
+  return brokers.length > 0 ? brokers : null;
+}
 
 function extractAnalystTargetStats(opinionPage) {
+  // 네이버 폴백 합성 행은 증권사별 집계(최고/최저/증권사 수)를 요약 필드로 이미 갖고 있다.
+  // slim 파이프라인에서 합성 행이 opinion 페이지 '루트'에 위치할 수 있어 루트도 후보에 포함한다.
+  const candidateRows = [...collectRows(opinionPage)];
+  if (opinionPage && typeof opinionPage === 'object' && !Array.isArray(opinionPage)) {
+    candidateRows.push(opinionPage);
+  }
+  const syntheticSummary = candidateRows
+    .map((row) => ({
+      highest: normalizeNumber(row?.최고목표주가),
+      lowest: normalizeNumber(row?.최저목표주가),
+      count: normalizeNumber(row?.증권사수),
+    }))
+    .find((entry) => entry.highest !== null || entry.lowest !== null || (entry.count !== null && entry.count > 0));
+  if (syntheticSummary) {
+    return {
+      analystCount: syntheticSummary.count,
+      highestTargetPrice: syntheticSummary.highest,
+      lowestTargetPrice: syntheticSummary.lowest,
+      brokers: normalizeAnalystBrokers(opinionPage?.analystBrokers),
+    };
+  }
+
   const targetRows = collectRows(opinionPage)
     .map((row) => ({
       row,
@@ -532,13 +578,23 @@ function extractAnalystTargetStats(opinionPage) {
       analystCount: null,
       highestTargetPrice: null,
       lowestTargetPrice: null,
+      brokers: null,
     };
   }
+
+  const rowBrokers = brokerRows
+    .map((item) => ({
+      name: normalizeEvidenceText(item.row?.추정기관 ?? item.row?.기관 ?? item.row?.broker ?? item.row?.증권사),
+      targetPrice: item.targetPrice,
+      date: normalizeEvidenceText(item.row?.날짜 ?? item.row?.작성일 ?? item.row?.발표일 ?? item.row?.writeDate),
+    }))
+    .filter((entry) => entry.name !== null);
 
   return {
     analystCount: brokerRows.length > 0 ? brokerRows.length : null,
     highestTargetPrice: targetPrices.length > 1 ? Math.max(...targetPrices) : null,
     lowestTargetPrice: targetPrices.length > 1 ? Math.min(...targetPrices) : null,
+    brokers: rowBrokers.length > 0 ? rowBrokers : null,
   };
 }
 
@@ -659,6 +715,7 @@ function extractConsensusSnapshot(consensusPage, opinionPage, currentPrice, opti
     recommendationCounts: null,
     analystCount: analystTargetStats.analystCount,
     highestTargetPrice: analystTargetStats.highestTargetPrice,
+    analystBrokers: normalizeAnalystBrokers(opinionPage?.analystBrokers) ?? analystTargetStats.brokers,
     lowestTargetPrice: analystTargetStats.lowestTargetPrice,
     revisionDirection: resolveRevisionDirection(revisionPct),
     revisionPct,
@@ -1247,18 +1304,18 @@ function buildDisclosureFact(disclosureAnalysis) {
 
   const count = disclosureAnalysis.count ?? disclosureAnalysis.totalCount ?? 0;
   if (count === 0) {
-    return '최근 OpenDART 공시 없음';
+    return '최근 공시 없음';
   }
 
   if (disclosureAnalysis.riskCount > 0) {
-    return `최근 OpenDART 공시 ${formatNumber(count)}건 / 주요 리스크 ${formatNumber(disclosureAnalysis.riskCount)}건 확인`;
+    return `최근 공시 ${formatNumber(count)}건 / 주요 리스크 ${formatNumber(disclosureAnalysis.riskCount)}건 확인`;
   }
 
   if (disclosureAnalysis.ownershipCount > 0) {
-    return `최근 OpenDART 공시 ${formatNumber(count)}건 / 지분공시 ${formatNumber(disclosureAnalysis.ownershipCount)}건 확인`;
+    return `최근 공시 ${formatNumber(count)}건 / 지분공시 ${formatNumber(disclosureAnalysis.ownershipCount)}건 확인`;
   }
 
-  return `최근 OpenDART 공시 ${formatNumber(count)}건 확인`;
+  return `최근 공시 ${formatNumber(count)}건 확인`;
 }
 
 function buildDisclosureRisk(disclosureAnalysis) {
@@ -1414,13 +1471,15 @@ function buildTopFacts({ currentQuote, holding, pageCoverage, reportSignals, etf
   const facts = [];
 
   if (currentQuote) {
-    const priceText = `현재가 ${formatNumber(currentQuote.price)}${currentQuote.currency ? ` ${currentQuote.currency}` : ''} 확인`;
+    const priceText = currentQuote.currency === 'KRW'
+      ? `현재가 ${formatNumber(currentQuote.price)}원 확인`
+      : `현재가 ${formatNumber(currentQuote.price)}${currentQuote.currency ? ` ${currentQuote.currency}` : ''} 확인`;
     facts.push(priceText);
   }
 
   if (holding.hasHoldingContext) {
     if (holding.shares !== null && holding.averagePrice !== null) {
-      facts.push(`보유 ${formatNumber(holding.shares)}주 / 평단 ${formatNumber(holding.averagePrice)} 확인`);
+      facts.push(`보유 ${formatNumber(holding.shares)}주 / 평단 ${formatNumber(holding.averagePrice)}원 확인`);
     } else {
       facts.push('보유 맥락 일부 확인');
     }
@@ -1484,9 +1543,9 @@ function buildTopRisks({ currentQuote, holding, pageCoverage, sourceCoverage, is
 
   if (pageCoverage.availableCount === 0) {
     risks.push('KR 리포트 페이지 근거 없음');
-  } else if (pageCoverage.missingPageIds.length > 0) {
-    risks.push(`미확보 KR 페이지 ${pageCoverage.missingPageIds.length}건`);
   }
+  // '미확보 KR 페이지 N건'은 내부 페이지 커버리지 정보라 사용자 노출에서 제외(2026-09-23) —
+  // 커버리지 수치는 pageCoverage 필드로 그대로 남는다.
 
   return risks.slice(0, 3);
 }

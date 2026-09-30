@@ -96,7 +96,7 @@ test('createDeepScanCanonicalResponse는 internal builder 예외를 local JSON e
     data: null,
     count: 0,
     error: {
-      message: 'builder down',
+      message: '딥스캔에 일시적인 문제가 생겼어요. 잠시 후 다시 시도해 주세요.',
     },
   })
 })
@@ -168,7 +168,7 @@ test('GET은 KR crawler admission failure status를 보존한다', async () => {
     const body = await response.json()
 
     assert.equal(response.status, 429)
-    assert.equal(body.error.message, 'KR DeepScan crawler is busy')
+    assert.equal(body.error.message, '딥스캔에 일시적인 문제가 생겼어요. 잠시 후 다시 시도해 주세요.')
   } finally {
     global.fetch = originalFetch
     if (originalCrawlerBaseUrl === undefined) {
@@ -182,4 +182,69 @@ test('GET은 KR crawler admission failure status를 보존한다', async () => {
       process.env.DEEPSCAN_KR_BUSY_MAX_WAIT_MS = originalBusyMaxWaitMs
     }
   }
+})
+
+
+test('createDeepScanCanonicalResponse는 성공 시 onPayload 훅(스냅샷 저장 지점)을 호출한다', async () => {
+  let hookCalls = 0
+  let seenDebugId: string | undefined
+  const response = await createDeepScanCanonicalResponse(
+    new URLSearchParams('market=US&ticker=NVDA&name=NVIDIA'),
+    async () => ({
+      input: {
+        instrument: { name: 'NVIDIA', ticker: 'NVDA', market: 'US' },
+        sourceContext: { from: 'holding' },
+      },
+      hero: {
+        blockState: 'ok', sourceRefs: [], fallback: null, error: null,
+        headline: 'NVIDIA US DeepScan 70점', body: 'body', statusText: '우세',
+        score: 70, scoreLabel: 'strong · 70 / 100', scoreDelta: '+0',
+      },
+      committee: { blockState: 'ok', sourceRefs: [], fallback: null, error: null, axes: [] },
+      insights: { blockState: 'ok', sourceRefs: [], fallback: null, error: null, sectionLabel: '이번 주 체크포인트', items: [], summaryTags: [] },
+      strategy: {
+        blockState: 'ok', sourceRefs: [], fallback: null, error: null,
+        weekSignal: '보유 유지', weekSignalTone: 'positive', weekBadgeText: '위원회 70점',
+        scenarioLabel: '기본 시나리오', scenarioProbability: '70%', scenarioPeriod: '약 3개월', scenarioCondition: 'cond',
+        currentPriceText: '$100.00', targetPriceText: '$110.00', scenarioDetails: [], otherScenarios: [], otherScenarioTags: [],
+      },
+      sellNow: { blockState: 'ok', sourceRefs: [], fallback: null, error: null, realizedText: 'text', rows: [] },
+      portfolioSimulation: { blockState: 'ok', sourceRefs: [], fallback: null, error: null, beforeScore: 70, afterScore: 76, deltaLabel: 'hold:+6', caption: 'caption' },
+      metadata: {
+        generatedAt: '2026-04-17T00:00:00.000Z',
+        version: 'test',
+        degraded: false,
+        debugId: 'deepscan:US:NVDA',
+        inputValidity: { valid: true, raw: {} },
+        sourceRefs: [],
+        blockStatus: { hero: 'ok', committee: 'ok', insights: 'ok', strategy: 'ok', sellNow: 'ok', portfolioSimulation: 'ok' },
+      },
+    }),
+    null,
+    (payload) => {
+      hookCalls += 1
+      seenDebugId = payload.metadata.debugId
+    },
+  )
+
+  assert.equal(response.status, 200)
+  assert.equal(hookCalls, 1)
+  assert.equal(seenDebugId, 'deepscan:US:NVDA')
+})
+
+test('createDeepScanCanonicalResponse는 builder 예외 시 onPayload 훅을 호출하지 않는다', async () => {
+  let hookCalls = 0
+  const response = await createDeepScanCanonicalResponse(
+    new URLSearchParams('market=KR&code=005930'),
+    async () => {
+      throw new Error('builder down')
+    },
+    null,
+    () => {
+      hookCalls += 1
+    },
+  )
+
+  assert.equal(response.status, 400)
+  assert.equal(hookCalls, 0)
 })

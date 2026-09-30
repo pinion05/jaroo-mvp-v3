@@ -40,6 +40,14 @@ export function extractLoadingStageKeysFromCommitteeResults(results: unknown): L
   )
 }
 
+/**
+ * 모든 위원 팀 스테이지 키 — 위원회 상태 스토어가 만료(not_found)·서버 오류로
+ * 더 이상 도착할 데이터가 없을 때 강제 도착 처리에 쓴다.
+ */
+export function allCommitteeLoadingStageKeys(): LoadingStageKey[] {
+  return uniqueLoadingStageKeys(Object.values(DEEPSCAN_MEMBER_STAGE_BY_KEY))
+}
+
 export function extractLoadingStageKeysFromCommitteeAxes(committeeAxes: JarooDeepScanCommitteeAxis[] | undefined): LoadingStageKey[] {
   return uniqueLoadingStageKeys(
     (committeeAxes ?? [])

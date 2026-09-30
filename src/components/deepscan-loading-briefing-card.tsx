@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useMemo } from 'react'
+import { BarChart3, Calendar, ChartCandlestick, ChevronLeft, Flame, Target, Telescope, TrendingUp, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import type {
@@ -49,30 +50,58 @@ import styles from './deepscan-loading-screen.module.css'
 
 
 export function BackControl({ onBack, backHref }: Pick<DeepScanLoadingScreenProps, 'onBack' | 'backHref'>) {
+  // '←' 텍스트 글리프는 폰트 환경(임베디드 웹뷰 등)에 따라 빈 박스로 렌더링될 수 있어 SVG 아이콘으로 대체한다.
+  const icon = <ChevronLeft className='size-[16px]' aria-hidden />
+
   if (onBack) {
     return (
       <button type='button' className={styles.backButton} onClick={onBack} aria-label='뒤로 가기'>
-        ←
+        {icon}
       </button>
     )
   }
 
   return (
     <Link href={backHref ?? '/home'} className={styles.backButton} aria-label='홈으로 가기'>
-      ←
+      {icon}
     </Link>
   )
 }
 
 
-export function TargetPriceFanChart({
+/** 목표가가 현재가보다 높으면 profit(빨강), 낮으면 loss(파랑) — 같으면 무톤 */
+function consensusToneOf(consensus: NonNullable<LoadingQuickFact['consensus']>): 'profit' | 'loss' | null {
+  if (!isFiniteNumber(consensus.targetPriceValue) || !isFiniteNumber(consensus.currentPriceValue) || consensus.targetPriceValue === consensus.currentPriceValue) return null
+  return consensus.targetPriceValue > consensus.currentPriceValue ? 'profit' : 'loss'
+}
+
+/** 거래 배수 — 1 미만은 분수 표기(분모 2~5 최근접, 오차 5%p 초과면 소수 유지), 1 이상은 소수 그대로 */
+function formatVolumeRatioLabel(value: number) {
+  if (value >= 1 || value <= 0) return `어제의 ${formatNumber(value)}배`
+  let best: { label: string; err: number } | null = null
+  for (let denominator = 2; denominator <= 5; denominator += 1) {
+    for (let numerator = 1; numerator < denominator; numerator += 1) {
+      const err = Math.abs(numerator / denominator - value)
+      if (best === null || err < best.err) best = { label: `${numerator}/${denominator}배`, err }
+    }
+  }
+  return best !== null && best.err <= 0.05 ? `어제의 ${best.label}` : `어제의 ${formatNumber(value)}배`
+}
+
+function TargetPriceFanChart({
   consensus,
   dailyCloses,
   seedKey,
+  tone,
+  averagePrice,
+  averageLabel,
 }: {
   consensus: NonNullable<LoadingQuickFact['consensus']>
   dailyCloses?: Array<number | null | undefined>
   seedKey?: string
+  tone?: 'profit' | 'loss' | null
+  averagePrice?: number | null
+  averageLabel?: string
 }) {
   const geometry = useMemo(() => {
     const current = consensus.currentPriceValue
@@ -86,29 +115,47 @@ export function TargetPriceFanChart({
       averageTarget: target,
       highTarget: consensus.highTargetValue,
       lowTarget: consensus.lowTargetValue,
+      averagePrice,
       recentCloses: dailyCloses,
       volatility,
       seed: seedKey ?? `${current}|${target}`,
     })
-  }, [consensus.currentPriceValue, consensus.targetPriceValue, consensus.highTargetValue, consensus.lowTargetValue, dailyCloses, seedKey])
+  }, [consensus.currentPriceValue, consensus.targetPriceValue, consensus.highTargetValue, consensus.lowTargetValue, dailyCloses, seedKey, averagePrice])
 
   if (!geometry) {
     return null
   }
 
+  // 기본 클래스를 유지한 채 톤 클래스를 겹친다 — 톤 단독이면 fill:none·애니메이션 등이 유실돼
+  // path에 SVG 기본 검정 fill이 채워지는 문제가 생긴다.
+  const averageToneClass = cn(
+    styles.consensusFanTargetPath,
+    tone === 'profit' && styles.consensusFanTargetPathProfit,
+    tone === 'loss' && styles.consensusFanTargetPathLoss,
+  )
   const curveClass: Record<'high' | 'average' | 'low', string> = {
     high: styles.consensusFanHighPath,
-    average: styles.consensusFanTargetPath,
+    average: averageToneClass,
     low: styles.consensusFanLowPath,
   }
+  const averageDotClass = cn(
+    styles.consensusFanTargetDot,
+    tone === 'profit' && styles.consensusFanTargetDotProfit,
+    tone === 'loss' && styles.consensusFanTargetDotLoss,
+  )
   const dotClass: Record<'high' | 'average' | 'low', string> = {
     high: styles.consensusFanHighDot,
-    average: styles.consensusFanTargetDot,
+    average: averageDotClass,
     low: styles.consensusFanLowDot,
   }
+  const averageLegendClass = cn(
+    styles.consensusFanLegendTarget,
+    tone === 'profit' && styles.consensusFanLegendTargetProfit,
+    tone === 'loss' && styles.consensusFanLegendTargetLoss,
+  )
   const legendClass: Record<'high' | 'average' | 'low', string> = {
     high: styles.consensusFanLegendHigh,
-    average: styles.consensusFanLegendTarget,
+    average: averageLegendClass,
     low: styles.consensusFanLegendLow,
   }
   const legendLabel: Record<'high' | 'average' | 'low', string> = {
@@ -127,15 +174,30 @@ export function TargetPriceFanChart({
         ) : (
           <line className={styles.consensusFanCurrentLine} x1={geometry.leftX} y1={geometry.currentY} x2={geometry.fanStartX} y2={geometry.currentY} />
         )}
+        {geometry.averagePriceY !== null ? (
+          <line
+            className={styles.consensusFanAvgLine}
+            x1={geometry.leftX}
+            y1={geometry.averagePriceY}
+            x2={geometry.rightX}
+            y2={geometry.averagePriceY}
+          />
+        ) : null}
         {geometry.curves.map((curve) => (
           <path key={`path-${curve.key}`} className={curveClass[curve.key]} d={curve.pathD} pathLength={1} />
         ))}
         {geometry.curves.map((curve) => (
           <circle key={`dot-${curve.key}`} className={dotClass[curve.key]} cx={geometry.rightX} cy={curve.dotY} r='3.6' />
         ))}
+        {/* 현재가 위치 포인트 — 좌측 현재가 선이 끝나고 부채꼴로 갈라지는 분기점(#267). 곡선 위에 얹는다. */}
+        <circle className={styles.consensusFanCurrentDotHalo} cx={geometry.fanStartX} cy={geometry.currentY} r='7.5' />
+        <circle className={styles.consensusFanCurrentDot} cx={geometry.fanStartX} cy={geometry.currentY} r='3.6' />
       </svg>
       <div className={styles.consensusFanLegend}>
         <span className={styles.consensusFanLegendCurrent}><i />현재가</span>
+        {geometry.averagePriceY !== null ? (
+          <span className={styles.consensusFanLegendAvgPrice}><i />{averageLabel ?? '내 평단'}</span>
+        ) : null}
         {legendOrder.filter((key) => activeKeys.has(key)).map((key) => (
           <span key={`legend-${key}`} className={legendClass[key]}><i />{legendLabel[key]}</span>
         ))}
@@ -195,12 +257,13 @@ export function TodayBriefingItem({
 }: {
   at: number
   elapsedSeconds: number
-  icon: string
+  icon: LucideIcon
   question: string
   data: ReactNode
   meaning: ReactNode
   forceReady?: boolean
 }) {
+  const Icon = icon
   const isVisible = forceReady || elapsedSeconds >= at
   const isContentReady = isDeepScanBriefingItemContentReady({
     elapsedSeconds,
@@ -212,7 +275,7 @@ export function TodayBriefingItem({
   return (
     <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-item='true'>
       <div className={styles.todayBriefQuestionRow}>
-        <span className={styles.todayBriefIcon} aria-hidden='true'>{icon}</span>
+        <span className={styles.todayBriefIcon} aria-hidden='true'><Icon className='size-[13px]' /></span>
         <span className={styles.todayBriefQuestion}>{question}</span>
       </div>
       <div className={cn(styles.todayBriefBody, isVisible ? styles.todayBriefBodyIn : undefined)}>
@@ -285,7 +348,7 @@ export function TodayMarketBriefing({
   return (
     <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-item='true'>
       <div className={styles.todayBriefQuestionRow}>
-        <span className={styles.todayBriefIcon} aria-hidden='true'>🏛️</span>
+        <span className={styles.todayBriefIcon} aria-hidden='true'><ChartCandlestick className='size-[13px]' /></span>
         <span className={styles.todayBriefQuestion}>오늘 시장 속에서는?</span>
       </div>
       <div className={cn(styles.todayBriefBody, isVisible ? styles.todayBriefBodyIn : undefined)}>
@@ -447,7 +510,7 @@ export function TodayBriefingCard({
     : sameMoneyCurrency ? '현재가와 평단을 맞춰 보는 중이에요.' : '현재가는 달러, 평단은 원화 기준이라 환율 환산 후 비교해야 해요.'
   const todayFlow = briefingModel.todayFlow
   const volumeRatio = briefingModel.volumeRatio
-  const volumeRatioLabel = isFiniteNumber(volumeRatio) ? `어제의 ${formatNumber(volumeRatio)}배` : '거래량 확인 중'
+  const volumeRatioLabel = isFiniteNumber(volumeRatio) ? formatVolumeRatioLabel(volumeRatio) : '거래량 확인 중'
   const volumeMeaning = isFiniteNumber(volumeRatio)
     ? volumeRatio >= 1.3
       ? '평소보다 관심이 붙은 하루예요.'
@@ -490,12 +553,12 @@ export function TodayBriefingCard({
         </div>
         {chart.hasData ? (
           <svg className={styles.todayChartSvg} viewBox='0 0 300 120' aria-label='최근 3개월 일봉 차트'>
-            <path className={styles.todayChartArea} d={chart.areaPath} />
-            <path className={styles.todayChartLine} d={chart.linePath} pathLength={1} />
+            <path className={cn(styles.todayChartArea, chart.isProfit === false ? styles.todayChartToneLoss : styles.todayChartToneProfit)} d={chart.areaPath} />
+            <path className={cn(styles.todayChartLine, chart.isProfit === false ? styles.todayChartToneLoss : styles.todayChartToneProfit)} d={chart.linePath} pathLength={1} />
             <line className={styles.todayAvgLine} x1='4' y1={chart.averageY} x2='296' y2={chart.averageY} />
               <text className={styles.todayAvgText} x='296' y={Math.max(12, chart.averageY - 6)} textAnchor='end'>{chartAverageLabel} {displayChartAveragePrice.replace(/원$/u, '')}</text>
-            <circle className={styles.todayChartDot} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='3' />
-            <circle className={styles.todayChartRing} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='7' />
+            <circle className={cn(styles.todayChartDot, chart.isProfit === false ? styles.todayChartToneLoss : styles.todayChartToneProfit)} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='3' />
+            <circle className={cn(styles.todayChartRing, chart.isProfit === false ? styles.todayChartToneLoss : styles.todayChartToneProfit)} cx={chart.lastPoint.x} cy={chart.lastPoint.y} r='7' />
           </svg>
         ) : (
           <div className={styles.todayChartEmpty} role='status'>차트 데이터를 확인하는 중이에요</div>
@@ -504,9 +567,9 @@ export function TodayBriefingCard({
       </div>
 
       <div className={styles.todayBriefList} ref={todayBriefListRef}>
-        <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='🗓️' question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
-        <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='📈' question='단기 흐름은요?' data={<span className={shortStreak.direction === 'up' ? styles.todayUp : shortStreak.direction === 'down' ? styles.todayDown : styles.todayBlue}>{streakLabel}</span>} meaning={shortStreak.direction === 'up' ? '짧게 봐도 흐름이 살아나고 있어요.' : shortStreak.direction === 'down' ? '단기적으로는 숨 고르기가 이어지고 있어요.' : '아직 한쪽 방향으로 강하게 기울지는 않았어요.'} />
-        <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='🎯' question='내 자리는 어디쯤일까요?' data={<span className={financialToneClass(positionPct)}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
+        <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Calendar} question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
+        <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={TrendingUp} question='단기 흐름은요?' data={<span className={shortStreak.direction === 'up' ? styles.todayUp : shortStreak.direction === 'down' ? styles.todayDown : styles.todayBlue}>{streakLabel}</span>} meaning={shortStreak.direction === 'up' ? '짧게 봐도 흐름이 살아나고 있어요.' : shortStreak.direction === 'down' ? '단기적으로는 숨 고르기가 이어지고 있어요.' : '아직 한쪽 방향으로 강하게 기울지는 않았어요.'} />
+        <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Target} question='내 자리는 어디쯤일까요?' data={<span className={financialToneClass(positionPct)}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
         <TodayMarketBriefing
           at={briefStartSeconds[3]}
           elapsedSeconds={elapsedSeconds}
@@ -517,38 +580,63 @@ export function TodayBriefingCard({
           secondPct={briefingSnapshot?.market?.nasdaq?.changePct ?? briefingSnapshot?.market?.kosdaq?.changePct ?? null}
           stockPct={quote?.changePct ?? briefingModel.latestRow?.changePct ?? null}
         />
-        <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='📊' question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
-        <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon='🔥' question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
-        {consensus ? (
+        <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={BarChart3} question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
+        <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Flame} question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
+        {consensus ? (() => {
+          const consensusTone = consensusToneOf(consensus)
+          const averageUpsidePct = isFiniteNumber(chartAveragePriceValue) && chartAveragePriceValue > 0 && isFiniteNumber(consensus.targetPriceValue) && consensus.targetPriceValue > 0
+            ? (consensus.targetPriceValue / chartAveragePriceValue - 1) * 100
+            : null
+          const averageUpsideLabel = averageUpsidePct !== null
+            ? `${averageUpsidePct > 0 ? '+' : ''}${new Intl.NumberFormat('ko-KR', { maximumFractionDigits: 1 }).format(averageUpsidePct)}%`
+            : null
+          return (
           <article
             className={cn(styles.todayBriefItem, (forceReady || elapsedSeconds >= consensusAt) ? styles.todayBriefItemIn : undefined, styles.todayBriefConsensusItem)}
             data-today-briefing-item='true'
           >
             <div className={styles.todayBriefQuestionRow}>
-              <span className={styles.todayBriefIcon} aria-hidden='true'>🔭</span>
+              <span className={styles.todayBriefIcon} aria-hidden='true'><Telescope className='size-[13px]' /></span>
               <span className={styles.todayBriefQuestion}>애널리스트 목표가는 어디쯤일까?</span>
             </div>
             {forceReady || elapsedSeconds >= consensusAt + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS ? (
               <div className={styles.consensusInsight}>
-                <div className={styles.consensusChartTop}>
+                <div className={cn(styles.consensusChartTop, consensusTone === 'profit' ? styles.consensusToneProfit : consensusTone === 'loss' ? styles.consensusToneLoss : undefined)}>
                   <div>
                     <span className={styles.consensusEyebrow}>{consensus.analystCountLabel ?? 'TARGET VIEW'}</span>
                     <strong>{consensus.targetPriceLabel}</strong>
                   </div>
-                  {consensus.upsideLabel ? <span>{consensus.upsideLabel}</span> : null}
+                  <div className={styles.consensusUpsideList}>
+                    {consensus.upsideLabel ? <span className={consensusTone === 'profit' ? styles.consensusUpsideProfit : consensusTone === 'loss' ? styles.consensusUpsideLoss : undefined}>현재가 대비 {consensus.upsideLabel}</span> : null}
+                    {averageUpsideLabel ? <span className={averageUpsidePct !== null && averageUpsidePct > 0 ? styles.consensusUpsideProfit : averageUpsidePct !== null && averageUpsidePct < 0 ? styles.consensusUpsideLoss : undefined}>평단 대비 {averageUpsideLabel}</span> : null}
+                  </div>
                 </div>
-                <TargetPriceFanChart consensus={consensus} dailyCloses={dailyCloses} seedKey={seedKey} />
+                <TargetPriceFanChart
+                  consensus={consensus}
+                  dailyCloses={dailyCloses}
+                  seedKey={seedKey}
+                  tone={consensusTone}
+                  averagePrice={chartAveragePriceValue}
+                  averageLabel={chartAverageLabel}
+                />
                 <dl className={styles.consensusStats}>
                   {consensus.currentPriceLabel ? (<div className={styles.consensusStat}><dt>현재가</dt><dd>{consensus.currentPriceLabel}</dd></div>) : null}
                   {consensus.opinionLabel ? (<div className={styles.consensusStat}><dt>투자의견</dt><dd>{consensus.opinionLabel}</dd></div>) : null}
                   {consensus.highTargetLabel ? (<div className={styles.consensusStat}><dt>최고</dt><dd>{consensus.highTargetLabel}</dd></div>) : null}
                   {consensus.lowTargetLabel ? (<div className={styles.consensusStat}><dt>최저</dt><dd>{consensus.lowTargetLabel}</dd></div>) : null}
                 </dl>
-                {consensus.summary ? <p className={styles.consensusSummary}>{consensus.summary}</p> : null}
+                {consensus.summary ? (
+                  <p className={cn(
+                    styles.consensusSummary,
+                    // 투자의견 요약 톤(#266 데이터 색 규율): 매수 우세=빨강, 의견 갈림=중립. 신중 등 나머지는 기존 파랑.
+                    consensus.summary.includes('매수') ? styles.consensusSummaryProfit : consensus.summary.includes('갈리') ? styles.consensusSummaryNeutral : undefined,
+                  )}>{consensus.summary}</p>
+                ) : null}
               </div>
             ) : null}
           </article>
-        ) : null}
+          )
+        })() : null}
       </div>
     </section>
   )

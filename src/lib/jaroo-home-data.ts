@@ -147,7 +147,7 @@ export const homeHoldings: HomeHolding[] = [
       { label: '6개월 회복', value: '잠금', tone: 'locked' },
       { label: '추가 하락', value: '보통', tone: 'warning' },
     ],
-    actionLabel: '딥스캔',
+    actionLabel: '딥스캔 분석',
     actionSubLabel: '세 팀이 분석해요',
     actionCredits: undefined,
     actionHref: '/deepscan',
@@ -192,7 +192,7 @@ export const homeHoldings: HomeHolding[] = [
       { label: '6개월 회복', value: '잠금', tone: 'locked' },
       { label: '추가 하락', value: '보통', tone: 'warning' },
     ],
-    actionLabel: '딥스캔',
+    actionLabel: '딥스캔 분석',
     actionSubLabel: '세 팀이 분석해요',
     actionCredits: undefined,
     actionHref: null,
@@ -236,7 +236,7 @@ export const homeHoldings: HomeHolding[] = [
       { label: 'DART 공시', value: '잠금', tone: 'locked' },
       { label: '상폐 위험', value: '확인필요', tone: 'danger' },
     ],
-    actionLabel: 'DART 딥스캔',
+    actionLabel: '딥스캔 분석',
     actionCredits: undefined,
     actionHref: null,
   },
@@ -262,7 +262,7 @@ export const homeHoldings: HomeHolding[] = [
     centerBadge: '수익 중',
     centerBadgeTone: 'green',
     centerName: 'SK하이닉스',
-    donutColor: '#1D9E75',
+    donutColor: '#7E97BD',
     donutPercent: 0.14,
     heatmapWeight: '18%',
     heatmapBackground: '#1A7A5E',
@@ -270,7 +270,7 @@ export const homeHoldings: HomeHolding[] = [
     opinionLabel: 'AI 의견',
     opinionText: '저항선 근접 중. 모멘텀 둔화 시작. 익절 타이밍을 딥스캔으로 확인하세요.',
     opinionBackground: '#F0FAF4',
-    opinionBorder: '#C0DD97',
+    opinionBorder: '#C3D0E3',
     opinionTextColor: '#27500A',
     metaLine: '평단 146,500원 · 평가금액 7,692,000원',
     metrics: [
@@ -278,7 +278,7 @@ export const homeHoldings: HomeHolding[] = [
       { label: '저항선까지', value: '+3.2%', tone: 'positive' },
       { label: '매도 전략', value: '잠금', tone: 'locked' },
     ],
-    actionLabel: '딥스캔',
+    actionLabel: '딥스캔 분석',
     actionSubLabel: '세 팀이 분석해요',
     actionCredits: undefined,
     actionHref: null,
@@ -325,7 +325,7 @@ export const homeHoldings: HomeHolding[] = [
     actionLabel: 'ETF 분석',
     actionSubLabel: '섹터 구성 + 회복 시나리오',
     actionCredits: undefined,
-    actionHref: '/deepscan',
+    actionHref: '/etf',
   },
 ]
 
@@ -641,7 +641,7 @@ export const portfolioScoreBreakdown = [
     stocks: [
       { label: '삼성전자 50%', dot: '#E24B4A' },
       { label: '코칩 21%', dot: '#EF9F27' },
-      { label: 'SK하이닉스 18%', dot: '#1D9E75' },
+      { label: 'SK하이닉스 18%', dot: '#7E97BD' },
       { label: '드래곤플라이 11%', dot: '#378ADD' },
     ],
   },
@@ -661,14 +661,14 @@ export const portfolioScoreBreakdown = [
   {
     label: '섹터 균형',
     score: '14 / 20',
-    scoreColor: '#3B6D11',
+    scoreColor: '#5A6473',
     barWidth: '70%',
     barColor: '#639922',
     description: '반도체 섹터에 집중되어 있어요. 업황이 좋을 땐 유리하지만 섹터 전체가 흔들리면 함께 영향받아요.',
     stocks: [
       { label: '삼성전자 · 반도체', dot: '#E24B4A' },
       { label: '코칩 · 반도체', dot: '#EF9F27' },
-      { label: 'SK하이닉스 · 반도체', dot: '#1D9E75' },
+      { label: 'SK하이닉스 · 반도체', dot: '#7E97BD' },
       { label: '드래곤플라이 · 게임', dot: '#378ADD' },
     ],
   },
@@ -704,8 +704,8 @@ export const momentumSignals = [
     name: '삼성전자',
     dot: '#E24B4A',
     badge: '순풍',
-    badgeBackground: '#EAF3DE',
-    badgeColor: '#3B6D11',
+    badgeBackground: '#FBE6E7',
+    badgeColor: '#A8323A',
     description: '이중 바닥 패턴 감지. 외국인 매도 부담이나 반등 신호 있어요.',
   },
   {
@@ -718,10 +718,10 @@ export const momentumSignals = [
   },
   {
     name: 'SK하이닉스',
-    dot: '#1D9E75',
+    dot: '#7E97BD',
     badge: '순풍',
-    badgeBackground: '#EAF3DE',
-    badgeColor: '#3B6D11',
+    badgeBackground: '#FBE6E7',
+    badgeColor: '#A8323A',
     description: '저항선 근접 중. 모멘텀은 있지만 둔화 조짐이 있어요.',
   },
   {
@@ -753,7 +753,7 @@ export type AppliedHomePortfolioSession = {
   appliedAt?: string
 }
 
-const OCR_HOME_DONUT_COLORS = ['#E24B4A', '#EF9F27', '#1D9E75', '#378ADD', '#185FA5', '#7C3AED', '#0EA5E9', '#F97316']
+const OCR_HOME_DONUT_COLORS = ['#E24B4A', '#EF9F27', '#7E97BD', '#378ADD', '#185FA5', '#7C3AED', '#0EA5E9', '#F97316']
 const HOME_HOLDING_CODE_BY_NAME = new Map(
   homeHoldings
     .filter((item) => item.code)
@@ -907,17 +907,18 @@ function formatCurrencyValue(value: string, currency?: AveragePriceCurrency) {
   if (currency === 'USD') {
     return `$${parsedValue.toLocaleString('en-US', {
       minimumFractionDigits: 0,
-      maximumFractionDigits: 4,
+      maximumFractionDigits: 2,
     })}`
   }
 
   if (currency === 'KRW') {
-    return `${formatNumber(parsedValue, Number.isInteger(parsedValue) ? 0 : 4)}원`
+    // §5-4: 평단·금액은 정수 반올림
+    return `${Math.round(parsedValue).toLocaleString('ko-KR')}원`
   }
 
   return parsedValue.toLocaleString('ko-KR', {
     minimumFractionDigits: 0,
-    maximumFractionDigits: 4,
+    maximumFractionDigits: 2,
   })
 }
 
@@ -1581,10 +1582,12 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
         { label: '평가 금액', value: evaluationAmount ?? '-', tone: 'neutral' },
         { label: '현재가', value: currentPriceText ?? '-', tone: 'neutral' },
       ],
-      actionLabel: kind === 'etf' ? 'ETF 분석' : '딥스캔',
+      actionLabel: kind === 'etf' ? 'ETF 분석' : '딥스캔 분석',
       actionSubLabel: kind === 'etf' ? '섹터 구성 + 회복 시나리오' : '세 팀이 분석해요',
       actionCredits: undefined,
-      actionHref: '/deepscan',
+      // ETF는 /etf 실데이터 분석으로, 주식은 기존 딥스캔으로. 둘 다
+      // shouldUseDeepScanLoadingHandoff가 로딩 핸드오프를 이어준다.
+      actionHref: kind === 'etf' ? '/etf' : '/deepscan',
     }
   })
 }

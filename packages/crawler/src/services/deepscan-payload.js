@@ -15,12 +15,16 @@ import { scoreDeepScanKrEvidence, scoreDeepScanKrFromCommittee } from './deepsca
 import { invokeDeepScanKrPackage } from './deepscan-kr-package-adapter.js';
 import {
   buildKrCommitteeAxesFromLlmResults,
+  KR_ETF_PAGE_MEMBER_KEYS,
   scoreDeepScanKrCommitteeFromDump,
 } from './deepscan-kr-committee-runtime.js';
 import {
+  buildCrawlerCacheIdentity,
+  buildCrawlerCachePayloadEntry,
   getDefaultCrawlerCacheFreshTtlMs,
   getDefaultCrawlerCacheStaleTtlMs,
   getDefaultSupabaseCrawlerCacheClient,
+  isCacheRowFresh,
   normalizeCrawlerCacheToggle,
   readThroughCrawlerCache,
 } from './supabase-crawler-cache.js';
@@ -1186,7 +1190,10 @@ function formatNumber(value) {
     return 'N/A';
   }
 
-  return Number.isInteger(value) ? String(value) : String(Math.round(value * 100) / 100);
+  // UI 표기 통일: 천단위 콤마(이슈 — krw->원·콤마 전역 치환)
+  return Number.isInteger(value)
+    ? value.toLocaleString('en-US')
+    : (Math.round(value * 100) / 100).toLocaleString('en-US', { maximumFractionDigits: 2 });
 }
 
 function formatSignedNumber(value) {
@@ -1208,9 +1215,16 @@ function formatSignedPercent(value) {
 }
 
 function formatCurrencyValue(value, currency) {
-  return typeof value === 'number' && Number.isFinite(value)
-    ? `${formatNumber(value)}${currency ? ` ${currency}` : ''}`
-    : 'N/A';
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return 'N/A';
+  }
+
+  // 한국 화폐는 '265,000원' 형태로 표기한다(krw->원 전역 치환).
+  if (currency === 'KRW') {
+    return `${formatNumber(value)}원`;
+  }
+
+  return `${formatNumber(value)}${currency ? ` ${currency}` : ''}`;
 }
 
 function resolveConsensusOpinionSummary(consensusSnapshot) {
@@ -1572,7 +1586,7 @@ function buildEventScannerReason(evidence) {
   if (disclosureAnalysis?.available) {
     const totalCount = disclosureAnalysis.count ?? disclosureAnalysis.totalCount ?? 0;
     const disclosureParts = [
-      `OpenDART 공시 ${formatNumber(totalCount)}건`,
+      `최근 공시 ${formatNumber(totalCount)}건`,
       disclosureAnalysis.ownershipCount > 0 ? `지분공시 ${formatNumber(disclosureAnalysis.ownershipCount)}건` : null,
       disclosureAnalysis.correctionCount > 0 ? `정정 ${formatNumber(disclosureAnalysis.correctionCount)}건` : null,
       disclosureAnalysis.dilutionCount > 0 ? `자본변동 ${formatNumber(disclosureAnalysis.dilutionCount)}건` : null,
@@ -1582,7 +1596,7 @@ function buildEventScannerReason(evidence) {
     return `${disclosureParts.join(', ')}을 확인했고 최근 리포트 ${formatNumber(reportCount)}건과 함께 이벤트 신호로 반영했습니다.`;
   }
 
-  return `OpenDART 공시 근거는 없고 컨센서스 ${evidence.reportSignals?.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals?.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${formatNumber(reportCount)}건을 이벤트 신호로 반영했습니다.`;
+  return `최근 공시 근거는 없고 컨센서스 ${evidence.reportSignals?.consensusAvailable ? '확보' : '없음'}, 의견 ${evidence.reportSignals?.opinionAvailable ? '확보' : '없음'}, 최근 리포트 ${formatNumber(reportCount)}건을 이벤트 신호로 반영했습니다.`;
 }
 
 function createCommitteeAxes(evidence, scored, packageResult) {
@@ -1662,7 +1676,7 @@ function createCommitteeAxes(evidence, scored, packageResult) {
           '가격 위치',
           scored.committee.marketTiming.priceLocation,
           evidence.currentQuote
-            ? `현재가 ${formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency)}와 평단 ${formatNumber(evidence.holding.averagePrice)} 비교 기준입니다.`
+            ? `현재가 ${formatCurrencyValue(evidence.currentQuote.price, evidence.currentQuote.currency)} · 평단 ${formatNumber(evidence.holding.averagePrice)}원 비교 기준입니다.`
             : '현재가가 없어 가격 위치 점수는 보수적으로 계산했습니다.',
           'priceLocation',
         ),
@@ -2098,6 +2112,16 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
   const consensusLowestTargetPrice = typeof consensusSnapshot.lowestTargetPrice === 'number' && Number.isFinite(consensusSnapshot.lowestTargetPrice)
     ? consensusSnapshot.lowestTargetPrice
     : null;
+  const consensusBrokers = Array.isArray(consensusSnapshot.analystBrokers)
+    ? consensusSnapshot.analystBrokers
+      .map((entry) => ({
+        name: typeof entry?.name === 'string' ? entry.name.trim() : '',
+        targetPrice: typeof entry?.targetPrice === 'number' && Number.isFinite(entry.targetPrice) ? entry.targetPrice : null,
+        date: typeof entry?.date === 'string' && entry.date.trim() ? entry.date.trim() : null,
+      }))
+      .filter((entry) => entry.name && entry.targetPrice !== null && entry.targetPrice > 0)
+      .slice(0, 40)
+    : null;
   const disclosureAnalysis = evidence.disclosureAnalysis ?? null;
   const disclosureInsightBody = buildDisclosureInsightBody(disclosureAnalysis);
   const items = [
@@ -2154,6 +2178,7 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
             highestTargetPrice: consensusHighestTargetPrice,
             lowestTargetPrice: consensusLowestTargetPrice,
             opinionSummary: consensusOpinionSummary,
+            brokers: consensusBrokers && consensusBrokers.length > 0 ? consensusBrokers : null,
             currency: evidence.currentQuote?.currency ?? 'KRW',
           },
         }]
@@ -2185,7 +2210,7 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
           sourceLabel: '공시 분석',
           date: disclosureAnalysis.latestReceiptDate ?? dateLabel,
           label: disclosureAnalysis.riskCount > 0 || disclosureAnalysis.correctionCount > 0 || disclosureAnalysis.dilutionCount > 0 ? '공시주의' : '공시',
-          title: `${input.instrument.name} 최근 OpenDART 공시 흐름`,
+          title: `${input.instrument.name} 최근 공시 흐름`,
           body: disclosureInsightBody,
           ...(buildDisclosureInsightSourceBody(disclosureAnalysis) ? { sourceBody: buildDisclosureInsightSourceBody(disclosureAnalysis) } : {}),
         }]
@@ -2198,7 +2223,7 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
       title: '보유 포지션 맥락',
       body: evidence.holding.hasHoldingContext
         ? (evidence.holding.hasFullSellNowInputs
-          ? `보유 ${formatNumber(evidence.holding.shares)}주 / 평단 ${formatNumber(evidence.holding.averagePrice)} 확인`
+          ? `보유 ${formatNumber(evidence.holding.shares)}주 / 평단 ${formatNumber(evidence.holding.averagePrice)}원 확인`
           : '보유 맥락 일부 확인')
         : '국내 보유 맥락 없음',
     },
@@ -2239,12 +2264,13 @@ function clampNumber(value, min, max) {
   return Math.min(max, Math.max(min, numeric));
 }
 
-function buildNormalizedScenarioProbabilities(heroScore, hasExplicitRisk, riskSignalCount) {
+// 규칙 기반 시나리오 퍼센트 — 통계 확률이 아니라 히어로 점수(primary)와 리스크 신호 수(risk)의 재표현.
+// 100을 채우는 residual 행('근거 유지')은 의미가 없어 2026-09-17 제거했다.
+function buildScenarioProbabilities(heroScore, hasExplicitRisk, riskSignalCount) {
   const primary = Math.round(clampNumber(heroScore, 5, hasExplicitRisk ? 90 : 95));
   if (!hasExplicitRisk) {
     return {
       primary,
-      support: Math.max(0, 100 - primary),
       risk: null,
     };
   }
@@ -2253,7 +2279,6 @@ function buildNormalizedScenarioProbabilities(heroScore, hasExplicitRisk, riskSi
   const risk = Math.min(desiredRisk, Math.max(0, 100 - primary));
   return {
     primary,
-    support: Math.max(0, 100 - primary - risk),
     risk,
   };
 }
@@ -2270,7 +2295,7 @@ function buildStrategy(input, evidence, scored) {
     ...scored.hero.penalties.map((penalty) => `패널티: ${penalty}`),
   ].slice(0, 4);
 
-  const probabilities = buildNormalizedScenarioProbabilities(
+  const probabilities = buildScenarioProbabilities(
     scored.hero.score,
     hasExplicitRisk,
     Math.max(evidence.missingSources.length, evidence.topRisks.length),
@@ -2287,18 +2312,13 @@ function buildStrategy(input, evidence, scored) {
     currentPriceText,
     targetPriceText: resolveTargetPriceText(evidence),
     scenarioDetails: scenarioDetails.length > 0 ? scenarioDetails : ['확보된 근거가 부족합니다.'],
-    otherScenarios: [
-      {
-        label: '근거 유지',
-        probability: `${probabilities.support}%`,
-        condition: evidence.topFacts[0] ?? '핵심 근거를 다시 확보합니다.',
-      },
-      ...(hasExplicitRisk ? [{
-        label: '리스크 재점검',
-        probability: `${probabilities.risk ?? 0}%`,
-        condition: evidence.topRisks[0] ?? '추가 리스크를 다시 확인합니다.',
-      }] : []),
-    ],
+    otherScenarios: hasExplicitRisk
+      ? [{
+          label: '리스크 재점검',
+          probability: `${probabilities.risk ?? 0}%`,
+          condition: evidence.topRisks[0] ?? '추가 리스크를 다시 확인합니다.',
+        }]
+      : [],
     otherScenarioTags: [getDecisionBandLabel(decisionBand), evidence.currentQuote ? '현재가 확인' : '현재가 없음'],
   };
 }
@@ -2334,7 +2354,9 @@ function buildSellNow(evidence, scored) {
   const currency = evidence.currentQuote?.currency ?? 'KRW';
   const decisionBandLabel = getDecisionBandLabel(scored.sellNow.decisionBand);
   return {
-    realizedText: `현재가 기준 평가손익 ${formatSignedNumber(scored.sellNow.evaluationPnL)} ${currency} (${formatSignedPercent(scored.sellNow.evaluationPnLPct)}). 즉시 매도 판단은 ${decisionBandLabel}입니다.`,
+    realizedText: currency === 'KRW'
+        ? `현재가 기준 평가손익 ${formatSignedNumber(scored.sellNow.evaluationPnL)}원 (${formatSignedPercent(scored.sellNow.evaluationPnLPct)}). 즉시 매도 판단은 ${decisionBandLabel}입니다.`
+        : `현재가 기준 평가손익 ${formatSignedNumber(scored.sellNow.evaluationPnL)} ${currency} (${formatSignedPercent(scored.sellNow.evaluationPnLPct)}). 즉시 매도 판단은 ${decisionBandLabel}입니다.`,
     rows: [
       {
         label: '판단 밴드',
@@ -2472,12 +2494,14 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
       instrumentName: evidence.instrument?.name ?? null,
     });
     const heroBodyParts = [...evidence.topFacts];
+    const heroCautions = [...evidence.topRisks.slice(0, 2)];
 
-    for (const risk of evidence.topRisks.slice(0, 2)) {
+    for (const risk of heroCautions) {
       heroBodyParts.push(`주의: ${risk}`);
     }
     if (evidence.pageCoverage.availableCount === 0 && !heroBodyParts.some((part) => part.includes('국내 리포트 페이지 근거 없음'))) {
       heroBodyParts.push('주의: 국내 리포트 페이지 근거 없음');
+      heroCautions.push('국내 리포트 페이지 근거 없음');
     }
     if (heroBodyParts.length === 0 && evidence.missingSources.length > 0) {
       heroBodyParts.push(`누락 소스: ${evidence.missingSources.join(', ')}`);
@@ -2497,6 +2521,12 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
         : createOkBlockMeta({ sourceRefs: createBlockSourceRefs(input, 'hero', combinedSourceRefs), fallback: blockFallback })),
       headline: llmCommitteeBlocked || llmCommitteePartialError ? `${input.instrument.name} 국내 DeepScan 위원회 재시도 필요` : `${input.instrument.name} 국내 DeepScan ${scored.hero.score}점`,
       body: llmCommitteeBlocked || llmCommitteePartialError ? '일부 국내 위원이 LLM 응답 확보에 실패해 축/종합 점수를 보류했습니다. 성공한 위원 판단과 실패 슬롯을 함께 확인하세요.' : heroBodyParts.join(' · '),
+      ...(llmCommitteeBlocked || llmCommitteePartialError
+        ? {}
+        : {
+            evidenceFacts: [...evidence.topFacts],
+            evidenceCautions: [...heroCautions],
+          }),
       statusText: llmCommitteeBlocked || llmCommitteePartialError ? '부분 오류' : scored.hero.statusText,
       score: llmCommitteeBlocked || llmCommitteePartialError ? 0 : scored.hero.score,
       scoreLabel: llmCommitteeBlocked || llmCommitteePartialError ? 'N/A' : `${scored.hero.scoreLabel} · ${scored.hero.score} / 100`,
@@ -2616,6 +2646,137 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
   } catch {
     return createInternalErrorPayload(rawInput);
   }
+}
+
+// ─── /etf 페이지 AI 위원회 — 시장 타이밍 축 3명만 실행 ───────────────────────────
+// ETF엔 PER·애널리스트 컨센서스 등 주식형 근거가 없어 펀더멘털 위원은 제외하고
+// 트렌드·시장 신호·가격 위치 3명만 LLM 분석한다(사용자 요청 2026-09-17).
+// 완성(complete) 결과만 캐시에 저장하고, 소프트데드라인에 걸린 셸은
+// requestId로 /kr/committee-status 폴링해 완성한다(딥스캔과 동일 계약).
+const ETF_COMMITTEE_CACHE_ROUTE = 'etf-market-committee';
+const ETF_COMMITTEE_CACHE_ROUTE_VERSION = 'v1';
+const ETF_COMMITTEE_CACHE_SCHEMA_VERSION = 'etf-committee-market-timing-v1';
+const DEFAULT_ETF_COMMITTEE_SOFT_DEADLINE_MS = 25_000;
+
+function buildEtfCommitteeCacheDescriptor(input) {
+  const hasHolding = input.holding?.shares != null && input.holding?.averagePrice != null;
+
+  return {
+    source: 'deepscan',
+    market: 'KR',
+    targetIdentifier: input.instrument.code,
+    targetDisplayName: input.instrument.name,
+    targetKind: 'etf',
+    route: ETF_COMMITTEE_CACHE_ROUTE,
+    routeVersion: ETF_COMMITTEE_CACHE_ROUTE_VERSION,
+    schemaVersion: ETF_COMMITTEE_CACHE_SCHEMA_VERSION,
+    authScope: 'public',
+    request: {
+      code: input.instrument.code,
+      memberKeys: [...KR_ETF_PAGE_MEMBER_KEYS],
+      // 보유 맥락 유무가 위원 덤프·점수를 바꾼다 — 캐시 키에 반영한다.
+      hasHolding: hasHolding ? '1' : '0',
+    },
+    metadata: {
+      consumer: 'etf-page',
+      crawler: 'deepscan-kr-committee',
+      memberCount: KR_ETF_PAGE_MEMBER_KEYS.length,
+    },
+    sourceRefs: [],
+  };
+}
+
+function createEtfCommitteeErrorSnapshot(errorCode, message) {
+  return {
+    ok: false,
+    error: { code: errorCode, message },
+    memberKeys: [...KR_ETF_PAGE_MEMBER_KEYS],
+    requestId: null,
+    status: 'error',
+    axes: [],
+    results: {},
+    errors: [],
+    pending: [],
+    generatedAt: new Date().toISOString(),
+    cache: null,
+  };
+}
+
+export async function buildEtfMarketCommitteeSnapshot(rawInput = {}) {
+  const input = normalizeInput(rawInput);
+  const code = normalizeText(input.instrument.code);
+  if (!code || !/^\d{6}$/.test(code)) {
+    return createEtfCommitteeErrorSnapshot('input-invalid', '한국 상장 ETF(6자리) 코드가 필요해요.');
+  }
+
+  const { sources } = await resolveKrSourceBundle(rawInput, input);
+  const evidence = buildDeepScanKrEvidencePacket(input, sources);
+  if (!isKrExchangeProductEvidence(evidence)) {
+    return createEtfCommitteeErrorSnapshot('not_an_etf_code', 'ETF 코드가 아니에요. 한국 상장 ETF(6자리) 코드를 사용해주세요.');
+  }
+
+  const cacheClient = getCrawlerCacheClientFromRawInput(rawInput);
+  const cacheOptions = getCrawlerCacheOptions(rawInput);
+  const identity = buildCrawlerCacheIdentity(buildEtfCommitteeCacheDescriptor(input));
+
+  if (cacheClient && !cacheOptions.bypassCache && !cacheOptions.forceRefresh) {
+    try {
+      const cachedRow = await cacheClient.readPayload(identity.cacheKey);
+      if (cachedRow && isCacheRowFresh(cachedRow)) {
+        const cached = getRowPayloadLike(cachedRow);
+        if (cached?.ok === true && cached?.status === 'complete') {
+          return {
+            ...cached,
+            cache: { hit: true, scannedAt: normalizeText(cachedRow.created_at ?? cachedRow.createdAt) ?? null },
+          };
+        }
+      }
+    } catch {
+      // 캐시 조회 실패는 정상 실행 경로를 막지 않는다.
+    }
+  }
+
+  const committee = await scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources, {
+    memberKeys: KR_ETF_PAGE_MEMBER_KEYS,
+    softDeadlineMs: parsePositiveInteger(
+      process.env.DEEPSCAN_ETF_LLM_SOFT_DEADLINE_MS,
+      DEFAULT_ETF_COMMITTEE_SOFT_DEADLINE_MS,
+    ),
+  });
+  const shape = buildKrCommitteeAxesFromLlmResults(evidence, committee.results, committee.errors, committee.pending, {
+    memberKeys: KR_ETF_PAGE_MEMBER_KEYS,
+  });
+  const snapshot = {
+    ok: true,
+    code,
+    memberKeys: [...KR_ETF_PAGE_MEMBER_KEYS],
+    requestId: committee.requestId,
+    status: committee.status,
+    axes: shape.axes,
+    results: committee.results,
+    errors: committee.errors,
+    pending: committee.pending,
+    generatedAt: deriveGeneratedAt(input),
+    cache: null,
+  };
+
+  if (cacheClient && snapshot.status === 'complete') {
+    // partial 셸은 캐시하지 않는다 — 폴링 완성분까지 저장하면 무결성이 깨진다.
+    try {
+      await cacheClient.upsertPayload(buildCrawlerCachePayloadEntry(identity, snapshot, {
+        freshTtlMs: cacheOptions.freshTtlMs,
+        staleTtlMs: cacheOptions.staleTtlMs,
+      }));
+    } catch {
+      // 캐시 저장 실패는 응답에 영향 없음
+    }
+  }
+
+  return snapshot;
+}
+
+function getRowPayloadLike(row) {
+  return row && typeof row === 'object' && row.payload && typeof row.payload === 'object' ? row.payload : null;
 }
 
 export {

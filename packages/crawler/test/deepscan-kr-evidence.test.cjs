@@ -191,6 +191,7 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
     analystCount: null,
     highestTargetPrice: null,
     lowestTargetPrice: null,
+    analystBrokers: null,
     revisionDirection: 'unknown',
     revisionPct: null,
   });
@@ -211,11 +212,12 @@ test('buildDeepScanKrEvidencePacket assembles deterministic KR evidence from nes
   });
   assert.deepEqual(packet.missingSources, []);
   assert.deepEqual(packet.topFacts, [
-    '현재가 85200 KRW 확인',
-    '보유 12주 / 평단 71000 확인',
+    '현재가 85,200원 확인',
+    '보유 12주 / 평단 71,000원 확인',
     'KR 리포트 페이지 6/11 확보',
   ]);
-  assert.deepEqual(packet.topRisks, ['미확보 KR 페이지 5건']);
+  // '미확보 KR 페이지 N건'은 2026-09-23 노출 제거로 더 이상 리스크에 못 올라온다.
+  assert.deepEqual(packet.topRisks, []);
 });
 
 test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a direct quote item while keeping safe defaults for missing sources', async () => {
@@ -294,7 +296,7 @@ test('buildDeepScanKrEvidencePacket accepts flat normalized-ish input and a dire
   assert.deepEqual(packet.packageContext.summaryFacts, []);
   assert.deepEqual(packet.missingSources, ['slim']);
   assert.deepEqual(packet.topFacts, [
-    '현재가 90000 KRW 확인',
+    '현재가 90,000원 확인',
     '보유 맥락 일부 확인',
   ]);
   assert.deepEqual(packet.topRisks, [
@@ -393,9 +395,9 @@ test('buildDeepScanKrEvidencePacket promotes OpenDART disclosures into structure
   assert.equal(packet.reportSignals.disclosureCount, 4);
   assert.equal(packet.reportSignals.disclosureRiskCount, 1);
   assert.deepEqual(packet.topFacts, [
-    '현재가 85200 KRW 확인',
-    '보유 12주 / 평단 71000 확인',
-    '최근 OpenDART 공시 4건 / 주요 리스크 1건 확인',
+    '현재가 85,200원 확인',
+    '보유 12주 / 평단 71,000원 확인',
+    '최근 공시 4건 / 주요 리스크 1건 확인',
   ]);
   assert.deepEqual(packet.topRisks, [
     '주의 공시 1건: 소송등의제기ㆍ신청',
@@ -445,7 +447,7 @@ test('buildDeepScanKrEvidencePacket uses canonical disclosure analysis without r
   assert.equal(packet.disclosureAnalysis.riskCount, 1);
   assert.deepEqual(packet.disclosureAnalysis.filings.map((entry) => entry.rceptNo), ['selected-risk']);
   assert.equal(packet.reportSignals.disclosureCount, 1);
-  assert.ok(packet.topFacts.includes('최근 OpenDART 공시 1건 / 주요 리스크 1건 확인'));
+  assert.ok(packet.topFacts.includes('최근 공시 1건 / 주요 리스크 1건 확인'));
 });
 
 test('KR disclosure risk keyword database catches sampled delisting disclosure title variants', async () => {
@@ -903,7 +905,6 @@ test('buildDeepScanKrEvidencePacket ignores unknown slim page keys, counts recen
   assert.deepEqual(packet.topRisks, [
     '현재가 근거 없음',
     'KR 보유 맥락 없음',
-    '미확보 KR 페이지 10건',
   ]);
 });
 
@@ -982,8 +983,8 @@ test('buildDeepScanKrEvidencePacket parses display-formatted holding strings fro
     hasFullSellNowInputs: true,
   });
   assert.deepEqual(packet.topFacts, [
-    '현재가 85200 KRW 확인',
-    '보유 12주 / 평단 71000 확인',
+    '현재가 85,200원 확인',
+    '보유 12주 / 평단 71,000원 확인',
   ]);
   assert.deepEqual(packet.topRisks, [
     'KR 리포트 페이지 근거 없음',
@@ -1046,8 +1047,8 @@ test('buildDeepScanKrEvidencePacket promotes ETF constituent snapshot into facts
   assert.equal(packet.etfProductSnapshot.constituents.top10WeightPct, 57.12);
   assert.deepEqual(packet.missingSources, ['slim']);
   assert.deepEqual(packet.topFacts, [
-    '현재가 84235 KRW 확인',
-    '보유 35주 / 평단 58828.75 확인',
+    '현재가 84,235원 확인',
+    '보유 35주 / 평단 58,828.75원 확인',
     'ETF 기초지수 코스피지수 / 상위 구성 삼성전자·SK하이닉스 확인',
   ]);
   assert.deepEqual(packet.topRisks, ['KR 리포트 페이지 근거 없음']);
@@ -1103,4 +1104,65 @@ test('buildDeepScanKrEvidencePacket uses ETF snapshot close price as a quote fal
   assert.equal(packet.sourceCoverage.hasCurrentQuote, true);
   assert.equal(packet.marketSnapshot.averagePriceGapPct, ((84235 - 58828.75) / 58828.75) * 100);
   assert.equal(packet.missingSources.includes('current-quote'), false);
+});
+
+test('buildDeepScanKrEvidencePacket carries naver fallback analyst brokers into the consensus snapshot', async () => {
+  const service = await import('../src/services/deepscan-kr-evidence.js');
+
+  const packet = service.buildDeepScanKrEvidencePacket(
+    {
+      instrument: {
+        code: '005930',
+        name: '삼성전자',
+      },
+      holding: {
+        shares: '12',
+        averagePrice: '71000',
+      },
+      selectedAt: '2026-04-15T00:00:00.000Z',
+    },
+    {
+      slim: {
+        code: '005930',
+        company: { code: '005930', name: '삼성전자' },
+        pages: {
+          opinion: {
+            sourceLabel: 'naver-fallback',
+            asOfText: '2026.09.09',
+            targetPrice: 100000,
+            추정기관: 'consensus',
+            증권사수: 3,
+            최고목표주가: 110000,
+            최저목표주가: 90000,
+            analystBrokers: [
+              { name: '미래에셋증권', targetPrice: 110000, date: '2026-09-07' },
+              { name: '현대차증권', targetPrice: 90000, date: '2026-08-05' },
+              { name: '깨진항목', targetPrice: -5, date: '2026-08-01' },
+              { name: '', targetPrice: 95000, date: '2026-08-02' },
+            ],
+            rows: [{ '투자의견(점수)': 4.0, 목표주가: 100000 }],
+          },
+        },
+      },
+      quotes: {
+        items: [
+          {
+            market: 'KR',
+            code: '005930',
+            price: 85200,
+            currency: 'KRW',
+            asOf: null,
+            source: 'krx',
+            status: 'ok',
+          },
+        ],
+      },
+    },
+  );
+
+  assert.deepEqual(packet.consensusSnapshot.analystBrokers, [
+    { name: '미래에셋증권', targetPrice: 110000, date: '2026-09-07' },
+    { name: '현대차증권', targetPrice: 90000, date: '2026-08-05' },
+  ]);
+  assert.equal(packet.consensusSnapshot.analystCount, 3);
 });
