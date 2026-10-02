@@ -8,7 +8,7 @@ const NAVER_DOMESTIC_DETAIL_BASE = 'https://stock.naver.com/api/domestic/detail'
 const NAVER_M_STOCK_API_BASE = 'https://m.stock.naver.com/api';
 const BROWSER_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36';
-const DEFAULT_ETF_PROFILE_TIMEOUT_MS = 10_000;
+const DEFAULT_ETF_PROFILE_TIMEOUT_MS = 30_000;
 const HOLDINGS_LIMIT = 30;
 // 일봉: m.stock price API는 pageSize 상한 60 — 5페이지(≈300거래일)로 1년치 확보
 const DAILY_PRICE_PAGE_SIZE = 60;

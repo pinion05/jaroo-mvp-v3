@@ -9,7 +9,7 @@ const USD_KRW_YAHOO_CHART_URLS = [
   'https://query1.finance.yahoo.com/v8/finance/chart/KRW=X?range=5d&interval=1d',
 ];
 const USD_KRW_OPEN_ER_API_URL = 'https://open.er-api.com/v6/latest/USD';
-const USD_KRW_FETCH_TIMEOUT_MS = 3000;
+const USD_KRW_FETCH_TIMEOUT_MS = 8_000;
 const USD_KRW_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
 const USD_KRW_REDIS_CACHE_KEY = 'crawler:usd-krw-rate';
 

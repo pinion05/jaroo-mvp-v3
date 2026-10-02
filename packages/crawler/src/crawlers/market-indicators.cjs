@@ -16,7 +16,7 @@ const MARKET_JSON_HEADERS = {
     'user-agent': 'Mozilla/5.0 (compatible; JarooCrawler/1.0; +https://jaroo.local)'
 };
 
-const MARKET_JSON_TIMEOUT_MS = 3000;
+const MARKET_JSON_TIMEOUT_MS = 10_000;
 
 const USER_AGENT =
     'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/146.0.0.0 Safari/537.36';

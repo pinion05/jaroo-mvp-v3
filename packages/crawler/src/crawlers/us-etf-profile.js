@@ -19,7 +19,7 @@ import { polygonFetch } from './api-clients.js';
 const YAHOO_QUERY1_BASE = 'https://query1.finance.yahoo.com';
 const BROWSER_USER_AGENT =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/128.0 Safari/537.36';
-const DEFAULT_US_ETF_PROFILE_TIMEOUT_MS = 10_000;
+const DEFAULT_US_ETF_PROFILE_TIMEOUT_MS = 30_000;
 // 52주 지표(etf-metrics 최소 260거래일) + 여유 — 약 2년
 const DAILY_LIMIT = 510;
 const HOLDINGS_LIMIT = 10; // quoteSummary topHoldings가 주는 상위 10종목

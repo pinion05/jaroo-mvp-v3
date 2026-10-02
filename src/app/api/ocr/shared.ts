@@ -118,7 +118,7 @@ const DEFAULT_OCR_FALLBACK_MODELS = [
 
 export const OCR_MAX_IMAGE_DATA_URL_LENGTH = 4_000_000 // 스크린샷 클라이언트 총량 상한과 동일
 export const OCR_MAX_REQUEST_BYTES = OCR_MAX_IMAGE_DATA_URL_LENGTH + 64 * 1024 // JSON 래핑 여유
-export const OCR_UPSTREAM_TIMEOUT_MS = 30_000
+export const OCR_UPSTREAM_TIMEOUT_MS = 120_000
 export const OCR_RATE_LIMIT_MAX = 10 // 배치 업로드 상한(5) + 재시도 여유
 export const OCR_RATE_LIMIT_WINDOW_MS = 5 * 60_000
 

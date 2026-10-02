@@ -13,7 +13,7 @@ export const runtime = 'nodejs'
 export const ETF_COMMITTEE_RATE_LIMIT_MAX = 15 // 화면 진입당 1회 + 재시도 여유
 export const ETF_COMMITTEE_RATE_LIMIT_WINDOW_MS = 5 * 60_000
 // 상류 소프트데드라인(기본 25s)보다 넉넉히 — LLM 3명 완성을 한 번에 받아온다.
-export const ETF_COMMITTEE_UPSTREAM_TIMEOUT_MS = 45_000
+export const ETF_COMMITTEE_UPSTREAM_TIMEOUT_MS = 120_000
 
 const KR_ETF_CODE_PATTERN = /^\d{6}$/
 

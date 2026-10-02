@@ -4,7 +4,7 @@ import type { LoadingBriefingDailyRow, LoadingBriefingSnapshot } from '@/lib/dee
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 
 const NAVER_STOCK_API_BASE = 'https://m.stock.naver.com/api'
-const BRIEFING_SNAPSHOT_TIMEOUT_MS = 4_500
+const BRIEFING_SNAPSHOT_TIMEOUT_MS = 15_000
 const BRIEFING_SNAPSHOT_CACHE_TTL_MS = 15_000
 const DAILY_PRICE_PAGE_SIZE = 60
 

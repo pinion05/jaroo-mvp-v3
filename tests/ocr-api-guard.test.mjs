@@ -29,7 +29,7 @@ test('OCR shared: 가드 상수·레이트리밋이 정의된다', () => {
   assert.match(shared, /OCR_MAX_REQUEST_BYTES = OCR_MAX_IMAGE_DATA_URL_LENGTH/)
 
   // 4) 업스트림 타임아웃
-  assert.match(shared, /OCR_UPSTREAM_TIMEOUT_MS = 30_000/)
+  assert.match(shared, /OCR_UPSTREAM_TIMEOUT_MS = 120_000/)
 })
 
 test('OCR 라우트: 유료 LLM 호출 전에 4겹 가드가 배선된다', () => {

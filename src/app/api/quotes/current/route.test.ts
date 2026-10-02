@@ -14,7 +14,7 @@ test('quotes current proxy는 crawler endpoint url을 그대로 조합한다', (
   const url = buildQuotesCurrentUpstreamUrl('http://127.0.0.1:3040', new URL('http://localhost/api/quotes/current?codes=005930&tickers=AAPL').searchParams)
 
   assert.equal(url, 'http://127.0.0.1:3040/api/source/krx-polygon-fmp/market/quotes/current?codes=005930&tickers=AAPL')
-  assert.equal(QUOTES_CURRENT_PROXY_TIMEOUT_MS, 15_000)
+  assert.equal(QUOTES_CURRENT_PROXY_TIMEOUT_MS, 30_000)
 })
 
 test('quotes current proxy fetch normalizes signal-aware upstream timeout aborts', async () => {

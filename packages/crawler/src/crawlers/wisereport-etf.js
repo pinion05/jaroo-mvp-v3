@@ -1,5 +1,5 @@
 const WISEREPORT_ETF_DETAIL_URL = 'https://comp.wisereport.co.kr/ETF/ETF.aspx';
-const DEFAULT_WISEREPORT_ETF_TIMEOUT_MS = 4_500;
+const DEFAULT_WISEREPORT_ETF_TIMEOUT_MS = 15_000;
 
 function normalizeText(value) {
   return typeof value === 'string' && value.trim() ? value.trim() : null;

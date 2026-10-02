@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-const DEFAULT_RPC_TIMEOUT_MS = 2_500;
+const DEFAULT_RPC_TIMEOUT_MS = 5_000;
 const DEFAULT_FRESH_TTL_MS = 6 * 60 * 60_000;
 const DEFAULT_STALE_TTL_MS = 7 * 24 * 60 * 60_000;
 const CACHE_KEY_PREFIX = 'crawler-cache-v1';

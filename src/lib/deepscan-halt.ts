@@ -13,7 +13,7 @@ import type { HomeHolding } from './holding-types'
 
 export type DeepScanHaltVerdict = 'halted' | 'active' | 'pending'
 
-export const DEEPSCAN_HALT_CHECK_TIMEOUT_MS = 3000
+export const DEEPSCAN_HALT_CHECK_TIMEOUT_MS = 10_000
 
 export function isHaltedHomeHolding(holding: Pick<HomeHolding, 'cardTone'> | null | undefined) {
   return holding?.cardTone === 'halt'

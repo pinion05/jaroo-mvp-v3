@@ -8,7 +8,7 @@
 import { readFile } from 'node:fs/promises';
 
 export const WISEREPORT_GLOBAL_BASE_URL = 'https://compglobal.wisereport.co.kr';
-export const WISEREPORT_GLOBAL_DEFAULT_TIMEOUT_MS = 20_000;
+export const WISEREPORT_GLOBAL_DEFAULT_TIMEOUT_MS = 45_000;
 export const WISEREPORT_GLOBAL_DEFAULT_CONCURRENCY = 4;
 
 const DEFAULT_USER_AGENT = [

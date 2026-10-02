@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 
-export const USD_KRW_FX_PROXY_TIMEOUT_MS = 4500
+export const USD_KRW_FX_PROXY_TIMEOUT_MS = 10_000
 
 export class UsdKrwFxProxyTimeoutError extends Error {
   constructor(message = 'usd krw fx upstream timed out') {

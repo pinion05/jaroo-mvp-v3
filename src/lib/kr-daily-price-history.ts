@@ -1,7 +1,7 @@
 const NAVER_STOCK_API_BASE = 'https://m.stock.naver.com/api'
 const DEFAULT_PAGE_COUNT = 6
 const DEFAULT_PAGE_SIZE = 60
-const DEFAULT_TIMEOUT_MS = 5_000
+const DEFAULT_TIMEOUT_MS = 15_000
 
 type NaverDailyPriceRow = {
   localTradedAt?: unknown
