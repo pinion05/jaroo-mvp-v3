@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 
-export const US_MARKET_INDICATORS_PROXY_TIMEOUT_MS = 12000
+export const US_MARKET_INDICATORS_PROXY_TIMEOUT_MS = 30_000
 
 export class UsMarketIndicatorsProxyTimeoutError extends Error {
   constructor(message = 'us market indicators upstream timed out') {

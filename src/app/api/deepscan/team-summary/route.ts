@@ -26,7 +26,7 @@ export const DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT = [
   '좋은 예: “지금 구간은 평단 대비 수익권이라 포지션 자체는 안정적으로 보여요. 다만 단기 가격이 빠르게 올라온 만큼 추가 여지는 목표가와 거래량 흐름을 같이 봐야 해요. 최근 실적이나 리포트 신선도가 약하면 상승 논리보다 변동성 관리가 더 중요해요.”',
   '나쁜 예: “세 위원 모두 긍정적으로 평가합니다. 심리 분석AI는 수익률을 근거로 보고 산업 전문가는 목표가 차이를 상승 여력으로 해석합니다.”',
 ].join(' ')
-const DEFAULT_TEAM_SUMMARY_TIMEOUT_MS = 2500
+const DEFAULT_TEAM_SUMMARY_TIMEOUT_MS = 10_000
 const MAX_TEAM_BODY_CHARS = 2400
 const ETF_TEAM_SUMMARY_PROMPT_APPENDIX = [
   'ETF/ETN 입력에서는 개별 기업식 목표가, 증권사 컨센서스, 실적, EPS, PER, PBR 부재를 리스크나 한계로 쓰지 마라.',

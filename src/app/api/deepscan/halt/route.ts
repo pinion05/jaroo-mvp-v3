@@ -18,7 +18,7 @@ import {
 
 // 업스트림(DART 공시) 타임아웃. 크롤러가 corpCode.xml(3.6MB, 24h 캐시)을 콜드 다운로드하는
 // 순간이 가장 느린 경로라 기존 6초보다 2배 여유를 둔다.
-const HALT_DISCLOSURE_TIMEOUT_MS = 12_000
+const HALT_DISCLOSURE_TIMEOUT_MS = 30_000
 // 업스트림 실패 시 재시도 1회(총 2회 시도). 첫 시도가 corp 콜드 다운로드 등 일회성 지연에
 // 걸려도 재시도 시점엔 크롤러 캐시가 웜이라 즉시 성공한다(2026-09-23 실측 분석).
 const HALT_DISCLOSURE_ATTEMPTS = 2

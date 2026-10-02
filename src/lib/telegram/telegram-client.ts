@@ -21,7 +21,7 @@ async function callTelegramApi(method: string, payload: Record<string, unknown>)
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
       cache: 'no-store',
-      signal: AbortSignal.timeout(10_000),
+      signal: AbortSignal.timeout(20_000),
     })
     const data = (await res.json().catch(() => null)) as { ok?: boolean; result?: unknown; description?: string } | null
     if (res.ok && data?.ok) {

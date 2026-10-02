@@ -7,7 +7,7 @@ import { promisify } from 'node:util';
 
 const execFile = promisify(execFileCallback);
 
-const DEFAULT_TIMEOUT_MS = 60_000;
+const DEFAULT_TIMEOUT_MS = 150_000;
 const DEFAULT_MAX_RETRIES = 1;
 const DEFAULT_RETRY_DELAY_MS = 250;
 const DEFAULT_CONNECT_TIMEOUT_SECONDS = 10;

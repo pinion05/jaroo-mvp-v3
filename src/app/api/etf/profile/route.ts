@@ -22,7 +22,7 @@ import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 
 export const ETF_PROFILE_RATE_LIMIT_MAX = 30 // 화면 진입당 1회 호출 기준, 탐색 여유 포함
 export const ETF_PROFILE_RATE_LIMIT_WINDOW_MS = 5 * 60_000
-export const ETF_PROFILE_UPSTREAM_TIMEOUT_MS = 20_000
+export const ETF_PROFILE_UPSTREAM_TIMEOUT_MS = 60_000
 
 const KR_ETF_CODE_PATTERN = /^\d{6}$/
 

@@ -52,7 +52,7 @@ function buildQuoteLookupKeyFromReviewRow(
   return (row.resolvedCode ?? row.code)?.trim() || undefined
 }
 
-const AVERAGE_PRICE_FILL_TIMEOUT_MS = 10_000
+const AVERAGE_PRICE_FILL_TIMEOUT_MS = 30_000
 
 export async function fillMissingAveragePricesFromQuotes<T extends OcrReviewRow>(
   rows: T[],
