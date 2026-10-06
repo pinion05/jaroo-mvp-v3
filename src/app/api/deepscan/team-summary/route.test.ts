@@ -107,6 +107,53 @@ test('parseTeamSummaryContent accepts JSON or direct sentence and normalizes whi
   assert.equal(parseTeamSummaryContent('  직접 한 문장입니다.  '), '직접 한 문장입니다.')
 })
 
+test('team summary route logs elapsedMs on success and failure message on error', async () => {
+  const originalLog = console.log
+  const originalError = console.error
+  const logged: string[] = []
+  console.log = (message: unknown) => { logged.push(String(message)) }
+  console.error = (message: unknown) => { logged.push(String(message)) }
+
+  try {
+    await createDeepScanTeamSummaryResponse(
+      {
+        teamKey: 'contextTeam',
+        teamName: '심리·환경 팀',
+        body: '의견 1: 긍정. 의견 2: 중립. 의견 3: 주의.',
+      },
+      async () => ({
+        summary: '지금 구간은 확인이 필요해요. 변동성 관리가 중요해요.',
+        model: 'openai/gpt-oss-120b',
+        provider: 'Cerebras/fp16',
+        elapsedMs: 547,
+      }),
+    )
+
+    await createDeepScanTeamSummaryResponse(
+      {
+        teamKey: 'contextTeam',
+        teamName: '심리·환경 팀',
+        body: '의견 1: 긍정. 의견 2: 중립. 의견 3: 주의.',
+      },
+      async () => {
+        throw new Error('OpenRouter team summary failed (502)')
+      },
+    )
+  } finally {
+    console.log = originalLog
+    console.error = originalError
+  }
+
+  assert.ok(
+    logged.some((line) => line.includes('[team-summary] ok') && line.includes("'contextTeam'") && line.includes('547')),
+    `success log missing: ${JSON.stringify(logged)}`,
+  )
+  assert.ok(
+    logged.some((line) => line.includes('[team-summary] fail') && line.includes('OpenRouter team summary failed')),
+    `failure log missing: ${JSON.stringify(logged)}`,
+  )
+})
+
 test('team summary removes forbidden investment action advice phrases', async () => {
   assert.equal(
     removeForbiddenInvestmentActionAdvice('현재 포지션을 유지하면서 시장 전반의 흐름을 주시할 필요가 있습니다.'),

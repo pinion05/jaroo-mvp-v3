@@ -226,6 +226,9 @@ export async function createDeepScanTeamSummaryResponse(
   try {
     const result = await requester({ teamKey, teamName, body: rawBody, market: market ?? undefined, instrumentKind: instrumentKind ?? undefined })
     const summary = cleanupTeamSummaryForInstrument(result.summary, { market: market ?? undefined, instrumentKind: instrumentKind ?? undefined })
+    // 관측 공백 해소(2026-10-06): 이 라우트는 로그를 남기지 않아 응답 지연 원인을
+    // journalctl에서 추적할 수 없었다. elapsedMs는 요청자가 계산해 전달한다.
+    console.log(`[team-summary] ok { teamKey: '${teamKey}', elapsedMs: ${result.elapsedMs ?? 'n/a'}, provider: '${result.provider ?? 'unknown'}' }`)
     return NextResponse.json({
       ok: true,
       teamKey,
@@ -236,12 +239,14 @@ export async function createDeepScanTeamSummaryResponse(
       elapsedMs: result.elapsedMs,
     })
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'team summary failed'
+    console.error(`[team-summary] fail { teamKey: '${teamKey}', message: ${JSON.stringify(message)} }`)
     return NextResponse.json(
       {
         ok: false,
         teamKey,
         teamName,
-        error: { message: error instanceof Error ? error.message : 'team summary failed' },
+        error: { message },
       },
       { status: 502 },
     )
