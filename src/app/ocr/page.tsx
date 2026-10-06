@@ -22,6 +22,12 @@ import { hydratePortfolioItemsWithCurrentQuotes } from '@/lib/home-quote-bootstr
 import { getFinancialValueTone } from '@/lib/financial-value-tone'
 import { aggregateResolvedOcrReviewRows, type AggregatedOcrReviewRow } from '@/lib/ocr-review-aggregation'
 import {
+  buildEvaluationPreviewKey,
+  computeEvaluationPreviewAmount,
+  fetchCurrentPricesForEvaluationPreview,
+  formatEvaluationPreviewAmount,
+} from '@/lib/ocr-evaluation-preview'
+import {
   buildMergeRowsFromReviewRows,
   fillMissingAveragePricesFromQuotes,
   isMissingAveragePrice,
@@ -249,6 +255,7 @@ function OcrResultDesignStyles() {
       .jaroo-ocr-okr-meta{font-size:10.5px;color:#97A0AE;margin-top:2px;line-height:1.35}
       .jaroo-ocr-okr-right{text-align:right;flex-shrink:0}
       .jaroo-ocr-okr-amt{font-size:12.5px;font-weight:600;color:#0F1419;font-variant-numeric:tabular-nums;white-space:nowrap}
+      .jaroo-ocr-okr-amt.computed{font-weight:500;color:#5A6473}
       .jaroo-ocr-okr-rate{font-size:11px;margin-top:1px;font-variant-numeric:tabular-nums}
       .jaroo-ocr-okr-rate.up{color:var(--jaroo-profit)}.jaroo-ocr-okr-rate.down{color:var(--jaroo-loss)}
       .jaroo-ocr-okr-edit{font-size:10.5px;color:#2B6BE6;margin-top:3px;cursor:pointer;border:0;background:transparent}
@@ -377,9 +384,11 @@ export default function OcrPage() {
   const [removedRowIds, setRemovedRowIds] = useState<Record<string, true>>({})
   const [persistedUploadSession, setPersistedUploadSession] = useState<ScreenshotUploadSession | null>(null)
   const [hasCheckedPersistedUploadSession, setHasCheckedPersistedUploadSession] = useState(false)
+  const [evaluationPreviewPrices, setEvaluationPreviewPrices] = useState<Map<string, number>>(() => new Map())
   const ocrRunIdRef = useRef(0)
   const autoOcrSessionKeyRef = useRef<string | null>(null)
   const isLeavingAfterApplyRef = useRef(false)
+  const fetchedEvaluationPreviewKeyRef = useRef('')
   const session = uploadStoreSession ?? persistedUploadSession
 
   useEffect(() => {
@@ -680,6 +689,37 @@ export default function OcrPage() {
     () => aggregateResolvedOcrReviewRows(rowsReadyForApply),
     [rowsReadyForApply],
   )
+  const evaluationPreviewKey = useMemo(
+    () => buildEvaluationPreviewKey(aggregatedRows),
+    [aggregatedRows],
+  )
+
+  // 평가금이 비어 있는 행(스키마 축소 이후 일반적)은 현재 시세로 프리뷰 금액(현재가×수량)을
+  // 계산해 카드에 보여준다. 표시 전용 근사값이고 적용 데이터는 적용 시점에만 확정된다.
+  useEffect(() => {
+    if (!evaluationPreviewKey || evaluationPreviewKey === fetchedEvaluationPreviewKeyRef.current) {
+      return
+    }
+
+    fetchedEvaluationPreviewKeyRef.current = evaluationPreviewKey
+    const abortController = new AbortController()
+
+    fetchCurrentPricesForEvaluationPreview(aggregatedRows, fetch, { signal: abortController.signal })
+      .then((prices) => {
+        if (!abortController.signal.aborted) {
+          setEvaluationPreviewPrices(prices)
+        }
+      })
+      .catch(() => {
+        if (!abortController.signal.aborted) {
+          setEvaluationPreviewPrices(new Map())
+        }
+      })
+
+    return () => {
+      abortController.abort()
+    }
+  }, [aggregatedRows, evaluationPreviewKey])
   const rowsNeedingAttention = useMemo(
     () => previewRows.filter((row) => row.resolutionState !== 'resolved'),
     [previewRows],
@@ -884,6 +924,7 @@ export default function OcrPage() {
                     const candidates = instrumentCandidatesByRowId[editableRowId] ?? []
                     const selectedId = editableRow.selectedCandidateId ?? candidates[0]?.id
                     const isEditing = expandedRowId === editableRowId
+                    const computedEvaluationAmount = computeEvaluationPreviewAmount(row, evaluationPreviewPrices)
 
                     return (
                       <div key={`${row.id}-${index}`}>
@@ -899,14 +940,20 @@ export default function OcrPage() {
                                 {accountDetails.map((detail, detailIndex) => (
                                   <div key={detail.rowId} className='jaroo-ocr-acct-row'>
                                     <span>{detail.sourceFileName || `계좌 ${detailIndex + 1}`}</span>
-                                    <span>{detail.quantity} · {detail.evaluationAmount}</span>
+                                    <span>
+                                      {detail.evaluationAmount ? `${detail.quantity} · ${detail.evaluationAmount}` : detail.quantity}
+                                    </span>
                                   </div>
                                 ))}
                               </div>
                             ) : null}
                           </div>
                           <div className='jaroo-ocr-okr-right'>
-                            <div className='jaroo-ocr-okr-amt'>{row.evaluationAmount || '-'}</div>
+                            <div className={`jaroo-ocr-okr-amt${computedEvaluationAmount !== null ? ' computed' : ''}`}>
+                              {computedEvaluationAmount !== null
+                                ? formatEvaluationPreviewAmount(computedEvaluationAmount, row.resolvedMarketTone)
+                                : (row.evaluationAmount || '-')}
+                            </div>
                             <div className={`jaroo-ocr-okr-rate ${getProfitRateClass(row.profitRate)}`}>{row.profitRate || '-'}</div>
                             <button
                               type='button'
