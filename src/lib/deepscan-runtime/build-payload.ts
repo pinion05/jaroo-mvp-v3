@@ -1039,6 +1039,13 @@ export async function buildKrDeepScanPayloadViaCrawler(
       continue
     }
 
+    // 크롤러 429 busy의 limits/activeJobs, 504 timeout의 잔존 잡 정보를 서버 로그에 남긴다.
+    // 응답 본문으로는 전달되지 않는 진단 신호라 운영자가 웹 로그만으로 슬롯 점유 원인을 볼 수 있게 한다.
+    const upstreamDetails = (payload?.error as { details?: unknown } | undefined)?.details
+    if (upstreamDetails) {
+      console.error('[deepscan] crawler upstream error details', JSON.stringify(upstreamDetails))
+    }
+
     throw new CrawlerDeepScanRequestError(
       typeof payload?.error?.message === 'string'
         ? payload.error.message

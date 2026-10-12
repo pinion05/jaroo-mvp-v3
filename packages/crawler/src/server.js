@@ -58,14 +58,8 @@ const host = process.env.CRAWLER_HOST || '127.0.0.1';
 
 app.use(express.json());
 
-class HttpError extends Error {
-  constructor(status, message, details = null) {
-    super(message);
-    this.name = 'HttpError';
-    this.status = status;
-    this.details = details;
-  }
-}
+import { HttpError } from './services/http-error.js';
+import { createDeepscanKrAdmission } from './services/deepscan-kr-admission.js';
 
 function normalizeValue(value) {
   if (Array.isArray(value)) {
@@ -130,92 +124,7 @@ function parseBooleanQuery(value) {
   return normalizedValue === '1' || normalizedValue === 'true' || normalizedValue === 'yes' || normalizedValue === 'on';
 }
 
-function parsePositiveInteger(value, fallback) {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function stableStringify(value) {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
-  }
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
-  }
-  return JSON.stringify(value ?? null);
-}
-
-const deepscanKrJobs = new Map();
-const activeDeepscanKrCodes = new Map();
-
-function buildDeepscanKrJobKey(input) {
-  return stableStringify({
-    schema: 'jaroo.deepscan.kr.canonical.v1',
-    instrument: {
-      code: input.instrument?.code ?? null,
-      ticker: input.instrument?.ticker ?? null,
-      market: input.instrument?.market ?? null,
-      kind: input.instrument?.kind ?? null,
-    },
-    holding: input.holding ?? null,
-    selectedAt: input.selectedAt ?? null,
-    sourceContext: input.sourceContext ?? null,
-    disclosureOptions: input.disclosureOptions ?? null,
-  });
-}
-
-async function runDeepscanKrWithAdmission(input, load) {
-  if (process.env.DEEPSCAN_KR_EXECUTION_DISABLED === '1') {
-    throw new HttpError(503, 'KR DeepScan execution disabled', {
-      status: 'unavailable',
-      retryable: true,
-    });
-  }
-
-  const jobKey = buildDeepscanKrJobKey(input);
-  const existing = deepscanKrJobs.get(jobKey);
-  if (existing) {
-    return existing.promise;
-  }
-
-  const code = String(input.instrument?.code ?? input.instrument?.ticker ?? 'unknown');
-  const globalLimit = parsePositiveInteger(process.env.DEEPSCAN_KR_GLOBAL_JOBS, 1);
-  const perCodeLimit = parsePositiveInteger(process.env.DEEPSCAN_KR_PER_CODE_JOBS, 1);
-  const activeForCode = activeDeepscanKrCodes.get(code) ?? 0;
-
-  if (deepscanKrJobs.size >= globalLimit || activeForCode >= perCodeLimit) {
-    throw new HttpError(429, 'KR DeepScan crawler is busy', {
-      status: 'busy',
-      reason: deepscanKrJobs.size >= globalLimit ? 'global_limit' : 'per_code_limit',
-      retryAfterMs: parsePositiveInteger(process.env.DEEPSCAN_KR_BUSY_RETRY_AFTER_MS, 2000),
-    });
-  }
-
-  activeDeepscanKrCodes.set(code, activeForCode + 1);
-  const startedAt = Date.now();
-  const promise = (async () => {
-    try {
-      return await load();
-    } finally {
-      const nextActiveForCode = Math.max(0, (activeDeepscanKrCodes.get(code) ?? 1) - 1);
-      if (nextActiveForCode === 0) {
-        activeDeepscanKrCodes.delete(code);
-      } else {
-        activeDeepscanKrCodes.set(code, nextActiveForCode);
-      }
-      deepscanKrJobs.delete(jobKey);
-      console.log(`[${SERVICE_NAME}] deepscan-kr job complete code=${code} durationMs=${Date.now() - startedAt}`);
-    }
-  })();
-
-  deepscanKrJobs.set(jobKey, {
-    code,
-    startedAt: new Date().toISOString(),
-    promise,
-  });
-
-  return promise;
-}
+const deepscanKrAdmission = createDeepscanKrAdmission({ serviceName: SERVICE_NAME });
 
 const DEEPSCAN_MAJOR_BLOCK_KEYS = Object.freeze([
   'hero',
@@ -3091,7 +3000,7 @@ const endpointDefinitions = [
         return buildJarooDeepScanPayload(input);
       }
 
-      return runDeepscanKrWithAdmission(input, () => buildJarooDeepScanPayload(input));
+      return deepscanKrAdmission.run(input, () => buildJarooDeepScanPayload(input));
     },
   },
   {
