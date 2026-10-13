@@ -636,6 +636,13 @@ test('getDartCorpCodeList ignores stale disk cache and refetches', async () => {
   assert.equal(calls.filter((p) => p.endsWith('/corpCode.xml')).length, 1);
 
   // corpCodeDiskTtlMs=0 → 디스크 사본은 즉시 낡은 것으로 간주해 다시 내려받는다.
+  // 단 쓰기-읽기가 같은 밀리초에 끝나면 (0 > 0)이 거짓이라 신선으로 오판하므로
+  // 메타의 fetchedAt을 명시적으로 1초 과거로 되돌려 결정적으로 만든다.
+  const { readFileSync, writeFileSync } = require('node:fs');
+  const metaPath = joinPath(diskDir, 'corpCode-stale-ke.meta.json');
+  const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
+  meta.fetchedAt -= 1000;
+  writeFileSync(metaPath, JSON.stringify(meta));
   clearDartCaches();
   await getDartCorpCodeList({ apiKey: 'stale-key', fetchImpl, corpCodeDiskDir: diskDir, corpCodeDiskTtlMs: 0 });
   assert.equal(calls.filter((p) => p.endsWith('/corpCode.xml')).length, 2);
@@ -761,10 +768,6 @@ test('getDartCorpCodeList creates the storage bucket once when upload hits 404',
   const fetchImpl = async (url, init) => {
     const target = String(url);
     const method = init?.method ?? 'GET';
-    if (target.includes('/storage/v1/buckets')) {
-      calls.push('create-bucket');
-      return new Response('ok', { status: 201 });
-    }
     if (target.includes('/storage/v1/object/') && method === 'GET') {
       return new Response('not found', { status: 404 });
     }
@@ -772,6 +775,11 @@ test('getDartCorpCodeList creates the storage bucket once when upload hits 404',
       uploadAttempts += 1;
       calls.push(`upload-${uploadAttempts}`);
       return uploadAttempts === 1 ? new Response('not found', { status: 404 }) : new Response('created', { status: 201 });
+    }
+    if (target.includes('/storage/v1/bucket')) {
+      // 단수형/복수형 모두 잡는다 — 실제 라우트는 배포에 따라 다르다.
+      calls.push(`create-bucket:${target.split('/storage/v1/')[1] ?? ''}`);
+      return target.endsWith('/storage/v1/bucket') ? new Response('ok', { status: 201 }) : new Response('not found', { status: 404 });
     }
     if (target.includes('/corpCode.xml')) {
       return new Response(CORP_CODE_XML, { status: 200 });
@@ -788,7 +796,7 @@ test('getDartCorpCodeList creates the storage bucket once when upload hits 404',
   });
 
   assert.equal(entries.length, 2);
-  assert.deepEqual(calls, ['upload-1', 'create-bucket', 'upload-2'], '업로드 404 → 버킷 생성 → 재시도');
+  assert.deepEqual(calls, ['upload-1', 'create-bucket:bucket', 'upload-2'], '업로드 404 → 버킷 생성(단수형 우선) → 재시도');
 });
 
 test('getDartCorpCodeList skips the remote layer when disabled by env', async () => {
