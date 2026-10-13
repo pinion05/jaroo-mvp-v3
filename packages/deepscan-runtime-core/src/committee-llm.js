@@ -460,6 +460,7 @@ export async function scoreCommitteeMember(memberKey, dumps, options = {}) {
         errorKind: null,
         llmResultPresent: true,
         model: runtimeOptions.model,
+        elapsedMs: elapsedMs,
       }
 
       writeLog(runtimeOptions.logDir, `${memberKey}.json`, {
@@ -639,6 +640,8 @@ export async function scoreCommitteeMembersProgressive({ memberKeys, shared, mem
   const requestId = runtimeOptions.requestId ?? `committee-${Date.now()}-${Math.random().toString(36).slice(2)}`
   const concurrency = parsePositiveInteger(runtimeOptions.concurrency ?? process.env.DEEPSCAN_LLM_CONCURRENCY, memberKeys.length || 1)
   const softDeadlineMs = parseNonNegativeInteger(runtimeOptions.softDeadlineMs ?? process.env.DEEPSCAN_LLM_SOFT_DEADLINE_MS, 0)
+  const committeeStartedAtMs = Date.now()
+  console.log(`[committee-llm] start requestId=${requestId} members=${memberKeys.length} concurrency=${Math.max(1, Math.min(memberKeys.length || 1, concurrency))} model=${runtimeOptions.model ?? process.env.DEEPSCAN_LLM_MODEL ?? DEFAULT_COMMITTEE_LLM_MODEL} softDeadlineMs=${softDeadlineMs}`)
   const job = {
     requestId,
     memberKeys: [...memberKeys],
@@ -668,9 +671,12 @@ export async function scoreCommitteeMembersProgressive({ memberKeys, shared, mem
           })
         }
 
+        const memberStartedAtMs = Date.now()
         job.results[memberKey] = await scoreCommitteeMember(memberKey, { shared, memberDump }, runtimeOptions)
+        console.log(`[committee-llm] member=${memberKey} elapsed=${Date.now() - memberStartedAtMs}ms attempts=${job.results[memberKey].attempts ?? 1} status=ok requestId=${requestId}`)
       } catch (reason) {
         job.errors.push(createMemberError(memberKey, reason, runtimeOptions))
+        console.log(`[committee-llm] member=${memberKey} status=error kind=${job.errors[job.errors.length - 1].errorKind ?? 'llm-unknown'} attempts=${job.errors[job.errors.length - 1].attempts ?? '?'} requestId=${requestId}`)
       } finally {
         job.updatedAt = nowIso()
       }
@@ -684,11 +690,13 @@ export async function scoreCommitteeMembersProgressive({ memberKeys, shared, mem
   await waitForAllDoneOrSoftDeadline(allDone, softDeadlineMs)
 
   const snapshot = createCommitteeProgressSnapshot(job)
+  console.log(`[committee-llm] soft-deadline snapshot status=${snapshot.status} completed=${snapshot.completed}/${memberKeys.length} pending=${snapshot.pending.length} errors=${snapshot.errors.length} elapsed=${Date.now() - committeeStartedAtMs}ms requestId=${requestId}`)
   writeCommitteeSummary(runtimeOptions, memberKeys, concurrency, snapshot)
 
   void allDone
     .then(() => {
       const finalSnapshot = createCommitteeProgressSnapshot(job)
+      console.log(`[committee-llm] final status=${finalSnapshot.status} completed=${finalSnapshot.completed}/${memberKeys.length} errors=${finalSnapshot.errors.length} elapsed=${Date.now() - committeeStartedAtMs}ms requestId=${requestId}`)
       writeCommitteeSummary(runtimeOptions, memberKeys, concurrency, finalSnapshot)
       scheduleCommitteeProgressCleanup(job, parseNonNegativeInteger(runtimeOptions.progressTtlMs, DEFAULT_COMMITTEE_PROGRESS_TTL_MS))
     })

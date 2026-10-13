@@ -520,7 +520,10 @@ async function mapWithConcurrency(items, concurrency, worker) {
   return results;
 }
 
-async function fetchWithTimeout(url, { fetchImpl = fetch, timeoutMs = DART_DEFAULT_TIMEOUT_MS, headers = {} } = {}) {
+// fetchWithTimeout은 응답 헤더까지만 타임아웃을 보장한다 — 이후 json()/arrayBuffer()/
+// 스트림 바디 읽기가 무제한 대기할 수 있다(corpCode.xml.zip ~7MB 등 대용량 바디에서
+// 실제로 잡을 묶은 전례). fetch + 바디 소비 전체를 하나의 데드라인으로 감싼다.
+async function withDartDeadline(url, { fetchImpl = fetch, timeoutMs = DART_DEFAULT_TIMEOUT_MS, headers = {} } = {}, consume) {
   const controller = timeoutMs > 0 ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
@@ -532,8 +535,11 @@ async function fetchWithTimeout(url, { fetchImpl = fetch, timeoutMs = DART_DEFAU
       },
       signal: controller?.signal,
     });
-    return response;
+    return await consume(response);
   } catch (error) {
+    if (error instanceof DartDisclosureError) {
+      throw error;
+    }
     if (error?.name === 'AbortError') {
       throw new DartDisclosureError('OpenDART request timed out', {
         status: 504,
@@ -611,25 +617,23 @@ async function fetchDartJson(path, params, opts = {}) {
     return cached.value;
   }
 
-  const response = await fetchWithTimeout(url, opts);
-  if (!response.ok) {
-    throw new DartDisclosureError(`OpenDART HTTP ${response.status}`, {
-      status: response.status >= 500 ? 502 : response.status,
-      code: 'provider_http_error',
-      details: { providerStatus: response.status, url: redactDartUrl(url.toString()) },
-    });
-  }
+  const data = await withDartDeadline(url, opts, (response) => {
+    if (!response.ok) {
+      throw new DartDisclosureError(`OpenDART HTTP ${response.status}`, {
+        status: response.status >= 500 ? 502 : response.status,
+        code: 'provider_http_error',
+        details: { providerStatus: response.status, url: redactDartUrl(url.toString()) },
+      });
+    }
 
-  let data;
-  try {
-    data = await response.json();
-  } catch (error) {
-    throw new DartDisclosureError('OpenDART returned invalid JSON', {
-      status: 502,
-      code: 'provider_invalid_json',
-      details: { message: error?.message ?? 'invalid json', url: redactDartUrl(url.toString()) },
+    return response.json().catch(() => {
+      throw new DartDisclosureError('OpenDART returned invalid JSON', {
+        status: 502,
+        code: 'provider_invalid_json',
+        details: { message: 'invalid json', url: redactDartUrl(url.toString()) },
+      });
     });
-  }
+  });
 
   listCache.set(cacheKey, { fetchedAt: Date.now(), value: data });
   return data;
@@ -663,22 +667,23 @@ export async function getDartDisclosureDocumentText(rceptNoInput, opts = {}) {
     return cached.value;
   }
 
-  const response = await fetchWithTimeout(url, {
+  const payload = await withDartDeadline(url, {
     ...opts,
     headers: { Accept: 'application/zip, application/xml, text/xml, */*', ...(opts.headers ?? {}) },
-  });
-  if (!response.ok) {
-    throw new DartDisclosureError(`OpenDART document HTTP ${response.status}`, {
-      status: response.status >= 500 ? 502 : response.status,
-      code: 'provider_http_error',
-      details: { providerStatus: response.status, url: redactDartUrl(url.toString()) },
-    });
-  }
+  }, async (response) => {
+    if (!response.ok) {
+      throw new DartDisclosureError(`OpenDART document HTTP ${response.status}`, {
+        status: response.status >= 500 ? 502 : response.status,
+        code: 'provider_http_error',
+        details: { providerStatus: response.status, url: redactDartUrl(url.toString()) },
+      });
+    }
 
-  const payload = await readResponseBodyWithLimit(
-    response,
-    resourcePolicy.maxCompressedBytes,
-  );
+    return readResponseBodyWithLimit(
+      response,
+      resourcePolicy.maxCompressedBytes,
+    );
+  });
   const head = payload.subarray(0, Math.min(payload.length, 800)).toString('utf8').trimStart();
   const xmlStatus = parseOpenDartXmlStatus(head);
   if (xmlStatus && xmlStatus.status !== '000') {
@@ -946,20 +951,22 @@ export async function getDartCorpCodeList(opts = {}) {
 
   const url = new URL(`${OPEN_DART_BASE_URL}/corpCode.xml`);
   url.searchParams.set('crtfc_key', apiKey);
-  const response = await fetchWithTimeout(url, {
+  const payload = await withDartDeadline(url, {
     ...opts,
     headers: { Accept: 'application/zip, application/xml, text/xml, */*', ...(opts.headers ?? {}) },
+  }, async (response) => {
+    if (!response.ok) {
+      throw new DartDisclosureError(`OpenDART corpCode HTTP ${response.status}`, {
+        status: response.status >= 500 ? 502 : response.status,
+        code: 'provider_http_error',
+        details: { providerStatus: response.status, url: redactDartUrl(url.toString()) },
+      });
+    }
+
+    // corpCode.xml.zip은 ~7MB — 헤더 이후 바디 다운로드가 오래 걸릴 수 있어
+    // 반드시 데드라인 안에서 읽는다.
+    return Buffer.from(await response.arrayBuffer());
   });
-
-  if (!response.ok) {
-    throw new DartDisclosureError(`OpenDART corpCode HTTP ${response.status}`, {
-      status: response.status >= 500 ? 502 : response.status,
-      code: 'provider_http_error',
-      details: { providerStatus: response.status, url: redactDartUrl(url.toString()) },
-    });
-  }
-
-  const payload = Buffer.from(await response.arrayBuffer());
   const xml = extractFirstXmlFromZipBuffer(payload);
   const entries = parseDartCorpCodeXml(xml);
   if (entries.length === 0) {

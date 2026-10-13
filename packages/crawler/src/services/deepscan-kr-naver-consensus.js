@@ -29,20 +29,33 @@ function naverJsonHeaders() {
   return { 'User-Agent': 'Mozilla/5.0', Referer: 'https://stock.naver.com/' };
 }
 
-async function fetchWithTimeout(url, headers, timeoutMs) {
+// 타임아웃이 헤더 도착까지만 보장하면(기존 fetchWithTimeout 패턴) 바디 읽기가
+// 무제한으로 늘어질 수 있다(2026-10-13 085620 사고: 소스 번들 252s 무음 정체).
+// fetch + 바디 소비 전체를 하나의 데드라인으로 감싼다.
+async function fetchWithBodyDeadline(url, headers, timeoutMs, consume) {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
+  timer.unref?.();
   try {
-    return await fetch(url, { headers, signal: controller.signal });
+    const response = await fetch(url, { headers, signal: controller.signal });
+    return await consume(response);
   } finally {
     clearTimeout(timer);
   }
 }
 
+function fetchJsonWithDeadline(url, headers, timeoutMs) {
+  return fetchWithBodyDeadline(url, headers, timeoutMs, async (response) => ({ response, data: await response.json() }));
+}
+
+function fetchTextWithDeadline(url, headers, timeoutMs) {
+  return fetchWithBodyDeadline(url, headers, timeoutMs, async (response) => ({ response, text: await response.text() }));
+}
+
 /** 1차: 신규 stock.naver.com JSON API — 순수 JSON이라 가장 안정적 */
 async function fetchNaverConsensusApi(code, timeoutMs = 6000) {
   try {
-    const response = await fetchWithTimeout(
+    const { response, data } = await fetchJsonWithDeadline(
       `https://stock.naver.com/api/domestic/detail/${encodeURIComponent(code)}/consensus`,
       naverJsonHeaders(),
       timeoutMs,
@@ -50,7 +63,6 @@ async function fetchNaverConsensusApi(code, timeoutMs = 6000) {
     if (!response.ok) {
       return null;
     }
-    const data = await response.json();
     const targetPrice = data && typeof data.targetPrice === 'string'
       ? extractNumberWithComma(data.targetPrice)
       : null;
@@ -79,7 +91,7 @@ async function fetchNaverConsensusApi(code, timeoutMs = 6000) {
 /** 2차: m.stock 경량 HTML (모바일 전용, 약 24KB, 기준일 포함) */
 async function fetchNaverMStockOverall(code, timeoutMs = 8000) {
   try {
-    const response = await fetchWithTimeout(
+    const { response, text: html } = await fetchTextWithDeadline(
       `https://m.stock.naver.com/api/html/item/getOverallInfo.nhn?code=${encodeURIComponent(code)}`,
       { 'User-Agent': 'Mozilla/5.0', Referer: 'https://m.stock.naver.com/' },
       timeoutMs,
@@ -87,7 +99,6 @@ async function fetchNaverMStockOverall(code, timeoutMs = 8000) {
     if (!response.ok) {
       return null;
     }
-    const html = await response.text();
 
     // 컨센서스 점수: graph_data 툴팁 span (범례 뒤 실측값, 예: <span class="data_lyr">4.04</span>)
     const scoreMatch = html.match(/_graph_data[^>]*>\s*<span[^>]*>([\d.]+)</);
@@ -113,7 +124,7 @@ async function fetchNaverMStockOverall(code, timeoutMs = 8000) {
 /** 3차: 네이버 금융 메인 HTML (크지만 구조 고정적) */
 async function fetchNaverMainOpinion(code, timeoutMs = 10000) {
   try {
-    const response = await fetchWithTimeout(
+    const { response, text: html } = await fetchTextWithDeadline(
       `https://finance.naver.com/item/main.naver?code=${encodeURIComponent(code)}`,
       { 'User-Agent': 'Mozilla/5.0' },
       timeoutMs,
@@ -121,7 +132,6 @@ async function fetchNaverMainOpinion(code, timeoutMs = 10000) {
     if (!response.ok) {
       return null;
     }
-    const html = await response.text();
     const anchorIndex = html.indexOf('summary="투자의견 정보"');
     if (anchorIndex < 0) {
       return null;
@@ -168,7 +178,7 @@ async function fetchNaverBrokerTargetStats(code, timeoutMs = 12000) {
     let exhausted = false;
 
     for (let offset = 0; offset < 200 && !exhausted; offset += 50) {
-      const response = await fetchWithTimeout(
+      const { response, data } = await fetchJsonWithDeadline(
         `https://stock.naver.com/api/stockSecurity/researches/v2/company?itemCodes=${encodeURIComponent(code)}&index=${offset}&size=50`,
         naverJsonHeaders(),
         timeoutMs,
@@ -176,7 +186,6 @@ async function fetchNaverBrokerTargetStats(code, timeoutMs = 12000) {
       if (!response.ok) {
         break;
       }
-      const data = await response.json();
       const items = Array.isArray(data) ? data : data.items ?? [];
       if (items.length === 0) {
         break;
@@ -233,15 +242,30 @@ async function fetchNaverBrokerTargetStats(code, timeoutMs = 12000) {
  * fnguide가 정상이면(null 반환 없음) 호출측에서 이 함수를 쓰지 않는다.
  */
 async function buildNaverConsensusSyntheticRow(code) {
-  const fallback = (await fetchNaverConsensusApi(code))
-    ?? (await fetchNaverMStockOverall(code))
-    ?? (await fetchNaverMainOpinion(code));
+  const startedAtMs = Date.now();
+  const step = async (label, fn) => {
+    const stepStartedAtMs = Date.now();
+    try {
+      const value = await fn();
+      console.log(`[naver-consensus-fallback] ${code} step=${label} elapsed=${Date.now() - stepStartedAtMs}ms hit=${value ? 1 : 0}`);
+      return value;
+    } catch (error) {
+      console.log(`[naver-consensus-fallback] ${code} step=${label} elapsed=${Date.now() - stepStartedAtMs}ms error=${error?.message ?? 'unknown'}`);
+      return null;
+    }
+  };
+
+  const fallback = (await step('consensus-api', () => fetchNaverConsensusApi(code)))
+    ?? (await step('mstock-overall', () => fetchNaverMStockOverall(code)))
+    ?? (await step('finance-main', () => fetchNaverMainOpinion(code)));
   if (!fallback || fallback.targetPrice === null) {
+    console.log(`[naver-consensus-fallback] ${code} miss total=${Date.now() - startedAtMs}ms`);
     return null;
   }
 
-  const brokerStats = await fetchNaverBrokerTargetStats(code);
+  const brokerStats = await step('broker-stats', () => fetchNaverBrokerTargetStats(code));
 
+  console.log(`[naver-consensus-fallback] ${code} hit total=${Date.now() - startedAtMs}ms targetPrice=${fallback.targetPrice} brokers=${brokerStats?.analystCount ?? 0}`);
   return {
     sourceLabel: 'naver-fallback',
     asOfText: fallback.asOfText,

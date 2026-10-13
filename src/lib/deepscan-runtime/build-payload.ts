@@ -1002,6 +1002,7 @@ export async function buildKrDeepScanPayloadViaCrawler(
   fetcher: typeof fetch = fetch,
   options: KrDeepScanCrawlerFetchOptions = {},
 ) {
+  const fetchStartedAtMs = Date.now()
   const upstreamUrl = buildKrDeepScanCrawlerCanonicalUrl(rawInput)
   const preparedInput = prepareDeepScanRawInputForBuilder(rawInput)
   const recoveryCode = preparedInput.instrument.code
@@ -1029,6 +1030,7 @@ export async function buildKrDeepScanPayloadViaCrawler(
       const canonicalPayload = recoveryHistory
         ? replaceKrRecoveryForecastWithDailyHistory(payload as JarooDeepScanPayload, recoveryHistory)
         : payload as JarooDeepScanPayload
+      console.log(`[deepscan] canonical fetch ok code=${recoveryCode || 'NA'} elapsedMs=${Date.now() - fetchStartedAtMs} busyWaitedMs=${waitedMs} httpStatus=${response.status}`)
       return attachKrRecoveryForecast(canonicalPayload)
     }
 
@@ -1046,6 +1048,7 @@ export async function buildKrDeepScanPayloadViaCrawler(
       console.error('[deepscan] crawler upstream error details', JSON.stringify(upstreamDetails))
     }
 
+    console.error(`[deepscan] canonical fetch failed code=${recoveryCode || 'NA'} elapsedMs=${Date.now() - fetchStartedAtMs} busyWaitedMs=${waitedMs} httpStatus=${response.status}`)
     throw new CrawlerDeepScanRequestError(
       typeof payload?.error?.message === 'string'
         ? payload.error.message

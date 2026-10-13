@@ -148,6 +148,29 @@ async function withFetchTimeout(fetchImpl, url, init, timeoutMs) {
   }
 }
 
+// withFetchTimeout은 응답 헤더까지만 타임아웃을 보장한다 — 이후 response.json()이
+// 바디를 무제한 기다릴 수 있다(2026-10-13 딥스캔 252s 정체의 원인 패턴).
+// fetch + 바디 소비(consume) 전체를 하나의 데드라인으로 감싼다.
+async function withResponseDeadline(fetchImpl, url, init, timeoutMs, consume) {
+  if (!timeoutMs) {
+    const response = await fetchImpl(url, init);
+    return consume(response);
+  }
+
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
+
+  try {
+    const response = await fetchImpl(url, {
+      ...init,
+      signal: abortController.signal,
+    });
+    return await consume(response);
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
 function getFetchImpl(fetchImpl) {
   if (typeof fetchImpl === 'function') {
     return fetchImpl;
@@ -350,7 +373,7 @@ async function getNaverCurrentQuote(code, options = {}) {
 
   const fetchImpl = getFetchImpl(options.naverFetchImpl ?? options.fetchImpl);
   const timeoutMs = getNaverCurrentQuotesTimeoutMs(options);
-  const response = await withFetchTimeout(
+  const payload = await withResponseDeadline(
     fetchImpl,
     `${NAVER_STOCK_BASIC_URL_PREFIX}${encodeURIComponent(normalizedCode)}/basic`,
     {
@@ -360,17 +383,18 @@ async function getNaverCurrentQuote(code, options = {}) {
       },
     },
     timeoutMs,
+    async (response) => {
+      if (response.status === 404 || response.status === 409) {
+        return null;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Naver current quote returned HTTP ${response.status}`);
+      }
+
+      return response.json();
+    },
   );
-
-  if (response.status === 404 || response.status === 409) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error(`Naver current quote returned HTTP ${response.status}`);
-  }
-
-  const payload = await response.json();
   const price = parseQuoteNumber(payload?.closePrice);
 
   if (!Number.isFinite(price)) {
@@ -442,7 +466,7 @@ async function getNaverCurrentQuoteContext(code, options = {}) {
 }
 
 async function fetchNaverCurrentQuoteContext(code, options = {}) {
-  const response = await withFetchTimeout(
+  return withResponseDeadline(
     options.fetchImpl,
     `${NAVER_STOCK_BASIC_URL_PREFIX}${encodeURIComponent(code)}${NAVER_STOCK_INTEGRATION_PATH_SUFFIX}`,
     {
@@ -452,17 +476,18 @@ async function fetchNaverCurrentQuoteContext(code, options = {}) {
       },
     },
     options.timeoutMs,
+    async (response) => {
+      if (response.status === 404 || response.status === 409) {
+        return null;
+      }
+
+      if (!response.ok) {
+        throw new Error(`Naver current quote context returned HTTP ${response.status}`);
+      }
+
+      return response.json();
+    },
   );
-
-  if (response.status === 404 || response.status === 409) {
-    return null;
-  }
-
-  if (!response.ok) {
-    throw new Error(`Naver current quote context returned HTTP ${response.status}`);
-  }
-
-  return response.json();
 }
 
 async function getNaverCurrentQuoteVolume(code, options = {}) {
@@ -476,7 +501,7 @@ async function getNaverCurrentQuoteVolume(code, options = {}) {
     );
   }
 
-  const response = await withFetchTimeout(
+  return withResponseDeadline(
     options.fetchImpl,
     `${NAVER_STOCK_BASIC_URL_PREFIX}${encodeURIComponent(code)}${NAVER_STOCK_PRICE_PATH_SUFFIX}`,
     {
@@ -486,23 +511,25 @@ async function getNaverCurrentQuoteVolume(code, options = {}) {
       },
     },
     options.timeoutMs,
-  );
+    async (response) => {
+      if (response.status === 404 || response.status === 409) {
+        return null;
+      }
 
-  if (response.status === 404 || response.status === 409) {
-    return null;
-  }
+      if (!response.ok) {
+        throw new Error(`Naver current quote volume returned HTTP ${response.status}`);
+      }
 
-  if (!response.ok) {
-    throw new Error(`Naver current quote volume returned HTTP ${response.status}`);
-  }
-
-  const pricePayload = await response.json();
-  const latestPrice = Array.isArray(pricePayload) ? pricePayload[0] : pricePayload;
-  return parseQuoteNumber(
-    latestPrice?.accumulatedTradingVolume
-    ?? latestPrice?.tradeVolume
-    ?? latestPrice?.volume,
-  );
+      return response.json();
+    },
+  ).then((pricePayload) => {
+    const latestPrice = Array.isArray(pricePayload) ? pricePayload[0] : pricePayload;
+    return parseQuoteNumber(
+      latestPrice?.accumulatedTradingVolume
+      ?? latestPrice?.tradeVolume
+      ?? latestPrice?.volume,
+    );
+  });
 }
 
 export async function getNaverCurrentQuotes(codes, options = {}) {

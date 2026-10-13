@@ -128,12 +128,19 @@ async function getCrawlV12(targetCode, options = {}) {
 
   // 컨센서스 폴백: fnguide 투자의견 페이지 장애('페이지가 없습니다') 시
   // 네이버 증권 데이터를 opinion 페이지에 주입해 목표주가·투자의견을 회복한다.
+  // 주의: 과거 조건의 !includes('목표')는 '정상 로드됐지만 목표가 없는 종목'(애널리스트
+  // 커버리지 없음)에서도 매번 폴백을 돌렸다 — 그런 종목은 네이버에도 컨센서스가 없어
+  // 실패만 반복한다. 폴백은 페이지가 실제로 깨진 경우에만 돌린다(2026-10-13 사고 개선).
   try {
     const opinionPage = aggregate?.normalized?.opinion ?? aggregate?.pages?.opinion;
     const opinionText = JSON.stringify(opinionPage?.bodyTextHead ?? opinionPage ?? '');
-    if (opinionPage && (opinionText.includes('페이지가 없습니다') || !JSON.stringify(opinionPage).includes('목표'))) {
+    const opinionBroken = Boolean(opinionPage) && opinionText.includes('페이지가 없습니다');
+    if (opinionBroken) {
+      const fallbackStartedAtMs = Date.now();
+      logger.info('Crawler', `[naver-consensus-fallback] ${targetCode} | fnguide opinion 페이지 장애 — 네이버 폴백 시도`);
       const { buildNaverConsensusSyntheticRow } = await import('../services/deepscan-kr-naver-consensus.js');
       const synthetic = await buildNaverConsensusSyntheticRow(targetCode);
+      logger.info('Crawler', `[naver-consensus-fallback] ${targetCode} | 폴백 완료 elapsed=${Date.now() - fallbackStartedAtMs}ms 결과=${synthetic ? '회복' : '데이터 없음'}`);
       if (synthetic) {
         synthetic.bodyTextHead = '네이버 증권 컨센서스 폴백 데이터';
         if (aggregate.normalized) aggregate.normalized.opinion = synthetic;
