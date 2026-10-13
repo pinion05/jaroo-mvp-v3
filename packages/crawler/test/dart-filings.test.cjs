@@ -687,6 +687,12 @@ test('getDartCorpCodeList recovers from the remote Supabase cache on a fresh dep
     if (target.includes('/storage/v1/object/')) {
       storageCalls.push(`${init?.method ?? 'GET'} ${target.split('/').slice(-2).join('/')}`);
       if ((init?.method ?? 'GET') === 'GET') {
+        if (target.endsWith('.meta.json')) {
+          return new Response(JSON.stringify({ fetchedAt: Date.now(), byteCount: 3 }), {
+            status: 200,
+            headers: { 'last-modified': new Date().toUTCString() },
+          });
+        }
         return new Response(CORP_CODE_XML, {
           status: 200,
           headers: { 'last-modified': new Date().toUTCString() },
@@ -711,7 +717,7 @@ test('getDartCorpCodeList recovers from the remote Supabase cache on a fresh dep
 
   assert.equal(entries.length, 2);
   assert.equal(dartCalls.length, 0, '원격 캐시 히트 시 DART를 호출하지 않는다');
-  assert.equal(storageCalls.length, 1, '원격 GET 1회만 호출');
+  assert.equal(storageCalls.length, 2, '원격 GET은 meta 1회 + zip 1회');
   assert.equal(existsSync(joinPath(diskDir, 'corpCode-remote-k.zip')), true, '원격 사본으로 디스크를 덥혀둔다');
 });
 
@@ -724,12 +730,18 @@ test('getDartCorpCodeList ignores a stale remote cache and falls back to DART + 
   const diskDir = mkdtempSync(joinPath(tmpdir(), 'dart-remote-stale-'));
   clearDartCaches();
 
-  const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toUTCString();
+  const eightDaysAgoMs = Date.now() - 8 * 24 * 60 * 60 * 1000;
   const uploads = [];
+  const remoteGets = [];
   const fetchImpl = async (url, init) => {
     const target = String(url);
     if (target.includes('/storage/v1/object/') && (init?.method ?? 'GET') === 'GET') {
-      return new Response(CORP_CODE_XML, { status: 200, headers: { 'last-modified': eightDaysAgo } });
+      remoteGets.push(target.endsWith('.meta.json') ? 'meta' : 'zip');
+      if (target.endsWith('.meta.json')) {
+        // 신선도는 meta 객체가 지배한다 — 8일 치 낡음.
+        return new Response(JSON.stringify({ fetchedAt: eightDaysAgoMs }), { status: 200 });
+      }
+      return new Response(CORP_CODE_XML, { status: 200, headers: { 'last-modified': new Date().toUTCString() } });
     }
     if (target.includes('/storage/v1/object/')) {
       uploads.push(init);
@@ -750,7 +762,8 @@ test('getDartCorpCodeList ignores a stale remote cache and falls back to DART + 
   });
 
   assert.equal(entries.length, 2);
-  assert.equal(uploads.length, 1, 'DART 성공 후 원격 업로드');
+  assert.deepEqual(remoteGets, ['meta'], '메타가 낡았으면 zip은 내려받지 않는다');
+  assert.equal(uploads.length, 2, 'DART 성공 후 zip + meta 업로드');
   assert.equal(uploads[0].headers['x-upsert'], 'true');
 });
 
@@ -773,7 +786,8 @@ test('getDartCorpCodeList creates the storage bucket once when upload hits 404',
     }
     if (target.includes('/storage/v1/object/')) {
       uploadAttempts += 1;
-      calls.push(`upload-${uploadAttempts}`);
+      const isMeta = target.endsWith('.meta.json');
+      calls.push(`upload-${uploadAttempts}(${isMeta ? 'meta' : 'zip'})`);
       return uploadAttempts === 1 ? new Response('not found', { status: 404 }) : new Response('created', { status: 201 });
     }
     if (target.includes('/storage/v1/bucket')) {
@@ -796,7 +810,11 @@ test('getDartCorpCodeList creates the storage bucket once when upload hits 404',
   });
 
   assert.equal(entries.length, 2);
-  assert.deepEqual(calls, ['upload-1', 'create-bucket:bucket', 'upload-2'], '업로드 404 → 버킷 생성(단수형 우선) → 재시도');
+  assert.deepEqual(
+    calls,
+    ['upload-1(zip)', 'create-bucket:bucket', 'upload-2(zip)', 'upload-3(meta)'],
+    '업로드 404 → 버킷 생성(단수형 우선) → zip 재시도 → meta 업로드',
+  );
 });
 
 test('getDartCorpCodeList skips the remote layer when disabled by env', async () => {

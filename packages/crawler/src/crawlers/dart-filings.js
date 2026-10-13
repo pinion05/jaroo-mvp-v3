@@ -1039,35 +1039,63 @@ function remoteObjectUrl(config, bucket, objectPath) {
   return `${config.baseUrl}/storage/v1/object/${encodeURIComponent(bucket).replace(/%2F/gu, '/')}/${objectPath.split('/').map(encodeURIComponent).join('/')}`;
 }
 
-/** 원격 corpCode 읽기 — miss/stale/오류는 모두 null (침묵 폴백). */
+/** 원격 corpCode 읽기 — miss/stale/오류는 모두 null (침묵 폴백).
+ * 신선도는 Last-Modified 헤더가 아니라 함께 저장하는 meta 객체의 fetchedAt으로
+ * 판정한다 — 이 스토리지의 upsert는 내용을 갱신해도 Last-Modified를 갱신하지
+ * 않는다(2026-10-13 실측), 헤더 기반 TTL은 거짓 만료를 일으킨다. */
 async function readDartCorpCodeRemoteCache(opts) {
   const config = resolveCorpCodeRemoteConfig(opts);
   if (!config) {
     return null;
   }
 
+  const authHeaders = {
+    apikey: config.serviceKey,
+    authorization: `Bearer ${config.serviceKey}`,
+  };
+
   try {
-    return await fetchBufferWithDeadline(
+    // 메타 먼저(수백 바이트) — 낡았으면 3.5MB zip까지 내려받지 않는다.
+    const meta = await fetchBufferWithDeadline(
       config.fetchImpl,
-      remoteObjectUrl(config, config.bucket, config.objectPath),
-      {
-        headers: {
-          apikey: config.serviceKey,
-          authorization: `Bearer ${config.serviceKey}`,
-        },
-      },
+      remoteObjectUrl(config, config.bucket, `${DART_CORP_CODE_REMOTE_OBJECT_PATH}.meta.json`),
+      { headers: authHeaders },
       config.timeoutMs,
       async (response) => {
         if (!response.ok) {
           return null;
         }
-        const lastModifiedHeader = response.headers?.get?.('last-modified');
-        const lastModified = lastModifiedHeader ? Date.parse(lastModifiedHeader) : Number.NaN;
+        try {
+          const parsed = JSON.parse(await response.text());
+          const fetchedAt = Number(parsed?.fetchedAt);
+          return Number.isFinite(fetchedAt) ? fetchedAt : null;
+        } catch {
+          return null;
+        }
+      },
+    );
+    if (meta !== null && Date.now() - meta > config.ttlMs) {
+      return null;
+    }
+
+    return await fetchBufferWithDeadline(
+      config.fetchImpl,
+      remoteObjectUrl(config, config.bucket, config.objectPath),
+      { headers: authHeaders },
+      config.timeoutMs,
+      async (response) => {
+        if (!response.ok) {
+          return null;
+        }
         const payload = Buffer.from(await response.arrayBuffer());
         if (payload.length === 0) {
           return null;
         }
-        const fetchedAt = Number.isFinite(lastModified) ? lastModified : Date.now();
+        // 우선순위: meta 객체 > Last-Modified > 다운로드 시각(보수적 최후 수단).
+        const lastModifiedHeader = response.headers?.get?.('last-modified');
+        const lastModified = lastModifiedHeader ? Date.parse(lastModifiedHeader) : Number.NaN;
+        const fetchedAt = meta
+          ?? (Number.isFinite(lastModified) ? lastModified : Date.now());
         if (Date.now() - fetchedAt > config.ttlMs) {
           return null;
         }
@@ -1086,18 +1114,18 @@ async function writeDartCorpCodeRemoteCache(opts, payload) {
     return;
   }
 
-  const upload = () => fetchBufferWithDeadline(
+  const uploadObject = (objectPath, body, contentType) => fetchBufferWithDeadline(
     config.fetchImpl,
-    remoteObjectUrl(config, config.bucket, config.objectPath),
+    remoteObjectUrl(config, config.bucket, objectPath),
     {
       method: 'POST',
       headers: {
         apikey: config.serviceKey,
         authorization: `Bearer ${config.serviceKey}`,
-        'content-type': 'application/zip',
+        'content-type': contentType,
         'x-upsert': 'true',
       },
-      body: payload,
+      body,
     },
     config.timeoutMs,
     async (response) => response.status,
@@ -1105,49 +1133,47 @@ async function writeDartCorpCodeRemoteCache(opts, payload) {
 
   // 버킷 생성 — storage-api 버전에 따라 버킷 관리 라우트가 단수형(/bucket)과
   // 복수형(/buckets)으로 갈린다(jaroo 프로젝트는 단수형). 단수형 우선, 실패 시 복수형.
-  const createBucket = () => fetchBufferWithDeadline(
-    config.fetchImpl,
-    `${config.baseUrl}/storage/v1/bucket`,
-    {
-      method: 'POST',
-      headers: {
-        apikey: config.serviceKey,
-        authorization: `Bearer ${config.serviceKey}`,
-        'content-type': 'application/json',
+  const ensureBucket = async () => {
+    const createAt = (path) => fetchBufferWithDeadline(
+      config.fetchImpl,
+      `${config.baseUrl}/storage/v1/${path}`,
+      {
+        method: 'POST',
+        headers: {
+          apikey: config.serviceKey,
+          authorization: `Bearer ${config.serviceKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ name: config.bucket, public: false }),
       },
-      body: JSON.stringify({ name: config.bucket, public: false }),
-    },
-    config.timeoutMs,
-    async (response) => response.status,
-  ).catch(() => null);
-  const createBucketPlural = () => fetchBufferWithDeadline(
-    config.fetchImpl,
-    `${config.baseUrl}/storage/v1/buckets`,
-    {
-      method: 'POST',
-      headers: {
-        apikey: config.serviceKey,
-        authorization: `Bearer ${config.serviceKey}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({ name: config.bucket, public: false }),
-    },
-    config.timeoutMs,
-    async (response) => response.status,
-  ).catch(() => null);
+      config.timeoutMs,
+      async (response) => response.status,
+    ).catch(() => null);
+
+    const singular = await createAt('bucket');
+    if (singular >= 200 && singular < 300) {
+      return true;
+    }
+    const plural = await createAt('buckets');
+    return plural >= 200 && plural < 300;
+  };
 
   try {
-    let status = await upload();
-    if (status === 404 || status === 400) {
-      // 버킷 부재일 가능성 — 1회 생성 후 재시도(이미 있으면 무시).
-      let created = await createBucket();
-      if (!(created >= 200 && created < 300)) {
-        created = await createBucketPlural();
-      }
-      void created;
-      status = await upload();
+    let status = await uploadObject(config.objectPath, payload, 'application/zip');
+    if ((status === 404 || status === 400) && await ensureBucket()) {
+      status = await uploadObject(config.objectPath, payload, 'application/zip');
     }
-    if (!(status >= 200 && status < 300)) {
+    if (status >= 200 && status < 300) {
+      // 신선도 판정은 meta 객체가 책임진다(헤더는 신뢰 불가). 실패는 경고만.
+      const metaStatus = await uploadObject(
+        `${DART_CORP_CODE_REMOTE_OBJECT_PATH}.meta.json`,
+        JSON.stringify({ fetchedAt: Date.now(), byteCount: payload.length }),
+        'application/json',
+      );
+      if (!(metaStatus >= 200 && metaStatus < 300)) {
+        console.warn(`[dart-corpcode] remote cache meta write skipped — status=${metaStatus}`);
+      }
+    } else {
       console.error(`[dart-corpcode] remote cache write failed — bucket=${config.bucket} status=${status}`);
     }
   } catch (error) {
