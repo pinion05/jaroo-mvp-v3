@@ -1103,25 +1103,48 @@ async function writeDartCorpCodeRemoteCache(opts, payload) {
     async (response) => response.status,
   );
 
+  // 버킷 생성 — storage-api 버전에 따라 버킷 관리 라우트가 단수형(/bucket)과
+  // 복수형(/buckets)으로 갈린다(jaroo 프로젝트는 단수형). 단수형 우선, 실패 시 복수형.
+  const createBucket = () => fetchBufferWithDeadline(
+    config.fetchImpl,
+    `${config.baseUrl}/storage/v1/bucket`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: config.serviceKey,
+        authorization: `Bearer ${config.serviceKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ name: config.bucket, public: false }),
+    },
+    config.timeoutMs,
+    async (response) => response.status,
+  ).catch(() => null);
+  const createBucketPlural = () => fetchBufferWithDeadline(
+    config.fetchImpl,
+    `${config.baseUrl}/storage/v1/buckets`,
+    {
+      method: 'POST',
+      headers: {
+        apikey: config.serviceKey,
+        authorization: `Bearer ${config.serviceKey}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ name: config.bucket, public: false }),
+    },
+    config.timeoutMs,
+    async (response) => response.status,
+  ).catch(() => null);
+
   try {
     let status = await upload();
     if (status === 404 || status === 400) {
-      // 버킷 부재일 가능성 — 1회 생성 후 재시도(이미 있으면 409 등 무시).
-      await fetchBufferWithDeadline(
-        config.fetchImpl,
-        `${config.baseUrl}/storage/v1/buckets`,
-        {
-          method: 'POST',
-          headers: {
-            apikey: config.serviceKey,
-            authorization: `Bearer ${config.serviceKey}`,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({ name: config.bucket, public: false }),
-        },
-        config.timeoutMs,
-        async (response) => response.status,
-      ).catch(() => null);
+      // 버킷 부재일 가능성 — 1회 생성 후 재시도(이미 있으면 무시).
+      let created = await createBucket();
+      if (!(created >= 200 && created < 300)) {
+        created = await createBucketPlural();
+      }
+      void created;
       status = await upload();
     }
     if (!(status >= 200 && status < 300)) {
