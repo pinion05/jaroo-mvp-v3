@@ -663,3 +663,169 @@ test('getDartCorpCodeList refresh:true skips memory cache and hits network', asy
   assert.equal(refreshed.length, 2);
   assert.equal(calls.filter((p) => p.endsWith('/corpCode.xml')).length, 2);
 });
+
+test('getDartCorpCodeList recovers from the remote Supabase cache on a fresh deployment', async () => {
+  const { clearDartCaches, getDartCorpCodeList } = await import('../src/crawlers/dart-filings.js');
+  const { mkdtempSync, existsSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join: joinPath } = require('node:path');
+
+  const diskDir = mkdtempSync(joinPath(tmpdir(), 'dart-remote-fresh-'));
+  clearDartCaches();
+
+  const dartCalls = [];
+  const storageCalls = [];
+  const fetchImpl = async (url, init) => {
+    const target = String(url);
+    if (target.includes('/storage/v1/object/')) {
+      storageCalls.push(`${init?.method ?? 'GET'} ${target.split('/').slice(-2).join('/')}`);
+      if ((init?.method ?? 'GET') === 'GET') {
+        return new Response(CORP_CODE_XML, {
+          status: 200,
+          headers: { 'last-modified': new Date().toUTCString() },
+        });
+      }
+      return new Response('created', { status: 201 });
+    }
+    if (target.includes('/corpCode.xml')) {
+      dartCalls.push(target);
+      throw new Error('DART unreachable');
+    }
+    throw new Error(`unexpected url ${target}`);
+  };
+
+  const entries = await getDartCorpCodeList({
+    apiKey: 'remote-key',
+    fetchImpl,
+    corpCodeDiskDir: diskDir,
+    supabaseUrl: 'https://fake.supabase.co',
+    supabaseServiceKey: 'fake-service-key',
+  });
+
+  assert.equal(entries.length, 2);
+  assert.equal(dartCalls.length, 0, '원격 캐시 히트 시 DART를 호출하지 않는다');
+  assert.equal(storageCalls.length, 1, '원격 GET 1회만 호출');
+  assert.equal(existsSync(joinPath(diskDir, 'corpCode-remote-k.zip')), true, '원격 사본으로 디스크를 덥혀둔다');
+});
+
+test('getDartCorpCodeList ignores a stale remote cache and falls back to DART + upload', async () => {
+  const { clearDartCaches, getDartCorpCodeList } = await import('../src/crawlers/dart-filings.js');
+  const { mkdtempSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join: joinPath } = require('node:path');
+
+  const diskDir = mkdtempSync(joinPath(tmpdir(), 'dart-remote-stale-'));
+  clearDartCaches();
+
+  const eightDaysAgo = new Date(Date.now() - 8 * 24 * 60 * 60 * 1000).toUTCString();
+  const uploads = [];
+  const fetchImpl = async (url, init) => {
+    const target = String(url);
+    if (target.includes('/storage/v1/object/') && (init?.method ?? 'GET') === 'GET') {
+      return new Response(CORP_CODE_XML, { status: 200, headers: { 'last-modified': eightDaysAgo } });
+    }
+    if (target.includes('/storage/v1/object/')) {
+      uploads.push(init);
+      return new Response('created', { status: 201 });
+    }
+    if (target.includes('/corpCode.xml')) {
+      return new Response(CORP_CODE_XML, { status: 200 });
+    }
+    throw new Error(`unexpected url ${target}`);
+  };
+
+  const entries = await getDartCorpCodeList({
+    apiKey: 'remote-stale-key',
+    fetchImpl,
+    corpCodeDiskDir: diskDir,
+    supabaseUrl: 'https://fake.supabase.co',
+    supabaseServiceKey: 'fake-service-key',
+  });
+
+  assert.equal(entries.length, 2);
+  assert.equal(uploads.length, 1, 'DART 성공 후 원격 업로드');
+  assert.equal(uploads[0].headers['x-upsert'], 'true');
+});
+
+test('getDartCorpCodeList creates the storage bucket once when upload hits 404', async () => {
+  const { clearDartCaches, getDartCorpCodeList } = await import('../src/crawlers/dart-filings.js');
+  const { mkdtempSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join: joinPath } = require('node:path');
+
+  const diskDir = mkdtempSync(joinPath(tmpdir(), 'dart-remote-bucket-'));
+  clearDartCaches();
+
+  const calls = [];
+  let uploadAttempts = 0;
+  const fetchImpl = async (url, init) => {
+    const target = String(url);
+    const method = init?.method ?? 'GET';
+    if (target.includes('/storage/v1/buckets')) {
+      calls.push('create-bucket');
+      return new Response('ok', { status: 201 });
+    }
+    if (target.includes('/storage/v1/object/') && method === 'GET') {
+      return new Response('not found', { status: 404 });
+    }
+    if (target.includes('/storage/v1/object/')) {
+      uploadAttempts += 1;
+      calls.push(`upload-${uploadAttempts}`);
+      return uploadAttempts === 1 ? new Response('not found', { status: 404 }) : new Response('created', { status: 201 });
+    }
+    if (target.includes('/corpCode.xml')) {
+      return new Response(CORP_CODE_XML, { status: 200 });
+    }
+    throw new Error(`unexpected url ${target}`);
+  };
+
+  const entries = await getDartCorpCodeList({
+    apiKey: 'remote-bucket-key',
+    fetchImpl,
+    corpCodeDiskDir: diskDir,
+    supabaseUrl: 'https://fake.supabase.co',
+    supabaseServiceKey: 'fake-service-key',
+  });
+
+  assert.equal(entries.length, 2);
+  assert.deepEqual(calls, ['upload-1', 'create-bucket', 'upload-2'], '업로드 404 → 버킷 생성 → 재시도');
+});
+
+test('getDartCorpCodeList skips the remote layer when disabled by env', async () => {
+  const { clearDartCaches, getDartCorpCodeList } = await import('../src/crawlers/dart-filings.js');
+  const { mkdtempSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join: joinPath } = require('node:path');
+
+  const saved = process.env.DART_CORP_CODE_REMOTE_CACHE_ENABLE;
+  process.env.DART_CORP_CODE_REMOTE_CACHE_ENABLE = '0';
+  try {
+    const diskDir = mkdtempSync(joinPath(tmpdir(), 'dart-remote-off-'));
+    clearDartCaches();
+    const storageCalls = [];
+    const fetchImpl = async (url, init) => {
+      const target = String(url);
+      if (target.includes('/storage/v1/')) {
+        storageCalls.push(target);
+        throw new Error('storage must not be called');
+      }
+      return new Response(CORP_CODE_XML, { status: 200 });
+    };
+
+    const entries = await getDartCorpCodeList({
+      apiKey: 'remote-off-key',
+      fetchImpl,
+      corpCodeDiskDir: diskDir,
+      supabaseUrl: 'https://fake.supabase.co',
+      supabaseServiceKey: 'fake-service-key',
+    });
+    assert.equal(entries.length, 2);
+    assert.equal(storageCalls.length, 0, '비활성 플래그 시 스토리지를 건드리지 않는다');
+  } finally {
+    if (saved === undefined) {
+      delete process.env.DART_CORP_CODE_REMOTE_CACHE_ENABLE;
+    } else {
+      process.env.DART_CORP_CODE_REMOTE_CACHE_ENABLE = saved;
+    }
+  }
+});
