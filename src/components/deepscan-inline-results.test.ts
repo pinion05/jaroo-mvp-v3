@@ -131,27 +131,13 @@ test('DeepScanInlineResults folds detail behind 자세히 보기 without numbere
 
   assert.match(markup, /자세히 보기/)
   assert.match(markup, /aria-expanded="false"/)
-  assert.match(markup, /추천 시나리오 · 목표가 근거/)
+  assert.match(markup, /추천 시나리오/)
   assert.doesNotMatch(markup, /세 팀 의견/)
-  assert.match(markup, /목표가 근거/)
-  assert.match(markup, /증권사 12개/)
-  assert.match(markup, /17,500원/)
-  // 목표가가 현재가(14,185원)보다 높으면 빨강 — 평균·최고·최저 모두 적용
-  assert.match(markup, /jaroo-profit\)\][^<]*>17,500원/)
-  assert.match(markup, /jaroo-profit\)\][^<]*>18,400원/)
-  assert.match(markup, /jaroo-profit\)\][^<]*>16,200원/)
+  // '목표가 근거' 상세 카드 제거(2026-10-13) — 컨센서스 상세는 상단 목표가/상승 여력 요약으로 충분
+  assert.doesNotMatch(markup, /목표가 근거/)
+  assert.doesNotMatch(markup, /증권사 12개/)
+  assert.doesNotMatch(markup, /18,400원|16,200원/)
   assert.doesNotMatch(markup, /위원 평균|70점|\/ 100/)
-})
-
-test('DeepScanInlineResults colors target prices below the current price blue', () => {
-  const payload = basePayload()
-  payload.insights.items[0].consensus = { targetPrice: 13000, highestTargetPrice: 18500, lowestTargetPrice: 12500, analystCount: 8, recommendation: '중립' }
-  const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
-
-  // 현재가(14,185원)보다 낮은 평균·최저 목표가는 파랑, 높은 최고 목표가는 빨강
-  assert.match(markup, /jaroo-loss\)\][^<]*>13,000원/)
-  assert.match(markup, /jaroo-loss\)\][^<]*>12,500원/)
-  assert.match(markup, /jaroo-profit\)\][^<]*>18,500원/)
 })
 
 test('DeepScanInlineResults colors the strength label and gauge by the agreed tone rule', () => {

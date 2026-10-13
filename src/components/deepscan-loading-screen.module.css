@@ -926,13 +926,17 @@
   gap: 5px;
 }
 
+/* 현재가 — 차트의 부채꼴 분기점 닷(consensusFanCurrentDot)과 동일한 회색 점.
+   점선 라인 마커는 '내 평단'과 구분되지 않아 혼동을 줬다(#UI 피드백 2026-10-13). */
 .consensusFanLegendCurrent i {
   display: inline-block;
-  width: 14px;
-  height: 0;
-  border-top: 1.5px dashed var(--ds-muted);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ds-muted);
 }
 
+/* 내 평단 — 차트의 평단 기준선(consensusFanAvgLine, 회색 점선)과 동일. */
 .consensusFanLegendAvgPrice i {
   display: inline-block;
   width: 14px;
