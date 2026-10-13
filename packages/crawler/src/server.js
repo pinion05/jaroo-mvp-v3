@@ -60,6 +60,7 @@ app.use(express.json());
 
 import { HttpError } from './services/http-error.js';
 import { createDeepscanKrAdmission } from './services/deepscan-kr-admission.js';
+import { startDartCorpCodePrefetchScheduler } from './services/dart-corpcode-prefetch.js';
 
 function normalizeValue(value) {
   if (Array.isArray(value)) {
@@ -3284,6 +3285,8 @@ const isDirectExecution = process.argv[1] && fileURLToPath(import.meta.url) === 
 if (isDirectExecution) {
   app.listen(port, host, () => {
     console.log(`[${SERVICE_NAME}] listening on ${host}:${port}`);
+    // corpCode 프리페치(하루 1회·디스크 캐시) — 요청 경로의 수 분짜리 다운로드를 흡수한다.
+    startDartCorpCodePrefetchScheduler();
   });
 }
 
