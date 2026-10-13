@@ -5,6 +5,8 @@
  * - 종목코드 → DART 고유번호: OpenDART `/api/corpCode.xml` ZIP
  */
 
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { inflateRawSync } from 'node:zlib';
 import {
   OPEN_DART_DISCLOSURE_DETAIL_TYPES,
@@ -17,6 +19,15 @@ import {
 
 const OPEN_DART_BASE_URL = 'https://opendart.fss.or.kr/api';
 const DART_CORP_CODE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+// corpCode.xml.zip(~3.5MB)은 미국 리전에서 DART가 ~13KB/s로 쓰로틀해 완전 수신에
+// 수 분이 걸린다(2026-10-13 실측). 요청 경로에서는 짧게 끊고, 백그라운드
+// 프리페치(하루 1회, 장 타임아웃)가 디스크 캉시를 채운다.
+const DART_CORP_CODE_REQUEST_TIMEOUT_MS = 5_000;
+// 디스크 캐시는 프로세스 재시작에도 살아야 하므로 메모리 TTL보다 넉넉히.
+// 프리페치가 매일 갱신하므로 정상 상태 체류는 ~24h, 프리페치 실패가 이어져도
+// 최대 7일까지 낡은 목록으로 서비스한다(신규 상장만 놓칠 뿐 기존 종목은 정상).
+const DART_CORP_CODE_DISK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DART_CORP_CODE_DISK_DIR = join(process.cwd(), '.omx', 'cache', 'dart-corpcode');
 const DART_LIST_CACHE_TTL_MS = 5 * 60 * 1000;
 const DART_DEFAULT_LOOKBACK_DAYS = 90;
 const DART_DEFAULT_TIMEOUT_MS = 30_000;
@@ -941,18 +952,97 @@ export function extractFirstXmlFromZipBuffer(bufferLike) {
   });
 }
 
+function resolveCorpCodeRequestTimeoutMs(opts = {}) {
+  if (Number.isFinite(Number(opts.corpCodeTimeoutMs)) && Number(opts.corpCodeTimeoutMs) > 0) {
+    return Math.floor(Number(opts.corpCodeTimeoutMs));
+  }
+  const parsed = Number(process.env.DART_CORP_CODE_REQUEST_TIMEOUT_MS);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : DART_CORP_CODE_REQUEST_TIMEOUT_MS;
+}
+
+function resolveCorpCodeDiskTtlMs(opts = {}) {
+  if (Number.isFinite(Number(opts.corpCodeDiskTtlMs)) && Number(opts.corpCodeDiskTtlMs) >= 0) {
+    return Math.floor(Number(opts.corpCodeDiskTtlMs));
+  }
+  const parsed = Number(process.env.DART_CORP_CODE_DISK_TTL_MS);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : DART_CORP_CODE_DISK_TTL_MS;
+}
+
+function resolveCorpCodeDiskPaths(opts = {}, cacheKey) {
+  const dir = typeof opts.corpCodeDiskDir === 'string' && opts.corpCodeDiskDir.trim()
+    ? opts.corpCodeDiskDir.trim()
+    : (process.env.DART_CORP_CODE_DISK_DIR || DART_CORP_CODE_DISK_DIR);
+  const safeKey = cacheKey.replace(/[^a-zA-Z0-9]/g, '-');
+  return {
+    dir,
+    zipPath: join(dir, `${safeKey}.zip`),
+    metaPath: join(dir, `${safeKey}.meta.json`),
+  };
+}
+
+/** 디스크 corpCode 캐시 읽기 — 있고 신선하면 { payload } 반환 (파싱은 호출측). */
+async function readDartCorpCodeDiskCache(opts, cacheKey) {
+  const { zipPath, metaPath } = resolveCorpCodeDiskPaths(opts, cacheKey);
+  try {
+    const meta = JSON.parse(await readFile(metaPath, 'utf8'));
+    const fetchedAt = Number(meta?.fetchedAt);
+    if (!Number.isFinite(fetchedAt)) {
+      return null;
+    }
+    if (Date.now() - fetchedAt > resolveCorpCodeDiskTtlMs(opts)) {
+      return null;
+    }
+    const payload = await readFile(zipPath);
+    if (!(payload instanceof Buffer) || payload.length === 0) {
+      return null;
+    }
+    return { payload, fetchedAt };
+  } catch {
+    return null;
+  }
+}
+
+/** 디스크 corpCode 캐시 쓰기 — best-effort, 실패는 캐시 무효로 침묵 통과. */
+async function writeDartCorpCodeDiskCache(opts, cacheKey, payload) {
+  const { dir, zipPath, metaPath } = resolveCorpCodeDiskPaths(opts, cacheKey);
+  try {
+    await mkdir(dir, { recursive: true });
+    await writeFile(zipPath, payload);
+    await writeFile(metaPath, JSON.stringify({ fetchedAt: Date.now(), byteCount: payload.length }));
+  } catch {
+    // 캉시 저장 실패는 프리페치/네트워크 경로 동작에 영향을 주지 않는다.
+  }
+}
+
 export async function getDartCorpCodeList(opts = {}) {
   const apiKey = getDartApiKey(opts);
   const cacheKey = `corpCode:${apiKey.slice(0, 8)}`;
   const cached = corpCodeCache.get(cacheKey);
-  if (cached && Date.now() - cached.fetchedAt < (opts.cacheTtlMs ?? DART_CORP_CODE_CACHE_TTL_MS)) {
+  if (!opts.refresh && cached && Date.now() - cached.fetchedAt < (opts.cacheTtlMs ?? DART_CORP_CODE_CACHE_TTL_MS)) {
     return cached.entries;
+  }
+
+  // 2차 계층 — 디스크 캐시(프리페치가 채워둔 것). 프로세스가 재시작돼도
+  // corpCode 다운로드(수 분)를 요청 경로에서 다시 기다리지 않게 한다.
+  if (!opts.refresh) {
+    const disk = await readDartCorpCodeDiskCache(opts, cacheKey);
+    if (disk) {
+      const xmlFromDisk = extractFirstXmlFromZipBuffer(disk.payload);
+      const entriesFromDisk = parseDartCorpCodeXml(xmlFromDisk);
+      if (entriesFromDisk.length > 0) {
+        corpCodeCache.set(cacheKey, { fetchedAt: disk.fetchedAt, entries: entriesFromDisk });
+        return entriesFromDisk;
+      }
+    }
   }
 
   const url = new URL(`${OPEN_DART_BASE_URL}/corpCode.xml`);
   url.searchParams.set('crtfc_key', apiKey);
   const payload = await withDartDeadline(url, {
     ...opts,
+    // corpCode는 list/document와 달리 대용량(수 MB)이라 전용 타임아웃을 쓴다.
+    // 백그라운드 프리페치가 corpCodeTimeoutMs를 크게 주고 들어온다.
+    timeoutMs: resolveCorpCodeRequestTimeoutMs(opts),
     headers: { Accept: 'application/zip, application/xml, text/xml, */*', ...(opts.headers ?? {}) },
   }, async (response) => {
     if (!response.ok) {
@@ -977,6 +1067,7 @@ export async function getDartCorpCodeList(opts = {}) {
   }
 
   corpCodeCache.set(cacheKey, { fetchedAt: Date.now(), entries });
+  await writeDartCorpCodeDiskCache(opts, cacheKey, payload);
   return entries;
 }
 
@@ -1301,6 +1392,16 @@ export async function collectDartDisclosures(input = {}, opts = {}) {
 export function clearDartCaches() {
   corpCodeCache.clear();
   listCache.clear();
+}
+
+/** DART API 키가 설정돼 있는지만 확인 — 프리페치 스케줄러 기동 판정용. */
+export function hasDartKeyConfigured(opts = {}) {
+  try {
+    getDartApiKey(opts);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export {
