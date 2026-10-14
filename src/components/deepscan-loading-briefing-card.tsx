@@ -43,6 +43,7 @@ import {
   calculateBriefingShortStreak,
 } from '@/lib/deepscan-briefing-snapshot'
 import { resolveDeepScanBriefingCardCurrentPrice } from '@/lib/deepscan-loading-current-price'
+import { buildDeepScanShortFlow } from '@/lib/deepscan-short-flow'
 import { getVisibleDeepScanBriefingItemCount, isDeepScanBriefingItemContentReady } from '@/lib/deepscan-loading-behavior'
 import { buildConsensusFanGeometry, estimateDailyVolatility } from '@/lib/deepscan-target-price-paths'
 import { cn } from '@/lib/utils'
@@ -476,11 +477,10 @@ export function TodayBriefingCard({
   const oneMonthPct = briefingModel.oneMonthPct
   const oneMonthLabel = formatPercentValue(oneMonthPct)
   const shortStreak = briefingModel.shortStreak
-  const streakLabel = shortStreak.direction === 'up'
-    ? `${shortStreak.count}일 연속 상승`
-    : shortStreak.direction === 'down'
-      ? `${shortStreak.count}일 연속 하락`
-      : '전일과 비슷한 흐름'
+  const shortFlow = buildDeepScanShortFlow(
+    shortStreak,
+    quote?.changePct ?? briefingModel.latestRow?.changePct ?? null,
+  )
   const positionPct = calculatedProfitRate ?? profitRateFromBroker
   const needToBreakeven = canCompareCostBasis && currentPriceValue < comparableAveragePriceValue
     ? ((comparableAveragePriceValue / currentPriceValue) - 1) * 100
@@ -568,7 +568,7 @@ export function TodayBriefingCard({
 
       <div className={styles.todayBriefList} ref={todayBriefListRef}>
         <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Calendar} question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
-        <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={TrendingUp} question='단기 흐름은요?' data={<span className={shortStreak.direction === 'up' ? styles.todayUp : shortStreak.direction === 'down' ? styles.todayDown : styles.todayBlue}>{streakLabel}</span>} meaning={shortStreak.direction === 'up' ? '짧게 봐도 흐름이 살아나고 있어요.' : shortStreak.direction === 'down' ? '단기적으로는 숨 고르기가 이어지고 있어요.' : '아직 한쪽 방향으로 강하게 기울지는 않았어요.'} />
+        <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={TrendingUp} question='단기 흐름은요?' data={<span className={shortFlow.tone === 'up' ? styles.todayUp : shortFlow.tone === 'down' ? styles.todayDown : styles.todayBlue}>{shortFlow.label}</span>} meaning={shortFlow.meaning} />
         <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Target} question='내 자리는 어디쯤일까요?' data={<span className={financialToneClass(positionPct)}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
         <TodayMarketBriefing
           at={briefStartSeconds[3]}

@@ -52,9 +52,19 @@ export type LoadingBriefingSnapshot = {
   sources?: string[]
 }
 
+export type LoadingBriefingStreakRun = {
+  direction: 'up' | 'down'
+  count: number
+}
+
 export type LoadingBriefingStreak = {
   direction: 'up' | 'down' | 'flat'
   count: number
+  /**
+   * 현재 연속 흐름 직전의 마지막 반대 방향 구간(사이의 플랫 봉은 건너뛴다).
+   * '하락하다 오늘 첫 상승' 같은 맥락 구분에 쓰며, 직전 구간을 알 수 없으면 null.
+   */
+  previous: LoadingBriefingStreakRun | null
 }
 
 export function isFiniteNumber(value: unknown): value is number {
@@ -102,23 +112,46 @@ function getDailyMoveDirection(rows: LoadingBriefingDailyRow[], index: number): 
   return row.close > previous.close ? 'up' : 'down'
 }
 
+/** startIndex 직전(과거 방향)부터 플랫 봉을 건너뛰고 마지막 연속 구간을 센다. */
+function findBriefingRunEndingBefore(rows: LoadingBriefingDailyRow[], startIndex: number): LoadingBriefingStreakRun | null {
+  let index = startIndex - 1
+  while (index > 0 && getDailyMoveDirection(rows, index) === 'flat') {
+    index -= 1
+  }
+  if (index <= 0) {
+    return null
+  }
+
+  const direction = getDailyMoveDirection(rows, index)
+  if (direction === 'flat') {
+    return null
+  }
+
+  let count = 0
+  while (index > 0 && getDailyMoveDirection(rows, index) === direction) {
+    count += 1
+    index -= 1
+  }
+
+  return { direction, count }
+}
+
 export function calculateBriefingShortStreak(rows: LoadingBriefingDailyRow[]): LoadingBriefingStreak {
   if (rows.length < 2) {
-    return { direction: 'flat', count: 0 }
+    return { direction: 'flat', count: 0, previous: null }
   }
 
   const direction = getDailyMoveDirection(rows, rows.length - 1)
   if (direction === 'flat') {
-    return { direction: 'flat', count: 0 }
+    return { direction: 'flat', count: 0, previous: findBriefingRunEndingBefore(rows, rows.length - 1) }
   }
 
   let count = 0
-  for (let index = rows.length - 1; index > 0; index -= 1) {
-    if (getDailyMoveDirection(rows, index) !== direction) {
-      break
-    }
+  let index = rows.length - 1
+  while (index > 0 && getDailyMoveDirection(rows, index) === direction) {
     count += 1
+    index -= 1
   }
 
-  return { direction, count }
+  return { direction, count, previous: findBriefingRunEndingBefore(rows, index + 1) }
 }
