@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import { calculateBriefingShortStreak, type LoadingBriefingDailyRow } from './deepscan-briefing-snapshot'
 
-function rows(closes: number[], changePcts?: number[]): LoadingBriefingDailyRow[] {
+function rows(closes: number[], changePcts?: (number | null)[]): LoadingBriefingDailyRow[] {
   return closes.map((close, index) => ({
     date: `2026-05-${String(index + 1).padStart(2, '0')}`,
     close,
@@ -49,5 +49,38 @@ test('briefing short streak skips flat bars when finding the previous run', () =
   assert.deepEqual(
     calculateBriefingShortStreak(rows([100, 102, 101, 100, 100])),
     { direction: 'flat', count: 0, previous: { direction: 'down', count: 2 } },
+  )
+})
+
+test('briefing short streak counts the window-first row in the previous run', () => {
+  // 직전 구간이 데이터 첫 행(index 0)까지 이어져도 빠짐없이 센다 — 경계 카운트 결함 회귀 방지
+  assert.deepEqual(
+    calculateBriefingShortStreak(rows([100, 101], [-2, 1])),
+    { direction: 'up', count: 1, previous: { direction: 'down', count: 1 } },
+  )
+  assert.deepEqual(
+    calculateBriefingShortStreak(rows([100, 100, 100, 100, 100], [-2, -2, -1.5, -1, 2])),
+    { direction: 'up', count: 1, previous: { direction: 'down', count: 4 } },
+  )
+  // 하락 반대편 미러: 첫 행까지 이어진 직전 상승 구간
+  assert.deepEqual(
+    calculateBriefingShortStreak(rows([100, 100, 100, 100, 100], [2, 2, 1.5, 1, -2])),
+    { direction: 'down', count: 1, previous: { direction: 'up', count: 4 } },
+  )
+})
+
+test('briefing short streak keeps previous null when the first row has no changePct', () => {
+  // 첫 행의 방향을 알 수 없으면(changePct 결측·보합) '알 수 없음' null을 보존한다
+  assert.deepEqual(
+    calculateBriefingShortStreak(rows([100, 100, 103], [null, 0, 3])),
+    { direction: 'up', count: 1, previous: null },
+  )
+})
+
+test('briefing short streak counts the window-first row in the current run too', () => {
+  // 전 구간이 한 방향인 짧은 윈도우 — 현재 streak도 첫 행을 포함해 센다
+  assert.deepEqual(
+    calculateBriefingShortStreak(rows([100, 100, 100], [-2, -2, -2])),
+    { direction: 'down', count: 3, previous: null },
   )
 })

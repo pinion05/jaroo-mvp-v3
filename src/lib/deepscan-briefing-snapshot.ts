@@ -61,8 +61,9 @@ export type LoadingBriefingStreak = {
   direction: 'up' | 'down' | 'flat'
   count: number
   /**
-   * 현재 연속 흐름 직전의 마지막 반대 방향 구간(사이의 플랫 봉은 건너뛴다).
-   * '하락하다 오늘 첫 상승' 같은 맥락 구분에 쓰며, 직전 구간을 알 수 없으면 null.
+   * 현재 연속 흐름 직전의 마지막 방향 구간(사이의 플랫 봉은 건너뛴다).
+   * 반대 방향일 수도 같은 방향일 수도 있으며 '하락하다 오늘 첫 상승' 같은
+   * 맥락 구분에 쓰고, 직전 구간을 알 수 없으면 null.
    */
   previous: LoadingBriefingStreakRun | null
 }
@@ -115,10 +116,10 @@ function getDailyMoveDirection(rows: LoadingBriefingDailyRow[], index: number): 
 /** startIndex 직전(과거 방향)부터 플랫 봉을 건너뛰고 마지막 연속 구간을 센다. */
 function findBriefingRunEndingBefore(rows: LoadingBriefingDailyRow[], startIndex: number): LoadingBriefingStreakRun | null {
   let index = startIndex - 1
-  while (index > 0 && getDailyMoveDirection(rows, index) === 'flat') {
+  while (index >= 0 && getDailyMoveDirection(rows, index) === 'flat') {
     index -= 1
   }
-  if (index <= 0) {
+  if (index < 0) {
     return null
   }
 
@@ -128,7 +129,7 @@ function findBriefingRunEndingBefore(rows: LoadingBriefingDailyRow[], startIndex
   }
 
   let count = 0
-  while (index > 0 && getDailyMoveDirection(rows, index) === direction) {
+  while (index >= 0 && getDailyMoveDirection(rows, index) === direction) {
     count += 1
     index -= 1
   }
@@ -148,7 +149,7 @@ export function calculateBriefingShortStreak(rows: LoadingBriefingDailyRow[]): L
 
   let count = 0
   let index = rows.length - 1
-  while (index > 0 && getDailyMoveDirection(rows, index) === direction) {
+  while (index >= 0 && getDailyMoveDirection(rows, index) === direction) {
     count += 1
     index -= 1
   }
