@@ -62,11 +62,18 @@ function createEtfHistoryServiceClient() {
   return createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
-/** 기록 저장(append + 유저당 보존 한도 prune) — 실패해도 조회 응답에는 영향을 주지 않는다. */
+/** 기록 저장(append + 유저당 보존 한도 prune) — 실패해도 조회 응답에는 영향을 주지 않는다.
+ *  ETN 프로필(instrumentType 'etn')은 기록하지 않는다 — 이 원장은 ETF 전용이고, ETN
+ *  조회는 화면 표시만 허용된다(1차 가드는 route의 appendEtfHistory→isEtfLedgerPayload,
+ *  여기는 미래 호출자를 위한 이중 방어). */
 export async function recordEtfHistory(input: {
   userId: string
   profile: EtfProfileJson
 }): Promise<boolean> {
+  if (!isEtfLedgerPayload(input.profile)) {
+    return false
+  }
+
   const client = createEtfHistoryServiceClient()
   if (!client) return false
 

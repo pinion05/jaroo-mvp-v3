@@ -64,7 +64,7 @@ function EtfProductCard({ vm }: { vm: EtfViewModel }) {
       <div className='px-4 py-5 text-center'>
         <div className='text-[10px] text-[#97A0AE]'>기준지수</div>
         <div className='mt-1 text-[28px] font-black leading-none text-[#0F1419]'>{headline}</div>
-        {vm.header.issuer ? <p className='mt-2 text-[12px] text-[#5A6473]'>{vm.header.issuer} 운용</p> : null}
+        {vm.header.issuer ? <p className='mt-2 text-[12px] text-[#5A6473]'>{vm.header.issuer} {vm.header.instrumentType === 'etn' ? '발행' : '운용'}</p> : null}
       </div>
 
       {stats.length > 0 ? (

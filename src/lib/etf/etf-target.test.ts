@@ -30,14 +30,20 @@ test('non-etf kind and malformed codes are rejected (US ETF tickers are accepted
     resolveEtfPageTarget({ searchParams: new URLSearchParams('code=005930&kind=stock'), readSession: () => null }).status,
     'invalid',
   )
-  // ETN 명시 거부 — /etf 게이트는 ETF 전용(530092 삼성 인버스 ETN).
-  assert.equal(
-    resolveEtfPageTarget({ searchParams: new URLSearchParams('code=530092&kind=etn'), readSession: () => null }).status,
-    'invalid',
-  )
+  // ETN 수용(런타임 실측 시나리오 #2) — /etf?code=530092&kind=etn은 ETN 프로필 타깃으로 ok.
+  const etnTarget = resolveEtfPageTarget({
+    searchParams: new URLSearchParams('code=530092&kind=etn&name=삼성 인버스 코스피 200 선물 ETN'),
+    readSession: () => null,
+  })
+  assert.equal(etnTarget.status, 'ok')
+  if (etnTarget.status === 'ok') {
+    assert.equal(etnTarget.code, '530092')
+    assert.equal(etnTarget.market, 'kr')
+    assert.equal(etnTarget.name, '삼성 인버스 코스피 200 선물 ETN')
+  }
   assert.equal(
     resolveEtfPageTarget({ searchParams: new URLSearchParams('code=530092&kind=etf&market=etn'), readSession: () => null }).status,
-    'invalid',
+    'ok',
   )
   // 미국 ETF 티커는 이제 ok — market 'us'로 내려온다
   const usTarget = resolveEtfPageTarget({
@@ -76,10 +82,14 @@ test('no query falls back to session, otherwise empty', () => {
   })
   assert.equal(stockSession.status, 'invalid')
 
-  // 세션 kind 'etn'(딥스캔 ETN 타깃 세션)도 명시 거부
+  // 세션 kind 'etn'(딥스캔 ETN 타깃 세션)도 타깃으로 수용 — ETN 프로필 렌더 진입
   const etnSession = resolveEtfPageTarget({
     searchParams: new URLSearchParams(''),
     readSession: () => ({ code: '530092', name: '삼성 인버스 코스피 200 선물 ETN', kind: 'etn' }),
   })
-  assert.equal(etnSession.status, 'invalid')
+  assert.equal(etnSession.status, 'ok')
+  if (etnSession.status === 'ok') {
+    assert.equal(etnSession.code, '530092')
+    assert.equal(etnSession.market, 'kr')
+  }
 })

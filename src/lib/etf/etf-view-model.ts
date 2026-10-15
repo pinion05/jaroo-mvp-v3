@@ -132,7 +132,7 @@ export type EtfRiskItem = { label: string; value: string; subtitle: string }
 export type EtfRiskBlock = { notice: null; items: EtfRiskItem[] } | EtfNoticeBlock
 
 export type EtfViewModel = {
-  header: { name: string; code: string; issuer: string; tracking: string }
+  header: { name: string; code: string; issuer: string; tracking: string; instrumentType?: 'etf' | 'etn' }
   hero: {
     name: string
     price: string
@@ -157,6 +157,10 @@ function buildHeroStats(product: EtfProfileJson['product'], currency: EtfProfile
   if (product.totalFeePct != null) stats.push({ label: '총보수', value: `연 ${product.totalFeePct.toFixed(2)}%` })
   if (product.firstSettleDate) {
     stats.push({ label: '설정일', value: product.firstSettleDate.slice(0, 7).replace('-', '.') })
+  }
+  // ETN 전용 — 만기일(상환 예정일). ETF엔 이 필드가 없다(하위호환: 부재 시 스킵).
+  if (product.maturityDate) {
+    stats.push({ label: '만기', value: product.maturityDate.slice(0, 7).replace('-', '.') })
   }
   return stats
 }
@@ -240,9 +244,13 @@ function buildHoldingsBlock(profile: EtfProfileJson): EtfHoldingsBlock {
 }
 
 function buildBasicInfoItems(product: EtfProfileJson['product'], money: EtfMoneyFormatter): EtfBasicInfoItem[] {
+  const isEtn = product.issueDate != null || product.maturityDate != null
   const items: EtfBasicInfoItem[] = []
-  if (product.issuerName) items.push({ label: '운용사', value: product.issuerName })
+  // ETN은 발행사(증권사), ETF는 운용사 — 발행 주체 표기를 상품 유형에 맞게 붙인다.
+  if (product.issuerName) items.push({ label: isEtn ? '발행사' : '운용사', value: product.issuerName })
   if (product.baseIndexName) items.push({ label: '기준지수', value: product.baseIndexName })
+  if (product.issueDate) items.push({ label: '최초발행일', value: product.issueDate })
+  if (product.maturityDate) items.push({ label: '만기일', value: product.maturityDate })
   if (product.nav != null) items.push({ label: 'NAV', value: money(product.nav) })
   if (product.deviationPct != null) items.push({ label: 'NAV 괴리율', value: signedPct(product.deviationPct) })
   return items
@@ -272,6 +280,9 @@ export function buildEtfViewModel(input: {
       code: profile.code,
       issuer: product.issuerName ?? '',
       tracking: product.baseIndexName ? `${product.baseIndexName} 추종` : '',
+      // ETN 렌더 분기용 식별자(부재='etf' — 하위호환). 소비 예: 발행 주체 표기
+      // '운용'(ETF) vs '발행'(ETN).
+      ...(profile.instrumentType ? { instrumentType: profile.instrumentType } : {}),
     },
     hero: {
       name: profile.name,
