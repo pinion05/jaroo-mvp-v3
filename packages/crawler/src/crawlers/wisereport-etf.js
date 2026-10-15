@@ -30,17 +30,25 @@ function getFetchImpl(fetchImpl) {
   throw new Error('fetch implementation unavailable');
 }
 
-async function withFetchTimeout(fetchImpl, url, init, timeoutMs) {
-  if (!timeoutMs) return fetchImpl(url, init);
+// fetch + 바디 소비(consume) 전체를 하나의 데드라인으로 감싼다 — 헤더까지만
+// 타임아웃을 보장하는 구 withFetchTimeout은 response.text()가 보호 밖이었다
+// (deepscan d6b4f7c가 고친 결함의 프로필 경로 잔존). current-quotes.js의
+// withResponseDeadline과 동일 구조: finally가 consume 완료 후에만 실행된다.
+async function withResponseDeadline(fetchImpl, url, init, timeoutMs, consume) {
+  if (!timeoutMs) {
+    const response = await fetchImpl(url, init);
+    return consume(response);
+  }
 
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), timeoutMs);
 
   try {
-    return await fetchImpl(url, {
+    const response = await fetchImpl(url, {
       ...init,
       signal: abortController.signal,
     });
+    return await consume(response);
   } finally {
     clearTimeout(timeoutId);
   }
@@ -212,19 +220,18 @@ export async function fetchWiseReportEtfSnapshot(code, options = {}) {
       ? Number(options.timeoutMs)
       : DEFAULT_WISEREPORT_ETF_TIMEOUT_MS;
   const url = `${WISEREPORT_ETF_DETAIL_URL}?cmp_cd=${encodeURIComponent(normalizedCode)}`;
-  const response = await withFetchTimeout(fetchImpl, url, {
+  const html = await withResponseDeadline(fetchImpl, url, {
     headers: {
       Accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
       'User-Agent': 'Mozilla/5.0',
       Referer: 'https://comp.wisereport.co.kr/ETF/lookup.aspx',
     },
-  }, timeoutMs);
-
-  if (!response.ok) {
-    throw new Error(`WiseReport ETF snapshot fetch failed: ${response.status}`);
-  }
-
-  const html = await response.text();
+  }, timeoutMs, async (response) => {
+    if (!response.ok) {
+      throw new Error(`WiseReport ETF snapshot fetch failed: ${response.status}`);
+    }
+    return response.text();
+  });
   const snapshot = parseWiseReportEtfSnapshotHtml(html, normalizedCode);
   if (!snapshot.product.baseIndexName && snapshot.constituents.totalCount === 0 && !snapshot.marketStatus.closePrice) {
     return null;

@@ -28,7 +28,10 @@ export type EtfHistoryDetailRow = EtfHistoryListRow & {
   priceBasis: number | null
 }
 
-/** 원장 payload 판별 — jaroo-etf-profile-v1 계약을 충족하는지(읽기 경로 가드). */
+/** 원장 payload 판별 — jaroo-etf-profile-v1 계약을 충족하는지(읽기 경로 가드).
+ *  market null(스냅샷 부재 미확정)도 통과 — 가드가 거부하면 null-market 프로필이
+ *  재열람 캐시·히스토리 복원에서 조용히 유실된다. JSON 파싱 결과엔 undefined가
+ *  없으므로 엄격한 === null 매칭(시장 필드 자체 부재는 여전히 거부). */
 export function isEtfLedgerPayload(payload: unknown): payload is EtfProfileJson {
   if (!payload || typeof payload !== 'object') return false
   const candidate = payload as Partial<EtfProfileJson>
@@ -38,7 +41,8 @@ export function isEtfLedgerPayload(payload: unknown): payload is EtfProfileJson 
     typeof candidate.code === 'string' &&
     candidate.code.trim().length > 0 &&
     typeof candidate.name === 'string' &&
-    (candidate.market === 'kospi' || candidate.market === 'kosdaq' || candidate.market === 'us')
+    (candidate.market === 'kospi' || candidate.market === 'kosdaq' || candidate.market === 'us' ||
+      candidate.market === null)
   )
 }
 
