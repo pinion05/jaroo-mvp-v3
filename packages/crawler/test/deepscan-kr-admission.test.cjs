@@ -83,34 +83,43 @@ test('정상 완료 시 기존 로그 형식 유지 + 슬롯 해제', async () =
 });
 
 test('와치독: 유기 load()를 504로 마무리하고 슬롯 회수 + 고스트 settle 로그', async () => {
-  const { admission, logs, warns } = await makeAdmission({ DEEPSCAN_KR_JOB_MAX_MS: '20' });
-  let ghostResolve;
-  const load = () => new Promise((resolve) => { ghostResolve = resolve; });
+  // 와치독 타이머는 unref라 이벤트 루프를 유지하지 않는다(admission 구현 참조).
+  // orphan reject를 20ms 와치독 발화에 의존해 await하는 동안 루프에 남은 예정
+  // 작업이 없으면 node:test가 루프 종료로 판정해 이 테스트(와 이후 테스트)를
+  // 취소한다 — ref keep-alive 타이머로 루프를 유지해 러너 상호작용 결함을 보완한다.
+  const keepAlive = setTimeout(() => {}, 5000);
+  try {
+    const { admission, logs, warns } = await makeAdmission({ DEEPSCAN_KR_JOB_MAX_MS: '20' });
+    let ghostResolve;
+    const load = () => new Promise((resolve) => { ghostResolve = resolve; });
 
-  const orphan = admission.run(inputFor('005930'), load);
-  await assert.rejects(orphan, (error) => {
-    assert.equal(error.status, 504);
-    assert.equal(error.details.status, 'timeout');
-    assert.equal(error.details.code, '005930');
-    assert.equal(error.details.retryable, true);
-    return true;
-  });
-  assert.equal(warns.length, 1);
-  assert.match(warns[0], /deepscan-kr job watchdog timeout code=005930/);
-  assert.match(warns[0], /activeJobs=\[/);
+    const orphan = admission.run(inputFor('005930'), load);
+    await assert.rejects(orphan, (error) => {
+      assert.equal(error.status, 504);
+      assert.equal(error.details.status, 'timeout');
+      assert.equal(error.details.code, '005930');
+      assert.equal(error.details.retryable, true);
+      return true;
+    });
+    assert.equal(warns.length, 1);
+    assert.match(warns[0], /deepscan-kr job watchdog timeout code=005930/);
+    assert.match(warns[0], /activeJobs=\[/);
 
-  // 슬롯 회수 확인: 동일 jobKey 재요청이 즉시 새 잡으로 승인된다(죽은 promise dedup 아님).
-  const retried = admission.run(inputFor('005930'), () => Promise.resolve('recovered'));
-  assert.notEqual(retried, orphan);
-  assert.equal(await retried, 'recovered');
+    // 슬롯 회수 확인: 동일 jobKey 재요청이 즉시 새 잡으로 승인된다(죽은 promise dedup 아님).
+    const retried = admission.run(inputFor('005930'), () => Promise.resolve('recovered'));
+    assert.notEqual(retried, orphan);
+    assert.equal(await retried, 'recovered');
 
-  // 고스트가 늦게 settle해도: 결과는 버려지고 ghost 로그만 남는다(오도성 complete 로그 없음).
-  ghostResolve('late-value');
-  await new Promise((resolve) => setTimeout(resolve, 10));
-  const ghostWarns = warns.filter((line) => line.includes('ghost settled'));
-  assert.equal(ghostWarns.length, 1);
-  assert.match(ghostWarns[0], /outcome=resolved/);
-  assert.equal(logs.filter((line) => line.includes('code=005930')).length, 1); // 재시도 잡의 complete만
+    // 고스트가 늦게 settle해도: 결과는 버려지고 ghost 로그만 남는다(오도성 complete 로그 없음).
+    ghostResolve('late-value');
+    await new Promise((resolve) => setTimeout(resolve, 10));
+    const ghostWarns = warns.filter((line) => line.includes('ghost settled'));
+    assert.equal(ghostWarns.length, 1);
+    assert.match(ghostWarns[0], /outcome=resolved/);
+    assert.equal(logs.filter((line) => line.includes('code=005930')).length, 1); // 재시도 잡의 complete만
+  } finally {
+    clearTimeout(keepAlive);
+  }
 });
 
 test('와치독 지연 오버플로 클램프: 거대 env값도 즉시 504로 이어지지 않음', async () => {

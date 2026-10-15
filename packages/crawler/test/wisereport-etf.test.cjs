@@ -69,3 +69,27 @@ test('fetchWiseReportEtfSnapshot requests WiseReport ETF detail page and parses 
   assert.equal(snapshot.product.baseIndexName, '코스피지수');
   assert.equal(snapshot.constituents.top10[0].name, '삼성전자');
 });
+
+// 바디 읽기 타임아웃 보호 — 헤더만 커버하는 구 withFetchTimeout 패턴이면 헤더
+// 반환 후 타이머가 해제돼 text()가 영구 대기한다. 그 경우 이 테스트는 2초
+// 타임아웃으로 실패해야 한다(구현 누락 감지용).
+test('fetchWiseReportEtfSnapshot aborts body reads that exceed the deadline', { timeout: 2000 }, async () => {
+  const { fetchWiseReportEtfSnapshot } = await import('../src/crawlers/wisereport-etf.js');
+
+  // ok 응답을 반환하되 text()는 init.signal abort 시에만 거부하는 목업
+  // (undici가 signal을 바디 스트림에 연결하는 동작 시뮬레이션).
+  const fetchImpl = async (url, init) => ({
+    ok: true,
+    status: 200,
+    text: () =>
+      new Promise((_, reject) => {
+        init.signal.addEventListener('abort', () =>
+          reject(init.signal.reason ?? new DOMException('aborted', 'AbortError')),
+        );
+      }),
+  });
+
+  await assert.rejects(
+    () => fetchWiseReportEtfSnapshot('226490', { timeoutMs: 30, fetchImpl }),
+  );
+});

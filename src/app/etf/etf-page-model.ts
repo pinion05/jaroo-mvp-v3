@@ -24,7 +24,8 @@ export type EtfPageState =
       phase: 'ready'
       vm: EtfViewModel
       briefing: LoadingBriefingSnapshot
-      market: 'kospi' | 'kosdaq' | 'us'
+      /** null = 프로필 시장 미확정(위세리포트 스냅샷 부재) */
+      market: 'kospi' | 'kosdaq' | 'us' | null
       holding: { shares: number; averagePrice: number } | null
       /** 재열람 캐시 히트 — 원장에 저장된 분석 시각. fresh 수집이면 null. */
       restoredAt: string | null

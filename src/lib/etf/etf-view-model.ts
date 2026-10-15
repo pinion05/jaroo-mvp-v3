@@ -17,11 +17,18 @@ export type EtfProfileJson = {
   schemaVersion: 'jaroo-etf-profile-v1'
   code: string
   name: string
-  market: 'kospi' | 'kosdaq' | 'us'
+  /** null = 위세리포트 스냅샷 부재·인식 불가로 시장 미확정 (추측 오염 금지) */
+  market: 'kospi' | 'kosdaq' | 'us' | null
   ok: true
   /** 미국 ETF는 'USD'(기본 KRW — 필드 부재 시 원화) */
   currency?: 'KRW' | 'USD'
   quote?: { changePct: number | null } | null
+  /**
+   * 크롤러 소스 상태 마커(스키마 v1 하위호환 선택 필드) — 위세리포트 스냅샷
+   * 확보 여부. 'ok'=확보, 'empty'=빈/인식 불가 페이지, 'failed'=fetch 실패
+   * (관용 처리됨). 에러 상세는 공개 엔드포인트라 서버 로그에만 있다.
+   */
+  sources?: { wisereport: 'ok' | 'empty' | 'failed' }
   product: {
     issuerName: string | null
     baseIndexName: string | null

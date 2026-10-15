@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const { mock } = require('node:test');
 
 const naverPriceFixture = {
   itemname: 'KODEX 200',
@@ -122,7 +123,9 @@ test('buildEtfProfile tolerates missing snapshot (naver-only) and caps holdings 
   assert.equal(profile.product.baseIndexName, null);
   assert.equal(profile.product.firstSettleDate, null);
   assert.equal(profile.product.issuerName, '삼성자산운용(ETF)');
-  assert.equal(profile.market, 'kospi');
+  // 스냅샷 부재 → 시장 미확정(null). 네이버 price엔 시장 식별자가 없어 'kospi'로
+  // 추측하지 않는다(오염 계약의 의도적 전환 — 무음 실패 수정).
+  assert.equal(profile.market, null);
   assert.equal(profile.holdings.length, 30);
   assert.equal(profile.holdings[0].rank, 1);
   assert.deepEqual(profile.returns, null);
@@ -160,19 +163,105 @@ test('fetchEtfProfile fetches naver endpoints with UA header and tolerates snaps
     throw new Error(`unexpected url: ${url}`);
   };
 
-  const profile = await fetchEtfProfile('069500', {
-    fetchImpl,
-    fetchSnapshot: async () => {
-      throw new Error('wisereport down');
-    },
-  });
+  // 실패 경로는 무음이 아니어야 한다 — 서버 콘솔 warn 1회(코드+에러명 포함).
+  const warnMock = mock.method(console, 'warn');
 
-  assert.equal(profile.ok, true);
-  assert.equal(profile.name, 'KODEX 200');
-  assert.equal(profile.holdings.length, 2);
+  try {
+    const profile = await fetchEtfProfile('069500', {
+      fetchImpl,
+      fetchSnapshot: async () => {
+        throw new Error('wisereport down');
+      },
+    });
+
+    assert.equal(profile.ok, true);
+    assert.equal(profile.name, 'KODEX 200');
+    assert.equal(profile.holdings.length, 2);
+    // 실패 관측 가능화: 응답 마커 'failed' + 시장 미확정(null)
+    assert.equal(profile.sources.wisereport, 'failed');
+    assert.equal(profile.market, null);
+    assert.equal(warnMock.mock.callCount(), 1);
+    assert.match(String(warnMock.mock.calls[0].arguments[0]), /069500/);
+    assert.match(String(warnMock.mock.calls[0].arguments[0]), /wisereport 스냅샷 실패/);
+  } finally {
+    warnMock.mock.restore();
+  }
+
   for (const call of fetchedUrls) {
     assert.match(call.headers['User-Agent'], /Mozilla/);
   }
+});
+
+// 무음 실패 수정의 핵심 회귀 방지 — 스냅샷 부재 시 KOSDAQ 상품이 'kospi'로
+// 오염되지 않는다(229200 KODEX 코스닥150, naverPrice itemname 실측값).
+test('fetchEtfProfile leaves market null for KOSDAQ products when snapshot is missing (no kospi pollution)', async () => {
+  const { fetchEtfProfile } = await import('../src/crawlers/etf-profile.js');
+
+  const kosdaqNaverPrice = {
+    ...naverPriceFixture,
+    itemname: 'KODEX 코스닥150',
+  };
+  const fetchImpl = async (url) => {
+    if (url.endsWith('/price')) return { ok: true, json: async () => kosdaqNaverPrice };
+    if (url.endsWith('/ETFComponent')) return { ok: true, json: async () => [] };
+    throw new Error(`unexpected url: ${url}`);
+  };
+
+  const profile = await fetchEtfProfile('229200', {
+    fetchImpl,
+    fetchSnapshot: async () => null,
+  });
+
+  assert.equal(profile.ok, true);
+  assert.equal(profile.name, 'KODEX 코스닥150');
+  // 절대 'kospi'가 아님 — 시장 미확정은 null
+  assert.equal(profile.market, null);
+  assert.notEqual(profile.market, 'kospi');
+});
+
+test('fetchEtfProfile marks sources.wisereport empty (null-resolved snapshot) without warning', async () => {
+  const { fetchEtfProfile } = await import('../src/crawlers/etf-profile.js');
+
+  const fetchImpl = async (url) => {
+    if (url.endsWith('/price')) return { ok: true, json: async () => naverPriceFixture };
+    if (url.endsWith('/ETFComponent')) return { ok: true, json: async () => naverComponentFixture };
+    throw new Error(`unexpected url: ${url}`);
+  };
+
+  const warnMock = mock.method(console, 'warn');
+
+  try {
+    // fetchSnapshot이 null로 해결(빈/인식 불가 페이지) — throw가 아니므로 warn 없음
+    const profile = await fetchEtfProfile('069500', {
+      fetchImpl,
+      fetchSnapshot: async () => null,
+    });
+
+    assert.equal(profile.ok, true);
+    assert.equal(profile.sources.wisereport, 'empty');
+    assert.equal(warnMock.mock.callCount(), 0);
+  } finally {
+    warnMock.mock.restore();
+  }
+});
+
+test('fetchEtfProfile marks sources.wisereport ok when the snapshot resolves', async () => {
+  const { fetchEtfProfile } = await import('../src/crawlers/etf-profile.js');
+
+  const fetchImpl = async (url) => {
+    if (url.endsWith('/price')) return { ok: true, json: async () => naverPriceFixture };
+    if (url.endsWith('/ETFComponent')) return { ok: true, json: async () => naverComponentFixture };
+    throw new Error(`unexpected url: ${url}`);
+  };
+
+  const profile = await fetchEtfProfile('069500', {
+    fetchImpl,
+    fetchSnapshot: async () => snapshotFixture,
+  });
+
+  assert.equal(profile.ok, true);
+  assert.equal(profile.sources.wisereport, 'ok');
+  assert.equal(profile.market, 'kospi');
 });
 
 test('fetchEtfProfile throws when naver price fails entirely', async () => {
