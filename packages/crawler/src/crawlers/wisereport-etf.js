@@ -171,6 +171,15 @@ export function parseWiseReportEtfSnapshotHtml(html, code) {
       liquidityProviders: normalizeText(productSummaryData.LP_NM_KOR),
       issuerName: normalizeText(productSummaryData.ISSUE_NM_KOR),
       issuerUrl: normalizeText(productSummaryData.URL),
+      // ETN 전용 키 — ETF 응답에는 없어 null로 해석된다(하위호환).
+      // 실측(2026-10-15, ETF.aspx?cmp_cd=530092): EXPENSES='0.50'(보수),
+      // FIRST_ISSUE_DT='2021-10-14'(최초발행), EXP_TRD_DT='2031-09-15'(만기),
+      // REPAY_UNIT='100000'(상환단위), REPAY_COMM='1.00'(상환수수료).
+      expensePct: normalizeNumber(productSummaryData.EXPENSES),
+      firstIssueDate: normalizeText(productSummaryData.FIRST_ISSUE_DT),
+      expiryDate: normalizeText(productSummaryData.EXP_TRD_DT),
+      repayUnit: normalizeNumber(productSummaryData.REPAY_UNIT),
+      repayCommissionPct: normalizeNumber(productSummaryData.REPAY_COMM),
     },
     marketStatus: {
       closePrice: normalizeNumber(statusData.CLS_PRC),

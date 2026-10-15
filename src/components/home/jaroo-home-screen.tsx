@@ -8,7 +8,7 @@ import { Cell, Pie, PieChart } from 'recharts'
 import { AuthHomeStatus } from '@/components/auth/auth-home-status'
 import { DeepScanLoadingScreen } from '@/components/deepscan-loading-screen'
 import { shouldUseDeepScanLoadingHandoff } from '@/lib/deepscan-navigation'
-import { pickDeepScanDefaultHolding } from '@/lib/deepscan-target'
+import { resolveDefaultDeepScanHolding } from '@/lib/deepscan-target'
 import { getFinancialValueTone } from '@/lib/financial-value-tone'
 import {
   applyCurrentQuotesToHomeHoldings,
@@ -882,13 +882,13 @@ export function JarooHomeScreen() {
     () => buildHomeV2Summary(homeHoldings, isAppliedPortfolio, { usdKrwRate: hasUsHomeHoldings ? usdKrwRate : null }),
     [hasUsHomeHoldings, homeHoldings, isAppliedPortfolio, usdKrwRate],
   )
-  const defaultDeepScanHolding = useMemo(() => {
-    if (selectedHolding?.kind === 'stock') {
-      return selectedHolding
-    }
-
-    return pickDeepScanDefaultHolding(homeHoldings)
-  }, [homeHoldings, selectedHolding])
+  // fast-path(선택 카드가 딥스캔 진입 가능 종류면 그 카드)는 deepscan-target의
+  // export 헬퍼로 내렸다 — 'stock'|'etn' 조건이 헬퍼 안에 있어 선택된 ETN 카드가
+  // picker 결과로 조용히 대체되지 않는다(동작 검증은 deepscan-target.test.ts가 담당).
+  const defaultDeepScanHolding = useMemo(
+    () => resolveDefaultDeepScanHolding(selectedHolding, homeHoldings),
+    [homeHoldings, selectedHolding],
+  )
 
   const handleQuoteRefresh = useCallback(() => {
     if (quoteStatus === 'loading') {

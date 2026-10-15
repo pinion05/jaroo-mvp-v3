@@ -14,7 +14,7 @@ export type DeepScanRawInputForDump = {
     code?: string
     ticker?: string
     market?: string
-    kind?: 'stock' | 'etf'
+    kind?: 'stock' | 'etf' | 'etn'
   }
   holding?: {
     shares?: string

@@ -939,3 +939,98 @@ test('home market score has loading, missing, and error fallback states', () => 
   assert.equal(errorScore.tone, 'red')
   assert.match(errorScore.description, /시장지표를 불러오지 못해/)
 })
+
+// ── kind 'etn' 전파(유니버스 389종 교정의 웹 측 앵커) ──
+
+test('inferHoldingKind는 ETN 이름을 etf보다 먼저 etn으로 분류한다 — sol 오분류 방어', () => {
+  const items = buildPortfolioItemsFromAppliedHomePortfolioRows([
+    // 실측 오분류 2건 중 1건: ETF 정규식 'sol'에 걸리는 ETN 이름
+    { name: '하나 Solactive US Tech Top 10 ETN(H)', quantity: '10주', profitRate: '+1.0%', evaluationAmount: '1,000,000원', averagePrice: '100,000원' },
+    { name: '삼성 인버스 코스피 200 선물 ETN', quantity: '10주', profitRate: '+1.0%', evaluationAmount: '1,000,000원', averagePrice: '100,000원' },
+    { name: 'KODEX 200', quantity: '10주', profitRate: '+1.0%', evaluationAmount: '1,000,000원', averagePrice: '100,000원' },
+    { name: '삼성전자', quantity: '10주', profitRate: '+1.0%', evaluationAmount: '1,000,000원', averagePrice: '100,000원' },
+  ])
+
+  assert.equal(items[0]?.kind, 'etn')
+  assert.equal(items[1]?.kind, 'etn')
+  assert.equal(items[2]?.kind, 'etf')
+  assert.equal(items[3]?.kind, 'stock')
+})
+
+test('sanitize 왕복 경로는 resolvedKind etn을 보존하고 marketTone etf와 합산된다', () => {
+  const [item] = buildPortfolioItemsFromAppliedHomePortfolioRows([
+    {
+      name: '삼성 인버스 코스피 200 선물 ETN',
+      quantity: '10주',
+      profitRate: '+15.8%',
+      evaluationAmount: '34,750원',
+      averagePrice: '3,000원',
+      resolvedCode: '530092',
+      resolvedMarket: 'KOSPI',
+      resolvedMarketTone: 'etf',
+      resolvedKind: 'etn',
+    },
+  ])
+
+  // kind 보존(848 sanitize 화이트리스트) + tone 정합(1029 병기)
+  assert.equal(item?.kind, 'etn')
+  assert.equal(item?.marketTone, 'etf')
+
+  // 포트폴리오 아이템 → applied row 왕복도 etn을 유지한다
+  const [roundTripRow] = buildAppliedHomePortfolioRowsFromPortfolioItems([item!])
+  assert.equal(roundTripRow?.resolvedKind, 'etn')
+})
+
+test('미해결 market 폴백은 kind etn 행에 ETN 라벨을 붙인다(OCR 대신)', () => {
+  // 홈 카드 빌드(buildHomeHoldingsFromOcrRows의 market 폴백) — 포트폴리오 아이템의
+  // market은 resolvedMarket 원본만 실으므로 ETN 라벨 폴백은 홀딩 파이프라인에서 주장.
+  const [holding] = buildHomeHoldingsFromOcrRows([
+    { name: '삼성 인버스 코스피 200 선물 ETN', quantity: '10주', profitRate: '+1.0%', evaluationAmount: '34,750원', averagePrice: '3,000원' },
+  ])
+
+  assert.equal(holding?.market, 'ETN')
+  assert.equal(holding?.marketTone, 'etf')
+  assert.equal(holding?.kind, 'etn')
+})
+
+test('홈 카드 파이프라인은 ETN 보유에 전용 의견 문구를 내리고 /deepscan으로 라우팅한다', () => {
+  const [holding] = buildHomeHoldingsFromPortfolioItems([
+    {
+      name: '삼성 인버스 코스피 200 선물 ETN',
+      code: '530092',
+      market: 'ETN',
+      marketTone: 'etf',
+      kind: 'etn',
+      quantity: 10,
+      averagePrice: 3000,
+    },
+  ])
+
+  // buildOpinionText('etn' 전용 분기) — 비익스포트라 파이프라인 결과로 간접 주장
+  assert.match(holding?.opinionText ?? '', /ETN을 OCR에서 읽어/)
+  assert.doesNotMatch(holding?.opinionText ?? '', /ETF를 OCR에서 읽어/)
+  // 카드 빌드는 ETN을 else(stock) 분기로 둔다 — /deepscan 라우팅 보장
+  assert.equal(holding?.kind, 'etn')
+  assert.equal(holding?.actionHref, '/deepscan')
+  assert.equal(holding?.actionLabel, '딥스캔 분석')
+})
+
+test('유니버스 ETN 389종 이름 전부가 kind etn으로 분류된다(스모크)', async () => {
+  const { default: universe } = await import('./data/instrument-universe.json')
+  const etnNames = (universe as Array<{ name: string; market: string; kind: string }>)
+    .filter((row) => row.market === 'ETN')
+    .map((row) => row.name)
+
+  assert.equal(etnNames.length, 389)
+
+  const items = buildPortfolioItemsFromAppliedHomePortfolioRows(
+    etnNames.map((name) => ({ name, quantity: '1주', profitRate: '+1.0%', evaluationAmount: '1,000원', averagePrice: '1,000원' })),
+  )
+
+  const misclassified = items.filter((item) => item.kind !== 'etn')
+  assert.deepEqual(
+    misclassified.map((item) => item.name),
+    [],
+    '유니버스 ETN 이름 전부가 etn으로 분류돼야 한다',
+  )
+})

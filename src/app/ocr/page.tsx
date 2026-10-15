@@ -6,6 +6,8 @@ import {
   buildOcrSourceRows,
   clearPersistedScreenshotUploadSession,
   computeAveragePrice,
+  inferMarketTone,
+  normalizeKindChoice,
   normalizeOcrProfitAmount,
   normalizeOcrProfitRate,
   readPersistedScreenshotUploadSession,
@@ -148,39 +150,8 @@ function isManualRowComplete(row: OcrReviewRow) {
   )
 }
 
-function inferMarketTone(market?: string) {
-  const normalized = market?.trim().toUpperCase()
-
-  if (!normalized) {
-    return undefined
-  }
-
-  if (normalized === 'KR') {
-    return 'kospi'
-  }
-
-  if (normalized === 'US') {
-    return 'nasdaq'
-  }
-
-  if (normalized.includes('KOSDAQ')) {
-    return 'kosdaq'
-  }
-
-  if (normalized.includes('KOSPI') || normalized.includes('KRX')) {
-    return 'kospi'
-  }
-
-  if (normalized.includes('NASDAQ') || normalized.includes('NYSE') || normalized.includes('AMEX')) {
-    return 'nasdaq'
-  }
-
-  if (normalized.includes('ETF')) {
-    return 'etf'
-  }
-
-  return undefined
-}
+// inferMarketTone은 screenshot-ocr.ts의 export 순수 함수로 이동했다(컴포넌트 내부
+// 함수라 직접 테스트가 불가하다는 검열 지적 반영). 여기선 import로 재사용만 한다.
 
 function filterConflictSelections(
   conflicts: Array<{ key: string; candidates: Array<{ id: string }> }>,
@@ -786,9 +757,7 @@ export default function OcrPage() {
       resolvedMarket: field === 'resolvedMarket' ? normalizedValue || undefined : currentRow.resolvedMarket,
       resolvedKind:
         field === 'resolvedKind'
-          ? normalizedValue === 'stock' || normalizedValue === 'etf'
-            ? normalizedValue
-            : undefined
+          ? normalizeKindChoice(normalizedValue)
           : currentRow.resolvedKind,
       quantity: field === 'quantity' ? value : currentRow.quantity,
       profitAmount,

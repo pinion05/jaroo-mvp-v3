@@ -82,6 +82,22 @@ test('resolveDeepScanHaltVerdict — 대상 없음·미국·KR ETF는 판정 없
   }), 'active')
 })
 
+test('resolveDeepScanHaltVerdict — ETN은 etf 조기리턴을 타지 않고 거래량 판정 흐름에 들어간다', () => {
+  const base = {
+    targetKey: 'KR:530092',
+    isUsTarget: false,
+    instrumentKind: 'etn' as const,
+    haltHint: false,
+    checkExpired: false,
+  }
+
+  // 만기·상환 정지(거래량 0)는 검출된다 — 레거시(kind 'etf')은 skip이었으나
+  // kind 'etn'은 주식과 동일한 거래량 판정 흐름으로(의도된 동작 변화)
+  assert.equal(resolveDeepScanHaltVerdict({ ...base, quickQuoteVolume: 0 }), 'halted')
+  assert.equal(resolveDeepScanHaltVerdict({ ...base, quickQuoteVolume: 64_202 }), 'active')
+  assert.equal(resolveDeepScanHaltVerdict({ ...base, quickQuoteVolume: undefined }), 'pending')
+})
+
 test('appendSubjectJosa — 받침 여부로 은/는을 붙인다', () => {
   assert.equal(appendSubjectJosa('드래곤플라이'), '드래곤플라이는')
   assert.equal(appendSubjectJosa('삼성전자'), '삼성전자는')

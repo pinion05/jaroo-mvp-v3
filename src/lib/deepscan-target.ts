@@ -170,7 +170,9 @@ function buildAxisMember(
 }
 
 export function pickDeepScanDefaultHolding(holdings: HomeHolding[]) {
-  const candidates = holdings.filter((holding) => holding.kind === 'stock')
+  // 홈 빠른 딥스캔 기본 타깃 후보 — 주식과 ETN. ETN은 딥스캔 경로 상품이다
+  // (/etf 게이트가 거부하므로 후보에 포함하지 않는다).
+  const candidates = holdings.filter((holding) => holding.kind === 'stock' || holding.kind === 'etn')
 
   if (candidates.length === 0) {
     return null
@@ -194,6 +196,23 @@ export function pickDeepScanDefaultHolding(holdings: HomeHolding[]) {
 
     return leftChange - rightChange
   })[0]
+}
+
+/** 홈 빠른 딥스캔 기본 타깃 결정 — 선택 카드 fast-path + 폴백 picker.
+ *  jaroo-home-screen의 useMemo 내 인라인 로직을 순수 함수로 추출·export한 것
+ *  (컴포넌트 내부 로직이라 직접 테스트가 불가하다는 검열 지적 반영).
+ *  선택된 카드가 딥스캔 진입 가능 종류(stock·etn)면 그 카드를 그대로 쓰고,
+ *  아니면(ETF·미선택) picker(최악 수익률 종목)로 위임한다. ETN이 fast-path
+ *  조건에 없으면 선택된 ETN 카드가 picker 결과로 조용히 대체된다. */
+export function resolveDefaultDeepScanHolding(
+  selected: HomeHolding | null,
+  holdings: HomeHolding[],
+): HomeHolding | null {
+  if (selected?.kind === 'stock' || selected?.kind === 'etn') {
+    return selected
+  }
+
+  return pickDeepScanDefaultHolding(holdings)
 }
 
 export function createPlaceholderDeepScanHolding(): HomeHolding {

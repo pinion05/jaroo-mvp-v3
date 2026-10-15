@@ -57,6 +57,64 @@ test('buildEtfViewModel without holding hides profit fields (guest)', () => {
   assert.equal(vm.hero.profitAmount, null)
 })
 
+// ETN 프로필 렌더(런타임 실측 시나리오 #1·#2) — /etf?code=530092가 invalid 카드가
+// 아니라 발행사·기초지수·보수 프로필을 내린다. ETN은 nav·aum·firstSettleDate가
+// null이고(실측) issueDate·maturityDate·repayUnit·repayCommissionPct를 실은다.
+test('buildEtfViewModel renders an ETN profile with issuer/base index/fee and maturity', () => {
+  const etnProfile: EtfProfileJson = {
+    schemaVersion: 'jaroo-etf-profile-v1',
+    code: '530092',
+    name: '삼성 인버스 코스피 200 선물 ETN',
+    market: 'kospi',
+    ok: true,
+    instrumentType: 'etn',
+    quote: { changePct: 7.56 },
+    product: {
+      issuerName: '삼성증권',
+      baseIndexName: '코스피 200 선물 TWAP 인버스지수',
+      totalFeePct: 0.5,
+      firstSettleDate: null,
+      aum: null,
+      nav: null,
+      deviationPct: null,
+      issueDate: '2021-10-14',
+      maturityDate: '2031-09-15',
+      repayUnit: 100000,
+      repayCommissionPct: 1.0,
+    },
+    returns: null,
+    holdings: null,
+    daily: null,
+  }
+
+  const vm = buildEtfViewModel({ profile: etnProfile, quote: { price: 3130, changePct: 7.56 }, holding: null })
+
+  // 헤더 — 발행사·기초지수 추종 + ETN 식별자(발행 주체 표기 분기용)
+  assert.equal(vm.header.issuer, '삼성증권')
+  assert.equal(vm.header.tracking, '코스피 200 선물 TWAP 인버스지수 추종')
+  assert.equal(vm.header.instrumentType, 'etn')
+
+  // 히어로 스탯 — aum·설정일 없음, 보수·만기만
+  const statLabels = vm.hero.stats.map((stat) => stat.label)
+  assert.deepEqual(statLabels, ['총보수', '만기'])
+  assert.equal(vm.hero.stats[0].value, '연 0.50%')
+  assert.equal(vm.hero.stats[1].value, '2031.09')
+
+  // 기본정보 — ETN은 '운용사'가 아니라 '발행사', 만기·최초발행 행 추가
+  const byLabel = new Map(vm.basicInfo.items.map((item) => [item.label, item.value]))
+  assert.equal(byLabel.get('발행사'), '삼성증권')
+  assert.equal(byLabel.get('운용사'), undefined)
+  assert.equal(byLabel.get('기준지수'), '코스피 200 선물 TWAP 인버스지수')
+  assert.equal(byLabel.get('최초발행일'), '2021-10-14')
+  assert.equal(byLabel.get('만기일'), '2031-09-15')
+  // nav·괴리율 없음(ETN price 응답에 부재 — 실측)
+  assert.equal(byLabel.has('NAV'), false)
+  assert.equal(byLabel.has('NAV 괴리율'), false)
+
+  // 구성종목 없음(holdings null 고정) → 소스 준비 중 notice로 관용
+  assert.equal(vm.topHoldings.notice?.reason, 'source-pending')
+})
+
 test('buildEtfViewModel loss formatting uses U+2212 and rounded integers', () => {
   const vm = buildEtfViewModel({
     profile,

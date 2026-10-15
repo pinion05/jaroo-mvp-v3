@@ -47,12 +47,12 @@ function normalizeCurrency(value: unknown): WorkflowMoneyCurrency | undefined {
 
 function normalizeKind(value: unknown): WorkflowInstrumentKind | undefined {
   const text = normalizeText(value)?.toLowerCase()
-  return text === 'etf' || text === 'stock' ? text : undefined
+  return text === 'etf' || text === 'etn' || text === 'stock' ? text : undefined
 }
 
 function normalizeMarketTone(market: string | undefined, kind: WorkflowInstrumentKind | undefined): WorkflowMarketTone {
   if (market === 'US' || market === 'NASDAQ') return 'nasdaq'
-  if (kind === 'etf') return 'etf'
+  if (kind === 'etf' || kind === 'etn') return 'etf'
   if (market === 'KOSDAQ') return 'kosdaq'
   return 'kospi'
 }

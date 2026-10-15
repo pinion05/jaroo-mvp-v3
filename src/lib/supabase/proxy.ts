@@ -14,6 +14,16 @@ function isProtectedAppPath(pathname: string): boolean {
   )
 }
 
+/** 보호 경로 리다이렉트의 next 값 — 원래 경로를 쿼리까지 통째로 보존한다.
+ *  예전 구현은 pathname만 실어 ?code= 같은 딥링크 쿼리를 버렸다(로그인 후
+ *  /deepscan?code=530092 링크가 /deepscan으로 죽는 문제). 소비자(login 페이지의
+ *  same-origin 검증, OAuth 콜백의 safeOAuthNext — pathname+search+hash 보존)는
+ *  모두 쿼리 포함 값을 이미 지원한다. */
+export function buildLoginRedirectNext(pathname: string, search: string): string {
+  const normalizedSearch = search.startsWith('?') ? search : ''
+  return normalizedSearch ? `${pathname}${normalizedSearch}` : pathname
+}
+
 export async function updateSupabaseSession(request: NextRequest) {
   const url = getSupabaseUrl()
   const anonKey = getSupabaseAnonKey()
@@ -38,12 +48,13 @@ export async function updateSupabaseSession(request: NextRequest) {
 
   const { data } = await supabase.auth.getUser()
 
-  // 보호 경로에 게스트면 로그인 페이지로 보낸다. 원래 경로는 next 파라미터로 보존.
+  // 보호 경로에 게스트면 로그인 페이지로 보낸다. 원래 경로(쿼리 포함)는 next
+  // 파라미터로 보존 — 로그인 성공 후 그 경로로 돌아온다.
   if (!data.user && isProtectedAppPath(request.nextUrl.pathname)) {
     const redirectUrl = request.nextUrl.clone()
     redirectUrl.pathname = '/login'
     redirectUrl.search = ''
-    redirectUrl.searchParams.set('next', request.nextUrl.pathname)
+    redirectUrl.searchParams.set('next', buildLoginRedirectNext(request.nextUrl.pathname, request.nextUrl.search))
     return NextResponse.redirect(redirectUrl)
   }
 

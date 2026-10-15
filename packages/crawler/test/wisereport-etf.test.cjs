@@ -38,6 +38,12 @@ test('parseWiseReportEtfSnapshotHtml extracts ETF product, status, holdings, and
     liquidityProviders: '신한증권, 한국증권',
     issuerName: '삼성자산운용(주)',
     issuerUrl: 'http://www.kodex.com',
+    // ETN 전용 키 — ETF 응답에는 없어 null(하위호환 계약)
+    expensePct: null,
+    firstIssueDate: null,
+    expiryDate: null,
+    repayUnit: null,
+    repayCommissionPct: null,
   });
   assert.equal(snapshot.marketStatus.closePrice, 84235);
   assert.equal(snapshot.marketStatus.changePct, -5.6);
@@ -49,6 +55,42 @@ test('parseWiseReportEtfSnapshotHtml extracts ETF product, status, holdings, and
     { rank: 2, asOf: '2026-06-05', name: 'SK하이닉스', shares: 461, weightPct: 22.72 },
   ]);
   assert.equal(snapshot.liquidity.avgTradingVolume, 450);
+});
+
+// ETN 상품 — 동일 엔드포인트(ETF.aspx?cmp_cd=530092)가 ETN 응답을 반환한다.
+// product_summary_data 실측값(2026-10-15): EXPENSES='0.50'(보수), FIRST_ISSUE_DT
+// ='2021-10-14'(최초발행), EXP_TRD_DT='2031-09-15'(만기), REPAY_UNIT='100000'
+// (상환단위), REPAY_COMM='1.00'(상환수수료). FIRST_SETTLE_DT·TOT_PAY는 부재.
+const etnFixtureHtml = `
+<html><head><title>삼성 인버스 코스피 200 선물 ETN</title></head><body>
+<script>
+var status_data = {"CLS_PRC":"2,910","PRC_CHG":"10","ADJ_CHG":"0.34","YR_HIGH":"7,465","YR_LOW":"2,070","LIST_STK_CNT":"5,000","trD_QTY":"45,093","trD_AMT":"129","MKT_VAL":"146","YR_BETA":"-1.02","AVG_TRD_QTY20":"29,391","AVG_TRD_AMT20":"78","FRG_RT":"0.00","ERN1":"10.86","ERN3":"5.05","ERN6":"-22.04","ERN12":"-34.83"};
+var stock_price_relative_chart_data = {"name":[{"CMP_CD":"530092","CMP_NM":"삼성 인버스 코스피 200 선물 ETN","MKT_NM":"KOSPI"}]};
+var product_summary_data = {"BASE_IDX_NM_KOR":"코스피 200 선물 TWAP 인버스지수","FIRST_ISSUE_DT":"2021-10-14","LIST_DT":"2021-10-21","EXP_TRD_DT":"2031-09-15","EXPENSES":"0.50","REPAY_UNIT":"100000","REPAY_COMM":"1.00","DIV_BASE_DT":"해당사항 없음","LP_NM_KOR":"삼성증권","ISSUE_NM_KOR":"삼성증권","URL":"","DIV_NM_KOR":"지급(재투자)"};
+var volume_chart_data = {"grid_data":[{"TRD_DT":"2026-10-14","AVG_TRD_QTY":450.0,"AVG_TRD_AMT":39563.0}]};
+</script>
+</body></html>`;
+
+test('parseWiseReportEtfSnapshotHtml maps ETN product keys (동일 엔드포인트의 ETN 응답)', async () => {
+  const { parseWiseReportEtfSnapshotHtml } = await import('../src/crawlers/wisereport-etf.js');
+
+  const snapshot = parseWiseReportEtfSnapshotHtml(etnFixtureHtml, '530092');
+
+  assert.equal(snapshot.code, '530092');
+  assert.equal(snapshot.product.name, '삼성 인버스 코스피 200 선물 ETN');
+  assert.equal(snapshot.product.marketName, 'KOSPI');
+  assert.equal(snapshot.product.issuerName, '삼성증권');
+  assert.equal(snapshot.product.baseIndexName, '코스피 200 선물 TWAP 인버스지수');
+  // ETN 전용 매핑
+  assert.equal(snapshot.product.expensePct, 0.5);
+  assert.equal(snapshot.product.firstIssueDate, '2021-10-14');
+  assert.equal(snapshot.product.expiryDate, '2031-09-15');
+  assert.equal(snapshot.product.repayUnit, 100000);
+  assert.equal(snapshot.product.repayCommissionPct, 1.0);
+  // ETF 전용 키는 ETN 응답에 부재 — null(하위호환)
+  assert.equal(snapshot.product.firstSettleDate, null);
+  assert.equal(snapshot.product.totalFeePct, null);
+  assert.equal(snapshot.product.fundType, null);
 });
 
 test('fetchWiseReportEtfSnapshot requests WiseReport ETF detail page and parses response', async () => {

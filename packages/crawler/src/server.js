@@ -3074,7 +3074,7 @@ const endpointDefinitions = [
   {
     id: 'etf-profile',
     resource: 'etf.profile',
-    description: '한국 ETF 프로필 — 네이버 구성종목/기본정보와 위세리포트 상품정보를 병합합니다.',
+    description: '한국 ETF/ETN 프로필 — 네이버 구성종목/기본정보와 위세리포트 상품정보를 병합합니다(ETN은 instrumentType etn 구분).',
     primaryPath: buildDataSourcePath('naver-wisereport', '/kr/etf/:code/profile'),
     dataSources: ['naver-finance', 'wisereport'],
     params: ['code'],
@@ -3082,6 +3082,11 @@ const endpointDefinitions = [
     count: (data) => Array.isArray(data?.holdings) ? data.holdings.length : 0,
     handler: async (req) => {
       try {
+        // ETF('EF')·ETN('EN') 프로필 모두 반환한다 — ETN은 instrumentType 'etn'으로
+        // 구분된다. /api/etf/profile의 원장 기록(appendEtfHistory)은 웹 쓰기 경로에서
+        // isEtfLedgerPayload가 instrumentType 'etn'을 거부하므로 ETF 원장 오염 없이
+        // 화면 표시용 프로필로 흘린다(런타임 실측 시나리오 #1·#2 — /etf?code=530092가
+        // invalid 카드가 아니라 발행사·기초지수·보수 프로필을 렌더해야 한다).
         return await fetchEtfProfile(req.params.code);
       } catch (error) {
         if (error?.code === 'NOT_ETF') {
