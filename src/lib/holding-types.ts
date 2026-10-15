@@ -12,7 +12,7 @@ export type AveragePriceCurrency = 'KRW' | 'USD'
 
 export type HomeHolding = {
   id: number
-  kind: 'stock' | 'etf'
+  kind: 'stock' | 'etf' | 'etn'
   name: string
   code?: string
   shortName: string

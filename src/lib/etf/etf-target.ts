@@ -48,6 +48,14 @@ export function resolveEtfPageTarget(input: {
   const kind = (query.get('kind') ?? '').trim().toLowerCase()
   const market = (query.get('market') ?? '').trim().toLowerCase()
 
+  // ETN 명시 거부 — /etf 게이트는 ETF 전용이다. kind=etn·market=etn 조기 invalid로
+  // 명시화(구조적으로 kind ''|'etf' 화이트리스트가 이미 막지만, 의도를 코드에 남겨
+  // 회귀 테스트 앵커로 쓴다). bare /etf?code=530092(무kind)는 여기서 못 막고
+  // 크롤러 엔드포인트의 400(etn_code)이 최종 방어다.
+  if (kind === 'etn' || market === 'etn') {
+    return { status: 'invalid' }
+  }
+
   if (code || ticker || kind) {
     const isKrEtf = KR_ETF_CODE.test(code) && (kind === '' || kind === 'etf') && KR_MARKETS.has(market) && !ticker
     if (isKrEtf) {
@@ -86,6 +94,11 @@ export function resolveEtfPageTarget(input: {
 
   const sessionCode = String(session.code ?? '')
   const sessionKind = String(session.kind ?? 'etf')
+  // 세션 kind 'etn'(딥스캔 ETN 타깃 세션)은 명시 거부 — !== 'etf' 조건이 구조적으로
+  // 막지만 ETN 의도를 코드에 남긴다(회귀 테스트 앵커).
+  if (sessionKind === 'etn') {
+    return { status: 'invalid' }
+  }
   if (sessionKind !== 'etf') {
     return { status: 'invalid' }
   }

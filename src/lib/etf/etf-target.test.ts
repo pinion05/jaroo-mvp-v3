@@ -30,6 +30,15 @@ test('non-etf kind and malformed codes are rejected (US ETF tickers are accepted
     resolveEtfPageTarget({ searchParams: new URLSearchParams('code=005930&kind=stock'), readSession: () => null }).status,
     'invalid',
   )
+  // ETN 명시 거부 — /etf 게이트는 ETF 전용(530092 삼성 인버스 ETN).
+  assert.equal(
+    resolveEtfPageTarget({ searchParams: new URLSearchParams('code=530092&kind=etn'), readSession: () => null }).status,
+    'invalid',
+  )
+  assert.equal(
+    resolveEtfPageTarget({ searchParams: new URLSearchParams('code=530092&kind=etf&market=etn'), readSession: () => null }).status,
+    'invalid',
+  )
   // 미국 ETF 티커는 이제 ok — market 'us'로 내려온다
   const usTarget = resolveEtfPageTarget({
     searchParams: new URLSearchParams('ticker=SPY&kind=etf&market=nasdaq'),
@@ -66,4 +75,11 @@ test('no query falls back to session, otherwise empty', () => {
     readSession: () => ({ code: '005930', name: '삼성전자', kind: 'stock' }),
   })
   assert.equal(stockSession.status, 'invalid')
+
+  // 세션 kind 'etn'(딥스캔 ETN 타깃 세션)도 명시 거부
+  const etnSession = resolveEtfPageTarget({
+    searchParams: new URLSearchParams(''),
+    readSession: () => ({ code: '530092', name: '삼성 인버스 코스피 200 선물 ETN', kind: 'etn' }),
+  })
+  assert.equal(etnSession.status, 'invalid')
 })

@@ -324,6 +324,40 @@ test('KR DeepScan crawler canonical URL preserves ETN market as etn kind even wi
   assert.match(url, /kind=etn/)
 })
 
+test('KR DeepScan crawler canonical URL은 market KOSPI 표기에서도 명시 kind etn을 유지한다', () => {
+  // 유니버스 교정 후 ETN 행은 market KOSPI/KOSDAQ + kind etn으로 내려온다 —
+  // 크롤러 이름 정규식 추론에 의존하지 않고 kind=etn이 전달돼야 한다.
+  const url = buildKrDeepScanCrawlerCanonicalUrl({
+    instrument: {
+      name: '삼성 인버스 코스피 200 선물 ETN',
+      code: '530092',
+      market: 'KOSPI',
+      kind: 'etn',
+    },
+    sourceContext: {
+      from: 'holding',
+    },
+  })
+
+  assert.match(url, /market=KOSPI/)
+  assert.match(url, /kind=etn/)
+})
+
+test('buildRawInputFromSearchParams 화이트리스트는 kind=etn을 드롭하지 않는다', async () => {
+  const { buildRawInputFromSearchParams } = await import('./build-payload')
+
+  const rawInput = buildRawInputFromSearchParams(
+    new URLSearchParams('code=530092&name=삼성%20인버스%20ETN&market=KOSPI&kind=etn'),
+  )
+
+  // kind 런타임 화이트리스트(745) 회귀 방어 — 여기서 드롭되면 스냅샷 raw input·
+  // history target_input에서 상품 유형이 조용히 소실된다.
+  assert.equal(rawInput.instrument.kind, 'etn')
+
+  const legacyInput = buildRawInputFromSearchParams(new URLSearchParams('code=005930&kind=bond'))
+  assert.equal(legacyInput.instrument.kind, undefined)
+})
+
 test('KR DeepScan crawler proxy waits and retries busy admission responses', async () => {
   const rawInput: DeepScanRawInput = {
     instrument: {

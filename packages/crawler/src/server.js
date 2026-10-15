@@ -3081,16 +3081,24 @@ const endpointDefinitions = [
     query: [],
     count: (data) => Array.isArray(data?.holdings) ? data.holdings.length : 0,
     handler: async (req) => {
-      try {
-        return await fetchEtfProfile(req.params.code);
-      } catch (error) {
+      const profile = await fetchEtfProfile(req.params.code).catch((error) => {
         if (error?.code === 'NOT_ETF') {
           throw new HttpError(400, 'not_an_etf_code', {
             message: 'ETF 코드가 아니에요. 한국 상장 ETF(6자리) 코드를 사용해주세요.',
           });
         }
         throw error;
+      });
+      // ETN 프로필은 이 엔드포인트(ETF 전용)에서 400으로 끊는다 — /api/etf/profile
+      // route는 상류 200+세션일 때 appendEtfHistory하므로 ETN을 통과시키면 원장이
+      // 오염된다. ETN은 홈 딥스캔 경로로 진입해야 한다. 프로필 데이터 자체는
+      // fetchEtfProfile 반환값으로 향후 소비자(딥스캔 ETN 위원회 등)에 제공된다.
+      if (profile?.instrumentType === 'etn') {
+        throw new HttpError(400, 'etn_code', {
+          message: 'ETN 상품 코드예요. 홈의 딥스캔 분석으로 진입해주세요.',
+        });
       }
+      return profile;
     },
   },
   {

@@ -31,7 +31,7 @@ export function resolveHaltedQuoteVolume(volume: number | null | undefined): boo
 export function resolveDeepScanHaltVerdict(input: {
   targetKey: string | null
   isUsTarget: boolean
-  instrumentKind?: 'stock' | 'etf' | null
+  instrumentKind?: 'stock' | 'etf' | 'etn' | null
   haltHint: boolean
   quickQuoteVolume?: number | null
   checkExpired: boolean
@@ -46,6 +46,8 @@ export function resolveDeepScanHaltVerdict(input: {
   }
 
   // KR ETF 분기는 후속 과제(#276 범위 외) — 일반 플로우 유지.
+  // ETN은 이 조기리턴을 타지 않는다: 만기·상환 정지는 거래량 판정 흐름(주식과
+  // 동일)에서 검출한다(의도된 동작 변화 — 레거시 kind 'etf' ETN은 skip이었음).
   if (input.instrumentKind === 'etf') {
     return 'active'
   }

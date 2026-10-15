@@ -5,6 +5,7 @@ import type { HomeHolding } from '@/lib/jaroo-home-data'
 import {
   applyCurrentQuotesToHomeHoldings,
   buildHomeCurrentQuoteQuery,
+  buildHomeHoldingErrorCard,
   buildQuoteLookupKey,
   requiresFxConversion,
   shouldTreatQuoteFailureAsErrorCard,
@@ -106,6 +107,9 @@ test('quote-unavailable는 ETF/ETN holding에서 오류 카드로 승격하지 �
   assert.equal(shouldTreatQuoteFailureAsErrorCard(createHolding({ kind: 'stock' }), 'quote-unavailable'), true)
   assert.equal(shouldTreatQuoteFailureAsErrorCard(createHolding({ kind: 'etf' }), 'quote-unavailable'), false)
   assert.equal(shouldTreatQuoteFailureAsErrorCard(createHolding({ kind: 'etf' }), 'fx-required'), true)
+  // kind 'etn'(신규 유니버스 표기)도 시세 실패 관용 — ETN만 오류카드화하는 회귀 방어
+  assert.equal(shouldTreatQuoteFailureAsErrorCard(createHolding({ kind: 'etn' }), 'quote-unavailable'), false)
+  assert.equal(shouldTreatQuoteFailureAsErrorCard(createHolding({ kind: 'etn' }), 'fx-required'), true)
 })
 
 test('home current quote hydrate는 ETN holding의 live 수익률에 맞춰 badge를 갱신한다', () => {
@@ -282,6 +286,58 @@ test('home current quote hydrate는 ETN holding의 음수 수익률을 손실 �
   assert.equal(updated.heatmapBadge, '손실 중')
   assert.equal(updated.cardTone, 'warning')
   assert.equal(updated.signalTone, 'warning')
+})
+
+// 신규 표기(kind 'etn') — 유니버스 ETN 행은 market 'KOSPI'/'KOSDAQ'·marketTone 'etf'로
+// 내려온다. 레거시(market 'ETN' + kind 'etf')와 동일한 교환상품 톤 UX를 받는지.
+function createEtnHolding(overrides: Partial<HomeHolding> = {}): HomeHolding {
+  return createHolding({
+    kind: 'etn',
+    name: '삼성 인버스 코스피 200 선물 ETN',
+    code: '530092',
+    shortName: '삼성인버스',
+    donutLabel: '삼성인버스ETN',
+    shares: '10주',
+    averagePrice: '3,000원',
+    market: 'KOSPI',
+    marketTone: 'etf',
+    identifierCode: '530092',
+    ...overrides,
+  })
+}
+
+test('kind etn holding도 live 수익률에 맞춰 교환상품 톤 블록을 탄다(신규 표기)', () => {
+  const [updated] = applyCurrentQuotesToHomeHoldings(
+    [createEtnHolding()],
+    [{ market: 'KR', code: '530092', ticker: null, price: 3475, currency: 'KRW', asOf: '2026-10-15', source: 'fixture', status: 'ok' }],
+  )
+
+  assert.equal(updated.change, '+15.8%')
+  assert.equal(updated.badge, '수익 중')
+  assert.equal(updated.badgeTone, 'green')
+  assert.equal(updated.cardTone, 'profit')
+  assert.equal(updated.centerBadge, '수익 중')
+  assert.equal(updated.heatmapBadge, '수익 중')
+})
+
+test('kind etn holding의 거래정지(거래량 0)는 ETF와 같은 signalTone/blink 표기를 쓴다', () => {
+  const [updated] = applyCurrentQuotesToHomeHoldings(
+    [createEtnHolding()],
+    [{ market: 'KR', code: '530092', ticker: null, price: 3475, currency: 'KRW', asOf: '2026-10-15', source: 'fixture', status: 'ok', volume: 0 }],
+  )
+
+  assert.equal(updated.badge, '거래 정지')
+  assert.equal(updated.cardTone, 'halt')
+  assert.equal(updated.signalTone, 'etf')
+  assert.equal(updated.blink, undefined)
+})
+
+test('kind etn holding의 오류 카드도 signalTone etf·blink undefined를 유지한다', () => {
+  const errorCard = buildHomeHoldingErrorCard(createEtnHolding(), 'quote-unavailable')
+
+  assert.equal(errorCard.badge, '시세 오류')
+  assert.equal(errorCard.signalTone, 'etf')
+  assert.equal(errorCard.blink, undefined)
 })
 
 test('home current quote hydrate는 KR live quote로 평가금액/손익/수익률/비중을 다시 계산한다', () => {

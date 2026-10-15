@@ -20,6 +20,10 @@ export type EtfProfileJson = {
   /** null = 위세리포트 스냅샷 부재·인식 불가로 시장 미확정 (추측 오염 금지) */
   market: 'kospi' | 'kosdaq' | 'us' | null
   ok: true
+  /** 상품 유형 식별자(하위호환 선택 필드) — 부재='etf'로 해석한다(etf_scan_history
+   *  기존 payload·캐시 호환). /etf 게이트가 ETN을 거부하므로 렌더 경로엔 'etn'이
+   *  도달하지 않는다 — 타입만 확장하고 표기 분기는 불필요. */
+  instrumentType?: 'etf' | 'etn'
   /** 미국 ETF는 'USD'(기본 KRW — 필드 부재 시 원화) */
   currency?: 'KRW' | 'USD'
   quote?: { changePct: number | null } | null
@@ -37,6 +41,12 @@ export type EtfProfileJson = {
     aum: number | null
     nav: number | null
     deviationPct: number | null
+    /** ETN 전용(선택) — ETF 프로필엔 없다. issueDate=최초발행, maturityDate=만기 */
+    issueDate?: string | null
+    maturityDate?: string | null
+    /** ETN 전용(선택) — 상환단위·상환수수료 */
+    repayUnit?: number | null
+    repayCommissionPct?: number | null
   }
   returns: { m1: number | null; m3: number | null; m6: number | null; y1: number | null } | null
   holdings: Array<{ rank: number; code: string; name: string; weightPct: number; changePct: number | null }> | null

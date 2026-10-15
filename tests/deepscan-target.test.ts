@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 
 import type { JarooDeepScanPayload } from '../packages/contracts/src/deepscan'
 
-import { buildDeepScanViewModel, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding } from '../src/lib/deepscan-target'
+import { buildDeepScanViewModel, createPlaceholderDeepScanHolding, pickDeepScanDefaultHolding, resolveDefaultDeepScanHolding } from '../src/lib/deepscan-target'
 import { buildDeepScanHeroCard, buildDeepScanPageHeader, buildDeepScanPartialSuccessNotice, getDeepScanBlockNotice } from '../src/lib/deepscan-page-projection'
 import { sanitizeOcrRows } from '../src/lib/screenshot-ocr'
 
@@ -75,7 +75,7 @@ test('buildDeepScanViewModel reflects selected holding data instead of samsung f
   }
 })
 
-test('pickDeepScanDefaultHolding prefers the worst stock and ignores etf entries', () => {
+test('pickDeepScanDefaultHolding prefers the worst stock/etn and ignores etf entries', () => {
   const holdings = [
     { ...sampleHolding, id: 1, kind: 'etf' as const, name: 'KODEX 200', change: '-32.0%' },
     { ...sampleHolding, id: 2, name: '카카오', change: '-4.5%' },
@@ -89,10 +89,54 @@ test('pickDeepScanDefaultHolding prefers the worst stock and ignores etf entries
   assert.equal(selected?.name, 'NAVER')
 })
 
-test('pickDeepScanDefaultHolding returns null when there is no stock candidate', () => {
+test('pickDeepScanDefaultHolding includes ETN entries as deepscan-path candidates', () => {
+  const holdings = [
+    { ...sampleHolding, id: 1, kind: 'etf' as const, name: 'KODEX 200', change: '-32.0%' },
+    { ...sampleHolding, id: 2, kind: 'etn' as const, name: '삼성 인버스 코스피 200 선물 ETN', change: '-25.0%' },
+    { ...sampleHolding, id: 3, name: '삼성전자', change: '+3.1%' },
+  ]
+
+  const selected = pickDeepScanDefaultHolding(holdings)
+
+  // 후보(stock·etn) 중 최악 수익률 — ETF(-32%)는 후보가 아니다
+  assert.equal(selected?.id, 2)
+  assert.equal(selected?.kind, 'etn')
+})
+
+test('pickDeepScanDefaultHolding returns null when there is no stock/etn candidate', () => {
   const holdings = [{ ...sampleHolding, id: 1, kind: 'etf' as const, name: 'KODEX 200' }]
 
   assert.equal(pickDeepScanDefaultHolding(holdings), null)
+})
+
+// 홈 fast-path(선택 카드 우선)의 동작 앵커 — jaroo-home-screen의 useMemo가 이 헬퍼를
+// 호출한다(배선은 jaroo-home-screen.test.ts의 정적 매칭이 확인).
+test('resolveDefaultDeepScanHolding — 선택된 stock/etn 카드는 fast-path로 그 카드를 반환한다', () => {
+  const holdings = [
+    { ...sampleHolding, id: 2, name: '카카오', change: '-4.5%' },
+    { ...sampleHolding, id: 3, name: 'NAVER', change: '-16.7%' },
+  ]
+  const selectedEtn = { ...sampleHolding, id: 9, kind: 'etn' as const, name: '삼성 인버스 ETN', change: '+1.0%' }
+
+  assert.equal(resolveDefaultDeepScanHolding(selectedEtn, holdings)?.id, 9)
+  assert.equal(resolveDefaultDeepScanHolding(holdings[1] ?? null, holdings)?.id, 3)
+})
+
+test('resolveDefaultDeepScanHolding — 선택된 etf 카드·미선택은 picker로 위임한다', () => {
+  const holdings = [
+    { ...sampleHolding, id: 1, kind: 'etf' as const, name: 'KODEX 200', change: '-32.0%' },
+    { ...sampleHolding, id: 2, name: '카카오', change: '-4.5%' },
+    { ...sampleHolding, id: 3, name: 'NAVER', change: '-16.7%' },
+  ]
+  const selectedEtf = holdings[0] ?? null
+
+  // ETF 선택은 fast-path 대상 아님 — picker(최악 수익률 stock)로 위임
+  assert.equal(resolveDefaultDeepScanHolding(selectedEtf, holdings)?.id, 3)
+  assert.equal(resolveDefaultDeepScanHolding(null, holdings)?.id, 3)
+  // 선택 ETN이 있어도 picker가 선택 카드를 대체하지 않는다(핵심 회귀 방어)
+  const selectedEtn = { ...sampleHolding, id: 9, kind: 'etn' as const, name: '삼성 인버스 ETN', change: '+1.0%' }
+  assert.notEqual(resolveDefaultDeepScanHolding(selectedEtn, holdings)?.id, 3)
+  assert.equal(resolveDefaultDeepScanHolding(selectedEtn, holdings)?.id, 9)
 })
 
 test('sanitizeOcrRows preserves visible code and ticker fields', () => {

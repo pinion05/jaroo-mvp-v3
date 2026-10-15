@@ -2,7 +2,7 @@ import type { JarooDeepScanPayload } from '../../packages/contracts/src/deepscan
 import { isAveragePriceComputedFromEvaluation, parseOcrNumber, parseOcrProfitRate } from './screenshot-ocr'
 
 export type WorkflowMarketTone = 'kospi' | 'kosdaq' | 'nasdaq' | 'etf'
-export type WorkflowInstrumentKind = 'stock' | 'etf'
+export type WorkflowInstrumentKind = 'stock' | 'etf' | 'etn'
 export type WorkflowMoneyCurrency = 'KRW' | 'USD'
 export type WorkflowAsyncStatus = 'idle' | 'loading' | 'success' | 'error'
 export type OcrReviewResolutionState = 'unresolved' | 'resolved' | 'manual-required' | 'error'

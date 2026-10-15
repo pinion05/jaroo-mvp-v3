@@ -846,7 +846,7 @@ function sanitizeAppliedHomePortfolioRows(input: unknown): AppliedHomePortfolioR
           ? item.resolvedMarketTone
           : undefined
       const resolvedKind: AppliedHomePortfolioRow['resolvedKind'] =
-        item.resolvedKind === 'stock' || item.resolvedKind === 'etf' ? item.resolvedKind : undefined
+        item.resolvedKind === 'stock' || item.resolvedKind === 'etf' || item.resolvedKind === 'etn' ? item.resolvedKind : undefined
       const resolvedMarket = readTrimmedString(item.resolvedMarket)
       const averagePriceCurrency = resolveAppliedAveragePriceCurrency(item, resolvedMarketTone, resolvedMarket)
       const currentPrice = typeof item.currentPrice === 'number' && Number.isFinite(item.currentPrice) ? item.currentPrice : undefined
@@ -1018,6 +1018,12 @@ function computeHoldingBaseAmount(quantity: string, averagePrice: string) {
 }
 
 function inferHoldingKind(name: string): HomeHolding['kind'] {
+  // ETN 판별은 ETF 정규식보다 '앞에' 와야 한다 — 실측: ETN 389종 이름은 전부
+  // 'ETN'을 포함하지만(100% 리콜) '하나 Solactive US Tech Top 10 ETN(H)' 등 정확히
+  // 2건이 ETF 정규식의 'sol'에 걸려 'etf'로 오분류된다.
+  if (/etn/i.test(name)) {
+    return 'etn'
+  }
   return /(etf|kodex|tiger|koosef|kosef|arirang|ace|sol|kbstar|timefolio)/i.test(name) ? 'etf' : 'stock'
 }
 
@@ -1026,7 +1032,7 @@ function resolveHomeMarketTone(resolvedMarketTone: OcrRow['resolvedMarketTone'],
     return resolvedMarketTone
   }
 
-  if (kind === 'etf') {
+  if (kind === 'etf' || kind === 'etn') {
     return 'etf'
   }
 
@@ -1117,6 +1123,13 @@ function deriveHoldingTone(profitRateValue: number | null) {
 function buildOpinionText(name: string, kind: HomeHolding['kind'], profitRateValue: number | null) {
   if (kind === 'etf') {
     return `${name} ETF를 OCR에서 읽어 홈 포트폴리오에 반영했어요. 섹터 구성과 회복 시나리오는 딥스캔에서 더 확인할 수 있어요.`
+  }
+
+  // ETN 전용 문구 — 전용 분기가 없으면 kind 'etn' 전환 시 주식용 문구로 조용히
+  // 바뀌는 사용자 가시 회귀가 생긴다(ETF 문구가 그대로 남는 게 아니라 아래
+  // profitRate 분기로 흘러버림).
+  if (kind === 'etn') {
+    return `${name} ETN을 OCR에서 읽어 홈 포트폴리오에 반영했어요. 상품 구조와 회복 시나리오는 딥스캔에서 확인할 수 있어요.`
   }
 
   if (profitRateValue === null) {
@@ -1398,7 +1411,7 @@ export function buildPortfolioItemsFromAppliedHomePortfolioRows(rows: AppliedHom
 
       const kind = row.resolvedKind ?? inferHoldingKind(name)
       const resolvedMarket = row.resolvedMarket?.trim()
-      const market = resolvedMarket || (kind === 'etf' ? 'ETF' : 'OCR')
+      const market = resolvedMarket || (kind === 'etf' ? 'ETF' : kind === 'etn' ? 'ETN' : 'OCR')
       const marketTone = resolveHomeMarketTone(row.resolvedMarketTone, market, kind)
       const code = row.resolvedCode?.trim() || row.code?.trim() || undefined
       const ticker = row.resolvedTicker?.trim() || row.ticker?.trim() || undefined
@@ -1447,7 +1460,7 @@ export function buildHomeHoldingsFromOcrRows(rows: AppliedHomePortfolioRow[]): H
   const preparedRows = sanitizedRows.map((row, index) => {
     const kind = row.resolvedKind ?? inferHoldingKind(row.resolvedName || row.name)
     const displayName = row.resolvedName?.trim() || row.name.trim() || `인식 종목 ${index + 1}`
-    const market = row.resolvedMarket?.trim() || (kind === 'etf' ? 'ETF' : 'OCR')
+    const market = row.resolvedMarket?.trim() || (kind === 'etf' ? 'ETF' : kind === 'etn' ? 'ETN' : 'OCR')
     const marketTone = resolveHomeMarketTone(row.resolvedMarketTone, market, kind)
     const displayCurrency: AveragePriceCurrency | undefined = row.averagePriceCurrency
       ?? inferCurrencyFromMoneyText(row.averagePrice)

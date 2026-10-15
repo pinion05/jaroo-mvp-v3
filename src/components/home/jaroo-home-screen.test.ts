@@ -89,3 +89,19 @@ test('expanded home stock card exposes an accessible removal action', () => {
   assert.match(source, /role='dialog'/)
   assert.match(source, /aria-modal='true'/)
 })
+
+// ── kind 'etn' 배선(정적 매칭) ──
+// 이 파일의 테스트 인프라는 export 순수 함수 직접 호출 + 소스 정적 매칭뿐이고
+// React 렌더링 환경이 없다 — fast-path의 '동작'은 deepscan-target.test.ts의
+// resolveDefaultDeepScanHolding 직접 테스트가 담당하고, 여기선 배선(헬퍼 호출·
+// CTA 전달)만 확인한다.
+test('빠른 딥스캔 기본 타깃 fast-path는 export 헬퍼 resolveDefaultDeepScanHolding로 배선된다', () => {
+  const source = readFileSync(new URL('./jaroo-home-screen.tsx', import.meta.url), 'utf8')
+
+  assert.match(source, /resolveDefaultDeepScanHolding\(selectedHolding, homeHoldings\)/)
+  assert.match(source, /import \{ resolveDefaultDeepScanHolding \} from '@\/lib\/deepscan-target'/)
+  // 인라인 fast-path(kind === 'stock' 조건문)는 제거됐다
+  assert.doesNotMatch(source, /if \(selectedHolding\?\.kind === 'stock'\)/)
+  // forecast CTA가 defaultDeepScanHolding를 전달하는 기존 패턴 유지
+  assert.match(source, /navigateToDeepScanForHolding\(defaultDeepScanHolding\.id, summary\.forecast\.href\)/)
+})

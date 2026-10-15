@@ -29,7 +29,7 @@ export type DeepScanRawInput = {
     code?: string
     ticker?: string
     market?: string
-    kind?: 'stock' | 'etf'
+    kind?: 'stock' | 'etf' | 'etn'
   }
   holding?: {
     shares?: string
@@ -742,7 +742,15 @@ function buildRawInputFromSearchParams(searchParams: URLSearchParams): DeepScanR
       code,
       ticker,
       market,
-      ...(kind === 'etf' ? { kind: 'etf' as const } : kind === 'stock' ? { kind: 'stock' as const } : {}),
+      // kind 런타임 화이트리스트 — 'etn'이 여기서 드롭되면 스냅샷 raw input·
+      // history target_input에서 상품 유형이 조용히 소실된다(kind 휘발성 회귀).
+      ...(kind === 'etf'
+        ? { kind: 'etf' as const }
+        : kind === 'etn'
+          ? { kind: 'etn' as const }
+          : kind === 'stock'
+            ? { kind: 'stock' as const }
+            : {}),
     },
     holding: Object.keys(holding).length > 0 ? holding : undefined,
     selectedAt: selectedAt ?? undefined,
@@ -818,6 +826,12 @@ function resolveCrawlerDeepScanKind(input: DeepScanRawInput) {
 
   if (market === 'ETF') {
     return input.instrument.kind ?? 'etf'
+  }
+
+  // kind 'etn'은 market 표기(KOSPI/KOSDAQ)와 무관하게 명시 통과 — 크롤러의
+  // 이름 정규식 추론(inferWiseReportKrInstrumentKind)에 의존하지 않는다.
+  if (input.instrument.kind === 'etn') {
+    return 'etn'
   }
 
   return input.instrument.kind === 'etf' ? 'etf' : undefined

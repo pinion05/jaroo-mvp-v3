@@ -6,7 +6,7 @@ const MAX_PORTFOLIO_CODE_LENGTH = 32
 const MAX_PORTFOLIO_MONEY_VALUE = 1_000_000_000_000_000
 const PORTFOLIO_MARKETS = new Set(['KR', 'KOSPI', 'KOSDAQ', 'ETF', 'ETN', 'US', 'NASDAQ', 'NYSE', 'AMEX'])
 const PORTFOLIO_MARKET_TONES = new Set(['kospi', 'kosdaq', 'etf', 'nasdaq'])
-const PORTFOLIO_KINDS = new Set(['stock', 'etf'])
+const PORTFOLIO_KINDS = new Set(['stock', 'etf', 'etn'])
 const PORTFOLIO_CURRENCIES = new Set(['KRW', 'USD'])
 const PORTFOLIO_SOURCES = new Set(['ocr', 'manual', 'import'])
 
