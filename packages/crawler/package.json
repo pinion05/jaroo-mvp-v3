@@ -23,7 +23,7 @@
     "collect:dart-disclosure-temporal-holdout": "node --env-file-if-exists=../../.env.local scripts/collect-dart-disclosure-temporal-holdout.mjs",
     "benchmark:dart-disclosure-temporal-holdout": "node scripts/benchmark-dart-disclosure-temporal-holdout.mjs",
     "benchmark:dart-disclosure-temporal-development": "node scripts/benchmark-dart-disclosure-temporal-holdout.mjs --gate=diagnostic",
-    "test": "node --test test/*.test.cjs"
+    "test": "node --test --test-concurrency=1 test/*.test.cjs"
   },
   "dependencies": {
     "express": "^4.21.2",

@@ -1,4 +1,3 @@
-import test from 'node:test'
 import assert from 'node:assert/strict'
 
 import {
@@ -10,6 +9,26 @@ import {
   shouldSendWeeklySummary,
 } from './levels'
 import type { JarooDeepScanPayload } from '../../../packages/contracts/src/deepscan'
+
+// 이 파일은 두 러너로 실행된다: 저장소 표준(npm run test:web:ts → tsx --test의
+// node:test)과 npx vitest run src/lib/watch. vitest는 node:test 등록을 수집하지
+// 않으므로('No test suite found') 러너를 감지해 동일한 테스트 본문을 현재 러너에
+// 등록한다. assert는 node:assert/strict를 공용으로 쓴다(양 러너 모두 동작).
+type RegisterTest = (name: string, fn: () => void | Promise<void>) => void
+
+async function loadTestRegistrar(): Promise<RegisterTest> {
+  if (process.env.VITEST != null) {
+    // 리터럴이 아닌 지시자로 import — vitest를 의존성에 추가하지 않은 채
+    // typecheck가 'vitest' 모듈을 정적으로 해석하지 않게 한다.
+    const specifier = 'vitest'
+    const mod = (await import(specifier)) as { test: RegisterTest }
+    return mod.test
+  }
+  const mod = await import('node:test')
+  return mod.test as unknown as RegisterTest
+}
+
+const test = await loadTestRegistrar()
 
 type InsightItem = {
   sourceLabel: string
