@@ -41,12 +41,100 @@ function isDisclosureInsight(item: { sourceLabel?: string; label?: string; title
   return `${item.sourceLabel ?? ''}${item.label ?? ''}${item.title ?? ''}`.includes('공시')
 }
 
-function collectDisclosureTitles(payload: JarooDeepScanPayload): string[] {
+/** 공시 카드 1건 — 감지 키 산식에 필요한 필드만 정규화한 형태. */
+export type WatchDisclosureFiling = {
+  /** 원문 날짜('YYYY-MM-DD' 또는 'YYYYMMDD') — 없으면 빈 문자열 */
+  receiptDate: string
+  reportName: string
+  /** 제출자 — 없으면 빈 문자열 */
+  filerName: string
+}
+
+/** crawler 공시 분류기(deepscan-kr-disclosure-pipeline)가 부여하는 riskLabel 전집. */
+const KNOWN_DISCLOSURE_RISK_LABELS = ['치명적 리스크', '중요 리스크', '확인 필요', '지분 변동', '일반']
+
+const SOURCE_BODY_SEPARATOR = ' · '
+const FILER_PREFIX = '제출:'
+
+function isReceiptDateSegment(segment: string): boolean {
+  return /^\d{8}$/.test(segment) || /^\d{4}-\d{2}-\d{2}$/.test(segment)
+}
+
+/**
+ * 공시 카드 sourceBody(줄별 '날짜 · 보고서명 · 제출:제출자 · 리스크라벨') 역직렬화.
+ * 구조화 latestFilings 미러가 없는 구형 스냅샷 호환용 폴백이다 — 직렬화 형식은
+ * crawler(deepscan-payload.js buildDisclosureInsightSourceBody)와 테스트로 고정.
+ */
+export function parseDisclosureSourceBody(sourceBody: string | undefined | null): WatchDisclosureFiling[] {
+  if (!sourceBody) return []
+  const filings: WatchDisclosureFiling[] = []
+  for (const rawLine of sourceBody.split('\n')) {
+    const segments = rawLine.split(SOURCE_BODY_SEPARATOR).map((segment) => segment.trim()).filter(Boolean)
+    if (segments.length === 0) continue
+
+    let receiptDate = ''
+    if (isReceiptDateSegment(segments[0] ?? '')) {
+      receiptDate = segments[0]
+      segments.shift()
+    }
+
+    let filerName = ''
+    const rest = segments.filter((segment) => {
+      if (segment.startsWith(FILER_PREFIX)) {
+        filerName = segment.slice(FILER_PREFIX.length).trim()
+        return false
+      }
+      return true
+    })
+
+    if (rest.length > 0 && KNOWN_DISCLOSURE_RISK_LABELS.includes(rest[rest.length - 1] ?? '')) {
+      rest.pop()
+    }
+
+    const reportName = rest.join(SOURCE_BODY_SEPARATOR)
+    if (!reportName) continue // 보고서명을 잃은 줄(파싱 불능)은 스킵
+    filings.push({ receiptDate, reportName, filerName })
+  }
+  return filings
+}
+
+/** 구조체 latestFilings(컨트랙트 타입 그대로 오지 않는 DB 저장본 대비 런타임 정규화). */
+function normalizeStructuredFilings(value: unknown): WatchDisclosureFiling[] {
+  if (!Array.isArray(value)) return []
+  const filings: WatchDisclosureFiling[] = []
+  for (const entry of value) {
+    if (!entry || typeof entry !== 'object') continue
+    const filing = entry as { receiptDate?: unknown; reportName?: unknown; filerName?: unknown }
+    const reportName = typeof filing.reportName === 'string' ? filing.reportName.trim() : ''
+    if (!reportName) continue // 보고서명 없는 filing은 무효
+    filings.push({
+      receiptDate: typeof filing.receiptDate === 'string' ? filing.receiptDate.trim() : '',
+      reportName,
+      filerName: typeof filing.filerName === 'string' ? filing.filerName.trim() : '',
+    })
+  }
+  return filings
+}
+
+/** 공시 카드에서 filing 목록 수집 — 구조체 latestFilings 우선, 부재·전부 무효면 sourceBody 파싱 폴백. */
+export function collectDisclosureFilings(payload: JarooDeepScanPayload): WatchDisclosureFiling[] {
   const items = payload.insights?.items ?? []
-  return items
-    .filter((item) => isDisclosureInsight(item))
-    .map((item) => String(item.title ?? '').trim())
-    .filter(Boolean)
+  const filings: WatchDisclosureFiling[] = []
+  for (const item of items) {
+    if (!isDisclosureInsight(item)) continue
+    const structured = normalizeStructuredFilings(item.latestFilings)
+    if (structured.length > 0) {
+      filings.push(...structured)
+      continue
+    }
+    filings.push(...parseDisclosureSourceBody(item.sourceBody))
+  }
+  return filings
+}
+
+/** 새 공시 판별 키 — 대시 제거 8자리 날짜 | 보고서명 | 제출자(동일 보고서의 제출자 교체도 신규로 본다). */
+export function disclosureFilingKey(filing: WatchDisclosureFiling): string {
+  return `${filing.receiptDate.replace(/-/g, '')}|${filing.reportName.trim()}|${filing.filerName.trim()}`
 }
 
 export function parsePriceFromText(text: string | undefined | null): number | null {
@@ -57,10 +145,11 @@ export function parsePriceFromText(text: string | undefined | null): number | nu
   return Number.isFinite(value) ? value : null
 }
 
-/** 어제 대비 오늘의 신규 공시 제목 (층1 이벤트). 이전 스냅샷이 없으면 빈 배열. */
-export function findNewDisclosureTitles(today: JarooDeepScanPayload, previous: JarooDeepScanPayload | null): string[] {
-  const previousTitles = new Set(collectDisclosureTitles(previous ?? ({ insights: { items: [] } } as unknown as JarooDeepScanPayload)))
-  return collectDisclosureTitles(today).filter((title) => !previousTitles.has(title))
+/** 어제 대비 오늘의 신규 공시 filing (층1 이벤트). 이전 스냅샷이 없으면 빈 배열. */
+export function findNewDisclosureFilings(today: JarooDeepScanPayload, previous: JarooDeepScanPayload | null): WatchDisclosureFiling[] {
+  if (!previous) return []
+  const previousKeys = new Set(collectDisclosureFilings(previous).map(disclosureFilingKey))
+  return collectDisclosureFilings(today).filter((filing) => !previousKeys.has(disclosureFilingKey(filing)))
 }
 
 /** 전일 대비 가격 변화율(%, 부호 있음). 계산 불가 시 null. */
@@ -75,18 +164,24 @@ export function priceChangePctBetween(today: JarooDeepScanPayload, previous: Jar
  * 두 스냅샷을 비교해 이벤트를 뽑는다.
  * - safety: 안전 하한선 공시(모든 레벨 발송)
  * - disclosure: 신규 공시(층1 — normal 이상)
+ * safety 판정은 보고서명(reportName)에만 적용 — 카드 title은 종목마다 고정이라
+ * ('{종목명} 최근 공시 흐름') diff 대상으로 쓸 수 없다(결함 A).
  */
 export function detectStockEvents(today: JarooDeepScanPayload, previous: JarooDeepScanPayload | null): WatchEvent[] {
   const events: WatchEvent[] = []
-  const newTitles = previous ? findNewDisclosureTitles(today, previous) : []
-  for (const title of newTitles) {
-    events.push({ kind: isSafetyTitle(title) ? 'safety' : 'disclosure', layer: isSafetyTitle(title) ? 'safety' : 1, title })
+  const filingEventTitle = (filing: WatchDisclosureFiling): string =>
+    filing.filerName ? `${filing.reportName} (제출:${filing.filerName})` : filing.reportName
+
+  const newFilings = previous ? findNewDisclosureFilings(today, previous) : []
+  for (const filing of newFilings) {
+    const safety = isSafetyTitle(filing.reportName)
+    events.push({ kind: safety ? 'safety' : 'disclosure', layer: safety ? 'safety' : 1, title: filingEventTitle(filing) })
   }
   // 이전 스냅샷이 없어도 오늘 새로 수집된 공시 중 안전 키워드는 즉시 안전 이벤트로 본다.
   if (!previous) {
-    for (const title of collectDisclosureTitles(today)) {
-      if (isSafetyTitle(title)) {
-        events.push({ kind: 'safety', layer: 'safety', title })
+    for (const filing of collectDisclosureFilings(today)) {
+      if (isSafetyTitle(filing.reportName)) {
+        events.push({ kind: 'safety', layer: 'safety', title: filingEventTitle(filing) })
       }
     }
   }

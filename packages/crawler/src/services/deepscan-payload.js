@@ -2139,6 +2139,23 @@ function buildDisclosureInsightSourceBody(disclosureAnalysis) {
     .join('\n');
 }
 
+// Structured mirror of the disclosure filings behind `sourceBody`, so the watch
+// alert pipeline can diff per-filing instead of reverse-parsing the text body.
+function buildDisclosureInsightLatestFilings(disclosureAnalysis) {
+  if (!Array.isArray(disclosureAnalysis?.latestFilings) || disclosureAnalysis.latestFilings.length === 0) {
+    return [];
+  }
+
+  return disclosureAnalysis.latestFilings
+    .slice(0, 8)
+    .map((filing) => ({
+      receiptDate: typeof filing?.receiptDate === 'string' && filing.receiptDate.trim() ? filing.receiptDate.trim() : null,
+      reportName: typeof filing?.reportName === 'string' && filing.reportName.trim() ? filing.reportName.trim() : null,
+      filerName: typeof filing?.filerName === 'string' && filing.filerName.trim() ? filing.filerName.trim() : null,
+      riskLabel: typeof filing?.riskLabel === 'string' && filing.riskLabel.trim() ? filing.riskLabel.trim() : null,
+    }));
+}
+
 function buildInsights(input, evidence, scored, generatedAt, sourceIssues, options = {}) {
   const dateLabel = (input.selectedAt ?? generatedAt).slice(0, 10);
   const performanceComment = evidence.businessCommentary?.performanceComment ?? null;
@@ -2184,6 +2201,8 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
     : null;
   const disclosureAnalysis = evidence.disclosureAnalysis ?? null;
   const disclosureInsightBody = buildDisclosureInsightBody(disclosureAnalysis);
+  const disclosureSourceBody = buildDisclosureInsightSourceBody(disclosureAnalysis);
+  const disclosureLatestFilings = buildDisclosureInsightLatestFilings(disclosureAnalysis);
   const items = [
     {
       sourceType: evidence.currentQuote ? 'market' : 'system',
@@ -2272,7 +2291,8 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
           label: disclosureAnalysis.riskCount > 0 || disclosureAnalysis.correctionCount > 0 || disclosureAnalysis.dilutionCount > 0 ? '공시주의' : '공시',
           title: `${input.instrument.name} 최근 공시 흐름`,
           body: disclosureInsightBody,
-          ...(buildDisclosureInsightSourceBody(disclosureAnalysis) ? { sourceBody: buildDisclosureInsightSourceBody(disclosureAnalysis) } : {}),
+          ...(disclosureSourceBody ? { sourceBody: disclosureSourceBody } : {}),
+          ...(disclosureLatestFilings.length > 0 ? { latestFilings: disclosureLatestFilings } : {}),
         }]
       : []),
     {

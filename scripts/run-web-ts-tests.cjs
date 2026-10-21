@@ -23,7 +23,8 @@ function collectTestFiles(dir) {
     if (!entry.isFile() && !statSync(path).isFile()) {
       return []
     }
-    return path.endsWith('.test.ts') ? [path] : []
+    // .test.mts: 항상 ESM으로 취급되는 테스트(듀얼 러너 등 top-level await 필요)
+    return path.endsWith('.test.ts') || path.endsWith('.test.mts') ? [path] : []
   })
 }
 

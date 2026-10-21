@@ -434,7 +434,18 @@ test('KR DeepScan crawler proxy times out an unresponsive upstream fetch', async
   await assert.rejects(
     () => buildKrDeepScanPayloadViaCrawler(
       rawInput,
-      (() => new Promise<Response>(() => undefined)) as typeof fetch,
+      // 응답 없는 upstream 흉내 — 단, 영원히 정착하지 않는 promise만 남기면
+      // 유일한 깨어남이 unref 데드라인 타이머(fetchWithDeadline)인 시점에 이벤트
+      // 루프가 먼저 drain되어 node:test가 파일 루트를 'Promise resolution is
+      // still pending'로 취소시키는 플레이크가 있다(나머지 테스트까지 취소됨).
+      // abort 신호에 즉시 거절하고, ref 타이머 안전판을 둬 루프가 못 죽게 한다.
+      ((_input, init) => new Promise<Response>((_, reject) => {
+        const fallback = setTimeout(() => reject(new Error('upstream unresponsive')), 50)
+        init?.signal?.addEventListener('abort', () => {
+          clearTimeout(fallback)
+          reject(new Error('aborted'))
+        })
+      })) as typeof fetch,
       { fetchTimeoutMs: 1 },
     ),
     (error) => error instanceof CrawlerDeepScanRequestError
