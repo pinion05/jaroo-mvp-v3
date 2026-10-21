@@ -516,6 +516,11 @@ test('buildJarooDeepScanPayload adds OpenDART disclosure analysis to KR DeepScan
         '2026-06-01 · 임원ㆍ주요주주특정증권등소유상황보고서 · 제출:하지훈 · 지분 변동',
         '2026-05-15 · 분기보고서 (2026.03) · 제출:삼성전자 · 일반',
       ].join('\n'),
+      latestFilings: [
+        { receiptDate: '2026-06-08', reportName: '최대주주등소유주식변동신고서', filerName: '삼성전자', riskLabel: '지분 변동' },
+        { receiptDate: '2026-06-01', reportName: '임원ㆍ주요주주특정증권등소유상황보고서', filerName: '하지훈', riskLabel: '지분 변동' },
+        { receiptDate: '2026-05-15', reportName: '분기보고서 (2026.03)', filerName: '삼성전자', riskLabel: '일반' },
+      ],
     },
   );
 });

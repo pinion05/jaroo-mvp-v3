@@ -35,7 +35,9 @@ export type WatchDailyBatchSummary = {
   collected: number
   skippedAlreadyCollected: number
   eventMessagesSent: number
+  eventMessagesFailed: number
   weeklySummariesSent: number
+  weeklySummariesFailed: number
   failed: Array<{ code: string; reason: string }>
 }
 
@@ -167,15 +169,21 @@ async function loadChatIdsByUser(userIds: string[]): Promise<Map<string, string>
 }
 
 function deepscanUrl(): string {
-  return `${(process.env.NEXT_PUBLIC_APP_URL ?? 'https://test.jaroo.kr').replace(/\/+$/, '')}/deepscan`
+  return `${(process.env.NEXT_PUBLIC_APP_URL ?? 'https://jaroo.kr').replace(/\/+$/, '')}/deepscan`
 }
 
-async function sendToUser(chatId: string, text: string): Promise<boolean> {
+/** 발송 실패(ok:false)도 무음 처리하지 않는다 — 종목·발신 종류와 API 오류 코드만 기록(chat_id 제외). */
+async function sendToUser(chatId: string, text: string, context: { kind: 'event' | 'weekly'; stock?: string }): Promise<boolean> {
   try {
     const result = await sendTelegramMessage(chatId, text)
+    if (!result.ok) {
+      console.error(
+        `[watch-daily-batch] telegram send failed kind=${context.kind}${context.stock ? ` stock=${context.stock}` : ''} code=${result.code} description=${result.description} blocked=${result.blocked}`,
+      )
+    }
     return result.ok
   } catch (error) {
-    console.error('[watch-daily-batch] telegram send failed', error)
+    console.error(`[watch-daily-batch] telegram send failed kind=${context.kind}${context.stock ? ` stock=${context.stock}` : ''}`, error)
     return false
   }
 }
@@ -188,7 +196,9 @@ export async function runWatchDailyBatch(options?: { maxStocks?: number }): Prom
     collected: 0,
     skippedAlreadyCollected: 0,
     eventMessagesSent: 0,
+    eventMessagesFailed: 0,
     weeklySummariesSent: 0,
+    weeklySummariesFailed: 0,
     failed: [],
   }
 
@@ -254,9 +264,11 @@ export async function runWatchDailyBatch(options?: { maxStocks?: number }): Prom
         }
 
         const message = buildEventMessage(stockName, priceText.current, targets.events, deepscanUrl())
-        const sent = await sendToUser(chatId, message)
+        const sent = await sendToUser(chatId, message, { kind: 'event', stock: stock.code })
         if (sent) {
           summary.eventMessagesSent += 1
+        } else {
+          summary.eventMessagesFailed += 1
         }
         if (isSunday && shouldSendWeeklySummary(level)) {
           const rows = weeklyRowsByUser.get(userId) ?? []
@@ -278,15 +290,17 @@ export async function runWatchDailyBatch(options?: { maxStocks?: number }): Prom
     for (const [userId, rows] of weeklyRowsByUser) {
       const chatId = chatIdsByUser.get(userId)
       if (!chatId) continue
-      const sent = await sendToUser(chatId, buildWeeklySummaryMessage(rows, deepscanUrl()))
+      const sent = await sendToUser(chatId, buildWeeklySummaryMessage(rows, deepscanUrl()), { kind: 'weekly' })
       if (sent) {
         summary.weeklySummariesSent += 1
+      } else {
+        summary.weeklySummariesFailed += 1
       }
     }
   }
 
   console.log(
-    `[watch-daily-batch] done date=${summary.date} stocks=${summary.watchedStocks} collected=${summary.collected} events=${summary.eventMessagesSent} weekly=${summary.weeklySummariesSent} failed=${summary.failed.length}`,
+    `[watch-daily-batch] done date=${summary.date} stocks=${summary.watchedStocks} collected=${summary.collected} events=${summary.eventMessagesSent} weekly=${summary.weeklySummariesSent} sendFailed=${summary.eventMessagesFailed + summary.weeklySummariesFailed} failed=${summary.failed.length}`,
   )
   return summary
 }

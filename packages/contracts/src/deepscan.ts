@@ -138,6 +138,14 @@ export type JarooDeepScanConsensusStructured = {
   currency?: string | null
 }
 
+/** 공시 분석 카드의 개별 filing 구조화 미러 — receiptDate는 'YYYY-MM-DD' 정규화 후 값. */
+export type JarooDeepScanDisclosureFiling = {
+  receiptDate: string | null
+  reportName: string | null
+  filerName?: string | null
+  riskLabel?: string | null
+}
+
 export type JarooDeepScanInsightItem = {
   sourceType: DeepScanSourceType
   sourceLabel: string
@@ -150,6 +158,8 @@ export type JarooDeepScanInsightItem = {
    *  crawler emits them, so the web client can read values directly instead of
    *  reverse-parsing `body` with regex. */
   consensus?: JarooDeepScanConsensusStructured
+  /** 공시 분석 카드 구조화 미러 — 워치 알림이 sourceBody 역파싱 없이 filing 단위로 읽는다. */
+  latestFilings?: JarooDeepScanDisclosureFiling[] | null
 }
 
 export type JarooDeepScanStrategyScenario = {
