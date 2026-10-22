@@ -133,6 +133,27 @@ export function AuthForm({ mode }: AuthFormProps) {
     // 성공 시 signInWithOAuth 가 브라우저를 Google로 이동시키므로 pending 해제 불필요(컴포넌트 언마운트).
   }
 
+  const handleKakao = async () => {
+    setErrorMessage(null)
+    if (!termsAgreed) {
+      setErrorMessage('서비스 이용약관과 개인정보처리방침에 동의해주세요.')
+      return
+    }
+    setInfoMessage(null)
+    setPending(true)
+    const supabase = createSupabaseBrowserClient()
+    const consentQuery = consentAt ? `?consent=${encodeURIComponent(consentAt)}` : ''
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'kakao',
+      options: { redirectTo: `${buildOAuthRedirectTo()}${consentQuery}` },
+    })
+    if (error) {
+      setErrorMessage(error.message || '카카오 로그인을 시작하지 못했어요.')
+      setPending(false)
+    }
+    // 성공 시 signInWithOAuth 가 브라우저를 카카오로 이동시키므로 pending 해제 불필요(컴포넌트 언마운트).
+  }
+
   return (
     <section className='space-y-5 rounded-[28px] border border-[color:var(--jaroo-border)] bg-white p-5 shadow-[0_16px_40px_rgba(15,47,78,0.08)]'>
       <div>
@@ -147,6 +168,11 @@ export function AuthForm({ mode }: AuthFormProps) {
       <button type='button' onClick={handleGoogle} disabled={pending || !termsAgreed} className='flex h-12 w-full items-center justify-center gap-2 rounded-2xl border border-[#d8e0ea] bg-white text-sm font-semibold text-[color:var(--jaroo-ink)] transition hover:bg-[#f3f5f8] disabled:cursor-not-allowed disabled:opacity-45'>
         <GoogleIcon />
         Google로 계속하기
+      </button>
+
+      <button type='button' onClick={handleKakao} disabled={pending || !termsAgreed} className='flex h-12 w-full items-center justify-center gap-2 rounded-2xl bg-[#FEE500] text-sm font-semibold text-[#191919] transition hover:bg-[#f2dc00] disabled:cursor-not-allowed disabled:opacity-45'>
+        <KakaoIcon />
+        카카오로 계속하기
       </button>
 
       <label className='flex items-start gap-2 text-xs leading-5 text-[color:var(--jaroo-muted)]'>
@@ -208,6 +234,14 @@ function GoogleIcon() {
       <path fill='#34A853' d='M9 18c2.43 0 4.47-.81 5.96-2.18l-2.91-2.26c-.81.54-1.84.86-3.05.86-2.34 0-4.32-1.58-5.03-3.71H.96v2.33A9 9 0 0 0 9 18z' />
       <path fill='#FBBC05' d='M3.97 10.71A5.41 5.41 0 0 1 3.68 9c0-.59.1-1.17.29-1.71V4.96H.96A9 9 0 0 0 0 9c0 1.45.35 2.83.96 4.04l3.01-2.33z' />
       <path fill='#EA4335' d='M9 3.58c1.32 0 2.51.45 3.44 1.35l2.58-2.58A9 9 0 0 0 .96 4.96l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58z' />
+    </svg>
+  )
+}
+
+function KakaoIcon() {
+  return (
+    <svg width='18' height='18' viewBox='0 0 24 24' fill='#191919' aria-hidden='true'>
+      <path d='M12 3C6.48 3 2 6.48 2 10.8c0 2.77 1.84 5.21 4.6 6.6-.2.7-.73 2.62-.83 3.03-.13.5.18.5.38.36.16-.1 2.5-1.7 3.52-2.4.75.1 1.53.16 2.33.16 5.52 0 10-3.48 10-7.75S17.52 3 12 3z' />
     </svg>
   )
 }

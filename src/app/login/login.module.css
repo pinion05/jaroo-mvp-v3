@@ -113,6 +113,15 @@
   border: none;
   box-shadow: 0 4px 12px rgba(15, 20, 25, 0.28);
 }
+/* 카카오 브랜드 버튼: #FEE500 배경에 #191919 심볼/텍스트 */
+.kakao {
+  background: #fee500;
+  color: #191919;
+  border: none;
+}
+.kakao:disabled {
+  opacity: 0.4;
+}
 .disabled {
   opacity: 0.4;
   cursor: not-allowed;

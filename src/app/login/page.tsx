@@ -68,6 +68,27 @@ export default function LoginPage() {
     // 성공 시 signInWithOAuth 가 브라우저를 Google로 이동시키므로 pending 해제 불필요(컴포넌트 언마운트).
   }
 
+  async function handleKakao() {
+    setError(null)
+    if (!termsAgreed) {
+      setError('서비스 이용약관과 개인정보처리방침에 동의해주세요.')
+      return
+    }
+    setPending(true)
+    const supabase = createSupabaseBrowserClient()
+    // consent: 동의한 시점을 콜백으로 전달해 서버(profiles)에 동의 기록으로 남긴다.
+    const consentQuery = consentAt ? `&consent=${encodeURIComponent(consentAt)}` : ''
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'kakao',
+      options: { redirectTo: `${buildOAuthRedirectTo()}?next=${encodeURIComponent(loginSuccessPath)}${consentQuery}` },
+    })
+    if (error) {
+      setError(error.message || '카카오 로그인을 시작하지 못했어요.')
+      setPending(false)
+    }
+    // 성공 시 signInWithOAuth 가 브라우저를 카카오로 이동시키므로 pending 해제 불필요(컴포넌트 언마운트).
+  }
+
   async function handleEmail(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
     setError(null)
@@ -180,18 +201,23 @@ export default function LoginPage() {
               </span>
               Google로 시작하기
             </button>
+            <button
+              type='button'
+              className={cn(styles.loginBtn, styles.kakao)}
+              onClick={handleKakao}
+              disabled={pending || !termsAgreed}
+              aria-disabled={!termsAgreed}
+            >
+              <span className={styles.loginBtnIco}>
+                <KakaoIcon />
+              </span>
+              카카오로 시작하기
+            </button>
 
             <div className={styles.divider}>
               <span className={styles.dividerSpan}>준비 중</span>
             </div>
 
-            <button type='button' className={cn(styles.loginBtn, styles.disabled)} disabled>
-              <span className={styles.loginBtnIco}>
-                <KakaoIcon />
-              </span>
-              카카오로 시작하기
-              <span className={styles.soon}>준비 중</span>
-            </button>
             <button type='button' className={cn(styles.loginBtn, styles.disabled)} disabled>
               <span className={styles.loginBtnIco}>
                 <AppleIcon />
@@ -337,7 +363,7 @@ function GoogleIcon() {
 
 function KakaoIcon() {
   return (
-    <svg width='17' height='17' viewBox='0 0 24 24' fill='#97A0AE' aria-hidden='true'>
+    <svg width='17' height='17' viewBox='0 0 24 24' fill='#191919' aria-hidden='true'>
       <path d='M12 3C6.48 3 2 6.48 2 10.8c0 2.77 1.84 5.21 4.6 6.6-.2.7-.73 2.62-.83 3.03-.13.5.18.5.38.36.16-.1 2.5-1.7 3.52-2.4.75.1 1.53.16 2.33.16 5.52 0 10-3.48 10-7.75S17.52 3 12 3z' />
     </svg>
   )
