@@ -65,7 +65,7 @@ test('readRecoveryForecastForLoss hides the card when recoveryForecast is absent
 test('DeepScanRecoveryForecastCard renders the recovery forecast for a loss-making holding', () => {
   const markup = renderToStaticMarkup(createElement(DeepScanRecoveryForecastCard, { payload: payloadWithRecovery(baseRecoveryBlock()) }))
   assert.match(markup, /원금회수 예측/)
-  assert.match(markup, /도달 사례 기준 기간/)
+  assert.match(markup, /평단 도달 예상 기간/)
   assert.match(markup, /약 74일/)
   assert.match(markup, /1년 내 도달 비율/)
   assert.match(markup, /61\.1%/)
@@ -73,6 +73,33 @@ test('DeepScanRecoveryForecastCard renders the recovery forecast for a loss-maki
   assert.doesNotMatch(markup, /예상 회수 기간/)
   assert.match(markup, /유사 패턴/)
   assert.match(markup, /투자 권유/)
+  // 수치 원본이 있으면 확률 게이지가 렌더된다.
+  assert.match(markup, /width:61\.1%/)
+  // priceHistory가 없으면(구형 페이로드) 차트 섹션은 렌더되지 않는다.
+  assert.doesNotMatch(markup, /최근 1년 종가와 유사 과거 패턴/)
+})
+
+test('DeepScanRecoveryForecastCard renders the 1-year chart with similar-pattern bands when history is present', () => {
+  const priceHistory = Array.from({ length: 12 }, (_, index) => ({
+    date: `2026-01-${String(index + 1).padStart(2, '0')}`,
+    close: 30000 - index * 800,
+  }))
+  const markup = renderToStaticMarkup(createElement(DeepScanRecoveryForecastCard, {
+    payload: payloadWithRecovery(baseRecoveryBlock({
+      currentPrice: 21200,
+      targetPrice: 28000,
+      priceHistory,
+      similarPatternSamples: [
+        { date: '2026-01-04', close: 27600, drawdownPct: 8.1, recoveryDays: 42, recovered: true },
+        { date: '2026-01-09', close: 23600, drawdownPct: 21.3, recoveryDays: null, recovered: false },
+      ],
+    })),
+  }))
+  assert.match(markup, /최근 1년 종가와 유사 과거 패턴/)
+  assert.match(markup, /평단 2\.8만/)
+  assert.match(markup, /유사 패턴 · 2026-01-04 · 당시 하락 8% → 약 42일 만에 회복/)
+  assert.match(markup, /2026-01-09 · 당시 하락 21% → 1년\(252거래일\) 내 미회복/)
+  assert.match(markup, /<title>현재가 ₩20,050<\/title>/)
 })
 
 test('DeepScanRecoveryForecastCard renders nothing for a profit position', () => {

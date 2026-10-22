@@ -593,14 +593,79 @@ export function runRecoveryForecast(context: RecoveryForecastContext): {
   return { forecast, targetPrice, currentPrice, recoverySourceRefs }
 }
 
+const RECOVERY_PRICE_HISTORY_MAX_POINTS = 252
+const RECOVERY_SIMILAR_PATTERN_SAMPLES_MAX = 12
+
+function normalizeRecoverySeriesPoint(point: unknown): { date: string | null; close: number } | null {
+  const record = asRecord(point)
+  if (!record) {
+    return null
+  }
+
+  const close = asFiniteNumber(record.close ?? record.closePrice ?? record.price ?? record.value)
+  const rawDate = typeof record.date === 'string' && record.date.trim() ? record.date.trim() : null
+  return close !== null && close > 0 ? { date: rawDate, close } : null
+}
+
+function buildRecoveryPriceHistory(primarySeries: ReadonlyArray<unknown> | null | undefined) {
+  if (!Array.isArray(primarySeries)) {
+    return undefined
+  }
+
+  const points = primarySeries
+    .map(normalizeRecoverySeriesPoint)
+    .filter((point): point is { date: string | null; close: number } => point !== null)
+    .slice(-RECOVERY_PRICE_HISTORY_MAX_POINTS)
+
+  return points.length >= 3 ? points : undefined
+}
+
+function buildRecoverySimilarPatternSamples(
+  forecast: unknown,
+  primarySeries: ReadonlyArray<unknown> | null | undefined,
+) {
+  const seriesPoints = Array.isArray(primarySeries)
+    ? primarySeries.map(normalizeRecoverySeriesPoint)
+    : []
+  const samples = asArray(asRecord(asRecord(asRecord(forecast)?.modelDetails)?.similarPattern)?.samples)
+  if (samples.length === 0 || seriesPoints.length === 0) {
+    return undefined
+  }
+
+  const mapped = samples
+    .map((sample) => {
+      const sampleRecord = asRecord(sample)
+      const index = asFiniteNumber(sampleRecord?.index)
+      const seriesPoint = index !== null ? seriesPoints[index] : null
+      if (!sampleRecord || !seriesPoint) {
+        return null
+      }
+
+      const drawdownPct = asFiniteNumber(sampleRecord.drawdownPct)
+      const recoveryDays = asFiniteNumber(sampleRecord.recoveryDays)
+      return {
+        date: seriesPoint.date,
+        close: seriesPoint.close,
+        drawdownPct: drawdownPct ?? 0,
+        recoveryDays,
+        recovered: recoveryDays !== null,
+      }
+    })
+    .filter((sample): sample is NonNullable<typeof sample> => sample !== null)
+    .slice(-RECOVERY_SIMILAR_PATTERN_SAMPLES_MAX)
+
+  return mapped.length > 0 ? mapped : undefined
+}
+
 export function shapeRecoveryForecastBlock(args: {
   forecast: unknown
   targetPrice: number
   currentPrice: number
   currency: string | undefined
   recoverySourceRefs: DeepScanSourceRef[]
+  primarySeries?: ReadonlyArray<unknown> | null
 }): JarooDeepScanRecoveryForecastBlock {
-  const { forecast, targetPrice, currentPrice, currency, recoverySourceRefs } = args
+  const { forecast, targetPrice, currentPrice, currency, recoverySourceRefs, primarySeries } = args
   const forecastRecord = asRecord(forecast)
   const consensus = asRecord(forecastRecord?.consensus)
   const confidence = asRecord(consensus?.confidence)
@@ -608,6 +673,10 @@ export function shapeRecoveryForecastBlock(args: {
   const expectedRecoveryDays = asFiniteNumber(consensus?.expectedRecoveryDays)
   const recoveryProbabilityPct = asFiniteNumber(consensus?.recoveryProbabilityPct)
   const confidenceLabel = recoveryConfidenceLabel(normalizeText(confidence?.level))
+  const confidenceLevelRaw = normalizeText(confidence?.level)
+  const confidenceLevel = confidenceLevelRaw === 'high' || confidenceLevelRaw === 'medium' || confidenceLevelRaw === 'low'
+    ? confidenceLevelRaw
+    : null
   const isUnavailable = status === 'unavailable' || !consensus
   const blockState: DeepScanBlockState = isUnavailable ? 'blocked' : 'ok'
   const fallback = status === 'low_confidence'
@@ -632,6 +701,13 @@ export function shapeRecoveryForecastBlock(args: {
     targetPriceText: formatCurrency(targetPrice, currency),
     drawdownText: formatDrawdownPct(currentPrice, targetPrice),
     modelRows: buildRecoveryModelRows(forecast),
+    currentPrice,
+    targetPrice,
+    expectedRecoveryDays,
+    recoveryProbabilityPct,
+    confidenceLevel,
+    priceHistory: buildRecoveryPriceHistory(primarySeries),
+    similarPatternSamples: buildRecoverySimilarPatternSamples(forecast, primarySeries),
     disclaimer: `${normalizeText(consensus?.disclaimer) ?? '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.'} 1년 내 도달 비율은 유사 과거 표본과 5,000개 모의 경로가 252거래일 안에 각 회복 기준을 한 번 이상 터치한 비율을 종합한 값이며, 예측 정확도나 회복 보장이 아닙니다.`,
   }
 }
@@ -647,6 +723,7 @@ export function buildDeepScanRecoveryForecastBlock(context: RecoveryForecastCont
     currentPrice: ran.currentPrice,
     currency: context.currency,
     recoverySourceRefs: ran.recoverySourceRefs,
+    primarySeries: context.primarySeries,
   })
 }
 
@@ -1129,6 +1206,7 @@ function replaceKrRecoveryForecastWithDailyHistory(
     recoveryForecastRaw: {
       ...raw,
       forecast,
+      primarySeries: history.series ?? undefined,
       sourceId: 'naver-daily-price-history',
       sourceLabel: 'Naver Finance daily price history',
     },
@@ -1141,6 +1219,7 @@ function attachKrRecoveryForecast(payload: JarooDeepScanPayload): JarooDeepScanP
   const forecast = raw?.forecast
   const currentPrice = asFiniteNumber(raw?.currentPrice)
   const targetPrice = asFiniteNumber(raw?.targetPrice)
+  const primarySeries = asArray(raw?.primarySeries)
   const rest = { ...record }
   delete rest.recoveryForecastRaw
   if (forecast === undefined || currentPrice === null || targetPrice === null) {
@@ -1160,6 +1239,7 @@ function attachKrRecoveryForecast(payload: JarooDeepScanPayload): JarooDeepScanP
     targetPrice,
     currency: 'KRW',
     recoverySourceRefs,
+    primarySeries,
   })
   return { ...rest, recoveryForecast } as JarooDeepScanPayload
 }
