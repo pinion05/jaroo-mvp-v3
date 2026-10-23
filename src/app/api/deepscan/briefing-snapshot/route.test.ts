@@ -154,6 +154,84 @@ test('buildUsBriefingSnapshotData exposes latest US OHLC quote and previous clos
   assert.equal(snapshot.quote?.source, 'polygon-v2-aggs-ticker-range-day')
 })
 
+// 원금회수 예측 테스트용 — 1년치(260거래일) 일봉 합성 계열. 약 30거래일 주기로
+// 9,800~13,200를 오르내리는 파형이라 마지막 저점(≈9,830)에서 평단 12,500까지의
+// 회복이 유사 패턴·몬테카를로 양쪽에서 잡힌다(need ≈ 0.7σ, 도달 확률 ~40%).
+const recoveryYearRows = Array.from({ length: 260 }, (_, index) => {
+  const date = new Date(Date.UTC(2025, 0, 1 + index))
+  const iso = date.toISOString().slice(0, 10)
+  const close = Math.round(11500 + Math.sin(index / 5 + 3) * 1700)
+  return {
+    localTradedAt: iso,
+    closePrice: String(close),
+    openPrice: String(close + 80),
+    highPrice: String(close + 200),
+    lowPrice: String(close - 180),
+    accumulatedTradingVolume: 100000 + index * 10,
+    fluctuationsRatio: '0',
+  }
+})
+
+function createRecoveryBriefingFetcher() {
+  return (async (input: RequestInfo | URL) => {
+    const url = String(input)
+    if (url.includes('/price?')) {
+      // 네이버 일별 시세와 동일하게 최신 우선으로 내려준다(fetchDailyRows가 reverse로 정렬).
+      return jsonResponse([...recoveryYearRows].reverse())
+    }
+    if (url.includes('/stock/') && url.includes('/basic')) {
+      return jsonResponse(stockBasic)
+    }
+    if (url.includes('/index/')) {
+      return jsonResponse(indexBasic)
+    }
+    return jsonResponse({ error: 'unexpected url' }, 404)
+  }) as typeof fetch
+}
+
+test('briefing snapshot attaches recovery forecast for a loss position when averagePrice is provided', async () => {
+  clearBriefingSnapshotCache()
+  const response = await handleBriefingSnapshotRequest(
+    new NextRequest('http://localhost/api/deepscan/briefing-snapshot?code=003720&averagePrice=12500'),
+    { fetcher: createRecoveryBriefingFetcher(), cacheTtlMs: 0 },
+  )
+  const body = await response.json()
+
+  assert.equal(response.status, 200)
+  const recovery = body.data.recoveryForecast
+  assert.ok(recovery, 'recoveryForecast must be attached for a loss position')
+  assert.match(recovery.expectedRecoveryDaysText, /거래일/)
+  assert.equal(typeof recovery.recoveryProbabilityPct, 'number')
+  assert.match(recovery.summaryText, /도달한 사례만/)
+  assert.equal(recovery.modelRows.length, 3)
+  assert.deepEqual(recovery.modelRows.map((row: { label: string }) => row.label), ['유사 패턴', '일반 주가 변동', '급등락 반영'])
+  // 차트 재료(1년 종가 계열 + 유사 패턴 샘플)도 함께 내려간다.
+  assert.equal(recovery.targetPrice, 12500)
+  assert.ok(Array.isArray(recovery.priceHistory))
+  assert.equal(recovery.priceHistory.length, 252)
+  assert.ok(recovery.priceHistory.every((point: { close: number }) => Number.isFinite(point.close)))
+  assert.ok(Array.isArray(recovery.similarPatternSamples))
+  assert.ok(recovery.similarPatternSamples.length >= 1, '파형 계열에서 유사 패턴 샘플이 잡혀야 한다')
+})
+
+test('briefing snapshot omits recovery forecast without averagePrice and for a profit position', async () => {
+  clearBriefingSnapshotCache()
+  const withoutAverage = await handleBriefingSnapshotRequest(
+    new NextRequest('http://localhost/api/deepscan/briefing-snapshot?code=003720'),
+    { fetcher: createRecoveryBriefingFetcher(), cacheTtlMs: 0 },
+  )
+  const withoutBody = await withoutAverage.json()
+  assert.equal(withoutBody.data.recoveryForecast, null)
+
+  clearBriefingSnapshotCache()
+  const profit = await handleBriefingSnapshotRequest(
+    new NextRequest('http://localhost/api/deepscan/briefing-snapshot?code=003720&averagePrice=5000'),
+    { fetcher: createRecoveryBriefingFetcher(), cacheTtlMs: 0 },
+  )
+  const profitBody = await profit.json()
+  assert.equal(profitBody.data.recoveryForecast, null, '수익 구간(평단 이상)에서는 예측을 붙이지 않는다')
+})
+
 test('US briefing tolerates market-indicators failure (market {} 폴백)', async () => {
   clearBriefingSnapshotCache()
   const snapshot = await buildUsBriefingSnapshotData('TSLA', {

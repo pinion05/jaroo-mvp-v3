@@ -222,6 +222,19 @@ export type JarooDeepScanStrategyBlock = DeepScanBlockMeta & {
   otherScenarioTags: string[]
 }
 
+export type JarooRecoveryPricePoint = {
+  date: string | null
+  close: number
+}
+
+export type JarooRecoverySimilarPatternSample = {
+  date: string | null
+  close: number
+  drawdownPct: number
+  recoveryDays: number | null
+  recovered: boolean
+}
+
 export type JarooDeepScanRecoveryForecastBlock = DeepScanBlockMeta & {
   statusText: string
   summaryText: string
@@ -233,6 +246,16 @@ export type JarooDeepScanRecoveryForecastBlock = DeepScanBlockMeta & {
   drawdownText: string
   modelRows: JarooDeepScanRecoveryForecastModelRow[]
   disclaimer: string
+  /** 수치 원본(히어로 게이지·차트용) — 구형 페이로드에는 없어 화면은 텍스트 폴백 */
+  currentPrice?: number | null
+  targetPrice?: number | null
+  expectedRecoveryDays?: number | null
+  recoveryProbabilityPct?: number | null
+  confidenceLevel?: 'high' | 'medium' | 'low' | null
+  /** 모델 입력에 쓴 가격 계열(최근 252포인트) — 차트 렌더링용 */
+  priceHistory?: JarooRecoveryPricePoint[]
+  /** 유사 패턴이 매칭한 과거 하락 구간(차트 하이라이트용) */
+  similarPatternSamples?: JarooRecoverySimilarPatternSample[]
 }
 
 export type JarooDeepScanSellNowBlock = DeepScanBlockMeta & {

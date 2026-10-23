@@ -169,6 +169,12 @@ test('buildDeepScanRecoveryForecastBlock returns a deepscan-ready 원금회수 b
   assert.equal(block.targetPriceText, '$121.00')
   assert.equal(block.modelRows.length, 3)
   assert.match(block.disclaimer, /투자 권유/)
+  // 수치 원본·차트 재료(히어로 게이지·1년 차트 렌더링용)가 함께 내려간다.
+  assert.equal(block.currentPrice, 100)
+  assert.equal(block.targetPrice, 121)
+  assert.equal(block.confidenceLevel === null || ['high', 'medium', 'low'].includes(block.confidenceLevel ?? ''), true)
+  assert.ok(Array.isArray(block.priceHistory) && block.priceHistory.length === 10)
+  assert.deepEqual(block.priceHistory?.[0], { date: '2026-01-01', close: 121 })
 })
 
 test('describeMomentumProvenance는 provider별 OHLC 문구를 맞춘다', () => {
@@ -582,6 +588,14 @@ test('buildKrDeepScanPayloadViaCrawler recomputes optimistic crawler recovery ou
   const rows = block.modelRows as Array<Record<string, unknown>>
   assert.notEqual(rows[1]?.recoveryDaysText, '15일')
   assert.notEqual(rows[1]?.probabilityText, '100%')
+  // 주입된 일봉 계열이 차트 재료(priceHistory, 최대 252포인트)로 내려간다.
+  const priceHistory = block.priceHistory as Array<{ date: string | null; close: number }>
+  assert.ok(Array.isArray(priceHistory))
+  assert.equal(priceHistory.length, 252)
+  assert.equal(block.currentPrice, 100)
+  assert.equal(block.targetPrice, 150)
+  assert.equal(typeof block.recoveryProbabilityPct, 'number')
+  assert.ok(['high', 'medium', 'low'].includes(String(block.confidenceLevel)))
 })
 
 test('buildKrDeepScanPayloadViaCrawler blocks recovery output when daily history loading fails', async () => {
