@@ -85,7 +85,7 @@ export default async function DebugRecoveryCardPage() {
   }
 
   return (
-    <main className='mx-auto flex max-w-[440px] flex-col gap-6 bg-[#F7F8FA] p-4'>
+    <main className='mx-auto flex h-full max-w-[440px] flex-col gap-6 overflow-y-auto bg-[#F7F8FA] p-4'>
       <header className='text-[12px] leading-5 text-[#5A6473]'>
         <h1 className='text-[14px] font-bold text-[#0F1419]'>원금회수 예측 카드 프리뷰</h1>
         네이버 일봉 실데이터 · 운영 KR 옵션과 동일한 모델 파라미터로 렌더한 실카드. 평단가는 1년 고점 대비 데모 값.

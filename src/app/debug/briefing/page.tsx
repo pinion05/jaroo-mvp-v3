@@ -4,7 +4,6 @@
 // 실제 스캔(로그인·크레딧) 없이 차트 요소를 검증하기 위한 개발 하네스다.
 import { TodayBriefingCard } from '@/components/deepscan-loading-briefing-card'
 import { DEEPSCAN_CONSENSUS_EMPTY_STATE_TEXT } from '@/components/deepscan-loading-types'
-import styles from '@/components/deepscan-loading-screen.module.css'
 
 const KR_FIXTURE = {
   currentPriceText: '250,000원',
@@ -122,21 +121,47 @@ const KR_LOSS_FIXTURE = {
   },
 }
 
+// loadingCard는 풀스크린 로딩 화면용(height 100% + 내부 스크롤)이라 디버그 페이지에선
+// 디자인 토큰(--ds-* 변수)만 제공하는 평범한 블록으로 감싼다 — 카드 3장은 페이지 스크롤로.
+const CARD_CONTEXT_STYLE = {
+  '--ds-bg': '#f5f6f8',
+  '--ds-card': '#ffffff',
+  '--ds-ink': '#0f1419',
+  '--ds-muted': '#97a0ae',
+  '--ds-mid': '#5a6473',
+  '--ds-line': '#e8eaee',
+  '--ds-blue': '#2b6be6',
+  '--ds-blue-soft': '#e6f1fe',
+  '--ds-blue-border': '#cfe0ff',
+  '--ds-cream': '#fff8ec',
+  '--ds-rise': '#a8323a',
+  '--ds-rise-soft': '#fbe6e7',
+  '--ds-emerald': '#1e7a43',
+  '--ds-emerald-soft': '#e6f6ec',
+  '--ds-red': '#e5484d',
+  '--ds-amber': '#b8860b',
+  '--ds-amber-soft': '#fef3e3',
+  '--ds-skeleton-shimmer-duration': '4.2s',
+  '--ds-member-pulse-duration': '4s',
+  maxWidth: 420,
+  background: '#fff',
+} as const
+
 export default function DebugBriefingPage() {
   return (
-    <main style={{ display: 'grid', gap: 24, padding: 24, background: '#0b0e13', minHeight: '100vh' }}>
+    <main style={{ display: 'grid', gap: 24, padding: 24, background: '#0b0e13', height: '100%', overflowY: 'auto' }}>
       <h1 style={{ color: '#fff', fontSize: 16 }}>딥스캔 브리핑 카드 미리보기 — 목표가 팬차트 내 평단 점선</h1>
-      <section className={styles.loadingCard} style={{ maxWidth: 420 }}>
+      <div style={CARD_CONTEXT_STYLE}>
         <TodayBriefingCard {...KR_FIXTURE} />
-      </section>
+      </div>
       <h2 style={{ color: '#fff', fontSize: 14 }}>consensus 없음 — 빈 상태 문구</h2>
-      <section className={styles.loadingCard} style={{ maxWidth: 420 }}>
+      <div style={CARD_CONTEXT_STYLE}>
         <TodayBriefingCard {...KR_EMPTY_FIXTURE} />
-      </section>
+      </div>
       <h2 style={{ color: '#fff', fontSize: 14 }}>손실 구간 — 원금회수 예측 브리핑 포함</h2>
-      <section className={styles.loadingCard} style={{ maxWidth: 420 }}>
+      <div style={CARD_CONTEXT_STYLE}>
         <TodayBriefingCard {...KR_LOSS_FIXTURE} />
-      </section>
+      </div>
     </main>
   )
 }
