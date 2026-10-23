@@ -2,7 +2,7 @@ import type { JarooDeepScanPayload, JarooDeepScanRecoveryForecastBlock } from '.
 
 import { DeepScanRecoveryForecastCard } from '@/components/deepscan-recovery-forecast-card'
 import { fetchKrDailyPriceHistory } from '@/lib/kr-daily-price-history'
-import { shapeRecoveryForecastBlock } from '@/lib/deepscan-runtime/build-payload'
+import { KR_DAILY_RECOVERY_FORECAST_OPTIONS, shapeRecoveryForecastBlock } from '@/lib/deepscan-runtime/build-payload'
 import { buildRecoveryForecastFromPriceSeries } from '../../../../packages/deepscan-runtime-core/src/recovery-forecast.js'
 
 // 원금회수 예측 카드(히어로 게이지 + 1년 차트 + 유사 패턴 밴드) 미리보기.
@@ -14,26 +14,6 @@ const PREVIEW_TARGETS = [
   { code: '000660', name: 'SK하이닉스' },
   { code: '069500', name: 'KODEX 200' },
 ] as const
-
-// build-payload의 KR_DAILY_RECOVERY_FORECAST_OPTIONS와 동일 값(개발 하네스 재현용).
-const KR_DAILY_RECOVERY_FORECAST_OPTIONS = {
-  returnParameters: {
-    windowMode: 'full',
-    requireDailyCadence: true,
-    minReturnCount: 252,
-  },
-  similarPattern: {
-    lookbackDays: 40,
-    tolerancePct: 12,
-    spacingDays: 20,
-    minSampleSize: 3,
-    horizonDays: 252,
-  },
-  simulation: {
-    horizonDays: 252,
-    pathCount: 5000,
-  },
-} as const
 
 function resolvePreviewTargetPrice(series: ReadonlyArray<{ close: number }>) {
   const high = Math.max(...series.map((point) => point.close))

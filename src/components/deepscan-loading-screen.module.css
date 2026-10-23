@@ -2996,6 +2996,70 @@
   color: var(--ds-blue);
 }
 
+/* 원금회수 예측 브리핑(내 자리 후속 항목) */
+.recoveryProbText {
+  color: var(--ds-blue);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.recoveryGaugeTrack {
+  height: 6px;
+  margin-top: 7px;
+  border-radius: 3px;
+  background: #f5f6f8;
+  overflow: hidden;
+}
+
+.recoveryGaugeBar {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--ds-blue);
+}
+
+.recoveryModels {
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recoveryModelRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2.5px 0;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.recoveryModelDot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  transform: translateY(-1px);
+}
+
+.recoveryModelName {
+  color: var(--ds-ink);
+  font-weight: 750;
+}
+
+.recoveryModelDays {
+  color: var(--ds-mid);
+}
+
+.recoveryModelSample {
+  color: var(--ds-muted);
+  font-size: 9.5px;
+}
+
+.recoveryModelProb {
+  margin-left: auto;
+  color: var(--ds-mid);
+  font-weight: 700;
+}
+
 @keyframes today-chart-area-reveal {
   0%, 35% {
     opacity: 0;

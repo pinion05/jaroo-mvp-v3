@@ -1149,7 +1149,10 @@ export async function buildKrDeepScanPayloadViaCrawler(
   }
 }
 
-const KR_DAILY_RECOVERY_FORECAST_OPTIONS = {
+// KR 원금회수 예측 표준 옵션 — 일봉 계열(requireDailyCadence·minReturnCount 252) 전체 구간
+// 드리프트로 캘리브레이션한다(반등 구간 낙관 편향 차단). briefing-snapshot 라우트·
+// debug 프리뷰가 같은 값을 재사용한다.
+export const KR_DAILY_RECOVERY_FORECAST_OPTIONS = {
   returnParameters: {
     windowMode: 'full',
     requireDailyCadence: true,

@@ -16,6 +16,19 @@ export type LoadingBriefingMarketIndex = {
   asOf?: string | null
 }
 
+// 로딩 브리핑용 원금회수 예측 요약 — 딥스캔 결과 recoveryForecast 블록의 표시 서브셋.
+// 손실 구간(현재가 < 평단)이고 일봉 계열이 확보될 때만 붙는다.
+export type LoadingBriefingRecoveryForecast = {
+  statusText: string
+  summaryText: string
+  expectedRecoveryDaysText: string
+  recoveryProbabilityText: string
+  confidenceText: string
+  expectedRecoveryDays: number | null
+  recoveryProbabilityPct: number | null
+  modelRows: Array<{ label: string; recoveryDaysText: string; probabilityText: string; sampleText?: string }>
+}
+
 export type LoadingBriefingSnapshot = {
   code?: string
   ticker?: string
@@ -43,6 +56,7 @@ export type LoadingBriefingSnapshot = {
     nasdaq?: LoadingBriefingMarketIndex | null
     vix?: LoadingBriefingMarketIndex | null
   }
+  recoveryForecast?: LoadingBriefingRecoveryForecast | null
   sourceStatus?: {
     daily?: 'ok' | 'error'
     stockBasic?: 'ok' | 'error'

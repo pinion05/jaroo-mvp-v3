@@ -1,7 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-import type { LoadingBriefingDailyRow, LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
+import type { LoadingBriefingDailyRow, LoadingBriefingRecoveryForecast, LoadingBriefingSnapshot } from '@/lib/deepscan-briefing-snapshot'
 import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
+import { fetchKrDailyPriceHistory } from '@/lib/kr-daily-price-history'
+import { KR_DAILY_RECOVERY_FORECAST_OPTIONS, shapeRecoveryForecastBlock } from '@/lib/deepscan-runtime/build-payload'
+import { buildRecoveryForecastFromPriceSeries } from '../../../../../packages/deepscan-runtime-core/src/recovery-forecast.js'
 
 const NAVER_STOCK_API_BASE = 'https://m.stock.naver.com/api'
 const BRIEFING_SNAPSHOT_TIMEOUT_MS = 15_000
@@ -70,6 +73,8 @@ type BriefingSnapshotRequestOptions = {
   timeoutMs?: number
   cacheTtlMs?: number
   now?: () => number
+  /** 보유 평단가(원금회수 예측용) — 손실 구간일 때만 예측을 계산한다 */
+  averagePrice?: number | null
 }
 
 type FetchJsonOptions = {
@@ -327,9 +332,72 @@ function resolveChangePct(currentPrice: number | null, latest: LoadingBriefingDa
   return currentPrice !== null && previous?.close ? ((currentPrice / previous.close) - 1) * 100 : null
 }
 
+// 로딩 브리핑용 원금회수 예측 요약 — 손실 구간(현재가 < 평단)일 때만 계산한다.
+// 모델·문구 성형은 딥스캔 결과 카드와 같은 엔진(core 모델 + shapeRecoveryForecastBlock)을
+// 쓴다. 일봉 계열 확보나 계산에 실패하면 null(섹션 미표시)로 관용 처리한다.
+async function buildRecoveryForecastSummary(args: {
+  code: string
+  averagePrice: number
+  currentPrice: number | null
+  fetcher: typeof fetch
+}): Promise<LoadingBriefingRecoveryForecast | null> {
+  const { code, averagePrice, currentPrice, fetcher } = args
+  if (!(averagePrice > 0) || currentPrice === null || !(currentPrice > 0) || currentPrice >= averagePrice) {
+    return null
+  }
+
+  try {
+    const series = await fetchKrDailyPriceHistory(code, { fetcher })
+    if (series.length < 3) {
+      return null
+    }
+
+    const forecast = buildRecoveryForecastFromPriceSeries(
+      {
+        currentPrice,
+        targetPrice: averagePrice,
+        primarySeries: series,
+      },
+      {
+        ...KR_DAILY_RECOVERY_FORECAST_OPTIONS,
+        simulation: {
+          ...KR_DAILY_RECOVERY_FORECAST_OPTIONS.simulation,
+          seed: `briefing-recovery:${code}:${currentPrice}:${averagePrice}`,
+        },
+      },
+    )
+    const block = shapeRecoveryForecastBlock({
+      forecast,
+      currentPrice,
+      targetPrice: averagePrice,
+      currency: 'KRW',
+      recoverySourceRefs: [],
+      primarySeries: series,
+    })
+    if (block.blockState !== 'ok' || !block.modelRows || block.modelRows.length === 0) {
+      return null
+    }
+
+    return {
+      statusText: block.statusText,
+      summaryText: block.summaryText,
+      expectedRecoveryDaysText: block.expectedRecoveryDaysText,
+      recoveryProbabilityText: block.recoveryProbabilityText,
+      confidenceText: block.confidenceText,
+      expectedRecoveryDays: block.expectedRecoveryDays ?? null,
+      recoveryProbabilityPct: block.recoveryProbabilityPct ?? null,
+      modelRows: block.modelRows.map((row) => row.sampleText
+        ? { label: row.label, recoveryDaysText: row.recoveryDaysText, probabilityText: row.probabilityText, sampleText: row.sampleText }
+        : { label: row.label, recoveryDaysText: row.recoveryDaysText, probabilityText: row.probabilityText }),
+    }
+  } catch {
+    return null
+  }
+}
+
 export async function buildBriefingSnapshotData(
   code: string,
-  options: Required<Pick<BriefingSnapshotRequestOptions, 'fetcher' | 'timeoutMs'>> & Pick<BriefingSnapshotRequestOptions, 'cacheTtlMs' | 'now'>,
+  options: Required<Pick<BriefingSnapshotRequestOptions, 'fetcher' | 'timeoutMs'>> & Pick<BriefingSnapshotRequestOptions, 'cacheTtlMs' | 'now' | 'averagePrice'>,
   requestSignal?: AbortSignal,
 ): Promise<LoadingBriefingSnapshot> {
   const fetchOptions: FetchJsonOptions = {
@@ -362,6 +430,15 @@ export async function buildBriefingSnapshotData(
     throw new Error('stock briefing snapshot unavailable')
   }
 
+  const recoveryForecast = options.averagePrice != null && options.averagePrice > 0
+    ? await buildRecoveryForecastSummary({
+      code,
+      averagePrice: options.averagePrice,
+      currentPrice,
+      fetcher: options.fetcher,
+    })
+    : null
+
   return {
     code,
     asOf: stockBasic?.localTradedAt ?? latest?.date ?? null,
@@ -385,6 +462,7 @@ export async function buildBriefingSnapshotData(
       kospi,
       kosdaq,
     },
+    recoveryForecast,
     sourceStatus: {
       daily: sourceStatus(dailyResult),
       stockBasic: sourceStatus(stockBasicResult),
@@ -487,7 +565,9 @@ export async function handleBriefingSnapshotRequest(request: NextRequest, option
   const timeoutMs = getBriefingSnapshotTimeoutMs(options)
   const cacheTtlMs = getBriefingSnapshotCacheTtlMs(options)
   const now = options.now?.() ?? Date.now()
-  const cacheKey = code ? `KR:${code}` : `US:${ticker}`
+  const averagePriceParam = Number(request.nextUrl.searchParams.get('averagePrice'))
+  const averagePrice = Number.isFinite(averagePriceParam) && averagePriceParam > 0 ? averagePriceParam : null
+  const cacheKey = code ? `KR:${code}:${averagePrice ?? '-'}` : `US:${ticker}`
 
   const cached = cacheTtlMs > 0 ? briefingSnapshotCache.get(cacheKey) : undefined
   if (cached && cached.expiresAt > now) {
@@ -498,7 +578,7 @@ export async function handleBriefingSnapshotRequest(request: NextRequest, option
     let inflight = briefingSnapshotInflight.get(cacheKey)
     if (!inflight) {
       inflight = (code
-        ? buildBriefingSnapshotData(code, { fetcher, timeoutMs, cacheTtlMs, now: options.now })
+        ? buildBriefingSnapshotData(code, { fetcher, timeoutMs, cacheTtlMs, now: options.now, averagePrice })
         : buildUsBriefingSnapshotData(ticker!, { fetcher, timeoutMs, cacheTtlMs, now: options.now })
       )
         .then((data) => ({ ok: true as const, data }))

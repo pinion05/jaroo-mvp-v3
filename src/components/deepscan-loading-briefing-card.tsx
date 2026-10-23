@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useMemo } from 'react'
-import { BarChart3, Calendar, ChartCandlestick, ChevronLeft, Flame, Target, Telescope, TrendingUp, type LucideIcon } from 'lucide-react'
+import { BarChart3, Calendar, ChartCandlestick, ChevronLeft, Flame, Hourglass, Target, Telescope, TrendingUp, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import type {
@@ -41,6 +41,7 @@ import {
   getPreviousBriefingDailyRow,
   calculateBriefingOneMonthChangePct,
   calculateBriefingShortStreak,
+  type LoadingBriefingRecoveryForecast,
 } from '@/lib/deepscan-briefing-snapshot'
 import { resolveDeepScanBriefingCardCurrentPrice } from '@/lib/deepscan-loading-current-price'
 import { buildDeepScanShortFlow } from '@/lib/deepscan-short-flow'
@@ -371,6 +372,79 @@ export function TodayMarketBriefing({
 }
 
 
+// 원금회수 예측 섹션 모델 식별색 — 딥스캔 결과 카드(recovery forecast card)와 같은 매핑.
+export const RECOVERY_FORECAST_DOT_COLORS = ['#E0942A', '#185FA5', '#7A5AF8'] as const
+
+// 원금회수 예측 브리핑 — '내 자리는 어디쯤일까요?' 바로 아래에서 이어지는 후속 질문.
+// data-today-briefing-item을 달지 않는다(공개 타이밍 시퀀스·모바일 자동스크롤 인덱스를
+// 밀지 않기 위해 — consensus 항목과 같은 보조 항목 패턴).
+export function TodayRecoveryForecastBriefing({
+  at,
+  elapsedSeconds,
+  forceReady = false,
+  recovery,
+}: {
+  at: number
+  elapsedSeconds: number
+  forceReady?: boolean
+  recovery: LoadingBriefingRecoveryForecast
+}) {
+  const isVisible = forceReady || elapsedSeconds >= at
+  const isContentReady = isDeepScanBriefingItemContentReady({
+    elapsedSeconds,
+    revealAtSeconds: at,
+    skeletonSeconds: TODAY_BRIEFING_SKELETON_SECONDS,
+    forceReady,
+  })
+  const probabilityPct = isFiniteNumber(recovery.recoveryProbabilityPct) ? recovery.recoveryProbabilityPct : null
+
+  return (
+    <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-recovery='true'>
+      <div className={styles.todayBriefQuestionRow}>
+        <span className={styles.todayBriefIcon} aria-hidden='true'><Hourglass className='size-[13px]' /></span>
+        <span className={styles.todayBriefQuestion}>원금회수까지는 얼마나 걸릴까요?</span>
+      </div>
+      <div className={cn(styles.todayBriefBody, isVisible ? styles.todayBriefBodyIn : undefined)}>
+        <div className={cn(styles.todayBriefBodyContent, isContentReady ? styles.todayBriefBodyContentIn : undefined)}>
+          <div className={styles.todayBriefData}>
+            {recovery.expectedRecoveryDaysText}
+            {probabilityPct !== null ? <span className={styles.recoveryProbText}> · 1년 내 {recovery.recoveryProbabilityText}</span> : null}
+          </div>
+          {probabilityPct !== null ? (
+            <div
+              className={styles.recoveryGaugeTrack}
+              role='img'
+              aria-label={`1년 내 평단 도달 비율 ${recovery.recoveryProbabilityText}`}
+            >
+              <div className={styles.recoveryGaugeBar} style={{ width: `${Math.min(100, Math.max(1.5, probabilityPct))}%` }} />
+            </div>
+          ) : null}
+          <ul className={styles.recoveryModels}>
+            {recovery.modelRows.map((row, index) => (
+              <li key={row.label} className={styles.recoveryModelRow}>
+                <span
+                  className={styles.recoveryModelDot}
+                  style={{ backgroundColor: RECOVERY_FORECAST_DOT_COLORS[index % RECOVERY_FORECAST_DOT_COLORS.length] }}
+                  aria-hidden='true'
+                />
+                <span className={styles.recoveryModelName}>{row.label}</span>
+                <span className={styles.recoveryModelDays}>{row.recoveryDaysText}</span>
+                {row.sampleText ? <span className={styles.recoveryModelSample}>· {row.sampleText}</span> : null}
+                <span className={styles.recoveryModelProb}>{row.probabilityText}</span>
+              </li>
+            ))}
+          </ul>
+          <p className={styles.todayBriefMeaning}><b>{recovery.summaryText}</b> 신뢰도 {recovery.confidenceText}.</p>
+        </div>
+        <div className={cn(styles.todayBriefSkeleton, isContentReady ? styles.todayBriefSkeletonOut : undefined)} aria-hidden='true'>
+          <span className={styles.todayBriefSkeletonBar} />
+          <span className={styles.todayBriefSkeletonBar} />
+        </div>
+      </div>
+    </article>
+  )
+}
+
 export function TodayBriefingCard({
   currentPriceText,
   currentPriceCurrency,
@@ -385,6 +459,7 @@ export function TodayBriefingCard({
   briefingSnapshot,
   tradingVolumeText,
   consensus,
+  consensusEmptyState,
   dailyCloses,
   seedKey,
 }: {
@@ -401,6 +476,8 @@ export function TodayBriefingCard({
   briefingSnapshot?: LoadingBriefingSnapshot | null
   tradingVolumeText?: string | null
   consensus?: LoadingQuickFact['consensus']
+  /** 컨센서스 데이터가 없는 일반 종목의 빈 상태 문구 — 없으면(로딩 중·ETF) 항목 전체를 숨긴다 */
+  consensusEmptyState?: string | null
   dailyCloses?: Array<number | null | undefined>
   seedKey?: string
 }) {
@@ -570,6 +647,14 @@ export function TodayBriefingCard({
         <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Calendar} question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
         <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={TrendingUp} question='단기 흐름은요?' data={<span className={shortFlow.tone === 'up' ? styles.todayUp : shortFlow.tone === 'down' ? styles.todayDown : styles.todayBlue}>{shortFlow.label}</span>} meaning={shortFlow.meaning} />
         <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Target} question='내 자리는 어디쯤일까요?' data={<span className={financialToneClass(positionPct)}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
+        {briefingSnapshot?.recoveryForecast && isFiniteNumber(needToBreakeven) ? (
+          <TodayRecoveryForecastBriefing
+            at={briefStartSeconds[2]}
+            elapsedSeconds={elapsedSeconds}
+            forceReady={forceReady}
+            recovery={briefingSnapshot.recoveryForecast}
+          />
+        ) : null}
         <TodayMarketBriefing
           at={briefStartSeconds[3]}
           elapsedSeconds={elapsedSeconds}
@@ -636,7 +721,22 @@ export function TodayBriefingCard({
             ) : null}
           </article>
           )
-        })() : null}
+        })() : consensusEmptyState ? (
+          <article
+            className={cn(styles.todayBriefItem, (forceReady || elapsedSeconds >= consensusAt) ? styles.todayBriefItemIn : undefined, styles.todayBriefConsensusItem)}
+            data-today-briefing-item='true'
+          >
+            <div className={styles.todayBriefQuestionRow}>
+              <span className={styles.todayBriefIcon} aria-hidden='true'><Telescope className='size-[13px]' /></span>
+              <span className={styles.todayBriefQuestion}>애널리스트 목표가는 어디쯤일까?</span>
+            </div>
+            {forceReady || elapsedSeconds >= consensusAt + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS ? (
+              <div className={styles.consensusInsight}>
+                <p className={styles.consensusSummary}>{consensusEmptyState}</p>
+              </div>
+            ) : null}
+          </article>
+        ) : null}
       </div>
     </section>
   )
