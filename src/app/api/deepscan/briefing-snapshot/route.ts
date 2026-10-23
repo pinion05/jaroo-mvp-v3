@@ -386,6 +386,9 @@ async function buildRecoveryForecastSummary(args: {
       confidenceText: block.confidenceText,
       expectedRecoveryDays: block.expectedRecoveryDays ?? null,
       recoveryProbabilityPct: block.recoveryProbabilityPct ?? null,
+      targetPrice: block.targetPrice ?? null,
+      priceHistory: block.priceHistory,
+      similarPatternSamples: block.similarPatternSamples,
       modelRows: block.modelRows.map((row) => row.sampleText
         ? { label: row.label, recoveryDaysText: row.recoveryDaysText, probabilityText: row.probabilityText, sampleText: row.sampleText }
         : { label: row.label, recoveryDaysText: row.recoveryDaysText, probabilityText: row.probabilityText }),

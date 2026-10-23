@@ -76,6 +76,13 @@ const lossBriefingSnapshot = {
     confidenceText: '보통',
     expectedRecoveryDays: 74,
     recoveryProbabilityPct: 61.1,
+    targetPrice: 38634,
+    priceHistory: lossDaily.map((row) => ({ date: row.date, close: row.close })),
+    similarPatternSamples: [
+      { date: lossDaily[10].date, close: lossDaily[10].close, drawdownPct: 12.4, recoveryDays: 38, recovered: true },
+      { date: lossDaily[34].date, close: lossDaily[34].close, drawdownPct: 19.8, recoveryDays: null, recovered: false },
+      { date: lossDaily[51].date, close: lossDaily[51].close, drawdownPct: 26.1, recoveryDays: 71, recovered: true },
+    ],
     modelRows: [
       { label: '유사 패턴', recoveryDaysText: '96거래일', probabilityText: '60.3%', sampleText: '63건' },
       { label: '일반 주가 변동', recoveryDaysText: '57거래일', probabilityText: '58.2%' },

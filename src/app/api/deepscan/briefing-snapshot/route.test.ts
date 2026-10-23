@@ -205,6 +205,13 @@ test('briefing snapshot attaches recovery forecast for a loss position when aver
   assert.match(recovery.summaryText, /도달한 사례만/)
   assert.equal(recovery.modelRows.length, 3)
   assert.deepEqual(recovery.modelRows.map((row: { label: string }) => row.label), ['유사 패턴', '일반 주가 변동', '급등락 반영'])
+  // 차트 재료(1년 종가 계열 + 유사 패턴 샘플)도 함께 내려간다.
+  assert.equal(recovery.targetPrice, 12500)
+  assert.ok(Array.isArray(recovery.priceHistory))
+  assert.equal(recovery.priceHistory.length, 252)
+  assert.ok(recovery.priceHistory.every((point: { close: number }) => Number.isFinite(point.close)))
+  assert.ok(Array.isArray(recovery.similarPatternSamples))
+  assert.ok(recovery.similarPatternSamples.length >= 1, '파형 계열에서 유사 패턴 샘플이 잡혀야 한다')
 })
 
 test('briefing snapshot omits recovery forecast without averagePrice and for a profit position', async () => {

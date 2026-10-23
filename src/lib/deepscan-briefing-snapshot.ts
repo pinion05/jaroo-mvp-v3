@@ -26,6 +26,9 @@ export type LoadingBriefingRecoveryForecast = {
   confidenceText: string
   expectedRecoveryDays: number | null
   recoveryProbabilityPct: number | null
+  targetPrice: number | null
+  priceHistory?: Array<{ date: string | null; close: number }>
+  similarPatternSamples?: Array<{ date: string | null; close: number; drawdownPct: number; recoveryDays: number | null; recovered: boolean }>
   modelRows: Array<{ label: string; recoveryDaysText: string; probabilityText: string; sampleText?: string }>
 }
 

@@ -47,6 +47,13 @@ import { resolveDeepScanBriefingCardCurrentPrice } from '@/lib/deepscan-loading-
 import { buildDeepScanShortFlow } from '@/lib/deepscan-short-flow'
 import { getVisibleDeepScanBriefingItemCount, isDeepScanBriefingItemContentReady } from '@/lib/deepscan-loading-behavior'
 import { buildConsensusFanGeometry, estimateDailyVolatility } from '@/lib/deepscan-target-price-paths'
+import {
+  buildRecoveryChartGeometry,
+  compactPrice,
+  RECOVERY_CHART_HEIGHT,
+  RECOVERY_CHART_MARGIN,
+  RECOVERY_CHART_WIDTH,
+} from './deepscan-recovery-forecast-card'
 import { cn } from '@/lib/utils'
 import styles from './deepscan-loading-screen.module.css'
 
@@ -376,6 +383,7 @@ export function TodayMarketBriefing({
 export const RECOVERY_FORECAST_DOT_COLORS = ['#E0942A', '#185FA5', '#7A5AF8'] as const
 
 // 원금회수 예측 브리핑 — '내 자리는 어디쯤일까요?' 바로 아래에서 이어지는 후속 질문.
+// 데이터가 확보되면 결과 카드와 같은 1년 차트(평단 점선·유사 패턴 밴드)도 함께 그린다.
 // data-today-briefing-item을 달지 않는다(공개 타이밍 시퀀스·모바일 자동스크롤 인덱스를
 // 밀지 않기 위해 — consensus 항목과 같은 보조 항목 패턴).
 export function TodayRecoveryForecastBriefing({
@@ -397,6 +405,13 @@ export function TodayRecoveryForecastBriefing({
     forceReady,
   })
   const probabilityPct = isFiniteNumber(recovery.recoveryProbabilityPct) ? recovery.recoveryProbabilityPct : null
+  const chartGeometry = recovery.priceHistory && recovery.priceHistory.length >= 3 && isFiniteNumber(recovery.targetPrice)
+    ? buildRecoveryChartGeometry({
+      priceHistory: recovery.priceHistory,
+      samples: recovery.similarPatternSamples,
+      targetPrice: recovery.targetPrice as number,
+    })
+    : null
 
   return (
     <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-recovery='true'>
@@ -418,6 +433,41 @@ export function TodayRecoveryForecastBriefing({
             >
               <div className={styles.recoveryGaugeBar} style={{ width: `${Math.min(100, Math.max(1.5, probabilityPct))}%` }} />
             </div>
+          ) : null}
+          {chartGeometry ? (
+            <svg
+              className={styles.recoveryChartSvg}
+              viewBox={`0 0 ${RECOVERY_CHART_WIDTH} ${RECOVERY_CHART_HEIGHT}`}
+              role='img'
+              aria-label='최근 1년 종가 차트. 파란 점선은 평단가, 호밍색 표시는 유사 과거 패턴 구간이다.'
+            >
+              {chartGeometry.gridlines.map((line) => (
+                <g key={`grid-${line.label}`}>
+                  <line className={styles.recoveryChartGrid} x1={RECOVERY_CHART_MARGIN.left} x2={RECOVERY_CHART_WIDTH - RECOVERY_CHART_MARGIN.right} y1={line.y} y2={line.y} />
+                  <text className={styles.recoveryChartTick} x={RECOVERY_CHART_MARGIN.left - 4} y={line.y + 3} textAnchor='end'>{line.label}</text>
+                </g>
+              ))}
+              {chartGeometry.dateTicks.map((tick) => (
+                <text key={`date-${tick.label}-${tick.x}`} className={styles.recoveryChartTick} x={tick.x} y={RECOVERY_CHART_HEIGHT - 4} textAnchor='middle'>{tick.label}</text>
+              ))}
+              {chartGeometry.bands.map((band) => (
+                <rect key={`band-${band.x}`} className={styles.recoveryChartBand} x={band.x - 3} y={RECOVERY_CHART_MARGIN.top} width='6' height={RECOVERY_CHART_HEIGHT - RECOVERY_CHART_MARGIN.top - RECOVERY_CHART_MARGIN.bottom} rx='1.5'>
+                  <title>{band.title}</title>
+                </rect>
+              ))}
+              {chartGeometry.targetY !== null ? (
+                <g>
+                  <line className={styles.recoveryChartTargetLine} x1={RECOVERY_CHART_MARGIN.left} x2={RECOVERY_CHART_WIDTH - RECOVERY_CHART_MARGIN.right} y1={chartGeometry.targetY} y2={chartGeometry.targetY} />
+                  <text className={styles.recoveryChartTargetText} x={RECOVERY_CHART_WIDTH - RECOVERY_CHART_MARGIN.right} y={chartGeometry.targetY - 3} textAnchor='end'>평단 {compactPrice(recovery.targetPrice ?? 0)}</text>
+                </g>
+              ) : null}
+              <path className={styles.recoveryChartLine} d={chartGeometry.pricePath} />
+              {chartGeometry.currentDot ? (
+                <circle className={styles.recoveryChartDot} cx={chartGeometry.currentDot.x} cy={chartGeometry.currentDot.y} r='3'>
+                  <title>{`현재가`}</title>
+                </circle>
+              ) : null}
+            </svg>
           ) : null}
           <ul className={styles.recoveryModels}>
             {recovery.modelRows.map((row, index) => (

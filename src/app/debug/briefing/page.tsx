@@ -112,6 +112,13 @@ const KR_LOSS_FIXTURE = {
       confidenceText: '보통',
       expectedRecoveryDays: 74,
       recoveryProbabilityPct: 61.1,
+      targetPrice: 38634,
+      priceHistory: KR_LOSS_DAILY.map((row) => ({ date: row.date, close: row.close })),
+      similarPatternSamples: [
+        { date: KR_LOSS_DAILY[10].date, close: KR_LOSS_DAILY[10].close, drawdownPct: 12.4, recoveryDays: 38, recovered: true },
+        { date: KR_LOSS_DAILY[34].date, close: KR_LOSS_DAILY[34].close, drawdownPct: 19.8, recoveryDays: null, recovered: false },
+        { date: KR_LOSS_DAILY[51].date, close: KR_LOSS_DAILY[51].close, drawdownPct: 26.1, recoveryDays: 71, recovered: true },
+      ],
       modelRows: [
         { label: '유사 패턴', recoveryDaysText: '96거래일', probabilityText: '60.3%', sampleText: '63건' },
         { label: '일반 주가 변동', recoveryDaysText: '57거래일', probabilityText: '58.2%' },

@@ -39,11 +39,11 @@ export function readRecoveryForecastForLoss(payload: JarooDeepScanPayload) {
 }
 
 const RECOVERY_MODEL_SWATCH_COLORS = ['#E0942A', '#2B6BE6', '#7A5AF8'] as const
-const RECOVERY_CHART_WIDTH = 320
-const RECOVERY_CHART_HEIGHT = 132
-const RECOVERY_CHART_MARGIN = { top: 8, right: 10, bottom: 16, left: 34 }
+export const RECOVERY_CHART_WIDTH = 320
+export const RECOVERY_CHART_HEIGHT = 132
+export const RECOVERY_CHART_MARGIN = { top: 8, right: 10, bottom: 16, left: 34 }
 
-function compactPrice(value: number) {
+export function compactPrice(value: number) {
   const trimDecimal = (text: string) => text.replace(/\.0$/u, '')
   if (value >= 100_000_000) return `${trimDecimal((value / 100_000_000).toFixed(1))}억`
   if (value >= 10_000) return `${trimDecimal((value / 10_000).toFixed(1))}만`
@@ -64,8 +64,9 @@ type RecoveryChartGeometry = {
 }
 
 // 1년 가격 계열 + 유사 패턴 샘플을 SVG 좌표로 변환한다. 모델이 실제로 본 데이터를
-// 그대로 그리므로 "모델의 근거"가 차트로 드러난다.
-function buildRecoveryChartGeometry(input: {
+// 그대로 그리므로 "모델의 근거"가 차트로 드러난다. 결과 카드와 로딩 브리핑이 같은
+// 지오메트리를 공유한다.
+export function buildRecoveryChartGeometry(input: {
   priceHistory: ReadonlyArray<JarooRecoveryPricePoint>
   samples: ReadonlyArray<JarooRecoverySimilarPatternSample> | undefined
   targetPrice: number
