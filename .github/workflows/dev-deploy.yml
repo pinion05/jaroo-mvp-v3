@@ -1,0 +1,25 @@
+name: dev deploy (Railway)
+
+# dev 브랜치 푸시 → Railway dev 환경 자동 배포.
+# 배경: Railway dev 인스턴스의 GitHub 감시 브랜치가 master로 설정돼 있어 dev 푸시가
+# 네이티브 자동배포를 트리거하지 않는다(2026-10-26 실측). 소스 브랜치 변경은 토큰 권한으로
+# 불가(GitHub App 연동 필요)하므로 Actions에서 railway up으로 확정적으로 배포한다.
+on:
+  push:
+    branches: [dev]
+
+concurrency:
+  group: railway-dev-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Railway CLI
+        run: npm i -g @railway/cli@5
+      - name: Deploy to Railway dev environment
+        env:
+          RAILWAY_API_TOKEN: ${{ secrets.RAILWAY_API_TOKEN }}
+        run: railway up --service jaroo --project 91cdd87e-70d1-4cdc-9805-84ae9b99055d --environment dev --detach --yes
