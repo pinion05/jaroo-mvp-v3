@@ -279,8 +279,11 @@ def build_kr_exchange_product_entries(product_type: str, cmp_typ: str) -> list[d
                 'name': name,
                 'code': normalized_code,
                 'market': product_type.upper(),
+                # ETN은 kind만 'etn' — marketTone은 'etf'를 유지한다(tone 유니언
+                # 확장이 4종 sanitize·PORTFOLIO_MARKET_TONES까지 번지는 것을 피하고
+                # 기존 ETN 파랑 톤 UX와 정합).
                 'marketTone': 'etf',
-                'kind': 'etf',
+                'kind': 'etn' if product_type.upper() == 'ETN' else 'etf',
                 'locale': 'KR',
                 'aliases': build_kr_aliases(name, normalized_code),
             }

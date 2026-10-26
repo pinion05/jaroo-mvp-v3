@@ -66,12 +66,17 @@ import {
 } from './deepscan-loading-utils'
 
 import { resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
+import { createTeamSummaryFetchCoordinator } from '@/lib/deepscan-team-summary-fetch'
 
 import {
   BackControl,
   QuickFactCard,
   TodayBriefingCard,
 } from './deepscan-loading-briefing-card'
+
+// 팀 요약 클라이언트 타임아웃 — 서버 타임아웃(DEEPSCAN_TEAM_SUMMARY_TIMEOUT_MS, 기본 10s)보다
+// 여유를 둬야 서버의 502 응답을 정상 경로로 받을 수 있다.
+const TEAM_SUMMARY_FETCH_TIMEOUT_MS = 15_000
 
 export function DeepScanLoadingScreen({
   name = '선택 종목',
@@ -112,7 +117,7 @@ export function DeepScanLoadingScreen({
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [teamSummaries, setTeamSummaries] = useState<Partial<Record<LoadingStageKey, TeamSummaryState>>>({})
   const [expandedTeamSummaries, setExpandedTeamSummaries] = useState<ReadonlySet<LoadingStageKey>>(() => new Set())
-  const requestedTeamSummariesRef = useRef<Set<string>>(new Set())
+  const teamSummaryFetchCoordinatorRef = useRef(createTeamSummaryFetchCoordinator())
   const teamBridgeRef = useRef<HTMLElement | null>(null)
   const targetLine = [identifier, market].filter(Boolean).join(' · ')
   const exchangeProduct = isExchangeTradedProduct(market, instrumentKind)
@@ -233,17 +238,17 @@ export function DeepScanLoadingScreen({
       : undefined
   ), [isTeamBridgeVisible])
 
+  // 팀 요약 fetch: 스테이지가 갱신돼도 진행 중 요청을 취소하지 않는다. 이전 구현은 effect
+  // 재실행 시 공유 AbortController로 진행 중 fetch를 abort했고, abort된 요청은 상태를
+  // 'error'로조차 바꾸지 않아 UI가 영구히 '요약 중'에 갇혔다. 발사 중복은 코디네이터가 막고,
+  // 같은 팀에 새 요청이 들어오면 이전 요청의 결과는 파기한다. 실패 확정은 서버 타임아웃(10s
+  // 기본)보다 여윈 개별 요청 타임아웃으로만 한다 — 실패 시 '요약 생략'으로 전환된다.
   useEffect(() => {
-    const controller = new AbortController()
-    let stopped = false
+    const pendingRequests = teamSummaryFetchCoordinatorRef.current.claimPendingRequests(teamSummaryRequests)
 
-    teamSummaryRequests.forEach((request) => {
+    pendingRequests.forEach((request) => {
       const { teamKey, inputKey, requestKey } = request
-      if (requestedTeamSummariesRef.current.has(requestKey)) {
-        return
-      }
 
-      requestedTeamSummariesRef.current.add(requestKey)
       setTeamSummaries((previous) => ({
         ...previous,
         [teamKey]: { inputKey, status: 'loading' },
@@ -252,7 +257,7 @@ export function DeepScanLoadingScreen({
       fetch('/api/deepscan/team-summary', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        signal: controller.signal,
+        signal: AbortSignal.timeout(TEAM_SUMMARY_FETCH_TIMEOUT_MS),
         body: JSON.stringify({
           teamKey: request.cardKey,
           teamName: request.analystName,
@@ -268,7 +273,7 @@ export function DeepScanLoadingScreen({
             throw new Error('team summary unavailable')
           }
 
-          if (stopped || controller.signal.aborted) {
+          if (!teamSummaryFetchCoordinatorRef.current.isLatestRequest(teamKey, requestKey)) {
             return
           }
 
@@ -278,7 +283,7 @@ export function DeepScanLoadingScreen({
           }))
         })
         .catch(() => {
-          if (stopped || controller.signal.aborted) {
+          if (!teamSummaryFetchCoordinatorRef.current.isLatestRequest(teamKey, requestKey)) {
             return
           }
 
@@ -288,11 +293,6 @@ export function DeepScanLoadingScreen({
           }))
         })
     })
-
-    return () => {
-      stopped = true
-      controller.abort()
-    }
   }, [exchangeProduct, market, teamSummaryRequests])
 
   return (

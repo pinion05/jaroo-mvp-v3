@@ -66,6 +66,10 @@ const DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_MAX_CHARS = 15_000;
 const DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_MAX_TOTAL_CHARS = 60_000;
 const DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_LIMIT = 20;
 const DEFAULT_DEEPSCAN_KR_DISCLOSURE_DOCUMENT_CONCURRENCY = 4;
+// 소스 하나가 늘어져도(바디 trickle·무응답) 잡 전체와 admission 슬롯이 함께 묶이지
+// 않도록 각 소스 로드에 거는 상한. 2026-10-13 085620 사고: 크롤 21s 후 소스 번들이
+// 252s 무음 정체해 150s 웹 데드라인 504 → 재시도 429로 번졌다.
+const DEFAULT_DEEPSCAN_KR_SOURCE_TIMEOUT_MS = 100_000;
 
 function normalizeText(value) {
   if (typeof value !== 'string') {
@@ -811,6 +815,43 @@ async function captureSource(sourceId, load) {
   }
 }
 
+/**
+ * captureSource + 하드 데드라인 + 콘솔 타이밍 로그.
+ * 개별 fetch의 timeout은 헤더 도착까지만 보장하는 경우가 있어(바디 읽기 무제한)
+ * 소스 수위의 상한이 유일한 안전망이다. 데드라인 초과 시 해당 소스는 issue로
+ * 강등되고 나머지 소스로 보고서를 계속 만든다.
+ */
+async function captureSourceWithDeadline(sourceId, load, deadlineMs) {
+  const startedAtMs = Date.now();
+  let timer = null;
+  const deadline = new Promise((_, reject) => {
+    timer = setTimeout(() => {
+      reject(new Error(`${sourceId} source deadline exceeded after ${deadlineMs}ms`));
+    }, deadlineMs);
+    timer.unref?.();
+  });
+
+  try {
+    const value = await Promise.race([load(), deadline]);
+    console.log(`[deepscan-kr] source ${sourceId} elapsed=${Date.now() - startedAtMs}ms status=ok`);
+    return { value, issue: null };
+  } catch (error) {
+    const message = normalizeText(error?.message) ?? `${sourceId} unavailable`;
+    const timedOut = message.includes('source deadline exceeded');
+    console.log(`[deepscan-kr] source ${sourceId} elapsed=${Date.now() - startedAtMs}ms status=${timedOut ? 'deadline' : 'error'} message=${message}`);
+    return {
+      value: null,
+      issue: { sourceId, message },
+    };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function resolveKrSourceTimeoutMs() {
+  return parsePositiveInteger(process.env.DEEPSCAN_KR_SOURCE_TIMEOUT_MS, DEFAULT_DEEPSCAN_KR_SOURCE_TIMEOUT_MS);
+}
+
 function shouldInvokeKrPackage(rawInput, input) {
   const safeRawInput = asObject(rawInput);
   const packageOptions = asObject(safeRawInput.packageOptions ?? safeRawInput.deepscanPackageOptions);
@@ -1136,12 +1177,21 @@ async function resolveKrSourceBundle(rawInput, input) {
   const tradeDate = normalizeTradeDate(input.selectedAt ?? input.sourceContext.appliedAt);
   const cacheClient = getCrawlerCacheClientFromRawInput(rawInput);
   const cacheOptions = getCrawlerCacheOptions(rawInput);
+  const sourceDeadlineMs = resolveKrSourceTimeoutMs();
+  const bundleStartedAtMs = Date.now();
+  const asValueLoader = (resolver) => async () => {
+    const resolved = await resolver();
+    if (resolved.issue) {
+      throw new Error(resolved.issue.message);
+    }
+    return resolved.value;
+  };
   const [slimResult, quotesResult, packageResult, etfSnapshotResult, disclosuresResult] = await Promise.all([
-    captureSource('slim', async () => loadWiseReportKrSlimSource(input, {
+    captureSourceWithDeadline('slim', () => loadWiseReportKrSlimSource(input, {
       cacheClient,
       ...cacheOptions,
-    })),
-    captureSource('current-quote', async () => getCurrentQuotes({
+    }), sourceDeadlineMs),
+    captureSourceWithDeadline('current-quote', () => getCurrentQuotes({
       codes: input.instrument.code ? [input.instrument.code] : [],
       tickers: input.instrument.ticker ? [input.instrument.ticker] : [],
       ...(tradeDate ? { tradeDate } : {}),
@@ -1149,23 +1199,39 @@ async function resolveKrSourceBundle(rawInput, input) {
       enrichKrVolumeFromKrx: false,
       naverCurrentQuotesTimeoutMs: parsePositiveInteger(
         process.env.DEEPSCAN_KR_CURRENT_QUOTES_TIMEOUT_MS
-          ?? process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS
-          ?? process.env.QUOTES_CURRENT_PROXY_TIMEOUT_MS,
+        ?? process.env.NAVER_CURRENT_QUOTES_TIMEOUT_MS
+        ?? process.env.QUOTES_CURRENT_PROXY_TIMEOUT_MS,
         DEFAULT_DEEPSCAN_KR_CURRENT_QUOTES_TIMEOUT_MS,
       ),
-    })),
-    maybeResolveKrPackageResult(rawInput, input),
-    captureSource('etf-snapshot', async () => (isKrExchangeProductInput(input)
+    }), sourceDeadlineMs),
+    captureSourceWithDeadline('package-result', asValueLoader(() => maybeResolveKrPackageResult(rawInput, input)), sourceDeadlineMs),
+    captureSourceWithDeadline('etf-snapshot', () => (isKrExchangeProductInput(input)
       ? fetchWiseReportEtfSnapshot(input.instrument.code, {
           timeoutMs: parsePositiveInteger(
             process.env.DEEPSCAN_KR_ETF_SNAPSHOT_TIMEOUT_MS
-              ?? process.env.WISEREPORT_ETF_SNAPSHOT_TIMEOUT_MS,
+            ?? process.env.WISEREPORT_ETF_SNAPSHOT_TIMEOUT_MS,
             DEFAULT_DEEPSCAN_KR_ETF_SNAPSHOT_TIMEOUT_MS,
           ),
         })
-      : null)),
-    maybeResolveKrDisclosures(rawInput, input),
+      : null), sourceDeadlineMs),
+    captureSourceWithDeadline('disclosures', asValueLoader(() => maybeResolveKrDisclosures(rawInput, input)), sourceDeadlineMs),
   ]);
+
+  const sourceIssues = [
+    slimResult.issue,
+    quotesResult.issue,
+    packageResult.issue,
+    etfSnapshotResult.issue,
+    disclosuresResult.issue,
+  ].filter(Boolean);
+  const okSources = [
+    slimResult.value ? 'slim' : null,
+    quotesResult.value ? 'quotes' : null,
+    packageResult.value ? 'package' : null,
+    etfSnapshotResult.value ? 'etf' : null,
+    disclosuresResult.value ? 'disclosures' : null,
+  ].filter(Boolean);
+  console.log(`[deepscan-kr] sources bundle elapsed=${Date.now() - bundleStartedAtMs}ms ok=[${okSources.join(',')}] issues=[${sourceIssues.map((issue) => `${issue.sourceId}:${issue.message}`).join(' | ')}]`);
 
   return {
     sources: {
@@ -1175,13 +1241,7 @@ async function resolveKrSourceBundle(rawInput, input) {
       ...(etfSnapshotResult.value ? { etfSnapshot: etfSnapshotResult.value } : {}),
       ...(disclosuresResult.value ? { disclosures: disclosuresResult.value } : {}),
     },
-    sourceIssues: [
-      slimResult.issue,
-      quotesResult.issue,
-      packageResult.issue,
-      etfSnapshotResult.issue,
-      disclosuresResult.issue,
-    ].filter(Boolean),
+    sourceIssues,
   };
 }
 
@@ -2079,6 +2139,23 @@ function buildDisclosureInsightSourceBody(disclosureAnalysis) {
     .join('\n');
 }
 
+// Structured mirror of the disclosure filings behind `sourceBody`, so the watch
+// alert pipeline can diff per-filing instead of reverse-parsing the text body.
+function buildDisclosureInsightLatestFilings(disclosureAnalysis) {
+  if (!Array.isArray(disclosureAnalysis?.latestFilings) || disclosureAnalysis.latestFilings.length === 0) {
+    return [];
+  }
+
+  return disclosureAnalysis.latestFilings
+    .slice(0, 8)
+    .map((filing) => ({
+      receiptDate: typeof filing?.receiptDate === 'string' && filing.receiptDate.trim() ? filing.receiptDate.trim() : null,
+      reportName: typeof filing?.reportName === 'string' && filing.reportName.trim() ? filing.reportName.trim() : null,
+      filerName: typeof filing?.filerName === 'string' && filing.filerName.trim() ? filing.filerName.trim() : null,
+      riskLabel: typeof filing?.riskLabel === 'string' && filing.riskLabel.trim() ? filing.riskLabel.trim() : null,
+    }));
+}
+
 function buildInsights(input, evidence, scored, generatedAt, sourceIssues, options = {}) {
   const dateLabel = (input.selectedAt ?? generatedAt).slice(0, 10);
   const performanceComment = evidence.businessCommentary?.performanceComment ?? null;
@@ -2124,6 +2201,8 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
     : null;
   const disclosureAnalysis = evidence.disclosureAnalysis ?? null;
   const disclosureInsightBody = buildDisclosureInsightBody(disclosureAnalysis);
+  const disclosureSourceBody = buildDisclosureInsightSourceBody(disclosureAnalysis);
+  const disclosureLatestFilings = buildDisclosureInsightLatestFilings(disclosureAnalysis);
   const items = [
     {
       sourceType: evidence.currentQuote ? 'market' : 'system',
@@ -2212,7 +2291,8 @@ function buildInsights(input, evidence, scored, generatedAt, sourceIssues, optio
           label: disclosureAnalysis.riskCount > 0 || disclosureAnalysis.correctionCount > 0 || disclosureAnalysis.dilutionCount > 0 ? '공시주의' : '공시',
           title: `${input.instrument.name} 최근 공시 흐름`,
           body: disclosureInsightBody,
-          ...(buildDisclosureInsightSourceBody(disclosureAnalysis) ? { sourceBody: buildDisclosureInsightSourceBody(disclosureAnalysis) } : {}),
+          ...(disclosureSourceBody ? { sourceBody: disclosureSourceBody } : {}),
+          ...(disclosureLatestFilings.length > 0 ? { latestFilings: disclosureLatestFilings } : {}),
         }]
       : []),
     {
@@ -2410,6 +2490,7 @@ function buildPortfolioSimulation(scored) {
 }
 
 export async function buildJarooDeepScanPayload(rawInput = {}) {
+  const jobStartedAtMs = Date.now();
   try {
     const input = normalizeInput(rawInput);
 
@@ -2418,7 +2499,9 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     }
 
     const generatedAt = deriveGeneratedAt(input);
+    const sourcesStartedAtMs = Date.now();
     const { sources, sourceIssues } = await resolveKrSourceBundle(rawInput, input);
+    console.log(`[deepscan-kr] stage sources elapsed=${Date.now() - sourcesStartedAtMs}ms code=${input.instrument.code ?? input.instrument.ticker ?? 'NA'}`);
     const evidence = isKrInput(input)
       ? buildDeepScanKrEvidencePacket(input, sources)
       : buildDeepScanKrEvidencePacket(input, {});
@@ -2437,7 +2520,9 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     const llmAttempted = isKrInput(input) && shouldInvokeKrCommitteeLlm();
 
     if (llmAttempted) {
+      const committeeStartedAtMs = Date.now();
       const llmCommittee = await scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources);
+      console.log(`[deepscan-kr] stage committee elapsed=${Date.now() - committeeStartedAtMs}ms status=${llmCommittee.status ?? 'NA'} completed=${llmCommittee.completed ?? 0}/${llmCommittee.memberKeys?.length ?? '?'} requestId=${llmCommittee.requestId}`);
       llmCommitteeErrors = llmCommittee.errors;
       llmCommitteePending = Array.isArray(llmCommittee.pending) ? llmCommittee.pending : [];
       llmCommitteeMetadata = {
@@ -2642,8 +2727,10 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
       },
     };
 
+    console.log(`[deepscan-kr] payload ready total=${Date.now() - jobStartedAtMs}ms code=${input.instrument.code ?? input.instrument.ticker ?? 'NA'} degraded=${payload.metadata.degraded === true ? 1 : 0} llm=${llmAttempted ? 'on' : 'off'}`);
     return payload;
-  } catch {
+  } catch (error) {
+    console.error(`[deepscan-kr] payload build failed total=${Date.now() - jobStartedAtMs}ms error=${normalizeText(error?.message) ?? 'unknown'}`);
     return createInternalErrorPayload(rawInput);
   }
 }

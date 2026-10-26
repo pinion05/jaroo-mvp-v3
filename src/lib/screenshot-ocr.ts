@@ -14,7 +14,7 @@ export type OcrRow = {
   resolvedTicker?: string
   resolvedMarket?: string
   resolvedMarketTone?: 'kospi' | 'kosdaq' | 'nasdaq' | 'etf'
-  resolvedKind?: 'stock' | 'etf'
+  resolvedKind?: 'stock' | 'etf' | 'etn'
   code?: string
   ticker?: string
 }
@@ -347,6 +347,52 @@ function normalizeInstrumentCode(value: unknown) {
   return normalized.length > 0 ? normalized : undefined
 }
 
+/** 종류 문자열의 런타임 화이트리스트 — 'stock'|'etf'|'etn'만 통과, 나머지는 undefined.
+ *  sanitizeOcrRows·수정 패널(ocr/page.tsx handleManualFieldChange)이 공유하는 단일
+ *  게이트다 — 'etn'이 여기서 드롭되면 localStorage 세션 복원·수동 편집에서 상품
+ *  유형이 조용히 소실된다(kind 휘발성 회귀 방어). */
+export function normalizeKindChoice(value: unknown): OcrRow['resolvedKind'] {
+  return value === 'stock' || value === 'etf' || value === 'etn' ? value : undefined
+}
+
+/** 시장 표기 → marketTone 추론(순수 함수 — ocr/page.tsx의 컴포넌트 내부 함수에서
+ *  이동·export). 원본 로직 그대로에 includes('ETN')→'etf' 한 줄만 추가했다:
+ *  marketTone 유니언 확장은 결이 남없이 번지므로(HomeMarketTone 등 4종+sanitize
+ *  4곳+PORTFOLIO_MARKET_TONES) ETN은 기존 교환상품 파랑 톤('etf')에 정합시킨다. */
+export function inferMarketTone(market?: string): OcrRow['resolvedMarketTone'] {
+  const normalized = market?.trim().toUpperCase()
+
+  if (!normalized) {
+    return undefined
+  }
+
+  if (normalized === 'KR') {
+    return 'kospi'
+  }
+
+  if (normalized === 'US') {
+    return 'nasdaq'
+  }
+
+  if (normalized.includes('KOSDAQ')) {
+    return 'kosdaq'
+  }
+
+  if (normalized.includes('KOSPI') || normalized.includes('KRX')) {
+    return 'kospi'
+  }
+
+  if (normalized.includes('NASDAQ') || normalized.includes('NYSE') || normalized.includes('AMEX')) {
+    return 'nasdaq'
+  }
+
+  if (normalized.includes('ETF') || normalized.includes('ETN')) {
+    return 'etf'
+  }
+
+  return undefined
+}
+
 export function sanitizeOcrRows(input: unknown): OcrRow[] {
   if (!Array.isArray(input)) {
     return []
@@ -374,7 +420,7 @@ export function sanitizeOcrRows(input: unknown): OcrRow[] {
         item.resolvedMarketTone === 'kospi' || item.resolvedMarketTone === 'kosdaq' || item.resolvedMarketTone === 'nasdaq' || item.resolvedMarketTone === 'etf'
           ? item.resolvedMarketTone
           : undefined
-      const resolvedKind: OcrRow['resolvedKind'] = item.resolvedKind === 'stock' || item.resolvedKind === 'etf' ? item.resolvedKind : undefined
+      const resolvedKind: OcrRow['resolvedKind'] = normalizeKindChoice(item.resolvedKind)
 
       return {
         name,
@@ -419,7 +465,7 @@ export function sanitizeOcrInstrumentCandidates(input: unknown): OcrInstrumentCa
         item.resolvedMarketTone === 'kospi' || item.resolvedMarketTone === 'kosdaq' || item.resolvedMarketTone === 'nasdaq' || item.resolvedMarketTone === 'etf'
           ? item.resolvedMarketTone
           : undefined
-      const resolvedKind: OcrRow['resolvedKind'] = item.resolvedKind === 'stock' || item.resolvedKind === 'etf' ? item.resolvedKind : undefined
+      const resolvedKind: OcrRow['resolvedKind'] = normalizeKindChoice(item.resolvedKind)
       const score = typeof item.score === 'number' && Number.isFinite(item.score) ? item.score : undefined
       const via = typeof item.via === 'string' ? item.via.trim() : undefined
 

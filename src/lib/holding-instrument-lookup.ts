@@ -1,7 +1,7 @@
 import instrumentUniverse from './data/instrument-universe.json'
 import { sanitizeOcrRows, type OcrRow } from './screenshot-ocr'
 
-type InstrumentKind = 'stock' | 'etf'
+type InstrumentKind = 'stock' | 'etf' | 'etn'
 type InstrumentMarketTone = 'kospi' | 'kosdaq' | 'nasdaq' | 'etf'
 type InstrumentLocale = 'KR' | 'US'
 

@@ -516,6 +516,11 @@ test('buildJarooDeepScanPayload adds OpenDART disclosure analysis to KR DeepScan
         '2026-06-01 · 임원ㆍ주요주주특정증권등소유상황보고서 · 제출:하지훈 · 지분 변동',
         '2026-05-15 · 분기보고서 (2026.03) · 제출:삼성전자 · 일반',
       ].join('\n'),
+      latestFilings: [
+        { receiptDate: '2026-06-08', reportName: '최대주주등소유주식변동신고서', filerName: '삼성전자', riskLabel: '지분 변동' },
+        { receiptDate: '2026-06-01', reportName: '임원ㆍ주요주주특정증권등소유상황보고서', filerName: '하지훈', riskLabel: '지분 변동' },
+        { receiptDate: '2026-05-15', reportName: '분기보고서 (2026.03)', filerName: '삼성전자', riskLabel: '일반' },
+      ],
     },
   );
 });
@@ -1033,7 +1038,10 @@ test('buildJarooDeepScanPayload returns partial pending committee at soft deadli
     const match = content.match(/\"member\":\"([^\"]+)\"/);
     const memberKey = match?.[1];
     if (memberKey === 'profitability') {
-      await new Promise((resolve) => setTimeout(resolve, 80));
+      // 소프트 데드라인 동작(10ms에 끊고 pending 처리)과 대기 경로(전체 straggler
+      // 대기)의 차를 충분히 벌린다 — 80ms/70ms 경계는 부하 상황에서 정상 경로도
+      // 어기는 플레이크였다. 정상 경로는 ~수십 ms, 대기 경로는 ≥1500ms.
+      await new Promise((resolve) => setTimeout(resolve, 1500));
     }
 
     return new Response(JSON.stringify({
@@ -1072,7 +1080,7 @@ test('buildJarooDeepScanPayload returns partial pending committee at soft deadli
       sources: createStrongKrSources(),
     });
 
-    assert.ok(Date.now() - startedAt < 70);
+    assert.ok(Date.now() - startedAt < 1000, `soft deadline 경로가 너무 느림: ${Date.now() - startedAt}ms`);
     assert.equal(payload.committee.blockState, 'ok');
     assert.equal(payload.metadata.degraded, true);
     assert.equal(payload.metadata.llmCommittee.status, 'partial');

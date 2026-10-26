@@ -58,14 +58,9 @@ const host = process.env.CRAWLER_HOST || '127.0.0.1';
 
 app.use(express.json());
 
-class HttpError extends Error {
-  constructor(status, message, details = null) {
-    super(message);
-    this.name = 'HttpError';
-    this.status = status;
-    this.details = details;
-  }
-}
+import { HttpError } from './services/http-error.js';
+import { createDeepscanKrAdmission } from './services/deepscan-kr-admission.js';
+import { startDartCorpCodePrefetchScheduler } from './services/dart-corpcode-prefetch.js';
 
 function normalizeValue(value) {
   if (Array.isArray(value)) {
@@ -130,92 +125,7 @@ function parseBooleanQuery(value) {
   return normalizedValue === '1' || normalizedValue === 'true' || normalizedValue === 'yes' || normalizedValue === 'on';
 }
 
-function parsePositiveInteger(value, fallback) {
-  const parsed = Number(value);
-  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
-}
-
-function stableStringify(value) {
-  if (Array.isArray(value)) {
-    return `[${value.map((item) => stableStringify(item)).join(',')}]`;
-  }
-  if (value && typeof value === 'object') {
-    return `{${Object.keys(value).sort().map((key) => `${JSON.stringify(key)}:${stableStringify(value[key])}`).join(',')}}`;
-  }
-  return JSON.stringify(value ?? null);
-}
-
-const deepscanKrJobs = new Map();
-const activeDeepscanKrCodes = new Map();
-
-function buildDeepscanKrJobKey(input) {
-  return stableStringify({
-    schema: 'jaroo.deepscan.kr.canonical.v1',
-    instrument: {
-      code: input.instrument?.code ?? null,
-      ticker: input.instrument?.ticker ?? null,
-      market: input.instrument?.market ?? null,
-      kind: input.instrument?.kind ?? null,
-    },
-    holding: input.holding ?? null,
-    selectedAt: input.selectedAt ?? null,
-    sourceContext: input.sourceContext ?? null,
-    disclosureOptions: input.disclosureOptions ?? null,
-  });
-}
-
-async function runDeepscanKrWithAdmission(input, load) {
-  if (process.env.DEEPSCAN_KR_EXECUTION_DISABLED === '1') {
-    throw new HttpError(503, 'KR DeepScan execution disabled', {
-      status: 'unavailable',
-      retryable: true,
-    });
-  }
-
-  const jobKey = buildDeepscanKrJobKey(input);
-  const existing = deepscanKrJobs.get(jobKey);
-  if (existing) {
-    return existing.promise;
-  }
-
-  const code = String(input.instrument?.code ?? input.instrument?.ticker ?? 'unknown');
-  const globalLimit = parsePositiveInteger(process.env.DEEPSCAN_KR_GLOBAL_JOBS, 1);
-  const perCodeLimit = parsePositiveInteger(process.env.DEEPSCAN_KR_PER_CODE_JOBS, 1);
-  const activeForCode = activeDeepscanKrCodes.get(code) ?? 0;
-
-  if (deepscanKrJobs.size >= globalLimit || activeForCode >= perCodeLimit) {
-    throw new HttpError(429, 'KR DeepScan crawler is busy', {
-      status: 'busy',
-      reason: deepscanKrJobs.size >= globalLimit ? 'global_limit' : 'per_code_limit',
-      retryAfterMs: parsePositiveInteger(process.env.DEEPSCAN_KR_BUSY_RETRY_AFTER_MS, 2000),
-    });
-  }
-
-  activeDeepscanKrCodes.set(code, activeForCode + 1);
-  const startedAt = Date.now();
-  const promise = (async () => {
-    try {
-      return await load();
-    } finally {
-      const nextActiveForCode = Math.max(0, (activeDeepscanKrCodes.get(code) ?? 1) - 1);
-      if (nextActiveForCode === 0) {
-        activeDeepscanKrCodes.delete(code);
-      } else {
-        activeDeepscanKrCodes.set(code, nextActiveForCode);
-      }
-      deepscanKrJobs.delete(jobKey);
-      console.log(`[${SERVICE_NAME}] deepscan-kr job complete code=${code} durationMs=${Date.now() - startedAt}`);
-    }
-  })();
-
-  deepscanKrJobs.set(jobKey, {
-    code,
-    startedAt: new Date().toISOString(),
-    promise,
-  });
-
-  return promise;
-}
+const deepscanKrAdmission = createDeepscanKrAdmission({ serviceName: SERVICE_NAME });
 
 const DEEPSCAN_MAJOR_BLOCK_KEYS = Object.freeze([
   'hero',
@@ -3091,7 +3001,7 @@ const endpointDefinitions = [
         return buildJarooDeepScanPayload(input);
       }
 
-      return runDeepscanKrWithAdmission(input, () => buildJarooDeepScanPayload(input));
+      return deepscanKrAdmission.run(input, () => buildJarooDeepScanPayload(input));
     },
   },
   {
@@ -3164,7 +3074,7 @@ const endpointDefinitions = [
   {
     id: 'etf-profile',
     resource: 'etf.profile',
-    description: '한국 ETF 프로필 — 네이버 구성종목/기본정보와 위세리포트 상품정보를 병합합니다.',
+    description: '한국 ETF/ETN 프로필 — 네이버 구성종목/기본정보와 위세리포트 상품정보를 병합합니다(ETN은 instrumentType etn 구분).',
     primaryPath: buildDataSourcePath('naver-wisereport', '/kr/etf/:code/profile'),
     dataSources: ['naver-finance', 'wisereport'],
     params: ['code'],
@@ -3172,6 +3082,11 @@ const endpointDefinitions = [
     count: (data) => Array.isArray(data?.holdings) ? data.holdings.length : 0,
     handler: async (req) => {
       try {
+        // ETF('EF')·ETN('EN') 프로필 모두 반환한다 — ETN은 instrumentType 'etn'으로
+        // 구분된다. /api/etf/profile의 원장 기록(appendEtfHistory)은 웹 쓰기 경로에서
+        // isEtfLedgerPayload가 instrumentType 'etn'을 거부하므로 ETF 원장 오염 없이
+        // 화면 표시용 프로필로 흘린다(런타임 실측 시나리오 #1·#2 — /etf?code=530092가
+        // invalid 카드가 아니라 발행사·기초지수·보수 프로필을 렌더해야 한다).
         return await fetchEtfProfile(req.params.code);
       } catch (error) {
         if (error?.code === 'NOT_ETF') {
@@ -3375,6 +3290,8 @@ const isDirectExecution = process.argv[1] && fileURLToPath(import.meta.url) === 
 if (isDirectExecution) {
   app.listen(port, host, () => {
     console.log(`[${SERVICE_NAME}] listening on ${host}:${port}`);
+    // corpCode 프리페치(하루 1회·디스크 캐시) — 요청 경로의 수 분짜리 다운로드를 흡수한다.
+    startDartCorpCodePrefetchScheduler();
   });
 }
 

@@ -5,6 +5,8 @@
  * - 종목코드 → DART 고유번호: OpenDART `/api/corpCode.xml` ZIP
  */
 
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { inflateRawSync } from 'node:zlib';
 import {
   OPEN_DART_DISCLOSURE_DETAIL_TYPES,
@@ -17,6 +19,15 @@ import {
 
 const OPEN_DART_BASE_URL = 'https://opendart.fss.or.kr/api';
 const DART_CORP_CODE_CACHE_TTL_MS = 24 * 60 * 60 * 1000;
+// corpCode.xml.zip(~3.5MB)은 미국 리전에서 DART가 ~13KB/s로 쓰로틀해 완전 수신에
+// 수 분이 걸린다(2026-10-13 실측). 요청 경로에서는 짧게 끊고, 백그라운드
+// 프리페치(하루 1회, 장 타임아웃)가 디스크 캉시를 채운다.
+const DART_CORP_CODE_REQUEST_TIMEOUT_MS = 5_000;
+// 디스크 캐시는 프로세스 재시작에도 살아야 하므로 메모리 TTL보다 넉넉히.
+// 프리페치가 매일 갱신하므로 정상 상태 체류는 ~24h, 프리페치 실패가 이어져도
+// 최대 7일까지 낡은 목록으로 서비스한다(신규 상장만 놓칠 뿐 기존 종목은 정상).
+const DART_CORP_CODE_DISK_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DART_CORP_CODE_DISK_DIR = join(process.cwd(), '.omx', 'cache', 'dart-corpcode');
 const DART_LIST_CACHE_TTL_MS = 5 * 60 * 1000;
 const DART_DEFAULT_LOOKBACK_DAYS = 90;
 const DART_DEFAULT_TIMEOUT_MS = 30_000;
@@ -520,7 +531,10 @@ async function mapWithConcurrency(items, concurrency, worker) {
   return results;
 }
 
-async function fetchWithTimeout(url, { fetchImpl = fetch, timeoutMs = DART_DEFAULT_TIMEOUT_MS, headers = {} } = {}) {
+// fetchWithTimeout은 응답 헤더까지만 타임아웃을 보장한다 — 이후 json()/arrayBuffer()/
+// 스트림 바디 읽기가 무제한 대기할 수 있다(corpCode.xml.zip ~7MB 등 대용량 바디에서
+// 실제로 잡을 묶은 전례). fetch + 바디 소비 전체를 하나의 데드라인으로 감싼다.
+async function withDartDeadline(url, { fetchImpl = fetch, timeoutMs = DART_DEFAULT_TIMEOUT_MS, headers = {} } = {}, consume) {
   const controller = timeoutMs > 0 ? new AbortController() : null;
   const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
 
@@ -532,8 +546,11 @@ async function fetchWithTimeout(url, { fetchImpl = fetch, timeoutMs = DART_DEFAU
       },
       signal: controller?.signal,
     });
-    return response;
+    return await consume(response);
   } catch (error) {
+    if (error instanceof DartDisclosureError) {
+      throw error;
+    }
     if (error?.name === 'AbortError') {
       throw new DartDisclosureError('OpenDART request timed out', {
         status: 504,
@@ -611,25 +628,23 @@ async function fetchDartJson(path, params, opts = {}) {
     return cached.value;
   }
 
-  const response = await fetchWithTimeout(url, opts);
-  if (!response.ok) {
-    throw new DartDisclosureError(`OpenDART HTTP ${response.status}`, {
-      status: response.status >= 500 ? 502 : response.status,
-      code: 'provider_http_error',
-      details: { providerStatus: response.status, url: redactDartUrl(url.toString()) },
-    });
-  }
+  const data = await withDartDeadline(url, opts, (response) => {
+    if (!response.ok) {
+      throw new DartDisclosureError(`OpenDART HTTP ${response.status}`, {
+        status: response.status >= 500 ? 502 : response.status,
+        code: 'provider_http_error',
+        details: { providerStatus: response.status, url: redactDartUrl(url.toString()) },
+      });
+    }
 
-  let data;
-  try {
-    data = await response.json();
-  } catch (error) {
-    throw new DartDisclosureError('OpenDART returned invalid JSON', {
-      status: 502,
-      code: 'provider_invalid_json',
-      details: { message: error?.message ?? 'invalid json', url: redactDartUrl(url.toString()) },
+    return response.json().catch(() => {
+      throw new DartDisclosureError('OpenDART returned invalid JSON', {
+        status: 502,
+        code: 'provider_invalid_json',
+        details: { message: 'invalid json', url: redactDartUrl(url.toString()) },
+      });
     });
-  }
+  });
 
   listCache.set(cacheKey, { fetchedAt: Date.now(), value: data });
   return data;
@@ -663,22 +678,23 @@ export async function getDartDisclosureDocumentText(rceptNoInput, opts = {}) {
     return cached.value;
   }
 
-  const response = await fetchWithTimeout(url, {
+  const payload = await withDartDeadline(url, {
     ...opts,
     headers: { Accept: 'application/zip, application/xml, text/xml, */*', ...(opts.headers ?? {}) },
-  });
-  if (!response.ok) {
-    throw new DartDisclosureError(`OpenDART document HTTP ${response.status}`, {
-      status: response.status >= 500 ? 502 : response.status,
-      code: 'provider_http_error',
-      details: { providerStatus: response.status, url: redactDartUrl(url.toString()) },
-    });
-  }
+  }, async (response) => {
+    if (!response.ok) {
+      throw new DartDisclosureError(`OpenDART document HTTP ${response.status}`, {
+        status: response.status >= 500 ? 502 : response.status,
+        code: 'provider_http_error',
+        details: { providerStatus: response.status, url: redactDartUrl(url.toString()) },
+      });
+    }
 
-  const payload = await readResponseBodyWithLimit(
-    response,
-    resourcePolicy.maxCompressedBytes,
-  );
+    return readResponseBodyWithLimit(
+      response,
+      resourcePolicy.maxCompressedBytes,
+    );
+  });
   const head = payload.subarray(0, Math.min(payload.length, 800)).toString('utf8').trimStart();
   const xmlStatus = parseOpenDartXmlStatus(head);
   if (xmlStatus && xmlStatus.status !== '000') {
@@ -936,30 +952,327 @@ export function extractFirstXmlFromZipBuffer(bufferLike) {
   });
 }
 
+function resolveCorpCodeRequestTimeoutMs(opts = {}) {
+  if (Number.isFinite(Number(opts.corpCodeTimeoutMs)) && Number(opts.corpCodeTimeoutMs) > 0) {
+    return Math.floor(Number(opts.corpCodeTimeoutMs));
+  }
+  const parsed = Number(process.env.DART_CORP_CODE_REQUEST_TIMEOUT_MS);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.floor(parsed) : DART_CORP_CODE_REQUEST_TIMEOUT_MS;
+}
+
+function resolveCorpCodeDiskTtlMs(opts = {}) {
+  if (Number.isFinite(Number(opts.corpCodeDiskTtlMs)) && Number(opts.corpCodeDiskTtlMs) >= 0) {
+    return Math.floor(Number(opts.corpCodeDiskTtlMs));
+  }
+  const parsed = Number(process.env.DART_CORP_CODE_DISK_TTL_MS);
+  return Number.isFinite(parsed) && parsed >= 0 ? Math.floor(parsed) : DART_CORP_CODE_DISK_TTL_MS;
+}
+
+function resolveCorpCodeDiskPaths(opts = {}, cacheKey) {
+  const dir = typeof opts.corpCodeDiskDir === 'string' && opts.corpCodeDiskDir.trim()
+    ? opts.corpCodeDiskDir.trim()
+    : (process.env.DART_CORP_CODE_DISK_DIR || DART_CORP_CODE_DISK_DIR);
+  const safeKey = cacheKey.replace(/[^a-zA-Z0-9]/g, '-');
+  return {
+    dir,
+    zipPath: join(dir, `${safeKey}.zip`),
+    metaPath: join(dir, `${safeKey}.meta.json`),
+  };
+}
+
+// ── corpCode 원격(Supabase Storage) 캐시 ─────────────────────────────────────
+// Railway는 배포마다 컨테이너 파일시스템이 초기화돼 디스크 캐시가 사라진다.
+// 3.5MB zip을 Supabase Storage(프로젝트와 같은 대륙, 초당 수 MB)에 올려두면
+// 새 컨테이너의 첫 조회도 1~2초 만에 원격에서 회복된다 — 배포 직후 공시 공백 제거.
+// 범용 crawler-cache 테이블(PostgREST RPC)은 다중 MB blob에 부적합해 전용 스토리지를 쓴다.
+const DART_CORP_CODE_REMOTE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const DART_CORP_CODE_REMOTE_TIMEOUT_MS = 30_000;
+const DART_CORP_CODE_REMOTE_BUCKET = 'jaroo-crawler-cache';
+const DART_CORP_CODE_REMOTE_OBJECT_PATH = 'dart-corpcode/corpcode.zip';
+
+function parsePositiveNumberEnv(name, fallback) {
+  const parsed = Number(process.env[name]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function resolveCorpCodeRemoteConfig(opts = {}) {
+  if (['0', 'false', 'off', 'no'].includes(String(process.env.DART_CORP_CODE_REMOTE_CACHE_ENABLE ?? '').trim().toLowerCase())) {
+    return null;
+  }
+
+  const supabaseUrl = normalizeText(opts.supabaseUrl) ?? normalizeText(process.env.SUPABASE_URL);
+  const serviceKey = normalizeText(opts.supabaseServiceKey)
+    ?? normalizeText(process.env.SUPABASE_SERVICE_ROLE_KEY)
+    ?? normalizeText(process.env.SUPABASE_SERVICE_KEY);
+  if (!supabaseUrl || !serviceKey) {
+    return null;
+  }
+
+  return {
+    baseUrl: supabaseUrl.replace(/\/+$/u, ''),
+    serviceKey,
+    bucket: normalizeText(opts.corpCodeRemoteBucket) ?? normalizeText(process.env.DART_CORP_CODE_REMOTE_BUCKET) ?? DART_CORP_CODE_REMOTE_BUCKET,
+    objectPath: DART_CORP_CODE_REMOTE_OBJECT_PATH,
+    timeoutMs: Number(opts.corpCodeRemoteTimeoutMs) > 0
+      ? Math.floor(Number(opts.corpCodeRemoteTimeoutMs))
+      : parsePositiveNumberEnv('DART_CORP_CODE_REMOTE_TIMEOUT_MS', DART_CORP_CODE_REMOTE_TIMEOUT_MS),
+    ttlMs: Number(opts.corpCodeRemoteTtlMs) >= 0
+      ? Math.floor(Number(opts.corpCodeRemoteTtlMs))
+      : parsePositiveNumberEnv('DART_CORP_CODE_REMOTE_TTL_MS', DART_CORP_CODE_REMOTE_TTL_MS),
+    fetchImpl: typeof opts.fetchImpl === 'function' ? opts.fetchImpl : fetch,
+  };
+}
+
+/** fetch + 바디 소비 전체에 데드라인을 거는 소형 헬퍼 (DART 오류 매핑 없음). */
+async function fetchBufferWithDeadline(fetchImpl, url, init, timeoutMs, consume) {
+  const controller = timeoutMs > 0 ? new AbortController() : null;
+  const timer = controller ? setTimeout(() => controller.abort(), timeoutMs) : null;
+  try {
+    const response = await fetchImpl(url, { ...init, ...(controller ? { signal: controller.signal } : {}) });
+    return await consume(response);
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+function remoteObjectUrl(config, bucket, objectPath) {
+  return `${config.baseUrl}/storage/v1/object/${encodeURIComponent(bucket).replace(/%2F/gu, '/')}/${objectPath.split('/').map(encodeURIComponent).join('/')}`;
+}
+
+/** 원격 corpCode 읽기 — miss/stale/오류는 모두 null (침묵 폴백).
+ * 신선도는 Last-Modified 헤더가 아니라 함께 저장하는 meta 객체의 fetchedAt으로
+ * 판정한다 — 이 스토리지의 upsert는 내용을 갱신해도 Last-Modified를 갱신하지
+ * 않는다(2026-10-13 실측), 헤더 기반 TTL은 거짓 만료를 일으킨다. */
+async function readDartCorpCodeRemoteCache(opts) {
+  const config = resolveCorpCodeRemoteConfig(opts);
+  if (!config) {
+    return null;
+  }
+
+  const authHeaders = {
+    apikey: config.serviceKey,
+    authorization: `Bearer ${config.serviceKey}`,
+  };
+
+  try {
+    // 메타 먼저(수백 바이트) — 낡았으면 3.5MB zip까지 내려받지 않는다.
+    const meta = await fetchBufferWithDeadline(
+      config.fetchImpl,
+      remoteObjectUrl(config, config.bucket, `${DART_CORP_CODE_REMOTE_OBJECT_PATH}.meta.json`),
+      { headers: authHeaders },
+      config.timeoutMs,
+      async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+        try {
+          const parsed = JSON.parse(await response.text());
+          const fetchedAt = Number(parsed?.fetchedAt);
+          return Number.isFinite(fetchedAt) ? fetchedAt : null;
+        } catch {
+          return null;
+        }
+      },
+    );
+    if (meta !== null && Date.now() - meta > config.ttlMs) {
+      return null;
+    }
+
+    return await fetchBufferWithDeadline(
+      config.fetchImpl,
+      remoteObjectUrl(config, config.bucket, config.objectPath),
+      { headers: authHeaders },
+      config.timeoutMs,
+      async (response) => {
+        if (!response.ok) {
+          return null;
+        }
+        const payload = Buffer.from(await response.arrayBuffer());
+        if (payload.length === 0) {
+          return null;
+        }
+        // 우선순위: meta 객체 > Last-Modified > 다운로드 시각(보수적 최후 수단).
+        const lastModifiedHeader = response.headers?.get?.('last-modified');
+        const lastModified = lastModifiedHeader ? Date.parse(lastModifiedHeader) : Number.NaN;
+        const fetchedAt = meta
+          ?? (Number.isFinite(lastModified) ? lastModified : Date.now());
+        if (Date.now() - fetchedAt > config.ttlMs) {
+          return null;
+        }
+        return { payload, fetchedAt };
+      },
+    );
+  } catch {
+    return null;
+  }
+}
+
+/** 원격 corpCode 쓰기 — best-effort. 버킷이 없으면 1회 생성 재시도. */
+async function writeDartCorpCodeRemoteCache(opts, payload) {
+  const config = resolveCorpCodeRemoteConfig(opts);
+  if (!config) {
+    return;
+  }
+
+  const uploadObject = (objectPath, body, contentType) => fetchBufferWithDeadline(
+    config.fetchImpl,
+    remoteObjectUrl(config, config.bucket, objectPath),
+    {
+      method: 'POST',
+      headers: {
+        apikey: config.serviceKey,
+        authorization: `Bearer ${config.serviceKey}`,
+        'content-type': contentType,
+        'x-upsert': 'true',
+      },
+      body,
+    },
+    config.timeoutMs,
+    async (response) => response.status,
+  );
+
+  // 버킷 생성 — storage-api 버전에 따라 버킷 관리 라우트가 단수형(/bucket)과
+  // 복수형(/buckets)으로 갈린다(jaroo 프로젝트는 단수형). 단수형 우선, 실패 시 복수형.
+  const ensureBucket = async () => {
+    const createAt = (path) => fetchBufferWithDeadline(
+      config.fetchImpl,
+      `${config.baseUrl}/storage/v1/${path}`,
+      {
+        method: 'POST',
+        headers: {
+          apikey: config.serviceKey,
+          authorization: `Bearer ${config.serviceKey}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ name: config.bucket, public: false }),
+      },
+      config.timeoutMs,
+      async (response) => response.status,
+    ).catch(() => null);
+
+    const singular = await createAt('bucket');
+    if (singular >= 200 && singular < 300) {
+      return true;
+    }
+    const plural = await createAt('buckets');
+    return plural >= 200 && plural < 300;
+  };
+
+  try {
+    let status = await uploadObject(config.objectPath, payload, 'application/zip');
+    if ((status === 404 || status === 400) && await ensureBucket()) {
+      status = await uploadObject(config.objectPath, payload, 'application/zip');
+    }
+    if (status >= 200 && status < 300) {
+      // 신선도 판정은 meta 객체가 책임진다(헤더는 신뢰 불가). 실패는 경고만.
+      const metaStatus = await uploadObject(
+        `${DART_CORP_CODE_REMOTE_OBJECT_PATH}.meta.json`,
+        JSON.stringify({ fetchedAt: Date.now(), byteCount: payload.length }),
+        'application/json',
+      );
+      if (!(metaStatus >= 200 && metaStatus < 300)) {
+        console.warn(`[dart-corpcode] remote cache meta write skipped — status=${metaStatus}`);
+      }
+    } else {
+      console.error(`[dart-corpcode] remote cache write failed — bucket=${config.bucket} status=${status}`);
+    }
+  } catch (error) {
+    console.error(`[dart-corpcode] remote cache write failed — ${error?.message ?? 'unknown'}`);
+  }
+}
+
+/** 디스크 corpCode 캐시 읽기 — 있고 신선하면 { payload } 반환 (파싱은 호출측). */
+async function readDartCorpCodeDiskCache(opts, cacheKey) {
+  const { zipPath, metaPath } = resolveCorpCodeDiskPaths(opts, cacheKey);
+  try {
+    const meta = JSON.parse(await readFile(metaPath, 'utf8'));
+    const fetchedAt = Number(meta?.fetchedAt);
+    if (!Number.isFinite(fetchedAt)) {
+      return null;
+    }
+    if (Date.now() - fetchedAt > resolveCorpCodeDiskTtlMs(opts)) {
+      return null;
+    }
+    const payload = await readFile(zipPath);
+    if (!(payload instanceof Buffer) || payload.length === 0) {
+      return null;
+    }
+    return { payload, fetchedAt };
+  } catch {
+    return null;
+  }
+}
+
+/** 디스크 corpCode 캐시 쓰기 — best-effort, 실패는 캐시 무효로 침묵 통과. */
+async function writeDartCorpCodeDiskCache(opts, cacheKey, payload) {
+  const { dir, zipPath, metaPath } = resolveCorpCodeDiskPaths(opts, cacheKey);
+  try {
+    await mkdir(dir, { recursive: true });
+    await writeFile(zipPath, payload);
+    await writeFile(metaPath, JSON.stringify({ fetchedAt: Date.now(), byteCount: payload.length }));
+  } catch {
+    // 캉시 저장 실패는 프리페치/네트워크 경로 동작에 영향을 주지 않는다.
+  }
+}
+
 export async function getDartCorpCodeList(opts = {}) {
   const apiKey = getDartApiKey(opts);
   const cacheKey = `corpCode:${apiKey.slice(0, 8)}`;
   const cached = corpCodeCache.get(cacheKey);
-  if (cached && Date.now() - cached.fetchedAt < (opts.cacheTtlMs ?? DART_CORP_CODE_CACHE_TTL_MS)) {
+  if (!opts.refresh && cached && Date.now() - cached.fetchedAt < (opts.cacheTtlMs ?? DART_CORP_CODE_CACHE_TTL_MS)) {
     return cached.entries;
+  }
+
+  // 2차 계층 — 디스크 캐시(프리페치가 채워둔 것). 프로세스가 재시작돼도
+  // corpCode 다운로드(수 분)를 요청 경로에서 다시 기다리지 않게 한다.
+  if (!opts.refresh) {
+    const disk = await readDartCorpCodeDiskCache(opts, cacheKey);
+    if (disk) {
+      const xmlFromDisk = extractFirstXmlFromZipBuffer(disk.payload);
+      const entriesFromDisk = parseDartCorpCodeXml(xmlFromDisk);
+      if (entriesFromDisk.length > 0) {
+        corpCodeCache.set(cacheKey, { fetchedAt: disk.fetchedAt, entries: entriesFromDisk });
+        return entriesFromDisk;
+      }
+    }
+  }
+
+  // 3차 계층 — 원격(Supabase Storage) 캐시. 배포로 컨테이너 파일시스템이
+  // 초기화돼도 여기서 1~2초 만에 회복된다(첫 스캔부터 공시 활성).
+  if (!opts.refresh) {
+    const remote = await readDartCorpCodeRemoteCache(opts);
+    if (remote) {
+      const entriesFromRemote = parseDartCorpCodeXml(extractFirstXmlFromZipBuffer(remote.payload));
+      if (entriesFromRemote.length > 0) {
+        corpCodeCache.set(cacheKey, { fetchedAt: remote.fetchedAt, entries: entriesFromRemote });
+        // 원격에서 회복된 사본으로 로컬 디스크까지 덮혀둔다(다음 부팅 디스크 히트).
+        await writeDartCorpCodeDiskCache(opts, cacheKey, remote.payload);
+        return entriesFromRemote;
+      }
+    }
   }
 
   const url = new URL(`${OPEN_DART_BASE_URL}/corpCode.xml`);
   url.searchParams.set('crtfc_key', apiKey);
-  const response = await fetchWithTimeout(url, {
+  const payload = await withDartDeadline(url, {
     ...opts,
+    // corpCode는 list/document와 달리 대용량(수 MB)이라 전용 타임아웃을 쓴다.
+    // 백그라운드 프리페치가 corpCodeTimeoutMs를 크게 주고 들어온다.
+    timeoutMs: resolveCorpCodeRequestTimeoutMs(opts),
     headers: { Accept: 'application/zip, application/xml, text/xml, */*', ...(opts.headers ?? {}) },
+  }, async (response) => {
+    if (!response.ok) {
+      throw new DartDisclosureError(`OpenDART corpCode HTTP ${response.status}`, {
+        status: response.status >= 500 ? 502 : response.status,
+        code: 'provider_http_error',
+        details: { providerStatus: response.status, url: redactDartUrl(url.toString()) },
+      });
+    }
+
+    // corpCode.xml.zip은 ~7MB — 헤더 이후 바디 다운로드가 오래 걸릴 수 있어
+    // 반드시 데드라인 안에서 읽는다.
+    return Buffer.from(await response.arrayBuffer());
   });
-
-  if (!response.ok) {
-    throw new DartDisclosureError(`OpenDART corpCode HTTP ${response.status}`, {
-      status: response.status >= 500 ? 502 : response.status,
-      code: 'provider_http_error',
-      details: { providerStatus: response.status, url: redactDartUrl(url.toString()) },
-    });
-  }
-
-  const payload = Buffer.from(await response.arrayBuffer());
   const xml = extractFirstXmlFromZipBuffer(payload);
   const entries = parseDartCorpCodeXml(xml);
   if (entries.length === 0) {
@@ -970,6 +1283,8 @@ export async function getDartCorpCodeList(opts = {}) {
   }
 
   corpCodeCache.set(cacheKey, { fetchedAt: Date.now(), entries });
+  await writeDartCorpCodeDiskCache(opts, cacheKey, payload);
+  await writeDartCorpCodeRemoteCache(opts, payload);
   return entries;
 }
 
@@ -1294,6 +1609,16 @@ export async function collectDartDisclosures(input = {}, opts = {}) {
 export function clearDartCaches() {
   corpCodeCache.clear();
   listCache.clear();
+}
+
+/** DART API 키가 설정돼 있는지만 확인 — 프리페치 스케줄러 기동 판정용. */
+export function hasDartKeyConfigured(opts = {}) {
+  try {
+    getDartApiKey(opts);
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 export {

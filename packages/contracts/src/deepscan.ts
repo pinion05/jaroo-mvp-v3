@@ -138,6 +138,14 @@ export type JarooDeepScanConsensusStructured = {
   currency?: string | null
 }
 
+/** 공시 분석 카드의 개별 filing 구조화 미러 — receiptDate는 'YYYY-MM-DD' 정규화 후 값. */
+export type JarooDeepScanDisclosureFiling = {
+  receiptDate: string | null
+  reportName: string | null
+  filerName?: string | null
+  riskLabel?: string | null
+}
+
 export type JarooDeepScanInsightItem = {
   sourceType: DeepScanSourceType
   sourceLabel: string
@@ -150,6 +158,8 @@ export type JarooDeepScanInsightItem = {
    *  crawler emits them, so the web client can read values directly instead of
    *  reverse-parsing `body` with regex. */
   consensus?: JarooDeepScanConsensusStructured
+  /** 공시 분석 카드 구조화 미러 — 워치 알림이 sourceBody 역파싱 없이 filing 단위로 읽는다. */
+  latestFilings?: JarooDeepScanDisclosureFiling[] | null
 }
 
 export type JarooDeepScanStrategyScenario = {
@@ -212,6 +222,19 @@ export type JarooDeepScanStrategyBlock = DeepScanBlockMeta & {
   otherScenarioTags: string[]
 }
 
+export type JarooRecoveryPricePoint = {
+  date: string | null
+  close: number
+}
+
+export type JarooRecoverySimilarPatternSample = {
+  date: string | null
+  close: number
+  drawdownPct: number
+  recoveryDays: number | null
+  recovered: boolean
+}
+
 export type JarooDeepScanRecoveryForecastBlock = DeepScanBlockMeta & {
   statusText: string
   summaryText: string
@@ -223,6 +246,16 @@ export type JarooDeepScanRecoveryForecastBlock = DeepScanBlockMeta & {
   drawdownText: string
   modelRows: JarooDeepScanRecoveryForecastModelRow[]
   disclaimer: string
+  /** 수치 원본(히어로 게이지·차트용) — 구형 페이로드에는 없어 화면은 텍스트 폴백 */
+  currentPrice?: number | null
+  targetPrice?: number | null
+  expectedRecoveryDays?: number | null
+  recoveryProbabilityPct?: number | null
+  confidenceLevel?: 'high' | 'medium' | 'low' | null
+  /** 모델 입력에 쓴 가격 계열(최근 252포인트) — 차트 렌더링용 */
+  priceHistory?: JarooRecoveryPricePoint[]
+  /** 유사 패턴이 매칭한 과거 하락 구간(차트 하이라이트용) */
+  similarPatternSamples?: JarooRecoverySimilarPatternSample[]
 }
 
 export type JarooDeepScanSellNowBlock = DeepScanBlockMeta & {

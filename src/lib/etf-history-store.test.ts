@@ -48,8 +48,27 @@ test('isEtfLedgerPayload — ok=false·빈 코드·비ETF 시장을 거부한다
   assert.equal(isEtfLedgerPayload({ ...validProfile, ok: false }), false)
   assert.equal(isEtfLedgerPayload({ ...validProfile, code: '' }), false)
   assert.equal(isEtfLedgerPayload({ ...validProfile, market: 'nasdaq' }), false)
+  assert.equal(isEtfLedgerPayload({ ...validProfile, market: 'tokyo' }), false)
   assert.equal(isEtfLedgerPayload(null), false)
   assert.equal(isEtfLedgerPayload('jaroo-etf-profile-v1'), false)
+})
+
+// ETF 원장 오염 방어(최후 가드) — 상류 크롤러 엔드포인트가 ETN을 400(etn_code)으로
+// 끊는 것이 1차 방벽이지만, 다른 경로가 ETN 200 프로필을 흘릴 경우를 대비한다.
+test('isEtfLedgerPayload — ETN 프로필(instrumentType etn)을 거부한다', () => {
+  assert.equal(isEtfLedgerPayload({ ...validProfile, instrumentType: 'etn' }), false)
+  // 부재·'etf'는 기존 계약 그대로 통과(하위호환: 부재='etf' 해석)
+  assert.equal(isEtfLedgerPayload(validProfile), true)
+  assert.equal(isEtfLedgerPayload({ ...validProfile, instrumentType: 'etf' }), true)
+})
+
+// market null 프로필(위세리포트 스냅샷 부재로 시장 미확정)도 원장 계약을 통과해야
+// 한다 — 가드가 거부하면 재열람 캐시·히스토리 복원에서 조용히 유실된다
+// (무음 실패의 웹 측 재생산).
+test('isEtfLedgerPayload — market null(스냅샷 부재 미확정) 프로필을 통과한다', () => {
+  assert.equal(isEtfLedgerPayload({ ...validProfile, market: null }), true)
+  // 시장 필드 자체 부재(undefined)는 여전히 거부 — 엄격한 === null 매칭
+  assert.equal(isEtfLedgerPayload({ ...validProfile, market: undefined }), false)
 })
 
 test('resolveEtfPriceBasis — 마지막 일봉 종가를 기준가로 내린다', () => {

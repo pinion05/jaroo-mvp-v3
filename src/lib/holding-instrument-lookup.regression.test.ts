@@ -101,7 +101,9 @@ test('대표적인 한국 ETN 이름도 코드까지 매핑한다', () => {
 
     assert.equal(resolved?.name, expectedName, query)
     assert.equal(resolved?.code, expectedCode, query)
-    assert.equal(resolved?.kind, 'etf', query)
+    // 유니버스 교정(2026-10-15) — market 'ETN' 389행의 kind가 'etf'에서 'etn'으로
+    // 정정됐다. 검색 거동(이름→코드 매핑)은 무변화.
+    assert.equal(resolved?.kind, 'etn', query)
     assert.equal(resolved?.market, 'ETN', query)
     assert.equal(resolved?.locale, 'KR', query)
   }

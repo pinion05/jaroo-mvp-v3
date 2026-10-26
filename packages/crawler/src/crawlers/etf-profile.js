@@ -1,6 +1,8 @@
-// 한국 ETF 프로필 수집기 — 네이버 내부 API(구성종목·시세성 기본정보)와
-// 위세리포트 ETF 스냅샷(상품정보·기간별 수익률)을 병합해 jaroo-etf-profile-v1 반환.
-// 웹 EtfProfileJson(스펙 2026-09-15 §4)과 동일 모양. Playwright 불필요 — 경량 fetch.
+// 한국 ETF/ETN 프로필 수집기 — 네이버 내부 API(구성종목·시세성 기본정보·상품
+// 유형 type 게이트)와 위세리포트 스냅샷(상품정보·기간별 수익률·ETN 발행/만기)을
+// 병렬 병합해 jaroo-etf-profile-v1 반환. 웹 EtfProfileJson(스펙 2026-09-15 §4)과
+// 동일 모양 + 선택 필드 instrumentType('etf'|'etn', 부재='etf')·sources.wisereport
+// ('ok'|'empty'|'failed' — 스냅샷 소스 상태 마커). Playwright 불필요 — 경량 fetch.
 
 import { fetchWiseReportEtfSnapshot } from './wisereport-etf.js';
 
@@ -26,9 +28,15 @@ function toFiniteNumber(value) {
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+// 시장은 위세리포트 스냅샷의 marketName에서만 확정한다 — 네이버 price 응답엔
+// 시장 식별자가 없다(069500·229200 실측 모두 sosok:"0"). 스냅샷 부재·인식 불가
+// 시 'kospi'로 추측하는 건 KOSDAQ 상품(229200 KODEX 코스닥150)의 시장을 조용히
+// 오염시키는 무음 반패턴(이슈 #42·PR #60 계열)이므로 null(unknown)이 유일한 정직한 값.
 function mapMarket(snapshot) {
   const marketName = String(snapshot?.product?.marketName ?? '').toLowerCase();
-  return marketName.includes('kosdaq') ? 'kosdaq' : 'kospi';
+  if (marketName.includes('kosdaq')) return 'kosdaq';
+  if (marketName.includes('kospi')) return 'kospi';
+  return null;
 }
 
 function buildHoldings(naverComponent) {
@@ -85,9 +93,40 @@ function buildProduct({ snapshot, naverPrice }) {
   };
 }
 
-export function buildEtfProfile({ code, snapshot = null, naverPrice = null, naverComponent = null, daily = null }) {
+// ETN 상품정보 — WiseReport 스냅샷의 ETN 전용 키에서만 나온다(2026-10-15 실측,
+// ETF.aspx?cmp_cd=530092): EXPENSES(보수), FIRST_ISSUE_DT(최초발행),
+// EXP_TRD_DT(만기), REPAY_UNIT(상환단위), REPAY_COMM(상환수수료).
+// ETF 전용 키(FIRST_SETTLE_DT·TOT_PAY)는 ETN 응답에 부재하고, nav·aum은
+// Naver price 응답에도 없어(ETN 실측 전부 null) null로 둔다.
+function buildEtnProduct({ snapshot }) {
+  const snapshotProduct = snapshot?.product ?? {};
+
+  return {
+    issuerName: snapshotProduct.issuerName || null,
+    baseIndexName: snapshotProduct.baseIndexName || null,
+    totalFeePct: toFiniteNumber(snapshotProduct.expensePct),
+    firstSettleDate: null,
+    aum: null,
+    nav: null,
+    deviationPct: null,
+    issueDate: snapshotProduct.firstIssueDate || null,
+    maturityDate: snapshotProduct.expiryDate || null,
+    repayUnit: toFiniteNumber(snapshotProduct.repayUnit),
+    repayCommissionPct: toFiniteNumber(snapshotProduct.repayCommissionPct),
+  };
+}
+
+export function buildEtfProfile({
+  code,
+  snapshot = null,
+  naverPrice = null,
+  naverComponent = null,
+  daily = null,
+  instrumentType = 'etf',
+}) {
   const normalizedCode = normalizeCode(code);
   const name = String(snapshot?.product?.name || naverPrice?.itemname || normalizedCode);
+  const isEtn = instrumentType === 'etn';
 
   return {
     schemaVersion: 'jaroo-etf-profile-v1',
@@ -95,11 +134,15 @@ export function buildEtfProfile({ code, snapshot = null, naverPrice = null, nave
     name,
     market: mapMarket(snapshot),
     ok: true,
+    // 상품 유형 식별자(하위호환: 부재='etf'). Naver price type 3분류에서 확정.
+    instrumentType: isEtn ? 'etn' : 'etf',
     // quotes/current엔 등락률이 없어서 전일 대비는 네이버 price의 prevChangeRate로 내린다
     quote: { changePct: toFiniteNumber(naverPrice?.prevChangeRate) },
-    product: buildProduct({ snapshot, naverPrice }),
+    product: isEtn ? buildEtnProduct({ snapshot }) : buildProduct({ snapshot, naverPrice }),
     returns: buildReturns(snapshot),
-    holdings: buildHoldings(naverComponent),
+    // ETN은 구성종목이 없다 — Naver ETFComponent가 200+빈 배열을 반환해도(530092
+    // 실측) buildHoldings([])가 []를 세는 결함을 차단하기 위해 null로 고정한다.
+    holdings: isEtn ? null : buildHoldings(naverComponent),
     daily: Array.isArray(daily) && daily.length > 0 ? daily : null,
   };
 }
@@ -159,13 +202,33 @@ export class NotAnEtfError extends Error {
   }
 }
 
+// 위세리포트 스냅샷 — 실패해도 관용(ok:true 유지)하되 무음으로 삼키지 않는다
+// (무음 반패턴 이력: 이슈 #42·PR #60). 흔적을 두 곳에 남긴다:
+//  - 서버 콘솔 warn(코드 + 에러명/메시지) — api-clients.js의 `[태그] 상세` 관행
+//  - 응답 sources.wisereport 마커 'ok' | 'empty' | 'failed'
+//    ok=스냅샷 확보, empty=빈/인식 불가 페이지로 null 해결(wisereport-etf.js),
+//    failed=fetch/파싱 throw. 에러 상세는 공개 엔드포인트라 응답에 실지 않고
+//    로그에만 둔다.
+async function fetchSnapshotWithStatus(code, fetchSnapshot) {
+  try {
+    const snapshot = await fetchSnapshot(code);
+    return snapshot ? { snapshot, status: 'ok' } : { snapshot: null, status: 'empty' };
+  } catch (error) {
+    console.warn(
+      `[etf-profile] wisereport 스냅샷 실패 — 관용 처리(ok:true 유지) code=${code} ` +
+        `error=${error?.name ?? 'Error'}: ${error?.message ?? 'unknown'}`,
+    );
+    return { snapshot: null, status: 'failed' };
+  }
+}
+
 export async function fetchEtfProfile(code, options = {}) {
   const normalizedCode = normalizeCode(code);
   const fetchImpl = options.fetchImpl ?? fetch;
   const timeoutMs = options.timeoutMs ?? DEFAULT_ETF_PROFILE_TIMEOUT_MS;
   const fetchSnapshot = options.fetchSnapshot ?? fetchWiseReportEtfSnapshot;
 
-  const [naverPrice, naverComponent, snapshot, dailyHistory] = await Promise.all([
+  const [naverPrice, naverComponent, snapshotResult, dailyHistory] = await Promise.all([
     fetchNaverJson(`${NAVER_DOMESTIC_DETAIL_BASE}/${normalizedCode}/price`, { fetchImpl, timeoutMs }).catch(
       () => null,
     ),
@@ -173,7 +236,7 @@ export async function fetchEtfProfile(code, options = {}) {
       fetchImpl,
       timeoutMs,
     }).catch(() => null),
-    fetchSnapshot(normalizedCode).catch(() => null),
+    fetchSnapshotWithStatus(normalizedCode, fetchSnapshot),
     fetchNaverDailyHistory(normalizedCode, { fetchImpl, timeoutMs }).catch(() => null),
   ]);
 
@@ -181,13 +244,27 @@ export async function fetchEtfProfile(code, options = {}) {
     throw new Error(`etf profile unavailable: naver price missing for ${normalizedCode}`);
   }
 
-  // ETF 전용 신호(nav/iNav/운용사)가 전혀 없으면 상장 주식 코드 — ETF 프로필로
-  // 내보내면 안 된다(QA ISSUE-001: 주식 코드가 ok:true 프로필로 반환됨).
-  const hasEtfSignal =
-    naverPrice.nav != null || naverPrice.inav != null || Boolean(String(naverPrice.issuerNameKo ?? '').trim());
-  if (!hasEtfSignal) {
+  // 상품 유형은 Naver price 응답의 type 필드로만 확정한다(2026-10-15 실측:
+  // 069500='EF', 530092 삼성 인버스 ETN='EN', 005930='ST'). 구 hasEtfSignal
+  // 휴리스틱(nav/inav/issuerNameKo 존재 검사)은 ETN이 셋 전부 null이라 ETN을
+  // 주식으로 오판해 NotAnEtfError로 죽이던 결함 — 폐지. type 부재·미인식 값도
+  // 거부한다(휴리스틱 부활 금지 — 결정론 3분류만 쓴다). 주식(ST)은 기존대로
+  // NotAnEtfError(QA ISSUE-001 회귀 방지).
+  const instrumentType =
+    naverPrice.type === 'EF' ? 'etf' : naverPrice.type === 'EN' ? 'etn' : null;
+  if (!instrumentType) {
     throw new NotAnEtfError(normalizedCode);
   }
 
-  return buildEtfProfile({ code: normalizedCode, snapshot, naverPrice, naverComponent, daily: dailyHistory });
+  // buildEtfProfile은 순수 데이터 빌더로 유지 — 실패 지식이 있는 fetch 레이어에서
+  // 마커를 부착한다(스키마 v1의 하위호환 선택 필드).
+  const profile = buildEtfProfile({
+    code: normalizedCode,
+    snapshot: snapshotResult.snapshot,
+    naverPrice,
+    naverComponent,
+    daily: dailyHistory,
+    instrumentType,
+  });
+  return { ...profile, sources: { wisereport: snapshotResult.status } };
 }

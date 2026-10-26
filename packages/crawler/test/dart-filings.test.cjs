@@ -104,6 +104,11 @@ test('getDartDisclosures resolves stock code to corp_code and normalizes filings
   const { clearDartCaches, getDartDisclosures } = await import('../src/crawlers/dart-filings.js');
   clearDartCaches();
   const requestedUrls = [];
+  // corpCode 디스크 캐시를 테스트 전용 임시 디렉토리로 격리 — 기본 디렉토리를
+  // 쓰면 실행 간 캐시가 남아 네트워크 호출 수 단언(2회)이 깨진다.
+  const { mkdtempSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join: joinPath } = require('node:path');
 
   const result = await getDartDisclosures({
     code: '005930.KS',
@@ -115,6 +120,7 @@ test('getDartDisclosures resolves stock code to corp_code and normalizes filings
     limit: 2,
   }, {
     apiKey: 'test-dart-key',
+    corpCodeDiskDir: mkdtempSync(joinPath(tmpdir(), 'dart-test-disclosures-')),
     fetchImpl: async (url) => {
       const parsed = new URL(String(url));
       requestedUrls.push(parsed);
@@ -571,5 +577,281 @@ test('kr-stock-disclosures endpoint is registered and returns standard envelope'
     assert.equal(body.data.filings[0].rceptNo, '20260515000001');
   } finally {
     definition.handler = originalHandler;
+  }
+});
+
+test('getDartCorpCodeList persists corpCode to disk cache and serves it without network', async () => {
+  const { clearDartCaches, getDartCorpCodeList } = await import('../src/crawlers/dart-filings.js');
+  const { mkdtempSync, existsSync, readFileSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join: joinPath } = require('node:path');
+
+  const diskDir = mkdtempSync(joinPath(tmpdir(), 'dart-corpcode-test-'));
+  clearDartCaches();
+
+  const makeFetch = (calls) => async (url) => {
+    const parsed = new URL(String(url));
+    if (!parsed.pathname.endsWith('/corpCode.xml')) {
+      throw new Error(`unexpected url ${parsed.pathname}`);
+    }
+    calls.push(parsed.pathname);
+    return new Response(CORP_CODE_XML, { status: 200, headers: { 'Content-Type': 'application/xml' } });
+  };
+
+  const firstCalls = [];
+  const first = await getDartCorpCodeList({ apiKey: 'disk-key', fetchImpl: makeFetch(firstCalls), corpCodeDiskDir: diskDir });
+  assert.equal(first.length, 2);
+  assert.equal(firstCalls.length, 1);
+  assert.equal(existsSync(joinPath(diskDir, 'corpCode-disk-key.zip')), true, 'zip이 디스크에 저장돼야 한다');
+  const meta = JSON.parse(readFileSync(joinPath(diskDir, 'corpCode-disk-key.meta.json'), 'utf8'));
+  assert.equal(typeof meta.fetchedAt, 'number');
+
+  // 메모리 캐시를 비우고 네트워크가 죽어도(throw) 디스크 캐시로 서비스한다.
+  clearDartCaches();
+  const failingCalls = [];
+  const second = await getDartCorpCodeList({
+    apiKey: 'disk-key',
+    fetchImpl: async () => { failingCalls.push('x'); throw new Error('network down'); },
+    corpCodeDiskDir: diskDir,
+  });
+  assert.equal(second.length, 2);
+  assert.equal(failingCalls.length, 0, '디스크 히트 시 네트워크를 호출하지 않는다');
+});
+
+test('getDartCorpCodeList ignores stale disk cache and refetches', async () => {
+  const { clearDartCaches, getDartCorpCodeList } = await import('../src/crawlers/dart-filings.js');
+  const { mkdtempSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join: joinPath } = require('node:path');
+
+  const diskDir = mkdtempSync(joinPath(tmpdir(), 'dart-corpcode-stale-'));
+  clearDartCaches();
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(new URL(String(url)).pathname);
+    return new Response(CORP_CODE_XML, { status: 200 });
+  };
+
+  await getDartCorpCodeList({ apiKey: 'stale-key', fetchImpl, corpCodeDiskDir: diskDir });
+  assert.equal(calls.filter((p) => p.endsWith('/corpCode.xml')).length, 1);
+
+  // corpCodeDiskTtlMs=0 → 디스크 사본은 즉시 낡은 것으로 간주해 다시 내려받는다.
+  // 단 쓰기-읽기가 같은 밀리초에 끝나면 (0 > 0)이 거짓이라 신선으로 오판하므로
+  // 메타의 fetchedAt을 명시적으로 1초 과거로 되돌려 결정적으로 만든다.
+  const { readFileSync, writeFileSync } = require('node:fs');
+  const metaPath = joinPath(diskDir, 'corpCode-stale-ke.meta.json');
+  const meta = JSON.parse(readFileSync(metaPath, 'utf8'));
+  meta.fetchedAt -= 1000;
+  writeFileSync(metaPath, JSON.stringify(meta));
+  clearDartCaches();
+  await getDartCorpCodeList({ apiKey: 'stale-key', fetchImpl, corpCodeDiskDir: diskDir, corpCodeDiskTtlMs: 0 });
+  assert.equal(calls.filter((p) => p.endsWith('/corpCode.xml')).length, 2);
+});
+
+test('getDartCorpCodeList refresh:true skips memory cache and hits network', async () => {
+  const { clearDartCaches, getDartCorpCodeList } = await import('../src/crawlers/dart-filings.js');
+  const { mkdtempSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join: joinPath } = require('node:path');
+
+  const diskDir = mkdtempSync(joinPath(tmpdir(), 'dart-corpcode-refresh-'));
+  clearDartCaches();
+  const calls = [];
+  const fetchImpl = async (url) => {
+    calls.push(new URL(String(url)).pathname);
+    return new Response(CORP_CODE_XML, { status: 200 });
+  };
+
+  const first = await getDartCorpCodeList({ apiKey: 'refresh-key', fetchImpl, corpCodeDiskDir: diskDir });
+  assert.equal(first.length, 2);
+
+  // 메모리가 신선해도 refresh:true면 네트워크를 다시 당긴다(프리페치 경로).
+  const refreshed = await getDartCorpCodeList({ apiKey: 'refresh-key', fetchImpl, corpCodeDiskDir: diskDir, refresh: true });
+  assert.equal(refreshed.length, 2);
+  assert.equal(calls.filter((p) => p.endsWith('/corpCode.xml')).length, 2);
+});
+
+test('getDartCorpCodeList recovers from the remote Supabase cache on a fresh deployment', async () => {
+  const { clearDartCaches, getDartCorpCodeList } = await import('../src/crawlers/dart-filings.js');
+  const { mkdtempSync, existsSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join: joinPath } = require('node:path');
+
+  const diskDir = mkdtempSync(joinPath(tmpdir(), 'dart-remote-fresh-'));
+  clearDartCaches();
+
+  const dartCalls = [];
+  const storageCalls = [];
+  const fetchImpl = async (url, init) => {
+    const target = String(url);
+    if (target.includes('/storage/v1/object/')) {
+      storageCalls.push(`${init?.method ?? 'GET'} ${target.split('/').slice(-2).join('/')}`);
+      if ((init?.method ?? 'GET') === 'GET') {
+        if (target.endsWith('.meta.json')) {
+          return new Response(JSON.stringify({ fetchedAt: Date.now(), byteCount: 3 }), {
+            status: 200,
+            headers: { 'last-modified': new Date().toUTCString() },
+          });
+        }
+        return new Response(CORP_CODE_XML, {
+          status: 200,
+          headers: { 'last-modified': new Date().toUTCString() },
+        });
+      }
+      return new Response('created', { status: 201 });
+    }
+    if (target.includes('/corpCode.xml')) {
+      dartCalls.push(target);
+      throw new Error('DART unreachable');
+    }
+    throw new Error(`unexpected url ${target}`);
+  };
+
+  const entries = await getDartCorpCodeList({
+    apiKey: 'remote-key',
+    fetchImpl,
+    corpCodeDiskDir: diskDir,
+    supabaseUrl: 'https://fake.supabase.co',
+    supabaseServiceKey: 'fake-service-key',
+  });
+
+  assert.equal(entries.length, 2);
+  assert.equal(dartCalls.length, 0, '원격 캐시 히트 시 DART를 호출하지 않는다');
+  assert.equal(storageCalls.length, 2, '원격 GET은 meta 1회 + zip 1회');
+  assert.equal(existsSync(joinPath(diskDir, 'corpCode-remote-k.zip')), true, '원격 사본으로 디스크를 덥혀둔다');
+});
+
+test('getDartCorpCodeList ignores a stale remote cache and falls back to DART + upload', async () => {
+  const { clearDartCaches, getDartCorpCodeList } = await import('../src/crawlers/dart-filings.js');
+  const { mkdtempSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join: joinPath } = require('node:path');
+
+  const diskDir = mkdtempSync(joinPath(tmpdir(), 'dart-remote-stale-'));
+  clearDartCaches();
+
+  const eightDaysAgoMs = Date.now() - 8 * 24 * 60 * 60 * 1000;
+  const uploads = [];
+  const remoteGets = [];
+  const fetchImpl = async (url, init) => {
+    const target = String(url);
+    if (target.includes('/storage/v1/object/') && (init?.method ?? 'GET') === 'GET') {
+      remoteGets.push(target.endsWith('.meta.json') ? 'meta' : 'zip');
+      if (target.endsWith('.meta.json')) {
+        // 신선도는 meta 객체가 지배한다 — 8일 치 낡음.
+        return new Response(JSON.stringify({ fetchedAt: eightDaysAgoMs }), { status: 200 });
+      }
+      return new Response(CORP_CODE_XML, { status: 200, headers: { 'last-modified': new Date().toUTCString() } });
+    }
+    if (target.includes('/storage/v1/object/')) {
+      uploads.push(init);
+      return new Response('created', { status: 201 });
+    }
+    if (target.includes('/corpCode.xml')) {
+      return new Response(CORP_CODE_XML, { status: 200 });
+    }
+    throw new Error(`unexpected url ${target}`);
+  };
+
+  const entries = await getDartCorpCodeList({
+    apiKey: 'remote-stale-key',
+    fetchImpl,
+    corpCodeDiskDir: diskDir,
+    supabaseUrl: 'https://fake.supabase.co',
+    supabaseServiceKey: 'fake-service-key',
+  });
+
+  assert.equal(entries.length, 2);
+  assert.deepEqual(remoteGets, ['meta'], '메타가 낡았으면 zip은 내려받지 않는다');
+  assert.equal(uploads.length, 2, 'DART 성공 후 zip + meta 업로드');
+  assert.equal(uploads[0].headers['x-upsert'], 'true');
+});
+
+test('getDartCorpCodeList creates the storage bucket once when upload hits 404', async () => {
+  const { clearDartCaches, getDartCorpCodeList } = await import('../src/crawlers/dart-filings.js');
+  const { mkdtempSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join: joinPath } = require('node:path');
+
+  const diskDir = mkdtempSync(joinPath(tmpdir(), 'dart-remote-bucket-'));
+  clearDartCaches();
+
+  const calls = [];
+  let uploadAttempts = 0;
+  const fetchImpl = async (url, init) => {
+    const target = String(url);
+    const method = init?.method ?? 'GET';
+    if (target.includes('/storage/v1/object/') && method === 'GET') {
+      return new Response('not found', { status: 404 });
+    }
+    if (target.includes('/storage/v1/object/')) {
+      uploadAttempts += 1;
+      const isMeta = target.endsWith('.meta.json');
+      calls.push(`upload-${uploadAttempts}(${isMeta ? 'meta' : 'zip'})`);
+      return uploadAttempts === 1 ? new Response('not found', { status: 404 }) : new Response('created', { status: 201 });
+    }
+    if (target.includes('/storage/v1/bucket')) {
+      // 단수형/복수형 모두 잡는다 — 실제 라우트는 배포에 따라 다르다.
+      calls.push(`create-bucket:${target.split('/storage/v1/')[1] ?? ''}`);
+      return target.endsWith('/storage/v1/bucket') ? new Response('ok', { status: 201 }) : new Response('not found', { status: 404 });
+    }
+    if (target.includes('/corpCode.xml')) {
+      return new Response(CORP_CODE_XML, { status: 200 });
+    }
+    throw new Error(`unexpected url ${target}`);
+  };
+
+  const entries = await getDartCorpCodeList({
+    apiKey: 'remote-bucket-key',
+    fetchImpl,
+    corpCodeDiskDir: diskDir,
+    supabaseUrl: 'https://fake.supabase.co',
+    supabaseServiceKey: 'fake-service-key',
+  });
+
+  assert.equal(entries.length, 2);
+  assert.deepEqual(
+    calls,
+    ['upload-1(zip)', 'create-bucket:bucket', 'upload-2(zip)', 'upload-3(meta)'],
+    '업로드 404 → 버킷 생성(단수형 우선) → zip 재시도 → meta 업로드',
+  );
+});
+
+test('getDartCorpCodeList skips the remote layer when disabled by env', async () => {
+  const { clearDartCaches, getDartCorpCodeList } = await import('../src/crawlers/dart-filings.js');
+  const { mkdtempSync } = require('node:fs');
+  const { tmpdir } = require('node:os');
+  const { join: joinPath } = require('node:path');
+
+  const saved = process.env.DART_CORP_CODE_REMOTE_CACHE_ENABLE;
+  process.env.DART_CORP_CODE_REMOTE_CACHE_ENABLE = '0';
+  try {
+    const diskDir = mkdtempSync(joinPath(tmpdir(), 'dart-remote-off-'));
+    clearDartCaches();
+    const storageCalls = [];
+    const fetchImpl = async (url, init) => {
+      const target = String(url);
+      if (target.includes('/storage/v1/')) {
+        storageCalls.push(target);
+        throw new Error('storage must not be called');
+      }
+      return new Response(CORP_CODE_XML, { status: 200 });
+    };
+
+    const entries = await getDartCorpCodeList({
+      apiKey: 'remote-off-key',
+      fetchImpl,
+      corpCodeDiskDir: diskDir,
+      supabaseUrl: 'https://fake.supabase.co',
+      supabaseServiceKey: 'fake-service-key',
+    });
+    assert.equal(entries.length, 2);
+    assert.equal(storageCalls.length, 0, '비활성 플래그 시 스토리지를 건드리지 않는다');
+  } finally {
+    if (saved === undefined) {
+      delete process.env.DART_CORP_CODE_REMOTE_CACHE_ENABLE;
+    } else {
+      process.env.DART_CORP_CODE_REMOTE_CACHE_ENABLE = saved;
+    }
   }
 });

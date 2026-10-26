@@ -42,7 +42,7 @@ export function deriveAveragePriceFromCurrentPrice(currentPrice: number, profitR
   return Number.isFinite(averagePrice) && averagePrice > 0 ? averagePrice : null
 }
 
-function buildQuoteLookupKeyFromReviewRow(
+export function buildQuoteLookupKeyFromReviewRow(
   row: Pick<OcrReviewRow, 'resolvedMarketTone' | 'resolvedCode' | 'resolvedTicker' | 'code' | 'ticker'>,
 ) {
   if (row.resolvedMarketTone === 'nasdaq') {

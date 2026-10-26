@@ -193,6 +193,32 @@ test('parseEtfProfileCacheInfo reads only explicit cache-hit markers', () => {
   assert.equal(parseEtfProfileCacheInfo(null), null)
 })
 
+// market null 프로필(위세리포트 스냅샷 부재로 시장 미확정)도 ready 상태를 만든다 —
+// page.tsx:538 표기 변경(시장 배지 생략)의 모델측 안전망. kospi 위조 없음.
+test('buildEtfPageState builds ready state with market null (snapshot-missing profile)', () => {
+  const briefing = parseEtfBriefingSnapshotResponse(briefingBody)
+  assert.ok(briefing)
+  const nullMarketProfile: EtfProfileJson = {
+    ...profileFixture,
+    market: null,
+    sources: { wisereport: 'empty' },
+    holdings: [{ rank: 1, code: '005930', name: '삼성전자', weightPct: 32.63, changePct: null }],
+  }
+
+  const state = buildEtfPageState(okTarget, briefing, nullMarketProfile)
+  assert.equal(state.phase, 'ready')
+  if (state.phase === 'ready') {
+    assert.equal(state.market, null)
+    // vm 빌드 정상 — 미확정 시장도 국내 경로(sourceText '네이버 제공 기준')
+    const topHoldings = state.vm.topHoldings
+    assert.equal(topHoldings.notice, null)
+    if (topHoldings.notice === null) {
+      assert.equal(topHoldings.headline.sourceText, '네이버 제공 기준')
+    }
+    assert.equal(state.vm.hero.price, '104,275원')
+  }
+})
+
 test('buildEtfPageState annotates cache hits with restoredAt and price drift vs live quote', () => {
   const briefing = parseEtfBriefingSnapshotResponse(briefingBody)
   assert.ok(briefing)

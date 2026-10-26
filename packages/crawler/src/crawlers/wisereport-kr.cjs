@@ -126,14 +126,24 @@ async function getCrawl(targetCode, options = {}) {
 async function getCrawlV12(targetCode, options = {}) {
   const aggregate = await crawlWiseReportKrV12(targetCode, options);
 
-  // 컨센서스 폴백: fnguide 투자의견 페이지 장애('페이지가 없습니다') 시
-  // 네이버 증권 데이터를 opinion 페이지에 주입해 목표주가·투자의견을 회복한다.
+  // 컨센서스 폴백: fnguide 투자의견 페이지가 깨졌거나('페이지가 없습니다') 목표가
+  // 데이터가 비어 있으면 네이버 증권 데이터를 opinion 페이지에 주입해 목표주가·
+  // 투자의견을 회복한다.
+  // 조건 원복(2026-10-13): '정상 로드됐지만 목표가 없음'을 제외했더니 fnguide에
+  // 목표가 행이 없는 종목의 유일한 출처가 사라져 리포트에서 애널리스트 목표가
+  // 그래프 자체가 증발했다. 폴백 체인 전체에 바디 포함 타임아웃이 걸린 지금은
+  // 빗나가는 폴백도 ~6초 안에 끝나므로(실측) 넓은 조건을 유지해도 안전하다.
   try {
     const opinionPage = aggregate?.normalized?.opinion ?? aggregate?.pages?.opinion;
     const opinionText = JSON.stringify(opinionPage?.bodyTextHead ?? opinionPage ?? '');
-    if (opinionPage && (opinionText.includes('페이지가 없습니다') || !JSON.stringify(opinionPage).includes('목표'))) {
+    const shouldFallback = Boolean(opinionPage)
+      && (opinionText.includes('페이지가 없습니다') || !JSON.stringify(opinionPage).includes('목표'));
+    if (shouldFallback) {
+      const fallbackStartedAtMs = Date.now();
+      logger.info('Crawler', `[naver-consensus-fallback] ${targetCode} | fnguide opinion 불충분(장애/목표가 없음) — 네이버 폴백 시도`);
       const { buildNaverConsensusSyntheticRow } = await import('../services/deepscan-kr-naver-consensus.js');
       const synthetic = await buildNaverConsensusSyntheticRow(targetCode);
+      logger.info('Crawler', `[naver-consensus-fallback] ${targetCode} | 폴백 완료 elapsed=${Date.now() - fallbackStartedAtMs}ms 결과=${synthetic ? '회복' : '데이터 없음'}`);
       if (synthetic) {
         synthetic.bodyTextHead = '네이버 증권 컨센서스 폴백 데이터';
         if (aggregate.normalized) aggregate.normalized.opinion = synthetic;

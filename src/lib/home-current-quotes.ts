@@ -222,13 +222,17 @@ function deriveExchangeProductBadge(changeValue: number | null) {
 }
 
 function applyLiveTone(holding: HomeHolding, changeValue: number | null) {
-  const isEtnHolding = /ETN/i.test(holding.market ?? '')
+  // 레거시 DB 행(kind 'etf', market 'ETN') 호환 유지 — kind 'etn' 우선, market
+  // 표기 탐지가 백스톱이다(자가치유 제외 스코프의 레거시 행도 실시간 톤 보존).
+  const isEtnHolding = holding.kind === 'etn' || /ETN/i.test(holding.market ?? '')
 
   if (changeValue === null) {
     return holding
   }
 
-  if (holding.kind === 'etf') {
+  // ETN은 ETF와 같은 교환상품 톤 블록을 탄다 — 'etn' 미병기 시 아래 ETN 전용
+  // 톤 블록(247-280)이 죽고 stock 톤으로 조용한 회귀가 된다.
+  if (holding.kind === 'etf' || holding.kind === 'etn') {
     const exchangeProductBadge = deriveExchangeProductBadge(changeValue)
     if (!exchangeProductBadge) {
       return holding
@@ -333,7 +337,8 @@ function applyLiveTone(holding: HomeHolding, changeValue: number | null) {
 // 거래정지 종목 표시 — 정지 전 종가로 손익은 계산하되, 상태는 '거래 정지'로 고정한다.
 // 정지 판정 근거는 당일 거래량 0(시세는 ok). 모형 목업의 halt 카드 문법(cardTone 'halt')을 따른다.
 function applyHaltedTone(holding: HomeHolding): HomeHolding {
-  const isEtfHolding = holding.kind === 'etf'
+  // ETN 만기·상환 정지 카드도 ETF와 같은 signalTone/blink 표기를 쓴다.
+  const isEtfHolding = holding.kind === 'etf' || holding.kind === 'etn'
 
   return {
     ...holding,
@@ -360,7 +365,8 @@ export function shouldTreatQuoteFailureAsErrorCard(
   holding: Pick<HomeHolding, 'kind'>,
   kind: HomeHoldingQuoteErrorKind,
 ) {
-  if (kind === 'quote-unavailable' && holding.kind === 'etf') {
+  // ETN도 시세 실패 관용(오류카드화하지 않는다) — 미병기 시 ETN만 오류카드화 회귀.
+  if (kind === 'quote-unavailable' && (holding.kind === 'etf' || holding.kind === 'etn')) {
     return false
   }
 
@@ -419,7 +425,7 @@ export function buildHomeHoldingErrorCard(holding: HomeHolding, kind: HomeHoldin
     badge: label,
     badgeTone: 'red',
     cardTone: 'danger',
-    signalTone: holding.kind === 'etf' ? 'etf' : 'danger',
+    signalTone: holding.kind === 'etf' || holding.kind === 'etn' ? 'etf' : 'danger',
     change: label,
     pnl: '-',
     centerScore: '오류',
@@ -430,7 +436,7 @@ export function buildHomeHoldingErrorCard(holding: HomeHolding, kind: HomeHoldin
     heatmapMeta: kind === 'fx-required' ? '수익률 대기' : '재시도 필요',
     heatmapBadge: label,
     heatmapBadgeTone: 'red',
-    blink: holding.kind === 'etf' ? undefined : true,
+    blink: holding.kind === 'etf' || holding.kind === 'etn' ? undefined : true,
     opinionLabel: '오류 안내',
     opinionText: description,
     opinionBackground: '#FFF0F0',

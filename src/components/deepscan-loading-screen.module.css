@@ -926,13 +926,17 @@
   gap: 5px;
 }
 
+/* 현재가 — 차트의 부채꼴 분기점 닷(consensusFanCurrentDot)과 동일한 회색 점.
+   점선 라인 마커는 '내 평단'과 구분되지 않아 혼동을 줬다(#UI 피드백 2026-10-13). */
 .consensusFanLegendCurrent i {
   display: inline-block;
-  width: 14px;
-  height: 0;
-  border-top: 1.5px dashed var(--ds-muted);
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--ds-muted);
 }
 
+/* 내 평단 — 차트의 평단 기준선(consensusFanAvgLine, 회색 점선)과 동일. */
 .consensusFanLegendAvgPrice i {
   display: inline-block;
   width: 14px;
@@ -2990,6 +2994,118 @@
 
 .todayBlue {
   color: var(--ds-blue);
+}
+
+/* 원금회수 예측 브리핑(내 자리 후속 항목) */
+.recoveryProbText {
+  color: var(--ds-blue);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.recoveryGaugeTrack {
+  height: 6px;
+  margin-top: 7px;
+  border-radius: 3px;
+  background: #f5f6f8;
+  overflow: hidden;
+}
+
+.recoveryGaugeBar {
+  height: 100%;
+  border-radius: 3px;
+  background: var(--ds-blue);
+}
+
+.recoveryModels {
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.recoveryModelRow {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  padding: 2.5px 0;
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.recoveryModelDot {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  transform: translateY(-1px);
+}
+
+.recoveryModelName {
+  color: var(--ds-ink);
+  font-weight: 750;
+}
+
+.recoveryModelDays {
+  color: var(--ds-mid);
+}
+
+.recoveryModelSample {
+  color: var(--ds-muted);
+  font-size: 9.5px;
+}
+
+.recoveryModelProb {
+  margin-left: auto;
+  color: var(--ds-mid);
+  font-weight: 700;
+}
+
+/* 원금회수 예측 1년 차트(결과 카드와 같은 지오메트리, 브리핑 토큰 적용) */
+.recoveryChartSvg {
+  display: block;
+  width: 100%;
+  margin-top: 9px;
+}
+
+.recoveryChartGrid {
+  stroke: #f1f3f6;
+  stroke-width: 1;
+}
+
+.recoveryChartTick {
+  fill: var(--ds-muted);
+  font-size: 8px;
+}
+
+.recoveryChartBand {
+  fill: #f0a73b;
+  fill-opacity: 0.28;
+  stroke: #e0942a;
+  stroke-width: 0.5;
+}
+
+.recoveryChartTargetLine {
+  stroke: var(--ds-blue);
+  stroke-width: 1.2;
+  stroke-dasharray: 4 3;
+}
+
+.recoveryChartTargetText {
+  fill: var(--ds-blue);
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.recoveryChartLine {
+  fill: none;
+  stroke: var(--ds-ink);
+  stroke-width: 1.4;
+}
+
+.recoveryChartDot {
+  fill: #c13030;
+  stroke: #fff;
+  stroke-width: 1.2;
 }
 
 @keyframes today-chart-area-reveal {

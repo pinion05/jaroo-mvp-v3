@@ -168,12 +168,11 @@ async function callOpenRouterTeamSummary(input: Parameters<TeamSummaryRequester>
     signal: AbortSignal.timeout(timeoutMs),
     body: JSON.stringify({
       model,
-      provider: {
-        order: ['Cerebras'],
-        quantizations: ['fp16'],
-        allow_fallbacks: false,
-      },
-      reasoning: { effort: 'minimal', exclude: true },
+      // 프로바이더 고정(Cerebras/fp16) 제거: gpt-oss-120b 시절 최적화였으나
+      // qwen/qwen3.8-flash는 OpenRouter에서 Alibaba 엔드포인트만 있어 고정 시 요청 전체가 실패한다.
+      // qwen3.8-flash는 effort:'minimal'을 무시하고 completion 예산 전부를 사고에 소진해 JSON이
+      // 비는 사고가 나므로(2026-10-12 실측, OCR #224 계열과 동일 증상) enabled:false로 사고를 끈다.
+      reasoning: { enabled: false, exclude: true },
       include_reasoning: false,
       temperature: 0.1,
       max_tokens: DEEPSCAN_TEAM_SUMMARY_MAX_TOKENS,
@@ -190,7 +189,7 @@ async function callOpenRouterTeamSummary(input: Parameters<TeamSummaryRequester>
     }),
   })
 
-  const result = await response.json().catch(() => null) as { choices?: Array<{ message?: { content?: unknown } }>; error?: { message?: string } } | null
+  const result = await response.json().catch(() => null) as { choices?: Array<{ message?: { content?: unknown } }>; provider?: unknown; error?: { message?: string } } | null
   if (!response.ok || result?.error?.message) {
     throw new Error(result?.error?.message ?? `OpenRouter team summary failed (${response.status})`)
   }
@@ -205,7 +204,7 @@ async function callOpenRouterTeamSummary(input: Parameters<TeamSummaryRequester>
     summary: cleanupTeamSummaryForInstrument(summary, input),
     elapsedMs: Date.now() - startedAt,
     model,
-    provider: 'Cerebras/fp16',
+    provider: typeof result?.provider === 'string' && result.provider ? result.provider : 'openrouter-auto',
   }
 }
 
@@ -226,22 +225,27 @@ export async function createDeepScanTeamSummaryResponse(
   try {
     const result = await requester({ teamKey, teamName, body: rawBody, market: market ?? undefined, instrumentKind: instrumentKind ?? undefined })
     const summary = cleanupTeamSummaryForInstrument(result.summary, { market: market ?? undefined, instrumentKind: instrumentKind ?? undefined })
+    // 관측 공백 해소(2026-10-06): 이 라우트는 로그를 남기지 않아 응답 지연 원인을
+    // journalctl에서 추적할 수 없었다. elapsedMs는 요청자가 계산해 전달한다.
+    console.log(`[team-summary] ok { teamKey: '${teamKey}', elapsedMs: ${result.elapsedMs ?? 'n/a'}, provider: '${result.provider ?? 'unknown'}' }`)
     return NextResponse.json({
       ok: true,
       teamKey,
       teamName,
       summary,
       model: result.model ?? process.env.DEEPSCAN_TEAM_SUMMARY_MODEL ?? DEEPSCAN_TEAM_SUMMARY_MODEL,
-      provider: result.provider ?? 'Cerebras/fp16',
+      provider: result.provider ?? 'openrouter-auto',
       elapsedMs: result.elapsedMs,
     })
   } catch (error) {
+    const message = error instanceof Error ? error.message : 'team summary failed'
+    console.error(`[team-summary] fail { teamKey: '${teamKey}', message: ${JSON.stringify(message)} }`)
     return NextResponse.json(
       {
         ok: false,
         teamKey,
         teamName,
-        error: { message: error instanceof Error ? error.message : 'team summary failed' },
+        error: { message },
       },
       { status: 502 },
     )

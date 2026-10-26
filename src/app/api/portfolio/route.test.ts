@@ -52,3 +52,7 @@ test('portfolio API는 enum과 numeric bound를 검증한다', () => {
   assert.equal(getPortfolioRowsValidationError([{ ...validRow, average_price_currency: 'EUR' }]), 'rows[0].average_price_currency has an unsupported value.')
   assert.equal(getPortfolioRowsValidationError([{ ...validRow, sort_order: 1.5 }]), 'rows[0].sort_order must be an integer.')
 })
+
+test('portfolio API는 kind etn 행을 허용한다(유니버스 389종 교정 수용)', () => {
+  assert.equal(getPortfolioRowsValidationError([{ ...validRow, kind: 'etn', market: 'ETN', market_tone: 'etf' }]), '')
+})

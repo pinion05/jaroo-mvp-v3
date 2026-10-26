@@ -56,3 +56,6 @@ supabase/.temp/
 /artifacts/
 /.gstack/
 /.reports/
+
+*storybook.log
+storybook-static

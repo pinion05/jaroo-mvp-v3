@@ -16,6 +16,22 @@ export type LoadingBriefingMarketIndex = {
   asOf?: string | null
 }
 
+// 로딩 브리핑용 원금회수 예측 요약 — 딥스캔 결과 recoveryForecast 블록의 표시 서브셋.
+// 손실 구간(현재가 < 평단)이고 일봉 계열이 확보될 때만 붙는다.
+export type LoadingBriefingRecoveryForecast = {
+  statusText: string
+  summaryText: string
+  expectedRecoveryDaysText: string
+  recoveryProbabilityText: string
+  confidenceText: string
+  expectedRecoveryDays: number | null
+  recoveryProbabilityPct: number | null
+  targetPrice: number | null
+  priceHistory?: Array<{ date: string | null; close: number }>
+  similarPatternSamples?: Array<{ date: string | null; close: number; drawdownPct: number; recoveryDays: number | null; recovered: boolean }>
+  modelRows: Array<{ label: string; recoveryDaysText: string; probabilityText: string; sampleText?: string }>
+}
+
 export type LoadingBriefingSnapshot = {
   code?: string
   ticker?: string
@@ -43,6 +59,7 @@ export type LoadingBriefingSnapshot = {
     nasdaq?: LoadingBriefingMarketIndex | null
     vix?: LoadingBriefingMarketIndex | null
   }
+  recoveryForecast?: LoadingBriefingRecoveryForecast | null
   sourceStatus?: {
     daily?: 'ok' | 'error'
     stockBasic?: 'ok' | 'error'
@@ -52,9 +69,20 @@ export type LoadingBriefingSnapshot = {
   sources?: string[]
 }
 
+export type LoadingBriefingStreakRun = {
+  direction: 'up' | 'down'
+  count: number
+}
+
 export type LoadingBriefingStreak = {
   direction: 'up' | 'down' | 'flat'
   count: number
+  /**
+   * 현재 연속 흐름 직전의 마지막 방향 구간(사이의 플랫 봉은 건너뛴다).
+   * 반대 방향일 수도 같은 방향일 수도 있으며 '하락하다 오늘 첫 상승' 같은
+   * 맥락 구분에 쓰고, 직전 구간을 알 수 없으면 null.
+   */
+  previous: LoadingBriefingStreakRun | null
 }
 
 export function isFiniteNumber(value: unknown): value is number {
@@ -102,23 +130,46 @@ function getDailyMoveDirection(rows: LoadingBriefingDailyRow[], index: number): 
   return row.close > previous.close ? 'up' : 'down'
 }
 
+/** startIndex 직전(과거 방향)부터 플랫 봉을 건너뛰고 마지막 연속 구간을 센다. */
+function findBriefingRunEndingBefore(rows: LoadingBriefingDailyRow[], startIndex: number): LoadingBriefingStreakRun | null {
+  let index = startIndex - 1
+  while (index >= 0 && getDailyMoveDirection(rows, index) === 'flat') {
+    index -= 1
+  }
+  if (index < 0) {
+    return null
+  }
+
+  const direction = getDailyMoveDirection(rows, index)
+  if (direction === 'flat') {
+    return null
+  }
+
+  let count = 0
+  while (index >= 0 && getDailyMoveDirection(rows, index) === direction) {
+    count += 1
+    index -= 1
+  }
+
+  return { direction, count }
+}
+
 export function calculateBriefingShortStreak(rows: LoadingBriefingDailyRow[]): LoadingBriefingStreak {
   if (rows.length < 2) {
-    return { direction: 'flat', count: 0 }
+    return { direction: 'flat', count: 0, previous: null }
   }
 
   const direction = getDailyMoveDirection(rows, rows.length - 1)
   if (direction === 'flat') {
-    return { direction: 'flat', count: 0 }
+    return { direction: 'flat', count: 0, previous: findBriefingRunEndingBefore(rows, rows.length - 1) }
   }
 
   let count = 0
-  for (let index = rows.length - 1; index > 0; index -= 1) {
-    if (getDailyMoveDirection(rows, index) !== direction) {
-      break
-    }
+  let index = rows.length - 1
+  while (index >= 0 && getDailyMoveDirection(rows, index) === direction) {
     count += 1
+    index -= 1
   }
 
-  return { direction, count }
+  return { direction, count, previous: findBriefingRunEndingBefore(rows, index + 1) }
 }

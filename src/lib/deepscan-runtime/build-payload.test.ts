@@ -169,6 +169,12 @@ test('buildDeepScanRecoveryForecastBlock returns a deepscan-ready 원금회수 b
   assert.equal(block.targetPriceText, '$121.00')
   assert.equal(block.modelRows.length, 3)
   assert.match(block.disclaimer, /투자 권유/)
+  // 수치 원본·차트 재료(히어로 게이지·1년 차트 렌더링용)가 함께 내려간다.
+  assert.equal(block.currentPrice, 100)
+  assert.equal(block.targetPrice, 121)
+  assert.equal(block.confidenceLevel === null || ['high', 'medium', 'low'].includes(block.confidenceLevel ?? ''), true)
+  assert.ok(Array.isArray(block.priceHistory) && block.priceHistory.length === 10)
+  assert.deepEqual(block.priceHistory?.[0], { date: '2026-01-01', close: 121 })
 })
 
 test('describeMomentumProvenance는 provider별 OHLC 문구를 맞춘다', () => {
@@ -324,6 +330,40 @@ test('KR DeepScan crawler canonical URL preserves ETN market as etn kind even wi
   assert.match(url, /kind=etn/)
 })
 
+test('KR DeepScan crawler canonical URL은 market KOSPI 표기에서도 명시 kind etn을 유지한다', () => {
+  // 유니버스 교정 후 ETN 행은 market KOSPI/KOSDAQ + kind etn으로 내려온다 —
+  // 크롤러 이름 정규식 추론에 의존하지 않고 kind=etn이 전달돼야 한다.
+  const url = buildKrDeepScanCrawlerCanonicalUrl({
+    instrument: {
+      name: '삼성 인버스 코스피 200 선물 ETN',
+      code: '530092',
+      market: 'KOSPI',
+      kind: 'etn',
+    },
+    sourceContext: {
+      from: 'holding',
+    },
+  })
+
+  assert.match(url, /market=KOSPI/)
+  assert.match(url, /kind=etn/)
+})
+
+test('buildRawInputFromSearchParams 화이트리스트는 kind=etn을 드롭하지 않는다', async () => {
+  const { buildRawInputFromSearchParams } = await import('./build-payload')
+
+  const rawInput = buildRawInputFromSearchParams(
+    new URLSearchParams('code=530092&name=삼성%20인버스%20ETN&market=KOSPI&kind=etn'),
+  )
+
+  // kind 런타임 화이트리스트(745) 회귀 방어 — 여기서 드롭되면 스냅샷 raw input·
+  // history target_input에서 상품 유형이 조용히 소실된다.
+  assert.equal(rawInput.instrument.kind, 'etn')
+
+  const legacyInput = buildRawInputFromSearchParams(new URLSearchParams('code=005930&kind=bond'))
+  assert.equal(legacyInput.instrument.kind, undefined)
+})
+
 test('KR DeepScan crawler proxy waits and retries busy admission responses', async () => {
   const rawInput: DeepScanRawInput = {
     instrument: {
@@ -400,7 +440,18 @@ test('KR DeepScan crawler proxy times out an unresponsive upstream fetch', async
   await assert.rejects(
     () => buildKrDeepScanPayloadViaCrawler(
       rawInput,
-      (() => new Promise<Response>(() => undefined)) as typeof fetch,
+      // 응답 없는 upstream 흉내 — 단, 영원히 정착하지 않는 promise만 남기면
+      // 유일한 깨어남이 unref 데드라인 타이머(fetchWithDeadline)인 시점에 이벤트
+      // 루프가 먼저 drain되어 node:test가 파일 루트를 'Promise resolution is
+      // still pending'로 취소시키는 플레이크가 있다(나머지 테스트까지 취소됨).
+      // abort 신호에 즉시 거절하고, ref 타이머 안전판을 둬 루프가 못 죽게 한다.
+      ((_input, init) => new Promise<Response>((_, reject) => {
+        const fallback = setTimeout(() => reject(new Error('upstream unresponsive')), 50)
+        init?.signal?.addEventListener('abort', () => {
+          clearTimeout(fallback)
+          reject(new Error('aborted'))
+        })
+      })) as typeof fetch,
       { fetchTimeoutMs: 1 },
     ),
     (error) => error instanceof CrawlerDeepScanRequestError
@@ -537,6 +588,14 @@ test('buildKrDeepScanPayloadViaCrawler recomputes optimistic crawler recovery ou
   const rows = block.modelRows as Array<Record<string, unknown>>
   assert.notEqual(rows[1]?.recoveryDaysText, '15일')
   assert.notEqual(rows[1]?.probabilityText, '100%')
+  // 주입된 일봉 계열이 차트 재료(priceHistory, 최대 252포인트)로 내려간다.
+  const priceHistory = block.priceHistory as Array<{ date: string | null; close: number }>
+  assert.ok(Array.isArray(priceHistory))
+  assert.equal(priceHistory.length, 252)
+  assert.equal(block.currentPrice, 100)
+  assert.equal(block.targetPrice, 150)
+  assert.equal(typeof block.recoveryProbabilityPct, 'number')
+  assert.ok(['high', 'medium', 'low'].includes(String(block.confidenceLevel)))
 })
 
 test('buildKrDeepScanPayloadViaCrawler blocks recovery output when daily history loading fails', async () => {

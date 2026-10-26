@@ -42,6 +42,18 @@ test('ETF: kind=etf면 etf 톤을 잡는다', () => {
   assert.equal(target.marketTone, 'etf')
 })
 
+test('ETN: kind=etn은 복원에서 소실되지 않고 etf 톤을 잡는다', () => {
+  const target = buildDeepScanTargetInputFromHistoryTargetInput({
+    instrument: { name: '삼성 인버스 코스피 200 선물 ETN', code: '530092', market: 'KOSPI', kind: 'etn' },
+    holding: { shares: '10', averagePrice: '3,000' },
+  })
+  assert.ok(target)
+  // normalizeKind 화이트리스트 통과(재진입 복원에서 kind 소실 방어)
+  assert.equal(target.kind, 'etn')
+  // marketTone은 'etf' 유지(tone 유니언 확장 없는 설계 결정)
+  assert.equal(target.marketTone, 'etf')
+})
+
 test('KOSDAQ: kosdaq 톤을 잡는다', () => {
   const target = buildDeepScanTargetInputFromHistoryTargetInput({
     instrument: { name: 'SFA반도체', code: '036540', market: 'KOSDAQ' },

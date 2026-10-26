@@ -236,7 +236,7 @@ export default function DeepScanPage() {
               evaluationAmount: typeof target.evaluationAmount === 'number' ? String(target.evaluationAmount) : undefined,
               usdKrwRate: typeof target.usdKrwRate === 'number' ? String(target.usdKrwRate) : undefined,
               market: target.market ?? target.marketTone?.toUpperCase() ?? '미확인',
-              marketTone: (target.marketTone ?? (target.kind === 'etf' ? 'etf' : 'kospi')) as HomeMarketTone,
+              marketTone: (target.marketTone ?? (target.kind === 'etf' || target.kind === 'etn' ? 'etf' : 'kospi')) as HomeMarketTone,
               kind: target.kind,
             },
             selectedAt: undefined,

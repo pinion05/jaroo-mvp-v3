@@ -17,11 +17,22 @@ export type EtfProfileJson = {
   schemaVersion: 'jaroo-etf-profile-v1'
   code: string
   name: string
-  market: 'kospi' | 'kosdaq' | 'us'
+  /** null = 위세리포트 스냅샷 부재·인식 불가로 시장 미확정 (추측 오염 금지) */
+  market: 'kospi' | 'kosdaq' | 'us' | null
   ok: true
+  /** 상품 유형 식별자(하위호환 선택 필드) — 부재='etf'로 해석한다(etf_scan_history
+   *  기존 payload·캐시 호환). /etf 게이트가 ETN을 거부하므로 렌더 경로엔 'etn'이
+   *  도달하지 않는다 — 타입만 확장하고 표기 분기는 불필요. */
+  instrumentType?: 'etf' | 'etn'
   /** 미국 ETF는 'USD'(기본 KRW — 필드 부재 시 원화) */
   currency?: 'KRW' | 'USD'
   quote?: { changePct: number | null } | null
+  /**
+   * 크롤러 소스 상태 마커(스키마 v1 하위호환 선택 필드) — 위세리포트 스냅샷
+   * 확보 여부. 'ok'=확보, 'empty'=빈/인식 불가 페이지, 'failed'=fetch 실패
+   * (관용 처리됨). 에러 상세는 공개 엔드포인트라 서버 로그에만 있다.
+   */
+  sources?: { wisereport: 'ok' | 'empty' | 'failed' }
   product: {
     issuerName: string | null
     baseIndexName: string | null
@@ -30,6 +41,12 @@ export type EtfProfileJson = {
     aum: number | null
     nav: number | null
     deviationPct: number | null
+    /** ETN 전용(선택) — ETF 프로필엔 없다. issueDate=최초발행, maturityDate=만기 */
+    issueDate?: string | null
+    maturityDate?: string | null
+    /** ETN 전용(선택) — 상환단위·상환수수료 */
+    repayUnit?: number | null
+    repayCommissionPct?: number | null
   }
   returns: { m1: number | null; m3: number | null; m6: number | null; y1: number | null } | null
   holdings: Array<{ rank: number; code: string; name: string; weightPct: number; changePct: number | null }> | null
@@ -115,7 +132,7 @@ export type EtfRiskItem = { label: string; value: string; subtitle: string }
 export type EtfRiskBlock = { notice: null; items: EtfRiskItem[] } | EtfNoticeBlock
 
 export type EtfViewModel = {
-  header: { name: string; code: string; issuer: string; tracking: string }
+  header: { name: string; code: string; issuer: string; tracking: string; instrumentType?: 'etf' | 'etn' }
   hero: {
     name: string
     price: string
@@ -140,6 +157,10 @@ function buildHeroStats(product: EtfProfileJson['product'], currency: EtfProfile
   if (product.totalFeePct != null) stats.push({ label: '총보수', value: `연 ${product.totalFeePct.toFixed(2)}%` })
   if (product.firstSettleDate) {
     stats.push({ label: '설정일', value: product.firstSettleDate.slice(0, 7).replace('-', '.') })
+  }
+  // ETN 전용 — 만기일(상환 예정일). ETF엔 이 필드가 없다(하위호환: 부재 시 스킵).
+  if (product.maturityDate) {
+    stats.push({ label: '만기', value: product.maturityDate.slice(0, 7).replace('-', '.') })
   }
   return stats
 }
@@ -223,9 +244,13 @@ function buildHoldingsBlock(profile: EtfProfileJson): EtfHoldingsBlock {
 }
 
 function buildBasicInfoItems(product: EtfProfileJson['product'], money: EtfMoneyFormatter): EtfBasicInfoItem[] {
+  const isEtn = product.issueDate != null || product.maturityDate != null
   const items: EtfBasicInfoItem[] = []
-  if (product.issuerName) items.push({ label: '운용사', value: product.issuerName })
+  // ETN은 발행사(증권사), ETF는 운용사 — 발행 주체 표기를 상품 유형에 맞게 붙인다.
+  if (product.issuerName) items.push({ label: isEtn ? '발행사' : '운용사', value: product.issuerName })
   if (product.baseIndexName) items.push({ label: '기준지수', value: product.baseIndexName })
+  if (product.issueDate) items.push({ label: '최초발행일', value: product.issueDate })
+  if (product.maturityDate) items.push({ label: '만기일', value: product.maturityDate })
   if (product.nav != null) items.push({ label: 'NAV', value: money(product.nav) })
   if (product.deviationPct != null) items.push({ label: 'NAV 괴리율', value: signedPct(product.deviationPct) })
   return items
@@ -255,6 +280,9 @@ export function buildEtfViewModel(input: {
       code: profile.code,
       issuer: product.issuerName ?? '',
       tracking: product.baseIndexName ? `${product.baseIndexName} 추종` : '',
+      // ETN 렌더 분기용 식별자(부재='etf' — 하위호환). 소비 예: 발행 주체 표기
+      // '운용'(ETF) vs '발행'(ETN).
+      ...(profile.instrumentType ? { instrumentType: profile.instrumentType } : {}),
     },
     hero: {
       name: profile.name,

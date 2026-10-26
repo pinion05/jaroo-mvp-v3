@@ -64,7 +64,7 @@ function EtfProductCard({ vm }: { vm: EtfViewModel }) {
       <div className='px-4 py-5 text-center'>
         <div className='text-[10px] text-[#97A0AE]'>기준지수</div>
         <div className='mt-1 text-[28px] font-black leading-none text-[#0F1419]'>{headline}</div>
-        {vm.header.issuer ? <p className='mt-2 text-[12px] text-[#5A6473]'>{vm.header.issuer} 운용</p> : null}
+        {vm.header.issuer ? <p className='mt-2 text-[12px] text-[#5A6473]'>{vm.header.issuer} {vm.header.instrumentType === 'etn' ? '발행' : '운용'}</p> : null}
       </div>
 
       {stats.length > 0 ? (
@@ -296,7 +296,8 @@ function EtfReadyBody({
   vm: EtfViewModel
   briefing: LoadingBriefingSnapshot
   sharesText: string | null
-  market: 'kospi' | 'kosdaq' | 'us'
+  /** null = 프로필 시장 미확정(위세리포트 스냅샷 부재) — us 비교만 하므로 null-safe */
+  market: 'kospi' | 'kosdaq' | 'us' | null
   committee: EtfCommitteeState
   onCommitteeRetry: () => void
 }) {
@@ -533,9 +534,11 @@ export default function EtfPage() {
   }, [committeeCode, committeeHolding, committeeRetryCount])
 
   const headerName = vm?.header.name ?? 'ETF 분석'
+  // 시장 미확정(market null)이면 시장 세그먼트를 생략한다 — 'kospi'로 위조하는
+  // 오염 표기 대신 정직한 생략(.filter(Boolean)이 null을 드롭).
   const headerTargetLine = vm
     ? [
-        MARKET_LABEL[ready?.market ?? 'kospi'],
+        ready?.market ? MARKET_LABEL[ready.market] : null,
         vm.header.code,
         ready?.holding ? `보유 ${formatShares(ready.holding.shares)}` : null,
       ]

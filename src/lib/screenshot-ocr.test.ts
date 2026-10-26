@@ -4,6 +4,8 @@ import assert from 'node:assert/strict'
 import {
   clearPersistedScreenshotUploadSession,
   computeAveragePrice,
+  inferMarketTone,
+  normalizeKindChoice,
   normalizeOcrProfitAmount,
   normalizeOcrProfitRate,
   normalizeStockName,
@@ -178,4 +180,65 @@ test('readPersistedScreenshotUploadSession rejects malformed payloads', () => {
       value: previousWindow,
     })
   }
+})
+
+// ── kind 'etn' 전파(추출 순수 함수 직접 테스트) ──
+
+test('normalizeKindChoice는 stock/etf/etn만 통과시키고 나머지는 undefined로 만든다', () => {
+  assert.equal(normalizeKindChoice('stock'), 'stock')
+  assert.equal(normalizeKindChoice('etf'), 'etf')
+  assert.equal(normalizeKindChoice('etn'), 'etn')
+  assert.equal(normalizeKindChoice(''), undefined)
+  assert.equal(normalizeKindChoice('bond'), undefined)
+  assert.equal(normalizeKindChoice('ETF'), undefined)
+  assert.equal(normalizeKindChoice(undefined), undefined)
+  assert.equal(normalizeKindChoice(42), undefined)
+})
+
+test('inferMarketTone은 시장 표기를 tone으로 매핑하고 ETN도 etf 톤에 정합시킨다', () => {
+  assert.equal(inferMarketTone('ETN'), 'etf')
+  assert.equal(inferMarketTone('KR ETN'), 'etf')
+  assert.equal(inferMarketTone('ETF'), 'etf')
+  assert.equal(inferMarketTone('KR'), 'kospi')
+  assert.equal(inferMarketTone('KOSDAQ'), 'kosdaq')
+  assert.equal(inferMarketTone('KOSPI'), 'kospi')
+  assert.equal(inferMarketTone('KRX'), 'kospi')
+  assert.equal(inferMarketTone('US'), 'nasdaq')
+  assert.equal(inferMarketTone('NASDAQ'), 'nasdaq')
+  assert.equal(inferMarketTone('NYSE'), 'nasdaq')
+  assert.equal(inferMarketTone('AMEX'), 'nasdaq')
+  assert.equal(inferMarketTone('  kosdaq '), 'kosdaq')
+  assert.equal(inferMarketTone(''), undefined)
+  assert.equal(inferMarketTone(undefined), undefined)
+  assert.equal(inferMarketTone('FRANKFURT'), undefined)
+})
+
+test('sanitizeOcrRows는 localStorage 복원 경로에서 kind etn과 etf tone을 보존한다', () => {
+  const rows = sanitizeOcrRows([
+    {
+      name: '삼성 인버스 코스피 200 선물 ETN',
+      quantity: '10주',
+      profitRate: '+15.8%',
+      evaluationAmount: '34,750원',
+      averagePrice: '3,000원',
+      resolvedKind: 'etn',
+      resolvedMarket: 'KOSPI',
+      resolvedMarketTone: 'etf',
+    },
+    {
+      name: '잘못된 행',
+      quantity: '1주',
+      profitRate: '+1%',
+      evaluationAmount: '1,000원',
+      averagePrice: '1,000원',
+      resolvedKind: 'bond',
+      resolvedMarketTone: 'tokyo',
+    },
+  ])
+
+  assert.equal(rows[0]?.resolvedKind, 'etn')
+  assert.equal(rows[0]?.resolvedMarketTone, 'etf')
+  // 화이트리스트 밖 값은 조용히 통과시키지 않고 undefined로 정규화
+  assert.equal(rows[1]?.resolvedKind, undefined)
+  assert.equal(rows[1]?.resolvedMarketTone, undefined)
 })
