@@ -48,9 +48,15 @@ export default function LoginPage() {
   const loginSuccessPath = nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/home'
 
   // DEV ONLY(dev 배포 전용): 로그인 버튼 클릭 = 고정 QA 계정 즉시 로그인(약관·OAuth 우회).
-  // NEXT_PUBLIC_DEV_AUTO_LOGIN은 dev 배포에서만 '1'로 주입되며, 운영(prod)·로컬에서는
-  // 플래그가 비어 모든 버튼이 기존 OAuth/이메일 동작 그대로 동작한다.
-  const devAutoLoginEnabled = process.env.NEXT_PUBLIC_DEV_AUTO_LOGIN === '1'
+  // 플래그는 런타임 주입(window.__JAROO_ENV__, 레이아웃이 서버 env에서 심음)을 최우선으로
+  // 읽는다 — 빌드타임 NEXT_PUBLIC 인라인이 stale가 되는 배포 특성 회피(2026-10-27).
+  // prod/로컬에서는 값이 비어 모든 버튼이 기존 OAuth/이메일 동작 그대로다.
+  const [devAutoLoginEnabled, setDevAutoLoginEnabled] = useState(false)
+  useEffect(() => {
+    setDevAutoLoginEnabled(
+      window.__JAROO_ENV__?.devAutoLogin === true || process.env.NEXT_PUBLIC_DEV_AUTO_LOGIN === '1',
+    )
+  }, [])
 
   async function tryDevAutoLogin(): Promise<boolean> {
     if (!devAutoLoginEnabled) return false
