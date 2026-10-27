@@ -4,6 +4,11 @@ import './globals.css'
 import { DebugPageNav } from '@/components/debug-page-nav'
 import { buildJarooRuntimeEnvScript } from '@/lib/jaroo-runtime-env'
 
+// 런타임 env 주입(window.__JAROO_ENV__)이 빌드타임 프리렌더에 빈 값으로 구워지지
+// 않도록 요청시 렌더로 강제한다(2026-10-27 실측: x-nextjs-prerender=1에서 {} 주입 확인).
+// 프리렌더 HTML이 s-maxage=1년으로 캐시되던 것도 함께 해소 — 값은 항상 최신 런타임 env.
+export const dynamic = 'force-dynamic'
+
 const notoSansKr = Noto_Sans_KR({
   variable: '--font-noto-sans-kr',
   subsets: ['latin'],
