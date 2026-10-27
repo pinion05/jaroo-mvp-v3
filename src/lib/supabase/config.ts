@@ -1,4 +1,4 @@
-import { readJarooRuntimeEnv } from './jaroo-runtime-env'
+import { readJarooRuntimeEnv } from '../jaroo-runtime-env'
 
 export function getSupabaseUrl(): string {
   // 클라이언트: 루트 레이아웃이 주입한 런타임 env(window.__JAROO_ENV__)를 최우선한다.
