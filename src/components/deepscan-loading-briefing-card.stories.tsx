@@ -70,7 +70,7 @@ const lossBriefingSnapshot = {
   },
   recoveryForecast: {
     statusText: '원금회수 예측',
-    summaryText: '각 모델에서 목표에 도달한 사례만 기준으로 계산한 기간은 약 74거래일이에요.',
+    summaryText: '여러 계산 방식을 종합하면 평균적으로 약 74거래일에 본전에 도달해요.',
     expectedRecoveryDaysText: '약 74거래일',
     recoveryProbabilityText: '61.1%',
     confidenceText: '보통',

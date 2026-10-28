@@ -521,9 +521,9 @@ function buildRecoveryModelRows(forecast: unknown): JarooDeepScanRecoveryForecas
   const models = asRecord(forecastRecord?.models)
   const modelDetails = asRecord(forecastRecord?.modelDetails)
   return [
-    ['similarPattern', '유사 패턴'],
-    ['gbm', '일반 주가 변동'],
-    ['jumpDiffusion', '급등락 반영'],
+    ['similarPattern', '과거 비슷한 흐름'],
+    ['gbm', '평범한 흐름'],
+    ['jumpDiffusion', '출렁이는 흐름'],
   ].map(([key, displayLabel]) => {
     const model = asRecord(models?.[key])
     const detail = asRecord(modelDetails?.[key])
@@ -680,7 +680,7 @@ export function shapeRecoveryForecastBlock(args: {
   const isUnavailable = status === 'unavailable' || !consensus
   const blockState: DeepScanBlockState = isUnavailable ? 'blocked' : 'ok'
   const fallback = status === 'low_confidence'
-    ? createFallback('recovery-low-confidence', '모델간 회수기간 편차가 큽니다.')
+    ? createFallback('recovery-low-confidence', '모델별 결과 차이가 커서 확신이 낮아요.')
     : null
   const error = isUnavailable
     ? createError('recovery-forecast-unavailable', normalizeText(forecastRecord?.reason) ?? '원금회수 예측에 필요한 모델 결과가 부족합니다.', true)
@@ -693,7 +693,7 @@ export function shapeRecoveryForecastBlock(args: {
       ? (error?.message ?? '원금회수 예측을 계산하지 못했어요.')
       : expectedRecoveryDays === 0
         ? '현재가가 이미 평단 이상이라 원금회수 목표에 도달한 상태입니다.'
-        : `각 모델에서 목표에 도달한 사례만 기준으로 계산한 기간은 약 ${formatRecoveryDays(expectedRecoveryDays)}예요.`,
+        : `여러 계산 방식을 종합하면 평균적으로 약 ${formatRecoveryDays(expectedRecoveryDays)}에 본전에 도달해요.`,
     expectedRecoveryDaysText: formatRecoveryDays(expectedRecoveryDays),
     recoveryProbabilityText: formatProbability(recoveryProbabilityPct),
     confidenceText: confidenceLabel,
