@@ -925,6 +925,7 @@ export default function DeepScanPage() {
         currentProfitRate={target?.currentProfitRate}
         snapshotProfitRate={target?.snapshotProfitRate}
         briefingSnapshot={activeLoadingBriefingSnapshot}
+        payloadRecoveryForecast={payload?.recoveryForecast ?? null}
         findingProgress={loadingFindingProgress}
         committeeAxes={payload?.committee.axes}
         quickFacts={loadingQuickFacts}
