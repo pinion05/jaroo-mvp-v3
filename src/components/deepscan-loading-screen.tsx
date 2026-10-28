@@ -380,6 +380,7 @@ export function DeepScanLoadingScreen({
           briefingSnapshot={briefingSnapshot}
           tradingVolumeText={tradingVolumeText}
           consensus={consensusData}
+          consensusPendingSkeleton={!exchangeProduct}
           dailyCloses={briefingDailyCloses}
           seedKey={identifier}
           payloadRecoveryForecast={payloadRecoveryForecast}
