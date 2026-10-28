@@ -1176,14 +1176,34 @@ type RecoveryHistoryLoadResult = {
   error: string | null
 }
 
+/** 입력 평단 문자열('300000', '300,000원' 등)을 안전하게 숫자로. 실패 시 null. */
+function parseKrHoldingAveragePrice(value: unknown): number | null {
+  if (typeof value !== 'string') {
+    return null
+  }
+  const cleaned = value.replace(/[^0-9.]/g, '')
+  if (!cleaned) {
+    return null
+  }
+  const parsed = Number(cleaned)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
 function replaceKrRecoveryForecastWithDailyHistory(
   payload: JarooDeepScanPayload,
   history: RecoveryHistoryLoadResult,
 ): JarooDeepScanPayload {
   const record = payload as unknown as Record<string, unknown>
   const raw = asRecord(record.recoveryForecastRaw)
-  const currentPrice = asFiniteNumber(raw?.currentPrice)
-  const targetPrice = asFiniteNumber(raw?.targetPrice)
+  const series = history.series ?? null
+  // 크롤러(FnGuide 상대수익률) 캡처 실패 시 recoveryForecastRaw의
+  // currentPrice/targetPrice가 null로 내려온다. 이때도 이미 로딩 차트가 쓰는
+  // 네이버 일봉 계열(마지막 종가)과 입력 평단으로 계속 계산한다(2026-10-27
+  // 실측: warnings:2 → priceHistory [] → 카드 미표시. 네이버 일봉은 컨테이너에서 정상).
+  const fallbackCurrentPrice = series && series.length > 0 ? asFiniteNumber(series[series.length - 1]?.close) : null
+  const fallbackTargetPrice = parseKrHoldingAveragePrice(asRecord(asRecord(record.input)?.holding)?.averagePrice)
+  const currentPrice = asFiniteNumber(raw?.currentPrice) ?? fallbackCurrentPrice
+  const targetPrice = asFiniteNumber(raw?.targetPrice) ?? fallbackTargetPrice
   if (currentPrice === null || targetPrice === null) {
     return payload
   }
@@ -1209,7 +1229,9 @@ function replaceKrRecoveryForecastWithDailyHistory(
     recoveryForecastRaw: {
       ...raw,
       forecast,
-      primarySeries: history.series ?? undefined,
+      currentPrice,
+      targetPrice,
+      primarySeries: series ?? undefined,
       sourceId: 'naver-daily-price-history',
       sourceLabel: 'Naver Finance daily price history',
     },
