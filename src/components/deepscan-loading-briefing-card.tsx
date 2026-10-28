@@ -512,6 +512,7 @@ export function TodayBriefingCard({
   tradingVolumeText,
   consensus,
   consensusEmptyState,
+  consensusPendingSkeleton = false,
   dailyCloses,
   seedKey,
   payloadRecoveryForecast,
@@ -531,6 +532,8 @@ export function TodayBriefingCard({
   consensus?: LoadingQuickFact['consensus']
   /** 컨센서스 데이터가 없는 일반 종목의 빈 상태 문구 — 없으면(로딩 중·ETF) 항목 전체를 숨긴다 */
   consensusEmptyState?: string | null
+  /** 스캔 로딩 중(데이터 도착 전) 컨센서스 아이템도 질문+스켈레톤으로 먼저 보여줄지 — 일반 주식만 true */
+  consensusPendingSkeleton?: boolean
   dailyCloses?: Array<number | null | undefined>
   seedKey?: string
   /** 스캔 완료 후 payload의 원금회수 예측 블록 — 브리핑 배열 아이텨으로 그대로 쓴다(우선순위 최상). */
@@ -796,6 +799,25 @@ export function TodayBriefingCard({
                 <p className={styles.consensusSummary}>{consensusEmptyState}</p>
               </div>
             ) : null}
+          </article>
+        ) : consensusPendingSkeleton && !forceReady ? (
+          // 컨센서스 데이터 도착 전(스캔 로딩 중)에도 다른 브리핑 아이템과 같은 리듬으로
+          // 질문 + 스켈레톤을 보여준다(2026-10-28 사용자 지시). 데이터가 끝내 없으면(완료 시점)
+          // 기존대로 항목을 숨긴다 — ETF는 로딩 화면에서 애초에 게이트된다.
+          <article
+            className={cn(styles.todayBriefItem, (forceReady || elapsedSeconds >= consensusAt) ? styles.todayBriefItemIn : undefined, styles.todayBriefConsensusItem)}
+            data-today-briefing-item='true'
+          >
+            <div className={styles.todayBriefQuestionRow}>
+              <span className={styles.todayBriefIcon} aria-hidden='true'><Telescope className='size-[13px]' /></span>
+              <span className={styles.todayBriefQuestion}>애널리스트 목표가는 어디쯤일까?</span>
+            </div>
+            <div className={cn(styles.todayBriefBody, (forceReady || elapsedSeconds >= consensusAt) ? styles.todayBriefBodyIn : undefined)}>
+              <div className={styles.todayBriefSkeleton} aria-hidden='true'>
+                <span className={styles.todayBriefSkeletonBar} />
+                <span className={styles.todayBriefSkeletonBar} />
+              </div>
+            </div>
           </article>
         ) : null}
       </div>
