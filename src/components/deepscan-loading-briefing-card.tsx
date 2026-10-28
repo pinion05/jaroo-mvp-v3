@@ -383,6 +383,29 @@ export function TodayMarketBriefing({
 // 원금회수 예측 섹션 모델 식별색 — 딥스캔 결과 카드(recovery forecast card)와 같은 매핑.
 export const RECOVERY_FORECAST_DOT_COLORS = ['#E0942A', '#185FA5', '#7A5AF8'] as const
 
+// 문구 쉽게(2026-10-28): '20거래일'·'85.3%' 같은 표기에서 숫자를 뽑는다.
+function recoveryNumberFromText(text: string | null | undefined) {
+  if (!text) return null
+  const matched = text.match(/-?\d+(?:\.\d+)?/u)
+  if (!matched) return null
+  const parsed = Number(matched[0])
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const RECOVERY_KOREAN_MONTHS = ['한', '두', '세', '넉', '다섯', '여섯', '일곱', '여덟', '아홉', '열', '열한'] as const
+
+// 거래일을 사람 말로 바꾼다(5거래일≈1주, 21거래일≈1달). 20거래일 → '약 4주'.
+// 레이아웃은 그대로 두고 표기만 돕는 용도 — 데이터 원문(expectedRecoveryDaysText)이 항상 함께 보인다.
+function recoveryFriendlyTradingDays(days: number | null) {
+  if (days === null || !Number.isFinite(days) || days <= 0) return null
+  if (days < 7) return `약 ${Math.round(days)}일`
+  const weeks = Math.round(days / 5)
+  if (weeks <= 8) return `약 ${Math.max(1, weeks)}주`
+  const months = Math.round(days / 21)
+  if (months >= 1 && months <= 11) return `약 ${RECOVERY_KOREAN_MONTHS[months - 1] ?? String(months)}달`
+  return '1년 넘게'
+}
+
 // 원금회수 예측 브리핑 — '내 자리는 어디쯤일까요?' 바로 아래에서 이어지는 후속 질문.
 // 데이터가 확보되면 결과 카드와 같은 1년 차트(평단 점선·유사 패턴 밴드)도 함께 그린다.
 // data-today-briefing-item을 달지 않는다(공개 타이밍 시퀀스·모바일 자동스크롤 인덱스를
@@ -406,6 +429,10 @@ export function TodayRecoveryForecastBriefing({
     forceReady,
   })
   const probabilityPct = isFiniteNumber(recovery.recoveryProbabilityPct) ? recovery.recoveryProbabilityPct : null
+  const recoveryDaysValue = isFiniteNumber(recovery.expectedRecoveryDays)
+    ? recovery.expectedRecoveryDays
+    : recoveryNumberFromText(recovery.expectedRecoveryDaysText)
+  const friendlyDuration = recoveryFriendlyTradingDays(recoveryDaysValue)
   const chartGeometry = recovery.priceHistory && recovery.priceHistory.length >= 3 && isFiniteNumber(recovery.targetPrice)
     ? buildRecoveryChartGeometry({
       priceHistory: recovery.priceHistory,
@@ -424,13 +451,14 @@ export function TodayRecoveryForecastBriefing({
         <div className={cn(styles.todayBriefBodyContent, isContentReady ? styles.todayBriefBodyContentIn : undefined)}>
           <div className={styles.todayBriefData}>
             {recovery.expectedRecoveryDaysText}
-            {probabilityPct !== null ? <span className={styles.recoveryProbText}> · 1년 내 {recovery.recoveryProbabilityText}</span> : null}
+            {friendlyDuration !== null ? <span className={styles.recoveryProbText}>({friendlyDuration})</span> : null}
+            {probabilityPct !== null ? <span className={styles.recoveryProbText}> · 1년 안에 본전 도달 {recovery.recoveryProbabilityText}</span> : null}
           </div>
           {probabilityPct !== null ? (
             <div
               className={styles.recoveryGaugeTrack}
               role='img'
-              aria-label={`1년 내 평단 도달 비율 ${recovery.recoveryProbabilityText}`}
+              aria-label={`1년 안에 본전 도달 비율 ${recovery.recoveryProbabilityText}`}
             >
               <div className={styles.recoveryGaugeBar} style={{ width: `${Math.min(100, Math.max(1.5, probabilityPct))}%` }} />
             </div>
@@ -485,7 +513,7 @@ export function TodayRecoveryForecastBriefing({
               </li>
             ))}
           </ul>
-          <p className={styles.todayBriefMeaning}><b>{recovery.summaryText}</b> 신뢰도 {recovery.confidenceText}.</p>
+          <p className={styles.todayBriefMeaning}><b>{recovery.summaryText}</b> (신뢰도 {recovery.confidenceText})</p>
           {'disclaimer' in recovery && recovery.disclaimer ? <p className={styles.recoveryDisclaimer}>{recovery.disclaimer}</p> : null}
         </div>
         <div className={cn(styles.todayBriefSkeleton, isContentReady ? styles.todayBriefSkeletonOut : undefined)} aria-hidden='true'>

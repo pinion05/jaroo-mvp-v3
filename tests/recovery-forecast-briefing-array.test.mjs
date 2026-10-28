@@ -12,6 +12,18 @@ test('원금회수 예측은 브리핑 배열 밖 — 기존 완료 카드 자�
   assert.doesNotMatch(screen, /progressDetails|세부 진행 단계/, "'세부 진행 단계·분석 상태' 접힘 컴포넌트는 제거되어야 한다")
 })
 
+test('원금회수 예측 문구 — 디자인 유지, 이해하기 쉬운 표기(2026-10-28)', () => {
+  const briefingCard = readFileSync(new URL('../src/components/deepscan-loading-briefing-card.tsx', import.meta.url), 'utf8')
+  assert.match(briefingCard, /recoveryFriendlyTradingDays/, '거래일 → 사람 말 환산 헬퍼(예: 20거래일(약 4주))')
+  assert.match(briefingCard, /1년 안에 본전 도달/, "'1년 내' 대신 쉬운 '1년 안에 본전 도달'")
+  assert.match(briefingCard, /\(신뢰도 \{recovery.confidenceText\}\)/, '신뢰도 괄호 표기')
+  const payload = readFileSync(new URL('../src/lib/deepscan-runtime/build-payload.ts', import.meta.url), 'utf8')
+  assert.match(payload, /과거 비슷한 흐름/, '모델 라벨: 유사 패턴 → 과거 비슷한 흐름')
+  assert.match(payload, /평범한 흐름/, '모델 라벨: 일반 주가 변동 → 평범한 흐름')
+  assert.match(payload, /출렁이는 흐름/, '모델 라벨: 급등락 반영 → 출렁이는 흐름')
+  assert.match(payload, /본전에 도달해요/, 'summaryText 쉬운 문장')
+})
+
 test('캐시 재사용·빠른 완료에도 브리핑 배열 순차 공개가 시퀀스 끝까지 재생된다', () => {
   const screen = readFileSync(new URL('../src/components/deepscan-loading-screen.tsx', import.meta.url), 'utf8')
   assert.match(screen, /const shouldAdvanceTimeline = elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS/, '타임라인은 시퀀스 완료까지 항상 진행')
