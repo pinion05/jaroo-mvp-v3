@@ -18,9 +18,9 @@ test('원금회수 예측 문구 — 디자인 유지, 이해하기 쉬운 표�
   assert.match(briefingCard, /1년 안에 본전 도달/, "'1년 내' 대신 쉬운 '1년 안에 본전 도달'")
   assert.match(briefingCard, /\(신뢰도 \{recovery.confidenceText\}\)/, '신뢰도 괄호 표기')
   const payload = readFileSync(new URL('../src/lib/deepscan-runtime/build-payload.ts', import.meta.url), 'utf8')
-  assert.match(payload, /과거 비슷한 흐름/, '모델 라벨: 유사 패턴 → 과거 비슷한 흐름')
-  assert.match(payload, /평범한 흐름/, '모델 라벨: 일반 주가 변동 → 평범한 흐름')
-  assert.match(payload, /출렁이는 흐름/, '모델 라벨: 급등락 반영 → 출렁이는 흐름')
+  assert.match(payload, /비슷하게 빠졌던 과거 사례/, '모델 라벨: 유사 패턴 → 비슷하게 빠졌던 과거 사례')
+  assert.match(payload, /평소처럼 움직일 때/, '모델 라벨: 일반 주가 변동 → 평소처럼 움직일 때')
+  assert.match(payload, /갑자기 급등락할 때/, '모델 라벨: 급등락 반영 → 갑자기 급등락할 때')
   assert.match(payload, /본전에 도달해요/, 'summaryText 쉬운 문장')
 })
 

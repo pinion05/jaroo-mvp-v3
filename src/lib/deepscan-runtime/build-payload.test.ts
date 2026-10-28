@@ -527,7 +527,7 @@ test('buildKrDeepScanPayloadViaCrawler shapes crawler recoveryForecastRaw into a
   assert.equal(block.confidenceText, '보통')
   const modelRows = block.modelRows as Array<{ label: string }>
   assert.equal(modelRows.length, 3)
-  assert.deepEqual(modelRows.map((row) => row.label), ['과거 비슷한 흐름', '평범한 흐름', '출렁이는 흐름'])
+  assert.deepEqual(modelRows.map((row) => row.label), ['비슷하게 빠졌던 과거 사례', '평소처럼 움직일 때', '갑자기 급등락할 때'])
   assert.match(String(block.summaryText), /본전에 도달/)
   assert.match(String(block.summaryText), /74/)
   assert.match(String(block.currentPriceText), /20/)
@@ -775,7 +775,7 @@ test('buildKrDeepScanPayloadViaCrawler preserves low-confidence similar-pattern 
   const block = payload.recoveryForecast as Record<string, unknown>
   const rows = block.modelRows as Array<Record<string, unknown>>
   assert.deepEqual(rows[0], {
-    label: '과거 비슷한 흐름',
+    label: '비슷하게 빠졌던 과거 사례',
     recoveryDaysText: 'N/A',
     probabilityText: '0%',
     sampleText: '1건',

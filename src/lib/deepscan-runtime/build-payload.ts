@@ -521,9 +521,9 @@ function buildRecoveryModelRows(forecast: unknown): JarooDeepScanRecoveryForecas
   const models = asRecord(forecastRecord?.models)
   const modelDetails = asRecord(forecastRecord?.modelDetails)
   return [
-    ['similarPattern', '과거 비슷한 흐름'],
-    ['gbm', '평범한 흐름'],
-    ['jumpDiffusion', '출렁이는 흐름'],
+    ['similarPattern', '비슷하게 빠졌던 과거 사례'],
+    ['gbm', '평소처럼 움직일 때'],
+    ['jumpDiffusion', '갑자기 급등락할 때'],
   ].map(([key, displayLabel]) => {
     const model = asRecord(models?.[key])
     const detail = asRecord(modelDetails?.[key])
@@ -693,7 +693,7 @@ export function shapeRecoveryForecastBlock(args: {
       ? (error?.message ?? '원금회수 예측을 계산하지 못했어요.')
       : expectedRecoveryDays === 0
         ? '현재가가 이미 평단 이상이라 원금회수 목표에 도달한 상태입니다.'
-        : `여러 계산 방식을 종합하면 평균적으로 약 ${formatRecoveryDays(expectedRecoveryDays)}에 본전에 도달해요.`,
+        : `세 가지 계산을 종합하면 평균적으로 약 ${formatRecoveryDays(expectedRecoveryDays)}에 본전에 도달해요.`,
     expectedRecoveryDaysText: formatRecoveryDays(expectedRecoveryDays),
     recoveryProbabilityText: formatProbability(recoveryProbabilityPct),
     confidenceText: confidenceLabel,

@@ -106,7 +106,7 @@ const KR_LOSS_FIXTURE = {
     },
     recoveryForecast: {
       statusText: '원금회수 예측',
-      summaryText: '여러 계산 방식을 종합하면 평균적으로 약 74거래일에 본전에 도달해요.',
+      summaryText: '세 가지 계산을 종합하면 평균적으로 약 74거래일에 본전에 도달해요.',
       expectedRecoveryDaysText: '약 74거래일',
       recoveryProbabilityText: '61.1%',
       confidenceText: '보통',
