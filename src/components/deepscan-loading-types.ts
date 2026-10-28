@@ -1,6 +1,6 @@
 import type { ComponentType, ReactNode } from 'react'
 import type { LucideIcon } from 'lucide-react'
-import type { JarooDeepScanCommitteeAxis } from '../../packages/contracts/src/deepscan'
+import type { JarooDeepScanCommitteeAxis, JarooDeepScanRecoveryForecastBlock } from '../../packages/contracts/src/deepscan'
 import {
   Activity,
   BadgeDollarSign,
@@ -33,6 +33,8 @@ export type DeepScanLoadingScreenProps = {
   currentProfitRate?: string | number
   snapshotProfitRate?: string | number
   briefingSnapshot?: LoadingBriefingSnapshot | null
+  /** 결과 payload의 원금회수 예측 블록 — 브리핑 배열 아이템(원금회수까지는 얼마나 걸릴까요?)의 최우선 소스 */
+  payloadRecoveryForecast?: JarooDeepScanRecoveryForecastBlock | null
   findingProgress?: Partial<Record<FindingKey, FindingProgress>>
   committeeAxes?: JarooDeepScanCommitteeAxis[]
   quickFacts?: LoadingQuickFact[]

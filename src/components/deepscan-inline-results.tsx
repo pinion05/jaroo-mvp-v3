@@ -13,7 +13,6 @@ import type { DeepScanTargetInput } from '@/lib/workflow-types'
 
 import { cn } from '@/lib/utils'
 import { WatchAlertLevelSelector } from '@/components/watch-alert-level'
-import { DeepScanRecoveryForecastCard } from '@/components/deepscan-recovery-forecast-card'
 
 type DeepScanInlineResultsProps = {
   payload: JarooDeepScanPayload
@@ -285,7 +284,6 @@ export function DeepScanInlineResults({
           </div>
         </div>
       </article>
-      <DeepScanRecoveryForecastCard payload={payload} />
       <article className='rounded-[16px] bg-[#0F1419] px-4 py-[18px] text-white' aria-label='딥스캔 후속 안내'>
         <div className='mb-2.5 flex items-center gap-2.5'>
           <div className='flex size-[34px] shrink-0 items-center justify-center rounded-[10px] bg-white/10 text-white/85'>

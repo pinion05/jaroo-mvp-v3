@@ -94,6 +94,7 @@ export function DeepScanLoadingScreen({
   currentProfitRate,
   snapshotProfitRate,
   briefingSnapshot,
+  payloadRecoveryForecast,
   findingProgress,
   committeeAxes,
   quickFacts = [],
@@ -378,6 +379,7 @@ export function DeepScanLoadingScreen({
           consensus={consensusData}
           dailyCloses={briefingDailyCloses}
           seedKey={identifier}
+          payloadRecoveryForecast={payloadRecoveryForecast}
         />
 
         {standaloneQuickFacts.length > 0 ? (
