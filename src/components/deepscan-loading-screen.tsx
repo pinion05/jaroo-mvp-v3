@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import {
   shouldDisplayDeepScanReadyResults,
   parseDeepScanEmphasisSegments,
@@ -28,12 +28,10 @@ import type {
 } from './deepscan-loading-types'
 
 import {
-  committeeMembers,
   TEAM_SEQUENCE_COMPLETE_SECONDS,
 } from './deepscan-loading-types'
 
 import {
-  buildCompletionState,
   buildLoadingStages,
   buildOrderedNarrativeCards,
   buildSequentialNarrativeCards,
@@ -55,7 +53,6 @@ import {
   hashSummaryInput,
   isExchangeTradedProduct,
   isHiddenLoadingQuickFact,
-  memberStateClass,
   narrativeToneClass,
   normalizeSummaryText,
   parseNumericValue,
@@ -71,6 +68,7 @@ import {
   BackControl,
   QuickFactCard,
   TodayBriefingCard,
+  TodayRecoveryForecastBriefing,
 } from './deepscan-loading-briefing-card'
 
 // 팀 요약 클라이언트 타임아웃 — 서버 타임아웃(DEEPSCAN_TEAM_SUMMARY_TIMEOUT_MS, 기본 10s)보다
@@ -98,7 +96,6 @@ export function DeepScanLoadingScreen({
   committeeAxes,
   quickFacts = [],
   performanceComment,
-  evidenceCollected = false,
   visibleStageCount = 1,
   arrivedStageKeys = [],
   resultsReady = false,
@@ -204,7 +201,6 @@ export function DeepScanLoadingScreen({
     () => buildSequentialNarrativeCards(timelineNarrativeCards, teamSummaries, resultsReadyForDisplay),
     [resultsReadyForDisplay, teamSummaries, timelineNarrativeCards],
   )
-  const completionState = buildCompletionState(resultsReadyForDisplay, elapsedSeconds, snapshotCacheHit, snapshotScannedAt)
   const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReadyForDisplay)
   const isTeamBridgeVisible = Boolean(teamBridgeState)
   // 브리핑 배열의 순차 공개(5초 리듬)는 결과가 언제 도착하든 시퀀스가 끝날 때까지
@@ -383,7 +379,6 @@ export function DeepScanLoadingScreen({
           consensusPendingSkeleton={!exchangeProduct}
           dailyCloses={briefingDailyCloses}
           seedKey={identifier}
-          payloadRecoveryForecast={payloadRecoveryForecast}
         />
 
         {standaloneQuickFacts.length > 0 ? (
@@ -481,66 +476,23 @@ export function DeepScanLoadingScreen({
           })}
         </section>
 
-        {resultsReadyForDisplay ? (
-          <section className={cn(styles.completionCard, styles.completionCardReady)} aria-label='완료 전환 상태'>
-            <div className={styles.completionHead}>
-              <span className={styles.completionIcon} aria-hidden='true'>✓</span>
-              <div>
-                <span className={styles.completionEyebrow}>{completionState.eyebrow}</span>
-                <h2 className={styles.completionTitle}>{completionState.title}</h2>
-              </div>
-            </div>
-            <p className={styles.completionBody}>{completionState.body}</p>
-          </section>
-        ) : null}
-
-        <details className={styles.progressDetails}>
-          <summary className={styles.progressDetailsSummary}>세부 진행 단계·분석 상태</summary>
-          <div className={styles.stepsWrap} aria-label='분석 단계'>
-            {[
-              { label: '대상 종목 확인', state: 'done' },
-              { label: '근거 데이터 수집', state: evidenceCollected ? 'done' : 'active' },
-              { label: '세 팀 분석 대기', state: resultsReadyForDisplay ? 'done' : evidenceCollected ? 'active' : 'wait' },
-              { label: '상세 리포트 연결', state: resultsReadyForDisplay ? 'done' : 'wait' },
-            ].map((step, index) => {
-              const isDone = step.state === 'done'
-              const isActive = step.state === 'active'
-
-              return (
-                <div key={step.label} className={styles.stepRow}>
-                  <div className={cn(styles.stepIcon, isDone && styles.stepDone, isActive && styles.stepActive, !isDone && !isActive && styles.stepWait)}>
-                    {isDone ? <CheckCircle2 className={styles.stepSvg} aria-hidden /> : isActive ? <Loader2 className={styles.stepSvg} aria-hidden /> : index + 1}
-                  </div>
-                  <div className={cn(styles.stepLabel, isDone && styles.stepLabelDone, isActive && styles.stepLabelActive, !isDone && !isActive && styles.stepLabelWait)}>
-                    {step.label}
-                  </div>
-                  {index === 2 ? <div className={styles.stepCount}>{resultsReadyForDisplay ? '완료' : `${committeeMembers.length}명 대기`}</div> : null}
-                </div>
-              )
-            })}
-          </div>
-
-          <section className={styles.committeeWrap} aria-label='세 팀 분석 진행 상태'>
-            <div className={styles.committeeTitle}>{resultsReadyForDisplay ? '세 팀 분석 완료' : '세 팀 분석 대기 중'}</div>
-            <div className={styles.membersGrid}>
-              {committeeMembers.map((member) => (
-                <div key={member.key} className={styles.member}>
-                  <div className={cn(styles.memberIcon, memberStateClass(resultsReadyForDisplay ? 'done' : member.state))}>
-                    <member.Icon className={styles.memberSvgIcon} aria-hidden />
-                  </div>
-                  <div className={styles.memberName}>
-                    {member.label.split('\n').map((line) => (
-                      <span key={line}>
-                        {line}
-                        <br />
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </details>
+        {(() => {
+          // 원금회수 예측 — 기존 '실제 분석 결과가 도착했어요'(완료 카드) 자리의 독립 컴포넌트.
+          // 브리핑 배열에서 빼고 이 위치로 이동(2026-10-28 사용자 지시). payload 블록이 최우선,
+          // 로딩 중에는 브리핑 스냅샷 프리뷰. 수익 구간(평단 이상)은 미표시.
+          const recoverySource = payloadRecoveryForecast && payloadRecoveryForecast.blockState === 'ok'
+            ? payloadRecoveryForecast
+            : briefingSnapshot?.recoveryForecast ?? null
+          if (!recoverySource) {
+            return null
+          }
+          const recoveryCurrent = payloadRecoveryForecast?.currentPrice
+          const recoveryTarget = payloadRecoveryForecast?.targetPrice
+          if (payloadRecoveryForecast && (recoveryCurrent == null || recoveryTarget == null || recoveryCurrent >= recoveryTarget)) {
+            return null
+          }
+          return <TodayRecoveryForecastBriefing at={0} elapsedSeconds={0} forceReady recovery={recoverySource} />
+        })()}
 
         {resultsReadyForDisplay && inlineResults ? <div className={styles.inlineResultsSlot}>{inlineResults}</div> : null}
           </>

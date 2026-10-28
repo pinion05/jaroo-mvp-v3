@@ -2,28 +2,20 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 
-test('원금회수 예측은 결과 화면에서 독립 카드가 아니라 브리핑 배열 아이템으로 렌더된다', () => {
-  const inlineResults = readFileSync(new URL('../src/components/deepscan-inline-results.tsx', import.meta.url), 'utf8')
-  assert.doesNotMatch(inlineResults, /DeepScanRecoveryForecastCard/, '결과 화면 바닥의 독립 카드 배치는 제거되어야 한다')
-
+test('원금회수 예측은 브리핑 배열 밖 — 기존 완료 카드 자리의 독립 컴포넌트', () => {
   const briefingCard = readFileSync(new URL('../src/components/deepscan-loading-briefing-card.tsx', import.meta.url), 'utf8')
-  assert.match(briefingCard, /payloadRecoveryForecast\?: JarooDeepScanRecoveryForecastBlock \| null/)
-  assert.match(briefingCard, /payloadRecoveryForecast && payloadRecoveryForecast\.blockState === 'ok'/, 'payload 블록이 최우선 소스여야 한다')
-  assert.match(briefingCard, /recovery=\{recoveryForecastSource\}/, '배열 아이템이 통합 소스를 사용해야 한다')
-  assert.match(briefingCard, /'disclaimer' in recovery/, '풀 블록의 면책 문구도 아이템 안에 렌더되어야 한다')
+  assert.doesNotMatch(briefingCard, /recoveryForecastSource/, '배열 내 회복 아이템 소스가 없어야 한다')
 
-  const loadingScreen = readFileSync(new URL('../src/components/deepscan-loading-screen.tsx', import.meta.url), 'utf8')
-  assert.match(loadingScreen, /payloadRecoveryForecast=\{payloadRecoveryForecast\}/)
-
-  const page = readFileSync(new URL('../src/app/deepscan/page.tsx', import.meta.url), 'utf8')
-  assert.match(page, /payloadRecoveryForecast=\{payload\?\.recoveryForecast \?\? null\}/)
+  const screen = readFileSync(new URL('../src/components/deepscan-loading-screen.tsx', import.meta.url), 'utf8')
+  assert.match(screen, /<TodayRecoveryForecastBriefing at=\{0\} elapsedSeconds=\{0\} forceReady recovery=/, '완료 카드 자리에 회복 컴포넌트가 렌더되어야 한다')
+  assert.doesNotMatch(screen, /completionTitle|completionCard/, "완료 카드('실제 분석 결과가 도착했어요')는 제거되어야 한다")
+  assert.doesNotMatch(screen, /progressDetails|세부 진행 단계/, "'세부 진행 단계·분석 상태' 접힘 컴포넌트는 제거되어야 한다")
 })
 
 test('캐시 재사용·빠른 완료에도 브리핑 배열 순차 공개가 시퀀스 끝까지 재생된다', () => {
   const screen = readFileSync(new URL('../src/components/deepscan-loading-screen.tsx', import.meta.url), 'utf8')
   assert.match(screen, /const shouldAdvanceTimeline = elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS/, '타임라인은 시퀀스 완료까지 항상 진행')
   assert.match(screen, /forceReady=\{resultsReadyForDisplay && elapsedSeconds >= TEAM_SEQUENCE_COMPLETE_SECONDS\}/, 'forceReady는 시퀀스 완료 전에는 꺼져 있어야 한다')
-  assert.match(screen, /buildCompletionState\(resultsReadyForDisplay, elapsedSeconds, snapshotCacheHit/, '상태바 즉시 완료는 유지')
 })
 
 test('컨센서스(애널리스트 목표가) 아이템도 로딩 중 질문+스켈레톤이 렌더된다', () => {
