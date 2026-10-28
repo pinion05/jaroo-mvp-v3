@@ -204,7 +204,7 @@ test('briefing snapshot attaches recovery forecast for a loss position when aver
   assert.equal(typeof recovery.recoveryProbabilityPct, 'number')
   assert.match(recovery.summaryText, /본전에 도달/)
   assert.equal(recovery.modelRows.length, 3)
-  assert.deepEqual(recovery.modelRows.map((row: { label: string }) => row.label), ['과거 비슷한 흐름', '평범한 흐름', '출렁이는 흐름'])
+  assert.deepEqual(recovery.modelRows.map((row: { label: string }) => row.label), ['비슷하게 빠졌던 과거 사례', '평소처럼 움직일 때', '갑자기 급등락할 때'])
   // 차트 재료(1년 종가 계열 + 유사 패턴 샘플)도 함께 내려간다.
   assert.equal(recovery.targetPrice, 12500)
   assert.ok(Array.isArray(recovery.priceHistory))
