@@ -23,6 +23,8 @@ test('원금회수 예측 카피 — D안 세 갈래 길 시안(2026-10-28)이 �
   assert.match(briefingCard, /이 흐름 그대로 가면/, '유사 패턴 레인 문구')
   assert.match(briefingCard, /평범하게 흐르면/, 'GBM 레인 문구')
   assert.match(briefingCard, /출렁여도 결국에는/, '점프-확산 레인 문구')
+  assert.match(briefingCard, /gbm\|일반 주가/, '한글 라벨(일반 주가 변동)도 GBM 레인으로 매핑')
+  assert.match(briefingCard, /급등락\|출락/, "한글 라벨(급등락 반영)도 점프-확산 레인으로 매핑")
   assert.match(briefingCard, /신뢰도 \{recovery.confidenceText\}/, '신뢰도 필')
 
   const css = readFileSync(new URL('../src/components/deepscan-loading-screen.module.css', import.meta.url), 'utf8')
