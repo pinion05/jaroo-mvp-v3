@@ -4,7 +4,6 @@ import Link from 'next/link'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { CheckCircle2, Loader2 } from 'lucide-react'
 import {
-  shouldAdvanceDeepScanTimeline,
   shouldDisplayDeepScanReadyResults,
   parseDeepScanEmphasisSegments,
   shouldShowDeepScanSummarySkeleton,
@@ -208,7 +207,11 @@ export function DeepScanLoadingScreen({
   const completionState = buildCompletionState(resultsReadyForDisplay, elapsedSeconds, snapshotCacheHit, snapshotScannedAt)
   const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReadyForDisplay)
   const isTeamBridgeVisible = Boolean(teamBridgeState)
-  const shouldAdvanceTimeline = shouldAdvanceDeepScanTimeline({ resultsReadyForDisplay, elapsedSeconds, sequenceCompleteSeconds: TEAM_SEQUENCE_COMPLETE_SECONDS })
+  // 브리핑 배열의 순차 공개(5초 리듬)는 결과가 언제 도착하든 시퀀스가 끝날 때까지
+  // 재생되어야 한다(2026-10-28 사용자 지시 — 캐시 재사용·빠른 완료 모두 해당).
+  // 타임라인은 시퀀스 완료 시각까지 항상 진행하고, 아이템 forceReady는 시퀀스
+  // 완료 전에는 켜지 않는다. 상태바(completionState)·브리지 억제는 기존 그대로.
+  const shouldAdvanceTimeline = elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS
   const progressPct = resultsReadyForDisplay ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
   const activeNarrativeCard = sequentialNarrativeCards.findLast((card) => !card.placeholder) ?? sequentialNarrativeCards.at(-1) ?? visibleNarrativeCards.at(-1) ?? orderedNarrativeCards[0]
   const progressLabel = resultsReadyForDisplay
@@ -373,7 +376,7 @@ export function DeepScanLoadingScreen({
           profitRateText={profitRateText}
           profitAmountText={profitAmountText}
           elapsedSeconds={elapsedSeconds}
-          forceReady={resultsReadyForDisplay}
+          forceReady={resultsReadyForDisplay && elapsedSeconds >= TEAM_SEQUENCE_COMPLETE_SECONDS}
           briefingSnapshot={briefingSnapshot}
           tradingVolumeText={tradingVolumeText}
           consensus={consensusData}
