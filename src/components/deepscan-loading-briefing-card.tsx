@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useMemo } from 'react'
-import { BarChart3, Calendar, ChartCandlestick, ChevronLeft, Flame, Hourglass, Target, Telescope, TrendingUp, type LucideIcon } from 'lucide-react'
+import { Activity, ArrowRight, BarChart3, Calendar, ChartCandlestick, ChevronLeft, Flame, Hourglass, Target, Telescope, TrendingUp, Waves, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import type {
@@ -380,8 +380,103 @@ export function TodayMarketBriefing({
 }
 
 
-// 원금회수 예측 섹션 모델 식별색 — 딥스캔 결과 카드(recovery forecast card)와 같은 매핑.
-export const RECOVERY_FORECAST_DOT_COLORS = ['#E0942A', '#185FA5', '#7A5AF8'] as const
+// ── 원금회수 예측 '세 갈래 길' 카피(D안 시안, 2026-10-28) ──────────────────
+// '약 74일'·'60.3%' 같은 표기에서 숫자를 뽑는다.
+function recoveryNumberFromText(text: string | null | undefined) {
+  if (!text) return null
+  const matched = text.match(/-?\d+(?:\.\d+)?/u)
+  if (!matched) return null
+  const parsed = Number(matched[0])
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const RECOVERY_KOREAN_MONTHS = ['한', '두', '세', '넉', '다섯', '여섯', '일곱', '여덟', '아홉', '열', '열한'] as const
+
+// 거래일 기간을 사람 말로 바꾼다(5거래일≈1주, 21거래일≈1달). 시안 기준: 26거래일 → '약 한 달'.
+function recoveryFriendlyTradingDays(days: number | null) {
+  if (days === null || !Number.isFinite(days) || days <= 0) return null
+  if (days < 7) return `약 ${Math.round(days)}일`
+  const weeks = Math.round(days / 5)
+  if (weeks <= 8) return `약 ${Math.max(1, weeks)}주`
+  const months = Math.round(days / 21)
+  if (months >= 1 && months <= 11) return `약 ${RECOVERY_KOREAN_MONTHS[months - 1] ?? String(months)}달`
+  return '1년 넘게'
+}
+
+// 종성(받침) 여부 — 조사 '이면/면' 선택용('약 한 달이면' / '약 3주면').
+function recoveryEndsWithBatchim(text: string) {
+  const code = text.charCodeAt(text.length - 1)
+  if (code < 0xac00 || code > 0xd7a3) return true
+  return (code - 0xac00) % 28 > 0
+}
+
+// 본전까지 필요한 상승률(%). 손실률(drawdownText) 기준이 우선, 없으면 가격으로 계산(-19.2% → +23.9%).
+function recoveryNeededGainPct(recovery: LoadingBriefingRecoveryForecast | JarooDeepScanRecoveryForecastBlock) {
+  const drawdown = 'drawdownText' in recovery ? recoveryNumberFromText(recovery.drawdownText) : null
+  if (drawdown !== null && drawdown > 0 && drawdown < 100) {
+    return Math.round((drawdown / (100 - drawdown)) * 1000) / 10
+  }
+  const target = isFiniteNumber(recovery.targetPrice) ? recovery.targetPrice : null
+  const current = 'currentPrice' in recovery && isFiniteNumber(recovery.currentPrice) ? recovery.currentPrice : null
+  const lastClose = recovery.priceHistory && recovery.priceHistory.length > 0
+    ? recovery.priceHistory[recovery.priceHistory.length - 1]?.close
+    : null
+  const base = current ?? (isFiniteNumber(lastClose) ? lastClose : null)
+  if (target !== null && base !== null && target > base && base > 0) {
+    return Math.round((target / base - 1) * 1000) / 10
+  }
+  return null
+}
+
+type RecoveryModelRowLike = {
+  label: string
+  recoveryDaysText: string
+  probabilityText: string
+  sampleText?: string | null
+}
+
+type RecoveryLaneKind = 'similar' | 'steady' | 'jumpy' | 'other'
+
+// 모델 라벨 → 세 갈래 길 레인(유사 패턴 / GBM / 점프-확산).
+function recoveryLaneKind(modelLabel: string): RecoveryLaneKind {
+  if (/유사|similar/iu.test(modelLabel)) return 'similar'
+  if (/gbm/iu.test(modelLabel)) return 'steady'
+  if (/jump|점프/iu.test(modelLabel)) return 'jumpy'
+  return 'other'
+}
+
+function recoveryLaneLabel(kind: RecoveryLaneKind, modelLabel: string) {
+  if (kind === 'similar') return '이 흐름 그대로 가면'
+  if (kind === 'steady') return '평범하게 흐르면'
+  if (kind === 'jumpy') return '출렁여도 결국에는'
+  return modelLabel
+}
+
+function recoveryLaneWhy(row: RecoveryModelRowLike, kind: RecoveryLaneKind) {
+  const core = `${row.probabilityText} (${row.recoveryDaysText})`
+  if (kind === 'similar') {
+    return row.sampleText
+      ? `유사 과거 패턴 ${row.sampleText} · 그중 ${row.probabilityText} 도달 (${row.recoveryDaysText})`
+      : `과거 비슷한 흐름 · 그중 ${core} 도달`
+  }
+  if (kind === 'steady') return `일반 주가 변동 가정 · ${core}`
+  if (kind === 'jumpy') return `급등락 반영 가정 · ${core}`
+  return `${row.label} 가정 · ${core}`
+}
+
+// ETA(예상 소요)도 같은 환산(15거래일 → '약 3주'). 숫자를 못 읽으면 원문 표기 유지.
+function recoveryEtaText(recoveryDaysText: string) {
+  return recoveryFriendlyTradingDays(recoveryNumberFromText(recoveryDaysText)) ?? recoveryDaysText
+}
+
+// 확률을 '10번 중 N번' 말로. 95% 이상은 '10번 중 10번 가까이'.
+function recoveryProbOdds(probabilityText: string | null | undefined) {
+  const pct = probabilityText === null || probabilityText === undefined ? null : recoveryNumberFromText(probabilityText)
+  if (pct === null) return probabilityText ?? ''
+  if (pct >= 95) return '10번 중 10번 가까이'
+  const tens = Math.round(pct / 10)
+  return tens <= 0 ? '10번 중 가끔' : `10번 중 ${tens}번`
+}
 
 // 원금회수 예측 브리핑 — '내 자리는 어디쯤일까요?' 바로 아래에서 이어지는 후속 질문.
 // 데이터가 확보되면 결과 카드와 같은 1년 차트(평단 점선·유사 패턴 밴드)도 함께 그린다.
@@ -413,28 +508,87 @@ export function TodayRecoveryForecastBriefing({
       targetPrice: recovery.targetPrice as number,
     })
     : null
+  const recoveryDaysValue = isFiniteNumber(recovery.expectedRecoveryDays)
+    ? recovery.expectedRecoveryDays
+    : recoveryNumberFromText(recovery.expectedRecoveryDaysText)
+  const friendlyDuration = recoveryFriendlyTradingDays(recoveryDaysValue) ?? recovery.expectedRecoveryDaysText
+  const headlineJoint = recoveryEndsWithBatchim(friendlyDuration) ? '이면' : '면'
+  const neededGainPct = recoveryNeededGainPct(recovery)
+  const displayTargetPrice = 'targetPriceText' in recovery && recovery.targetPriceText
+    ? recovery.targetPriceText
+    : isFiniteNumber(recovery.targetPrice)
+      ? `${Math.round(recovery.targetPrice).toLocaleString('ko-KR')}원`
+      : '--'
 
   return (
     <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-recovery='true'>
       <div className={styles.todayBriefQuestionRow}>
         <span className={styles.todayBriefIcon} aria-hidden='true'><Hourglass className='size-[13px]' /></span>
-        <span className={styles.todayBriefQuestion}>원금회수까지는 얼마나 걸릴까요?</span>
+        <span className={styles.todayBriefQuestion}>원금회수 예측</span>
+        <span className={styles.recoveryTrustPill}>신뢰도 {recovery.confidenceText}</span>
       </div>
       <div className={cn(styles.todayBriefBody, isVisible ? styles.todayBriefBodyIn : undefined)}>
         <div className={cn(styles.todayBriefBodyContent, isContentReady ? styles.todayBriefBodyContentIn : undefined)}>
-          <div className={styles.todayBriefData}>
-            {recovery.expectedRecoveryDaysText}
-            {probabilityPct !== null ? <span className={styles.recoveryProbText}> · 1년 내 {recovery.recoveryProbabilityText}</span> : null}
+          <div className={styles.recoveryHeadline}>
+            {friendlyDuration.startsWith('1년')
+              ? <>본전까지 <b className={styles.recoveryHeadlineEm}>{friendlyDuration}</b> 걸릴 수 있어요</>
+              : <>무리 없이 <b className={styles.recoveryHeadlineEm}>{friendlyDuration}</b>{headlineJoint} 본전까지 돌아와요</>}
           </div>
-          {probabilityPct !== null ? (
-            <div
-              className={styles.recoveryGaugeTrack}
-              role='img'
-              aria-label={`1년 내 평단 도달 비율 ${recovery.recoveryProbabilityText}`}
-            >
-              <div className={styles.recoveryGaugeBar} style={{ width: `${Math.min(100, Math.max(1.5, probabilityPct))}%` }} />
+          <p className={styles.recoveryHeadlineSub}>예상 회복 기간 <b>{recovery.expectedRecoveryDaysText}</b> 기준</p>
+
+          <div className={styles.recoveryStats}>
+            <div className={styles.recoveryStat}>
+              <span className={styles.recoveryStatK}>평단가</span>
+              <span className={styles.recoveryStatV}>{displayTargetPrice}</span>
             </div>
-          ) : null}
+            <div className={styles.recoveryStat}>
+              <span className={styles.recoveryStatK}>본전까지</span>
+              <span className={cn(styles.recoveryStatV, styles.recoveryStatVBlue)}>
+                {neededGainPct === null ? '--' : `+${neededGainPct}%`}<small>남음</small>
+              </span>
+            </div>
+          </div>
+
+          <div className={styles.recoveryReach}>
+            <div className={styles.recoveryReachTop}>
+              <span>1년 내 본전 도달 비율</span>
+              <b>{recovery.recoveryProbabilityText}</b>
+            </div>
+            {probabilityPct !== null ? (
+              <div
+                className={styles.recoveryGaugeTrack}
+                role='img'
+                aria-label={`1년 내 평단 도달 비율 ${recovery.recoveryProbabilityText}`}
+              >
+                <div className={styles.recoveryGaugeBar} style={{ width: `${Math.min(100, Math.max(1.5, probabilityPct))}%` }} />
+              </div>
+            ) : null}
+          </div>
+
+          <div className={styles.recoveryDivider} />
+          <div className={styles.recoverySectionLabel}>본전까지 <b>세 갈래 길</b></div>
+
+          <ul className={styles.recoveryPaths}>
+            {recovery.modelRows.map((row) => {
+              const kind = recoveryLaneKind(row.label)
+              const LaneIcon = kind === 'similar' ? ArrowRight : kind === 'steady' ? Waves : Activity
+              return (
+                <li key={row.label} className={styles.recoveryPath}>
+                  <span className={cn(styles.recoveryPathBadge, kind === 'similar' ? styles.recoveryPathBadgeLead : undefined)} aria-hidden='true'>
+                    <LaneIcon className='size-[15px]' />
+                  </span>
+                  <span className={styles.recoveryPathBody}>
+                    <span className={styles.recoveryPathLane}>{recoveryLaneLabel(kind, row.label)}</span>
+                    <span className={styles.recoveryPathWhy}>{recoveryLaneWhy(row, kind)}</span>
+                  </span>
+                  <span className={styles.recoveryPathEta}>
+                    <span className={styles.recoveryPathWeeks}>{recoveryEtaText(row.recoveryDaysText)}</span>
+                    <span className={styles.recoveryPathOdds}>{recoveryProbOdds(row.probabilityText)}</span>
+                  </span>
+                </li>
+              )
+            })}
+          </ul>
           {chartGeometry ? (
             <svg
               className={styles.recoveryChartSvg}
@@ -470,23 +624,11 @@ export function TodayRecoveryForecastBriefing({
               ) : null}
             </svg>
           ) : null}
-          <ul className={styles.recoveryModels}>
-            {recovery.modelRows.map((row, index) => (
-              <li key={row.label} className={styles.recoveryModelRow}>
-                <span
-                  className={styles.recoveryModelDot}
-                  style={{ backgroundColor: RECOVERY_FORECAST_DOT_COLORS[index % RECOVERY_FORECAST_DOT_COLORS.length] }}
-                  aria-hidden='true'
-                />
-                <span className={styles.recoveryModelName}>{row.label}</span>
-                <span className={styles.recoveryModelDays}>{row.recoveryDaysText}</span>
-                {row.sampleText ? <span className={styles.recoveryModelSample}>· {row.sampleText}</span> : null}
-                <span className={styles.recoveryModelProb}>{row.probabilityText}</span>
-              </li>
-            ))}
-          </ul>
-          <p className={styles.todayBriefMeaning}><b>{recovery.summaryText}</b> 신뢰도 {recovery.confidenceText}.</p>
-          {'disclaimer' in recovery && recovery.disclaimer ? <p className={styles.recoveryDisclaimer}>{recovery.disclaimer}</p> : null}
+          <p className={styles.recoveryDisclaimer}>
+            {'disclaimer' in recovery && recovery.disclaimer
+              ? recovery.disclaimer
+              : '과거 패턴 기반 추정치예요. 실제 회복 시기는 시장 상황에 따라 달라질 수 있어요.'}
+          </p>
         </div>
         <div className={cn(styles.todayBriefSkeleton, isContentReady ? styles.todayBriefSkeletonOut : undefined)} aria-hidden='true'>
           <span className={styles.todayBriefSkeletonBar} />
