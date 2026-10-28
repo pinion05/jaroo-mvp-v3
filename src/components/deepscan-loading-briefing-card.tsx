@@ -515,7 +515,6 @@ export function TodayBriefingCard({
   consensusPendingSkeleton = false,
   dailyCloses,
   seedKey,
-  payloadRecoveryForecast,
 }: {
   currentPriceText: string | null
   currentPriceCurrency: MoneyCurrency
@@ -536,16 +535,8 @@ export function TodayBriefingCard({
   consensusPendingSkeleton?: boolean
   dailyCloses?: Array<number | null | undefined>
   seedKey?: string
-  /** 스캔 완료 후 payload의 원금회수 예측 블록 — 브리핑 배열 아이텨으로 그대로 쓴다(우선순위 최상). */
-  payloadRecoveryForecast?: JarooDeepScanRecoveryForecastBlock | null
 }) {
   const todayBriefListRef = useRef<HTMLDivElement | null>(null)
-  // 원금회수 예측 소식: 결과 payload 블록(252포인트 차트·모델행 포함) > 브리핑 스냅샷 프리뷰.
-  // 어느 쪽도 ok 아니면 배열 아이템을 그리지 않는다(기존 동작 유지).
-  const recoveryForecastSource
-    = payloadRecoveryForecast && payloadRecoveryForecast.blockState === 'ok'
-      ? payloadRecoveryForecast
-      : briefingSnapshot?.recoveryForecast ?? null
   const quote = briefingSnapshot?.quote
   const averagePriceValue = parseNumericValue(averagePriceText ?? undefined)
   const chartAveragePriceValue = normalizeMoneyValueToCurrency(
@@ -711,14 +702,6 @@ export function TodayBriefingCard({
         <TodayBriefingItem at={briefStartSeconds[0]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Calendar} question='최근 한 달, 어떻게 흘러왔나요?' data={<span className={pctToneClass(oneMonthPct)}>{oneMonthLabel ? `한 달 전보다 ${oneMonthLabel}` : '한 달 흐름 계산 중'}</span>} meaning={buildOneMonthMeaning(oneMonthPct)} />
         <TodayBriefingItem at={briefStartSeconds[1]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={TrendingUp} question='단기 흐름은요?' data={<span className={shortFlow.tone === 'up' ? styles.todayUp : shortFlow.tone === 'down' ? styles.todayDown : styles.todayBlue}>{shortFlow.label}</span>} meaning={shortFlow.meaning} />
         <TodayBriefingItem at={briefStartSeconds[2]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Target} question='내 자리는 어디쯤일까요?' data={<span className={financialToneClass(positionPct)}>{positionLabel}</span>} meaning={<><b>{positionMeaning}</b></>} />
-        {recoveryForecastSource && isFiniteNumber(needToBreakeven) ? (
-          <TodayRecoveryForecastBriefing
-            at={briefStartSeconds[2]}
-            elapsedSeconds={elapsedSeconds}
-            forceReady={forceReady}
-            recovery={recoveryForecastSource}
-          />
-        ) : null}
         <TodayMarketBriefing
           at={briefStartSeconds[3]}
           elapsedSeconds={elapsedSeconds}

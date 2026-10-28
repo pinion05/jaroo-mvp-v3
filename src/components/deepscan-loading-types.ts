@@ -39,7 +39,6 @@ export type DeepScanLoadingScreenProps = {
   committeeAxes?: JarooDeepScanCommitteeAxis[]
   quickFacts?: LoadingQuickFact[]
   performanceComment?: LoadingPerformanceComment
-  evidenceCollected?: boolean
   visibleStageCount?: number
   arrivedStageKeys?: LoadingStageKey[]
   resultsReady?: boolean
