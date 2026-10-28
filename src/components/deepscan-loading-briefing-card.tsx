@@ -437,11 +437,12 @@ type RecoveryModelRowLike = {
 
 type RecoveryLaneKind = 'similar' | 'steady' | 'jumpy' | 'other'
 
-// 모델 라벨 → 세 갈래 길 레인(유사 패턴 / GBM / 점프-확산).
+// 모델 라벨 → 세 갈래 길 레인(유사 패턴 / 일반 주가 변동=GBM / 급락등 반영=점프-확산).
+// 크롤러가 내리는 한글 라벨(build-payload modelRows)과 영문 모델명 둘 다 잡는다.
 function recoveryLaneKind(modelLabel: string): RecoveryLaneKind {
   if (/유사|similar/iu.test(modelLabel)) return 'similar'
-  if (/gbm/iu.test(modelLabel)) return 'steady'
-  if (/jump|점프/iu.test(modelLabel)) return 'jumpy'
+  if (/gbm|일반 주가/iu.test(modelLabel)) return 'steady'
+  if (/jump|점프|급등락|출락/iu.test(modelLabel)) return 'jumpy'
   return 'other'
 }
 
