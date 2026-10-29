@@ -113,6 +113,12 @@
   border: none;
   box-shadow: 0 4px 12px rgba(15, 20, 25, 0.28);
 }
+/* 동의 미체크 시 모든 로그인 진입 버튼이 시각적으로도 흐려진다(2026-10-29 사용자 지시).
+   카카오 전용 규칙만 있어 구글·이메일 버튼이 클릭만 막히고 겉은 정상으로 보였다. */
+.loginBtn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
 /* 카카오 브랜드 버튼: #FEE500 배경에 #191919 심볼/텍스트 */
 .kakao {
   background: #fee500;
