@@ -32,6 +32,7 @@ import {
   TEAM_SEQUENCE_COMPLETE_SECONDS,
   TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS,
   CONCLUSION_REVEAL_DELAY_AFTER_TEAMS_SECONDS,
+  DEEPSCAN_CONSENSUS_EMPTY_STATE_TEXT,
 } from './deepscan-loading-types'
 
 import {
@@ -390,6 +391,9 @@ export function DeepScanLoadingScreen({
           <p className={styles.introBody}>{resultsReadyForDisplay ? (snapshotCacheHit ? '저장해둔 분석 결과를 불러왔어요. 아래 결과 카드가 바로 이어집니다.' : '실제 응답이 도착했어요. 아래 결과 카드가 바로 이어집니다.') : '완료 신호가 오면 기다림 없이 이 화면 아래에 결과가 이어집니다.'}</p>
         </section>
 
+        {/* 목표가 미제공 종목 — 결과가 확정된 뒤에도 항목을 통째로 숨기지 않고 스캘래톤 →
+            '증권사 목표가가 아직 없어요' 안내로 마무리한다(2026-10-29 사용자 지시).
+            로딩 중(데이터 도착 가능)에는 null이라 스캘래톤이 유지되고, ETF는 기존대로 미표시. */}
         <TodayBriefingCard
           currentPriceText={currentPriceText}
           currentPriceCurrency={currentPriceCurrency}
@@ -405,6 +409,7 @@ export function DeepScanLoadingScreen({
           tradingVolumeText={tradingVolumeText}
           consensus={consensusData}
           consensusPendingSkeleton={!exchangeProduct}
+          consensusEmptyState={resultsReadyForDisplay && !exchangeProduct ? DEEPSCAN_CONSENSUS_EMPTY_STATE_TEXT : null}
           dailyCloses={briefingDailyCloses}
           seedKey={identifier}
         />

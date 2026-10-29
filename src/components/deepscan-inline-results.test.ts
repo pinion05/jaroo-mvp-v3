@@ -39,7 +39,11 @@ test('DeepScanInlineResults renders the aggregate result without repeating team 
   assert.match(markup, /세 팀의 의견을 모았어요/)
   assert.match(markup, /보유 유지/)
   assert.match(markup, /62%/)
-  assert.match(markup, /상승 여력/)
+  // 목표가·상승 여력 필드 제거(2026-10-29) — 애널리스트 목표가는 브리핑 목표가 항목이 담당
+  assert.doesNotMatch(markup, />목표가</)
+  assert.doesNotMatch(markup, />상승 여력</)
+  assert.match(markup, />현재가</)
+  assert.match(markup, />근거</)
 })
 
 test('DeepScanInlineResults falls back when committee and strategy blocks are unavailable', () => {
@@ -81,9 +85,8 @@ test('DeepScanInlineResults treats non-numeric price fields as unknown instead o
   }
   const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
 
-  assert.match(markup, /상승 여력/)
-  assert.match(markup, /확인 중/)
-  assert.doesNotMatch(markup, /\\+0%/)
+  assert.match(markup, /현재가/)
+  assert.doesNotMatch(markup, /\+0%/)
 })
 
 test('DeepScanInlineResults resolves ETF committee teams by stable memberKey before title', () => {
@@ -163,15 +166,6 @@ test('DeepScanInlineResults colors the strength label and gauge by the agreed to
   const bullMarkup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload: basePayload() }))
   assert.match(bullMarkup, /leading-none text-\[color:var\(--jaroo-profit\)\][^>]*>강세</)
   assert.doesNotMatch(bullMarkup, /--jaroo-flat/)
-})
-
-test('DeepScanInlineResults colors negative upside blue and positive upside red', () => {
-  const payload = basePayload()
-  payload.strategy = { ...payload.strategy, currentPriceText: '20,000원', targetPriceText: '17,500원' }
-  const markup = renderToStaticMarkup(createElement(DeepScanInlineResults, { payload }))
-  // (17,500 / 20,000 - 1) * 100 = −12.5%
-  assert.match(markup, /jaroo-loss\)\][^<]*>−12\.5%/)
-  assert.doesNotMatch(markup, /jaroo-profit\)\][^<]*>−12\.5%/)
 })
 
 test('DeepScanInlineResults hides target-price section and consensus for ETF', () => {
