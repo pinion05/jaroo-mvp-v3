@@ -89,3 +89,11 @@ test('마이페이지 기타 메뉴는 약관/개인정보/문의를 실제 링�
   assert.match(source, /RowLink href='\/privacy'/)
   assert.match(source, /mailto:support@jaroo\.kr/)
 })
+
+test('로그인 화면의 모든 진입 버튼이 동의 게이트를 공유한다(2026-10-29)', () => {
+  const page = fs.readFileSync(new URL('../src/app/login/page.tsx', import.meta.url), 'utf8')
+  const gates = page.match(/disabled=\{pending \|\| \(!devAutoLoginEnabled && !termsAgreed\)\}/g) ?? []
+  assert.ok(gates.length >= 4, `이메일 진입·구글·카카오·이메일 제출 4곳이 게이트되어야 한다 (현재 ${gates.length})`)
+  const css = fs.readFileSync(new URL('../src/app/login/login.module.css', import.meta.url), 'utf8')
+  assert.match(css, /\.loginBtn:disabled\s*\{\s*opacity:\s*0\.4/, '공용 loginBtn:disabled 흐림 규칙 — 카카오만 시각 비활성화되던 문제 수정')
+})
