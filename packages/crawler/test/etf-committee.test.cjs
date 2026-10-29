@@ -213,6 +213,55 @@ test('buildEtfMarketCommitteeSnapshot writes only complete snapshots to the cach
   }
 });
 
+test('buildEtfMarketCommitteeSnapshot cache key separates snapshots per holding values', async () => {
+  const { buildEtfMarketCommitteeSnapshot } = await import('../src/services/deepscan-payload.js');
+  const readKeys = [];
+  const upsertedEntries = [];
+  const cacheClient = {
+    readPayload: async (cacheKey) => {
+      readKeys.push(cacheKey);
+      return null;
+    },
+    upsertPayload: async (entry) => {
+      upsertedEntries.push(entry);
+      return { id: 1 };
+    },
+  };
+  const capturedMemberKeys = [];
+  const restoreFetch = installMockCommitteeLlm(capturedMemberKeys);
+
+  try {
+    await withEnv({ OPENROUTER_API_KEY: 'test-key', DEEPSCAN_KR_LLM_ENABLE: '1' }, async () => {
+      const base = {
+        instrument: { name: 'KODEX 코스피', code: '226490', market: 'ETF', kind: 'etf' },
+        sources: ETF_SOURCES,
+        crawlerCache: { client: cacheClient },
+      };
+
+      // 같은 ETF 코드라도 보유 수량·평단이 다르면 위원 스냅샷(평단격차·평가손익)이 달라진다 —
+      // 캐시 키도 보유값별로 분리되어야 한다(hasHolding 1/0 비트만으론 부족).
+      await buildEtfMarketCommitteeSnapshot({ ...base, holding: { shares: '35', averagePrice: '58828.75' } });
+      await buildEtfMarketCommitteeSnapshot({ ...base, holding: { shares: '10', averagePrice: '58828.75' } });
+      await buildEtfMarketCommitteeSnapshot({ ...base, holding: { shares: '35', averagePrice: '70,000' } });
+      // 같은 값의 표기 변형(쉼표·소수 자릿수)은 같은 키를 쓴다 — 불필요한 캐시 미스 방지.
+      await buildEtfMarketCommitteeSnapshot({ ...base, holding: { shares: '35.0000', averagePrice: '70000.00' } });
+      await buildEtfMarketCommitteeSnapshot({ ...base });
+
+      assert.equal(readKeys.length, 5);
+      assert.equal(upsertedEntries.length, 5);
+
+      // 35/58828.75 · 10/58828.75 · 35/70000(×2 동일) · 보유 없음 → 서로 다른 4개 키.
+      assert.equal(new Set(readKeys).size, 4);
+      assert.equal(readKeys[2], readKeys[3]);
+      assert.notEqual(readKeys[0], readKeys[1]);
+      assert.notEqual(readKeys[0], readKeys[2]);
+      assert.notEqual(readKeys[0], readKeys[4]);
+    });
+  } finally {
+    restoreFetch();
+  }
+});
+
 test('buildEtfMarketCommitteeSnapshot skips cache writes for soft-deadline partial shells', async () => {
   const { buildEtfMarketCommitteeSnapshot } = await import('../src/services/deepscan-payload.js');
   const upsertedEntries = [];

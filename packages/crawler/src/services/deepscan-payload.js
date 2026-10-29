@@ -2745,8 +2745,38 @@ const ETF_COMMITTEE_CACHE_ROUTE_VERSION = 'v1';
 const ETF_COMMITTEE_CACHE_SCHEMA_VERSION = 'etf-committee-market-timing-v1';
 const DEFAULT_ETF_COMMITTEE_SOFT_DEADLINE_MS = 25_000;
 
+// 캐시 키용 보유값 파싱 — 증거 패킷(deepscan-kr-evidence normalizeNumber)과 같은 규칙으로
+// 쉼표/통화기호/공백을 제거해 숫자로 만든다.
+function parseEtfHoldingNumberForKey(value) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const cleaned = value.trim().replaceAll(',', '').replace(/\s+/g, '').replace(/[₩$€¥£%]/g, '');
+  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(cleaned)) {
+    return null;
+  }
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+// 키에는 반올림된 값 문자열만 담는다 — maxFractionDigits 자리에서 반올림해
+// 부동소수점 노이즈·표기 차이("70,000" vs "70000.0")로 인한 불필요한 캐시 미스를 막는다.
+function normalizeEtfHoldingValueForKey(value, maxFractionDigits) {
+  const parsed = parseEtfHoldingNumberForKey(value);
+  if (parsed === null) {
+    return null;
+  }
+  return String(Number(parsed.toFixed(maxFractionDigits)));
+}
+
 function buildEtfCommitteeCacheDescriptor(input) {
   const hasHolding = input.holding?.shares != null && input.holding?.averagePrice != null;
+  // shares는 정수·소수 구분을 유지(4자리 반올림), 평단은 원화 소수 2자리 반올림.
+  const holdingShares = normalizeEtfHoldingValueForKey(input.holding?.shares, 4);
+  const holdingAveragePrice = normalizeEtfHoldingValueForKey(input.holding?.averagePrice, 2);
 
   return {
     source: 'deepscan',
@@ -2763,6 +2793,11 @@ function buildEtfCommitteeCacheDescriptor(input) {
       memberKeys: [...KR_ETF_PAGE_MEMBER_KEYS],
       // 보유 맥락 유무가 위원 덤프·점수를 바꾼다 — 캐시 키에 반영한다.
       hasHolding: hasHolding ? '1' : '0',
+      // 평단격차·평가손익은 수량·평단 값 자체를 따라간다 — 1/0 비트만으로는 보유값이 다른
+      // 사용자가 타인의 평단이 반영된 스냅샷을 fresh TTL(기본 6시간) 동안 재사용하게 된다.
+      // 정규화된 보유값을 키에 포함해 보유값별로 캐시 엔트리를 분리한다.
+      holdingShares,
+      holdingAveragePrice,
     },
     metadata: {
       consumer: 'etf-page',
