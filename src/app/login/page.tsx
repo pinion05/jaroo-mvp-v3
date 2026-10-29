@@ -220,6 +220,8 @@ export default function LoginPage() {
                 setMode('login')
                 setView('email')
               }}
+              disabled={pending || (!devAutoLoginEnabled && !termsAgreed)}
+              aria-disabled={!devAutoLoginEnabled && !termsAgreed}
             >
               <span className={styles.loginBtnIco}>
                 <MailIcon />
@@ -325,7 +327,7 @@ export default function LoginPage() {
           {error ? <p className={styles.error} aria-live='polite'>{error}</p> : null}
           {info ? <p className={styles.info} aria-live='polite'>{info}</p> : null}
 
-          <button type='submit' className={cn(styles.loginBtn, styles.primary)} disabled={pending} style={{ marginTop: 8 }}>
+          <button type='submit' className={cn(styles.loginBtn, styles.primary)} disabled={pending || (!devAutoLoginEnabled && !termsAgreed)} aria-disabled={!devAutoLoginEnabled && !termsAgreed} style={{ marginTop: 8 }}>
             {pending ? '처리 중...' : mode === 'login' ? '로그인' : '계정 만들기'}
           </button>
 
