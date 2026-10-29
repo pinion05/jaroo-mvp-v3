@@ -26,6 +26,9 @@ import {
 } from '@/lib/workflow-types'
 import { cn } from '@/lib/utils'
 
+// 적용 후 홈 이동 전 시세 프리페치 상한 — OCR 적용 흐름과 같은 값(2026-10-29).
+const MERGE_APPLY_QUOTE_PREFETCH_CAP_MS = 2_500
+
 function MergeMetricChip({ label, value, valueClassName }: { label: string; value: string; valueClassName?: string }) {
   return (
     <div className='rounded-[14px] bg-[color:var(--jaroo-secondary)] px-3 py-2'>
@@ -137,7 +140,7 @@ export default function JarooMergeScreen() {
     router.push('/ocr')
   }
 
-  const handleApply = () => {
+  const handleApply = async () => {
     if (applyStatus === 'loading') {
       return
     }
@@ -166,14 +169,21 @@ export default function JarooMergeScreen() {
       const nextQuoteQuery = buildHomeCurrentQuoteQuery(applyResult.nextQuoteHoldings)
       replacePortfolioItems(applyResult.normalizedItems)
       setQuoteStatus('loading', null, nextQuoteQuery)
-      void hydratePortfolioItemsWithCurrentQuotes(applyResult.normalizedItems)
-        .then((result) => {
-          replacePortfolioItems(result.items)
-          setQuoteStatus(result.quoteStatus, result.quoteErrorMessage, result.quoteQuery)
-        })
-        .catch(() => {
-          setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', null)
-        })
+      // 시세 프리페치(2026-10-29): 완료 또는 상한까지 홈 이동을 잠깐 미뤄 홈 첫 프레임의
+      // '- · -' 임시값 갭을 없앤다. OCR 적용 흐름(page.tsx)과 같은 패턴.
+      await Promise.race([
+        hydratePortfolioItemsWithCurrentQuotes(applyResult.normalizedItems)
+          .then((result) => {
+            replacePortfolioItems(result.items)
+            setQuoteStatus(result.quoteStatus, result.quoteErrorMessage, result.quoteQuery)
+          })
+          .catch(() => {
+            setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', null)
+          }),
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, MERGE_APPLY_QUOTE_PREFETCH_CAP_MS)
+        }),
+      ])
       markApplied(appliedAt)
       router.push('/home')
     } catch (error) {
