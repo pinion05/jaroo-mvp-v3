@@ -71,7 +71,9 @@ export function WatchAlertLevelSelector({ compact = false, tone = 'light' }: { c
 
   return (
     <div className={compact ? 'space-y-1.5' : 'space-y-2'}>
-      <div className='flex flex-wrap items-center gap-1.5'>
+      {/* 컴팩트(딥스캔 결과 카드) — 라벨·필 그룹·힌트를 모두 가운데 정렬한다(2026-10-29 사용자 지시).
+          좌측 justify-start로 두면 카드의 중앙 정렬 버튼·안내문 사이에서만 왼쪽으로 쏠려 보였다. */}
+      <div className={compact ? 'flex flex-col items-center gap-1.5' : 'flex flex-wrap items-center gap-1.5'}>
         <span className={`text-[11px] font-semibold ${tone === 'dark' ? 'text-white/70' : 'text-[#5b6673]'}`}>알림 강도</span>
         <div className={`flex overflow-hidden rounded-full border ${tone === 'dark' ? 'border-white/20' : 'border-[#d7e0ea]'}`}>
           {WATCH_ALERT_LEVELS.map((item) => (
@@ -89,7 +91,7 @@ export function WatchAlertLevelSelector({ compact = false, tone = 'light' }: { c
           ))}
         </div>
       </div>
-      <p className={`text-[11px] leading-snug ${tone === 'dark' ? 'text-white/45' : 'text-[#8a95a3]'}`}>
+      <p className={`text-[11px] leading-snug ${tone === 'dark' ? 'text-white/45' : 'text-[#8a95a3]'} ${compact ? 'text-center' : ''}`}>
         {activeLabel} · {activeHint}
         {level !== 'minimal' ? ' · 주 1회 요약 포함' : ''}
         <br />
