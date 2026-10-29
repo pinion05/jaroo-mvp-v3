@@ -32,7 +32,6 @@ import {
   TODAY_BRIEFING_FIRST_REVEAL_SECONDS,
   TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS,
   TODAY_BRIEFING_SKELETON_SECONDS,
-  TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS,
   TODAY_BRIEFING_ITEM_COUNT,
 } from './deepscan-loading-types'
 import {
@@ -684,7 +683,14 @@ export function TodayBriefingCard({
     (_, index) => TODAY_BRIEFING_FIRST_REVEAL_SECONDS + index * TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS,
   )
   const consensusAt = TODAY_BRIEFING_FIRST_REVEAL_SECONDS + TODAY_BRIEFING_ITEM_COUNT * TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS
-  const visibleBriefingItemCount = getVisibleDeepScanBriefingItemCount(elapsedSeconds, briefStartSeconds, { forceReady })
+  const showConsensus = Boolean(consensus || consensusEmptyState || (consensusPendingSkeleton && !forceReady))
+  const consensusContentReady = Boolean(consensus || consensusEmptyState) && isDeepScanBriefingItemContentReady({
+    elapsedSeconds,
+    revealAtSeconds: consensusAt,
+    skeletonSeconds: TODAY_BRIEFING_SKELETON_SECONDS,
+    forceReady,
+  })
+  const visibleBriefingItemCount = getVisibleDeepScanBriefingItemCount(elapsedSeconds, showConsensus ? [...briefStartSeconds, consensusAt] : briefStartSeconds, { forceReady })
 
   useEffect(() => (
     startTodayBriefingMobileAutoScroll(todayBriefListRef.current, visibleBriefingItemCount)
@@ -742,9 +748,9 @@ export function TodayBriefingCard({
         />
         <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={BarChart3} question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
         <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Flame} question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
-        {consensus ? (() => {
-          const consensusTone = consensusToneOf(consensus)
-          const averageUpsidePct = isFiniteNumber(chartAveragePriceValue) && chartAveragePriceValue > 0 && isFiniteNumber(consensus.targetPriceValue) && consensus.targetPriceValue > 0
+        {showConsensus ? (() => {
+          const consensusTone = consensus ? consensusToneOf(consensus) : null
+          const averageUpsidePct = consensus && isFiniteNumber(chartAveragePriceValue) && chartAveragePriceValue > 0 && isFiniteNumber(consensus.targetPriceValue) && consensus.targetPriceValue > 0
             ? (consensus.targetPriceValue / chartAveragePriceValue - 1) * 100
             : null
           const averageUpsideLabel = averageUpsidePct !== null
@@ -759,8 +765,9 @@ export function TodayBriefingCard({
               <span className={styles.todayBriefIcon} aria-hidden='true'><Telescope className='size-[13px]' /></span>
               <span className={styles.todayBriefQuestion}>애널리스트 목표가는 어디쯤일까?</span>
             </div>
-            {forceReady || elapsedSeconds >= consensusAt + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS ? (
-              <div className={styles.consensusInsight}>
+            <div className={cn(styles.todayBriefBody, styles.todayBriefConsensusBody, (forceReady || elapsedSeconds >= consensusAt) ? styles.todayBriefBodyIn : undefined)}>
+              <div className={cn(styles.todayBriefBodyContent, consensusContentReady ? styles.todayBriefBodyContentIn : undefined)}>
+              {consensusContentReady && consensus ? <div className={styles.consensusInsight}>
                 <div className={cn(styles.consensusChartTop, consensusTone === 'profit' ? styles.consensusToneProfit : consensusTone === 'loss' ? styles.consensusToneLoss : undefined)}>
                   <div>
                     <span className={styles.consensusEyebrow}>{consensus.analystCountLabel ?? 'TARGET VIEW'}</span>
@@ -792,45 +799,18 @@ export function TodayBriefingCard({
                     consensus.summary.includes('매수') ? styles.consensusSummaryProfit : consensus.summary.includes('갈리') ? styles.consensusSummaryNeutral : undefined,
                   )}>{consensus.summary}</p>
                 ) : null}
+              </div> : consensusContentReady && consensusEmptyState ? (
+                <div className={styles.consensusInsight}><p className={styles.consensusSummary}>{consensusEmptyState}</p></div>
+              ) : null}
               </div>
-            ) : null}
+              <div className={cn(styles.todayBriefSkeleton, styles.todayBriefConsensusSkeleton, consensusContentReady ? styles.todayBriefSkeletonOut : undefined)} aria-hidden='true'>
+                <span className={styles.todayBriefSkeletonBar} />
+                <span className={styles.todayBriefSkeletonBar} />
+              </div>
+            </div>
           </article>
           )
-        })() : consensusEmptyState ? (
-          <article
-            className={cn(styles.todayBriefItem, (forceReady || elapsedSeconds >= consensusAt) ? styles.todayBriefItemIn : undefined, styles.todayBriefConsensusItem)}
-            data-today-briefing-item='true'
-          >
-            <div className={styles.todayBriefQuestionRow}>
-              <span className={styles.todayBriefIcon} aria-hidden='true'><Telescope className='size-[13px]' /></span>
-              <span className={styles.todayBriefQuestion}>애널리스트 목표가는 어디쯤일까?</span>
-            </div>
-            {forceReady || elapsedSeconds >= consensusAt + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS ? (
-              <div className={styles.consensusInsight}>
-                <p className={styles.consensusSummary}>{consensusEmptyState}</p>
-              </div>
-            ) : null}
-          </article>
-        ) : consensusPendingSkeleton && !forceReady ? (
-          // 컨센서스 데이터 도착 전(스캔 로딩 중)에도 다른 브리핑 아이템과 같은 리듬으로
-          // 질문 + 스켈레톤을 보여준다(2026-10-28 사용자 지시). 데이터가 끝내 없으면(완료 시점)
-          // 기존대로 항목을 숨긴다 — ETF는 로딩 화면에서 애초에 게이트된다.
-          <article
-            className={cn(styles.todayBriefItem, (forceReady || elapsedSeconds >= consensusAt) ? styles.todayBriefItemIn : undefined, styles.todayBriefConsensusItem)}
-            data-today-briefing-item='true'
-          >
-            <div className={styles.todayBriefQuestionRow}>
-              <span className={styles.todayBriefIcon} aria-hidden='true'><Telescope className='size-[13px]' /></span>
-              <span className={styles.todayBriefQuestion}>애널리스트 목표가는 어디쯤일까?</span>
-            </div>
-            <div className={cn(styles.todayBriefBody, (forceReady || elapsedSeconds >= consensusAt) ? styles.todayBriefBodyIn : undefined)}>
-              <div className={styles.todayBriefSkeleton} aria-hidden='true'>
-                <span className={styles.todayBriefSkeletonBar} />
-                <span className={styles.todayBriefSkeletonBar} />
-              </div>
-            </div>
-          </article>
-        ) : null}
+        })() : null}
       </div>
     </section>
   )

@@ -2874,6 +2874,20 @@
   transform: translateY(0);
 }
 
+/* 차트는 기존처럼 전체 너비를 유지하고, 데이터 전 스켈레톤에도 높이를 확보한다. */
+.todayBriefConsensusBody {
+  margin-left: 0;
+}
+
+.todayBriefConsensusBody.todayBriefBodyIn {
+  min-height: 32px;
+  max-height: 500px;
+}
+
+.todayBriefConsensusSkeleton {
+  left: 40px;
+}
+
 .todayBriefBodyContent {
   transition: opacity 0.3s ease;
   opacity: 0;
