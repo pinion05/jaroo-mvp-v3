@@ -491,6 +491,12 @@ export function DeepScanLoadingScreen({
           if (payloadRecoveryForecast && (recoveryCurrent == null || recoveryTarget == null || recoveryCurrent >= recoveryTarget)) {
             return null
           }
+          // 공개 순서(2026-10-29 사용자 지시): 브리핑 배열 전체(스캘래톤 포함) 공개가 끝나고 →
+          // 위원(세 팀) 결과가 완전히 도착한 뒤에 마지막에 등장한다. 브리핑 배열 forceReady와
+          // 같은 완성 조건이므로 이 카드가 먼저 뜨는 일은 없다.
+          if (!resultsReadyForDisplay || elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS) {
+            return null
+          }
           // 완료 카드 자리 — 브리핑 배열과 같은 개인 카드 컨테이너(todayBriefingCard)로 감싼다.
           // 배열 밖으로 옮겨온 뒤 카드 없이 내용이 바로 깔리는 문제 수정(2026-10-28 사용자 지시).
           return (
