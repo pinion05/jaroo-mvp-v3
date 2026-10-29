@@ -30,6 +30,8 @@ import type {
 import {
   TEAM_PRESENTATION_ORDER,
   TEAM_SEQUENCE_COMPLETE_SECONDS,
+  TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS,
+  CONCLUSION_REVEAL_DELAY_AFTER_TEAMS_SECONDS,
 } from './deepscan-loading-types'
 
 import {
@@ -51,6 +53,7 @@ import {
   getCollapsedTeamSummaryText,
   getTeamSummaryState,
   hasDisplayValue,
+  areDeepScanCommitteeCardsSettled,
   isDeepScanConclusionReady,
   hashSummaryInput,
   isExchangeTradedProduct,
@@ -114,6 +117,8 @@ export function DeepScanLoadingScreen({
 }: DeepScanLoadingScreenProps) {
   const isError = Boolean(errorNotice)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [teamsSettledAtSeconds, setTeamsSettledAtSeconds] = useState<number | null>(null)
+  const [prevCommitteeCardsSettled, setPrevCommitteeCardsSettled] = useState(false)
   const [teamSummaries, setTeamSummaries] = useState<Partial<Record<LoadingStageKey, TeamSummaryState>>>({})
   const [expandedTeamSummaries, setExpandedTeamSummaries] = useState<ReadonlySet<LoadingStageKey>>(() => new Set())
   const teamSummaryFetchCoordinatorRef = useRef(createTeamSummaryFetchCoordinator())
@@ -204,12 +209,23 @@ export function DeepScanLoadingScreen({
     () => buildSequentialNarrativeCards(timelineNarrativeCards, teamSummaries, resultsReadyForDisplay),
     [resultsReadyForDisplay, teamSummaries, timelineNarrativeCards],
   )
-  const inlineResultsReady = isDeepScanConclusionReady({
+  const committeeCardsSettled = areDeepScanCommitteeCardsSettled({
     resultsReady: resultsReadyForDisplay,
-    elapsedSeconds,
-    sequenceCompleteSeconds: TEAM_SEQUENCE_COMPLETE_SECONDS,
     cards: sequentialNarrativeCards,
     teamSummaries,
+  })
+  // 위원(세 팀) 카드가 완전히 렌더링된 최초 시점을 기록한다(2026-10-29). 종합 결론은 이 시점
+  // +n초(브리핑 배열 완료와 비교해 늦은 쪽)에 공개된다 — 스캔 시작 기준 81초 절대 게이트가
+  // 아니라 위원 컴포넌트 완성 기준 상대 시점. 렌더 중 상태 조정(React 공식 패턴 — You Might
+  // Not Need an Effect)으로 기록하고, 미완으로 되돌아가면(재스캔) 초기화해 순서를 다시 지킨다.
+  if (committeeCardsSettled !== prevCommitteeCardsSettled) {
+    setPrevCommitteeCardsSettled(committeeCardsSettled)
+    setTeamsSettledAtSeconds(committeeCardsSettled && teamsSettledAtSeconds === null ? elapsedSeconds : null)
+  }
+  const inlineResultsReady = isDeepScanConclusionReady({
+    teamsSettledAtSeconds,
+    elapsedSeconds,
+    arrayCompleteSeconds: TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS,
   })
   const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReadyForDisplay)
   const isTeamBridgeVisible = Boolean(teamBridgeState)
@@ -217,7 +233,9 @@ export function DeepScanLoadingScreen({
   // 재생되어야 한다(2026-10-28 사용자 지시 — 캐시 재사용·빠른 완료 모두 해당).
   // 타임라인은 시퀀스 완료 시각까지 항상 진행하고, 아이템 forceReady는 시퀀스
   // 완료 전에는 켜지 않는다. 상태바(completionState)·브리지 억제는 기존 그대로.
+  // 위원 카드가 81초 이후에 완성되는 흐름에서는 종합 결론 공개(+n초)까지 타이머를 연장한다.
   const shouldAdvanceTimeline = elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS
+    || (teamsSettledAtSeconds !== null && elapsedSeconds < teamsSettledAtSeconds + CONCLUSION_REVEAL_DELAY_AFTER_TEAMS_SECONDS)
   const progressPct = resultsReadyForDisplay ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
   const activeNarrativeCard = sequentialNarrativeCards.findLast((card) => !card.placeholder) ?? sequentialNarrativeCards.at(-1) ?? visibleNarrativeCards.at(-1) ?? orderedNarrativeCards[0]
   const progressLabel = resultsReadyForDisplay
@@ -501,10 +519,10 @@ export function DeepScanLoadingScreen({
           if (payloadRecoveryForecast && (recoveryCurrent == null || recoveryTarget == null || recoveryCurrent >= recoveryTarget)) {
             return null
           }
-          // 공개 순서(2026-10-29 사용자 지시): 브리핑 배열 전체(스캘래톤 포함) 공개가 끝나고 →
-          // 위원(세 팀) 결과가 완전히 도착한 뒤에 마지막에 등장한다. 브리핑 배열 forceReady와
-          // 같은 완성 조건이므로 이 카드가 먼저 뜨는 일은 없다.
-          if (!resultsReadyForDisplay || elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS) {
+          // 공개 순서: 브리핑 배열 전체(스캘래톤 포함) 공개가 끝나고 → 위원(세 팀) 카드가 완전히
+          // 렌더링된 뒤에 등장한다(2026-10-29 — 81초 절대 게이트를 배열 완료·위원 완성 시점 기준
+          // 상대 게이트로 교체). 종합 결론은 이 카드 뒤 n초 뒤에 이어진다.
+          if (!resultsReadyForDisplay || teamsSettledAtSeconds === null || elapsedSeconds < Math.max(TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS, teamsSettledAtSeconds)) {
             return null
           }
           // 완료 카드 자리 — 브리핑 배열과 같은 개인 카드 컨테이너(todayBriefingCard)로 감싼다.

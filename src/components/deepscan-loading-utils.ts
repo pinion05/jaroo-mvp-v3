@@ -36,6 +36,8 @@ import {
   TEAM_PRESENTATION_ORDER,
   TEAM_REVEAL_SECONDS,
   TODAY_BRIEFING_ITEM_SELECTOR,
+  CONCLUSION_REVEAL_DELAY_AFTER_ARRAY_SECONDS,
+  CONCLUSION_REVEAL_DELAY_AFTER_TEAMS_SECONDS,
 } from './deepscan-loading-types'
 
 /** 스냅샷 저장 시각(ISO) → '9월 8일' 라벨. 파싱 실패 시 null. */
@@ -574,23 +576,41 @@ export function hasNarrativeLoadingSkeleton(card: NarrativeCard, teamSummaries: 
   return !summaryText && !fallbackSummary
 }
 
-export function isDeepScanConclusionReady({
+export function areDeepScanCommitteeCardsSettled({
   resultsReady,
-  elapsedSeconds,
-  sequenceCompleteSeconds,
   cards,
   teamSummaries,
 }: {
   resultsReady: boolean
-  elapsedSeconds: number
-  sequenceCompleteSeconds: number
   cards: NarrativeCard[]
   teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>
 }) {
   return resultsReady
-    && elapsedSeconds >= sequenceCompleteSeconds
     && cards.length === TEAM_PRESENTATION_ORDER.length
     && cards.every((card) => !hasNarrativeLoadingSkeleton(card, teamSummaries, true))
+}
+
+// 종합 결론 공개 판정(2026-10-29) — 위원 카드 완성 시점(teamsSettledAtSeconds)과 브리핑 배열
+// 완료 시각(arrayCompleteSeconds) 중 늦은 쪽에 각각 지정 지연을 더한 시각부터 공개한다.
+// 캐시 등으로 위원 카드가 일찍 완성돼도 배열이 끝나기 전에 결론이 먼저 나오지 않고,
+// 신선 스캔처럼 위원 카드가 늦게 완성되면 그 시점부터 n초 뒤에 바로 나온다(81초 절대 게이트 폐지).
+export function isDeepScanConclusionReady({
+  teamsSettledAtSeconds,
+  elapsedSeconds,
+  arrayCompleteSeconds,
+}: {
+  teamsSettledAtSeconds: number | null
+  elapsedSeconds: number
+  arrayCompleteSeconds: number
+}) {
+  if (teamsSettledAtSeconds === null) {
+    return false
+  }
+
+  return elapsedSeconds >= Math.max(
+    teamsSettledAtSeconds + CONCLUSION_REVEAL_DELAY_AFTER_TEAMS_SECONDS,
+    arrayCompleteSeconds + CONCLUSION_REVEAL_DELAY_AFTER_ARRAY_SECONDS,
+  )
 }
 
 export function buildSequentialNarrativeCards(cards: NarrativeCard[], teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>, resultsReady = false) {
