@@ -80,6 +80,9 @@ type UploadStatus = {
 }
 
 const MIN_IDENTIFIER_SEARCH_RING_MS = 900
+// 적용 후 홈 이동 전 시세 프리페치 상한 — 이 시간을 넘으면 이동을 먼저 하고
+// 시세 하이드레이션은 백그라운드로 계속한다(2026-10-29).
+const OCR_APPLY_QUOTE_PREFETCH_CAP_MS = 2_500
 
 function waitForMinimumIdentifierSearchRing(startedAt: number) {
   const remainingMs = MIN_IDENTIFIER_SEARCH_RING_MS - (Date.now() - startedAt)
@@ -826,14 +829,22 @@ export default function OcrPage() {
       const nextQuoteQuery = buildHomeCurrentQuoteQuery(applyResult.nextQuoteHoldings)
       replacePortfolioItems(applyResult.normalizedItems)
       setQuoteStatus('loading', null, nextQuoteQuery)
-      void hydratePortfolioItemsWithCurrentQuotes(applyResult.normalizedItems)
-        .then((result) => {
-          replacePortfolioItems(result.items)
-          setQuoteStatus(result.quoteStatus, result.quoteErrorMessage, result.quoteQuery)
-        })
-        .catch(() => {
-          setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', null)
-        })
+      // 시세 프리페치(2026-10-29): 완료 또는 상한(2.5s)까지 홈 이동을 잠깐 미룬다 — 홈 첫 프레임이
+      // '- · - · 관찰' 임시값으로 깜빡이는 갭 제거. 상한 도달 시 백그라운드 하이드레이션이 계속
+      // 이어져 기존 동작(홈에서 늦게 시세 반영)으로 떨어진다. 실패해도 이동은 계속한다.
+      await Promise.race([
+        hydratePortfolioItemsWithCurrentQuotes(applyResult.normalizedItems)
+          .then((result) => {
+            replacePortfolioItems(result.items)
+            setQuoteStatus(result.quoteStatus, result.quoteErrorMessage, result.quoteQuery)
+          })
+          .catch(() => {
+            setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', null)
+          }),
+        new Promise<void>((resolve) => {
+          setTimeout(resolve, OCR_APPLY_QUOTE_PREFETCH_CAP_MS)
+        }),
+      ])
       markApplied(appliedAt)
       // 적용 후 이탈 표식 — 업로드 세션 정리(clearUploadInput)는 언마운트 클린업에서 한다.
       // push 직전에 store를 지우면 아직 마운트된 /ocr이 '0장 · 0개 종목 인식' 상태로
