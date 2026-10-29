@@ -392,6 +392,16 @@ export default function OcrPage() {
     )
   }, [hasCheckedPersistedUploadSession, router, session, setRequestStatus, setResolveStatus])
 
+  // 적용 후 이탈 시 업로드 세션 정리 — 실제로 /ocr이 언마운트되는 시점에 실행한다.
+  // handleContinue 안에서 바로 지우면 라우트 전환(~0.5s) 동안 아직 마운트된 /ocr이
+  // 빈 세션으로 재렌더링돼 '0개 종목 인식됐어요 · 인식된 종목이 없어요'가 깜빡인다.
+  useEffect(() => () => {
+    if (isLeavingAfterApplyRef.current) {
+      clearPersistedScreenshotUploadSession()
+      clearUploadInput()
+    }
+  }, [clearUploadInput])
+
   useEffect(() => {
     if (uploadStoreSession) {
       setPersistedUploadSession(uploadStoreSession)
@@ -825,9 +835,10 @@ export default function OcrPage() {
           setQuoteStatus('error', '현재 시세를 불러오지 못했어요. 다시 시도해주세요.', null)
         })
       markApplied(appliedAt)
+      // 적용 후 이탈 표식 — 업로드 세션 정리(clearUploadInput)는 언마운트 클린업에서 한다.
+      // push 직전에 store를 지우면 아직 마운트된 /ocr이 '0장 · 0개 종목 인식' 상태로
+      // 한 프레임 깨져 보이는 플리커가 생긴다(2026-10-29 실측 재현).
       isLeavingAfterApplyRef.current = true
-      clearPersistedScreenshotUploadSession()
-      clearUploadInput()
       router.push('/home')
     } catch (error) {
       setApplyStatus('error', error instanceof Error ? error.message : '포트폴리오 저장에 실패했어요.')
