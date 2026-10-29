@@ -4,13 +4,21 @@ import { createRequire } from 'node:module'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
-import { TEAM_PRESENTATION_ORDER, TEAM_SEQUENCE_COMPLETE_SECONDS, type NarrativeCard, type TeamSummaryState, type LoadingStageKey } from './deepscan-loading-types'
+import {
+  CONCLUSION_REVEAL_DELAY_AFTER_ARRAY_SECONDS,
+  CONCLUSION_REVEAL_DELAY_AFTER_TEAMS_SECONDS,
+  TEAM_PRESENTATION_ORDER,
+  TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS,
+  type NarrativeCard,
+  type TeamSummaryState,
+  type LoadingStageKey,
+} from './deepscan-loading-types'
 
 const require = createRequire(import.meta.url)
 require.extensions['.css'] = (module) => {
   module.exports = new Proxy({}, { get: (_target, property) => property === '__esModule' ? false : String(property) })
 }
-const { buildOrderedNarrativeCards, buildSequentialNarrativeCards, hashSummaryInput, isDeepScanConclusionReady } = require('./deepscan-loading-utils') as typeof import('./deepscan-loading-utils')
+const { buildOrderedNarrativeCards, hashSummaryInput, areDeepScanCommitteeCardsSettled, isDeepScanConclusionReady } = require('./deepscan-loading-utils') as typeof import('./deepscan-loading-utils')
 const { DeepScanLoadingScreen } = require('./deepscan-loading-screen') as typeof import('./deepscan-loading-screen')
 
 const cards: NarrativeCard[] = TEAM_PRESENTATION_ORDER.map((teamKey) => ({
@@ -31,16 +39,41 @@ const summaries = Object.fromEntries(cards.map((card) => [card.teamKey!, {
   inputKey: hashSummaryInput(card.body), status: 'success', summary: '팀 요약',
 }])) as Partial<Record<LoadingStageKey, TeamSummaryState>>
 
-function ready(overrides: Partial<Parameters<typeof isDeepScanConclusionReady>[0]> = {}) {
+function settled(overrides: Partial<Parameters<typeof areDeepScanCommitteeCardsSettled>[0]> = {}) {
+  return areDeepScanCommitteeCardsSettled({ resultsReady: true, cards, teamSummaries: summaries, ...overrides })
+}
+
+function conclusion(overrides: Partial<Parameters<typeof isDeepScanConclusionReady>[0]> = {}) {
   return isDeepScanConclusionReady({
-    resultsReady: true,
-    elapsedSeconds: TEAM_SEQUENCE_COMPLETE_SECONDS,
-    sequenceCompleteSeconds: TEAM_SEQUENCE_COMPLETE_SECONDS,
-    cards,
-    teamSummaries: summaries,
+    teamsSettledAtSeconds: 20,
+    elapsedSeconds: 60,
+    arrayCompleteSeconds: TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS,
     ...overrides,
   })
 }
+
+test('위원 카드 완성 판정 — 자리표시자·요약 로딩·미완 응답은 미완성', () => {
+  assert.equal(settled(), true)
+  assert.equal(settled({ resultsReady: false }), false)
+  assert.equal(settled({ cards: cards.slice(0, 2) }), false)
+  assert.equal(settled({ teamSummaries: {} }), false)
+  const loading = { ...summaries, fundamentalTeam: { inputKey: hashSummaryInput(cards[2].body), status: 'loading' as const } }
+  assert.equal(settled({ teamSummaries: loading }), false)
+  // 위원 응답이 종결돼 일부만 도착한 카드는 결과 준비 뒤 실패 대체 문구로 완성 취급한다
+  const incomplete = cards.map((card) => ({ ...card, complete: false, summarizable: false }))
+  assert.equal(settled({ cards: buildOrderedNarrativeCards(incomplete, TEAM_PRESENTATION_ORDER), teamSummaries: {} }), true)
+})
+
+test('종합 결론은 위원 카드 완성 + 3초(배열 완료 + 2초와 비교해 늦은 쪽)부터 공개', () => {
+  assert.equal(conclusion({ teamsSettledAtSeconds: null }), false)
+  // 캐시: 위원 카드 20초 완성 → max(23, 38+2) = 40초 공개(배열이 아직 진행 중이면 기다림)
+  assert.equal(conclusion({ teamsSettledAtSeconds: 20, elapsedSeconds: 39 }), false)
+  assert.equal(conclusion({ teamsSettledAtSeconds: 20, elapsedSeconds: 40 }), true)
+  // 신선: 위원 카드 79초 완성 → 82초 공개(81초 절대 게이트와 무관)
+  assert.equal(conclusion({ teamsSettledAtSeconds: 79, elapsedSeconds: 81 }), false)
+  assert.equal(conclusion({ teamsSettledAtSeconds: 79, elapsedSeconds: 82 }), true)
+  assert.ok(TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS + CONCLUSION_REVEAL_DELAY_AFTER_ARRAY_SECONDS > 20 + CONCLUSION_REVEAL_DELAY_AFTER_TEAMS_SECONDS)
+})
 
 test('캐시 결과가 준비된 첫 렌더에도 종합 결론을 표시하지 않는다', () => {
   const markup = renderToStaticMarkup(createElement(DeepScanLoadingScreen, {
@@ -49,28 +82,4 @@ test('캐시 결과가 준비된 첫 렌더에도 종합 결론을 표시하지 
     inlineResults: createElement('div', null, '세 팀의 의견을 모았어요'),
   }))
   assert.doesNotMatch(markup, /세 팀의 의견을 모았어요/)
-})
-
-test('캐시 결과가 빨리 와도 브리핑 목록과 팀 카드가 끝나기 전 종합 결론은 숨긴다', () => {
-  assert.equal(ready({ elapsedSeconds: 0 }), false)
-  assert.equal(ready({ elapsedSeconds: TEAM_SEQUENCE_COMPLETE_SECONDS - 1 }), false)
-  assert.equal(ready({ resultsReady: false }), false)
-  assert.equal(ready({ cards: cards.slice(0, 2) }), false)
-  assert.equal(ready(), true)
-})
-
-test('팀 요약 스켈레톤이 남아 있으면 마지막 카드까지 완성될 때까지 기다린다', () => {
-  const pending = { ...summaries, fundamentalTeam: { inputKey: hashSummaryInput(cards[2].body), status: 'loading' as const } }
-  const visible = buildSequentialNarrativeCards(cards, pending, true)
-  assert.equal(ready({ cards: visible, teamSummaries: pending }), false)
-  assert.equal(ready({ teamSummaries: { ...pending, fundamentalTeam: { inputKey: hashSummaryInput(cards[2].body), status: 'error' } } }), true)
-  assert.equal(ready({ teamSummaries: { ...summaries, fundamentalTeam: { inputKey: 'stale', status: 'success', summary: '오래된 요약' } } }), false)
-})
-
-test('도착 이벤트가 빠진 종결 결과는 최종 팀 카드와 실패 대체 문구로 표시할 수 있다', () => {
-  const incomplete = cards.map((card) => ({ ...card, complete: false, summarizable: false }))
-  const withMissingArrival = buildOrderedNarrativeCards(incomplete, ['marketTeam'])
-  assert.equal(ready({ cards: withMissingArrival, teamSummaries: {} }), false)
-  const terminalCards = buildOrderedNarrativeCards(incomplete, TEAM_PRESENTATION_ORDER)
-  assert.equal(ready({ cards: terminalCards, teamSummaries: {} }), true)
 })

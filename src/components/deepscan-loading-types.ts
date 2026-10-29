@@ -181,6 +181,14 @@ export const TEAM_BRIDGE_STATUS_MESSAGES = [
   '시장 흐름과 평단을 맞춰보는 중…',
   '세 팀이 의견을 정리하는 중…',
 ] as const
+// 종합 결론 공개 시점(2026-10-29 사용자 지시) — 스캔 시작 기준 절대 시각(81s)이 아니라
+// '위원(세 팀) 카드가 완전히 렌더링된 시점 + n초'를 기준으로 한다. 캐시 재사용처럼 위원 카드가
+// 일찍 완성되는 흐름에서 결론이 81초까지 붙잡혀 있던 문제의 수정.
+// 단, 오늘 브리핑 배열(5초 리듬 순차 공개)이 아직 진행 중이면 배열 완료도 함께 기다린다 —
+// 결론이 목록 컴포넌트보다 먼저 나오는 기존 문제(2026-10-29 이전 지시)가 되돌아오지 않게.
+export const TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS = TODAY_BRIEFING_FIRST_REVEAL_SECONDS + TODAY_BRIEFING_ITEM_COUNT * TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS + TODAY_BRIEFING_SKELETON_SECONDS
+export const CONCLUSION_REVEAL_DELAY_AFTER_TEAMS_SECONDS = 3
+export const CONCLUSION_REVEAL_DELAY_AFTER_ARRAY_SECONDS = 2
 
 // ─── Committee Members & Teams ───────────────────────────────────────────────
 
