@@ -574,6 +574,25 @@ export function hasNarrativeLoadingSkeleton(card: NarrativeCard, teamSummaries: 
   return !summaryText && !fallbackSummary
 }
 
+export function isDeepScanConclusionReady({
+  resultsReady,
+  elapsedSeconds,
+  sequenceCompleteSeconds,
+  cards,
+  teamSummaries,
+}: {
+  resultsReady: boolean
+  elapsedSeconds: number
+  sequenceCompleteSeconds: number
+  cards: NarrativeCard[]
+  teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>
+}) {
+  return resultsReady
+    && elapsedSeconds >= sequenceCompleteSeconds
+    && cards.length === TEAM_PRESENTATION_ORDER.length
+    && cards.every((card) => !hasNarrativeLoadingSkeleton(card, teamSummaries, true))
+}
+
 export function buildSequentialNarrativeCards(cards: NarrativeCard[], teamSummaries: Partial<Record<LoadingStageKey, TeamSummaryState>>, resultsReady = false) {
   const sequentialCards: NarrativeCard[] = []
 

@@ -28,6 +28,7 @@ import type {
 } from './deepscan-loading-types'
 
 import {
+  TEAM_PRESENTATION_ORDER,
   TEAM_SEQUENCE_COMPLETE_SECONDS,
 } from './deepscan-loading-types'
 
@@ -50,6 +51,7 @@ import {
   getCollapsedTeamSummaryText,
   getTeamSummaryState,
   hasDisplayValue,
+  isDeepScanConclusionReady,
   hashSummaryInput,
   isExchangeTradedProduct,
   isHiddenLoadingQuickFact,
@@ -164,8 +166,9 @@ export function DeepScanLoadingScreen({
     [committeeAxes, currentPriceText, displayQuickFacts, exchangeProduct, findingProgress, performanceComment, tradingVolumeText],
   )
   const orderedNarrativeCards = useMemo(
-    () => buildOrderedNarrativeCards(loadingStages, arrivedStageKeys),
-    [arrivedStageKeys, loadingStages],
+    // 종결된 캐시/오류 응답에서 일부 팀 도착 이벤트가 누락되어도 결과를 영원히 숨기지 않는다.
+    () => buildOrderedNarrativeCards(loadingStages, resultsReady && elapsedSeconds >= TEAM_SEQUENCE_COMPLETE_SECONDS ? TEAM_PRESENTATION_ORDER : arrivedStageKeys),
+    [arrivedStageKeys, elapsedSeconds, loadingStages, resultsReady],
   )
   const teamSummaryRequests = useMemo(
     () => loadingStages.flatMap((card) => {
@@ -201,6 +204,13 @@ export function DeepScanLoadingScreen({
     () => buildSequentialNarrativeCards(timelineNarrativeCards, teamSummaries, resultsReadyForDisplay),
     [resultsReadyForDisplay, teamSummaries, timelineNarrativeCards],
   )
+  const inlineResultsReady = isDeepScanConclusionReady({
+    resultsReady: resultsReadyForDisplay,
+    elapsedSeconds,
+    sequenceCompleteSeconds: TEAM_SEQUENCE_COMPLETE_SECONDS,
+    cards: sequentialNarrativeCards,
+    teamSummaries,
+  })
   const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReadyForDisplay)
   const isTeamBridgeVisible = Boolean(teamBridgeState)
   // 브리핑 배열의 순차 공개(5초 리듬)는 결과가 언제 도착하든 시퀀스가 끝날 때까지
@@ -508,7 +518,7 @@ export function DeepScanLoadingScreen({
           )
         })()}
 
-        {resultsReadyForDisplay && inlineResults ? <div className={styles.inlineResultsSlot}>{inlineResults}</div> : null}
+        {inlineResultsReady && inlineResults ? <div className={styles.inlineResultsSlot}>{inlineResults}</div> : null}
           </>
         )}
         <p className={styles.privacy}>분석 결과는 투자 권유가 아닌 참고 자료입니다.</p>
