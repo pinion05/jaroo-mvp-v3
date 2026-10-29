@@ -39,4 +39,5 @@ test('컨센서스(애널리스트 목표가) 아이템도 로딩 중 질문+스
   assert.match(briefingCard, /consensusPendingSkeleton\?: boolean/, '프롭이 선언되어야 한다')
   const screen = readFileSync(new URL('../src/components/deepscan-loading-screen.tsx', import.meta.url), 'utf8')
   assert.match(screen, /consensusPendingSkeleton=\{!exchangeProduct\}/, '일반 주식만 스켈레톤 활성(ETF는 미표시 유지)')
+  assert.match(screen, /consensusEmptyState=\{resultsReadyForDisplay && !exchangeProduct \? DEEPSCAN_CONSENSUS_EMPTY_STATE_TEXT : null\}/, '목표가 미제공 종목은 결과 확정 뒤 빈 상태 안내로 마무리(스캘래톤이 떴다 소멸하지 않게, 2026-10-29)')
 })

@@ -160,7 +160,7 @@ export const TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS = 5
 export const TODAY_BRIEFING_SKELETON_SECONDS = 3
 // 일반 종목의 스캔 완료 후 컨센서스(애널리스트 목표가) 데이터가 없을 때 오늘 브리핑에 내보내는 문구.
 // 세 소비처(loading-screen·briefing-card·debug fixture)가 이 상수를 참조해 리터럴 드리프트를 막는다.
-export const DEEPSCAN_CONSENSUS_EMPTY_STATE_TEXT = '증권사의 목표가평가가 아직없어요.'
+export const DEEPSCAN_CONSENSUS_EMPTY_STATE_TEXT = '증권사 목표가가 아직 없어요.'
 export const COMPLETION_SOON_REVEAL_SECONDS = 43
 export const TODAY_BRIEFING_ITEM_COUNT = 6
 export const TODAY_BRIEFING_ITEM_SELECTOR = '[data-today-briefing-item="true"]'
