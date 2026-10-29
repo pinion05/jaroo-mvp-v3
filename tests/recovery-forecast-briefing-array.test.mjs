@@ -10,6 +10,7 @@ test('원금회수 예측은 브리핑 배열 밖 — 기존 완료 카드 자�
   assert.match(screen, /<TodayRecoveryForecastBriefing at=\{0\} elapsedSeconds=\{0\} forceReady recovery=/, '완료 카드 자리에 회복 컴포넌트가 렌더되어야 한다')
   assert.match(screen, /<section className=\{styles\.todayBriefingCard\} aria-label='원금회수 예측'>/, '완료 자리 회복 컴포넌트는 개인 카드 컨테이너로 감싸져야 한다')
   assert.match(screen, /<div className=\{styles\.todayBriefList\}>/, '배열과 같은 내부 패딩 컨테이너를 쓴다')
+  assert.match(screen, /if \(!resultsReadyForDisplay \|\| elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS\)/, '공개 순서 게이트: 배열 스캘래톤 전부 공개 + 위원 결과 완전 도착 후에만 렌더')
   assert.doesNotMatch(screen, /completionTitle|completionCard/, "완료 카드('실제 분석 결과가 도착했어요')는 제거되어야 한다")
   assert.doesNotMatch(screen, /progressDetails|세부 진행 단계/, "'세부 진행 단계·분석 상태' 접힘 컴포넌트는 제거되어야 한다")
 })
