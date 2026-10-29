@@ -491,7 +491,15 @@ export function DeepScanLoadingScreen({
           if (payloadRecoveryForecast && (recoveryCurrent == null || recoveryTarget == null || recoveryCurrent >= recoveryTarget)) {
             return null
           }
-          return <TodayRecoveryForecastBriefing at={0} elapsedSeconds={0} forceReady recovery={recoverySource} />
+          // 완료 카드 자리 — 브리핑 배열과 같은 개인 카드 컨테이너(todayBriefingCard)로 감싼다.
+          // 배열 밖으로 옮겨온 뒤 카드 없이 내용이 바로 깔리는 문제 수정(2026-10-28 사용자 지시).
+          return (
+            <section className={styles.todayBriefingCard} aria-label='원금회수 예측'>
+              <div className={styles.todayBriefList}>
+                <TodayRecoveryForecastBriefing at={0} elapsedSeconds={0} forceReady recovery={recoverySource} />
+              </div>
+            </section>
+          )
         })()}
 
         {resultsReadyForDisplay && inlineResults ? <div className={styles.inlineResultsSlot}>{inlineResults}</div> : null}
