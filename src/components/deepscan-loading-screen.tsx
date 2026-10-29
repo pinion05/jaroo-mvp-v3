@@ -54,6 +54,7 @@ import {
   getCollapsedTeamSummaryText,
   getTeamSummaryState,
   hasDisplayValue,
+  hasNarrativeLoadingSkeleton,
   areDeepScanCommitteeCardsSettled,
   isDeepScanConclusionReady,
   hashSummaryInput,
@@ -124,6 +125,7 @@ export function DeepScanLoadingScreen({
   const [expandedTeamSummaries, setExpandedTeamSummaries] = useState<ReadonlySet<LoadingStageKey>>(() => new Set())
   const teamSummaryFetchCoordinatorRef = useRef(createTeamSummaryFetchCoordinator())
   const teamBridgeRef = useRef<HTMLElement | null>(null)
+  const narrativeStreamRef = useRef<HTMLElement | null>(null)
   const targetLine = [identifier, market].filter(Boolean).join(' · ')
   const exchangeProduct = isExchangeTradedProduct(market, instrumentKind)
   const sharesText = formatShares(shares)
@@ -228,6 +230,21 @@ export function DeepScanLoadingScreen({
     elapsedSeconds,
     arrayCompleteSeconds: TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS,
   })
+  // AI 위원(세 팀) 카드가 하나씩 공개될 때마다 그 카드로 화면을 내린다(2026-10-29 사용자 지시).
+  // 브리핑 배열·팀 브리지와 같은 모바일 오토스크롤 헬퍼를 재사용한다 — 새 카드 행이 등장할 때와
+  // 스켈래톤이 내용으로 채워질 때(렌더된 행 수·확정 카드 수 변화) 마지막 카드 하단을 뷰에 맞춘다.
+  const settledCommitteeCardCount = sequentialNarrativeCards.filter(
+    (card) => !hasNarrativeLoadingSkeleton(card, teamSummaries, resultsReadyForDisplay),
+  ).length
+  useEffect(() => {
+    if (sequentialNarrativeCards.length <= 0) {
+      return undefined
+    }
+
+    const cardNodes = narrativeStreamRef.current?.querySelectorAll<HTMLElement>('[data-narrative-card]')
+    const target = cardNodes?.item(sequentialNarrativeCards.length - 1) ?? null
+    return startDeepScanMobileAutoScroll(target)
+  }, [sequentialNarrativeCards.length, settledCommitteeCardCount])
   const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReadyForDisplay)
   const isTeamBridgeVisible = Boolean(teamBridgeState)
   // 브리핑 배열의 순차 공개(5초 리듬)는 결과가 언제 도착하든 시퀀스가 끝날 때까지
@@ -429,7 +446,7 @@ export function DeepScanLoadingScreen({
           </div>
         </section>
 
-        <section className={styles.narrativeStream} aria-label='분석가 진행 메시지'>
+        <section ref={narrativeStreamRef} className={styles.narrativeStream} aria-label='분석가 진행 메시지'>
           {sequentialNarrativeCards.map((card) => {
             const {
               summaryReady,
@@ -455,7 +472,7 @@ export function DeepScanLoadingScreen({
             ].filter((tag): tag is { text: string; tone: NarrativeTone } => Boolean(tag))
 
             return (
-              <article key={card.key} className={cn(styles.narrativeCard, cardSettled ? undefined : styles.narrativeCardPending)}>
+              <article key={card.key} data-narrative-card={card.key} className={cn(styles.narrativeCard, cardSettled ? undefined : styles.narrativeCardPending)}>
                 <div className={styles.narrativeHead}>
                   <span className={cn(styles.narrativeAvatar, card.placeholder && !card.teamKey ? styles.narrativeAvatarPending : undefined)} aria-hidden='true'>{card.placeholder && !card.teamKey ? <Loader2 className={styles.narrativeSpinner} aria-hidden /> : typeof card.avatar === 'string' || card.avatar == null ? card.avatar : <card.avatar className='size-[18px]' aria-hidden />}</span>
                   <div className={styles.narrativeNameWrap}>
