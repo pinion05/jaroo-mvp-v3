@@ -41,3 +41,9 @@ test('컨센서스(애널리스트 목표가) 아이템도 로딩 중 질문+스
   assert.match(screen, /consensusPendingSkeleton=\{!exchangeProduct\}/, '일반 주식만 스켈레톤 활성(ETF는 미표시 유지)')
   assert.match(screen, /consensusEmptyState=\{resultsReadyForDisplay && !exchangeProduct \? DEEPSCAN_CONSENSUS_EMPTY_STATE_TEXT : null\}/, '목표가 미제공 종목은 결과 확정 뒤 빈 상태 안내로 마무리(스캘래톤이 떴다 소멸하지 않게, 2026-10-29)')
 })
+
+test('딥스캔 결과 카드의 알림 강도 선택기는 가운데 정렬이다(2026-10-29)', () => {
+  const selector = readFileSync(new URL('../src/components/watch-alert-level.tsx', import.meta.url), 'utf8')
+  assert.match(selector, /compact \? 'flex flex-col items-center gap-1\.5' : 'flex flex-wrap items-center gap-1\.5'/, '컴팩트 모드는 라벨·필 그룹을 세로 가운데 정렬')
+  assert.match(selector, /\$\{compact \? 'text-center' : ''\}/, '컴팩트 모드 힌트도 가운데 정렬')
+})
