@@ -13,7 +13,7 @@ import {
   shouldShowDeepScanSummarySkeleton,
 } from './deepscan-loading-behavior'
 
-test('DeepScan ready payload displays inline results immediately without waiting for the staged timeline', () => {
+test('DeepScan payload readiness remains independent of the presentation timeline', () => {
   const rawReady = isDeepScanInlineResultsReady({
     fetchState: 'success',
     hasPayload: true,

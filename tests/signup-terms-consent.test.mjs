@@ -21,8 +21,9 @@ test('로그인 화면은 필수 가입 동의 체크박스로 게이트하며 �
   assert.match(source, /href='\/terms'/)
   assert.match(source, /href='\/privacy'/)
 
-  // 동의 전에는 Google/이메일 진입을 막는다
-  assert.match(source, /disabled=\{pending \|\| !termsAgreed\}/)
+  // 동의 전에는 Google/이메일 진입을 막는다 — dev 자동로그인 플래그(dev 배포 전용)가 켜져 있을 때만
+  // 게이트를 우회한다(NEXT_PUBLIC_DEV_AUTO_LOGIN 없는 prod/로컬은 termsAgreed 게이트 그대로).
+  assert.match(source, /disabled=\{pending \|\| \(!devAutoLoginEnabled && !termsAgreed\)\}/)
   assert.match(source, /서비스 이용약관과 개인정보처리방침에 동의해주세요\./)
 
   // 동의 상태는 공유 훅이 관리한다

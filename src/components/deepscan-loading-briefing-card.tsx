@@ -1,7 +1,7 @@
 'use client'
 
 import { useRef, useEffect, useMemo } from 'react'
-import { BarChart3, Calendar, ChartCandlestick, ChevronLeft, Flame, Target, Telescope, TrendingUp, type LucideIcon } from 'lucide-react'
+import { BarChart3, Calendar, ChartCandlestick, ChevronLeft, Flame, Hourglass, Target, Telescope, TrendingUp, type LucideIcon } from 'lucide-react'
 import type { ReactNode } from 'react'
 import Link from 'next/link'
 import type {
@@ -32,7 +32,6 @@ import {
   TODAY_BRIEFING_FIRST_REVEAL_SECONDS,
   TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS,
   TODAY_BRIEFING_SKELETON_SECONDS,
-  TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS,
   TODAY_BRIEFING_ITEM_COUNT,
 } from './deepscan-loading-types'
 import {
@@ -41,11 +40,20 @@ import {
   getPreviousBriefingDailyRow,
   calculateBriefingOneMonthChangePct,
   calculateBriefingShortStreak,
+  type LoadingBriefingRecoveryForecast,
 } from '@/lib/deepscan-briefing-snapshot'
+import type { JarooDeepScanRecoveryForecastBlock } from '../../packages/contracts/src/deepscan'
 import { resolveDeepScanBriefingCardCurrentPrice } from '@/lib/deepscan-loading-current-price'
 import { buildDeepScanShortFlow } from '@/lib/deepscan-short-flow'
 import { getVisibleDeepScanBriefingItemCount, isDeepScanBriefingItemContentReady } from '@/lib/deepscan-loading-behavior'
 import { buildConsensusFanGeometry, estimateDailyVolatility } from '@/lib/deepscan-target-price-paths'
+import {
+  buildRecoveryChartGeometry,
+  compactPrice,
+  RECOVERY_CHART_HEIGHT,
+  RECOVERY_CHART_MARGIN,
+  RECOVERY_CHART_WIDTH,
+} from './deepscan-recovery-forecast-card'
 import { cn } from '@/lib/utils'
 import styles from './deepscan-loading-screen.module.css'
 
@@ -371,6 +379,151 @@ export function TodayMarketBriefing({
 }
 
 
+// 원금회수 예측 섹션 모델 식별색 — 딥스캔 결과 카드(recovery forecast card)와 같은 매핑.
+export const RECOVERY_FORECAST_DOT_COLORS = ['#E0942A', '#185FA5', '#7A5AF8'] as const
+
+// 문구 쉽게(2026-10-28): '20거래일'·'85.3%' 같은 표기에서 숫자를 뽑는다.
+function recoveryNumberFromText(text: string | null | undefined) {
+  if (!text) return null
+  const matched = text.match(/-?\d+(?:\.\d+)?/u)
+  if (!matched) return null
+  const parsed = Number(matched[0])
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const RECOVERY_KOREAN_MONTHS = ['한', '두', '세', '넉', '다섯', '여섯', '일곱', '여덟', '아홉', '열', '열한'] as const
+
+// 거래일을 사람 말로 바꾼다(5거래일≈1주, 21거래일≈1달). 20거래일 → '약 4주'.
+// 레이아웃은 그대로 두고 표기만 돕는 용도 — 데이터 원문(expectedRecoveryDaysText)이 항상 함께 보인다.
+function recoveryFriendlyTradingDays(days: number | null) {
+  if (days === null || !Number.isFinite(days) || days <= 0) return null
+  if (days < 7) return `약 ${Math.round(days)}일`
+  const weeks = Math.round(days / 5)
+  if (weeks <= 8) return `약 ${Math.max(1, weeks)}주`
+  const months = Math.round(days / 21)
+  if (months >= 1 && months <= 11) return `약 ${RECOVERY_KOREAN_MONTHS[months - 1] ?? String(months)}달`
+  return '1년 넘게'
+}
+
+// 원금회수 예측 브리핑 — '내 자리는 어디쯤일까요?' 바로 아래에서 이어지는 후속 질문.
+// 데이터가 확보되면 결과 카드와 같은 1년 차트(평단 점선·유사 패턴 밴드)도 함께 그린다.
+// data-today-briefing-item을 달지 않는다(공개 타이밍 시퀀스·모바일 자동스크롤 인덱스를
+// 밀지 않기 위해 — consensus 항목과 같은 보조 항목 패턴).
+export function TodayRecoveryForecastBriefing({
+  at,
+  elapsedSeconds,
+  forceReady = false,
+  recovery,
+}: {
+  at: number
+  elapsedSeconds: number
+  forceReady?: boolean
+  recovery: LoadingBriefingRecoveryForecast | JarooDeepScanRecoveryForecastBlock
+}) {
+  const isVisible = forceReady || elapsedSeconds >= at
+  const isContentReady = isDeepScanBriefingItemContentReady({
+    elapsedSeconds,
+    revealAtSeconds: at,
+    skeletonSeconds: TODAY_BRIEFING_SKELETON_SECONDS,
+    forceReady,
+  })
+  const probabilityPct = isFiniteNumber(recovery.recoveryProbabilityPct) ? recovery.recoveryProbabilityPct : null
+  const recoveryDaysValue = isFiniteNumber(recovery.expectedRecoveryDays)
+    ? recovery.expectedRecoveryDays
+    : recoveryNumberFromText(recovery.expectedRecoveryDaysText)
+  const friendlyDuration = recoveryFriendlyTradingDays(recoveryDaysValue)
+  const chartGeometry = recovery.priceHistory && recovery.priceHistory.length >= 3 && isFiniteNumber(recovery.targetPrice)
+    ? buildRecoveryChartGeometry({
+      priceHistory: recovery.priceHistory,
+      samples: recovery.similarPatternSamples,
+      targetPrice: recovery.targetPrice as number,
+    })
+    : null
+
+  return (
+    <article className={cn(styles.todayBriefItem, isVisible ? styles.todayBriefItemIn : undefined)} data-today-briefing-recovery='true'>
+      <div className={styles.todayBriefQuestionRow}>
+        <span className={styles.todayBriefIcon} aria-hidden='true'><Hourglass className='size-[13px]' /></span>
+        <span className={styles.todayBriefQuestion}>원금회수까지는 얼마나 걸릴까요?</span>
+      </div>
+      <div className={cn(styles.todayBriefBody, isVisible ? styles.todayBriefBodyIn : undefined)}>
+        <div className={cn(styles.todayBriefBodyContent, isContentReady ? styles.todayBriefBodyContentIn : undefined)}>
+          <div className={styles.todayBriefData}>
+            {recovery.expectedRecoveryDaysText}
+            {friendlyDuration !== null ? <span className={styles.recoveryProbText}>({friendlyDuration})</span> : null}
+            {probabilityPct !== null ? <span className={styles.recoveryProbText}> · 1년 안에 본전 도달 {recovery.recoveryProbabilityText}</span> : null}
+          </div>
+          {probabilityPct !== null ? (
+            <div
+              className={styles.recoveryGaugeTrack}
+              role='img'
+              aria-label={`1년 안에 본전 도달 비율 ${recovery.recoveryProbabilityText}`}
+            >
+              <div className={styles.recoveryGaugeBar} style={{ width: `${Math.min(100, Math.max(1.5, probabilityPct))}%` }} />
+            </div>
+          ) : null}
+          {chartGeometry ? (
+            <svg
+              className={styles.recoveryChartSvg}
+              viewBox={`0 0 ${RECOVERY_CHART_WIDTH} ${RECOVERY_CHART_HEIGHT}`}
+              role='img'
+              aria-label='최근 1년 종가 차트. 파란 점선은 평단가, 호밍색 표시는 유사 과거 패턴 구간이다.'
+            >
+              {chartGeometry.gridlines.map((line) => (
+                <g key={`grid-${line.label}`}>
+                  <line className={styles.recoveryChartGrid} x1={RECOVERY_CHART_MARGIN.left} x2={RECOVERY_CHART_WIDTH - RECOVERY_CHART_MARGIN.right} y1={line.y} y2={line.y} />
+                  <text className={styles.recoveryChartTick} x={RECOVERY_CHART_MARGIN.left - 4} y={line.y + 3} textAnchor='end'>{line.label}</text>
+                </g>
+              ))}
+              {chartGeometry.dateTicks.map((tick) => (
+                <text key={`date-${tick.label}-${tick.x}`} className={styles.recoveryChartTick} x={tick.x} y={RECOVERY_CHART_HEIGHT - 4} textAnchor='middle'>{tick.label}</text>
+              ))}
+              {chartGeometry.bands.map((band) => (
+                <rect key={`band-${band.x}`} className={styles.recoveryChartBand} x={band.x - 3} y={RECOVERY_CHART_MARGIN.top} width='6' height={RECOVERY_CHART_HEIGHT - RECOVERY_CHART_MARGIN.top - RECOVERY_CHART_MARGIN.bottom} rx='1.5'>
+                  <title>{band.title}</title>
+                </rect>
+              ))}
+              {chartGeometry.targetY !== null ? (
+                <g>
+                  <line className={styles.recoveryChartTargetLine} x1={RECOVERY_CHART_MARGIN.left} x2={RECOVERY_CHART_WIDTH - RECOVERY_CHART_MARGIN.right} y1={chartGeometry.targetY} y2={chartGeometry.targetY} />
+                  <text className={styles.recoveryChartTargetText} x={RECOVERY_CHART_WIDTH - RECOVERY_CHART_MARGIN.right} y={chartGeometry.targetY - 3} textAnchor='end'>평단 {compactPrice(recovery.targetPrice ?? 0)}</text>
+                </g>
+              ) : null}
+              <path className={styles.recoveryChartLine} d={chartGeometry.pricePath} />
+              {chartGeometry.currentDot ? (
+                <circle className={styles.recoveryChartDot} cx={chartGeometry.currentDot.x} cy={chartGeometry.currentDot.y} r='3'>
+                  <title>{`현재가`}</title>
+                </circle>
+              ) : null}
+            </svg>
+          ) : null}
+          <ul className={styles.recoveryModels}>
+            {recovery.modelRows.map((row, index) => (
+              <li key={row.label} className={styles.recoveryModelRow}>
+                <span
+                  className={styles.recoveryModelDot}
+                  style={{ backgroundColor: RECOVERY_FORECAST_DOT_COLORS[index % RECOVERY_FORECAST_DOT_COLORS.length] }}
+                  aria-hidden='true'
+                />
+                <span className={styles.recoveryModelName}>{row.label}</span>
+                <span className={styles.recoveryModelDays}>{row.recoveryDaysText}</span>
+                {row.sampleText ? <span className={styles.recoveryModelSample}>· {row.sampleText}</span> : null}
+                <span className={styles.recoveryModelProb}>{row.probabilityText}</span>
+              </li>
+            ))}
+          </ul>
+          <p className={styles.todayBriefMeaning}><b>{recovery.summaryText}</b> (신뢰도 {recovery.confidenceText})</p>
+          {'disclaimer' in recovery && recovery.disclaimer ? <p className={styles.recoveryDisclaimer}>{recovery.disclaimer}</p> : null}
+        </div>
+        <div className={cn(styles.todayBriefSkeleton, isContentReady ? styles.todayBriefSkeletonOut : undefined)} aria-hidden='true'>
+          <span className={styles.todayBriefSkeletonBar} />
+          <span className={styles.todayBriefSkeletonBar} />
+        </div>
+      </div>
+    </article>
+  )
+}
+
 export function TodayBriefingCard({
   currentPriceText,
   currentPriceCurrency,
@@ -385,6 +538,8 @@ export function TodayBriefingCard({
   briefingSnapshot,
   tradingVolumeText,
   consensus,
+  consensusEmptyState,
+  consensusPendingSkeleton = false,
   dailyCloses,
   seedKey,
 }: {
@@ -401,6 +556,10 @@ export function TodayBriefingCard({
   briefingSnapshot?: LoadingBriefingSnapshot | null
   tradingVolumeText?: string | null
   consensus?: LoadingQuickFact['consensus']
+  /** 컨센서스 데이터가 없는 일반 종목의 빈 상태 문구 — 없으면(로딩 중·ETF) 항목 전체를 숨긴다 */
+  consensusEmptyState?: string | null
+  /** 스캔 로딩 중(데이터 도착 전) 컨센서스 아이템도 질문+스켈레톤으로 먼저 보여줄지 — 일반 주식만 true */
+  consensusPendingSkeleton?: boolean
   dailyCloses?: Array<number | null | undefined>
   seedKey?: string
 }) {
@@ -524,7 +683,14 @@ export function TodayBriefingCard({
     (_, index) => TODAY_BRIEFING_FIRST_REVEAL_SECONDS + index * TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS,
   )
   const consensusAt = TODAY_BRIEFING_FIRST_REVEAL_SECONDS + TODAY_BRIEFING_ITEM_COUNT * TODAY_BRIEFING_ITEM_REVEAL_INTERVAL_SECONDS
-  const visibleBriefingItemCount = getVisibleDeepScanBriefingItemCount(elapsedSeconds, briefStartSeconds, { forceReady })
+  const showConsensus = Boolean(consensus || consensusEmptyState || (consensusPendingSkeleton && !forceReady))
+  const consensusContentReady = Boolean(consensus || consensusEmptyState) && isDeepScanBriefingItemContentReady({
+    elapsedSeconds,
+    revealAtSeconds: consensusAt,
+    skeletonSeconds: TODAY_BRIEFING_SKELETON_SECONDS,
+    forceReady,
+  })
+  const visibleBriefingItemCount = getVisibleDeepScanBriefingItemCount(elapsedSeconds, showConsensus ? [...briefStartSeconds, consensusAt] : briefStartSeconds, { forceReady })
 
   useEffect(() => (
     startTodayBriefingMobileAutoScroll(todayBriefListRef.current, visibleBriefingItemCount)
@@ -582,9 +748,9 @@ export function TodayBriefingCard({
         />
         <TodayBriefingItem at={briefStartSeconds[4]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={BarChart3} question='오늘 하루는 어땠나요?' data={<span className={todayFlow.tone === 'positive' ? styles.todayUp : todayFlow.tone === 'negative' ? styles.todayDown : styles.todayBlue}>{todayFlow.label}</span>} meaning={todayFlow.meaning} />
         <TodayBriefingItem at={briefStartSeconds[5]} elapsedSeconds={elapsedSeconds} forceReady={forceReady} icon={Flame} question='거래는 활발했나요?' data={<span className={isFiniteNumber(volumeRatio) && volumeRatio >= 1 ? styles.todayBlue : styles.todayDown}>{volumeRatioLabel}</span>} meaning={volumeMeaning} />
-        {consensus ? (() => {
-          const consensusTone = consensusToneOf(consensus)
-          const averageUpsidePct = isFiniteNumber(chartAveragePriceValue) && chartAveragePriceValue > 0 && isFiniteNumber(consensus.targetPriceValue) && consensus.targetPriceValue > 0
+        {showConsensus ? (() => {
+          const consensusTone = consensus ? consensusToneOf(consensus) : null
+          const averageUpsidePct = consensus && isFiniteNumber(chartAveragePriceValue) && chartAveragePriceValue > 0 && isFiniteNumber(consensus.targetPriceValue) && consensus.targetPriceValue > 0
             ? (consensus.targetPriceValue / chartAveragePriceValue - 1) * 100
             : null
           const averageUpsideLabel = averageUpsidePct !== null
@@ -599,8 +765,9 @@ export function TodayBriefingCard({
               <span className={styles.todayBriefIcon} aria-hidden='true'><Telescope className='size-[13px]' /></span>
               <span className={styles.todayBriefQuestion}>애널리스트 목표가는 어디쯤일까?</span>
             </div>
-            {forceReady || elapsedSeconds >= consensusAt + TODAY_BRIEFING_DATA_REVEAL_DELAY_SECONDS ? (
-              <div className={styles.consensusInsight}>
+            <div className={cn(styles.todayBriefBody, styles.todayBriefConsensusBody, (forceReady || elapsedSeconds >= consensusAt) ? styles.todayBriefBodyIn : undefined)}>
+              <div className={cn(styles.todayBriefBodyContent, consensusContentReady ? styles.todayBriefBodyContentIn : undefined)}>
+              {consensusContentReady && consensus ? <div className={styles.consensusInsight}>
                 <div className={cn(styles.consensusChartTop, consensusTone === 'profit' ? styles.consensusToneProfit : consensusTone === 'loss' ? styles.consensusToneLoss : undefined)}>
                   <div>
                     <span className={styles.consensusEyebrow}>{consensus.analystCountLabel ?? 'TARGET VIEW'}</span>
@@ -632,8 +799,15 @@ export function TodayBriefingCard({
                     consensus.summary.includes('매수') ? styles.consensusSummaryProfit : consensus.summary.includes('갈리') ? styles.consensusSummaryNeutral : undefined,
                   )}>{consensus.summary}</p>
                 ) : null}
+              </div> : consensusContentReady && consensusEmptyState ? (
+                <div className={styles.consensusInsight}><p className={styles.consensusSummary}>{consensusEmptyState}</p></div>
+              ) : null}
               </div>
-            ) : null}
+              <div className={cn(styles.todayBriefSkeleton, styles.todayBriefConsensusSkeleton, consensusContentReady ? styles.todayBriefSkeletonOut : undefined)} aria-hidden='true'>
+                <span className={styles.todayBriefSkeletonBar} />
+                <span className={styles.todayBriefSkeletonBar} />
+              </div>
+            </div>
           </article>
           )
         })() : null}

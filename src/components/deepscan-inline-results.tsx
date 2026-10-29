@@ -13,7 +13,6 @@ import type { DeepScanTargetInput } from '@/lib/workflow-types'
 
 import { cn } from '@/lib/utils'
 import { WatchAlertLevelSelector } from '@/components/watch-alert-level'
-import { DeepScanRecoveryForecastCard } from '@/components/deepscan-recovery-forecast-card'
 
 type DeepScanInlineResultsProps = {
   payload: JarooDeepScanPayload
@@ -43,27 +42,6 @@ function parsePercent(value: string | null | undefined) {
   if (!cleaned) return null
   const parsed = Number(cleaned)
   return Number.isFinite(parsed) ? parsed : null
-}
-
-function formatPercent(value: number | null) {
-  if (value === null || !Number.isFinite(value)) return '--'
-  const sign = value > 0 ? '+' : value < 0 ? '−' : ''
-  return `${sign}${Math.abs(value).toFixed(1).replace(/\.0$/u, '')}%`
-}
-
-function parseMoneyNumber(value: string | null | undefined) {
-  if (!value) return null
-  const cleaned = value.replace(/[^0-9.-]/g, '')
-  if (!cleaned) return null
-  const parsed = Number(cleaned)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-function deriveUpside(currentText: string | null | undefined, targetText: string | null | undefined) {
-  const current = parseMoneyNumber(currentText)
-  const target = parseMoneyNumber(targetText)
-  if (current === null || target === null || current === 0) return null
-  return ((target / current) - 1) * 100
 }
 
 function buildStrength(payload: JarooDeepScanPayload) {
@@ -170,7 +148,6 @@ export function DeepScanInlineResults({
   const name = firstNonEmpty(payload.input.instrument.name, target?.name, requestSeed?.holding.name) ?? '선택 종목'
   const strength = buildStrength(payload)
   const scenarios = buildScenarioViews(payload, exchangeProduct)
-  const upside = exchangeProduct ? null : deriveUpside(payload.strategy.currentPriceText, payload.strategy.targetPriceText)
   const [detailsOpen, setDetailsOpen] = useState(false)
   const evidenceCount = payload.metadata.sourceRefs.length || payload.insights.items.length
   const rawSummary = payload.hero.blockState === 'ok'
@@ -185,6 +162,9 @@ export function DeepScanInlineResults({
         cautions: (Array.isArray(payload.hero.evidenceCautions) ? payload.hero.evidenceCautions : []).slice(0, 3).filter((caution) => !isMissingKrPageNotice(caution)),
       }
     : null
+  // 목표가·상승 여력 필드 제거(2026-10-29 사용자 지시) — 애널리스트 목표가는 오늘 브리핑의
+  // '애널리스트 목표가는 어디쯤일까?' 항목이 이미 보여주므로 종합 결론에서는 중복된다.
+  // 일반 종목 팩트는 현재가·근거 2열로, ETF는 기존 3열(ETF 기준·가격 위치·근거)을 유지한다.
   const facts = exchangeProduct
     ? [
         ['ETF 기준', payload.strategy.targetPriceText || 'NAV·구성 확인'],
@@ -192,8 +172,7 @@ export function DeepScanInlineResults({
         ['근거', evidenceCount > 0 ? `${evidenceCount}개` : normalizeDeepScanDisclosureWording(payload.insights.summaryTags[0]) ?? '확인 중'],
       ]
     : [
-        ['목표가', payload.strategy.targetPriceText || '확인 중'],
-        ['상승 여력', upside === null ? '확인 중' : formatPercent(upside)],
+        ['현재가', payload.strategy.currentPriceText || '확인 중'],
         ['근거', evidenceCount > 0 ? `${evidenceCount}개` : normalizeDeepScanDisclosureWording(payload.insights.summaryTags[0]) ?? '확인 중'],
       ]
 
@@ -234,11 +213,11 @@ export function DeepScanInlineResults({
         ) : (
           <p className='border-t border-[#EFF1F4] px-4 py-4 text-[13px] leading-6 text-[#0F1419]'>{summary}</p>
         )}
-        <div className='grid grid-cols-3 border-t border-[#EFF1F4]'>
+        <div className={cn('grid border-t border-[#EFF1F4]', exchangeProduct ? 'grid-cols-3' : 'grid-cols-2')}>
           {facts.map(([label, value]) => (
             <div key={label} className='border-r border-[#EFF1F4] px-3 py-3 last:border-r-0'>
               <div className='text-[10px] text-[#97A0AE]'>{label}</div>
-              <div className={cn('mt-1 text-[13px] font-bold text-[#0F1419]', label === '상승 여력' && upside !== null && upside > 0 ? 'text-[color:var(--jaroo-profit)]' : label === '상승 여력' && upside !== null && upside < 0 ? 'text-[color:var(--jaroo-loss)]' : undefined)}>{value}</div>
+              <div className='mt-1 text-[13px] font-bold text-[#0F1419]'>{value}</div>
             </div>
           ))}
         </div>
@@ -285,7 +264,6 @@ export function DeepScanInlineResults({
           </div>
         </div>
       </article>
-      <DeepScanRecoveryForecastCard payload={payload} />
       <article className='rounded-[16px] bg-[#0F1419] px-4 py-[18px] text-white' aria-label='딥스캔 후속 안내'>
         <div className='mb-2.5 flex items-center gap-2.5'>
           <div className='flex size-[34px] shrink-0 items-center justify-center rounded-[10px] bg-white/10 text-white/85'>

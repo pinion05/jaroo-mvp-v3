@@ -95,10 +95,23 @@ export function buildLoadingQuickQuoteUrl(target: { code?: string; ticker?: stri
   return `/api/quotes/current?${searchParams.toString()}`
 }
 
-export function buildLoadingBriefingSnapshotUrl(target: { code?: string; ticker?: string; market?: string; marketTone?: HomeMarketTone } | null) {
+// 평단가('38,634원' 등 표기 포함)를 숫자로 정규화 — 원금회수 예측 쿼리용.
+function normalizeHoldingAveragePrice(value: string | number | null | undefined) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) && value > 0 ? value : null
+  }
+  if (typeof value !== 'string') {
+    return null
+  }
+  const parsed = Number(value.replace(/[^0-9.]/g, ''))
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null
+}
+
+export function buildLoadingBriefingSnapshotUrl(target: { code?: string; ticker?: string; market?: string; marketTone?: HomeMarketTone; holding?: { averagePrice?: string | number | null } } | null) {
   const code = normalizeDeepScanCode(target?.code)
   if (code) {
-    const searchParams = new URLSearchParams({ code })
+    const averagePrice = normalizeHoldingAveragePrice(target?.holding?.averagePrice)
+    const searchParams = new URLSearchParams(averagePrice !== null ? { code, averagePrice: String(averagePrice) } : { code })
     return `/api/deepscan/briefing-snapshot?${searchParams.toString()}`
   }
 

@@ -20,3 +20,16 @@ test('OCR 페이지의 inferMarketTone은 screenshot-ocr export를 import한다(
   // 컴포넌트 내부 function 정의가 다시 생기면 추출이 무의미해진다
   assert.doesNotMatch(source, /function inferMarketTone\(/)
 })
+
+test('OCR 적용 직후 업로드 세션 정리는 언마운트 시점에 한다(2026-10-29)', () => {
+  const page = readFileSync(new URL('./page.tsx', import.meta.url), 'utf8')
+  // handleContinue 안에서 push 직전에 store를 지우면 아직 마운트된 /ocr이
+  // '0개 종목 인식' 상태로 깜빡인다(실측 재현) — 정리는 언마운트 클린업으로.
+  const handleContinueBody = page.slice(page.indexOf('const handleContinue'), page.indexOf('isIdentifierResolving'))
+  assert.ok(handleContinueBody.includes("router.push('/home')"), '적용 후 홈으로 이동한다')
+  assert.ok(!handleContinueBody.includes('clearUploadInput()'), 'handleContinue 안에서 업로드 store를 동기 삭제하지 않는다')
+  assert.match(page, /useEffect\(\(\) => \(\) => \{\n    if \(isLeavingAfterApplyRef\.current\) \{\n      clearPersistedScreenshotUploadSession\(\)\n      clearUploadInput\(\)\n    \}\n  \}, \[clearUploadInput\]\)/, '적용 후 이탈 시 언마운트 클린업에서 세션을 정리한다')
+  // 시세 프리페치 — push 전에 완료 또는 상한까지 기다려 홈 첫 프레임의 '- · -' 갭을 없앤다
+  assert.ok(handleContinueBody.includes('await Promise.race(['), '적용 후 push 전 시세 프리페치를 상한과 함께 기다린다')
+  assert.ok(handleContinueBody.includes('OCR_APPLY_QUOTE_PREFETCH_CAP_MS'), '프리페치 상한 상수를 참조한다')
+})

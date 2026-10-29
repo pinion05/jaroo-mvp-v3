@@ -47,8 +47,44 @@ export default function LoginPage() {
 
   const loginSuccessPath = nextPath.startsWith('/') && !nextPath.startsWith('//') ? nextPath : '/home'
 
+  // DEV ONLY(dev 배포 전용): 로그인 버튼 클릭 = 고정 QA 계정 즉시 로그인(약관·OAuth 우회).
+  // 플래그는 런타임 주입(window.__JAROO_ENV__, 레이아웃이 서버 env에서 심음)을 최우선으로
+  // 읽는다 — 빌드타임 NEXT_PUBLIC 인라인이 stale가 되는 배포 특성 회피(2026-10-27).
+  // prod/로컬에서는 값이 비어 모든 버튼이 기존 OAuth/이메일 동작 그대로다.
+  const [devAutoLoginEnabled, setDevAutoLoginEnabled] = useState(false)
+  useEffect(() => {
+    setDevAutoLoginEnabled(
+      window.__JAROO_ENV__?.devAutoLogin === true || process.env.NEXT_PUBLIC_DEV_AUTO_LOGIN === '1',
+    )
+  }, [])
+
+  async function tryDevAutoLogin(): Promise<boolean> {
+    if (!devAutoLoginEnabled) return false
+    setPending(true)
+    try {
+      const response = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ autoLogin: true }),
+      })
+      if (response.ok) {
+        router.replace(loginSuccessPath)
+        router.refresh()
+        return true
+      }
+      const payload = (await response.json().catch(() => ({}))) as { error?: { message?: string } }
+      setError(payload.error?.message || '자동 로그인에 실패했어요.')
+    } catch {
+      setError('네트워크 연결을 확인한 뒤 다시 시도해주세요.')
+    } finally {
+      setPending(false)
+    }
+    return true
+  }
+
   async function handleGoogle() {
     setError(null)
+    if (await tryDevAutoLogin()) return
     if (!termsAgreed) {
       setError('서비스 이용약관과 개인정보처리방침에 동의해주세요.')
       return
@@ -70,6 +106,7 @@ export default function LoginPage() {
 
   async function handleKakao() {
     setError(null)
+    if (await tryDevAutoLogin()) return
     if (!termsAgreed) {
       setError('서비스 이용약관과 개인정보처리방침에 동의해주세요.')
       return
@@ -193,8 +230,8 @@ export default function LoginPage() {
               type='button'
               className={styles.loginBtn}
               onClick={handleGoogle}
-              disabled={pending || !termsAgreed}
-              aria-disabled={!termsAgreed}
+              disabled={pending || (!devAutoLoginEnabled && !termsAgreed)}
+              aria-disabled={!devAutoLoginEnabled && !termsAgreed}
             >
               <span className={styles.loginBtnIco}>
                 <GoogleIcon />
@@ -205,8 +242,8 @@ export default function LoginPage() {
               type='button'
               className={cn(styles.loginBtn, styles.kakao)}
               onClick={handleKakao}
-              disabled={pending || !termsAgreed}
-              aria-disabled={!termsAgreed}
+              disabled={pending || (!devAutoLoginEnabled && !termsAgreed)}
+              aria-disabled={!devAutoLoginEnabled && !termsAgreed}
             >
               <span className={styles.loginBtnIco}>
                 <KakaoIcon />

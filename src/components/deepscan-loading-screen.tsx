@@ -2,9 +2,8 @@
 
 import Link from 'next/link'
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
-import { CheckCircle2, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import {
-  shouldAdvanceDeepScanTimeline,
   shouldDisplayDeepScanReadyResults,
   parseDeepScanEmphasisSegments,
   shouldShowDeepScanSummarySkeleton,
@@ -29,12 +28,14 @@ import type {
 } from './deepscan-loading-types'
 
 import {
-  committeeMembers,
+  TEAM_PRESENTATION_ORDER,
   TEAM_SEQUENCE_COMPLETE_SECONDS,
+  TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS,
+  CONCLUSION_REVEAL_DELAY_AFTER_TEAMS_SECONDS,
+  DEEPSCAN_CONSENSUS_EMPTY_STATE_TEXT,
 } from './deepscan-loading-types'
 
 import {
-  buildCompletionState,
   buildLoadingStages,
   buildOrderedNarrativeCards,
   buildSequentialNarrativeCards,
@@ -53,10 +54,12 @@ import {
   getCollapsedTeamSummaryText,
   getTeamSummaryState,
   hasDisplayValue,
+  hasNarrativeLoadingSkeleton,
+  areDeepScanCommitteeCardsSettled,
+  isDeepScanConclusionReady,
   hashSummaryInput,
   isExchangeTradedProduct,
   isHiddenLoadingQuickFact,
-  memberStateClass,
   narrativeToneClass,
   normalizeSummaryText,
   parseNumericValue,
@@ -72,6 +75,7 @@ import {
   BackControl,
   QuickFactCard,
   TodayBriefingCard,
+  TodayRecoveryForecastBriefing,
 } from './deepscan-loading-briefing-card'
 
 // 팀 요약 클라이언트 타임아웃 — 서버 타임아웃(DEEPSCAN_TEAM_SUMMARY_TIMEOUT_MS, 기본 10s)보다
@@ -94,11 +98,11 @@ export function DeepScanLoadingScreen({
   currentProfitRate,
   snapshotProfitRate,
   briefingSnapshot,
+  payloadRecoveryForecast,
   findingProgress,
   committeeAxes,
   quickFacts = [],
   performanceComment,
-  evidenceCollected = false,
   visibleStageCount = 1,
   arrivedStageKeys = [],
   resultsReady = false,
@@ -115,10 +119,15 @@ export function DeepScanLoadingScreen({
 }: DeepScanLoadingScreenProps) {
   const isError = Boolean(errorNotice)
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
+  const [teamsSettledAtSeconds, setTeamsSettledAtSeconds] = useState<number | null>(null)
+  const [prevCommitteeCardsSettled, setPrevCommitteeCardsSettled] = useState(false)
   const [teamSummaries, setTeamSummaries] = useState<Partial<Record<LoadingStageKey, TeamSummaryState>>>({})
   const [expandedTeamSummaries, setExpandedTeamSummaries] = useState<ReadonlySet<LoadingStageKey>>(() => new Set())
   const teamSummaryFetchCoordinatorRef = useRef(createTeamSummaryFetchCoordinator())
   const teamBridgeRef = useRef<HTMLElement | null>(null)
+  const narrativeStreamRef = useRef<HTMLElement | null>(null)
+  const recoveryForecastRef = useRef<HTMLElement | null>(null)
+  const inlineResultsRef = useRef<HTMLDivElement | null>(null)
   const targetLine = [identifier, market].filter(Boolean).join(' · ')
   const exchangeProduct = isExchangeTradedProduct(market, instrumentKind)
   const sharesText = formatShares(shares)
@@ -167,8 +176,9 @@ export function DeepScanLoadingScreen({
     [committeeAxes, currentPriceText, displayQuickFacts, exchangeProduct, findingProgress, performanceComment, tradingVolumeText],
   )
   const orderedNarrativeCards = useMemo(
-    () => buildOrderedNarrativeCards(loadingStages, arrivedStageKeys),
-    [arrivedStageKeys, loadingStages],
+    // 종결된 캐시/오류 응답에서 일부 팀 도착 이벤트가 누락되어도 결과를 영원히 숨기지 않는다.
+    () => buildOrderedNarrativeCards(loadingStages, resultsReady && elapsedSeconds >= TEAM_SEQUENCE_COMPLETE_SECONDS ? TEAM_PRESENTATION_ORDER : arrivedStageKeys),
+    [arrivedStageKeys, elapsedSeconds, loadingStages, resultsReady],
   )
   const teamSummaryRequests = useMemo(
     () => loadingStages.flatMap((card) => {
@@ -204,10 +214,67 @@ export function DeepScanLoadingScreen({
     () => buildSequentialNarrativeCards(timelineNarrativeCards, teamSummaries, resultsReadyForDisplay),
     [resultsReadyForDisplay, teamSummaries, timelineNarrativeCards],
   )
-  const completionState = buildCompletionState(resultsReadyForDisplay, elapsedSeconds, snapshotCacheHit, snapshotScannedAt)
+  const committeeCardsSettled = areDeepScanCommitteeCardsSettled({
+    resultsReady: resultsReadyForDisplay,
+    cards: sequentialNarrativeCards,
+    teamSummaries,
+  })
+  // 위원(세 팀) 카드가 완전히 렌더링된 최초 시점을 기록한다(2026-10-29). 종합 결론은 이 시점
+  // +n초(브리핑 배열 완료와 비교해 늦은 쪽)에 공개된다 — 스캔 시작 기준 81초 절대 게이트가
+  // 아니라 위원 컴포넌트 완성 기준 상대 시점. 렌더 중 상태 조정(React 공식 패턴 — You Might
+  // Not Need an Effect)으로 기록하고, 미완으로 되돌아가면(재스캔) 초기화해 순서를 다시 지킨다.
+  if (committeeCardsSettled !== prevCommitteeCardsSettled) {
+    setPrevCommitteeCardsSettled(committeeCardsSettled)
+    setTeamsSettledAtSeconds(committeeCardsSettled && teamsSettledAtSeconds === null ? elapsedSeconds : null)
+  }
+  const inlineResultsReady = isDeepScanConclusionReady({
+    teamsSettledAtSeconds,
+    elapsedSeconds,
+    arrayCompleteSeconds: TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS,
+  })
+  // AI 위원(세 팀) 카드가 하나씩 공개될 때마다 그 카드로 화면을 내린다(2026-10-29 사용자 지시).
+  // 브리핑 배열·팀 브리지와 같은 모바일 오토스크롤 헬퍼를 재사용한다 — 새 카드 행이 등장할 때와
+  // 스켈래톤이 내용으로 채워질 때(렌더된 행 수·확정 카드 수 변화) 마지막 카드 하단을 뷰에 맞춘다.
+  const settledCommitteeCardCount = sequentialNarrativeCards.filter(
+    (card) => !hasNarrativeLoadingSkeleton(card, teamSummaries, resultsReadyForDisplay),
+  ).length
+  useEffect(() => {
+    if (sequentialNarrativeCards.length <= 0) {
+      return undefined
+    }
+
+    const cardNodes = narrativeStreamRef.current?.querySelectorAll<HTMLElement>('[data-narrative-card]')
+    const target = cardNodes?.item(sequentialNarrativeCards.length - 1) ?? null
+    return startDeepScanMobileAutoScroll(target)
+  }, [sequentialNarrativeCards.length, settledCommitteeCardCount])
+  // 원금회수 예측 카드·종합 결론이 등장할 때도 화면을 해당 위치로 내린다(2026-10-29 사용자 지시).
+  // 원금회수 예측의 렌더 조건을 컴포넌트 몸통으로 옮겨(recoveryForecastVisible) 스크롤 이펙트가
+  // 같은 조건을 참조하게 한다. 결론은 inlineResultsReady(+ inlineResults 존재) 시점에 스크롤.
+  const recoveryForecastVisible = Boolean(
+    payloadRecoveryForecast && payloadRecoveryForecast.blockState === 'ok'
+      ? payloadRecoveryForecast
+      : briefingSnapshot?.recoveryForecast ?? null,
+  )
+    && !(payloadRecoveryForecast && (payloadRecoveryForecast.currentPrice == null || payloadRecoveryForecast.targetPrice == null || payloadRecoveryForecast.currentPrice >= payloadRecoveryForecast.targetPrice))
+    && resultsReadyForDisplay
+    && teamsSettledAtSeconds !== null
+    && elapsedSeconds >= Math.max(TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS, teamsSettledAtSeconds)
+  const hasInlineResults = inlineResults != null
+  useEffect(() => (
+    recoveryForecastVisible ? startDeepScanMobileAutoScroll(recoveryForecastRef.current) : undefined
+  ), [recoveryForecastVisible])
+  useEffect(() => (
+    inlineResultsReady && hasInlineResults ? startDeepScanMobileAutoScroll(inlineResultsRef.current) : undefined
+  ), [inlineResultsReady, hasInlineResults])
   const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReadyForDisplay)
   const isTeamBridgeVisible = Boolean(teamBridgeState)
-  const shouldAdvanceTimeline = shouldAdvanceDeepScanTimeline({ resultsReadyForDisplay, elapsedSeconds, sequenceCompleteSeconds: TEAM_SEQUENCE_COMPLETE_SECONDS })
+  // 브리핑 배열의 순차 공개(5초 리듬)는 결과가 언제 도착하든 시퀀스가 끝날 때까지
+  // 재생되어야 한다(2026-10-28 사용자 지시 — 캐시 재사용·빠른 완료 모두 해당).
+  // 타임라인은 시퀀스 완료 시각까지 항상 진행하고, 아이템 forceReady는 시퀀스
+  // 완료 전에는 켜지 않는다. 상태바(completionState)·브리지 억제는 기존 그대로.
+  // 위원 카드가 81초 이후에 완성되는 흐름에서는 종합 결론 공개(+n초)까지 타이머를 연장한다.
+  const shouldAdvanceTimeline = elapsedSeconds < TEAM_SEQUENCE_COMPLETE_SECONDS
+    || (teamsSettledAtSeconds !== null && elapsedSeconds < teamsSettledAtSeconds + CONCLUSION_REVEAL_DELAY_AFTER_TEAMS_SECONDS)
   const progressPct = resultsReadyForDisplay ? 100 : Math.min(92, 12 + elapsedSeconds * 7)
   const activeNarrativeCard = sequentialNarrativeCards.findLast((card) => !card.placeholder) ?? sequentialNarrativeCards.at(-1) ?? visibleNarrativeCards.at(-1) ?? orderedNarrativeCards[0]
   const progressLabel = resultsReadyForDisplay
@@ -362,6 +429,9 @@ export function DeepScanLoadingScreen({
           <p className={styles.introBody}>{resultsReadyForDisplay ? (snapshotCacheHit ? '저장해둔 분석 결과를 불러왔어요. 아래 결과 카드가 바로 이어집니다.' : '실제 응답이 도착했어요. 아래 결과 카드가 바로 이어집니다.') : '완료 신호가 오면 기다림 없이 이 화면 아래에 결과가 이어집니다.'}</p>
         </section>
 
+        {/* 목표가 미제공 종목 — 결과가 확정된 뒤에도 항목을 통째로 숨기지 않고 스캘래톤 →
+            '증권사 목표가가 아직 없어요' 안내로 마무리한다(2026-10-29 사용자 지시).
+            로딩 중(데이터 도착 가능)에는 null이라 스캘래톤이 유지되고, ETF는 기존대로 미표시. */}
         <TodayBriefingCard
           currentPriceText={currentPriceText}
           currentPriceCurrency={currentPriceCurrency}
@@ -372,10 +442,12 @@ export function DeepScanLoadingScreen({
           profitRateText={profitRateText}
           profitAmountText={profitAmountText}
           elapsedSeconds={elapsedSeconds}
-          forceReady={resultsReadyForDisplay}
+          forceReady={resultsReadyForDisplay && elapsedSeconds >= TEAM_SEQUENCE_COMPLETE_SECONDS}
           briefingSnapshot={briefingSnapshot}
           tradingVolumeText={tradingVolumeText}
           consensus={consensusData}
+          consensusPendingSkeleton={!exchangeProduct}
+          consensusEmptyState={resultsReadyForDisplay && !exchangeProduct ? DEEPSCAN_CONSENSUS_EMPTY_STATE_TEXT : null}
           dailyCloses={briefingDailyCloses}
           seedKey={identifier}
         />
@@ -395,7 +467,7 @@ export function DeepScanLoadingScreen({
           </div>
         </section>
 
-        <section className={styles.narrativeStream} aria-label='분석가 진행 메시지'>
+        <section ref={narrativeStreamRef} className={styles.narrativeStream} aria-label='분석가 진행 메시지'>
           {sequentialNarrativeCards.map((card) => {
             const {
               summaryReady,
@@ -421,7 +493,7 @@ export function DeepScanLoadingScreen({
             ].filter((tag): tag is { text: string; tone: NarrativeTone } => Boolean(tag))
 
             return (
-              <article key={card.key} className={cn(styles.narrativeCard, cardSettled ? undefined : styles.narrativeCardPending)}>
+              <article key={card.key} data-narrative-card={card.key} className={cn(styles.narrativeCard, cardSettled ? undefined : styles.narrativeCardPending)}>
                 <div className={styles.narrativeHead}>
                   <span className={cn(styles.narrativeAvatar, card.placeholder && !card.teamKey ? styles.narrativeAvatarPending : undefined)} aria-hidden='true'>{card.placeholder && !card.teamKey ? <Loader2 className={styles.narrativeSpinner} aria-hidden /> : typeof card.avatar === 'string' || card.avatar == null ? card.avatar : <card.avatar className='size-[18px]' aria-hidden />}</span>
                   <div className={styles.narrativeNameWrap}>
@@ -475,68 +547,29 @@ export function DeepScanLoadingScreen({
           })}
         </section>
 
-        {resultsReadyForDisplay ? (
-          <section className={cn(styles.completionCard, styles.completionCardReady)} aria-label='완료 전환 상태'>
-            <div className={styles.completionHead}>
-              <span className={styles.completionIcon} aria-hidden='true'>✓</span>
-              <div>
-                <span className={styles.completionEyebrow}>{completionState.eyebrow}</span>
-                <h2 className={styles.completionTitle}>{completionState.title}</h2>
+        {recoveryForecastVisible ? (() => {
+          // 원금회수 예측 — 기존 '실제 분석 결과가 도착했어요'(완료 카드) 자리의 독립 컴포넌트.
+          // 브리핑 배열에서 빼고 이 위치로 이동(2026-10-28 사용자 지시). payload 블록이 최우선,
+          // 로딩 중에는 브리핑 스냅샷 프리뷰. 수익 구간(평단 이상)은 미표시.
+          const recoverySource = payloadRecoveryForecast && payloadRecoveryForecast.blockState === 'ok'
+            ? payloadRecoveryForecast
+            : briefingSnapshot?.recoveryForecast ?? null
+          if (!recoverySource) {
+            return null
+          }
+          // 공개 순서·스크롤 조건은 recoveryForecastVisible(컴포넌트 몸통)이 담당한다.
+          // 완료 카드 자리 — 브리핑 배열과 같은 개인 카드 컨테이너(todayBriefingCard)로 감싼다.
+          // 배열 밖으로 옮겨온 뒤 카드 없이 내용이 바로 깔리는 문제 수정(2026-10-28 사용자 지시).
+          return (
+            <section ref={recoveryForecastRef} className={styles.todayBriefingCard} aria-label='원금회수 예측'>
+              <div className={styles.todayBriefList}>
+                <TodayRecoveryForecastBriefing at={0} elapsedSeconds={0} forceReady recovery={recoverySource} />
               </div>
-            </div>
-            <p className={styles.completionBody}>{completionState.body}</p>
-          </section>
-        ) : null}
+            </section>
+          )
+        })() : null}
 
-        <details className={styles.progressDetails}>
-          <summary className={styles.progressDetailsSummary}>세부 진행 단계·분석 상태</summary>
-          <div className={styles.stepsWrap} aria-label='분석 단계'>
-            {[
-              { label: '대상 종목 확인', state: 'done' },
-              { label: '근거 데이터 수집', state: evidenceCollected ? 'done' : 'active' },
-              { label: '세 팀 분석 대기', state: resultsReadyForDisplay ? 'done' : evidenceCollected ? 'active' : 'wait' },
-              { label: '상세 리포트 연결', state: resultsReadyForDisplay ? 'done' : 'wait' },
-            ].map((step, index) => {
-              const isDone = step.state === 'done'
-              const isActive = step.state === 'active'
-
-              return (
-                <div key={step.label} className={styles.stepRow}>
-                  <div className={cn(styles.stepIcon, isDone && styles.stepDone, isActive && styles.stepActive, !isDone && !isActive && styles.stepWait)}>
-                    {isDone ? <CheckCircle2 className={styles.stepSvg} aria-hidden /> : isActive ? <Loader2 className={styles.stepSvg} aria-hidden /> : index + 1}
-                  </div>
-                  <div className={cn(styles.stepLabel, isDone && styles.stepLabelDone, isActive && styles.stepLabelActive, !isDone && !isActive && styles.stepLabelWait)}>
-                    {step.label}
-                  </div>
-                  {index === 2 ? <div className={styles.stepCount}>{resultsReadyForDisplay ? '완료' : `${committeeMembers.length}명 대기`}</div> : null}
-                </div>
-              )
-            })}
-          </div>
-
-          <section className={styles.committeeWrap} aria-label='세 팀 분석 진행 상태'>
-            <div className={styles.committeeTitle}>{resultsReadyForDisplay ? '세 팀 분석 완료' : '세 팀 분석 대기 중'}</div>
-            <div className={styles.membersGrid}>
-              {committeeMembers.map((member) => (
-                <div key={member.key} className={styles.member}>
-                  <div className={cn(styles.memberIcon, memberStateClass(resultsReadyForDisplay ? 'done' : member.state))}>
-                    <member.Icon className={styles.memberSvgIcon} aria-hidden />
-                  </div>
-                  <div className={styles.memberName}>
-                    {member.label.split('\n').map((line) => (
-                      <span key={line}>
-                        {line}
-                        <br />
-                      </span>
-                    ))}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </section>
-        </details>
-
-        {resultsReadyForDisplay && inlineResults ? <div className={styles.inlineResultsSlot}>{inlineResults}</div> : null}
+        {inlineResultsReady && inlineResults ? <div ref={inlineResultsRef} className={styles.inlineResultsSlot}>{inlineResults}</div> : null}
           </>
         )}
         <p className={styles.privacy}>분석 결과는 투자 권유가 아닌 참고 자료입니다.</p>

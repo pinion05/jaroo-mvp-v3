@@ -162,13 +162,19 @@ test('buildDeepScanRecoveryForecastBlock returns a deepscan-ready 원금회수 b
 
   assert.ok(block)
   assert.equal(block.blockState, 'ok')
-  assert.match(block.summaryText, /도달한 사례만/)
+  assert.match(block.summaryText, /본전에 도달/)
   assert.match(block.expectedRecoveryDaysText, /거래일|이미 도달/)
   assert.notEqual(block.recoveryProbabilityText, 'N/A')
   assert.equal(block.currentPriceText, '$100.00')
   assert.equal(block.targetPriceText, '$121.00')
   assert.equal(block.modelRows.length, 3)
   assert.match(block.disclaimer, /투자 권유/)
+  // 수치 원본·차트 재료(히어로 게이지·1년 차트 렌더링용)가 함께 내려간다.
+  assert.equal(block.currentPrice, 100)
+  assert.equal(block.targetPrice, 121)
+  assert.equal(block.confidenceLevel === null || ['high', 'medium', 'low'].includes(block.confidenceLevel ?? ''), true)
+  assert.ok(Array.isArray(block.priceHistory) && block.priceHistory.length === 10)
+  assert.deepEqual(block.priceHistory?.[0], { date: '2026-01-01', close: 121 })
 })
 
 test('describeMomentumProvenance는 provider별 OHLC 문구를 맞춘다', () => {
@@ -521,8 +527,8 @@ test('buildKrDeepScanPayloadViaCrawler shapes crawler recoveryForecastRaw into a
   assert.equal(block.confidenceText, '보통')
   const modelRows = block.modelRows as Array<{ label: string }>
   assert.equal(modelRows.length, 3)
-  assert.deepEqual(modelRows.map((row) => row.label), ['유사 패턴', '일반 주가 변동', '급등락 반영'])
-  assert.match(String(block.summaryText), /도달한 사례만/)
+  assert.deepEqual(modelRows.map((row) => row.label), ['비슷하게 빠졌던 과거 사례', '평소처럼 움직일 때', '갑자기 급등락할 때'])
+  assert.match(String(block.summaryText), /본전에 도달/)
   assert.match(String(block.summaryText), /74/)
   assert.match(String(block.currentPriceText), /20/)
   assert.match(String(block.drawdownText), /28\.4/)
@@ -582,6 +588,14 @@ test('buildKrDeepScanPayloadViaCrawler recomputes optimistic crawler recovery ou
   const rows = block.modelRows as Array<Record<string, unknown>>
   assert.notEqual(rows[1]?.recoveryDaysText, '15일')
   assert.notEqual(rows[1]?.probabilityText, '100%')
+  // 주입된 일봉 계열이 차트 재료(priceHistory, 최대 252포인트)로 내려간다.
+  const priceHistory = block.priceHistory as Array<{ date: string | null; close: number }>
+  assert.ok(Array.isArray(priceHistory))
+  assert.equal(priceHistory.length, 252)
+  assert.equal(block.currentPrice, 100)
+  assert.equal(block.targetPrice, 150)
+  assert.equal(typeof block.recoveryProbabilityPct, 'number')
+  assert.ok(['high', 'medium', 'low'].includes(String(block.confidenceLevel)))
 })
 
 test('buildKrDeepScanPayloadViaCrawler blocks recovery output when daily history loading fails', async () => {
@@ -625,6 +639,92 @@ test('buildKrDeepScanPayloadViaCrawler blocks recovery output when daily history
   const block = payload.recoveryForecast as Record<string, unknown>
   assert.equal(block.blockState, 'blocked')
   assert.match(String((block.error as Record<string, unknown>)?.message), /일봉/)
+})
+
+test('buildKrDeepScanPayloadViaCrawler는 FnGuide 실패(null CP/TP) 시 네이버 일봉+입력 평단으로 회복예측을 계산한다', async () => {
+  const crawlerPayload = {
+    input: {
+      instrument: { name: '테스트', code: '100840', market: 'KR', kind: 'stock' },
+      holding: { shares: '10', averagePrice: '150' },
+      sourceContext: { from: 'holding' },
+    },
+    recoveryForecastRaw: {
+      forecast: {
+        status: 'unavailable',
+        reason: '과거 주가 데이터가 부족해 원금회수 예측을 계산할 수 없습니다.',
+        models: {},
+        consensus: null,
+      },
+      currentPrice: null,
+      targetPrice: null,
+    },
+  }
+  const dailySeries = Array.from({ length: 260 }, (_, index) => ({
+    date: new Date(Date.UTC(2025, 0, index + 1)).toISOString().slice(0, 10),
+    close: 100 + Math.sin(index) * 2,
+  }))
+  const rawInput: DeepScanRawInput = {
+    instrument: { name: '테스트', code: '100840', market: 'KR', kind: 'stock' },
+    holding: { shares: '10', averagePrice: '150' },
+    sourceContext: { from: 'holding' },
+  }
+
+  const payload = await buildKrDeepScanPayloadViaCrawler(
+    rawInput,
+    (async () => new Response(JSON.stringify(crawlerPayload), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch,
+    {
+      fetchTimeoutMs: 1000,
+      recoveryPriceHistoryLoader: async () => dailySeries,
+    },
+  ) as Record<string, unknown>
+
+  const block = payload.recoveryForecast as Record<string, unknown>
+  assert.ok(block, 'recoveryForecast 블록이 존재해야 한다')
+  assert.notEqual(block.blockState, 'blocked')
+  assert.equal(block.targetPrice, 150)
+  assert.equal(block.currentPrice, dailySeries[259].close)
+  const sourceRefs = block.sourceRefs as Array<Record<string, unknown>>
+  assert.ok(sourceRefs.some((source) => source.id === 'naver-daily-price-history'))
+})
+
+test('buildKrDeepScanPayloadViaCrawler는 recoveryForecastRaw 키 자체가 없어도 네이버 일봉으로 블록을 만든다', async () => {
+  const crawlerPayload = {
+    input: {
+      instrument: { name: '테스트', code: '100840', market: 'KR', kind: 'stock' },
+      holding: { shares: '5', averagePrice: '300,000원' },
+      sourceContext: { from: 'holding' },
+    },
+  }
+  const dailySeries = Array.from({ length: 260 }, (_, index) => ({
+    date: new Date(Date.UTC(2025, 0, index + 1)).toISOString().slice(0, 10),
+    close: 240000 + Math.sin(index) * 4000,
+  }))
+  const rawInput: DeepScanRawInput = {
+    instrument: { name: '테스트', code: '100840', market: 'KR', kind: 'stock' },
+    holding: { shares: '5', averagePrice: '300,000원' },
+    sourceContext: { from: 'holding' },
+  }
+
+  const payload = await buildKrDeepScanPayloadViaCrawler(
+    rawInput,
+    (async () => new Response(JSON.stringify(crawlerPayload), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch,
+    {
+      fetchTimeoutMs: 1000,
+      recoveryPriceHistoryLoader: async () => dailySeries,
+    },
+  ) as Record<string, unknown>
+
+  const block = payload.recoveryForecast as Record<string, unknown>
+  assert.ok(block, 'recoveryForecast 블록이 존재해야 한다')
+  assert.notEqual(block.blockState, 'blocked')
+  assert.equal(block.targetPrice, 300000)
+  assert.equal(block.currentPrice, dailySeries[259].close)
 })
 
 test('buildKrDeepScanPayloadViaCrawler preserves low-confidence similar-pattern evidence when recovery days are unavailable', async () => {
@@ -675,7 +775,7 @@ test('buildKrDeepScanPayloadViaCrawler preserves low-confidence similar-pattern 
   const block = payload.recoveryForecast as Record<string, unknown>
   const rows = block.modelRows as Array<Record<string, unknown>>
   assert.deepEqual(rows[0], {
-    label: '유사 패턴',
+    label: '비슷하게 빠졌던 과거 사례',
     recoveryDaysText: 'N/A',
     probabilityText: '0%',
     sampleText: '1건',

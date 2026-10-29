@@ -53,7 +53,6 @@ import {
   allCommitteeLoadingStageKeys,
   extractLoadingStageKeysFromCommitteeAxes,
   extractLoadingStageKeysFromCommitteeResults,
-  hasCollectedDeepScanEvidence,
   uniqueLoadingStageKeys,
 } from './deepscan-page-stages'
 
@@ -856,7 +855,6 @@ export default function DeepScanPage() {
     ?? activeLoadingQuickQuote?.currentPriceCurrency
     ?? (requestSeed.holding.market === 'US' ? 'USD' : undefined)
   const loadingQuickFacts = buildLoadingQuickFacts(payload, activeLoadingQuickQuote, activeLoadingBriefingSnapshot, requestSeed.holding.name, requestSeed.holding.market, requestSeed.holding.kind)
-  const evidenceCollected = hasCollectedDeepScanEvidence(payload)
   // 크레딧 부족(402)은 일시적 오류가 아니다 — 재시도 대신 크레딧 문구와 충전 CTA로 안내한다.
   const isCreditShortage = fetchState === 'error' && errorCode === 'insufficient-credits'
   const requestErrorNotice = isCreditShortage
@@ -925,11 +923,11 @@ export default function DeepScanPage() {
         currentProfitRate={target?.currentProfitRate}
         snapshotProfitRate={target?.snapshotProfitRate}
         briefingSnapshot={activeLoadingBriefingSnapshot}
+        payloadRecoveryForecast={payload?.recoveryForecast ?? null}
         findingProgress={loadingFindingProgress}
         committeeAxes={payload?.committee.axes}
         quickFacts={loadingQuickFacts}
         performanceComment={loadingPerformanceComment}
-        evidenceCollected={evidenceCollected}
         visibleStageCount={visibleStageCount}
         arrivedStageKeys={arrivedStageKeys}
         resultsReady={resultsReady}
