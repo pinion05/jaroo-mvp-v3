@@ -126,6 +126,8 @@ export function DeepScanLoadingScreen({
   const teamSummaryFetchCoordinatorRef = useRef(createTeamSummaryFetchCoordinator())
   const teamBridgeRef = useRef<HTMLElement | null>(null)
   const narrativeStreamRef = useRef<HTMLElement | null>(null)
+  const recoveryForecastRef = useRef<HTMLElement | null>(null)
+  const inlineResultsRef = useRef<HTMLDivElement | null>(null)
   const targetLine = [identifier, market].filter(Boolean).join(' · ')
   const exchangeProduct = isExchangeTradedProduct(market, instrumentKind)
   const sharesText = formatShares(shares)
@@ -245,6 +247,25 @@ export function DeepScanLoadingScreen({
     const target = cardNodes?.item(sequentialNarrativeCards.length - 1) ?? null
     return startDeepScanMobileAutoScroll(target)
   }, [sequentialNarrativeCards.length, settledCommitteeCardCount])
+  // 원금회수 예측 카드·종합 결론이 등장할 때도 화면을 해당 위치로 내린다(2026-10-29 사용자 지시).
+  // 원금회수 예측의 렌더 조건을 컴포넌트 몸통으로 옮겨(recoveryForecastVisible) 스크롤 이펙트가
+  // 같은 조건을 참조하게 한다. 결론은 inlineResultsReady(+ inlineResults 존재) 시점에 스크롤.
+  const recoveryForecastVisible = Boolean(
+    payloadRecoveryForecast && payloadRecoveryForecast.blockState === 'ok'
+      ? payloadRecoveryForecast
+      : briefingSnapshot?.recoveryForecast ?? null,
+  )
+    && !(payloadRecoveryForecast && (payloadRecoveryForecast.currentPrice == null || payloadRecoveryForecast.targetPrice == null || payloadRecoveryForecast.currentPrice >= payloadRecoveryForecast.targetPrice))
+    && resultsReadyForDisplay
+    && teamsSettledAtSeconds !== null
+    && elapsedSeconds >= Math.max(TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS, teamsSettledAtSeconds)
+  const hasInlineResults = inlineResults != null
+  useEffect(() => (
+    recoveryForecastVisible ? startDeepScanMobileAutoScroll(recoveryForecastRef.current) : undefined
+  ), [recoveryForecastVisible])
+  useEffect(() => (
+    inlineResultsReady && hasInlineResults ? startDeepScanMobileAutoScroll(inlineResultsRef.current) : undefined
+  ), [inlineResultsReady, hasInlineResults])
   const teamBridgeState = buildTeamBridgeState(elapsedSeconds, resultsReadyForDisplay)
   const isTeamBridgeVisible = Boolean(teamBridgeState)
   // 브리핑 배열의 순차 공개(5초 리듬)는 결과가 언제 도착하든 시퀀스가 끝날 때까지
@@ -526,7 +547,7 @@ export function DeepScanLoadingScreen({
           })}
         </section>
 
-        {(() => {
+        {recoveryForecastVisible ? (() => {
           // 원금회수 예측 — 기존 '실제 분석 결과가 도착했어요'(완료 카드) 자리의 독립 컴포넌트.
           // 브리핑 배열에서 빼고 이 위치로 이동(2026-10-28 사용자 지시). payload 블록이 최우선,
           // 로딩 중에는 브리핑 스냅샷 프리뷰. 수익 구간(평단 이상)은 미표시.
@@ -536,29 +557,19 @@ export function DeepScanLoadingScreen({
           if (!recoverySource) {
             return null
           }
-          const recoveryCurrent = payloadRecoveryForecast?.currentPrice
-          const recoveryTarget = payloadRecoveryForecast?.targetPrice
-          if (payloadRecoveryForecast && (recoveryCurrent == null || recoveryTarget == null || recoveryCurrent >= recoveryTarget)) {
-            return null
-          }
-          // 공개 순서: 브리핑 배열 전체(스캘래톤 포함) 공개가 끝나고 → 위원(세 팀) 카드가 완전히
-          // 렌더링된 뒤에 등장한다(2026-10-29 — 81초 절대 게이트를 배열 완료·위원 완성 시점 기준
-          // 상대 게이트로 교체). 종합 결론은 이 카드 뒤 n초 뒤에 이어진다.
-          if (!resultsReadyForDisplay || teamsSettledAtSeconds === null || elapsedSeconds < Math.max(TODAY_BRIEFING_ARRAY_COMPLETE_SECONDS, teamsSettledAtSeconds)) {
-            return null
-          }
+          // 공개 순서·스크롤 조건은 recoveryForecastVisible(컴포넌트 몸통)이 담당한다.
           // 완료 카드 자리 — 브리핑 배열과 같은 개인 카드 컨테이너(todayBriefingCard)로 감싼다.
           // 배열 밖으로 옮겨온 뒤 카드 없이 내용이 바로 깔리는 문제 수정(2026-10-28 사용자 지시).
           return (
-            <section className={styles.todayBriefingCard} aria-label='원금회수 예측'>
+            <section ref={recoveryForecastRef} className={styles.todayBriefingCard} aria-label='원금회수 예측'>
               <div className={styles.todayBriefList}>
                 <TodayRecoveryForecastBriefing at={0} elapsedSeconds={0} forceReady recovery={recoverySource} />
               </div>
             </section>
           )
-        })()}
+        })() : null}
 
-        {inlineResultsReady && inlineResults ? <div className={styles.inlineResultsSlot}>{inlineResults}</div> : null}
+        {inlineResultsReady && inlineResults ? <div ref={inlineResultsRef} className={styles.inlineResultsSlot}>{inlineResults}</div> : null}
           </>
         )}
         <p className={styles.privacy}>분석 결과는 투자 권유가 아닌 참고 자료입니다.</p>
