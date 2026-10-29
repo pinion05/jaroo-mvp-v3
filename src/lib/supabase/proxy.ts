@@ -41,7 +41,16 @@ export async function updateSupabaseSession(request: NextRequest) {
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
         response = NextResponse.next({ request })
-        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, {
+            ...options,
+            // 세션 토큰 회전 쿠키의 JS 노출 차단 — server.ts setAll 강제 패턴과 동일.
+            // @supabase/ssr 기본값(httpOnly:false)을 그대로 쓰면 토큰이 document.cookie로
+            // 열람된다. Secure는 운영(https)에서만, localhost 개발은 http 유지.
+            httpOnly: true,
+            secure: process.env.NODE_ENV === 'production',
+          }),
+        )
       },
     },
   })
