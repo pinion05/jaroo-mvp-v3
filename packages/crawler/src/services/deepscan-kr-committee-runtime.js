@@ -7,6 +7,7 @@ import {
   getCommitteeProgress,
   scoreCommitteeMembersProgressive,
 } from '../../../deepscan-runtime-core/src/committee-llm.js';
+import { isLlmMockEnabled } from '../../../deepscan-runtime-core/src/llm-mock.js';
 import { safeJsonStringify } from '../../../deepscan-runtime-core/src/safe-json.js';
 import {
   createDisclosureDebugProjection,
@@ -1068,7 +1069,8 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
   });
 
   const enabled = normalizeText(process.env.DEEPSCAN_KR_LLM_ENABLE)?.toLowerCase();
-  if (!process.env.OPENROUTER_API_KEY && !['1', 'true', 'yes', 'on'].includes(enabled ?? '')) {
+  // JAROO_LLM_MOCK=1이면 키 없이도 위원회 LLM(모의)이 돌아가게 한다(dev 비용 0).
+  if (!process.env.OPENROUTER_API_KEY && !isLlmMockEnabled() && !['1', 'true', 'yes', 'on'].includes(enabled ?? '')) {
     return {
       requestId,
       runtimeShape: {

@@ -406,7 +406,8 @@ function recoveryFriendlyTradingDays(days: number | null) {
 }
 
 // 원금회수 예측 브리핑 — '내 자리는 어디쯤일까요?' 바로 아래에서 이어지는 후속 질문.
-// 데이터가 확보되면 결과 카드와 같은 1년 차트(평단 점선·유사 패턴 밴드)도 함께 그린다.
+// 데이터가 확보되면 결과 카드와 같은 회복 차트(평단 점선·유사 패턴 밴드, KR은 3년
+// 일봉 기준 '최근 3년' 표기)도 함께 그린다.
 // data-today-briefing-item을 달지 않는다(공개 타이밍 시퀀스·모바일 자동스크롤 인덱스를
 // 밀지 않기 위해 — consensus 항목과 같은 보조 항목 패턴).
 export function TodayRecoveryForecastBriefing({
@@ -467,7 +468,7 @@ export function TodayRecoveryForecastBriefing({
               className={styles.recoveryChartSvg}
               viewBox={`0 0 ${RECOVERY_CHART_WIDTH} ${RECOVERY_CHART_HEIGHT}`}
               role='img'
-              aria-label='최근 1년 종가 차트. 파란 점선은 평단가, 호밍색 표시는 유사 과거 패턴 구간이다.'
+              aria-label={`${chartGeometry.periodLabel} 종가 차트. 파란 점선은 평단가, 호밍색 표시는 유사 과거 패턴 구간이다.`}
             >
               {chartGeometry.gridlines.map((line) => (
                 <g key={`grid-${line.label}`}>

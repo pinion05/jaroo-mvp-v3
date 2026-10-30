@@ -3,7 +3,14 @@ import { sanitizeOcrRows } from '@/lib/screenshot-ocr'
 import { NO_STORE_PRIVATE_HEADERS, resolveApiUserId } from '@/lib/supabase/api-auth'
 import { originAllowedForStateChange } from '@/lib/http-origin-guard'
 import {
+  createLlmMockSeededRandom,
+  isLlmMockEnabled,
+  llmMockDateToken,
+  sleepLlmMockLatency,
+} from '../../../../packages/deepscan-runtime-core/src/llm-mock.js'
+import {
   DEFAULT_OCR_MODEL,
+  MOCK_OCR_ROWS,
   OCR_MAX_IMAGE_DATA_URL_LENGTH,
   OCR_MAX_REQUEST_BYTES,
   OCR_UPSTREAM_TIMEOUT_MS,
@@ -28,6 +35,17 @@ async function requestOpenRouterOcr(options: {
   imageDataUrl: string
   useJsonSchema: boolean
 }) {
+  // JAROO_LLM_MOCK=1: 업로드 이미지와 무관하게 고정 픽스처를 반환한다(미설정 시 기존 경로 그대로).
+  if (isLlmMockEnabled()) {
+    const mockRandom = createLlmMockSeededRandom(`ocr|${options.broker || 'unknown'}|${options.fileName}|${llmMockDateToken()}`)
+    console.log(`[llm-mock] ocr broker=${options.broker || 'unknown'} file=${options.fileName}`)
+    await sleepLlmMockLatency(mockRandom)
+    return {
+      ok: true as const,
+      rows: sanitizeOcrRows(MOCK_OCR_ROWS),
+    }
+  }
+
   let upstreamResponse: Response
   try {
     upstreamResponse = await fetch('https://openrouter.ai/api/v1/chat/completions', {
@@ -96,7 +114,8 @@ export async function POST(request: Request) {
   const model = process.env.OCR_MODEL || DEFAULT_OCR_MODEL
   const useJsonSchema = process.env.OCR_RESPONSE_FORMAT === 'json_schema'
 
-  if (!apiKey) {
+  // JAROO_LLM_MOCK=1이면 키 없이도 모의 경로가 돌아간다(dev 비용 0).
+  if (!apiKey && !isLlmMockEnabled()) {
     return NextResponse.json({ error: 'OPENROUTER_API_KEY is not configured.' }, { status: 500 })
   }
 
@@ -150,7 +169,8 @@ export async function POST(request: Request) {
 
   for (const attempt of attempts) {
     const result = await requestOpenRouterOcr({
-      apiKey,
+      // mock 모드에서는 키가 없어도 모의 분기가 fetch 전에 반환되므로 빈 값이 흘러도 안전하다.
+      apiKey: apiKey ?? '',
       model: attempt.model,
       broker,
       fileName,

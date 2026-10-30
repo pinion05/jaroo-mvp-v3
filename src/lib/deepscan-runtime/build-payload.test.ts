@@ -349,6 +349,25 @@ test('KR DeepScan crawler canonical URL은 market KOSPI 표기에서도 명시 k
   assert.match(url, /kind=etn/)
 })
 
+test('KR DeepScan crawler canonical URL은 skipCommitteeLlm 옵션에서만 committeeLlm=off를 붙인다', () => {
+  const rawInput: DeepScanRawInput = {
+    instrument: {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KR',
+    },
+    sourceContext: {
+      from: 'system',
+    },
+  }
+
+  // 기본(유저 딥스캔)은 플래그가 없어야 한다
+  assert.doesNotMatch(buildKrDeepScanCrawlerCanonicalUrl(rawInput), /committeeLlm/)
+
+  // 워치 일괄 배치용 옵션은 committeeLlm=off를 전달한다
+  assert.match(buildKrDeepScanCrawlerCanonicalUrl(rawInput, { skipCommitteeLlm: true }), /committeeLlm=off/)
+})
+
 test('buildRawInputFromSearchParams 화이트리스트는 kind=etn을 드롭하지 않는다', async () => {
   const { buildRawInputFromSearchParams } = await import('./build-payload')
 
@@ -555,7 +574,7 @@ test('buildKrDeepScanPayloadViaCrawler recomputes optimistic crawler recovery ou
       targetPrice: 150,
     },
   }
-  const dailySeries = Array.from({ length: 260 }, (_, index) => ({
+  const dailySeries = Array.from({ length: 800 }, (_, index) => ({
     date: new Date(Date.UTC(2025, 0, index + 1)).toISOString().slice(0, 10),
     close: 100 + Math.sin(index) * 2,
   }))
@@ -588,10 +607,11 @@ test('buildKrDeepScanPayloadViaCrawler recomputes optimistic crawler recovery ou
   const rows = block.modelRows as Array<Record<string, unknown>>
   assert.notEqual(rows[1]?.recoveryDaysText, '15일')
   assert.notEqual(rows[1]?.probabilityText, '100%')
-  // 주입된 일봉 계열이 차트 재료(priceHistory, 최대 252포인트)로 내려간다.
+  // 주입된 일봉 계열이 차트 재료(priceHistory, 3년치 최대 780포인트)로 내려간다.
   const priceHistory = block.priceHistory as Array<{ date: string | null; close: number }>
   assert.ok(Array.isArray(priceHistory))
-  assert.equal(priceHistory.length, 252)
+  assert.equal(priceHistory.length, 780)
+  assert.equal(priceHistory[priceHistory.length - 1]?.date, dailySeries[dailySeries.length - 1]?.date)
   assert.equal(block.currentPrice, 100)
   assert.equal(block.targetPrice, 150)
   assert.equal(typeof block.recoveryProbabilityPct, 'number')

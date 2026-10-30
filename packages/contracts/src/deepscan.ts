@@ -252,7 +252,7 @@ export type JarooDeepScanRecoveryForecastBlock = DeepScanBlockMeta & {
   expectedRecoveryDays?: number | null
   recoveryProbabilityPct?: number | null
   confidenceLevel?: 'high' | 'medium' | 'low' | null
-  /** 모델 입력에 쓴 가격 계열(최근 252포인트) — 차트 렌더링용 */
+  /** 모델 입력에 쓴 가격 계열(KR은 최대 780포인트 ≈ 3년치 일봉) — 차트 렌더링용 */
   priceHistory?: JarooRecoveryPricePoint[]
   /** 유사 패턴이 매칭한 과거 하락 구간(차트 하이라이트용) */
   similarPatternSamples?: JarooRecoverySimilarPatternSample[]

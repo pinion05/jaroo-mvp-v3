@@ -102,6 +102,30 @@ test('DeepScanRecoveryForecastCard renders the 1-year chart with similar-pattern
   assert.match(markup, /<title>현재가 ₩20,050<\/title>/)
 })
 
+test('DeepScanRecoveryForecastCard renders the 3-year chart label and year-month ticks for a 3-year history', () => {
+  // KR 3년치 일봉(780봉) 페이로드 — 라벨·틱이 3년 표기로 전환되는지 확인한다.
+  const priceHistory = Array.from({ length: 780 }, (_, index) => ({
+    date: new Date(Date.UTC(2023, 7, 14 + index)).toISOString().slice(0, 10),
+    close: 30000 - (779 - index) * 10,
+  }))
+  const firstTickLabel = priceHistory[0]?.date.slice(0, 7).replace('-', '.') ?? ''
+  const lastTickLabel = priceHistory[priceHistory.length - 1]?.date.slice(0, 7).replace('-', '.') ?? ''
+  const markup = renderToStaticMarkup(createElement(DeepScanRecoveryForecastCard, {
+    payload: payloadWithRecovery(baseRecoveryBlock({
+      currentPrice: 30000,
+      targetPrice: 34000,
+      priceHistory,
+    })),
+  }))
+
+  assert.match(markup, /최근 3년 종가와 유사 과거 패턴/)
+  assert.match(markup, /최근 3년 종가 차트\. 파란 점선은 평단가/)
+  // 틱은 연·월(YYYY.MM) 서식으로 5개 그려진다.
+  assert.match(markup, new RegExp(firstTickLabel))
+  assert.match(markup, new RegExp(lastTickLabel))
+  assert.doesNotMatch(markup, /최근 1년/)
+})
+
 test('DeepScanRecoveryForecastCard renders nothing for a profit position', () => {
   const markup = renderToStaticMarkup(createElement(DeepScanRecoveryForecastCard, {
     payload: payloadWithRecovery(baseRecoveryBlock({ drawdownText: '-7.1%' })),

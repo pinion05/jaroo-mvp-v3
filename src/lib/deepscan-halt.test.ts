@@ -37,6 +37,8 @@ test('resolveDeepScanHaltVerdict — 퀵시세 거래량이 힌트보다 우선�
     instrumentKind: 'stock' as const,
     haltHint: true,
     checkExpired: false,
+    // 정규장 중(금 10:00 KST) 고정 — volume 0 폴백 판정이 도는 조건을 고정한다
+    now: new Date('2026-10-30T01:00:00.000Z'),
   }
 
   // 힌트만 있으면 즉시 정지 화면
@@ -49,6 +51,66 @@ test('resolveDeepScanHaltVerdict — 퀵시세 거래량이 힌트보다 우선�
   assert.equal(resolveDeepScanHaltVerdict({ ...base, haltHint: false, quickQuoteVolume: undefined }), 'pending')
   assert.equal(
     resolveDeepScanHaltVerdict({ ...base, haltHint: false, quickQuoteVolume: undefined, checkExpired: true }),
+    'active',
+  )
+})
+
+test('resolveDeepScanHaltVerdict — 권위 필드(tradeHalted)는 시각과 무관하게 즉시 확정한다', () => {
+  const base = {
+    targetKey: 'KR:263050',
+    isUsTarget: false,
+    instrumentKind: 'stock' as const,
+    haltHint: false,
+    checkExpired: false,
+    // 장전(금 08:02 KST) — 시간 게이트 밖에서도 권위 필드는 즉시 확정되어야 한다
+    now: new Date('2026-10-29T23:02:00.000Z'),
+  }
+
+  // 네이버가 정지(HALTED/halt)로 알림 → 장전이라도 즉시 정지
+  assert.equal(resolveDeepScanHaltVerdict({ ...base, quickQuoteTradeHalted: true, quickQuoteVolume: 0 }), 'halted')
+  // 네이버가 거래 중(TRADING/tradable)으로 알림 → 장전 volume 0(롤오버 행)과 무관하게 일반 플로우
+  assert.equal(resolveDeepScanHaltVerdict({ ...base, quickQuoteTradeHalted: false, quickQuoteVolume: 0 }), 'active')
+  // 정지 힌트가 있어도 권위 필드가 거래 중이면 해제로 판정(정지→해제 전환)
+  assert.equal(
+    resolveDeepScanHaltVerdict({ ...base, haltHint: true, quickQuoteTradeHalted: false, quickQuoteVolume: 0 }),
+    'active',
+  )
+  // 권위 필드만 있고 거래량 미제공이어도 즉시 확정
+  assert.equal(resolveDeepScanHaltVerdict({ ...base, quickQuoteTradeHalted: true, quickQuoteVolume: undefined }), 'halted')
+})
+
+test('resolveDeepScanHaltVerdict — 권위 필드 없으면 거래량 0 폴백은 정규장 시간 게이트를 지난다', () => {
+  const base = {
+    targetKey: 'KR:030350',
+    isUsTarget: false,
+    instrumentKind: 'stock' as const,
+    haltHint: false,
+    checkExpired: false,
+  }
+
+  // 정규장 중(금 10:00 KST) volume 0 → 기존대로 정지
+  assert.equal(
+    resolveDeepScanHaltVerdict({ ...base, quickQuoteVolume: 0, now: new Date('2026-10-30T01:00:00.000Z') }),
+    'halted',
+  )
+  // 장전(금 08:02 KST) volume 0(일별 행 롤오버) → 정지 아님, 즉시 일반 플로우
+  assert.equal(
+    resolveDeepScanHaltVerdict({ ...base, quickQuoteVolume: 0, now: new Date('2026-10-29T23:02:00.000Z') }),
+    'active',
+  )
+  // 주말(토 10:00 KST) volume 0 → 정지 아님
+  assert.equal(
+    resolveDeepScanHaltVerdict({ ...base, quickQuoteVolume: 0, now: new Date('2026-10-31T01:00:00.000Z') }),
+    'active',
+  )
+  // 정규장 밖 volume 0에 정지 힌트(권위 필드 유래)가 있으면 유지 — 밤/장전에도 실제 정지는 정지
+  assert.equal(
+    resolveDeepScanHaltVerdict({ ...base, haltHint: true, quickQuoteVolume: 0, now: new Date('2026-10-29T23:02:00.000Z') }),
+    'halted',
+  )
+  // 거래량 > 0은 시각과 무관하게 거래 중
+  assert.equal(
+    resolveDeepScanHaltVerdict({ ...base, quickQuoteVolume: 500, now: new Date('2026-10-29T23:02:00.000Z') }),
     'active',
   )
 })

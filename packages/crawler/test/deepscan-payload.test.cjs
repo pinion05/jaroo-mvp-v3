@@ -911,6 +911,96 @@ test('buildJarooDeepScanPayload can surface dump-backed KR LLM committee scores 
   }
 });
 
+test('buildJarooDeepScanPayload skips committee LLM calls when committeeLlm=off request toggle is set', async () => {
+  const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
+  const originalFetch = global.fetch;
+  const originalKey = process.env.OPENROUTER_API_KEY;
+  const originalEnable = process.env.DEEPSCAN_KR_LLM_ENABLE;
+  const originalSummaryEnable = process.env.DEEPSCAN_COMMENTARY_SUMMARY_ENABLE;
+  process.env.OPENROUTER_API_KEY = 'test-key';
+  // 환경만 보면 LLM이 켜져 있어야 하는 상태(유저 딥스캔과 동일)에서 요청 토글만으로 꺼지는지 검증.
+  process.env.DEEPSCAN_KR_LLM_ENABLE = 'true';
+  // 실적코멘트 요약 LLM은 위원회가 아니므로 이 테스트에서는 제외(유일한 LLM fetch=위원회).
+  process.env.DEEPSCAN_COMMENTARY_SUMMARY_ENABLE = 'false';
+
+  const createBaseInput = () => ({
+    instrument: {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KR',
+    },
+    holding: {
+      shares: '12',
+      averagePrice: '71000',
+      evaluationAmount: '1022400',
+    },
+    selectedAt: '2026-04-14T00:00:00.000Z',
+    sourceContext: {
+      from: 'holding',
+      sessionKey: 'session-1',
+      appliedAt: '2026-04-15T00:00:00.000Z',
+    },
+    sources: createStrongKrSources(),
+  });
+
+  let llmFetchCount = 0;
+  global.fetch = (async (url) => {
+    if (String(url).includes('openrouter.ai')) {
+      llmFetchCount += 1;
+    }
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({
+            score: 70,
+            reason: '대조군 위원 응답입니다.',
+            confidence: 'medium',
+          }),
+        },
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  });
+
+  try {
+    // 대조군: 토글 없으면(유저 딥스캔 경로) 위원회 LLM이 실제로 호출된다.
+    await buildJarooDeepScanPayload(createBaseInput());
+    assert.ok(llmFetchCount > 0, '대조군(토글 없음)에서는 위원회 LLM fetch가 발생해야 한다');
+
+    // 실험군: committeeLlm=off 면 위원회 LLM fetch가 0건이어야 한다.
+    llmFetchCount = 0;
+    const payload = await buildJarooDeepScanPayload({ ...createBaseInput(), committeeLlm: 'off' });
+    assert.equal(llmFetchCount, 0, 'committeeLlm=off 요청은 openrouter fetch를 하지 않아야 한다');
+    assert.equal(payload.metadata.llmCommittee, undefined, '스킵 시 metadata.llmCommittee가 없어야 한다');
+    assert.equal(
+      payload.metadata.sourceRefs.some((ref) => ref.id.startsWith('kr-llm:')),
+      false,
+      '스킵 시 kr-llm 실행 기록 sourceRef가 남지 않아야 한다',
+    );
+    // 위원회 블록은 LLM 키가 없을 때와 동일한 결정론 폴백(우아한 경로)으로 내려간다.
+    assertCanonicalPayloadShape(payload);
+    assert.equal(payload.metadata.degraded, false);
+    assertBlockMeta(payload.committee, 'ok');
+    assert.equal(payload.committee.axes.length, 3);
+    assert.ok(payload.committee.axes.every((axis) => axis.members.length > 0));
+  } finally {
+    global.fetch = originalFetch;
+    if (originalKey) {
+      process.env.OPENROUTER_API_KEY = originalKey;
+    } else {
+      delete process.env.OPENROUTER_API_KEY;
+    }
+    process.env.DEEPSCAN_KR_LLM_ENABLE = originalEnable ?? 'false';
+    if (originalSummaryEnable) {
+      process.env.DEEPSCAN_COMMENTARY_SUMMARY_ENABLE = originalSummaryEnable;
+    } else {
+      delete process.env.DEEPSCAN_COMMENTARY_SUMMARY_ENABLE;
+    }
+  }
+});
+
 test('buildJarooDeepScanPayload preserves 9 committee slots and marks failed members after retry exhaustion', async () => {
   const { buildJarooDeepScanPayload } = await import('../src/services/deepscan-payload.js');
   const originalFetch = global.fetch;

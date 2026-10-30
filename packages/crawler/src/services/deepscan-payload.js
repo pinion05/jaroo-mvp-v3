@@ -2,6 +2,13 @@ import { createRequire } from 'node:module';
 import { getCurrentQuotes } from '../crawlers/current-quotes.js';
 import { buildDartDisclosureDocumentDump, collectDartDisclosures } from '../crawlers/dart-filings.js';
 import { sanitizeForJson } from '../../../deepscan-runtime-core/src/safe-json.js';
+import {
+  createLlmMockSeededRandom,
+  isLlmMockEnabled,
+  llmMockDateToken,
+  pickLlmMockItem,
+  sleepLlmMockLatency,
+} from '../../../deepscan-runtime-core/src/llm-mock.js';
 import { fetchWiseReportEtfSnapshot } from '../crawlers/wisereport-etf.js';
 import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
 import {
@@ -1150,11 +1157,28 @@ function shouldInvokeKrCommitteeLlm() {
     return false;
   }
 
+  // JAROO_LLM_MOCK=1이면 키 없이도 위원회 LLM(모의) 경로가 돌아가게 한다(dev 비용 0).
+  if (isLlmMockEnabled()) {
+    return true;
+  }
+
   if (process.env.OPENROUTER_API_KEY) {
     return true;
   }
 
   return ['1', 'true', 'on', 'yes'].includes(explicitToggle ?? '');
+}
+
+// 요청 단위 위원회 LLM 스킵 — 워치 일일 배치처럼 committee 서사 없이 데이터(공시·가격)만
+// 필요한 소비처가 crawler ?committeeLlm=off 로 9인 위원회 LLM 호출을 끈다.
+// 강제 'on'은 없다(키 없는 강제 시도 방지) — 꺼기 값이 아니면 기존 환경 판정을 그대로 따른다.
+function committeeLlmEnabled(rawInput) {
+  const requestToggle = normalizeText(asObject(rawInput).committeeLlm)?.toLowerCase();
+  if (['0', 'false', 'off', 'no'].includes(requestToggle ?? '')) {
+    return false;
+  }
+
+  return shouldInvokeKrCommitteeLlm();
 }
 
 async function resolveKrSourceBundle(rawInput, input) {
@@ -1874,6 +1898,11 @@ function shouldSummarizePerformanceCommentWithLlm() {
     return false;
   }
 
+  // JAROO_LLM_MOCK=1이면 키 없이도 댓글 요약 LLM(모의) 경로가 돌아가게 한다(dev 비용 0).
+  if (isLlmMockEnabled()) {
+    return true;
+  }
+
   if (!process.env.OPENROUTER_API_KEY) {
     return false;
   }
@@ -2022,6 +2051,40 @@ function createLocalPerformanceCommentSummary(comment) {
   return lines.length === 3 ? lines : [];
 }
 
+// JAROO_LLM_MOCK=1용 결정적 실적 댓글 요약 템플릿 — 정확히 3줄(파서/소비부 계약),
+// 첫 줄에 [MOCK] 접두로 dev 모의 응답임을 화면에서 눈에 보이게 한다.
+const COMMENTARY_SUMMARY_LLM_MOCK_TEMPLATE_SETS = [
+  [
+    '[MOCK] 오늘 실적 댓글 요약은 dev 모의 응답이에요.',
+    '같은 종목을 같은 날 다시 스캔하면 같은 세 줄이 나와요.',
+    '실제 요약은 JAROO_LLM_MOCK을 끄면 다시 생성돼요.',
+  ],
+  [
+    '[MOCK] 목업 요약이라 원문 숫자는 옮기지 않아요.',
+    '요약 카드 표시와 로딩 흐름을 확인하는 용도예요.',
+    '운영에서는 실제 LLM이 숫자를 보존해 요약해요.',
+  ],
+  [
+    '[MOCK] dev 전용 실적 댓글 요약이에요.',
+    '점수·서사와 함께 모의 응답임을 표시해요.',
+    '투자 판단 근거로는 쓰지 않는 게 좋아요.',
+  ],
+  [
+    '[MOCK] 결정적 목업 요약으로 카드를 채웠어요.',
+    '입력이 같으면 하루 동안 같은 문장이 나와요.',
+    '실문장은 운영 모드에서 생성돼요.',
+  ],
+];
+
+// 테스트/진단용 export — 시드(종목+asOf+날짜)별로 항상 같은 3줄을 반환한다.
+export function buildLlmMockCommentarySummaryLines(input, performanceComment) {
+  const instrument = asObject(input).instrument ?? {};
+  const random = createLlmMockSeededRandom(
+    `commentary-summary|${instrument.code ?? instrument.ticker ?? instrument.name ?? 'unknown'}|${String(performanceComment?.asOf ?? '')}|${llmMockDateToken()}`,
+  );
+  return [...pickLlmMockItem(random, COMMENTARY_SUMMARY_LLM_MOCK_TEMPLATE_SETS)];
+}
+
 async function summarizePerformanceCommentForLoading(input, performanceComment) {
   if (!performanceComment?.text) {
     return null;
@@ -2042,6 +2105,17 @@ async function summarizePerformanceCommentForLoading(input, performanceComment) 
   );
 
   try {
+    // JAROO_LLM_MOCK=1: 네트워크 호출 없이 결정적 모의 3줄 요약을 반환한다(미설정 시 기존 경로 그대로).
+    if (isLlmMockEnabled()) {
+      const mockRandom = createLlmMockSeededRandom(
+        `commentary-summary|${input.instrument.code ?? input.instrument.ticker ?? input.instrument.name ?? 'unknown'}|${String(performanceComment.asOf ?? '')}|${llmMockDateToken()}`,
+      );
+      const lines = [...pickLlmMockItem(mockRandom, COMMENTARY_SUMMARY_LLM_MOCK_TEMPLATE_SETS)];
+      console.log(`[llm-mock] commentary-summary code=${input.instrument.code ?? input.instrument.ticker ?? 'NA'}`);
+      await sleepLlmMockLatency(mockRandom);
+      return { lines, method: 'mock' };
+    }
+
     const upstreamResponse = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
       method: 'POST',
       headers: {
@@ -2517,7 +2591,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     let llmCommitteePartialPending = false;
     let committeeAxes = createCommitteeAxes(evidence, deterministicScored, sources.packageResult);
     const performanceCommentSummaryPromise = summarizePerformanceCommentForLoading(input, evidence.businessCommentary?.performanceComment);
-    const llmAttempted = isKrInput(input) && shouldInvokeKrCommitteeLlm();
+    const llmAttempted = isKrInput(input) && committeeLlmEnabled(rawInput);
 
     if (llmAttempted) {
       const committeeStartedAtMs = Date.now();
@@ -2745,8 +2819,38 @@ const ETF_COMMITTEE_CACHE_ROUTE_VERSION = 'v1';
 const ETF_COMMITTEE_CACHE_SCHEMA_VERSION = 'etf-committee-market-timing-v1';
 const DEFAULT_ETF_COMMITTEE_SOFT_DEADLINE_MS = 25_000;
 
+// 캐시 키용 보유값 파싱 — 증거 패킷(deepscan-kr-evidence normalizeNumber)과 같은 규칙으로
+// 쉼표/통화기호/공백을 제거해 숫자로 만든다.
+function parseEtfHoldingNumberForKey(value) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const cleaned = value.trim().replaceAll(',', '').replace(/\s+/g, '').replace(/[₩$€¥£%]/g, '');
+  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(cleaned)) {
+    return null;
+  }
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+// 키에는 반올림된 값 문자열만 담는다 — maxFractionDigits 자리에서 반올림해
+// 부동소수점 노이즈·표기 차이("70,000" vs "70000.0")로 인한 불필요한 캐시 미스를 막는다.
+function normalizeEtfHoldingValueForKey(value, maxFractionDigits) {
+  const parsed = parseEtfHoldingNumberForKey(value);
+  if (parsed === null) {
+    return null;
+  }
+  return String(Number(parsed.toFixed(maxFractionDigits)));
+}
+
 function buildEtfCommitteeCacheDescriptor(input) {
   const hasHolding = input.holding?.shares != null && input.holding?.averagePrice != null;
+  // shares는 정수·소수 구분을 유지(4자리 반올림), 평단은 원화 소수 2자리 반올림.
+  const holdingShares = normalizeEtfHoldingValueForKey(input.holding?.shares, 4);
+  const holdingAveragePrice = normalizeEtfHoldingValueForKey(input.holding?.averagePrice, 2);
 
   return {
     source: 'deepscan',
@@ -2763,6 +2867,11 @@ function buildEtfCommitteeCacheDescriptor(input) {
       memberKeys: [...KR_ETF_PAGE_MEMBER_KEYS],
       // 보유 맥락 유무가 위원 덤프·점수를 바꾼다 — 캐시 키에 반영한다.
       hasHolding: hasHolding ? '1' : '0',
+      // 평단격차·평가손익은 수량·평단 값 자체를 따라간다 — 1/0 비트만으로는 보유값이 다른
+      // 사용자가 타인의 평단이 반영된 스냅샷을 fresh TTL(기본 6시간) 동안 재사용하게 된다.
+      // 정규화된 보유값을 키에 포함해 보유값별로 캐시 엔트리를 분리한다.
+      holdingShares,
+      holdingAveragePrice,
     },
     metadata: {
       consumer: 'etf-page',
