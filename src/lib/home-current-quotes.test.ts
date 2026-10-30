@@ -324,6 +324,8 @@ test('kind etn holding의 거래정지(거래량 0)는 ETF와 같은 signalTone/
   const [updated] = applyCurrentQuotesToHomeHoldings(
     [createEtnHolding()],
     [{ market: 'KR', code: '530092', ticker: null, price: 3475, currency: 'KRW', asOf: '2026-10-15', source: 'fixture', status: 'ok', volume: 0 }],
+    // 권위 필드 미제공 + 정규장 중(금 10:00 KST) — volume 0 폴백 판정이 도는 조건을 고정
+    { now: new Date('2026-10-30T01:00:00.000Z') },
   )
 
   assert.equal(updated.badge, '거래 정지')
@@ -628,6 +630,8 @@ test('거래량 0 시세는 거래 정지 카드로 표시하고 정지 전 종�
       identifierCode: '263050',
     })],
     [{ market: 'KR', code: '263050', ticker: null, price: 959, volume: 0, currency: 'KRW', asOf: '2026-09-16T10:11:21+09:00', source: 'naver-finance', status: 'ok' }],
+    // 권위 필드 미제공 + 정규장 중(금 10:00 KST) — volume 0 폴백이 정지로 판정되는 조건을 고정
+    { now: new Date('2026-10-30T01:00:00.000Z') },
   )
 
   assert.equal(updated.cardTone, 'halt')
@@ -641,4 +645,78 @@ test('거래량 0 시세는 거래 정지 카드로 표시하고 정지 전 종�
   // 손익은 정지 전 종가 기준: 200주 × (959 - 2,400) = -288,200원
   assert.equal(updated.pnl, '-288,200원')
   assert.equal(updated.metrics.some((metric) => metric.label === '수익률' && metric.value === '거래 정지'), true)
+})
+
+// ── 거래정지 오탐 수정(장전 롤오버·무체결) — 권위 필드 + 정규장 시간 게이트 ──
+// 픽스처: 2026-10-30(금) KST. 08:02=장전(일별 행 롤오버 시간대), 10:00=정규장 중.
+const KST_FRIDAY_PREMARKET_08_02 = new Date('2026-10-29T23:02:00.000Z')
+const KST_FRIDAY_MARKET_10_00 = new Date('2026-10-30T01:00:00.000Z')
+const KST_SATURDAY_10_00 = new Date('2026-10-31T01:00:00.000Z')
+
+function createSamsungHolding() {
+  return createHolding({
+    name: '삼성전자',
+    code: '005930',
+    shortName: '삼성전자',
+    donutLabel: '삼성전자',
+    shares: '10주',
+    averagePrice: '80,000원',
+    identifierCode: '005930',
+  })
+}
+
+test('장전(08:02 KST) 거래량 0은 거래 정지가 아니다 — 일별 행 롤오버 오탐 차단', () => {
+  const [updated] = applyCurrentQuotesToHomeHoldings(
+    [createSamsungHolding()],
+    [{ market: 'KR', code: '005930', ticker: null, price: 70000, volume: 0, currency: 'KRW', asOf: '2026-10-30T08:02:00+09:00', source: 'naver-finance', status: 'ok' }],
+    { now: KST_FRIDAY_PREMARKET_08_02 },
+  )
+
+  assert.equal(updated.cardTone !== 'halt', true)
+  assert.notEqual(updated.badge, '거래 정지')
+  assert.notEqual(updated.change, '거래 정지')
+  assert.equal(updated.metrics.some((metric) => metric.label === '수익률' && metric.value === '거래 정지'), false)
+})
+
+test('주말 거래량 0도 거래 정지가 아니다 — 시간 게이트는 요일도 본다', () => {
+  const [updated] = applyCurrentQuotesToHomeHoldings(
+    [createSamsungHolding()],
+    [{ market: 'KR', code: '005930', ticker: null, price: 70000, volume: 0, currency: 'KRW', asOf: '2026-10-31T10:00:00+09:00', source: 'naver-finance', status: 'ok' }],
+    { now: KST_SATURDAY_10_00 },
+  )
+
+  assert.equal(updated.cardTone !== 'halt', true)
+  assert.notEqual(updated.badge, '거래 정지')
+})
+
+test('정규장 중이라도 권위 필드가 거래 중(false)이면 무체결 거래량 0은 정지가 아니다', () => {
+  const [updated] = applyCurrentQuotesToHomeHoldings(
+    [createSamsungHolding()],
+    [{ market: 'KR', code: '005930', ticker: null, price: 70000, volume: 0, tradeHalted: false, currency: 'KRW', asOf: '2026-10-30T10:00:00+09:00', source: 'naver-finance', status: 'ok' }],
+    { now: KST_FRIDAY_MARKET_10_00 },
+  )
+
+  assert.equal(updated.cardTone !== 'halt', true)
+  assert.notEqual(updated.badge, '거래 정지')
+})
+
+test('권위 필드가 정지(true)면 장전(08:02 KST)이라도 즉시 거래 정지 카드다', () => {
+  const [updated] = applyCurrentQuotesToHomeHoldings(
+    [createHolding({
+      name: '유틸렉스',
+      code: '263050',
+      shortName: '유틸렉스',
+      donutLabel: '유틸렉스',
+      shares: '200주',
+      averagePrice: '2,400원',
+      identifierCode: '263050',
+    })],
+    [{ market: 'KR', code: '263050', ticker: null, price: 959, volume: 0, tradeHalted: true, currency: 'KRW', asOf: '2026-10-30T08:02:00+09:00', source: 'naver-finance', status: 'ok' }],
+    { now: KST_FRIDAY_PREMARKET_08_02 },
+  )
+
+  assert.equal(updated.cardTone, 'halt')
+  assert.equal(updated.badge, '거래 정지')
+  assert.equal(updated.change, '거래 정지')
+  assert.equal(updated.pnl, '-288,200원')
 })

@@ -152,6 +152,7 @@ export default function DeepScanPage() {
     instrumentKind: target?.kind ?? null,
     haltHint: haltHintTargetKey !== null && haltHintTargetKey === targetKey,
     quickQuoteVolume: activeQuickQuoteForHalt?.tradingVolume,
+    quickQuoteTradeHalted: activeQuickQuoteForHalt?.tradeHalted,
     checkExpired: haltCheckExpiredTargetKey !== null && haltCheckExpiredTargetKey === targetKey,
   }), [activeQuickQuoteForHalt, haltCheckExpiredTargetKey, haltHintTargetKey, target, targetKey])
 
@@ -430,6 +431,9 @@ export default function DeepScanPage() {
           : {}),
         ...(typeof item.volume === 'number' && Number.isFinite(item.volume)
           ? { tradingVolume: item.volume }
+          : {}),
+        ...(typeof item.tradeHalted === 'boolean'
+          ? { tradeHalted: item.tradeHalted }
           : {}),
         ...(typeof item.week52High === 'number' && Number.isFinite(item.week52High)
           ? { week52High: item.week52High }
