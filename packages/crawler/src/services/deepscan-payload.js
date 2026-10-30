@@ -2,6 +2,13 @@ import { createRequire } from 'node:module';
 import { getCurrentQuotes } from '../crawlers/current-quotes.js';
 import { buildDartDisclosureDocumentDump, collectDartDisclosures } from '../crawlers/dart-filings.js';
 import { sanitizeForJson } from '../../../deepscan-runtime-core/src/safe-json.js';
+import {
+  createLlmMockSeededRandom,
+  isLlmMockEnabled,
+  llmMockDateToken,
+  pickLlmMockItem,
+  sleepLlmMockLatency,
+} from '../../../deepscan-runtime-core/src/llm-mock.js';
 import { fetchWiseReportEtfSnapshot } from '../crawlers/wisereport-etf.js';
 import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
 import {
@@ -1150,6 +1157,11 @@ function shouldInvokeKrCommitteeLlm() {
     return false;
   }
 
+  // JAROO_LLM_MOCK=1이면 키 없이도 위원회 LLM(모의) 경로가 돌아가게 한다(dev 비용 0).
+  if (isLlmMockEnabled()) {
+    return true;
+  }
+
   if (process.env.OPENROUTER_API_KEY) {
     return true;
   }
@@ -1886,6 +1898,11 @@ function shouldSummarizePerformanceCommentWithLlm() {
     return false;
   }
 
+  // JAROO_LLM_MOCK=1이면 키 없이도 댓글 요약 LLM(모의) 경로가 돌아가게 한다(dev 비용 0).
+  if (isLlmMockEnabled()) {
+    return true;
+  }
+
   if (!process.env.OPENROUTER_API_KEY) {
     return false;
   }
@@ -2034,6 +2051,40 @@ function createLocalPerformanceCommentSummary(comment) {
   return lines.length === 3 ? lines : [];
 }
 
+// JAROO_LLM_MOCK=1용 결정적 실적 댓글 요약 템플릿 — 정확히 3줄(파서/소비부 계약),
+// 첫 줄에 [MOCK] 접두로 dev 모의 응답임을 화면에서 눈에 보이게 한다.
+const COMMENTARY_SUMMARY_LLM_MOCK_TEMPLATE_SETS = [
+  [
+    '[MOCK] 오늘 실적 댓글 요약은 dev 모의 응답이에요.',
+    '같은 종목을 같은 날 다시 스캔하면 같은 세 줄이 나와요.',
+    '실제 요약은 JAROO_LLM_MOCK을 끄면 다시 생성돼요.',
+  ],
+  [
+    '[MOCK] 목업 요약이라 원문 숫자는 옮기지 않아요.',
+    '요약 카드 표시와 로딩 흐름을 확인하는 용도예요.',
+    '운영에서는 실제 LLM이 숫자를 보존해 요약해요.',
+  ],
+  [
+    '[MOCK] dev 전용 실적 댓글 요약이에요.',
+    '점수·서사와 함께 모의 응답임을 표시해요.',
+    '투자 판단 근거로는 쓰지 않는 게 좋아요.',
+  ],
+  [
+    '[MOCK] 결정적 목업 요약으로 카드를 채웠어요.',
+    '입력이 같으면 하루 동안 같은 문장이 나와요.',
+    '실문장은 운영 모드에서 생성돼요.',
+  ],
+];
+
+// 테스트/진단용 export — 시드(종목+asOf+날짜)별로 항상 같은 3줄을 반환한다.
+export function buildLlmMockCommentarySummaryLines(input, performanceComment) {
+  const instrument = asObject(input).instrument ?? {};
+  const random = createLlmMockSeededRandom(
+    `commentary-summary|${instrument.code ?? instrument.ticker ?? instrument.name ?? 'unknown'}|${String(performanceComment?.asOf ?? '')}|${llmMockDateToken()}`,
+  );
+  return [...pickLlmMockItem(random, COMMENTARY_SUMMARY_LLM_MOCK_TEMPLATE_SETS)];
+}
+
 async function summarizePerformanceCommentForLoading(input, performanceComment) {
   if (!performanceComment?.text) {
     return null;
@@ -2054,6 +2105,17 @@ async function summarizePerformanceCommentForLoading(input, performanceComment) 
   );
 
   try {
+    // JAROO_LLM_MOCK=1: 네트워크 호출 없이 결정적 모의 3줄 요약을 반환한다(미설정 시 기존 경로 그대로).
+    if (isLlmMockEnabled()) {
+      const mockRandom = createLlmMockSeededRandom(
+        `commentary-summary|${input.instrument.code ?? input.instrument.ticker ?? input.instrument.name ?? 'unknown'}|${String(performanceComment.asOf ?? '')}|${llmMockDateToken()}`,
+      );
+      const lines = [...pickLlmMockItem(mockRandom, COMMENTARY_SUMMARY_LLM_MOCK_TEMPLATE_SETS)];
+      console.log(`[llm-mock] commentary-summary code=${input.instrument.code ?? input.instrument.ticker ?? 'NA'}`);
+      await sleepLlmMockLatency(mockRandom);
+      return { lines, method: 'mock' };
+    }
+
     const upstreamResponse = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
       method: 'POST',
       headers: {

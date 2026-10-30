@@ -208,6 +208,34 @@ export function getFallbackModels(primaryModel: string) {
   return fallbackModels.filter((fallbackModel, index, models) => fallbackModel !== primaryModel && models.indexOf(fallbackModel) === index)
 }
 
+// JAROO_LLM_MOCK=1 전용 고정 픽스처(dev 배포 비용 0) — 업로드 이미지와 무관하게
+// 항상 이 샘플 보유 3종을 반환한다. 모든 행이 sanitizeOcrRows 파서를 통과하는
+// 스키마(name/quantity/profitRate 필수 + 선택 평단·코드)로 작성돼 있다.
+// name에 [MOCK] 접두를 붙여 dev 화면에서 모의 응답임이 눈에 보이게 한다.
+export const MOCK_OCR_ROWS = [
+  {
+    name: '[MOCK] 삼성전자',
+    quantity: '12주',
+    profitRate: '+12.4%',
+    averagePrice: '71,500',
+    code: '005930',
+  },
+  {
+    name: '[MOCK] KODEX 200',
+    quantity: '30주',
+    profitRate: '-3.18%',
+    averagePrice: '38,940',
+    code: '364870',
+  },
+  {
+    name: '[MOCK] SK하이닉스',
+    quantity: '7주',
+    profitRate: '+45.2%',
+    averagePrice: '120,000',
+    code: '000660',
+  },
+] as const
+
 export function buildOpenRouterOcrBody(options: {
   model: string
   broker: string
