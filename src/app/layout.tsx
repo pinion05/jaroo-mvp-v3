@@ -1,5 +1,5 @@
 import type { Metadata } from 'next'
-import { Noto_Sans_KR } from 'next/font/google'
+import 'pretendard/dist/web/static/pretendard-dynamic-subset.css'
 import './globals.css'
 import { DebugPageNav } from '@/components/debug-page-nav'
 import { buildJarooRuntimeEnvScript } from '@/lib/jaroo-runtime-env'
@@ -8,12 +8,6 @@ import { buildJarooRuntimeEnvScript } from '@/lib/jaroo-runtime-env'
 // 않도록 요청시 렌더로 강제한다(2026-10-27 실측: x-nextjs-prerender=1에서 {} 주입 확인).
 // 프리렌더 HTML이 s-maxage=1년으로 캐시되던 것도 함께 해소 — 값은 항상 최신 런타임 env.
 export const dynamic = 'force-dynamic'
-
-const notoSansKr = Noto_Sans_KR({
-  variable: '--font-noto-sans-kr',
-  subsets: ['latin'],
-  weight: ['400', '500', '600', '700'],
-})
 
 export const metadata: Metadata = {
   title: 'jaroo-mvp-v3',
@@ -30,7 +24,7 @@ export default function RootLayout({
   return (
     <html
       lang='ko'
-      className={`${notoSansKr.variable} h-full antialiased`}
+      className='h-full antialiased'
       suppressHydrationWarning
     >
       <body className='min-h-full bg-background font-sans text-foreground' suppressHydrationWarning>

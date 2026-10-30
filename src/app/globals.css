@@ -4,6 +4,12 @@
 
 @custom-variant dark (&:is(.dark *));
 
+/* 셀프호스팅 Pretendard(dynamic-subset) — 빌드시간 구글 폰트 fetch 의존 제거.
+   변수명은 기존 next/font 산출물(--font-noto-sans-kr)을 그대로 계승해 소비자(globals) 변경 최소화. */
+:root {
+  --font-noto-sans-kr: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Helvetica Neue', 'Segoe UI', 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
