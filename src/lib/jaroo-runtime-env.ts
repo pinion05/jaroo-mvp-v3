@@ -8,6 +8,8 @@ export type JarooRuntimeEnv = {
   supabaseUrl?: string
   supabaseAnonKey?: string
   devAutoLogin?: boolean
+  /** 결제 UI 오픈 여부 — 서버가 전체 파이프라인(클라이언트 키·시크릿 키·웹훅 시크릿) 완비로 판정한다. */
+  paymentsOpen?: boolean
 }
 
 declare global {
@@ -26,10 +28,12 @@ export function buildJarooRuntimeEnvScript(env: {
   supabaseUrl?: string
   supabaseAnonKey?: string
   devAutoLogin?: boolean
+  paymentsOpen?: boolean
 }): string {
   const payload: JarooRuntimeEnv = {}
   if (env.supabaseUrl) payload.supabaseUrl = env.supabaseUrl
   if (env.supabaseAnonKey) payload.supabaseAnonKey = env.supabaseAnonKey
   if (env.devAutoLogin) payload.devAutoLogin = true
+  if (env.paymentsOpen) payload.paymentsOpen = true
   return `window.__JAROO_ENV__=${JSON.stringify(payload)};`
 }

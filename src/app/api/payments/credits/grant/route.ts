@@ -1,18 +1,20 @@
 import { NextResponse } from 'next/server'
 
-import { getTossClientKey } from '@/lib/payments/config'
+import { isPaymentsPipelineConfigured } from '@/lib/payments/config'
 import { DEEPSCAN_CREDIT_COST, FREE_GRANT_CREDITS, deepScanRunsLeft } from '@/lib/payments/products'
 import { NO_STORE_PRIVATE_HEADERS, resolvePaymentUserId } from '@/lib/payments/server'
 import { createSupabaseServiceClient } from '@/lib/supabase/service'
 
 export const runtime = 'nodejs'
 
-// 무료 크레딧 지급 — 결제 연동이 열리기 전까지의 임시 밸브.
-// 결제 UI(NEXT_PUBLIC_TOSS_CLIENT_KEY)가 없는 동안 '크레딧 충전' 진입 시
-// 즉시 FREE_GRANT_CREDITS(999)를 원장(reason='grant')에 적립한다.
-// 클라이언트 키가 설정되면(결제 오픈) 409 로 닫히므로 유료 전환 후 자동 무효화된다.
+// 무료 크레딧 지급 — 결제 파이프라인이 열리기 전까지의 임시 밸브.
+// 결제 UI가 준비되지 않은 동안 '크레딧 충전' 진입 시 즉시 FREE_GRANT_CREDITS(999)를
+// 원장(reason='grant')에 적립한다.
+// 파이프라인(클라이언트 키·시크릿 키·웹훅 시크릿)이 완비되면 409 로 닫히므로
+// 유료 전환 시 자동 무효화된다. 클라이언트 키만 env에 있는 반쪽 상태(웹훅 미설정)에서는
+// 결제가 실제로 열릴 수 없으므로 무료 지급이 유지된다.
 export async function POST() {
-  if (getTossClientKey()) {
+  if (isPaymentsPipelineConfigured()) {
     return NextResponse.json(
       { ok: false, error: 'payment-open', message: '결제가 열려 있어 무료 지급이 닫혔어요.' },
       { status: 409, headers: NO_STORE_PRIVATE_HEADERS },
