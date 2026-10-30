@@ -170,6 +170,8 @@ export async function GET(request: NextRequest) {
         ok: false,
         error: {
           code: 'insufficient-credits',
+          balance: gate.balance,
+          cost: gate.cost,
           message: `딥스캔 크레딧이 부족해요(필요 ${gate.cost}크레딧, 잔여 ${gate.balance}크레딧). 마이페이지에서 충전할 수 있어요.`,
         },
       },

@@ -28,22 +28,29 @@ test('deepscan canonical fetch가 서버 오류 code를 보존한다', () => {
 test('deepscan 스토어가 에러 코드를 함께 보관한다', () => {
   const source = read('src/lib/stores/use-deepscan-store.ts')
   assert.match(source, /errorCode: string \| null/)
-  assert.match(source, /finishError: \(errorMessage: string, errorCode\?: string \| null\) => void/)
+  // 402 insufficient-credits 상세(필요/잔여)도 화면 계층으로 올려 전용 예외 화면이 쓴다
+  assert.match(source, /finishError: \(errorMessage: string, errorCode\?: string \| null, errorCredit\?:/)
 })
 
-test('딥스캔 페이지는 크레딧 부족(402)을 전용 문구와 충전 CTA로 안내한다', () => {
+test('딥스캔 페이지는 크레딧 부족(402)을 친절한 전용 예외 화면으로 안내한다', () => {
   const source = read('src/app/deepscan/page.tsx')
 
   // 서버가 주는 code로 분기
   assert.match(source, /insufficient-credits/)
   assert.match(source, /DeepScanApiError/)
 
-  // 전용 타이틀 — "데이터를 표시할 수 없어요"가 아니라 크레딧 문구가 나온다
-  assert.match(source, /딥스캔 크레딧이 부족해요/)
+  // 로딩 스크린의 빨간 오류 카드 대신 전용 화면으로 전체 교체한다 (2026-10-30 UX 개선)
+  assert.match(source, /DeepScanCreditShortageScreen/)
 
-  // 충전 CTA — 마이페이지 크레딧 페이지로 보낸다
-  assert.match(source, /\/mypage\/credit/)
-  assert.match(source, /errorPrimaryAction/)
+  // 서버 402 상세(필요/잔여)를 전용 화면에 그대로 넘긴다
+  assert.match(source, /errorCredit\?\.cost/)
+  assert.match(source, /errorCredit\?\.balance/)
+
+  const screen = read('src/components/deepscan-credit-shortage-screen.tsx')
+  // 버그 페이지 같은 압박감 대신 '오류가 아니에요'로 설명한다
+  assert.match(screen, /오류가 아니에요/)
+  // 충전 CTA — 마이페이지 크레딧 페이지(무료 지급)로 보낸다
+  assert.match(screen, /\/mypage\/credit/)
 })
 
 test('딥스캔 로딩 화면 오류 카드가 primary 링크 액션을 지원한다', () => {
