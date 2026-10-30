@@ -319,3 +319,270 @@ test('buildEtfMarketCommitteeSnapshot skips cache writes for soft-deadline parti
     global.fetch = originalFetch;
   }
 });
+
+// ─── 재계안 폭주 방지 — 단일비행·stale 폴백·백오프 ───────────────────────────
+
+// LLM 응답을 외부에서 푸는 게이트로 지연시킨다 — 두 호출이 동시에 진행 중임을 보장해
+// 단일비행 병합을 결정적으로 검증한다.
+function installGatedCommitteeLlm(capturedMemberKeys) {
+  const originalFetch = global.fetch;
+  let releaseLlm;
+  const llmGate = new Promise((resolve) => {
+    releaseLlm = resolve;
+  });
+
+  global.fetch = async (_url, init) => {
+    const body = JSON.parse(String(init?.body ?? '{}'));
+    const userMessage = Array.isArray(body?.messages)
+      ? body.messages.find((message) => message.role === 'user')
+      : null;
+    const content = typeof userMessage?.content === 'string' ? userMessage.content : '';
+    const memberKey = content.match(/"member":"([^"]+)"/)?.[1] ?? 'unknown';
+    capturedMemberKeys.push(memberKey);
+    await llmGate;
+
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({ score: 70, reason: `${memberKey} ETF reason`, confidence: 'medium' }),
+        },
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  return {
+    releaseLlm,
+    restore: () => {
+      global.fetch = originalFetch;
+    },
+  };
+}
+
+// fresh는 아니지만 staleTtl 이내(fresh 지나 + 만료 전)인 complete 캐시 행.
+// 행 타임스탬프는 실제 시계 기준으로 만든다 — stale 판정은 now와 비교하기 때문.
+function createStaleCompleteRow() {
+  const now = Date.now();
+  return {
+    status: 'stale',
+    stale_after: new Date(now - 60_000).toISOString(),
+    expires_at: new Date(now + 24 * 60 * 60_000).toISOString(),
+    created_at: new Date(now - 3 * 60 * 60_000).toISOString(),
+    payload: {
+      ok: true,
+      code: '226490',
+      memberKeys: ['trend'],
+      requestId: 'stale-request',
+      status: 'complete',
+      axes: [{ label: '지수/가격 흐름', members: [{ title: '지수/가격 흐름', status: 'success' }] }],
+      results: {},
+      errors: [],
+      pending: [],
+      generatedAt: '2026-06-08T14:42:22.000Z',
+      cache: null,
+    },
+  };
+}
+
+function installDelayedPartialCommitteeLlm(llmCallCount) {
+  const originalFetch = global.fetch;
+  global.fetch = async (_url, init) => {
+    llmCallCount.value += 1;
+    const body = JSON.parse(String(init?.body ?? '{}'));
+    const userMessage = Array.isArray(body?.messages)
+      ? body.messages.find((message) => message.role === 'user')
+      : null;
+    const content = typeof userMessage?.content === 'string' ? userMessage.content : '';
+    const memberKey = content.match(/"member":"([^"]+)"/)?.[1] ?? 'unknown';
+    // 유일한 위원(trend)이 늦게 응답 — 소프트데드라인(1ms)에 걸려 partial이 된다.
+    if (memberKey === 'trend') {
+      await new Promise((resolve) => setTimeout(resolve, 80));
+    }
+
+    return new Response(JSON.stringify({
+      choices: [{
+        message: {
+          content: JSON.stringify({ score: 70, reason: `${memberKey} ETF reason`, confidence: 'medium' }),
+        },
+      }],
+    }), {
+      status: 200,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  };
+
+  return () => {
+    global.fetch = originalFetch;
+  };
+}
+
+test('buildEtfMarketCommitteeSnapshot merges concurrent recomputes into a single LLM load', async () => {
+  const { buildEtfMarketCommitteeSnapshot } = await import('../src/services/deepscan-payload.js');
+  const capturedMemberKeys = [];
+  const upsertedEntries = [];
+  const cacheClient = {
+    readPayload: async () => null,
+    upsertPayload: async (entry) => {
+      upsertedEntries.push(entry);
+      return { id: 1 };
+    },
+  };
+  const { releaseLlm, restore } = installGatedCommitteeLlm(capturedMemberKeys);
+
+  try {
+    await withEnv({ OPENROUTER_API_KEY: 'test-key', DEEPSCAN_KR_LLM_ENABLE: '1' }, async () => {
+      const request = {
+        instrument: { name: 'KODEX 코스피', code: '226490', market: 'ETF', kind: 'etf' },
+        holding: { shares: '21', averagePrice: '60000' },
+        sources: ETF_SOURCES,
+        crawlerCache: { client: cacheClient },
+      };
+      const first = buildEtfMarketCommitteeSnapshot(request);
+      const second = buildEtfMarketCommitteeSnapshot({ ...request });
+      // 두 호출 모두 캐시 읽기를 지나 단일비행 게이트에 도달한 뒤 LLM을 푼다.
+      await new Promise((resolve) => setTimeout(resolve, 25));
+      releaseLlm();
+      const [a, b] = await Promise.all([first, second]);
+
+      // 동시 호출 2개가 위원 LLM load를 1회만 실행한다.
+      assert.equal(capturedMemberKeys.length, 1);
+      assert.equal(a.status, 'complete');
+      assert.equal(b.status, 'complete');
+      assert.equal(b.requestId, a.requestId);
+      assert.equal(upsertedEntries.length, 1);
+    });
+  } finally {
+    restore();
+  }
+});
+
+test('buildEtfMarketCommitteeSnapshot falls back to a stale complete snapshot when recompute is partial', async () => {
+  const { buildEtfMarketCommitteeSnapshot } = await import('../src/services/deepscan-payload.js');
+  const staleRow = createStaleCompleteRow();
+  const upsertedEntries = [];
+  const cacheClient = {
+    readPayload: async () => staleRow,
+    upsertPayload: async (entry) => {
+      upsertedEntries.push(entry);
+      return { id: 1 };
+    },
+  };
+  const llmCallCount = { value: 0 };
+  const restoreFetch = installDelayedPartialCommitteeLlm(llmCallCount);
+
+  try {
+    await withEnv({
+      OPENROUTER_API_KEY: 'test-key',
+      DEEPSCAN_KR_LLM_ENABLE: '1',
+      DEEPSCAN_ETF_LLM_SOFT_DEADLINE_MS: '1',
+    }, async () => {
+      const snapshot = await buildEtfMarketCommitteeSnapshot({
+        instrument: { name: 'KODEX 코스피', code: '226490', market: 'ETF', kind: 'etf' },
+        holding: { shares: '7', averagePrice: '50000' },
+        sources: ETF_SOURCES,
+        crawlerCache: { client: cacheClient },
+      });
+
+      // 재계산은 시도됐지만(1회) partial로 끝났고 → stale complete 캐시로 폴백한다.
+      assert.equal(llmCallCount.value, 1);
+      assert.equal(snapshot.status, 'complete');
+      assert.equal(snapshot.requestId, 'stale-request');
+      assert.deepEqual(snapshot.cache, { hit: true, stale: true, scannedAt: staleRow.created_at });
+      // partial 결과를 캐시에 덮어쓰지 않는다.
+      assert.equal(upsertedEntries.length, 0);
+      // 백그라운드 잔여 위원이 마무리될 시간을 준다(테스트 프로세스 클린업 안정화).
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    });
+  } finally {
+    restoreFetch();
+  }
+});
+
+test('buildEtfMarketCommitteeSnapshot returns the partial snapshot as-is when no stale complete cache exists', async () => {
+  const { buildEtfMarketCommitteeSnapshot } = await import('../src/services/deepscan-payload.js');
+  const upsertedEntries = [];
+  const cacheClient = {
+    readPayload: async () => null,
+    upsertPayload: async (entry) => {
+      upsertedEntries.push(entry);
+      return { id: 1 };
+    },
+  };
+  const llmCallCount = { value: 0 };
+  const restoreFetch = installDelayedPartialCommitteeLlm(llmCallCount);
+
+  try {
+    await withEnv({
+      OPENROUTER_API_KEY: 'test-key',
+      DEEPSCAN_KR_LLM_ENABLE: '1',
+      DEEPSCAN_ETF_LLM_SOFT_DEADLINE_MS: '1',
+    }, async () => {
+      const snapshot = await buildEtfMarketCommitteeSnapshot({
+        instrument: { name: 'KODEX 코스피', code: '226490', market: 'ETF', kind: 'etf' },
+        holding: { shares: '3', averagePrice: '48000' },
+        sources: ETF_SOURCES,
+        crawlerCache: { client: cacheClient },
+      });
+
+      // 폴백할 stale 캐시가 없으면 partial을 그대로 반환한다.
+      assert.equal(snapshot.ok, true);
+      assert.equal(snapshot.status, 'partial');
+      assert.ok(snapshot.requestId);
+      assert.equal(snapshot.cache, null);
+      assert.equal(upsertedEntries.length, 0);
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    });
+  } finally {
+    restoreFetch();
+  }
+});
+
+test('buildEtfMarketCommitteeSnapshot skips recompute inside the failure backoff window', async () => {
+  const { buildEtfMarketCommitteeSnapshot } = await import('../src/services/deepscan-payload.js');
+  const cacheClient = {
+    readPayload: async () => null,
+    upsertPayload: async () => ({ id: 1 }),
+  };
+  const llmCallCount = { value: 0 };
+  const restoreFetch = installDelayedPartialCommitteeLlm(llmCallCount);
+
+  try {
+    await withEnv({
+      OPENROUTER_API_KEY: 'test-key',
+      DEEPSCAN_KR_LLM_ENABLE: '1',
+      DEEPSCAN_ETF_LLM_SOFT_DEADLINE_MS: '1',
+    }, async () => {
+      const request = {
+        instrument: { name: 'KODEX 코스피', code: '226490', market: 'ETF', kind: 'etf' },
+        holding: { shares: '9', averagePrice: '51000' },
+        sources: ETF_SOURCES,
+        crawlerCache: { client: cacheClient },
+      };
+
+      const first = await buildEtfMarketCommitteeSnapshot(request);
+      assert.equal(first.status, 'partial');
+      assert.equal(llmCallCount.value, 1);
+
+      // 직전 재계산이 60s 백오프 창 안에서 실패했다 — 재요청은 캐시 조회만 하고
+      // 위원 LLM을 다시 부르지 않는다(크레딧 나선 방지).
+      const second = await buildEtfMarketCommitteeSnapshot({ ...request });
+      assert.equal(llmCallCount.value, 1);
+      assert.equal(second.ok, false);
+      assert.equal(second.error.code, 'committee-recompute-backoff');
+      assert.equal(second.status, 'error');
+
+      // bypassCache(웹 새로고침 → crawlerCacheBypass=1)는 명시적 재시도라 백오프를 우회한다.
+      const forced = await buildEtfMarketCommitteeSnapshot({
+        ...request,
+        crawlerCache: { client: cacheClient, bypassCache: true },
+      });
+      assert.equal(llmCallCount.value, 2);
+      assert.equal(forced.status, 'partial');
+      await new Promise((resolve) => setTimeout(resolve, 120));
+    });
+  } finally {
+    restoreFetch();
+  }
+});
