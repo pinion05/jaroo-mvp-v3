@@ -205,10 +205,11 @@ test('briefing snapshot attaches recovery forecast for a loss position when aver
   assert.match(recovery.summaryText, /본전에 도달/)
   assert.equal(recovery.modelRows.length, 3)
   assert.deepEqual(recovery.modelRows.map((row: { label: string }) => row.label), ['비슷하게 빠졌던 과거 사례', '평소처럼 움직일 때', '갑자기 급등락할 때'])
-  // 차트 재료(1년 종가 계열 + 유사 패턴 샘플)도 함께 내려간다.
+  // 차트 재료(합성 1년 계열 260봉이 그대로 통과 — 상장 3년 미만 종목처럼 780 캡보다
+  // 짧은 계열은 잘리지 않는다) + 유사 패턴 샘플도 함께 내려간다.
   assert.equal(recovery.targetPrice, 12500)
   assert.ok(Array.isArray(recovery.priceHistory))
-  assert.equal(recovery.priceHistory.length, 252)
+  assert.equal(recovery.priceHistory.length, 260)
   assert.ok(recovery.priceHistory.every((point: { close: number }) => Number.isFinite(point.close)))
   assert.ok(Array.isArray(recovery.similarPatternSamples))
   assert.ok(recovery.similarPatternSamples.length >= 1, '파형 계열에서 유사 패턴 샘플이 잡혀야 한다')
