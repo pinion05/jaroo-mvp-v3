@@ -1,5 +1,13 @@
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
+import {
+  createLlmMockSeededRandom,
+  isLlmMockEnabled,
+  llmMockDateToken,
+  llmMockIntInRange,
+  pickLlmMockItem,
+  sleepLlmMockLatency,
+} from './llm-mock.js'
 import { safeJsonStringify, sanitizeForJson } from './safe-json.js'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
@@ -294,6 +302,56 @@ function createSchema(schemaName) {
   }
 }
 
+// --- JAROO_LLM_MOCK=1 전용 결정적 모의 응답(dev 배포 비용 0) ---
+// 실제 업스트림과 같은 형태({choices:[{message:{content}}]})를 만들어 아래 파싱·검증
+// 경로(JSON.parse → coerceCommitteeResult)를 그대로 통과시킨다. 네트워크는 전혀 쓰지 않는다.
+const COMMITTEE_LLM_MOCK_MIN_SCORE = 35;
+const COMMITTEE_LLM_MOCK_MAX_SCORE = 85;
+const COMMITTEE_LLM_MOCK_CONFIDENCES = ['low', 'medium', 'high'];
+const COMMITTEE_LLM_MOCK_REASONS = [
+  '[MOCK] 지금 점수는 dev 모의 값이에요. 같은 종목·같은 날짜면 항상 같은 점수가 나와요. 실제 근거 분석은 JAROO_LLM_MOCK을 끄면 돌아와요.',
+  '[MOCK] dev 모의 위원의 결정적 판정이에요. 실적·수급·공시 근거는 생성되지 않아요. 화면 흐름과 파싱을 확인하는 용도예요.',
+  '[MOCK] 목업 점수라 투자 판단 근거로 쓰면 안 돼요. 입력이 같으면 하루 동안 응답도 같아요. 운영에서는 실제 LLM이 같은 자리를 채워요.',
+  '[MOCK] 모의 응답으로 위원 카드를 채웠어요. 점수는 종목·위원·날짜 시드에서 결정돼요. dev 배포 확인용 서사예요.',
+];
+
+// 시드 키 — KR 덤프는 instrument.code이 {value,...} 래퍼, US/기타는 원시값일 수 있어 둘 다 허용한다.
+function committeeMockInstrumentKey(dumps) {
+  const instrument = dumps?.shared?.instrument;
+  const unwrap = (value) => (
+    value && typeof value === 'object' && typeof value.value === 'string' ? value.value : value
+  );
+  const code = unwrap(instrument?.code);
+  const name = unwrap(instrument?.name);
+  const raw = [
+    typeof code === 'string' && code.trim() ? code.trim() : '',
+    typeof name === 'string' && name.trim() ? name.trim() : '',
+  ].filter(Boolean).join('|');
+  return raw || 'unknown';
+}
+
+async function requestCommitteeMockAttempt(memberKey, dumps, attempt, startedAt) {
+  const instrumentKey = committeeMockInstrumentKey(dumps);
+  const random = createLlmMockSeededRandom(`committee|${memberKey}|${instrumentKey}|${llmMockDateToken()}`);
+  const score = llmMockIntInRange(random, COMMITTEE_LLM_MOCK_MIN_SCORE, COMMITTEE_LLM_MOCK_MAX_SCORE);
+  const reason = pickLlmMockItem(random, COMMITTEE_LLM_MOCK_REASONS);
+  const confidence = pickLlmMockItem(random, COMMITTEE_LLM_MOCK_CONFIDENCES);
+  console.log(`[llm-mock] committee member=${memberKey} instrument=${instrumentKey} score=${score} attempt=${attempt}`);
+
+  await sleepLlmMockLatency(random);
+  const content = JSON.stringify({ score, reason, confidence });
+  return {
+    upstreamResponse: { ok: true, status: 200 },
+    result: {
+      choices: [{ message: { role: 'assistant', content } }],
+      usage: { prompt_tokens: 0, completion_tokens: 0, total_tokens: 0 },
+    },
+    rawContent: content,
+    parsed: { score, reason, confidence },
+    elapsedMs: Date.now() - startedAt,
+  };
+}
+
 async function requestCommitteeAttempt(memberKey, dumps, runtimeOptions, attempt) {
   const startedAt = Date.now()
   const requestBody = buildRequestBody(memberKey, dumps, runtimeOptions)
@@ -305,6 +363,11 @@ async function requestCommitteeAttempt(memberKey, dumps, runtimeOptions, attempt
   }
   writeLog(runtimeOptions.logDir, `request-${memberKey}.json`, requestLog)
   writeLog(runtimeOptions.logDir, `request-${memberKey}-attempt-${attempt}.json`, requestLog)
+
+  // JAROO_LLM_MOCK=1: 네트워크 호출 없이 결정적 모의 응답으로 대체(미설정 시 기존 경로 그대로).
+  if (isLlmMockEnabled()) {
+    return requestCommitteeMockAttempt(memberKey, dumps, attempt, startedAt)
+  }
 
   let upstreamResponse
   try {
@@ -401,7 +464,8 @@ export async function scoreCommitteeMember(memberKey, dumps, options = {}) {
     systemPrompt: options.systemPrompt,
   }
 
-  if (!runtimeOptions.apiKey) {
+  // mock 모드에서는 키가 없어도 모의 응답을 반환한다(dev 비용 0 + 키 불필요).
+  if (!runtimeOptions.apiKey && !isLlmMockEnabled()) {
     throw new Error('OPENROUTER_API_KEY is not configured.')
   }
 

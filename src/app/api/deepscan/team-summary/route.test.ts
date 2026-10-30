@@ -5,6 +5,7 @@ import {
   DEEPSCAN_TEAM_SUMMARY_MAX_TOKENS,
   DEEPSCAN_TEAM_SUMMARY_SYSTEM_PROMPT,
   buildTeamSummarySystemPrompt,
+  callOpenRouterTeamSummary,
   createDeepScanTeamSummaryResponse,
   parseTeamSummaryContent,
   removeForbiddenInvestmentActionAdvice,
@@ -186,4 +187,72 @@ test('team summary removes forbidden investment action advice phrases', async ()
   assert.equal(response.status, 200)
   assert.doesNotMatch(body.summary, /포지션\s*유지|보유를\s*유지|보유\s*유지/)
   assert.match(body.summary, /현재 구간/)
+})
+
+// --- JAROO_LLM_MOCK=1 dev 전용 결정적 모의 응답(비용 0) 검증 ---
+
+test('JAROO_LLM_MOCK=1이면 팀 요약이 네트워크 0회·키 없이 결정적 [MOCK] 문장을 반환한다', async () => {
+  const originalMock = process.env.JAROO_LLM_MOCK
+  const originalLatency = process.env.JAROO_LLM_MOCK_LATENCY_MS
+  const originalKey = process.env.OPENROUTER_API_KEY
+  const originalFetch = global.fetch
+
+  process.env.JAROO_LLM_MOCK = '1'
+  process.env.JAROO_LLM_MOCK_LATENCY_MS = '0'
+  delete process.env.OPENROUTER_API_KEY
+  let fetchCalls = 0
+  global.fetch = (async () => {
+    fetchCalls += 1
+    throw new Error('network must not be called in llm-mock mode')
+  }) as typeof fetch
+
+  try {
+    const input = {
+      teamKey: 'marketTeam',
+      teamName: '시장/차트 팀',
+      body: '차트 마스터: 강한 추세입니다.\n수급 추적기: 거래량이 늘었습니다.\n모멘텀 스카우터: 기대가 큽니다.',
+      market: 'KR',
+    }
+    const first = await callOpenRouterTeamSummary(input)
+    const second = await callOpenRouterTeamSummary(input)
+
+    assert.equal(fetchCalls, 0, 'mock 모드에서는 fetch 네트워크 호출이 0회여야 한다')
+    assert.match(first.summary, /^\[MOCK\]/, '요약 앞에 [MOCK] 접두가 있어야 한다')
+    assert.equal(first.provider, 'llm-mock')
+    assert.equal(first.summary, second.summary, '같은 입력(팀+날짜)엔 같은 요약이 나와야 한다')
+    assert.ok(typeof first.elapsedMs === 'number' && first.elapsedMs >= 0)
+    // 실제 응답 파싱·정리 체인을 통과했는지(줄바꿈 제거·금지 표현 부재).
+    assert.doesNotMatch(first.summary, /[\r\n]/)
+    assert.doesNotMatch(first.summary, /매수|매도|포지션을 유지/)
+  } finally {
+    process.env.JAROO_LLM_MOCK = originalMock
+    process.env.JAROO_LLM_MOCK_LATENCY_MS = originalLatency
+    if (originalKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY
+    } else {
+      process.env.OPENROUTER_API_KEY = originalKey
+    }
+    global.fetch = originalFetch
+  }
+})
+
+test('JAROO_LLM_MOCK 미설정(기본)이면 기존 키 게이트가 그대로 작동한다', async () => {
+  const originalMock = process.env.JAROO_LLM_MOCK
+  const originalKey = process.env.OPENROUTER_API_KEY
+  delete process.env.JAROO_LLM_MOCK
+  delete process.env.OPENROUTER_API_KEY
+
+  try {
+    await assert.rejects(
+      callOpenRouterTeamSummary({ teamKey: 'marketTeam', teamName: '시장/차트 팀', body: '본문' }),
+      /OPENROUTER_API_KEY is not configured/,
+    )
+  } finally {
+    process.env.JAROO_LLM_MOCK = originalMock
+    if (originalKey === undefined) {
+      delete process.env.OPENROUTER_API_KEY
+    } else {
+      process.env.OPENROUTER_API_KEY = originalKey
+    }
+  }
 })
