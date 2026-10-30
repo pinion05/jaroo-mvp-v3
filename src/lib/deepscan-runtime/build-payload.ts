@@ -593,7 +593,9 @@ export function runRecoveryForecast(context: RecoveryForecastContext): {
   return { forecast, targetPrice, currentPrice, recoverySourceRefs }
 }
 
-const RECOVERY_PRICE_HISTORY_MAX_POINTS = 252
+// KR 일봉 3년치(13페이지 × 60 = 780봉)를 그대로 차트 재료로 내린다. US OHLC 계열은
+// 252봉 수준이라 이 상향의 영향을 받지 않는다(잘리지 않고 그대로 통과).
+const RECOVERY_PRICE_HISTORY_MAX_POINTS = 780
 const RECOVERY_SIMILAR_PATTERN_SAMPLES_MAX = 12
 
 function normalizeRecoverySeriesPoint(point: unknown): { date: string | null; close: number } | null {

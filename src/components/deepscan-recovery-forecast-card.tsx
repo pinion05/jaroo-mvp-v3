@@ -54,7 +54,25 @@ function shortDate(value: string | null | undefined) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(value) ? value.slice(5, 10).replace('-', '.') : ''
 }
 
+// 3년치 일봉의 연·월 틱(2024.06) — 월·일(MM.DD)은 3년 구간에서 같은 라벨이 해마다
+// 반복돼 구분할 수 없다.
+function yearMonthDate(value: string | null | undefined) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(value) ? value.slice(0, 7).replace('-', '.') : ''
+}
+
+function chartSpanDays(points: ReadonlyArray<JarooRecoveryPricePoint>) {
+  const first = points[0]?.date
+  const last = points[points.length - 1]?.date
+  const firstMs = first ? Date.parse(`${first.slice(0, 10)}T00:00:00Z`) : Number.NaN
+  const lastMs = last ? Date.parse(`${last.slice(0, 10)}T00:00:00Z`) : Number.NaN
+  return Number.isFinite(firstMs) && Number.isFinite(lastMs) ? (lastMs - firstMs) / 86_400_000 : 0
+}
+
+// 구간이 2년을 넘으면 3년 차트 표기·연·월 틱으로 전환한다(KR 일봉 3년 확장).
+const THREE_YEAR_CHART_MIN_SPAN_DAYS = 365 * 2
+
 type RecoveryChartGeometry = {
+  periodLabel: string
   pricePath: string
   gridlines: Array<{ y: number; label: string }>
   dateTicks: Array<{ x: number; label: string }>
@@ -63,9 +81,11 @@ type RecoveryChartGeometry = {
   currentDot: { x: number; y: number } | null
 }
 
-// 1년 가격 계열 + 유사 패턴 샘플을 SVG 좌표로 변환한다. 모델이 실제로 본 데이터를
+// 가격 계열 + 유사 패턴 샘플을 SVG 좌표로 변환한다. 모델이 실제로 본 데이터를
 // 그대로 그리므로 "모델의 근거"가 차트로 드러난다. 결과 카드와 로딩 브리핑이 같은
-// 지오메트리를 공유한다.
+// 지오메트리를 공유한다. 기간 표기·틱은 실제 데이터 구간을 따른다 — KR 일봉은
+// 3년치(780봉)로 확장돼 '최근 3년' + 연·월 틱 5개, US OHLC(≈252봉)·상장 3년 미만
+// 종목은 실제 구간 그대로 '최근 1년' + 월·일 틱 3개.
 export function buildRecoveryChartGeometry(input: {
   priceHistory: ReadonlyArray<JarooRecoveryPricePoint>
   samples: ReadonlyArray<JarooRecoverySimilarPatternSample> | undefined
@@ -97,10 +117,13 @@ export function buildRecoveryChartGeometry(input: {
     return { y: yAt(value), label: compactPrice(value) }
   })
 
-  const dateTickCount = Math.min(3, points.length)
+  // 구간이 2년을 넘으면 3년 차트 표기(연·월 틱 5개), 그 이하는 기존 1년 표기(월·일 틱 3개).
+  const isThreeYearSpan = chartSpanDays(points) >= THREE_YEAR_CHART_MIN_SPAN_DAYS
+  const dateTickCount = Math.min(isThreeYearSpan ? 5 : 3, points.length)
   const dateTicks = Array.from({ length: dateTickCount }, (_, index) => {
     const pointIndex = Math.round((index / (dateTickCount - 1)) * (points.length - 1))
-    return { x: xAt(pointIndex), label: shortDate(points[pointIndex]?.date) }
+    const pointDate = points[pointIndex]?.date
+    return { x: xAt(pointIndex), label: isThreeYearSpan ? yearMonthDate(pointDate) : shortDate(pointDate) }
   })
 
   const bands = points
@@ -121,6 +144,7 @@ export function buildRecoveryChartGeometry(input: {
 
   const lastPoint = points[points.length - 1]
   return {
+    periodLabel: isThreeYearSpan ? '최근 3년' : '최근 1년',
     pricePath,
     gridlines,
     dateTicks,
@@ -189,7 +213,7 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
       {geometry ? (
         <div className='border-t border-[#EFF1F4] px-4 py-4'>
           <div className='flex flex-wrap items-baseline justify-between gap-1'>
-            <span className='text-[10px] font-bold text-[#5A6473]'>최근 1년 종가와 유사 과거 패턴</span>
+            <span className='text-[10px] font-bold text-[#5A6473]'>{`${geometry.periodLabel} 종가와 유사 과거 패턴`}</span>
             <span className='flex gap-2 text-[10px] text-[#97A0AE]'>
               <span className='flex items-center gap-1'><span className='h-[2px] w-3 rounded bg-[#0F1419]' aria-hidden />종가</span>
               <span className='flex items-center gap-1'><span className='h-0 w-3 border-t-2 border-dashed border-[#2B6BE6]' aria-hidden />평단가</span>
@@ -200,7 +224,7 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
             className='mt-2 w-full'
             viewBox={`0 0 ${RECOVERY_CHART_WIDTH} ${RECOVERY_CHART_HEIGHT}`}
             role='img'
-            aria-label='최근 1년 종가 차트. 파란 점선은 평단가, 호밍색 표시는 유사 과거 패턴 구간이다.'
+            aria-label={`${geometry.periodLabel} 종가 차트. 파란 점선은 평단가, 호밍색 표시는 유사 과거 패턴 구간이다.`}
           >
             {geometry.gridlines.map((line) => (
               <g key={`grid-${line.label}`}>

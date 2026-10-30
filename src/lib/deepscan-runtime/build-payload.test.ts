@@ -574,7 +574,7 @@ test('buildKrDeepScanPayloadViaCrawler recomputes optimistic crawler recovery ou
       targetPrice: 150,
     },
   }
-  const dailySeries = Array.from({ length: 260 }, (_, index) => ({
+  const dailySeries = Array.from({ length: 800 }, (_, index) => ({
     date: new Date(Date.UTC(2025, 0, index + 1)).toISOString().slice(0, 10),
     close: 100 + Math.sin(index) * 2,
   }))
@@ -607,10 +607,11 @@ test('buildKrDeepScanPayloadViaCrawler recomputes optimistic crawler recovery ou
   const rows = block.modelRows as Array<Record<string, unknown>>
   assert.notEqual(rows[1]?.recoveryDaysText, '15일')
   assert.notEqual(rows[1]?.probabilityText, '100%')
-  // 주입된 일봉 계열이 차트 재료(priceHistory, 최대 252포인트)로 내려간다.
+  // 주입된 일봉 계열이 차트 재료(priceHistory, 3년치 최대 780포인트)로 내려간다.
   const priceHistory = block.priceHistory as Array<{ date: string | null; close: number }>
   assert.ok(Array.isArray(priceHistory))
-  assert.equal(priceHistory.length, 252)
+  assert.equal(priceHistory.length, 780)
+  assert.equal(priceHistory[priceHistory.length - 1]?.date, dailySeries[dailySeries.length - 1]?.date)
   assert.equal(block.currentPrice, 100)
   assert.equal(block.targetPrice, 150)
   assert.equal(typeof block.recoveryProbabilityPct, 'number')
