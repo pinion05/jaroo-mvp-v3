@@ -1157,6 +1157,18 @@ function shouldInvokeKrCommitteeLlm() {
   return ['1', 'true', 'on', 'yes'].includes(explicitToggle ?? '');
 }
 
+// 요청 단위 위원회 LLM 스킵 — 워치 일일 배치처럼 committee 서사 없이 데이터(공시·가격)만
+// 필요한 소비처가 crawler ?committeeLlm=off 로 9인 위원회 LLM 호출을 끈다.
+// 강제 'on'은 없다(키 없는 강제 시도 방지) — 꺼기 값이 아니면 기존 환경 판정을 그대로 따른다.
+function committeeLlmEnabled(rawInput) {
+  const requestToggle = normalizeText(asObject(rawInput).committeeLlm)?.toLowerCase();
+  if (['0', 'false', 'off', 'no'].includes(requestToggle ?? '')) {
+    return false;
+  }
+
+  return shouldInvokeKrCommitteeLlm();
+}
+
 async function resolveKrSourceBundle(rawInput, input) {
   const safeRawInput = asObject(rawInput);
 
@@ -2517,7 +2529,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     let llmCommitteePartialPending = false;
     let committeeAxes = createCommitteeAxes(evidence, deterministicScored, sources.packageResult);
     const performanceCommentSummaryPromise = summarizePerformanceCommentForLoading(input, evidence.businessCommentary?.performanceComment);
-    const llmAttempted = isKrInput(input) && shouldInvokeKrCommitteeLlm();
+    const llmAttempted = isKrInput(input) && committeeLlmEnabled(rawInput);
 
     if (llmAttempted) {
       const committeeStartedAtMs = Date.now();

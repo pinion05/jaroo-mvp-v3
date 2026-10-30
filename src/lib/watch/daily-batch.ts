@@ -98,7 +98,10 @@ async function collectStock(stock: WatchedStock): Promise<JarooDeepScanPayload> 
     },
     sourceContext: {},
   }
-  return buildKrDeepScanPayloadViaCrawler(rawInput)
+  // 워치 이벤트 판정(levels.ts)은 공시 diff·SAFETY 키워드·가격 텍스트만 쓰고 committee 서사를
+  // 쓰지 않는다 — 위원회 LLM(종목당 9회, 일 50종목=최대 450회)을 스킵한다. 유저 딥스캔 페이지는
+  // 이 플래그 없이 호출되므로 영향 없다.
+  return buildKrDeepScanPayloadViaCrawler(rawInput, fetch, { skipCommitteeLlm: true })
 }
 
 async function storeDailyScan(stock: WatchedStock, date: string, payload: JarooDeepScanPayload): Promise<void> {
