@@ -1,23 +1,68 @@
 'use client'
 
 import Link from 'next/link'
-import { useEffect, useState } from 'react'
-import { Coins, CreditCard, Loader2, LogIn } from 'lucide-react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { Coins, Loader2, LogIn, Sparkles } from 'lucide-react'
 import { SpecFrame } from '@/components/spec/spec-frame'
 import { CREDIT_PACKS, fetchPaymentsMe, isTossClientConfigured, startCreditPackCheckout } from '@/lib/payments/client'
-import { DEEPSCAN_CREDIT_COST, deepScanRunsLeft } from '@/lib/payments/products'
+import { DEEPSCAN_CREDIT_COST, FREE_GRANT_CREDITS, deepScanRunsLeft } from '@/lib/payments/products'
 import styles from '../../payments/payments.module.css'
+
+// 결제 미연동 상태의 무료 지급 흐름 — 페이지에 들어오면 바로 999크레딧을 채운다.
+type FreeGrantState =
+  | { status: 'checking' }
+  | { status: 'charging' }
+  | { status: 'done'; balance: number; deepScanLeft: number }
+  | { status: 'error'; message: string }
+
+async function requestFreeGrant(): Promise<{ balance: number; deepScanLeft: number }> {
+  const response = await fetch('/api/payments/credits/grant', { method: 'POST' })
+  const body = (await response.json().catch(() => ({}))) as Record<string, unknown>
+  if (!response.ok) {
+    if (response.status === 401) throw new Error('로그인 후 무료 크레딧을 받을 수 있어요.')
+    throw new Error('크레딧을 채우지 못했어요. 잠시 후 다시 시도해주세요.')
+  }
+  return {
+    balance: typeof body.balance === 'number' ? body.balance : 0,
+    deepScanLeft: typeof body.deepScanLeft === 'number' ? body.deepScanLeft : 0,
+  }
+}
 
 export default function CreditPage() {
   const [me, setMe] = useState<Awaited<ReturnType<typeof fetchPaymentsMe>>>(null)
   const [selected, setSelected] = useState<string>(CREDIT_PACKS[1]?.id ?? CREDIT_PACKS[0].id)
   const [pendingProductId, setPendingProductId] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [freeGrant, setFreeGrant] = useState<FreeGrantState>({ status: 'checking' })
+  const grantInFlight = useRef(false)
   const configured = isTossClientConfigured()
 
   useEffect(() => {
     fetchPaymentsMe().then(setMe)
   }, [])
+
+  // 결제 미연동 + 로그인이 확인되면 즉시 무료 999크레딧을 지급받는다.
+  const runFreeGrant = useCallback(() => {
+    if (grantInFlight.current) return
+    grantInFlight.current = true
+    setFreeGrant({ status: 'charging' })
+    requestFreeGrant()
+      .then((result) => setFreeGrant({ status: 'done', ...result }))
+      .catch((err: unknown) => {
+        setFreeGrant({
+          status: 'error',
+          message: err instanceof Error ? err.message : '크레딧을 채우지 못했어요. 잠시 후 다시 시도해주세요.',
+        })
+      })
+      .finally(() => {
+        grantInFlight.current = false
+      })
+  }, [])
+
+  useEffect(() => {
+    if (configured || me?.authScope !== 'authenticated') return
+    runFreeGrant()
+  }, [configured, me?.authScope, runFreeGrant])
 
   async function handlePurchase() {
     setError(null)
@@ -47,11 +92,36 @@ export default function CreditPage() {
             <Link href='/login' className={styles.primaryBtn}>로그인하러 가기</Link>
           </>
         ) : !configured ? (
-          <div className={styles.state}>
-            <div className={styles.ico}><CreditCard className='size-7' /></div>
-            <div className={styles.title}>결제 연동 준비 중</div>
-            <div className={styles.desc}>결제사 연동이 완료되면 크레딧 충전이 열려요. 지금은 딥스캔을 무료로 이용할 수 있어요.</div>
-          </div>
+          // 결제 연동 전 — 들어오자마자 999크레딧 무료 충전. 막다른 안내 대신 완료 상태로 안내한다.
+          freeGrant.status === 'done' ? (
+            <>
+              <div className={styles.state}>
+                <div className={`${styles.ico} ${styles.icoDone}`}><Sparkles className='size-7' /></div>
+                <div className={styles.title}>{FREE_GRANT_CREDITS.toLocaleString()}크레딧을 채웠어요!</div>
+                <div className={styles.desc}>
+                  결제 연동이 열리기 전까지 딥스캔 크레딧을 무료로 드려요.<br />
+                  보유 {freeGrant.balance.toLocaleString()}cr · 딥스캔 {freeGrant.deepScanLeft.toLocaleString()}회
+                </div>
+              </div>
+              <Link href='/home' className={styles.primaryBtn}>딥스캔 이용하러 가기</Link>
+              <button type='button' className={styles.ghostBtn} onClick={runFreeGrant}>크레딧이 더 필요해요 ({FREE_GRANT_CREDITS.toLocaleString()}cr 더 받기)</button>
+            </>
+          ) : freeGrant.status === 'error' ? (
+            <>
+              <div className={styles.state}>
+                <div className={styles.ico}><Coins className='size-7' /></div>
+                <div className={styles.title}>크레딧을 채우지 못했어요</div>
+                <div className={styles.desc}>{freeGrant.message}</div>
+              </div>
+              <button type='button' className={styles.primaryBtn} onClick={runFreeGrant}>다시 시도</button>
+            </>
+          ) : (
+            <div className={styles.state}>
+              <div className={styles.ico}><Loader2 className='size-7 animate-spin' /></div>
+              <div className={styles.title}>{freeGrant.status === 'checking' ? '크레딧 정보를 확인하고 있어요' : '무료 크레딧을 채우고 있어요'}</div>
+              <div className={styles.desc}>결제 연동이 열리기 전까지 {FREE_GRANT_CREDITS.toLocaleString()}크레딧을 무료로 드려요.</div>
+            </div>
+          )
         ) : (
           <>
             <div className={styles.subCard}>

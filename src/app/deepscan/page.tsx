@@ -7,6 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { LineChart } from 'lucide-react'
 import { DeepScanInlineResults } from '@/components/deepscan-inline-results'
 import { DeepScanLoadingScreen, type LoadingStageKey } from '@/components/deepscan-loading-screen'
+import { DeepScanCreditShortageScreen } from '@/components/deepscan-credit-shortage-screen'
 import { DeepScanHaltScreen } from '@/components/deepscan-halt-screen'
 import { SnapshotProvenanceBar } from '@/components/deepscan-inline-results'
 import { JarooShell } from '@/components/jaroo-shell'
@@ -75,6 +76,7 @@ export default function DeepScanPage() {
   const requestStatus = useDeepScanStore((state) => state.requestStatus)
   const errorMessage = useDeepScanStore((state) => state.errorMessage)
   const errorCode = useDeepScanStore((state) => state.errorCode)
+  const errorCredit = useDeepScanStore((state) => state.errorCredit)
   const activePayload = useDeepScanStore((state) => state.activePayload)
   const activeTargetKey = useDeepScanStore((state) => state.activeTargetKey)
   const lastSuccessful = useDeepScanStore((state) => state.lastSuccessful)
@@ -559,6 +561,9 @@ export default function DeepScanPage() {
         finishError(
           error instanceof Error ? error.message : 'DeepScan 데이터를 표시할 수 없어요. 잠시 후 다시 시도해주세요.',
           error instanceof DeepScanApiError ? error.code : null,
+          error instanceof DeepScanApiError && error.creditBalance != null && error.creditCost != null
+            ? { balance: error.creditBalance, cost: error.creditCost }
+            : null,
         )
       }
     }
@@ -859,19 +864,13 @@ export default function DeepScanPage() {
     ?? activeLoadingQuickQuote?.currentPriceCurrency
     ?? (requestSeed.holding.market === 'US' ? 'USD' : undefined)
   const loadingQuickFacts = buildLoadingQuickFacts(payload, activeLoadingQuickQuote, activeLoadingBriefingSnapshot, requestSeed.holding.name, requestSeed.holding.market, requestSeed.holding.kind)
-  // 크레딧 부족(402)은 일시적 오류가 아니다 — 재시도 대신 크레딧 문구와 충전 CTA로 안내한다.
+  // 크레딧 부족(402)은 오류가 아닌 별도 예외 화면으로 전체 교체한다(아래 early return).
   const isCreditShortage = fetchState === 'error' && errorCode === 'insufficient-credits'
-  const requestErrorNotice = isCreditShortage
-    ? {
-        badge: '크레딧 부족',
-        title: '딥스캔 크레딧이 부족해요',
-        body: errorMessage ?? '마이페이지에서 크레딧을 충전한 뒤 다시 시도해주세요.',
-      }
-    : {
-        badge: '오류',
-        title: 'DeepScan 데이터를 표시할 수 없어요',
-        body: errorMessage ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
-      }
+  const requestErrorNotice = {
+    badge: '오류',
+    title: 'DeepScan 데이터를 표시할 수 없어요',
+    body: errorMessage ?? '분석 데이터 요청에 실패했습니다. 잠시 후 다시 시도해주세요.',
+  }
 
   const identifier = [requestSeed.holding.ticker, requestSeed.holding.code]
     .filter((value, index, values): value is string => Boolean(value) && values.indexOf(value) === index)
@@ -894,6 +893,24 @@ export default function DeepScanPage() {
           averagePrice={target?.averagePrice}
           averagePriceCurrency={target?.averagePriceCurrency}
           fallbackProfitRatePct={target?.currentProfitRate ?? undefined}
+          backHref='/home'
+        />
+      </div>
+    )
+  }
+
+  // 크레딧 부족(402) — 로딩 스크린의 빨간 오류 카드 대신 친절한 안내 화면으로 교체한다.
+  // 필요/잔여 수치는 서버 402 상세를 그대로 쓰고, 없으면 정책 기본값으로 설명한다.
+  if (isCreditShortage) {
+    return (
+      <div className='flex h-full w-full justify-center bg-white'>
+        <DeepScanCreditShortageScreen
+          className='w-full overflow-hidden'
+          name={requestSeed.holding.name}
+          identifier={identifier}
+          market={requestSeed.holding.market}
+          cost={errorCredit?.cost ?? null}
+          balance={errorCredit?.balance ?? null}
           backHref='/home'
         />
       </div>
@@ -943,8 +960,7 @@ export default function DeepScanPage() {
             target={target}
           /> : null}
         errorNotice={fetchState === 'error' ? requestErrorNotice : null}
-        onRetry={isCreditShortage ? undefined : handleRetry}
-        errorPrimaryAction={isCreditShortage ? { label: '충전하러 가기', href: '/mypage/credit' } : undefined}
+        onRetry={handleRetry}
         backHref='/home'
       />
     </div>

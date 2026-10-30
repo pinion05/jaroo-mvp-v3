@@ -308,12 +308,17 @@ export function buildDeepScanCanonicalQuery(targetSession: DeepScanCanonicalTarg
 export class DeepScanApiError extends Error {
   readonly code: string
   readonly status: number
+  /** 402 insufficient-credits 상세 — 필요/잔여 크레딧. 없는 에러면 null. */
+  readonly creditBalance: number | null
+  readonly creditCost: number | null
 
-  constructor(message: string, code: string, status: number) {
+  constructor(message: string, code: string, status: number, credit?: { balance?: unknown; cost?: unknown }) {
     super(message)
     this.name = 'DeepScanApiError'
     this.code = code
     this.status = status
+    this.creditBalance = typeof credit?.balance === 'number' ? credit.balance : null
+    this.creditCost = typeof credit?.cost === 'number' ? credit.cost : null
   }
 }
 
@@ -336,6 +341,7 @@ export async function fetchDeepScanCanonicalPayload(
         String(errorBody.message),
         String(errorBody.code ?? 'unknown'),
         response.status,
+        { balance: (errorBody as { balance?: unknown }).balance, cost: (errorBody as { cost?: unknown }).cost },
       )
     }
   }
