@@ -349,6 +349,25 @@ test('KR DeepScan crawler canonical URL은 market KOSPI 표기에서도 명시 k
   assert.match(url, /kind=etn/)
 })
 
+test('KR DeepScan crawler canonical URL은 skipCommitteeLlm 옵션에서만 committeeLlm=off를 붙인다', () => {
+  const rawInput: DeepScanRawInput = {
+    instrument: {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KR',
+    },
+    sourceContext: {
+      from: 'system',
+    },
+  }
+
+  // 기본(유저 딥스캔)은 플래그가 없어야 한다
+  assert.doesNotMatch(buildKrDeepScanCrawlerCanonicalUrl(rawInput), /committeeLlm/)
+
+  // 워치 일괄 배치용 옵션은 committeeLlm=off를 전달한다
+  assert.match(buildKrDeepScanCrawlerCanonicalUrl(rawInput, { skipCommitteeLlm: true }), /committeeLlm=off/)
+})
+
 test('buildRawInputFromSearchParams 화이트리스트는 kind=etn을 드롭하지 않는다', async () => {
   const { buildRawInputFromSearchParams } = await import('./build-payload')
 

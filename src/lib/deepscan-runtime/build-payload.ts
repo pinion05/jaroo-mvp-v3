@@ -914,7 +914,10 @@ function resolveCrawlerDeepScanKind(input: DeepScanRawInput) {
   return input.instrument.kind === 'etf' ? 'etf' : undefined
 }
 
-export function buildKrDeepScanCrawlerCanonicalUrl(rawInput: DeepScanRawInput) {
+export function buildKrDeepScanCrawlerCanonicalUrl(
+  rawInput: DeepScanRawInput,
+  options?: { skipCommitteeLlm?: boolean },
+) {
   const input = prepareDeepScanRawInputForBuilder(rawInput)
   const searchParams = new URLSearchParams()
 
@@ -933,6 +936,11 @@ export function buildKrDeepScanCrawlerCanonicalUrl(rawInput: DeepScanRawInput) {
   setCrawlerDeepScanQueryValue(searchParams, 'usdKrwRate', input.holding?.usdKrwRate)
   setCrawlerDeepScanQueryValue(searchParams, 'selectedAt', input.selectedAt)
   setCrawlerDeepScanQueryValue(searchParams, 'from', normalizeSourceFrom(input.sourceContext.from))
+
+  // 워치 일일 배치 등 데이터 전용 소비처용: 위원회 LLM 스킵 — 유저 딥스캔(기본값)은 항상 LLM 실행
+  if (options?.skipCommitteeLlm) {
+    searchParams.set('committeeLlm', 'off')
+  }
 
   return buildCrawlerUrl(
     getCrawlerBaseUrl(),
@@ -1001,6 +1009,8 @@ type KrDeepScanCrawlerFetchOptions = {
   fetchTimeoutMs?: number
   sleep?: (durationMs: number) => Promise<void>
   recoveryPriceHistoryLoader?: (code: string) => Promise<KrDailyPricePoint[]>
+  /** 9인 위원회 LLM 호출 스킵(crawler ?committeeLlm=off) — 워치 일일 배치 전용. 유저 딥스캔은 절대 스킵 금지. */
+  skipCommitteeLlm?: boolean
 }
 
 function sleep(durationMs: number) {
@@ -1094,7 +1104,7 @@ export async function buildKrDeepScanPayloadViaCrawler(
   options: KrDeepScanCrawlerFetchOptions = {},
 ) {
   const fetchStartedAtMs = Date.now()
-  const upstreamUrl = buildKrDeepScanCrawlerCanonicalUrl(rawInput)
+  const upstreamUrl = buildKrDeepScanCrawlerCanonicalUrl(rawInput, { skipCommitteeLlm: options.skipCommitteeLlm })
   const preparedInput = prepareDeepScanRawInputForBuilder(rawInput)
   const recoveryCode = preparedInput.instrument.code
   const recoveryHistoryPromise = options.recoveryPriceHistoryLoader && recoveryCode
