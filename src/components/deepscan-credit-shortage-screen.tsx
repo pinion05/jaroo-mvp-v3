@@ -91,7 +91,7 @@ export function DeepScanCreditShortageScreen({
                 <p className={styles.stepTitle}>무료 크레딧 받기</p>
                 <p className={styles.stepDesc}>
                   지금은 결제 연동을 준비 중이라 {FREE_GRANT_CREDITS.toLocaleString()}크레딧을 무료로 드리고 있어요.
-                  '크레딧 충전' 페이지에 들어가기만 하면 자동으로 채워져요.
+                  크래딧 충전 페이지에 들어가기만 하면 자동으로 채워져요.
                 </p>
               </div>
             </div>

@@ -61,7 +61,9 @@ export default function CreditPage() {
 
   useEffect(() => {
     if (configured || me?.authScope !== 'authenticated') return
-    runFreeGrant()
+    // 이펙트 본문에서 동기 setState를 부르면 cascading render 경고가 뜬다 — 타이머로 한 틱 미룬다.
+    const timer = setTimeout(runFreeGrant, 0)
+    return () => clearTimeout(timer)
   }, [configured, me?.authScope, runFreeGrant])
 
   async function handlePurchase() {
