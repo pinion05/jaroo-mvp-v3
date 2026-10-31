@@ -32,6 +32,7 @@ import {
   getDefaultCrawlerCacheStaleTtlMs,
   getDefaultSupabaseCrawlerCacheClient,
   isCacheRowFresh,
+  isCacheRowUsableAsStale,
   normalizeCrawlerCacheToggle,
   readThroughCrawlerCache,
 } from './supabase-crawler-cache.js';
@@ -2814,10 +2815,37 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
 // 트렌드·시장 신호·가격 위치 3명만 LLM 분석한다(사용자 요청 2026-09-17).
 // 완성(complete) 결과만 캐시에 저장하고, 소프트데드라인에 걸린 셸은
 // requestId로 /kr/committee-status 폴링해 완성한다(딥스캔과 동일 계약).
+// 재계안 폭주(크레딧 나선)는 단일비행·stale 폴백·백오프로 막는다(아래 참조).
 const ETF_COMMITTEE_CACHE_ROUTE = 'etf-market-committee';
 const ETF_COMMITTEE_CACHE_ROUTE_VERSION = 'v1';
 const ETF_COMMITTEE_CACHE_SCHEMA_VERSION = 'etf-committee-market-timing-v1';
 const DEFAULT_ETF_COMMITTEE_SOFT_DEADLINE_MS = 25_000;
+
+// ─── 재계안 폭주 방지 — 단일비행·stale 폴백·백오프 ────────────────────────
+// 크레딧 부족 등으로 위원 일부만 성공(partial)하면 complete 캐시를 못 쓰고,
+// 매 요청마다 위원 LLM 재계산이 반복되며 남은 크레딧을 태우는 나선이 생긴다.
+// (a) 같은 캐시 키의 동시 재계산은 Promise 하나로 병합하고,
+// (b) 재계산이 partial/error로 끝나면 staleTtl 이내 complete 캐시로 폴백하며,
+// (c) 직전 재계산 실패 후 짧은 창(기본 60s)에는 재요청이 캐시 조회만 한다.
+const etfCommitteeRecomputeInFlight = new Map(); // cacheKey -> Promise<snapshot>
+const etfCommitteeLastFailedAtMs = new Map(); // cacheKey -> 직전 재계산 실패 시각(epoch ms)
+const DEFAULT_ETF_COMMITTEE_RECOMPUTE_BACKOFF_MS = 60_000;
+
+function getEtfCommitteeRecomputeBackoffMs() {
+  const raw = process.env.DEEPSCAN_ETF_COMMITTEE_RECOMPUTE_BACKOFF_MS;
+  // 명시적 0은 백오프 끄기 — 파싱 실패는 기본값으로.
+  return raw === '0' ? 0 : parsePositiveInteger(raw, DEFAULT_ETF_COMMITTEE_RECOMPUTE_BACKOFF_MS);
+}
+
+function isEtfCommitteeRecomputeCoolingDown(cacheKey, nowMs = Date.now()) {
+  const backoffMs = getEtfCommitteeRecomputeBackoffMs();
+  if (backoffMs <= 0) {
+    return false;
+  }
+
+  const lastFailedAtMs = etfCommitteeLastFailedAtMs.get(cacheKey);
+  return typeof lastFailedAtMs === 'number' && nowMs - lastFailedAtMs < backoffMs;
+}
 
 // 캐시 키용 보유값 파싱 — 증거 패킷(deepscan-kr-evidence normalizeNumber)과 같은 규칙으로
 // 쉼표/통화기호/공백을 제거해 숫자로 만든다.
@@ -2898,6 +2926,47 @@ function createEtfCommitteeErrorSnapshot(errorCode, message) {
   };
 }
 
+async function readEtfCommitteeCacheRow(cacheClient, cacheKey) {
+  try {
+    return await cacheClient.readPayload(cacheKey);
+  } catch {
+    // 캐시 조회 실패는 정상 실행 경로를 막지 않는다.
+    return null;
+  }
+}
+
+function asEtfCommitteeFreshSnapshot(row) {
+  if (!row || !isCacheRowFresh(row)) {
+    return null;
+  }
+
+  const cached = getRowPayloadLike(row);
+  if (cached?.ok !== true || cached?.status !== 'complete') {
+    return null;
+  }
+
+  return {
+    ...cached,
+    cache: { hit: true, scannedAt: normalizeText(row.created_at ?? row.createdAt) ?? null },
+  };
+}
+
+function asEtfCommitteeStaleSnapshot(row) {
+  if (!row || !isCacheRowUsableAsStale(row)) {
+    return null;
+  }
+
+  const cached = getRowPayloadLike(row);
+  if (cached?.ok !== true || cached?.status !== 'complete') {
+    return null;
+  }
+
+  return {
+    ...cached,
+    cache: { hit: true, stale: true, scannedAt: normalizeText(row.created_at ?? row.createdAt) ?? null },
+  };
+}
+
 export async function buildEtfMarketCommitteeSnapshot(rawInput = {}) {
   const input = normalizeInput(rawInput);
   const code = normalizeText(input.instrument.code);
@@ -2916,29 +2985,68 @@ export async function buildEtfMarketCommitteeSnapshot(rawInput = {}) {
   const identity = buildCrawlerCacheIdentity(buildEtfCommitteeCacheDescriptor(input));
 
   if (cacheClient && !cacheOptions.bypassCache && !cacheOptions.forceRefresh) {
-    try {
-      const cachedRow = await cacheClient.readPayload(identity.cacheKey);
-      if (cachedRow && isCacheRowFresh(cachedRow)) {
-        const cached = getRowPayloadLike(cachedRow);
-        if (cached?.ok === true && cached?.status === 'complete') {
-          return {
-            ...cached,
-            cache: { hit: true, scannedAt: normalizeText(cachedRow.created_at ?? cachedRow.createdAt) ?? null },
-          };
-        }
-      }
-    } catch {
-      // 캐시 조회 실패는 정상 실행 경로를 막지 않는다.
+    const freshSnapshot = asEtfCommitteeFreshSnapshot(await readEtfCommitteeCacheRow(cacheClient, identity.cacheKey));
+    if (freshSnapshot) {
+      return freshSnapshot;
     }
   }
 
-  const committee = await scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources, {
-    memberKeys: KR_ETF_PAGE_MEMBER_KEYS,
-    softDeadlineMs: parsePositiveInteger(
-      process.env.DEEPSCAN_ETF_LLM_SOFT_DEADLINE_MS,
-      DEFAULT_ETF_COMMITTEE_SOFT_DEADLINE_MS,
-    ),
+  // 같은 캐시 키의 재계산이 이미 진행 중이면 그 Promise를 재사용한다(단일비행) —
+  // 동시 요청이 각자 위원 LLM을 호출하며 크레딧을 태우는 것을 막는다.
+  const inFlightRecompute = etfCommitteeRecomputeInFlight.get(identity.cacheKey);
+  if (inFlightRecompute) {
+    return inFlightRecompute;
+  }
+
+  // 직전 재계산이 백오프 창(기본 60s) 안에 실패했다면 재계산을 스킵한다 —
+  // 캐시(fresh→stale) 조회만 하고 둘 다 없으면 재시도 안내를 반환한다.
+  // forceRefresh·bypassCache(웹 새로고침 → crawlerCacheBypass=1)는 사용자의
+  // 명시적 재시도라 이 보호를 우회한다.
+  if (!cacheOptions.forceRefresh && !cacheOptions.bypassCache && isEtfCommitteeRecomputeCoolingDown(identity.cacheKey)) {
+    let cooledSnapshot = null;
+    if (cacheClient) {
+      const cooledRow = await readEtfCommitteeCacheRow(cacheClient, identity.cacheKey);
+      cooledSnapshot = asEtfCommitteeFreshSnapshot(cooledRow) ?? asEtfCommitteeStaleSnapshot(cooledRow);
+    }
+
+    return cooledSnapshot ?? createEtfCommitteeErrorSnapshot(
+      'committee-recompute-backoff',
+      'AI 위원회 계산이 방금 실패했어요. 잠시 후 다시 시도해주세요.',
+    );
+  }
+
+  const recompute = runEtfCommitteeRecompute({
+    rawInput,
+    input,
+    evidence,
+    sources,
+    code,
+    cacheClient,
+    cacheOptions,
+    identity,
+  }).finally(() => {
+    // 완료·실패 모두 맵을 정리한다 — 다음 요청이 새 재계산을 시작할 수 있게.
+    etfCommitteeRecomputeInFlight.delete(identity.cacheKey);
   });
+  etfCommitteeRecomputeInFlight.set(identity.cacheKey, recompute);
+  return recompute;
+}
+
+async function runEtfCommitteeRecompute({ rawInput, input, evidence, sources, code, cacheClient, cacheOptions, identity }) {
+  let committee;
+  try {
+    committee = await scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources, {
+      memberKeys: KR_ETF_PAGE_MEMBER_KEYS,
+      softDeadlineMs: parsePositiveInteger(
+        process.env.DEEPSCAN_ETF_LLM_SOFT_DEADLINE_MS,
+        DEFAULT_ETF_COMMITTEE_SOFT_DEADLINE_MS,
+      ),
+    });
+  } catch (error) {
+    etfCommitteeLastFailedAtMs.set(identity.cacheKey, Date.now());
+    throw error;
+  }
+
   const shape = buildKrCommitteeAxesFromLlmResults(evidence, committee.results, committee.errors, committee.pending, {
     memberKeys: KR_ETF_PAGE_MEMBER_KEYS,
   });
@@ -2956,15 +3064,34 @@ export async function buildEtfMarketCommitteeSnapshot(rawInput = {}) {
     cache: null,
   };
 
-  if (cacheClient && snapshot.status === 'complete') {
-    // partial 셸은 캐시하지 않는다 — 폴링 완성분까지 저장하면 무결성이 깨진다.
-    try {
-      await cacheClient.upsertPayload(buildCrawlerCachePayloadEntry(identity, snapshot, {
-        freshTtlMs: cacheOptions.freshTtlMs,
-        staleTtlMs: cacheOptions.staleTtlMs,
-      }));
-    } catch {
-      // 캐시 저장 실패는 응답에 영향 없음
+  if (snapshot.status === 'complete') {
+    etfCommitteeLastFailedAtMs.delete(identity.cacheKey);
+    if (cacheClient) {
+      // partial 셸은 캐시하지 않는다 — 폴링 완성분까지 저장하면 무결성이 깨진다.
+      try {
+        await cacheClient.upsertPayload(buildCrawlerCachePayloadEntry(identity, snapshot, {
+          freshTtlMs: cacheOptions.freshTtlMs,
+          staleTtlMs: cacheOptions.staleTtlMs,
+        }));
+      } catch {
+        // 캐시 저장 실패는 응답에 영향 없음
+      }
+    }
+    return snapshot;
+  }
+
+  // LLM 비용을 쓴 채 실패한 재계산만 백오프에 기록한다(disabled은 비용이 없다).
+  if (snapshot.status === 'partial' || snapshot.status === 'error') {
+    etfCommitteeLastFailedAtMs.set(identity.cacheKey, Date.now());
+  }
+
+  // 재계산이 complete 아닐 때 staleTtl 이내 complete 캐시가 있으면 그쪽이 더 나은
+  // 사용자 경험이다 — cache:{hit:true, stale:true} 마커로 폴백한다. 없으면 partial 그대로.
+  if (cacheClient && !cacheOptions.bypassCache) {
+    const fallbackRow = await readEtfCommitteeCacheRow(cacheClient, identity.cacheKey);
+    const fallbackSnapshot = asEtfCommitteeFreshSnapshot(fallbackRow) ?? asEtfCommitteeStaleSnapshot(fallbackRow);
+    if (fallbackSnapshot) {
+      return fallbackSnapshot;
     }
   }
 
