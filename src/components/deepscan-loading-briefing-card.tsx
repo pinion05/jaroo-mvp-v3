@@ -57,6 +57,8 @@ import {
 import { cn } from '@/lib/utils'
 import styles from './deepscan-loading-screen.module.css'
 
+import { buildMarketMeaning } from '@/lib/deepscan-market-meaning'
+
 
 export function BackControl({ onBack, backHref }: Pick<DeepScanLoadingScreenProps, 'onBack' | 'backHref'>) {
   // '←' 텍스트 글리프는 폰트 환경(임베디드 웹뷰 등)에 따라 빈 박스로 렌더링될 수 있어 SVG 아이콘으로 대체한다.
@@ -302,27 +304,9 @@ export function TodayBriefingItem({
 }
 
 
-export function buildMarketMeaning(firstPct: number | null, secondPct: number | null, stockPct: number | null) {
-  if (!isFiniteNumber(stockPct)) {
-    return '내 종목의 장중 등락률을 확인하는 중이에요.'
-  }
-
-  const marketValues = [firstPct, secondPct].filter(isFiniteNumber)
-  if (marketValues.length === 0) {
-    return '시장 지수와 내 종목 흐름을 맞춰 보는 중이에요.'
-  }
-
-  const marketAverage = marketValues.reduce((sum, value) => sum + value, 0) / marketValues.length
-  if (stockPct >= marketAverage + 0.5) {
-    return '시장보다 더 강하게 움직이고 있어요.'
-  }
-
-  if (stockPct <= marketAverage - 0.5) {
-    return '시장 흐름 대비 아직 덜 따라온 상태예요.'
-  }
-
-  return '시장 흐름과 비슷한 속도로 움직이고 있어요.'
-}
+// '오늘 시장 속에서는?' 문구 — 순수 로직은 lib/deepscan-market-meaning(24분기 매트릭스)에 있다.
+// 하위 호환을 위해 기존 import 경로(src/components/deepscan-loading-briefing-card)로도 그대로 노출.
+export { buildMarketMeaning } from '@/lib/deepscan-market-meaning'
 
 export function TodayMarketBriefing({
   at,
