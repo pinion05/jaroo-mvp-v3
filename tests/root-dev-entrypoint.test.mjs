@@ -62,11 +62,13 @@ test('root entry opens home and home does not force empty guests to screenshot',
 })
 
 test('root test script runs root smoke tests and key workspace package suites', () => {
+  // deepscan-runtime-core(회복 예측·위원회 LLM·safe-json) 포함 — 커버리지 공백 수정(2026-11-02).
   assert.equal(
     packageJson.scripts.test,
-    'node --test tests/*.test.mjs && npm run test:web:ts && npm run test:crawler && npm run test:instrument-core',
+    'node --test tests/*.test.mjs && npm run test:web:ts && npm run test:crawler && npm run test:instrument-core && npm run test:runtime-core',
   )
   assert.equal(packageJson.scripts['test:web:ts'], 'node scripts/run-web-ts-tests.cjs')
+  assert.equal(packageJson.scripts['test:runtime-core'], 'npm --prefix packages/deepscan-runtime-core run test')
 })
 
 test('dev stack launcher starts both web and crawler dev scripts and stops siblings on exit', () => {
