@@ -423,6 +423,13 @@
 .stockDetailInner {
   overflow: hidden;
   min-height: 0;
+}
+
+/* 0fr→1fr 접힘 애니메이션의 그리드 아이템(.stockDetailInner)은 세로 padding/border를
+   가져서는 안 된다 — 트랙의 auto 최솟값에 더해져 접힌 상태가 0이 아니라 그 높이만큼
+   남아 종목 카드의 상하 세로 여백을 비대칭으로 만든다(접힌 카드 하단 유령 여백).
+   세로 여백과 구분선은 이 내부 래퍼가 대신 담당한다. */
+.stockDetailBody {
   border-top: 0.5px solid #eef0f3;
   padding: 0 13px 13px;
 }
