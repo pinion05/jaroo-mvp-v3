@@ -9,6 +9,10 @@ on:
   push:
     branches: [dev, master]
 
+# 최소 권한 — 이 워크플로는 코드 체크아웃만 필요하다.
+permissions:
+  contents: read
+
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
@@ -27,8 +31,8 @@ jobs:
       # 크롤러 테스트는 전부 오프라인 fixture 기반이라 Playwright 브라우저 다운로드가 불필요하다.
       PLAYWRIGHT_SKIP_BROWSER_DOWNLOAD: '1'
     steps:
-      # temporal-holdout 테스트가 candidate freeze 커밋을 git cat-file 로 검증하므로
-      # shallow clone 이 아니라 전체 히스토리를 내려받아야 한다.
+      # 전체 히스토리 checkout(레포 10MB 수준이라 비용 미미) — 히스토리 의존 테스트가
+      # 생길 수 있으므로 유지한다. (원래 근거였던 temporal-holdout 테스트는 제거됨)
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
