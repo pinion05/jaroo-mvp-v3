@@ -582,7 +582,7 @@ function extractAnalystTargetStats(opinionPage) {
     };
   }
 
-  const rowBrokers = brokerRows
+  const namedBrokerRows = brokerRows
     .map((item) => ({
       name: normalizeEvidenceText(item.row?.추정기관 ?? item.row?.기관 ?? item.row?.broker ?? item.row?.증권사),
       targetPrice: item.targetPrice,
@@ -590,8 +590,20 @@ function extractAnalystTargetStats(opinionPage) {
     }))
     .filter((entry) => entry.name !== null);
 
+  // 같은 증권사가 여러 경로(예: fnguide 행 + 네이버 폴백 합성 행)로 섞일 때
+  // 이름 기준 최신 행만 남긴다(2026-11-02). 없으면 analystCount가 실제 증권사 수보다
+  // 부풀고 brokers 목록과 어긋난다.
+  const latestBrokerByName = new Map();
+  for (const entry of namedBrokerRows) {
+    const prev = latestBrokerByName.get(entry.name);
+    if (!prev || (entry.date && (!prev.date || entry.date > prev.date))) {
+      latestBrokerByName.set(entry.name, entry);
+    }
+  }
+  const rowBrokers = [...latestBrokerByName.values()];
+
   return {
-    analystCount: brokerRows.length > 0 ? brokerRows.length : null,
+    analystCount: rowBrokers.length > 0 ? rowBrokers.length : (brokerRows.length > 0 ? brokerRows.length : null),
     highestTargetPrice: targetPrices.length > 1 ? Math.max(...targetPrices) : null,
     lowestTargetPrice: targetPrices.length > 1 ? Math.min(...targetPrices) : null,
     brokers: rowBrokers.length > 0 ? rowBrokers : null,
