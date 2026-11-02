@@ -598,6 +598,19 @@ export function runRecoveryForecast(context: RecoveryForecastContext): {
 const RECOVERY_PRICE_HISTORY_MAX_POINTS = 780
 const RECOVERY_SIMILAR_PATTERN_SAMPLES_MAX = 12
 
+// 3년 차트에서 유사 패턴 밴드가 오른쪽(최근)에만 몰려 보이는 문제(2026-11-02 삼영화학공업 실측).
+// 예전 1년 차트 시절의 slice(-N) 선택이 3년 확장(#334) 후에도 남아 최근 12개만
+// 내려갔고, 좌측 2년치 근거가 전부 잘려 나갔다. 통계(중앙값·확률)는 전체 샘플 기반이라
+// 수치는 맞지만 차트가 모델 근거를 왜곡해 보였다. 최대 12개를 전 구간에 걸쳐
+// 등간격(첫·끝 포함)으로 뽑아 전체 근거 분포를 보여준다.
+function selectEvenlyDistributedSamples<T>(samples: ReadonlyArray<T>, maxCount: number): T[] {
+  if (samples.length <= maxCount) {
+    return [...samples]
+  }
+  const stride = (samples.length - 1) / (maxCount - 1)
+  return Array.from({ length: maxCount }, (_, position) => samples[Math.round(position * stride)] as T)
+}
+
 function normalizeRecoverySeriesPoint(point: unknown): { date: string | null; close: number } | null {
   const record = asRecord(point)
   if (!record) {
@@ -654,9 +667,8 @@ function buildRecoverySimilarPatternSamples(
       }
     })
     .filter((sample): sample is NonNullable<typeof sample> => sample !== null)
-    .slice(-RECOVERY_SIMILAR_PATTERN_SAMPLES_MAX)
 
-  return mapped.length > 0 ? mapped : undefined
+  return mapped.length > 0 ? selectEvenlyDistributedSamples(mapped, RECOVERY_SIMILAR_PATTERN_SAMPLES_MAX) : undefined
 }
 
 export function shapeRecoveryForecastBlock(args: {
