@@ -452,7 +452,7 @@ export function TodayRecoveryForecastBriefing({
               className={styles.recoveryChartSvg}
               viewBox={`0 0 ${RECOVERY_CHART_WIDTH} ${RECOVERY_CHART_HEIGHT}`}
               role='img'
-              aria-label={`${chartGeometry.periodLabel} 종가 차트. 파란 점선은 평단가, 호밍색 표시는 유사 과거 패턴 구간이다.`}
+              aria-label={`${chartGeometry.periodLabel} 종가 차트. 파란 점선은 평단가, 호밍색 세로선은 유사 과거 패턴 구간이다.`}
             >
               {chartGeometry.gridlines.map((line) => (
                 <g key={`grid-${line.label}`}>
@@ -464,9 +464,14 @@ export function TodayRecoveryForecastBriefing({
                 <text key={`date-${tick.label}-${tick.x}`} className={styles.recoveryChartTick} x={tick.x} y={RECOVERY_CHART_HEIGHT - 4} textAnchor='middle'>{tick.label}</text>
               ))}
               {chartGeometry.bands.map((band) => (
-                <rect key={`band-${band.x}`} className={styles.recoveryChartBand} x={band.x - 3} y={RECOVERY_CHART_MARGIN.top} width='6' height={RECOVERY_CHART_HEIGHT - RECOVERY_CHART_MARGIN.top - RECOVERY_CHART_MARGIN.bottom} rx='1.5'>
-                  <title>{band.title}</title>
-                </rect>
+                // 유사 패턴 위치 표시 — 2026-11-02: 노란 밴드(rect)에서 얇은 세로선으로
+                // 변경(결과 카드와 동일 규격). 투명 rect는 툴팁 히트영역.
+                <g key={`band-${band.x}`}>
+                  <line className={styles.recoveryChartBand} x1={band.x} x2={band.x} y1={RECOVERY_CHART_MARGIN.top} y2={RECOVERY_CHART_HEIGHT - RECOVERY_CHART_MARGIN.bottom} />
+                  <rect x={band.x - 3} y={RECOVERY_CHART_MARGIN.top} width='6' height={RECOVERY_CHART_HEIGHT - RECOVERY_CHART_MARGIN.top - RECOVERY_CHART_MARGIN.bottom} fill='transparent'>
+                    <title>{band.title}</title>
+                  </rect>
+                </g>
               ))}
               {chartGeometry.targetY !== null ? (
                 <g>
