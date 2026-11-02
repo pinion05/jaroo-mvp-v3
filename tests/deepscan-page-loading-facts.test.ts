@@ -234,6 +234,23 @@ test('analystCount가 결손이면 brokers 수로 보정해 라벨을 만든다'
   assert.equal(parsed.analystCountLabel, '미래에셋증권 외 2곳')
 })
 
+test('analystCount와 brokers 수가 어긋나면 analystCount가 카운트의 원천이다', () => {
+  // wideCoverageConsensus 스토리 시나리오: 49곳 커버리지 중 브로커 이름은 2곳만
+  // 공급돼도 라벨 카운트는 analystCount(49)를 따라간다 (brokers.length로 대체 금지).
+  const wide = parseLoadingConsensusBody('', {
+    analystCount: 49,
+    brokers: [broker('하나증권'), broker('미래에셋증권')],
+  })
+  assert.equal(wide.analystCountLabel, '하나증권 외 48곳')
+
+  // 역방향: analystCount가 brokers 수보다 작아도 analystCount가 우선한다.
+  const narrow = parseLoadingConsensusBody('', {
+    analystCount: 2,
+    brokers: [broker('미래에셋증권'), broker('한국투자증권'), broker('KB증권')],
+  })
+  assert.equal(narrow.analystCountLabel, '미래에셋증권 외 1곳')
+})
+
 test('빈 문자열·공백 브로커명은 라벨 대상에서 제외한다', () => {
   // The empty first entry must not become the lead name; without filtering
   // the label would degrade to the legacy '증권사 2곳' form.
