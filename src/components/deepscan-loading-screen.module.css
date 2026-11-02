@@ -3100,10 +3100,10 @@
 }
 
 .recoveryChartBand {
-  fill: #f0a73b;
-  fill-opacity: 0.28;
-  stroke: #e0942a;
-  stroke-width: 0.5;
+  /* 유사 패턴 세로선(2026-11-02, 밴드 rect → 얇은 선) — 결과 카드와 동일 규격 */
+  stroke: #f0a73b;
+  stroke-width: 1.2;
+  stroke-opacity: 0.9;
 }
 
 .recoveryChartTargetLine {
