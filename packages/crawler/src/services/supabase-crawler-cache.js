@@ -161,7 +161,7 @@ export function isCacheRowFresh(row, now = new Date()) {
   return !staleAfter || Date.parse(staleAfter) > now.getTime();
 }
 
-function isCacheRowUsableAsStale(row, now = new Date()) {
+export function isCacheRowUsableAsStale(row, now = new Date()) {
   if (!row || !['fresh', 'stale', 'error_fallback'].includes(row.status)) {
     return false;
   }
