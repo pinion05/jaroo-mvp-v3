@@ -151,6 +151,9 @@ test('resolveDeepScanHaltVerdict — ETN은 etf 조기리턴을 타지 않고 �
     instrumentKind: 'etn' as const,
     haltHint: false,
     checkExpired: false,
+    // 정규장 중(금 10:00 KST) 고정 — volume 0 폴백 판정이 도는 조건을 고정한다.
+    // now를 안 넣으면 장 마감 후(15:30 KST) CI에서만 실패하는 시간 의존 테스트가 된다.
+    now: new Date('2026-10-30T01:00:00.000Z'),
   }
 
   // 만기·상환 정지(거래량 0)는 검출된다 — 레거시(kind 'etf')은 skip이었으나

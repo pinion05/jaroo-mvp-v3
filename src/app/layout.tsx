@@ -3,6 +3,7 @@ import 'pretendard/dist/web/static/pretendard-dynamic-subset.css'
 import './globals.css'
 import { DebugPageNav } from '@/components/debug-page-nav'
 import { buildJarooRuntimeEnvScript } from '@/lib/jaroo-runtime-env'
+import { isPaymentsPipelineConfigured } from '@/lib/payments/config'
 
 // 런타임 env 주입(window.__JAROO_ENV__)이 빌드타임 프리렌더에 빈 값으로 구워지지
 // 않도록 요청시 렌더로 강제한다(2026-10-27 실측: x-nextjs-prerender=1에서 {} 주입 확인).
@@ -33,6 +34,7 @@ export default function RootLayout({
           supabaseUrl: process.env.SUPABASE_URL?.trim(),
           supabaseAnonKey: process.env.SUPABASE_ANON_KEY?.trim(),
           devAutoLogin: process.env.NEXT_PUBLIC_DEV_AUTO_LOGIN?.trim() === '1' || process.env.DEV_AUTO_LOGIN?.trim() === '1',
+          paymentsOpen: isPaymentsPipelineConfigured(),
         }) }} />
         <DebugPageNav />
         <div className='min-h-dvh w-full bg-[color:var(--jaroo-canvas)] sm:px-6 sm:py-4'>
