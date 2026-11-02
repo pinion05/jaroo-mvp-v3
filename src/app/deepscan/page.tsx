@@ -216,7 +216,7 @@ export default function DeepScanPage() {
     if (!Number.isFinite(costBasis) || costBasis <= 0 || typeof evaluation !== 'number' || !Number.isFinite(evaluation)) {
       return null
     }
-    return buildProfitIntroMention({ name: target.name, profitAmount: evaluation - costBasis, portfolioTotal: introPortfolioTotal })
+    return buildProfitIntroMention({ name: target.name, profitAmount: evaluation - costBasis, costBasis, portfolioTotal: introPortfolioTotal })
   }, [introPortfolioTotal, target])
   const targetKeyRef = useRef(targetKey)
   const requestSeed = useMemo<DeepScanCanonicalTargetSession | null>(
