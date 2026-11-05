@@ -1,4 +1,4 @@
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import 'pretendard/dist/web/static/pretendard-dynamic-subset.css'
 import './globals.css'
 import { DebugPageNav } from '@/components/debug-page-nav'
@@ -10,9 +10,45 @@ import { isPaymentsPipelineConfigured } from '@/lib/payments/config'
 // 프리렌더 HTML이 s-maxage=1년으로 캐시되던 것도 함께 해소 — 값은 항상 최신 런타임 env.
 export const dynamic = 'force-dynamic'
 
+// jaroo.kr 운영 도메인 기준 절대 URL 생성용(OG/Twitter 이미지·캐논ical).
+// 상대 경로 메타 이미지는 카톡/디스코드 일부 크롤러에서 무시되므로 metadataBase가 필요하다.
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL?.trim() || 'https://jaroo.kr'
+
 export const metadata: Metadata = {
-  title: 'jaroo-mvp-v3',
-  description: 'Jaroo mobile mock built with Next.js and shadcn/ui',
+  metadataBase: new URL(SITE_URL),
+  title: 'Jaroo — MTS 스크린샷 한 장으로 AI 주식 진단',
+  description:
+    'MTS 스크린샷 한 장만 올리면 AI 위원회가 내 포트폴리오를 진단합니다. 딥스캔 · 원금회수 예측 · 포트폴리오 시뮬레이션을 jaroo에서.',
+  applicationName: 'Jaroo',
+  openGraph: {
+    type: 'website',
+    locale: 'ko_KR',
+    siteName: 'Jaroo',
+    url: '/',
+    title: 'Jaroo — MTS 스크린샷 한 장으로 AI 주식 진단',
+    description:
+      'MTS 스크린샷 한 장만 올리면 AI 위원회가 내 포트폴리오를 진단합니다. 딥스캔 · 원금회수 예측 · 포트폴리오 시뮬레이션.',
+    images: [
+      {
+        url: '/opengraph-image.png',
+        width: 1200,
+        height: 630,
+        alt: 'Jaroo — MTS 스크린샷 한 장으로 내 주식을 AI가 진단',
+      },
+    ],
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Jaroo — MTS 스크린샷 한 장으로 AI 주식 진단',
+    description:
+      'MTS 스크린샷 한 장만 올리면 AI 위원회가 내 포트폴리오를 진단합니다. 딥스캔 · 원금회수 예측 · 포트폴리오 시뮬레이션.',
+    images: ['/opengraph-image.png'],
+  },
+}
+
+// Next 16: themeColor는 viewport export로 분리되어 있다(metadata.viewport 불가).
+export const viewport: Viewport = {
+  themeColor: '#eef4f8',
 }
 
 export default function RootLayout({
