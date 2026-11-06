@@ -148,4 +148,14 @@ node scripts/e2e-deepscan-journey.cjs  # 딥스캔 시딩 여정 + 실호출 1�
 1. **BUG-CAND-001** — safe-json `Authorization: Bearer <토큰>` 마스킹 누수 (§3)
 2. **배포 빌드 위원 전멸(침묵 실패)** — §4 포렌식: 배포 환경에서 committeeLlm 스킵 미작동 가설 A/B 판정 필요
 
+### 9.4 수정 진행 (2026-11-06, P0+P1 범위 — 팀 분할 PR)
+
+| 이슈 | 상태 | PR |
+|---|---|---|
+| TC 스위트 원본 | ✅ PR 오픈 | #347 (test/tc-suite-v1) |
+| h1·canonical·404 표면·/login 재접근 (P1 4건) | ✅ 수정+검증 완료 | #348 (fix/ux-foundations) — 185/185+665/665 PASS |
+| 세션 쿠키 HttpOnly·Secure (P0) | 진행 중 | fix/session-cookie-httponly |
+| 딥스캔 소프트 데드라인·/mypage/history·dev혼선·hero.score·목표가 (P0 2+P1 3) | 진행 중 | fix/deepscan-quality |
+| www.jaroo.kr TLS 불일치 (P0) | **현상 유지 확정** (사용자 결정 2026-11-06) — Railway 플랜 커스텀 도메인 한도(서비스당 1개, jaroo.kr 사용 중). 대안 기록: www DNS 레코드 삭제(무료) 또는 플랜 업그레이드+301. jaroo.kr NS는 Railway 자체(9mwqd93x.up.railway.app), www는 apex CNAME | — (인프라) |
+
 
