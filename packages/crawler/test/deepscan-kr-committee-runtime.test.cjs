@@ -247,7 +247,13 @@ test('KR committee axes render pending members and score completed members only'
   const marketAxis = shape.axes.find((axis) => axis.label === '시장 타이밍');
 
   assert.equal(shape.hasPendingMembers, true);
-  assert.equal(shape.committeeScores, null);
+  // pending(고민 중)은 실패가 아니다 — 응답 완료 위원의 가중치로 정규화된 임시
+  // 종합 점수를 계산한다(과거 null → 종목 무관 폴백 점수 수렴 결함, TC-e2e-deepscan §9).
+  assert.notEqual(shape.committeeScores, null);
+  // (80×0.4 + 60×0.35) / (0.4+0.35) = 53/0.75 = 70.67 → 71 (미응답 0.25 가중치로 눌리지 않음)
+  assert.equal(shape.committeeScores.businessQuality.score, 71);
+  assert.equal(shape.committeeScores.marketTiming.score, null);
+  assert.equal(shape.committeeScores.positionFit.score, null);
   assert.equal(businessAxis.score, 70);
   assert.match(businessAxis.axisStatusText, /2\/3명 반영 · 1명 고민중/);
   assert.deepEqual(businessAxis.members.map((member) => member.status), ['success', 'success', 'pending']);

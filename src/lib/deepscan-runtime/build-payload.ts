@@ -1621,7 +1621,7 @@ function buildAxes(agentResults: DeepScanAgentResult[], exchangeProduct = false)
   })
 }
 
-function buildHeroScore(agentResults: DeepScanAgentResult[]) {
+export function buildHeroScore(agentResults: DeepScanAgentResult[]) {
   const weights: Record<DeepScanAgentResult['key'], number> = {
     valuation: 14,
     growth: 12,
@@ -1634,8 +1634,16 @@ function buildHeroScore(agentResults: DeepScanAgentResult[]) {
     'portfolio-fit': 12,
   }
 
+  // 분모를 고정 100이 아니라 "실제 응답 위원의 가중치 합"으로 정규화한다
+  // (버그헌트 3/5 — buildHeroScore 고정 분모 100). 위원 일부 실패 시에도 점수가
+  // 미응답 위원 몫만큼 일괄 감소(계통 축소)하지 않게 한다. 9인 전원 응답 시에는
+  // 가중치 합이 100이라 기존 산식과 완전히 동일하다.
+  const respondedWeight = agentResults.reduce((sum, agent) => sum + (weights[agent.key] ?? 0), 0)
   const weightedTotal = agentResults.reduce((sum, agent) => sum + (weights[agent.key] * agent.score), 0)
-  return clamp(weightedTotal / 100)
+  if (respondedWeight <= 0) {
+    return 0
+  }
+  return clamp(weightedTotal / respondedWeight)
 }
 
 function buildUsInsights(

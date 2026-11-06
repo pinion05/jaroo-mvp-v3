@@ -16,8 +16,29 @@ import {
 import { buildKrCommitteeFromMemberScores } from './deepscan-kr-score.js';
 
 export const DEFAULT_KR_LLM_TIMEOUT_MS = 180_000;
-export const DEFAULT_KR_LLM_SOFT_DEADLINE_MS = 5_000;
+// 유저 딥스캔 위원회 소프트 데드라인 기본값.
+// 과거 기본 5s(TC-e2e-deepscan §6.1 결정론적 재현): 멤버 응답이 1.9~44s(p95 ~45s,
+// deepscan-failure-analysis.md)에 분포하는데 5s에 스냅샷을 확정해 5~8명의 위원 결과가
+// pending으로 폐기되고, 서로 다른 종목의 hero.score가 전부 같은 값으로 수렴하는
+// "부실한 분석"의 1순위 원인이 됐다. 멤버 p95의 2배 여유(90s)로 상향한다.
+// 워치 일일 배치는 committeeLlm=off로 위원회 LLM 자체를 스킵하므로 이 값의 영향을
+// 받지 않는다. 운영/실측 환경은 DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS(또는 공통
+// DEEPSCAN_LLM_SOFT_DEADLINE_MS)로 언제든 오버라이드할 수 있다.
+export const DEFAULT_KR_LLM_SOFT_DEADLINE_MS = 90_000;
 export const DEFAULT_KR_LLM_MODEL = DEFAULT_COMMITTEE_LLM_MODEL;
+
+/**
+ * 위원회 소프트 데드라인 결정 — 호출부 옵션 > KR 전용 env > 공통 env > 기본 90s.
+ * 유저 딥스캔 경로의 기본값 계약을 이 함수 하나로 고정해 회귀를 잡는다.
+ */
+export function resolveKrCommitteeSoftDeadlineMs(override) {
+  return parsePositiveInteger(
+    override
+      ?? process.env.DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS
+      ?? process.env.DEEPSCAN_LLM_SOFT_DEADLINE_MS,
+    DEFAULT_KR_LLM_SOFT_DEADLINE_MS,
+  );
+}
 
 const EVENT_SCANNER_MAX_STRUCTURED_CHARS = 12_000;
 const EVENT_SCANNER_MAX_TEXT_CHARS = 60_000;
@@ -1091,12 +1112,7 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
     };
   }
 
-  const softDeadlineMs = parsePositiveInteger(
-    options.softDeadlineMs
-      ?? process.env.DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS
-      ?? process.env.DEEPSCAN_LLM_SOFT_DEADLINE_MS,
-    DEFAULT_KR_LLM_SOFT_DEADLINE_MS,
-  );
+  const softDeadlineMs = resolveKrCommitteeSoftDeadlineMs(options.softDeadlineMs);
   const { results, errors, pending, status, completed } = await scoreCommitteeMembersProgressive({
     memberKeys,
     shared,
@@ -1278,10 +1294,20 @@ export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErro
 
   const hasMemberErrors = rolledAxes.some(({ axis }) => axis.hasErrors);
   const hasPendingMembers = rolledAxes.some(({ axis }) => axis.hasPending);
-  // 서브셋 실행은 미요청 위원이 0점 기본값으로 섞이므로 종합 점수를 계산하지 않는다.
-  const committeeScores = isSubsetRun || hasMemberErrors || hasPendingMembers
+  // 종합 점수 계산 조건:
+  // - 오류 위원이 있으면 계산하지 않는다(기존 '보류' 계약 유지 — 축 부제·FM-1 저하 안내).
+  // - 서브셋 실행(ETF 팀 등)은 미요청 위원이 섞이므로 계산하지 않는다.
+  // - pending(소프트 데드라인에 아직 고민 중)은 실패가 아니다 — 응답 완료 위원의
+  //   가중치로 정규화한 임시 종합 점수를 계산한다. 과거에는 여기서 null을 돌려보내
+  //   종목 무관 데이터 가용성 점수(실측 hero.score=36 수렴, TC-e2e-deepscan §9 관측 2)로
+  //   폴백돼 서로 다른 종목의 점수가 전부 같아지는 결함이 있었다. 축 표시(
+  //   averageCompletedScore)와 달리 종합 점수만 partial을 반영하지 않았던 것.
+  // - 응답 위원이 0명이면 계산하지 않는다(빈 객체로 위원회 점수를 덮어쓰면
+  //   결측(0)이 데이터 가용성 점수보다 나쁘다 — 이때는 기존 폴백 유지).
+  const respondedMemberScores = Object.fromEntries(Object.entries(llmResults).map(([key, value]) => [key, value.score]));
+  const committeeScores = isSubsetRun || hasMemberErrors || Object.keys(respondedMemberScores).length === 0
     ? null
-    : buildKrCommitteeFromMemberScores(Object.fromEntries(Object.entries(llmResults).map(([key, value]) => [key, value.score])));
+    : buildKrCommitteeFromMemberScores(respondedMemberScores);
   return {
     axes,
     committeeScores,

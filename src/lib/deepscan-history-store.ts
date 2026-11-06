@@ -9,6 +9,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { isCanonicalPayload } from '@/lib/deepscan-canonical'
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/supabase/config'
 import type { JarooDeepScanPayload } from '../../packages/contracts/src/deepscan'
 
 export const HISTORY_RETENTION_PER_USER = 30
@@ -29,8 +30,13 @@ export type DeepScanHistoryDetailRow = DeepScanHistoryListRow & {
 }
 
 function createHistoryServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  // 서버 표준 해석기(config.getSupabaseUrl)를 쓴다: SUPABASE_URL 런타임 값을
+  // NEXT_PUBLIC_SUPABASE_URL보다 우선한다. 과거 이곳에서
+  // process.env.NEXT_PUBLIC_SUPABASE_URL만 직접 읽어서, SUPABASE_URL만 정의된
+  // 배포(dev Railway·.env.local 관례)에서 클라이언트가 null로 죽었고 두 기록 API가
+  // 영구 503("기록을 불러오지 못했어요", TC-blackbox-data TC-BBD-015)로 떨어졌다.
+  const url = getSupabaseUrl()
+  const serviceKey = getSupabaseServiceRoleKey()
   if (!url || !serviceKey) return null
   return createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
 }

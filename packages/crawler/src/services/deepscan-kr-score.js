@@ -232,54 +232,43 @@ function buildSellNowAndSimulation({
 }
 
 export function buildKrCommitteeFromMemberScores(memberScores = {}) {
+  // 위원 일부만 응답한 partial 상황에서도 계통이 축소되지 않게 축 점수를
+  // "실제 응답 위원의 가중치 합"으로 정규화한다(TC-e2e-deepscan §9 관측 2 —
+  // 과거 미응답 위원이 0점으로 섞여 서로 다른 종목의 점수가 같은 값으로 수렴).
+  // 전원 응답 시 가중치 합은 1이므로 기존 가중합과 완전히 동일하다.
+  const hasResponded = (key) => Object.prototype.hasOwnProperty.call(memberScores, key)
+    && Number.isFinite(asFiniteNumber(memberScores[key]));
   const scoreOf = (key) => clamp(asFiniteNumber(memberScores[key]) ?? 0);
+  const axisScore = (entries) => {
+    const present = entries.filter(([key]) => hasResponded(key));
+    if (present.length === 0) return null;
+    const weightSum = present.reduce((sum, [, weight]) => sum + weight, 0);
+    const weighted = present.reduce((sum, [key, weight]) => sum + scoreOf(key) * weight, 0);
+    return clamp(round(weightSum > 0 ? weighted / weightSum : weighted / present.length));
+  };
 
-  const profitability = scoreOf('profitability');
-  const valuation = scoreOf('valuation');
-  const ownershipStability = scoreOf('ownershipStability');
-  const trend = scoreOf('trend');
-  const consensusMomentum = scoreOf('consensusMomentum');
-  const priceLocation = scoreOf('priceLocation');
-  const avgPriceGap = scoreOf('avgPriceGap');
-  const upsideBuffer = scoreOf('upsideBuffer');
-  const holdingCompleteness = scoreOf('holdingCompleteness');
-
-  const businessQualityScore = clamp(round(
-    profitability * KR_AXIS_WEIGHTS.businessQuality.profitability
-      + valuation * KR_AXIS_WEIGHTS.businessQuality.valuation
-      + ownershipStability * KR_AXIS_WEIGHTS.businessQuality.ownershipStability,
-  ));
-
-  const marketTimingScore = clamp(round(
-    trend * KR_AXIS_WEIGHTS.marketTiming.trend
-      + consensusMomentum * KR_AXIS_WEIGHTS.marketTiming.consensusMomentum
-      + priceLocation * KR_AXIS_WEIGHTS.marketTiming.priceLocation,
-  ));
-
-  const positionFitScore = clamp(round(
-    avgPriceGap * KR_AXIS_WEIGHTS.positionFit.avgPriceGap
-      + upsideBuffer * KR_AXIS_WEIGHTS.positionFit.upsideBuffer
-      + holdingCompleteness * KR_AXIS_WEIGHTS.positionFit.holdingCompleteness,
-  ));
+  const businessQualityScore = axisScore(Object.entries(KR_AXIS_WEIGHTS.businessQuality));
+  const marketTimingScore = axisScore(Object.entries(KR_AXIS_WEIGHTS.marketTiming));
+  const positionFitScore = axisScore(Object.entries(KR_AXIS_WEIGHTS.positionFit));
 
   return {
     businessQuality: {
       score: businessQualityScore,
-      profitability,
-      valuation,
-      ownershipStability,
+      profitability: scoreOf('profitability'),
+      valuation: scoreOf('valuation'),
+      ownershipStability: scoreOf('ownershipStability'),
     },
     marketTiming: {
       score: marketTimingScore,
-      trend,
-      consensusMomentum,
-      priceLocation,
+      trend: scoreOf('trend'),
+      consensusMomentum: scoreOf('consensusMomentum'),
+      priceLocation: scoreOf('priceLocation'),
     },
     positionFit: {
       score: positionFitScore,
-      avgPriceGap,
-      upsideBuffer,
-      holdingCompleteness,
+      avgPriceGap: scoreOf('avgPriceGap'),
+      upsideBuffer: scoreOf('upsideBuffer'),
+      holdingCompleteness: scoreOf('holdingCompleteness'),
     },
   };
 }
@@ -295,20 +284,30 @@ export function scoreDeepScanKrFromCommittee(evidence = {}, committee) {
   const shares = asFiniteNumber(holding.shares);
   const gapPct = getGapPct(currentPrice, averagePrice);
   const safeCommittee = asObject(committee);
-  const businessQualityScore = asFiniteNumber(asObject(safeCommittee.businessQuality)?.score) ?? 0;
-  const marketTimingScore = asFiniteNumber(asObject(safeCommittee.marketTiming)?.score) ?? 0;
-  const positionFitScore = asFiniteNumber(asObject(safeCommittee.positionFit)?.score) ?? 0;
+  const businessQualityScore = asFiniteNumber(asObject(safeCommittee.businessQuality)?.score);
+  const marketTimingScore = asFiniteNumber(asObject(safeCommittee.marketTiming)?.score);
+  const positionFitScore = asFiniteNumber(asObject(safeCommittee.positionFit)?.score);
 
-  const baseHeroScore = clamp(round(
-    businessQualityScore * KR_HERO_WEIGHTS.businessQuality
-      + marketTimingScore * KR_HERO_WEIGHTS.marketTiming
-      + positionFitScore * KR_HERO_WEIGHTS.positionFit,
-  ));
+  // 축 점수가 있는 것만의 가중치 합으로 정규화 — 위원 일부 미응답으로 한 축 전체가
+  // 비어 있어도 나머지 축 점수가 0으로 눌리는(계통 축소) 일이 없게 한다.
+  // 세 축이 모두 있으면 가중치 합이 1이라 기존 산식과 동일하다.
+  const presentAxes = [
+    { score: businessQualityScore, weight: KR_HERO_WEIGHTS.businessQuality },
+    { score: marketTimingScore, weight: KR_HERO_WEIGHTS.marketTiming },
+    { score: positionFitScore, weight: KR_HERO_WEIGHTS.positionFit },
+  ].filter((axis) => axis.score !== null);
+  const presentWeightSum = presentAxes.reduce((sum, axis) => sum + axis.weight, 0);
+  const baseHeroScore = presentAxes.length === 0
+    ? 0
+    : clamp(round(
+      presentAxes.reduce((sum, axis) => sum + axis.score * axis.weight, 0) / presentWeightSum,
+    ));
   const { penalties, penaltyPoints } = getHeroPenalties(currentPrice, reportSignals, disclosureAnalysis);
   const heroScore = clamp(baseHeroScore - penaltyPoints);
   const { sellNow, portfolioSimulation } = buildSellNowAndSimulation({
     heroScore,
-    positionFitScore,
+    // positionFit 축이 통째로 미응답(null)일 수 있으므로 시뮬레이션 입력은 보수적 0으로.
+    positionFitScore: positionFitScore ?? 0,
     currentPrice,
     averagePrice,
     shares,
