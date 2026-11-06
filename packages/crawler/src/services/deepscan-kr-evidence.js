@@ -691,17 +691,54 @@ function resolveConsensusFieldStatus(value, hasSourcePage) {
   return hasSourcePage ? 'not_provided' : 'source_unavailable';
 }
 
+// 목표가 상식 가드(TC-e2e-deepscan §9 관측 3 — 목표가 이상치 대응).
+// 조사(2026-11-06): 삼성전자 472,381원은 네이버 컨센서스 API의 실제 응답
+// (targetPrice "472381.0", 당시 시세 약 20만원대의 2.34배)이며 KB금융 1.40배·
+// 셀트리온 1.34배·LG화학 1.50배와 같은 계열이다 — 중계 파싱·오버플로·단위 혼동은
+// 아니다. 다만 외부 데이터 오염(단위 혼동·잘못 종목 매핑 등)에 대한 방어가 전혀
+// 없어 100배급 이상치도 그대로 전략 목표가 텍스트로 흘러들어갔으므로
+// TC-blackbox-data TC-BBD-017의 상식 범위로 차단한다.
+//   - 절대 범위: 1,000원 이상 1억원 이하
+//   - 현재가 대비 배율: 0.1배 이상 20배 이하(현재가 확인 불가 시 절대 범위만 적용)
+const CONSENSUS_TARGET_PRICE_ABS_MIN = 1_000;
+const CONSENSUS_TARGET_PRICE_ABS_MAX = 100_000_000;
+const CONSENSUS_TARGET_PRICE_RATIO_MIN = 0.1;
+const CONSENSUS_TARGET_PRICE_RATIO_MAX = 20;
+
+function isPlausibleKrwTargetPrice(value, currentPrice) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return false;
+  }
+  if (value < CONSENSUS_TARGET_PRICE_ABS_MIN || value > CONSENSUS_TARGET_PRICE_ABS_MAX) {
+    return false;
+  }
+  if (typeof currentPrice === 'number' && Number.isFinite(currentPrice) && currentPrice > 0) {
+    const ratio = value / currentPrice;
+    if (ratio < CONSENSUS_TARGET_PRICE_RATIO_MIN || ratio > CONSENSUS_TARGET_PRICE_RATIO_MAX) {
+      return false;
+    }
+  }
+  return true;
+}
+
 function extractConsensusSnapshot(consensusPage, opinionPage, currentPrice, options = {}) {
   const hasSourcePage = options.hasConsensusPage === true || options.hasOpinionPage === true;
   const consensusRows = collectRows(consensusPage);
   const opinionConsensusRow = pickOpinionConsensusRow(opinionPage);
   const opinionRows = opinionConsensusRow ? [opinionConsensusRow] : [];
   const analystTargetStats = extractAnalystTargetStats(opinionPage);
-  const targetPrice = pickFirst(
+  const rawTargetPrice = pickFirst(
     readTargetPriceFromRow(opinionConsensusRow),
     normalizePositiveTargetPrice(findFirstKeyValue(consensusRows, [/목표주가/i, /목표가/i, /targetprice/i])),
     normalizePositiveTargetPrice(findNamedValue(consensusRows, [/목표주가/i, /목표가/i, /targetprice/i])),
   );
+  // 상식 범위 밖 목표가는 외부 데이터 오염으로 간주해 반영하지 않는다(가드 상단 주석).
+  const targetPrice = isPlausibleKrwTargetPrice(rawTargetPrice, currentPrice) ? rawTargetPrice : null;
+  if (rawTargetPrice !== null && targetPrice === null) {
+    console.warn(
+      `[deepscan-kr] consensus target price rejected by sanity guard value=${rawTargetPrice} currentPrice=${currentPrice ?? 'NA'}`,
+    );
+  }
   const previousTargetPrice = pickFirst(
     readPreviousTargetPriceFromRow(opinionConsensusRow),
     normalizeNumber(findFirstKeyValue(consensusRows, [/직전.*목표/i, /previous.*target/i])),
