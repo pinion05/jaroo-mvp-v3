@@ -10,6 +10,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { isCanonicalPayload } from '@/lib/deepscan-canonical'
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/supabase/config'
 import type { JarooDeepScanPayload } from '../../packages/contracts/src/deepscan'
 
 export type DeepScanSnapshotRow = {
@@ -20,8 +21,11 @@ export type DeepScanSnapshotRow = {
 }
 
 function createSnapshotServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  // 서버 표준 해석기 사용(자세한 배경은 deepscan-history-store 주석 참조):
+  // SUPABASE_URL 런타임 값을 우선해야 NEXT_PUBLIC_SUPABASE_URL만 정의 안 된 배포에서
+  // 스냅샷 캐시가 조용히 비활성화되지 않는다.
+  const url = getSupabaseUrl()
+  const serviceKey = getSupabaseServiceRoleKey()
   if (!url || !serviceKey) return null
   return createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
 }
