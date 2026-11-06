@@ -193,7 +193,8 @@ export default function LoginPage() {
       <SpecFrame backHref='/home'>
         <div className={styles.body}>
           <div className={styles.hero}>
-            <div className={styles.brand}>Jaroo</div>
+            {/* 페이지 대표 헤딩(TC-BBL-008) — 시안의 브랜드 타이포를 그대로 h1로 승격. */}
+            <h1 className={styles.brand}>Jaroo</h1>
             <div className={styles.heroSub}>
               MTS 스크린샷 한 장으로
               <br />
@@ -286,7 +287,7 @@ export default function LoginPage() {
     >
       <div className={styles.body}>
         <div className={cn(styles.hero, styles.heroSm)}>
-          <div className={cn(styles.brand, styles.brandSm)}>이메일로 시작</div>
+          <h1 className={cn(styles.brand, styles.brandSm)}>이메일로 시작</h1>
           <div className={cn(styles.heroSub, styles.heroSubSm)}>계정이 없으면 자동으로 만들어져요.</div>
         </div>
 

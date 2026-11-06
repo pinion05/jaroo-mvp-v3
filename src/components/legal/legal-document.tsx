@@ -22,6 +22,9 @@ export function LegalDocument({
   return (
     <SpecFrame backHref={backHref}>
       <div className={styles.doc}>
+        {/* 문서 대표 헤딩(TC-BBL-008) — 화면 타이틀 없이 시작하는 시안 구조를 유지하기 위해
+            시각적으로는 숨기고(title prop), 헤딩 계층(h1→h2 조문)만 노출한다. */}
+        <h1 className='sr-only'>{title}</h1>
         <div className={styles.meta}>{meta}</div>
         {sections.map((section) => (
           <section className={styles.section} key={section.heading}>

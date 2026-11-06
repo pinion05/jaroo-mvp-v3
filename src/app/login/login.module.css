@@ -21,7 +21,8 @@
   font-weight: 700;
   color: #0f1419;
   letter-spacing: -1px;
-  margin-bottom: 12px;
+  /* h1 승격(TC-BBL-008) — UA 기본 margin-top(0.67em)을 리셋해 시안 그대로 유지 */
+  margin: 0 0 12px;
 }
 .brandSm {
   font-size: 24px;
