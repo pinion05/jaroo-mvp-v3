@@ -1,4 +1,3 @@
-const JAROO_PRODUCTION_ORIGIN = 'https://jaroo.kr'
 const LOCAL_HOSTNAMES = new Set(['localhost', '127.0.0.1', '[::1]', '::1'])
 
 type OAuthCallbackOriginInput = {
@@ -35,10 +34,12 @@ export function resolveOAuthCallbackOrigin(input: OAuthCallbackOriginInput): str
     return normalizeOrigin(`${forwardedProto === 'http' ? 'http' : 'https'}://${forwardedHost}`)
   }
 
-  if (url.protocol === 'https:' && isLocalHostname(url.hostname)) {
-    return JAROO_PRODUCTION_ORIGIN
-  }
-
+  // 프록시 뒤 dev(예: https://localhost)도 운영 jaroo.kr로 "추정"해 넘기지 않고
+  // 요청 자기 origin으로 되돌린다. 과거 여기서 하드코딩된 운영 origin
+  // (https://jaroo.kr)으로 리다이렉트해 dev 로그인 세션이 운영 도메인으로 흘러들어가는
+  // 혼선이 있었다(TC-blackbox-data §6-2: dev에서 GET https://jaroo.kr/api/auth/me 관측,
+  // jaroo.kr/screenshot 이동). 미등록 redirect URI는 OAuth 공급자(Supabase/Google)가
+  // 거부하므로 자기 origin 유지가 안전하다.
   return url.origin
 }
 
