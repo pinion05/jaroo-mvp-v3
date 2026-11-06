@@ -140,6 +140,8 @@ const sections: LegalSection[] = [
 
 export const metadata = {
   title: '개인정보처리방침 | Jaroo',
+  // 자기 참조 canonical(TC-BBL-020) — metadataBase(루트 layout) 기준 절대 URL로 직렬화된다.
+  alternates: { canonical: '/privacy' },
 }
 
 export default function PrivacyPage() {
