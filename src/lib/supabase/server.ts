@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { cookies } from 'next/headers'
 import { assertSupabaseConfig } from './config'
+import { hardenSessionCookieOptions } from './session-cookie'
 
 export async function createSupabaseServerClient() {
   const { url, anonKey } = assertSupabaseConfig()
@@ -13,14 +14,10 @@ export async function createSupabaseServerClient() {
       },
       setAll(cookiesToSet) {
         try {
+          // 세션 쿠키 발급·갱신·삭제 속성의 단일 소스(session-cookie.ts)를 통과한다.
+          // httpOnly+Secure+SameSite=Lax, 만료 30일 슬라이딩(TC-BBS-001/002/003, 이슈 #224 E1).
           cookiesToSet.forEach(({ name, value, options }) =>
-            cookieStore.set(name, value, {
-              ...options,
-              // 세션 토큰의 JS 노출 차단(이슈 #224 E1). 서버 교환으로만 쓰이므로
-              // 브라우저 직접 읽기 경로는 더 이상 없다(프로필/재설정 서버 이전 완료).
-              httpOnly: true,
-              secure: process.env.NODE_ENV === 'production',
-            }),
+            cookieStore.set(name, value, hardenSessionCookieOptions(options ?? {})),
           )
         } catch (error) {
           // Server Components cannot set cookies. Route handlers and proxy can.

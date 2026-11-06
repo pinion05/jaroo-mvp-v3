@@ -175,3 +175,25 @@ node scripts/blackbox-session-security.cjs auth       # 인증 매트릭스만(0
 
 - 안전장치: 쿠키/토큰 값 마스킹 출력, 자기 탭만 생성/종료(브라우저 미종료), 순차 실행·최소 반복, 산출 마지막에 `SUMMARY_JSON {…}` 1행 출력(집계 파싱용)
 - 주의: 재로그인 자동화는 프로필의 구글 세션 상태에 의존 — 계정 선택기에 대상 계정(`BB_EMAIL`) 항목이 있을 때만 클릭하고, 비밀번호 입력 화면에서는 자동 중단(차단 보고)
+
+## 7. 후속 화이트박스 진단 — R1 세션 쿠키 노출의 실제 구조 (2026-11-06, fix/session-cookie-httponly)
+
+TC-BBS-001/002/003 관찰(쿠키 httpOnly=false·secure=false)과 AGENTS.md 기술("세션의 진실 소스는 `sb-<ref>-auth-token` 계열 httpOnly 쿠키")이 충돌해 소스를 직접 진단했다. 결론: **둘 다 절반씩 맞는 이중 발급 구조**였다.
+
+### 세션 쿠키 발급 경로 3곳 (수정 전)
+
+1. 서버 라우트(`/auth/callback`, `/auth/dev-set-session`, `/api/auth/login`·`logout`) — `src/lib/supabase/server.ts`가 이미 `httpOnly:true`(+prod `Secure`)로 발급. 초기 발급은 문서대로 httpOnly였다.
+2. **proxy(미들웨어, `src/lib/supabase/proxy.ts`)** — 액세스 토큰 만료(기본 1시간)마다 `auth.getUser()`가 토큰을 리프레시하고, 이때 `response.cookies.set`에 `@supabase/ssr` 0.12 기본 옵션(`httpOnly:false`, `maxAge:400일` ≈ 13개월)을 **그대로** 전달했다. 즉 로그인 직후에는 httpOnly였던 세션 쿠키가 첫 리프레시부터 JS-가독 쿠키로 덮어써졌고, 운영 관찰(httpOnly=false·secure=false·만료 ~13개월·SameSite=Lax)과 정확히 일치한다. R1의 근원.
+3. 브라우저 클라이언트(`createBrowserClient`) — OAuth 시작 시 PKCE code-verifier 쿠키만 `document.cookie`로 기록한다(세션 토큰 아님). 단 기본 플래그(`detectSessionInUrl`·`autoRefreshToken`)가 켜져 있어 조건부로 브라우저에서 세션 쿠키까지 재발급할 수 있는 여지가 있었다.
+
+### 수정 내용
+
+- 신규 `src/lib/supabase/session-cookie.ts`: 세션 쿠키 속성 단일 소스. `httpOnly:true` + `Secure`(prod) + `SameSite=Lax` + 만료 30일 슬라이딩 상한(R2 — @supabase/ssr가 400일로 강제하는 maxAge를 발급 시점에 절단, 활동 중 토큰 리프레시마다 갱신).
+- `server.ts`·`proxy.ts`: 발급·갱신·**삭제** 전부 이 헬퍼를 통과. 삭제(`maxAge=0`)에도 httpOnly를 유지한다 — RFC 6265bis상 httpOnly 쿠키는 httpOnly Set-Cookie로만 덮어쓸 수 있어, 폐기 플래그가 없으면 로그아웃이 조용히 실패한다.
+- `client.ts`: 브라우저 클라이언트의 `detectSessionInUrl`·`autoRefreshToken` 비활성 — 세션 발급·갱신은 전적으로 서버 경로로만.
+
+### 실측(로컬 스택 PORT=3011 + 모의 Supabase auth 서버, 운영 쓰기 없음)
+
+- `dev-set-session`·`/auth/callback`(PKCE 교환)·미들웨어 토큰 리프레시(보호 경로 통과)·로그아웃 폐기 — 전 경로의 Set-Cookie가 `HttpOnly; SameSite=lax; Max-Age=2592000` (prod에선 `Secure` 추가, dev http localhost는 예외).
+- headless Chrome(CDP): 세션 성립 후 `/home`에서 `document.cookie` = 빈 문자열, 쿠키 스토어에는 `httpOnly=true` 세션 쿠키 존재 — TC-BBS-002 관점 통과.
+- 계약 테스트: `src/lib/supabase/session-cookie.test.ts`(속성·직렬화 계약), `tests/tc-web-session-cookie-httponly.test.mjs`(발급 경로 소스 계약).
