@@ -1294,10 +1294,20 @@ export function buildKrCommitteeAxesFromLlmResults(evidence, llmResults, llmErro
 
   const hasMemberErrors = rolledAxes.some(({ axis }) => axis.hasErrors);
   const hasPendingMembers = rolledAxes.some(({ axis }) => axis.hasPending);
-  // 서브셋 실행은 미요청 위원이 0점 기본값으로 섞이므로 종합 점수를 계산하지 않는다.
-  const committeeScores = isSubsetRun || hasMemberErrors || hasPendingMembers
+  // 종합 점수 계산 조건:
+  // - 오류 위원이 있으면 계산하지 않는다(기존 '보류' 계약 유지 — 축 부제·FM-1 저하 안내).
+  // - 서브셋 실행(ETF 팀 등)은 미요청 위원이 섞이므로 계산하지 않는다.
+  // - pending(소프트 데드라인에 아직 고민 중)은 실패가 아니다 — 응답 완료 위원의
+  //   가중치로 정규화한 임시 종합 점수를 계산한다. 과거에는 여기서 null을 돌려보내
+  //   종목 무관 데이터 가용성 점수(실측 hero.score=36 수렴, TC-e2e-deepscan §9 관측 2)로
+  //   폴백돼 서로 다른 종목의 점수가 전부 같아지는 결함이 있었다. 축 표시(
+  //   averageCompletedScore)와 달리 종합 점수만 partial을 반영하지 않았던 것.
+  // - 응답 위원이 0명이면 계산하지 않는다(빈 객체로 위원회 점수를 덮어쓰면
+  //   결측(0)이 데이터 가용성 점수보다 나쁘다 — 이때는 기존 폴백 유지).
+  const respondedMemberScores = Object.fromEntries(Object.entries(llmResults).map(([key, value]) => [key, value.score]));
+  const committeeScores = isSubsetRun || hasMemberErrors || Object.keys(respondedMemberScores).length === 0
     ? null
-    : buildKrCommitteeFromMemberScores(Object.fromEntries(Object.entries(llmResults).map(([key, value]) => [key, value.score])));
+    : buildKrCommitteeFromMemberScores(respondedMemberScores);
   return {
     axes,
     committeeScores,
