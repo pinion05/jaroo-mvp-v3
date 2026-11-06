@@ -16,8 +16,29 @@ import {
 import { buildKrCommitteeFromMemberScores } from './deepscan-kr-score.js';
 
 export const DEFAULT_KR_LLM_TIMEOUT_MS = 180_000;
-export const DEFAULT_KR_LLM_SOFT_DEADLINE_MS = 5_000;
+// 유저 딥스캔 위원회 소프트 데드라인 기본값.
+// 과거 기본 5s(TC-e2e-deepscan §6.1 결정론적 재현): 멤버 응답이 1.9~44s(p95 ~45s,
+// deepscan-failure-analysis.md)에 분포하는데 5s에 스냅샷을 확정해 5~8명의 위원 결과가
+// pending으로 폐기되고, 서로 다른 종목의 hero.score가 전부 같은 값으로 수렴하는
+// "부실한 분석"의 1순위 원인이 됐다. 멤버 p95의 2배 여유(90s)로 상향한다.
+// 워치 일일 배치는 committeeLlm=off로 위원회 LLM 자체를 스킵하므로 이 값의 영향을
+// 받지 않는다. 운영/실측 환경은 DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS(또는 공통
+// DEEPSCAN_LLM_SOFT_DEADLINE_MS)로 언제든 오버라이드할 수 있다.
+export const DEFAULT_KR_LLM_SOFT_DEADLINE_MS = 90_000;
 export const DEFAULT_KR_LLM_MODEL = DEFAULT_COMMITTEE_LLM_MODEL;
+
+/**
+ * 위원회 소프트 데드라인 결정 — 호출부 옵션 > KR 전용 env > 공통 env > 기본 90s.
+ * 유저 딥스캔 경로의 기본값 계약을 이 함수 하나로 고정해 회귀를 잡는다.
+ */
+export function resolveKrCommitteeSoftDeadlineMs(override) {
+  return parsePositiveInteger(
+    override
+      ?? process.env.DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS
+      ?? process.env.DEEPSCAN_LLM_SOFT_DEADLINE_MS,
+    DEFAULT_KR_LLM_SOFT_DEADLINE_MS,
+  );
+}
 
 const EVENT_SCANNER_MAX_STRUCTURED_CHARS = 12_000;
 const EVENT_SCANNER_MAX_TEXT_CHARS = 60_000;
@@ -1091,12 +1112,7 @@ export async function scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence
     };
   }
 
-  const softDeadlineMs = parsePositiveInteger(
-    options.softDeadlineMs
-      ?? process.env.DEEPSCAN_KR_LLM_SOFT_DEADLINE_MS
-      ?? process.env.DEEPSCAN_LLM_SOFT_DEADLINE_MS,
-    DEFAULT_KR_LLM_SOFT_DEADLINE_MS,
-  );
+  const softDeadlineMs = resolveKrCommitteeSoftDeadlineMs(options.softDeadlineMs);
   const { results, errors, pending, status, completed } = await scoreCommitteeMembersProgressive({
     memberKeys,
     shared,
