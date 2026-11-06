@@ -14,7 +14,7 @@ import type { AddressInfo } from 'node:net'
 
 const ENV_KEYS = ['SUPABASE_URL', 'NEXT_PUBLIC_SUPABASE_URL', 'SUPABASE_SERVICE_ROLE_KEY'] as const
 
-type SavedEnv = Array<(typeof ENV_KEYS)[number], string | undefined>
+type SavedEnv = Array<[(typeof ENV_KEYS)[number], string | undefined]>
 
 function saveEnv(): SavedEnv {
   return ENV_KEYS.map((key) => [key, process.env[key]])
