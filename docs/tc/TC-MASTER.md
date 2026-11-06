@@ -153,9 +153,11 @@ node scripts/e2e-deepscan-journey.cjs  # 딥스캔 시딩 여정 + 실호출 1�
 | 이슈 | 상태 | PR |
 |---|---|---|
 | TC 스위트 원본 | ✅ PR 오픈 | #347 (test/tc-suite-v1) |
-| h1·canonical·404 표면·/login 재접근 (P1 4건) | ✅ 수정+검증 완료 | #348 (fix/ux-foundations) — 185/185+665/665 PASS |
-| 세션 쿠키 HttpOnly·Secure (P0) | 진행 중 | fix/session-cookie-httponly |
-| 딥스캔 소프트 데드라인·/mypage/history·dev혼선·hero.score·목표가 (P0 2+P1 3) | 진행 중 | fix/deepscan-quality |
+| h1·canonical·404 표면·/login 재접근 (P1 4건) | ✅ 수정+검증 완료 | #348 (fix/ux-foundations) |
+| 세션 쿠키 HttpOnly·Secure+30일 슬라이딩 (P0) | ✅ 수정+검증 완료 — 기존 #325(부분 패치)는 대체 종료 | #349 (fix/session-cookie-httponly) |
+| 딥스캔 소프트 데드라인 90s·/mypage/history 503 복구·dev혼선·hero.score 정규화·목표가 가드 (P0 2+P1 3) | ✅ 수정+검증 완료 — 목표가 이상치는 네이버 컨센서스 API 실제 데이터(코드 결함 아님, 상식 범위 가드 추가) | #350 (fix/deepscan-quality) |
 | www.jaroo.kr TLS 불일치 (P0) | **현상 유지 확정** (사용자 결정 2026-11-06) — Railway 플랜 커스텀 도메인 한도(서비스당 1개, jaroo.kr 사용 중). 대안 기록: www DNS 레코드 삭제(무료) 또는 플랜 업그레이드+301. jaroo.kr NS는 Railway 자체(9mwqd93x.up.railway.app), www는 apex CNAME | — (인프라) |
+
+**통합 검증 (integrate/p0p1-fixes 브랜치, 3-way 병합 충돌 0)**: 전체 스위트 **1,421 테스트 중 1,420 PASS + 의도적 FAIL 1**(tc-safe-json-edge 버그 증거) — 루트 mjs 189·web:ts 681·crawler 465·instrument-core 39·runtime-core 46/47. 병합 권장 순서: #347 → #348 → #349 → #350 (혹은 integrate/p0p1-fixes 참조).
 
 
