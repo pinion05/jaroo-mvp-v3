@@ -24,10 +24,11 @@
 
 ## 3. 발견된 버그 후보 (수정은 별도 승인 — 보고만)
 
-### BUG-CAND-001 — safe-json `Authorization: Bearer <토큰>` 마스킹 누수 🚨
+### BUG-CAND-001 — safe-json `Authorization: Bearer <토큰>` 마스킹 누수 ✅ 수정됨 (2026-11-06)
 - **위치**: `packages/deepscan-runtime-core/src/safe-json.js` `redactString`
 - **재현**: `safeJsonStringify({ k: 'Authorization: Bearer <token>' })` → 토큰이 마스킹 없이 생존
-- **원인 추정**: 치환 순서(QUERY→ASSIGNMENT→BEARER)상 `SENSITIVE_ASSIGNMENT_PATTERN`의 `authorization` 키워드가 `Authorization: ` 뒤 첫 토큰인 'Bearer'라는 단어를 값으로 소비 → 이후 `BEARER_PATTERN`이 적용 대상을 잃음. 가장 흔한 형태의 자격증명이 위원회 로그에 남을 수 있음(보안 flavor)
+- **원인**: 치환 순서(QUERY→ASSIGNMENT→BEARER)상 `SENSITIVE_ASSIGNMENT_PATTERN`의 `authorization` 키워드가 `Authorization: ` 뒤 첫 토큰인 'Bearer'라는 단어를 값으로 소비 → 이후 `BEARER_PATTERN`이 적용 대상을 잃음
+- **수정 (사용자 승인 2026-11-06, 기존 "FAIL 보존" 결정 대체)**: ① BEARER 치환을 ASSIGNMENT보다 먼저 적용 ② ASSIGNMENT 값에 `(?!Bearer\b)` lookahead 추가 — `Authorization: Bearer [REDACTED]` 형태로 스킴 표시 보존. 당시 FAIL 보존했던 증거 테스트(tc-safe-json-edge '[버그 후보]')가 실증 PASS로 전환, 전체 스위트 1,378/1,378 green
 - **처리**: 증거 테스트를 **FAIL 상태로 보존**(TC-CORE-029 `[버그 후보]`, `packages/deepscan-runtime-core/test/tc-safe-json-edge.test.ts`) — 사용자 확정(2026-11-05, FAIL 보존 방침). 수정 시 BEARER 치환을 ASSIGNMENT보다 먼저 적용하는 방안 검토
 - **부수 관찰(버그 아님, 문서화만)**: `JAROO_LLM_MOCK_LATENCY_MS=''` → `Number('')===0` 특성으로 무지연 0 고정
 
