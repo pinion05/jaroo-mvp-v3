@@ -260,6 +260,56 @@ test('fetchDeepScanCanonicalPayload는 안내 메시지 없는 비-canonical 응
   assert.equal(fetched, null)
 })
 
+// 유료 실행 계약(2026-11-09 실측 §5-A/B): 의도 없는 방문의 재열람은 cacheOnly로
+// 요청한다 — 서버는 스냅샷 미스 시 과금 파이프라인 대신 snapshot-miss(404)를 내린다.
+test('fetchDeepScanCanonicalPayload는 cacheOnly 조회에 cacheOnly=1을 붙인다', async () => {
+  const payload = createCanonicalPayload()
+  let calledUrl = ''
+
+  await fetchDeepScanCanonicalPayload(createTargetSession(), async (input) => {
+    calledUrl = String(input)
+    return new Response(JSON.stringify(payload), { status: 200 })
+  }, { cacheOnly: true })
+
+  assert.match(calledUrl, /&cacheOnly=1$/)
+})
+
+test('fetchDeepScanCanonicalPayload는 snapshot-miss(404)를 code가 담긴 ApiError로 전달한다', async () => {
+  let caught: unknown = null
+  try {
+    await fetchDeepScanCanonicalPayload(createTargetSession(), async () => new Response(JSON.stringify({
+      ok: false,
+      data: null,
+      count: 0,
+      error: {
+        code: 'snapshot-miss',
+        cost: 10,
+        message: '저장된 최신 딥스캔 결과가 없어요. 다시 분석하면 딥스캔 크레딧이 사용돼요.',
+      },
+    }), { status: 404 }), { cacheOnly: true })
+  } catch (error) {
+    caught = error
+  }
+
+  assert.ok(caught instanceof Error)
+  assert.equal((caught as { code?: string }).code, 'snapshot-miss')
+  assert.equal((caught as { status?: number }).status, 404)
+  assert.equal((caught as { creditCost?: number | null }).creditCost, 10)
+})
+
+test('fetchDeepScanCanonicalPayload는 명시적 refresh가 cacheOnly보다 우선한다', async () => {
+  const payload = createCanonicalPayload()
+  let calledUrl = ''
+
+  await fetchDeepScanCanonicalPayload(createTargetSession(), async (input) => {
+    calledUrl = String(input)
+    return new Response(JSON.stringify(payload), { status: 200 })
+  }, { refresh: true, cacheOnly: true })
+
+  assert.match(calledUrl, /&refresh=1$/)
+  assert.doesNotMatch(calledUrl, /cacheOnly/)
+})
+
 test('isDeepScanPayloadReady는 meta 모양만 맞춘 불완전 payload를 거부한다', () => {
   const malformedPayload = {
     input: {

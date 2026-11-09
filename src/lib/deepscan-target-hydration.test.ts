@@ -4,7 +4,7 @@ import assert from 'node:assert/strict'
 import { getDeepScanTargetKey, type DeepScanTargetInput } from './workflow-types'
 import {
   resolveDeepScanHydratedTarget,
-  shouldStartDeepScanRequestAfterHydration,
+  resolveDeepScanStartAfterHydration,
 } from './deepscan-target-hydration'
 
 const storedUsTarget: DeepScanTargetInput = {
@@ -81,19 +81,51 @@ test('US target hydration loads a missing FX rate once and then converges', asyn
 test('DeepScan request waits until hydration resolved the exact target key', () => {
   const targetKey = getDeepScanTargetKey(storedUsTarget)
 
-  assert.equal(shouldStartDeepScanRequestAfterHydration({
+  assert.equal(resolveDeepScanStartAfterHydration({
     shouldStartRequest: true,
     targetKey,
     hydratedTargetKey: null,
-  }), false)
-  assert.equal(shouldStartDeepScanRequestAfterHydration({
+    explicitRunIntent: true,
+  }), 'idle')
+  assert.equal(resolveDeepScanStartAfterHydration({
     shouldStartRequest: true,
     targetKey,
     hydratedTargetKey: 'different-target',
-  }), false)
-  assert.equal(shouldStartDeepScanRequestAfterHydration({
+    explicitRunIntent: true,
+  }), 'idle')
+  assert.equal(resolveDeepScanStartAfterHydration({
     shouldStartRequest: true,
     targetKey,
     hydratedTargetKey: targetKey,
-  }), true)
+    explicitRunIntent: true,
+  }), 'run-explicit')
+})
+
+// 유료 실행 계약(2026-11-09 운영 실측 §5-A/B): 페이지 방문(하이드레이션 타깃
+// 복원)만으로 유료 파이프라인이 발사되지 않아야 한다. 명시적 실행 의도가 없는
+// 방문은 읽기 전용(run-readonly) 조회로만 저장된 결과를 열 수 있다.
+test('DeepScan 재방문(명시적 의도 없음)은 자동 유료 실행이 아니라 읽기 전용 조회가 된다', () => {
+  const targetKey = getDeepScanTargetKey(storedUsTarget)
+
+  // §5-B 재현 조건 — 타깃 복원은 완료됐지만 사용자 클릭 표식이 없는 방문
+  assert.equal(resolveDeepScanStartAfterHydration({
+    shouldStartRequest: true,
+    targetKey,
+    hydratedTargetKey: targetKey,
+    explicitRunIntent: false,
+  }), 'run-readonly')
+
+  // 보여줄 payload가 이미 있으면 아무 요청도 시작하지 않는다
+  assert.equal(resolveDeepScanStartAfterHydration({
+    shouldStartRequest: false,
+    targetKey,
+    hydratedTargetKey: targetKey,
+    explicitRunIntent: false,
+  }), 'idle')
+  assert.equal(resolveDeepScanStartAfterHydration({
+    shouldStartRequest: false,
+    targetKey,
+    hydratedTargetKey: targetKey,
+    explicitRunIntent: true,
+  }), 'idle')
 })

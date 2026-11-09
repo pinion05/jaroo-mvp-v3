@@ -325,12 +325,15 @@ export class DeepScanApiError extends Error {
 export async function fetchDeepScanCanonicalPayload(
   targetSession: DeepScanCanonicalTargetSession,
   fetcher: typeof fetch = fetch,
-  options?: { refresh?: boolean },
+  options?: { refresh?: boolean; cacheOnly?: boolean },
 ) {
   const query = buildDeepScanCanonicalQuery(targetSession).toString()
   // refresh=1 — 스냅샷 캐시를 무시하고 새로 분석한다(과금 발생)
   const suffix = options?.refresh ? '&refresh=1' : ''
-  const response = await fetcher(`/api/deepscan?${query}${suffix}`, { cache: 'no-store' })
+  // cacheOnly=1 — 읽기 전용 재열람. 스냅샷 히트만 내려오고, 미스면 서버가
+  // 과금 파이프라인 대신 snapshot-miss(404)로 응답한다(유료 실행 계약 §5-A/B).
+  const cacheOnlySuffix = options?.cacheOnly && !options?.refresh ? '&cacheOnly=1' : ''
+  const response = await fetcher(`/api/deepscan?${query}${suffix}${cacheOnlySuffix}`, { cache: 'no-store' })
   const payload = await response.json()
 
   if (!response.ok && payload && typeof payload === 'object' && 'error' in payload) {

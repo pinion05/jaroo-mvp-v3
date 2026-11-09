@@ -6,24 +6,56 @@ import { useRouter } from 'next/navigation'
 import { ChevronRight, Loader2, LogIn, ScanSearch } from 'lucide-react'
 import { SpecFrame } from '@/components/spec/spec-frame'
 import { buildDeepScanTargetInputFromHistoryTargetInput } from '@/lib/deepscan-history-restore'
+import { isCanonicalPayload } from '@/lib/deepscan-canonical'
+import { clearDeepScanRunIntent } from '@/lib/deepscan-run-intent'
+import { buildSnapshotCacheAnnotatedPayload } from '@/lib/deepscan-snapshot-policy'
 import {
   etfMarketLabel,
   mergeAnalysisHistory,
   type AnalysisHistoryRow,
 } from '@/lib/analysis-history'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
+import type { JarooDeepScanPayload } from '../../../../packages/contracts/src/deepscan'
 import styles from '../detail.module.css'
 
 // 마이페이지 > 분석 기록 — 딥스캔(deepscan_scan_history)과 ETF(etf_scan_history)
-// 두 원장을 시간순 한 타임라인으로 나열한다. 딥스캔 행은 당시 타깃(target_input)을
-// 복원해 딥스캔으로 이동하고(종목당 최신 스냅샷 캐시 히트 — 재열람 무료·즉시, A안),
-// ETF 행은 /etf?code= 로 재진입한다(공개 시세성 데이터라 매번 실시간 재수집).
+// 두 원장을 시간순 한 타임라인으로 나열한다. 딥스캔 행은 "다시 보기" 안내대로
+// 저장된 리포트(기록 단건 payload)를 무료로 열람한다(유료 실행 계약 §5-A —
+// 2026-11-09 실측에서 기록 탭이 유료 재실행을 유발한 결함의 수정). ETF 행은
+// /etf?code= 로 재진입한다(공개 시세성 데이터라 매번 실시간 재수집).
 
 type LoadState =
   | { phase: 'loading' }
   | { phase: 'guest' }
   | { phase: 'error' }
   | { phase: 'ready'; rows: AnalysisHistoryRow[] }
+
+/** 기록 단건에 저장된 리포트 — 열람(무료)에 필요한 최소 필드만 정규화한다. */
+type SavedDeepScanRowDetail = {
+  payload: JarooDeepScanPayload
+  scannedAt: string
+  chargedCredits: number
+}
+
+/** 기록 단건 조회(/api/deepscan/history/[id]) — 저장된 payload를 되살린다. 실패는 null. */
+async function fetchSavedDeepScanRowDetail(id: string): Promise<SavedDeepScanRowDetail | null> {
+  try {
+    const response = await fetch(`/api/deepscan/history/${encodeURIComponent(id)}`, { cache: 'no-store' })
+    if (!response.ok) return null
+    const body = (await response.json().catch(() => null)) as {
+      row?: { payload?: unknown; scannedAt?: unknown; chargedCredits?: unknown }
+    } | null
+    const payload = body?.row?.payload
+    if (!isCanonicalPayload(payload)) return null
+    return {
+      payload,
+      scannedAt: typeof body?.row?.scannedAt === 'string' ? body.row.scannedAt : '',
+      chargedCredits: Number.isFinite(Number(body?.row?.chargedCredits)) ? Number(body?.row?.chargedCredits) : 0,
+    }
+  } catch {
+    return null
+  }
+}
 
 function formatHistoryDate(iso: string): string {
   const date = new Date(iso)
@@ -63,8 +95,10 @@ async function fetchAnalysisHistoryRows(): Promise<
 
 export default function HistoryPage() {
   const [state, setState] = useState<LoadState>({ phase: 'loading' })
+  const [openingRowKey, setOpeningRowKey] = useState<string | null>(null)
   const router = useRouter()
   const setDeepScanTarget = useDeepScanStore((store) => store.setTarget)
+  const finishSuccess = useDeepScanStore((store) => store.finishSuccess)
 
   useEffect(() => {
     let active = true
@@ -79,17 +113,44 @@ export default function HistoryPage() {
     }
   }, [])
 
-  // 딥스캔 행: 당시 타깃 복원 → 딥스캔 진입(복원 불가 행은 스캔 폼으로).
+  // 딥스캔 행: 저장된 리포트 열람(무료) — 기록 단건 API의 payload를 스토어에 심어
+  // /deepscan가 재실행 없이 그대로 렌더하게 한다(유료 실행 계약 §5-A). 단건 조회
+  // 실패 시에도 타깃만 복원해 이동한다 — /deepscan는 읽기 전용 조회(cacheOnly)로
+  // 스냅샷이 있으면 무료 열람, 없으면 확인 절차 뒤 재실행을 유도한다.
   // ETF 행: 코드로 재진입 — 매번 실시간 재수집이므로 별도 복원 없이 ?code= 로 충분하다.
-  const openRow = (row: AnalysisHistoryRow) => {
+  const openRow = async (row: AnalysisHistoryRow) => {
+    if (openingRowKey) {
+      return
+    }
     if (row.kind === 'etf' && row.etfCode) {
       router.push(`/etf?code=${encodeURIComponent(row.etfCode)}`)
       return
     }
+    // 기록 열람은 '명시적 유료 실행'이 아니다 — 남아있던 실행 표식을 소거해
+    // /deepscan 도착 시 자동 유료 실행이 발사되지 않게 한다(§5-B).
+    clearDeepScanRunIntent()
     const target = buildDeepScanTargetInputFromHistoryTargetInput(row.targetInput)
-    if (target) {
-      setDeepScanTarget(target)
+    if (!target) {
+      router.push('/deepscan')
+      return
     }
+
+    const rowKey = `${row.kind}:${row.id}`
+    setOpeningRowKey(rowKey)
+    const detail = await fetchSavedDeepScanRowDetail(row.id)
+    setDeepScanTarget(target)
+    if (detail) {
+      // 스냅샷 캐시 표식을 얹어 출처 바("N 전에 분석한 결과를 그대로 보여드려요")와
+      // 명시적 "다시 분석하기"(확인 절차 → 유료) 진입점이 함께 노출되게 한다.
+      finishSuccess(
+        buildSnapshotCacheAnnotatedPayload(detail.payload, {
+          scannedAt: detail.scannedAt,
+          chargedCredits: detail.chargedCredits,
+        }),
+        detail.scannedAt,
+      )
+    }
+    setOpeningRowKey(null)
     router.push('/deepscan')
   }
 
@@ -119,32 +180,43 @@ export default function HistoryPage() {
             <Link href='/screenshot' className={styles.saveBtn} style={{ textDecoration: 'none', display: 'inline-block' }}>스캔 시작하기</Link>
           </div>
         ) : (
-          state.rows.map((row) => (
-            <button
-              type='button'
-              key={`${row.kind}:${row.id}`}
-              className={`${styles.recItem} ${styles.recBtn}`}
-              onClick={() => openRow(row)}
-              aria-label={`${row.stockName ?? row.targetKey} ${row.kind === 'etf' ? 'ETF 분석' : '딥스캔'} 다시 보기`}
-            >
-              <div className={styles.recTop}>
-                <span
-                  className={styles.recDot}
-                  style={{ background: row.kind === 'etf' ? '#2B6BE6' : '#97A0AE' }}
-                  aria-hidden
-                />
-                <span className={styles.recName}>{row.stockName ?? row.targetKey}</span>
-                <span className={styles.recDate}>{formatHistoryDate(row.scannedAt)}</span>
-              </div>
-              <div className={styles.recBody}>
-                <span className={styles.recLabel}>
-                  {row.kind === 'etf' ? `ETF · ${etfMarketLabel(row.market)}` : (row.market ?? '—')}
-                </span>
-                <span className={styles.recSummary}>탭하면 최신 분석으로 다시 열어요</span>
-                <span className={styles.recArrow}><ChevronRight className='size-4' aria-hidden /></span>
-              </div>
-            </button>
-          ))
+          state.rows.map((row) => {
+            const rowKey = `${row.kind}:${row.id}`
+            const opening = openingRowKey === rowKey
+            return (
+              <button
+                type='button'
+                key={rowKey}
+                className={`${styles.recItem} ${styles.recBtn}`}
+                onClick={() => void openRow(row)}
+                disabled={openingRowKey !== null}
+                aria-label={`${row.stockName ?? row.targetKey} ${row.kind === 'etf' ? 'ETF 분석' : '딥스캔'} 다시 보기`}
+              >
+                <div className={styles.recTop}>
+                  <span
+                    className={styles.recDot}
+                    style={{ background: row.kind === 'etf' ? '#2B6BE6' : '#97A0AE' }}
+                    aria-hidden
+                  />
+                  <span className={styles.recName}>{row.stockName ?? row.targetKey}</span>
+                  <span className={styles.recDate}>{formatHistoryDate(row.scannedAt)}</span>
+                </div>
+                <div className={styles.recBody}>
+                  <span className={styles.recLabel}>
+                    {row.kind === 'etf' ? `ETF · ${etfMarketLabel(row.market)}` : (row.market ?? '—')}
+                  </span>
+                  <span className={styles.recSummary}>
+                    {opening ? '저장된 분석 결과를 불러오는 중…' : '탭하면 저장된 분석 결과를 열어요'}
+                  </span>
+                  <span className={styles.recArrow}>
+                    {opening
+                      ? <Loader2 className='size-4 animate-spin' aria-hidden />
+                      : <ChevronRight className='size-4' aria-hidden />}
+                  </span>
+                </div>
+              </button>
+            )
+          })
         )}
       </div>
     </SpecFrame>
