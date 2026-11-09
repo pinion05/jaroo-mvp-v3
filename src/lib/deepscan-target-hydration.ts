@@ -1,4 +1,5 @@
 import type { DeepScanTargetInput } from './workflow-types'
+import { getDeepScanTargetKey } from './workflow-types'
 
 type ResolveDeepScanHydratedTargetInput = {
   currentTarget: DeepScanTargetInput | null
@@ -93,6 +94,46 @@ export async function resolveDeepScanHydratedTarget({
   return {
     ...targetWithLiveContext,
     usdKrwRate,
+  }
+}
+
+export type DeepScanHydrationApplicationInput = {
+  currentTarget: DeepScanTargetInput | null
+  nextTarget: DeepScanTargetInput
+}
+
+export type DeepScanHydrationApplication = {
+  /** 스토어에 하이드레이션 타깃을 반영할 것인가(원샷 시드) */
+  apply: boolean
+  /** 시작 결정(startDecision) 잠금 해제에 쓸 타깃 키 */
+  hydratedTargetKey: string | null
+  /** 세션 거래정지 힌트를 현재 타깃에 적용해도 되는가(시드했거나 같은 종목일 때) */
+  sessionHaltHintEligible: boolean
+}
+
+/** 하이드레이션 반영 결정 — 순수 함수.
+ *
+ * 계약(TC-BBSC-007 웨지 회귀): 하이드레이션은 '스토어가 비어 있을 때 한 번'만
+ * 타깃을 시드한다(원샷). 이미 메모리 타깃이 있는 상태에서 같은 종목을 새 객체로
+ * 덮어쓰면 target 참조가 매 이펙트 주기마다 바뀌고, [target]을 deps로 걸고 있는
+ * 이펙트들(퀵시세·브리핑 스냅샷·정규 요청)이 무한 재실행(런 중 새로고침 시
+ * 30초 만에 렌더러 RSS 1.8→3.7GB·평가 불응)되며 페이지가 웨지된다. 세션 복원
+ * 값은 이미 시드된 값과 같으므로 다시 반영할 필요가 없다.
+ */
+export function resolveDeepScanHydrationApplication({
+  currentTarget,
+  nextTarget,
+}: DeepScanHydrationApplicationInput): DeepScanHydrationApplication {
+  const nextTargetKey = getDeepScanTargetKey(nextTarget)
+
+  if (!currentTarget) {
+    return { apply: true, hydratedTargetKey: nextTargetKey, sessionHaltHintEligible: true }
+  }
+
+  return {
+    apply: false,
+    hydratedTargetKey: getDeepScanTargetKey(currentTarget),
+    sessionHaltHintEligible: hasSameInstrument(currentTarget, nextTarget),
   }
 }
 

@@ -24,7 +24,7 @@ import { DEEPSCAN_CREDIT_COST } from '@/lib/payments/products'
 import { resolveDeepScanPageCacheState } from '@/lib/deepscan-page-projection'
 import { resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
 import { isDeepScanInlineResultsReady } from '@/lib/deepscan-loading-behavior'
-import { resolveDeepScanHydratedTarget, resolveDeepScanStartAfterHydration } from '@/lib/deepscan-target-hydration'
+import { resolveDeepScanHydratedTarget, resolveDeepScanHydrationApplication, resolveDeepScanStartAfterHydration } from '@/lib/deepscan-target-hydration'
 import { clearDeepScanRunIntent, readDeepScanRunIntent } from '@/lib/deepscan-run-intent'
 import { readAppliedHomePortfolio, resolveDeepScanTargetSession } from '@/lib/jaroo-home-data'
 import { buildProfitIntroMention } from '@/lib/deepscan-intro-mention'
@@ -135,15 +135,21 @@ export default function DeepScanPage() {
       })
 
       if (!cancelled) {
-        const nextTargetKey = getDeepScanTargetKey(nextTarget)
-        // 세션 복원값이 이미 자리 잡은 인메모리 타깃(기록 열람 시딩 등 더 최근의
-        // 명시적 액션)과 다른 종목이면 덮어쓰지 않는다 — 하이드레이션은 보조 경로다.
-        const shouldApplyHydratedTarget = !target || getDeepScanTargetKey(target) === nextTargetKey
+        // 하이드레이션은 원샷 시드다(TC-BBSC-007 웨지 회귀 계약 — 순수 판정은
+        // resolveDeepScanHydrationApplication). 이미 메모리 타깃이 있을 때 새
+        // 객체로 덮어쓰면 target 참조가 매 이펙트 주기마다 바뀌고, [target]을
+        // deps로 가진 이펙트(퀵시세·브리핑 스냅샷·정규 요청)가 무한 재실행되며
+        // 런 중 새로고침에서 페이지가 웨지(RSS 폭발)된다. 시드는 스토어가 비어
+        // 있을 때만, 그 이후의 명시적 타깃(홈 핸드오프·기록 열람)은 유지한다.
+        const { apply: shouldApplyHydratedTarget, hydratedTargetKey: nextHydratedTargetKey, sessionHaltHintEligible } = resolveDeepScanHydrationApplication({
+          currentTarget: target,
+          nextTarget,
+        })
         if (shouldApplyHydratedTarget) {
           setDeepScanTarget(nextTarget)
         }
-        setHaltHintTargetKey(sessionTarget && shouldApplyHydratedTarget && isHaltedHomeHolding(sessionTarget.holding) ? nextTargetKey : null)
-        setHydratedTargetKey(shouldApplyHydratedTarget ? nextTargetKey : target ? getDeepScanTargetKey(target) : null)
+        setHaltHintTargetKey(sessionHaltHintEligible && sessionTarget && isHaltedHomeHolding(sessionTarget.holding) ? nextHydratedTargetKey : null)
+        setHydratedTargetKey(nextHydratedTargetKey)
         setHydrationChecked(true)
       }
     }
@@ -545,8 +551,14 @@ export default function DeepScanPage() {
     }
   }, [loadingMarketSnapshot?.targetKey, target, targetKey])
 
+  // 정규 요청 이펙트의 게이트는 '거래정지(halted)' 불리언만 필요하다 — haltVerdict
+  // 객체 자체를 deps에 걸면 퀵시세 도착 등으로 판정 객체가 갱신될 때마다 진행 중
+  // 요청이 abort·재발사된다(TC-BBSC-007 스톰의 증폭 경로). 객체 정체성이 아니라
+  // 파생 불리언만 구독한다.
+  const canonicalRequestHalted = haltVerdict === 'halted'
+
   useEffect(() => {
-    if (!requestSeed || !targetKey || requestStatus !== 'loading' || haltVerdict === 'halted') {
+    if (!requestSeed || !targetKey || requestStatus !== 'loading' || canonicalRequestHalted) {
       return
     }
 
@@ -605,7 +617,7 @@ export default function DeepScanPage() {
         abandonInFlight()
       }
     }
-  }, [abandonInFlight, appendArrivedLoadingStageKeys, finishError, finishSuccess, haltVerdict, markDeepScanLoadingSuccess, refreshEpoch, requestSeed, requestStatus, targetKey])
+  }, [abandonInFlight, appendArrivedLoadingStageKeys, canonicalRequestHalted, finishError, finishSuccess, markDeepScanLoadingSuccess, refreshEpoch, requestSeed, requestStatus, targetKey])
 
   useEffect(() => {
     const llmCommittee = payload?.metadata.llmCommittee

@@ -458,14 +458,20 @@ export function DeepScanLoadingScreen({
           </section>
         ) : null}
 
-        <section ref={teamBridgeRef} className={cn(styles.teamBridgeCard, teamBridgeState ? styles.teamBridgeCardShow : styles.teamBridgeCardDone)} aria-label='세 팀 분석 전환 상태' aria-hidden={teamBridgeState ? undefined : true}>
-          <p className={styles.teamBridgeText}>시세는 다 봤어요. 이제 <b>세 팀이 더 깊이</b> 분석하는 중이에요.</p>
-          <div className={styles.teamBridgeProgress}>
-            <span className={styles.teamBridgeSpinner} aria-hidden='true' />
-            <span className={styles.teamBridgeStatus}>{teamBridgeState?.statusText ?? '세 팀이 의견을 정리하는 중…'}</span>
-            <span className={styles.teamBridgeTime}>{teamBridgeState?.remainingText ?? '0:00'}</span>
-          </div>
-        </section>
+        {/* 팀 브리지 카드는 진행 중에만 존재한다(TC-BBSC-005). 종결(ready)·브리지
+            종료 시점부터는 DOM에서 완전히 소거한다 — CSS 접힘(max-height/opacity)으로
+            가리는 구조는 "세 팀이 의견을 정리하는 중…" 라벨이 종결 후에도 DOM·페인트에
+            잔존하는 결함의 원인이었다. */}
+        {teamBridgeState ? (
+          <section ref={teamBridgeRef} className={cn(styles.teamBridgeCard, styles.teamBridgeCardShow)} aria-label='세 팀 분석 전환 상태'>
+            <p className={styles.teamBridgeText}>시세는 다 봤어요. 이제 <b>세 팀이 더 깊이</b> 분석하는 중이에요.</p>
+            <div className={styles.teamBridgeProgress}>
+              <span className={styles.teamBridgeSpinner} aria-hidden='true' />
+              <span className={styles.teamBridgeStatus}>{teamBridgeState.statusText}</span>
+              <span className={styles.teamBridgeTime}>{teamBridgeState.remainingText}</span>
+            </div>
+          </section>
+        ) : null}
 
         <section ref={narrativeStreamRef} className={styles.narrativeStream} aria-label='분석가 진행 메시지'>
           {sequentialNarrativeCards.map((card) => {
