@@ -16,6 +16,7 @@ import {
 } from '@/lib/deepscan-snapshot-policy'
 import { lookupDeepScanSnapshot, saveDeepScanSnapshot } from '@/lib/deepscan-snapshot-store'
 import { recordScanHistory } from '@/lib/deepscan-history-store'
+import { DEEPSCAN_CREDIT_COST } from '@/lib/payments/products'
 import type { JarooDeepScanPayload } from '../../../../packages/contracts/src/deepscan'
 
 export const runtime = 'nodejs'
@@ -109,16 +110,58 @@ export async function createDeepScanCanonicalResponse(
 export async function GET(request: NextRequest) {
   const searchParams = request.nextUrl.searchParams
 
-  // 스냅샷 캐시 — 기본 경로(재열람)는 최근 결과를 즉시 돌려준다(과금 0·대기 0).
-  // 갱신은 명시적 refresh=1(다시 분석) 요청만 허용한다.
-  // ⚠️ 과금 시스템(Toss) 설정 여부와 무관하게 가장 먼저 판정한다 —
-  //    미과금 환경(운영 체험 기간 등)에서 캐시가 죽는 결함(이슈: 캐시히트 안 됨)의 수정.
   const refreshRequested = searchParams.get('refresh') === '1'
+  // cacheOnly=1 — 읽기 전용 재열람(/deepscan 재방문·기록 열람). 유료 실행 계약
+  // (2026-11-09 실측 §5-A/B): 스냅샷 미스 시 과금 파이프라인·게이트로 절대
+  // 진입하지 않고 snapshot-miss(404)로 종결한다. 과금은 명시적 사용자 액션
+  // 요청(기본 진입 클릭·refresh=1 확인)에서만 일어난다.
+  const cacheOnlyRequested = searchParams.get('cacheOnly') === '1' && !refreshRequested
   const snapshotKey = resolveDeepScanSnapshotKey({
     code: searchParams.get('code'),
     ticker: searchParams.get('ticker'),
   })
   let sessionUserId: string | null = null
+
+  if (cacheOnlyRequested) {
+    try {
+      const supabase = await createSupabaseServerClient()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+      if (user && snapshotKey) {
+        const snapshot = await lookupDeepScanSnapshot(user.id, snapshotKey)
+        if (snapshot && isSnapshotFresh(snapshot.scannedAt)) {
+          return NextResponse.json(
+            buildSnapshotCacheAnnotatedPayload(snapshot.payload, {
+              scannedAt: snapshot.scannedAt,
+              chargedCredits: snapshot.chargedCredits,
+            }),
+          )
+        }
+      }
+    } catch (cacheOnlyError) {
+      // 읽기 전용 요청에서 조회가 죽어도 과금 경로로 넘어가서는 안 된다 — 미스로 응답한다.
+      console.error('[deepscan-snapshot] cacheOnly lookup failed — snapshot-miss로 응답', cacheOnlyError)
+    }
+    return NextResponse.json(
+      {
+        ok: false,
+        data: null,
+        count: 0,
+        error: {
+          code: 'snapshot-miss',
+          cost: DEEPSCAN_CREDIT_COST,
+          message: '저장된 최신 딥스캔 결과가 없어요. 다시 분석하면 딥스캔 크레딧이 사용돼요.',
+        },
+      },
+      { status: 404 },
+    )
+  }
+
+  // 스냅샷 캐시 — 기본 경로(재열람)는 최근 결과를 즉시 돌려준다(과금 0·대기 0).
+  // 갱신은 명시적 refresh=1(다시 분석) 요청만 허용한다.
+  // ⚠️ 과금 시스템(Toss) 설정 여부와 무관하게 가장 먼저 판정한다 —
+  //    미과금 환경(운영 체험 기간 등)에서 캐시가 죽는 결함(이슈: 캐시히트 안 됨)의 수정.
   if (!refreshRequested && snapshotKey) {
     try {
       const supabase = await createSupabaseServerClient()

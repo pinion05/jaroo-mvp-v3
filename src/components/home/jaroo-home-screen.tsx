@@ -41,6 +41,7 @@ import {
   type HomeHolding,
 } from '@/lib/jaroo-home-data'
 import { fetchPortfolio, shouldUsePortfolioSessionFallback, syncPortfolioToServer } from '@/lib/portfolio-sync'
+import { markDeepScanRunIntent } from '@/lib/deepscan-run-intent'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { AppBottomNav } from '@/components/app-bottom-nav'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
@@ -968,6 +969,12 @@ export function JarooHomeScreen() {
       evaluationAmount: item.evaluationAmount,
     })
     persistDeepScanTarget(holding)
+    // 명시적 유료 실행 클릭 표식(유료 실행 계약 §5-A/B) — 딥스캔 라우트로 향하는
+    // 클릭일 때만 남긴다. /deepscan는 이 표식이 신선한 방문만 자동 실행하고,
+    // 표식 없는 방문(재방문·기록 열람)은 읽기 전용 조회로 저장된 결과만 연다.
+    if (actionHref === '/deepscan') {
+      markDeepScanRunIntent()
+    }
     setDeepScanTarget({
       ...toDeepScanTargetInput(item),
       usdKrwRate: hasUsHomeHoldings ? usdKrwRate ?? undefined : undefined,
