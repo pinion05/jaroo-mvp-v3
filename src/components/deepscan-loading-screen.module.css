@@ -703,10 +703,6 @@
   transform: translateY(0);
 }
 
-.teamBridgeCardDone {
-  pointer-events: none;
-}
-
 .teamBridgeText {
   margin: 0 0 11px;
   color: var(--ds-ink);
