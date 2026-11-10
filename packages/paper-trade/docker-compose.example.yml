@@ -1,0 +1,24 @@
+# jaroo 크롤러(deepscan)와 같은 네트워크에 붙이는 예시.
+# jaroo-mvp-v3 의 compose 네트워크가 `jaroo_default` 라고 가정 — 실제 이름에 맞게 수정.
+services:
+  paper-trade:
+    build: .
+    container_name: jaroo-paper-trade
+    ports:
+      - "3041:3041"
+    environment:
+      QUOTE_PROVIDER: deepscan
+      # 크롤러 직접 경로 (같은 도커 네트워크일 때):
+      DEEPSCAN_QUOTES_URL: http://crawler:3040/api/source/krx-polygon-fmp/market/quotes/current
+      # 또는 jaroo 웹 프록시 경로:
+      # DEEPSCAN_QUOTES_URL: https://jaroo.kr/api/quotes/current
+      BROKER_FEE_BPS: "1.5"   # 수수료 0.015%
+      SELL_TAX_BPS: "15"      # 증권거래세 0.15% (매도)
+      QUOTE_TIMEOUT_MS: "8000"
+    volumes:
+      - ./data:/data
+    restart: unless-stopped
+# networks:
+#   default:
+#     name: jaroo_default
+#     external: true
