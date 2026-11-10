@@ -293,5 +293,5 @@ test('TC-DSF-008 위원 전원 실패는 results 0·errors N건과 _summary 로�
 test('TC-DSF-008b 위원회 기본 모델·동시성 기본값이 운영 관측값과 일치한다', () => {
   // 운영 로그: model=deepseek/deepseek-v4-flash, members=9 concurrency=9.
   // 모델 id가 바뀌면 운영 OpenRouter 호출 결과도 바뀌므로 의도치 않은 기본값 변경을 잠근다.
-  assert.equal(DEFAULT_COMMITTEE_LLM_MODEL, 'deepseek/deepseek-v4.1-flash-1017')
+  assert.equal(DEFAULT_COMMITTEE_LLM_MODEL, 'deepseek/deepseek-v4-flash')
 })
