@@ -11,7 +11,7 @@ import {
 import { safeJsonStringify, sanitizeForJson } from './safe-json.js'
 
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions'
-export const DEFAULT_COMMITTEE_LLM_MODEL = 'deepseek/deepseek-v4.1-flash-1017'
+export const DEFAULT_COMMITTEE_LLM_MODEL = 'deepseek/deepseek-v4-flash'
 const DEFAULT_LOG_DIR = join(/* turbopackIgnore: true */ process.cwd(), '.omx', 'context', 'committee-debug-logs')
 const EMPTY_RESPONSE_RETRY_DELAY_MS = 2000
 const DEFAULT_COMMITTEE_PROGRESS_TTL_MS = 300_000
