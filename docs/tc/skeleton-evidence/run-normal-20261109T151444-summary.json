@@ -1,0 +1,140 @@
+{
+  "runId": "run-normal-20261109T151444",
+  "meta": {
+    "kind": "run-normal"
+  },
+  "sampleCount": 129,
+  "spanMs": 64000,
+  "pathDistribution": {
+    "/home": 3,
+    "/deepscan": 126
+  },
+  "events": [
+    {
+      "event": "stock-ready",
+      "at": "2026-11-09T06:14:49.441Z"
+    },
+    {
+      "event": "deepscan-start-click",
+      "at": "2026-11-09T06:14:54.170Z"
+    },
+    {
+      "event": "terminal-detected",
+      "at": "2026-11-09T06:15:42.371Z"
+    },
+    {
+      "event": "run-end",
+      "at": "2026-11-09T06:15:59.086Z"
+    }
+  ],
+  "order": {
+    "announced": [
+      "가격 위치",
+      "핵심 근거",
+      "세 팀 판단(팀1→2→3 순차: 세 분석가가 차례로)"
+    ],
+    "observed": [
+      {
+        "name": "가격 위치(오늘 장 기준)",
+        "t": 1794204894252,
+        "i": 2
+      },
+      {
+        "name": "핵심 근거(시세 완료 안내)",
+        "t": 1794204894252,
+        "i": 2
+      },
+      {
+        "name": "팀1 시장·차트",
+        "t": 1794204920199,
+        "i": 54
+      },
+      {
+        "name": "팀2 심리·환경",
+        "t": 1794204941199,
+        "i": 96
+      },
+      {
+        "name": "팀3 가치·기본",
+        "t": 1794204941199,
+        "i": 96
+      }
+    ],
+    "inversion": null
+  },
+  "occupation": [
+    {
+      "section": "가격 위치",
+      "arrived": true,
+      "firstAtMs": 4657,
+      "preWindow": 2,
+      "preWindowSkeleton": 0,
+      "occupied": false
+    },
+    {
+      "section": "팀1",
+      "arrived": true,
+      "firstAtMs": 30604,
+      "preWindow": 6,
+      "preWindowSkeleton": 6,
+      "occupied": true
+    },
+    {
+      "section": "팀2",
+      "arrived": true,
+      "firstAtMs": 51603,
+      "preWindow": 6,
+      "preWindowSkeleton": 6,
+      "occupied": true
+    },
+    {
+      "section": "팀3",
+      "arrived": true,
+      "firstAtMs": 51603,
+      "preWindow": 6,
+      "preWindowSkeleton": 6,
+      "occupied": true
+    }
+  ],
+  "regressions": [],
+  "skeletonReturns": [
+    {
+      "startAt": 1794204941699,
+      "n": 32,
+      "endAt": null,
+      "durMs": null
+    }
+  ],
+  "stalls": [],
+  "teamReorders": [
+    {
+      "atMs": 51603,
+      "from": "t1#시장·차트 팀 ",
+      "to": "t1>t2>t3#시장·차트 팀 |심리·환경 팀 |가치·기본 팀 ",
+      "gapMs": 501
+    }
+  ],
+  "terminal": {
+    "detected": true,
+    "detectedAtMs": 51603,
+    "lastFlags": {
+      "waitTop": false,
+      "readyTop": true,
+      "arrivedTop": true,
+      "teamLoading": true,
+      "doneCnt": 4,
+      "footer": true,
+      "emptyState": false,
+      "marketDone": true,
+      "price": true
+    },
+    "lastUrl": "/deepscan",
+    "residual": {
+      "paintedSkeletonSamples": 33,
+      "domSkeletonSamples": 33,
+      "waitTopStillVisible": false,
+      "teamLoadingStillVisible": true,
+      "timerStillTicking": false
+    }
+  }
+}

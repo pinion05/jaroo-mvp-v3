@@ -1,0 +1,16 @@
+[16:04:25] auth: {"authScope":"authenticated","provider":
+[16:04:44] run: started
+[16:04:49] A0 run+5s: {"u": "/deepscan", "tmr": "00:04", "wait": true, "ready": false, "empty": false, "err": false, "teams": 0, "t1": false, "t2": false, "t3": false, "txt": "삼성전자 0
+[16:04:52] A1 left(home): u=/home err=False
+[16:05:22] A2 reenter +0: u=None wait=None ready=None empty=None err=None teams=None tmr=None
+[16:05:49] A2 reenter +1: u=None wait=None ready=None empty=None err=None teams=None tmr=None
+[16:06:16] A2 reenter +2: u=None wait=None ready=None empty=None err=None teams=None tmr=None
+[16:06:48] A2 reenter +3: u=None wait=None ready=None empty=None err=None teams=None tmr=None
+[16:07:19] A2 reenter +4: u=None wait=None ready=None empty=None err=None teams=None tmr=None
+[16:07:57] A2 reenter +5: u=None wait=None ready=None empty=None err=None teams=None tmr=None
+[16:08:24] A2 reenter +6: u=None wait=None ready=None empty=None err=None teams=None tmr=None
+[16:08:52] A2 reenter +7: u=None wait=None ready=None empty=None err=None teams=None tmr=None
+[16:09:20] A2 reenter +8: u=None wait=None ready=None empty=None err=None teams=None tmr=None
+[16:09:47] A2 reenter +9: u=None wait=None ready=None empty=None err=None teams=None tmr=None
+[16:10:14] A2 reenter +10: u=None wait=None ready=None empty=None err=None teams=None tmr=None
+[16:10:41] A2 reenter +11: u=None wait=None ready=None empty=None err=None teams=None tmr=None

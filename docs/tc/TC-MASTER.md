@@ -99,6 +99,7 @@ node scripts/e2e-deepscan-journey.cjs  # 딥스캔 시딩 여정 + 실호출 1�
 | 금융 데이터 표시 신뢰성 | [TC-blackbox-data.md](./TC-blackbox-data.md) | jaroo-dev(QA) + 로컬 빈 상태 + 보유 계정 수기 실측 | 28 TC: PASS 8 / FAIL 1 / WARN 4 / SKIP 15 (+수기 산술 검증 6/6 일치) |
 | 운영 딥스캔 종목 매트릭스 (전멸 후속) | [TC-blackbox-prod-deepscan.md](./TC-blackbox-prod-deepscan.md) | **운영 jaroo.kr 실계정 실측** (유료 4회+ETF 2회, -50cr) | TC-BBPD-001~009 — 전멸 재현 0건·점수 다양성 확보(31~70)·기록 503 재현 없음. HIGH 버그 A(기록탭 유료 재실행)·B(/deepscan 재방문 자동 재실행 과금) 신규 발견 |
 | 전멸 후속 로그 포렌식 | [deepscan-annihilation-followup.md](./deepscan-annihilation-followup.md) | Railway 운영 로그 (배포 96de67c4 전/후) | **softDeadlineMs=90000 운영 목격** (12:15:36 KST 유저 실행, 9/9 complete) — 유저 경로 수정 실증. 배치 3일+ 정상, 잔존 llm 오류 0건 |
+| 스켈레톤 안무 (로딩 코레오그래피) | [TC-blackbox-skeleton.md](./TC-blackbox-skeleton.md) | jaroo-dev 2런+교란·500ms DOM 타임라인 캡처 | 7 TC: PASS 4 / FAIL 2 / SKIP 1 — 대기·순서·타이밍·그리드 안정성 PASS. **[치명] 런 중 F5/재진입 시 페이지 웨지+RSS 30초 1.8→3.7GB 폭발(순수 CDP 2회 재현)**, 종결 후 "의견 정리 중" 라벨 잔존 |
 
 **2차 확장 (프로덕션 출시 대비, 2026-11-06)**: 세션·보안(쿠키 플래그·로그아웃 후 개인정보 캐시 노출·재로그인 사이클), 출시 체크리스트(성능 예산·WCAG 기본·결제 표시 계약·크로스 뷰포트·SEO), 금융 데이터 신뢰성(포트폴리오 산술 정합·시세 상식 범위·목표가 이상치·한국 색 규약).
 
