@@ -9,6 +9,15 @@ type DeepScanRecoveryForecastCardProps = {
   payload: JarooDeepScanPayload
 }
 
+// 기간별 확률 칩 표시 순서 — core RECOVERY_PROBABILITY_HORIZONS와 같은 5버킷. (#358)
+const HORIZON_CHIP_ORDER = [
+  { key: '3m', label: '3개월' },
+  { key: '6m', label: '6개월' },
+  { key: '1y', label: '1년' },
+  { key: '2y', label: '2년' },
+  { key: '3y', label: '3년' },
+] as const
+
 function parsePercent(value: string | null | undefined) {
   if (!value) return null
   const cleaned = value.replace(/[^0-9.-]/g, '')
@@ -166,11 +175,22 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
   const geometry = block.priceHistory && targetPrice !== null
     ? buildRecoveryChartGeometry({ priceHistory: block.priceHistory, samples: block.similarPatternSamples, targetPrice })
     : null
+  // 기간별(3개월/6개월/1년/2년/3년) 누적 복구확률 칩 — 실효 horizon 너머(null)는 표시하지 않는다. (#358)
+  type HorizonChip = { key: (typeof HORIZON_CHIP_ORDER)[number]['key']; label: string; value: number }
+  const horizonChips: HorizonChip[] = HORIZON_CHIP_ORDER
+    .map(({ key, label }): HorizonChip | { key: HorizonChip['key']; label: string; value: number | null } => ({
+      key,
+      label,
+      value: block.recoveryHorizonProbabilities?.[key] ?? null,
+    }))
+    .filter((chip): chip is HorizonChip => typeof chip.value === 'number')
   const facts: ReadonlyArray<readonly [string, string]> = [
     ['현재가', block.currentPriceText || '--'],
     ['평단가', block.targetPriceText || '--'],
     ['손실률', block.drawdownText || '--'],
-    ...(probabilityPct === null ? [['1년 내 도달 비율', block.recoveryProbabilityText || '--'] as const] : []),
+    ...(probabilityPct === null && horizonChips.length === 0
+      ? [['1년 내 도달 비율', block.recoveryProbabilityText || '--'] as const]
+      : []),
   ]
 
   return (
@@ -194,7 +214,23 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
           <div className='text-[10px] text-[#97A0AE]'>평단 도달 예상 기간</div>
           <div className='mt-1 text-[28px] font-black leading-none text-[#0F1419]'>{block.expectedRecoveryDaysText || '--'}</div>
         </div>
-        {probabilityPct !== null ? (
+        {horizonChips.length > 0 ? (
+          <div className='flex flex-wrap items-end gap-x-5 gap-y-3' role='list' aria-label='기간별 본전 회복 확률'>
+            {horizonChips.map((chip) => (
+              <div key={chip.key} className='min-w-[64px]' role='listitem'>
+                <div className='text-[10px] text-[#97A0AE]'>{chip.label} 내</div>
+                <div className='mt-1 text-[20px] font-black leading-none text-[#0F1419]'>{Math.max(chip.value, 0).toFixed(0)}%</div>
+                <div
+                  className='mt-1.5 h-1 overflow-hidden rounded-full bg-[#F1F3F6]'
+                  role='img'
+                  aria-label={`${chip.label} 내 회복 확률 ${chip.value.toFixed(1)}%`}
+                >
+                  <div className='h-full rounded-full bg-[#2B6BE6]' style={{ width: `${Math.min(100, Math.max(1.5, chip.value))}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : probabilityPct !== null ? (
           <div className='w-[136px]'>
             <div className='text-[10px] text-[#97A0AE]'>1년 내 도달 비율</div>
             <div className='mt-1 text-[22px] font-black leading-none text-[#0F1419]'>{Math.max(probabilityPct, 0).toFixed(1)}%</div>

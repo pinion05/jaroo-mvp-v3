@@ -132,3 +132,53 @@ test('DeepScanRecoveryForecastCard renders nothing for a profit position', () =>
   }))
   assert.equal(markup, '')
 })
+
+test('DeepScanRecoveryForecastCard renders horizon probability chips (3m/6m/1y/2y/3y) when available', () => {
+  // KR 3년 계열 — 실효 horizon 780거래일 → 5개 버킷 전부 표시. (#358)
+  const markup = renderToStaticMarkup(createElement(DeepScanRecoveryForecastCard, {
+    payload: payloadWithRecovery(baseRecoveryBlock({
+      recoveryProbabilityPct: 56.1,
+      recoveryHorizonProbabilities: { '3m': 34.2, '6m': 41.5, '1y': 56.1, '2y': 71.3, '3y': 78.4 },
+      recoveryProbabilityHeadlineText: '본전 회복 확률은 3개월 내 34%, 6개월 내 42%, 1년 내 56%, 2년 내 71%, 3년 내 78%입니다',
+      summaryText: '세 가지 계산을 종합하면 본전 회복 확률은 3개월 내 34%, 6개월 내 42%, 1년 내 56%, 2년 내 71%, 3년 내 78%입니다. 평균적으로는 약 74거래일에 본전에 도달해요.',
+    })),
+  }))
+  assert.match(markup, /기간별 본전 회복 확률/)
+  assert.match(markup, /3개월 내/)
+  assert.match(markup, /6개월 내/)
+  assert.match(markup, /1년 내/)
+  assert.match(markup, /2년 내/)
+  assert.match(markup, /3년 내/)
+  assert.match(markup, /34%/)
+  assert.match(markup, /78%/)
+  // 한 문장 헤드라인이 요약 문단에 그대로 노출된다.
+  assert.match(markup, /본전 회복 확률은 3개월 내 34%, 6개월 내 42%, 1년 내 56%, 2년 내 71%, 3년 내 78%입니다/)
+  // 칩 우선 — 레거시 단일 게이지("1년 내 도달 비율")는 미표시.
+  assert.doesNotMatch(markup, /1년 내 도달 비율/)
+})
+
+test('DeepScanRecoveryForecastCard renders partial horizon chips (US 1-year horizon) without 2y/3y', () => {
+  // US OHLC 계열 — 실효 horizon 252거래일 → 3m/6m/1y만. 2년/3년 칩은 렌더되지 않는다.
+  const markup = renderToStaticMarkup(createElement(DeepScanRecoveryForecastCard, {
+    payload: payloadWithRecovery(baseRecoveryBlock({
+      recoveryProbabilityPct: 55.2,
+      recoveryHorizonProbabilities: { '3m': 22.0, '6m': 38.4, '1y': 55.2, '2y': null, '3y': null },
+    })),
+  }))
+  assert.match(markup, /기간별 본전 회복 확률/)
+  assert.match(markup, /3개월 내/)
+  assert.match(markup, /1년 내/)
+  assert.doesNotMatch(markup, /2년 내/)
+  assert.doesNotMatch(markup, /3년 내/)
+  assert.doesNotMatch(markup, /1년 내 도달 비율/)
+})
+
+test('DeepScanRecoveryForecastCard falls back to the legacy single-year gauge for old payloads', () => {
+  // horizonProbabilities 없는 구형 저장 스냅샷 — 기존 1년 단일 게이지 유지.
+  const markup = renderToStaticMarkup(createElement(DeepScanRecoveryForecastCard, {
+    payload: payloadWithRecovery(baseRecoveryBlock({ recoveryProbabilityPct: 61.1 })),
+  }))
+  assert.match(markup, /1년 내 도달 비율/)
+  assert.match(markup, /61\.1%/)
+  assert.doesNotMatch(markup, /기간별 본전 회복 확률/)
+})

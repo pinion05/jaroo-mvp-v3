@@ -2,6 +2,9 @@ import assert from 'node:assert/strict'
 import test from 'node:test'
 
 import {
+  buildRecoveryProbabilityHeadline,
+  cumulativeHorizonProbabilities,
+  resolveRecoverySimulationHorizonDays,
   buildRecoveryForecastFromPriceSeries,
   calculateSimilarPatternRecovery,
   calculateRecoveryLogReturns,
@@ -505,4 +508,124 @@ test('buildRecoveryForecastFromPriceSeries infers current price from target draw
   assert.equal(forecast.consensus.expectedRecoveryDays, 2)
   assert.equal(forecast.modelDetails.gbm.medianRecoveryDays, 2)
   assert.equal(forecast.modelDetails.jumpDiffusion.medianRecoveryDays, 2)
+})
+
+// ── 기간별 누적 복구확률 (#358) ─────────────────────────────────────────────
+
+test('cumulativeHorizonProbabilities computes 3m/6m/1y/2y/3y buckets from recovery days', () => {
+  const recoveryDays = [10, 20, 63, 64, 126, 127, 252, 253, 504, 756]
+  const probabilities = cumulativeHorizonProbabilities(recoveryDays, 12, 1, 780)
+  // 12 경로 중 ≤63: 3, ≤126: 5, ≤252: 7, ≤504: 9, ≤756: 10
+  closeTo(probabilities['3m'], 25.0, 0.05)
+  closeTo(probabilities['6m'], 5 / 12 * 100, 0.05)
+  closeTo(probabilities['1y'], 7 / 12 * 100, 0.05)
+  closeTo(probabilities['2y'], 9 / 12 * 100, 0.05)
+  closeTo(probabilities['3y'], 10 / 12 * 100, 0.05)
+})
+
+test('cumulativeHorizonProbabilities nulls out buckets beyond the effective horizon', () => {
+  // 실효 horizon 252(1년) — 2y/3y는 계산 대상 밖이므로 null (1년치 확률과 중복 표시 방지)
+  const probabilities = cumulativeHorizonProbabilities([10, 100, 200, 252], 4, 1, 252)
+  assert.equal(probabilities['3m'], 25.0)
+  assert.equal(probabilities['6m'], 50.0)
+  assert.equal(probabilities['1y'], 100.0)
+  assert.equal(probabilities['2y'], null)
+  assert.equal(probabilities['3y'], null)
+})
+
+test('cumulativeHorizonProbabilities returns all-null buckets for empty/invalid input', () => {
+  const empty = cumulativeHorizonProbabilities([], 0, 1, 780)
+  for (const key of ['3m', '6m', '1y', '2y', '3y']) {
+    assert.equal(empty[key], null)
+  }
+})
+
+test('resolveRecoverySimulationHorizonDays follows series length — KR 3y vs US 1y', () => {
+  assert.equal(resolveRecoverySimulationHorizonDays(780), 780)
+  assert.equal(resolveRecoverySimulationHorizonDays(500), 780)
+  assert.equal(resolveRecoverySimulationHorizonDays(252), 252)
+  assert.equal(resolveRecoverySimulationHorizonDays(100), 252)
+})
+
+test('buildRecoveryProbabilityHeadline renders one-sentence breakdown and skips nulls', () => {
+  assert.equal(
+    buildRecoveryProbabilityHeadline({ '3m': 34.2, '6m': 51.8, '1y': 56.1, '2y': 71.3, '3y': 78.4 }),
+    '본전 회복 확률은 3개월 내 34%, 6개월 내 52%, 1년 내 56%, 2년 내 71%, 3년 내 78%입니다',
+  )
+  assert.equal(
+    buildRecoveryProbabilityHeadline({ '3m': null, '6m': 41.5, '1y': 56.1, '2y': null, '3y': null }),
+    '본전 회복 확률은 6개월 내 42%, 1년 내 56%입니다',
+  )
+  assert.equal(buildRecoveryProbabilityHeadline({}), null)
+  assert.equal(buildRecoveryProbabilityHeadline(null), null)
+})
+
+test('simulation models expose horizonProbabilities — 1y equals recoveryProbabilityPct, monotone', () => {
+  const gbm = simulateGbmRecovery(
+    { currentPrice: 80, targetPrice: 100, meanLogReturn: 0.0005, volatilityLogReturn: 0.02 },
+    { horizonDays: 780, pathCount: 3000, seed: 42 },
+  )
+  assert.equal(gbm.status, 'available')
+  // horizon 780(3년) — recoveryProbabilityPct는 '실효 horizon 내' 확률 → 3년 버킷과 일치(757~780일 경계 유실 감안)
+  closeTo(gbm.horizonProbabilities['3y'], gbm.recoveryProbabilityPct, 1.5)
+  assert.ok(gbm.horizonProbabilities['3m'] <= gbm.horizonProbabilities['6m'])
+  assert.ok(gbm.horizonProbabilities['6m'] <= gbm.horizonProbabilities['1y'])
+  assert.ok(gbm.horizonProbabilities['1y'] <= gbm.horizonProbabilities['2y'])
+  assert.ok(gbm.horizonProbabilities['2y'] <= gbm.horizonProbabilities['3y'])
+
+  // horizon 252(US 계열) — 2y/3y는 null
+  const oneYear = simulateGbmRecovery(
+    { currentPrice: 80, targetPrice: 100, meanLogReturn: 0.0005, volatilityLogReturn: 0.02 },
+    { horizonDays: 252, pathCount: 3000, seed: 42 },
+  )
+  assert.equal(oneYear.horizonProbabilities['1y'], oneYear.recoveryProbabilityPct)
+  assert.equal(oneYear.horizonProbabilities['2y'], null)
+  assert.equal(oneYear.horizonProbabilities['3y'], null)
+})
+
+test('similarPattern model exposes horizonProbabilities with sample-based buckets', () => {
+  const buildDatedSeries = (closes) => closes.map((close, index) => ({
+    date: new Date(Date.UTC(2024, 0, 2 + index)).toISOString().slice(0, 10),
+    close,
+  }))
+  const closes = []
+  // 샘플1: 100→80 하락(20% dd) 후 70거래일에 걸쳐 회복 (6개월 버킷)
+  closes.push(100); for (let i = 0; i < 5; i += 1) closes.push(80) // 간략화: 즉시 80
+  for (let i = 0; i < 70; i += 1) closes.push(80 * Math.pow(1.0035, i + 1))
+  // 스페이싱 후 샘플2: 100→80 하락 후 10거래일 만에 회복 (3개월 버킷)
+  const atRecovery1 = closes[closes.length - 1] // ≈102 → 100으로 리셋
+  closes.push(100); for (let i = 0; i < 5; i += 1) closes.push(80)
+  for (let i = 0; i < 10; i += 1) closes.push(80 * Math.pow(1.026, i + 1))
+  // 스페이싱 후 샘플3: 100→80 하락, 미회복 (null)
+  closes.push(100); for (let i = 0; i < 5; i += 1) closes.push(80)
+  for (let i = 0; i < 100; i += 1) closes.push(80 * Math.pow(0.999, i + 1))
+  void atRecovery1
+
+  const result = calculateSimilarPatternRecovery(
+    { primarySeries: buildDatedSeries(closes), currentPrice: 80, targetPrice: 100 },
+    { lookbackDays: 40, tolerancePct: 12, spacingDays: 5, minSampleSize: 1, horizonDays: 780 },
+  )
+  assert.ok(result.sampleCount >= 2)
+  assert.equal(result.horizonProbabilities['1y'], result.recoveryProbabilityPct)
+  assert.ok(result.horizonProbabilities['3m'] <= result.horizonProbabilities['6m'])
+  assert.ok(result.horizonProbabilities['6m'] <= result.horizonProbabilities['1y'])
+  assert.ok(result.horizonProbabilities['1y'] <= result.horizonProbabilities['3y'])
+})
+
+test('summarizeRecoveryForecast consensus carries per-horizon weighted average and headline', () => {
+  const modelResults = {
+    similarPattern: { medianRecoveryDays: 105, recoveryProbabilityPct: 55, horizonProbabilities: { '3m': 26, '6m': 40, '1y': 55, '2y': 70, '3y': 76 } },
+    gbm: { medianRecoveryDays: 100, recoveryProbabilityPct: 50, horizonProbabilities: { '3m': 20, '6m': 35, '1y': 50, '2y': 65, '3y': 70 } },
+    jumpDiffusion: { medianRecoveryDays: 110, recoveryProbabilityPct: 60, horizonProbabilities: { '3m': 30, '6m': 45, '1y': 60, '2y': 75, '3y': 80 } },
+  }
+  // 기본 가중치 similarPattern:40/gbm:30/jumpDiffusion:30
+  const summary = summarizeRecoveryForecast(modelResults)
+  assert.equal(summary.status, 'available')
+  closeTo(summary.consensus.horizonProbabilities['3m'], 25.4, 0.05)
+  closeTo(summary.consensus.horizonProbabilities['1y'], 55.0, 0.05)
+  closeTo(summary.consensus.horizonProbabilities['3y'], 75.4, 0.05)
+  assert.equal(
+    summary.consensus.probabilityHeadline,
+    '본전 회복 확률은 3개월 내 25%, 6개월 내 40%, 1년 내 55%, 2년 내 70%, 3년 내 75%입니다',
+  )
 })
