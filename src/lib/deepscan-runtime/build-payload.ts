@@ -102,7 +102,6 @@ import {
   parseNumberish,
   normalizeMoneyCurrency,
   normalizeUsdKrwRate,
-  inferAveragePriceCurrency,
   resolveCurrencyAwareAveragePrice,
 } from '../deepscan-average-price-currency'
 
@@ -111,7 +110,6 @@ export type {
   CurrencyAwareAveragePriceInput,
   CurrencyAwareAveragePriceResult,
 } from '../deepscan-average-price-currency'
-import type { MoneyCurrency } from '../deepscan-average-price-currency'
 
 type RuntimeDumpQuality = {
   availability?: string
@@ -175,8 +173,8 @@ function asFiniteNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-// inferAveragePriceCurrency·resolveCurrencyAwareAveragePrice 포함 평단가 통화 헬퍼는
-// deepscan-average-price-currency 모듈에서 import 해 사용한다(위 import 참고).
+// 평단가 통화 헬퍼(parseNumberish·normalize*·resolveCurrencyAwareAveragePrice)는
+// deepscan-average-price-currency 모듈에서 import 한다(파일 상단 참고).
 
 function readRuntimeDumpFact<T>(memberDump: unknown, factKey: string): RuntimeDumpFact<T> | null {
   const facts = asRecord(asRecord(memberDump)?.facts)
