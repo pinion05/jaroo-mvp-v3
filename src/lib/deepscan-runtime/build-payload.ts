@@ -96,26 +96,22 @@ type UsDeepScanFacts = {
   consensus?: ReturnType<typeof decodeUsConsensusObservation>
 }
 
-type MoneyCurrency = 'KRW' | 'USD'
+// 평단가 통화 정규화 헬퍼는 클라이언트(딥스캔 로딩 화면)와 공유한다(T4L-B2 회귀).
+// 순수 함수만 모듈로 분리했고, 아래 재수출로 기존 import 경로 호환을 유지한다.
+import {
+  parseNumberish,
+  normalizeMoneyCurrency,
+  normalizeUsdKrwRate,
+  inferAveragePriceCurrency,
+  resolveCurrencyAwareAveragePrice,
+} from '../deepscan-average-price-currency'
 
-export type CurrencyAwareAveragePriceInput = {
-  averagePrice?: string | number | null
-  averagePriceCurrency?: string | null
-  currentPrice?: number | null
-  currentPriceCurrency?: string | null
-  usdKrwRate?: number | null
-}
-
-export type CurrencyAwareAveragePriceResult = {
-  averagePrice: number | null
-  averagePriceCurrency: MoneyCurrency | null
-  currentPriceCurrency: MoneyCurrency
-  averagePriceInCurrentCurrency: number | null
-  requiresFx: boolean
-  usdKrwRate: number | null
-  converted: boolean
-  blockedReason: string | null
-}
+export { resolveCurrencyAwareAveragePrice } from '../deepscan-average-price-currency'
+export type {
+  CurrencyAwareAveragePriceInput,
+  CurrencyAwareAveragePriceResult,
+} from '../deepscan-average-price-currency'
+import type { MoneyCurrency } from '../deepscan-average-price-currency'
 
 type RuntimeDumpQuality = {
   availability?: string
@@ -179,162 +175,8 @@ function asFiniteNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function parseNumberish(value: unknown) {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value
-  }
-
-  if (typeof value !== 'string') {
-    return null
-  }
-
-  const normalized = value.trim().replace(/[−–—]/g, '-')
-  if (!normalized) {
-    return null
-  }
-
-  const cleaned = normalized.replaceAll(',', '').replace(/[₩$€¥£%원주]/g, '')
-  if (!cleaned || !/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(cleaned)) {
-    return null
-  }
-
-  const parsed = Number(cleaned)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-function normalizeMoneyCurrency(value: unknown): MoneyCurrency | null {
-  if (typeof value !== 'string') {
-    return null
-  }
-
-  const normalized = value.trim().toUpperCase()
-  if (normalized === 'KRW' || normalized.includes('원') || normalized.includes('₩')) {
-    return 'KRW'
-  }
-
-  if (normalized === 'USD' || normalized.includes('$') || normalized.includes('달러')) {
-    return 'USD'
-  }
-
-  return null
-}
-
-function normalizeUsdKrwRate(value: unknown) {
-  const parsed = parseNumberish(value)
-  return typeof parsed === 'number' && parsed > 0 ? parsed : null
-}
-
-function inferAveragePriceCurrency({
-  averagePrice,
-  averagePriceCurrency,
-  currentPrice,
-  currentPriceCurrency,
-  usdKrwRate,
-}: Required<Pick<CurrencyAwareAveragePriceResult, 'currentPriceCurrency'>> & {
-  averagePrice: number | null
-  averagePriceCurrency?: string | null
-  currentPrice?: number | null
-  usdKrwRate?: number | null
-}) {
-  const explicitCurrency = normalizeMoneyCurrency(averagePriceCurrency)
-  if (explicitCurrency) {
-    return explicitCurrency
-  }
-
-  if (averagePrice === null) {
-    return null
-  }
-
-  if (currentPriceCurrency === 'KRW') {
-    return 'KRW'
-  }
-
-  if (typeof currentPrice !== 'number' || !Number.isFinite(currentPrice) || currentPrice <= 0) {
-    return averagePrice > 10_000 ? 'KRW' : 'USD'
-  }
-
-  if (typeof usdKrwRate === 'number' && Number.isFinite(usdKrwRate) && usdKrwRate > 0) {
-    const krwComparablePrice = currentPrice * usdKrwRate
-    const usdDistance = Math.abs(averagePrice - currentPrice) / Math.max(Math.abs(currentPrice), 1)
-    const krwDistance = Math.abs(averagePrice - krwComparablePrice) / Math.max(Math.abs(krwComparablePrice), 1)
-    return krwDistance < usdDistance ? 'KRW' : 'USD'
-  }
-
-  return averagePrice > currentPrice * 20 ? 'KRW' : 'USD'
-}
-
-export function resolveCurrencyAwareAveragePrice({
-  averagePrice: rawAveragePrice,
-  averagePriceCurrency: rawAveragePriceCurrency,
-  currentPrice,
-  currentPriceCurrency: rawCurrentPriceCurrency,
-  usdKrwRate: rawUsdKrwRate,
-}: CurrencyAwareAveragePriceInput): CurrencyAwareAveragePriceResult {
-  const averagePrice = parseNumberish(rawAveragePrice)
-  const currentCurrency = normalizeMoneyCurrency(rawCurrentPriceCurrency) ?? 'USD'
-  const usdKrwRate = normalizeUsdKrwRate(rawUsdKrwRate)
-  const averagePriceCurrency = inferAveragePriceCurrency({
-    averagePrice,
-    averagePriceCurrency: rawAveragePriceCurrency,
-    currentPrice,
-    currentPriceCurrency: currentCurrency,
-    usdKrwRate,
-  })
-
-  if (averagePrice === null || averagePriceCurrency === null) {
-    return {
-      averagePrice,
-      averagePriceCurrency,
-      currentPriceCurrency: currentCurrency,
-      averagePriceInCurrentCurrency: null,
-      requiresFx: false,
-      usdKrwRate,
-      converted: false,
-      blockedReason: 'average-price-missing',
-    }
-  }
-
-  if (averagePriceCurrency === currentCurrency) {
-    return {
-      averagePrice,
-      averagePriceCurrency,
-      currentPriceCurrency: currentCurrency,
-      averagePriceInCurrentCurrency: averagePrice,
-      requiresFx: false,
-      usdKrwRate,
-      converted: false,
-      blockedReason: null,
-    }
-  }
-
-  if (usdKrwRate === null) {
-    return {
-      averagePrice,
-      averagePriceCurrency,
-      currentPriceCurrency: currentCurrency,
-      averagePriceInCurrentCurrency: null,
-      requiresFx: true,
-      usdKrwRate,
-      converted: false,
-      blockedReason: 'usd-krw-rate-missing',
-    }
-  }
-
-  const convertedAveragePrice = averagePriceCurrency === 'KRW' && currentCurrency === 'USD'
-    ? averagePrice / usdKrwRate
-    : averagePrice * usdKrwRate
-
-  return {
-    averagePrice,
-    averagePriceCurrency,
-    currentPriceCurrency: currentCurrency,
-    averagePriceInCurrentCurrency: convertedAveragePrice,
-    requiresFx: true,
-    usdKrwRate,
-    converted: true,
-    blockedReason: null,
-  }
-}
+// inferAveragePriceCurrency·resolveCurrencyAwareAveragePrice 포함 평단가 통화 헬퍼는
+// deepscan-average-price-currency 모듈에서 import 해 사용한다(위 import 참고).
 
 function readRuntimeDumpFact<T>(memberDump: unknown, factKey: string): RuntimeDumpFact<T> | null {
   const facts = asRecord(asRecord(memberDump)?.facts)

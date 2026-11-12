@@ -9,6 +9,7 @@ import {
   shouldShowDeepScanSummarySkeleton,
 } from '@/lib/deepscan-loading-behavior'
 import { buildDeepScanReturnRateDisplay } from '@/lib/deepscan-loading-metrics'
+import { resolveDeepScanDisplayCurrencies } from '@/lib/deepscan-average-price-currency'
 import { cn } from '@/lib/utils'
 import styles from './deepscan-loading-screen.module.css'
 
@@ -90,9 +91,9 @@ export function DeepScanLoadingScreen({
   instrumentKind,
   shares,
   averagePrice,
-  averagePriceCurrency = 'KRW',
+  averagePriceCurrency: averagePriceCurrencyProp,
   currentPrice,
-  currentPriceCurrency = averagePriceCurrency,
+  currentPriceCurrency: currentPriceCurrencyProp,
   usdKrwRate,
   tradingVolume,
   currentProfitRate,
@@ -118,6 +119,21 @@ export function DeepScanLoadingScreen({
   headerNotice,
 }: DeepScanLoadingScreenProps) {
   const isError = Boolean(errorNotice)
+  // 평단/현재가 통화 결정(T4L-B2 회귀, 2026-11-12) — US 종목의 평단 통화는 DB에
+  // 없는 경우가 있다(원화평단-미국주 가능성 때문). 과거엔 여기서 'KRW' 기본값을
+  // 물려 "평단 228원 → 환산 $0.17 → +207,846.84%" 폭주가 발생했다. 서버
+  // 빌더와 같은 추론(resolveDeepScanDisplayCurrencies)으로 통일한다.
+  const { averagePriceCurrency, currentPriceCurrency } = useMemo(
+    () => resolveDeepScanDisplayCurrencies({
+      market,
+      averagePrice,
+      averagePriceCurrency: averagePriceCurrencyProp,
+      currentPrice,
+      currentPriceCurrency: currentPriceCurrencyProp,
+      usdKrwRate,
+    }),
+    [averagePrice, averagePriceCurrencyProp, currentPrice, currentPriceCurrencyProp, market, usdKrwRate],
+  )
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [teamsSettledAtSeconds, setTeamsSettledAtSeconds] = useState<number | null>(null)
   const [prevCommitteeCardsSettled, setPrevCommitteeCardsSettled] = useState(false)
