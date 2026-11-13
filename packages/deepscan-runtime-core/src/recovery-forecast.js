@@ -800,6 +800,9 @@ function modelResultFromDetail(detail) {
   return {
     medianRecoveryDays: detail.medianRecoveryDays,
     recoveryProbabilityPct: isFiniteNumber(detail.recoveryProbabilityPct) ? detail.recoveryProbabilityPct : null,
+    // 시뮬레이터·유사패턴이 계산한 기간별 누적확률을 컨센서스로 전달 — 누락 시
+    // consensus.horizonProbabilities가 항상 null이 되어 카드에 칩이 뜨지 않는다. (#358)
+    horizonProbabilities: isPlainObject(detail.horizonProbabilities) ? detail.horizonProbabilities : null,
     sampleSize: isFiniteNumber(detail.sampleCount) ? detail.sampleCount : null,
     note: detail.reason,
   }

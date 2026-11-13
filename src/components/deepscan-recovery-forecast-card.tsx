@@ -214,23 +214,7 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
           <div className='text-[10px] text-[#97A0AE]'>평단 도달 예상 기간</div>
           <div className='mt-1 text-[28px] font-black leading-none text-[#0F1419]'>{block.expectedRecoveryDaysText || '--'}</div>
         </div>
-        {horizonChips.length > 0 ? (
-          <div className='flex flex-wrap items-end gap-x-5 gap-y-3' role='list' aria-label='기간별 본전 회복 확률'>
-            {horizonChips.map((chip) => (
-              <div key={chip.key} className='min-w-[64px]' role='listitem'>
-                <div className='text-[10px] text-[#97A0AE]'>{chip.label} 내</div>
-                <div className='mt-1 text-[20px] font-black leading-none text-[#0F1419]'>{Math.max(chip.value, 0).toFixed(0)}%</div>
-                <div
-                  className='mt-1.5 h-1 overflow-hidden rounded-full bg-[#F1F3F6]'
-                  role='img'
-                  aria-label={`${chip.label} 내 회복 확률 ${chip.value.toFixed(1)}%`}
-                >
-                  <div className='h-full rounded-full bg-[#2B6BE6]' style={{ width: `${Math.min(100, Math.max(1.5, chip.value))}%` }} />
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : probabilityPct !== null ? (
+        {horizonChips.length === 0 && probabilityPct !== null ? (
           <div className='w-[136px]'>
             <div className='text-[10px] text-[#97A0AE]'>1년 내 도달 비율</div>
             <div className='mt-1 text-[22px] font-black leading-none text-[#0F1419]'>{Math.max(probabilityPct, 0).toFixed(1)}%</div>
@@ -244,7 +228,9 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
           </div>
         ) : null}
       </div>
-      <p className='border-t border-[#EFF1F4] px-4 py-3 text-[12px] leading-5 text-[#5A6473]'>{block.summaryText}</p>
+      {horizonChips.length === 0 ? (
+        <p className='border-t border-[#EFF1F4] px-4 py-3 text-[12px] leading-5 text-[#5A6473]'>{block.summaryText}</p>
+      ) : null}
 
       {geometry ? (
         <div className='border-t border-[#EFF1F4] px-4 py-4'>
@@ -306,7 +292,27 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
         ))}
       </div>
 
-      {block.modelRows.length > 0 ? (
+      {horizonChips.length > 0 ? (
+        <div className='border-t border-[#EFF1F4] px-4 py-4'>
+          <div className='flex flex-col gap-3' role='list' aria-label='기간별 본전 회복 확률'>
+            {horizonChips.map((chip) => (
+              <div key={chip.key} role='listitem'>
+                <div className='flex items-center justify-between'>
+                  <span className='text-[10px] text-[#97A0AE]'>{chip.label} 내</span>
+                  <span className='text-[10px] font-black leading-none text-[#0F1419]'>{Math.max(chip.value, 0).toFixed(0)}%</span>
+                </div>
+                <div
+                  className='mt-1 h-1 w-full overflow-hidden rounded-full bg-[#F1F3F6]'
+                  role='img'
+                  aria-label={`${chip.label} 내 회복 확률 ${chip.value.toFixed(1)}%`}
+                >
+                  <div className='h-full rounded-full bg-[#2B6BE6]' style={{ width: `${Math.min(100, Math.max(1.5, chip.value))}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : block.modelRows.length > 0 ? (
         <div className='border-t border-[#EFF1F4] px-4 py-4'>
           <div className='mb-3 text-[10px] text-[#97A0AE]'>모델별 도달 기간 · 비율</div>
           <div className='space-y-3'>

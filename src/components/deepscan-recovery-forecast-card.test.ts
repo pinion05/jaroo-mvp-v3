@@ -151,8 +151,14 @@ test('DeepScanRecoveryForecastCard renders horizon probability chips (3m/6m/1y/2
   assert.match(markup, /3년 내/)
   assert.match(markup, /34%/)
   assert.match(markup, /78%/)
-  // 한 문장 헤드라인이 요약 문단에 그대로 노출된다.
-  assert.match(markup, /본전 회복 확률은 3개월 내 34%, 6개월 내 42%, 1년 내 56%, 2년 내 71%, 3년 내 78%입니다/)
+  // v4 레이아웃: 기간별 항목은 세로(column) 스택으로 모델 로우 위치에 — 게이지가 좌우를 꽉 채운다.
+  assert.match(markup, /h-1 w-full/)
+  // v4: 요약 문단(헤드라인 문장 포함)은 기간별 칩이 있으면 렌더하지 않는다.
+  assert.doesNotMatch(markup, /본전 회복 확률은 3개월 내/)
+  assert.doesNotMatch(markup, /세 가지 계산을 종합하면/)
+  // v4: "모델별 도달 기간 · 비율" 섹션도 기간별 칩이 있으면 렌더하지 않는다.
+  assert.doesNotMatch(markup, /모델별 도달 기간/)
+  assert.doesNotMatch(markup, /유사 패턴/)
   // 칩 우선 — 레거시 단일 게이지("1년 내 도달 비율")는 미표시.
   assert.doesNotMatch(markup, /1년 내 도달 비율/)
 })
@@ -181,4 +187,7 @@ test('DeepScanRecoveryForecastCard falls back to the legacy single-year gauge fo
   assert.match(markup, /1년 내 도달 비율/)
   assert.match(markup, /61\.1%/)
   assert.doesNotMatch(markup, /기간별 본전 회복 확률/)
+  // 구형 스냅샷은 요약 문단·모델별 로우도 기존 그대로 유지한다.
+  assert.match(markup, /평단 ₩28,000 회복까지 약 74일로 추정돼요\./)
+  assert.match(markup, /모델별 도달 기간/)
 })

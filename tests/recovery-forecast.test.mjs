@@ -469,6 +469,43 @@ test('buildRecoveryForecastFromPriceSeries runs similar pattern, GBM, JD, and co
   assert.equal(forecast.parameters.status, 'available')
 })
 
+test('buildRecoveryForecastFromPriceSeries forwards horizon probabilities to consensus (modelResultFromDetail regression)', () => {
+  // 회귀 방어(#358 리뷰에서 발견): 시뮬레이터·유사패턴이 계산한 horizonProbabilities가
+  // modelResultFromDetail에서 버려져 컨센서스 horizonProbabilities가 항상 null이 되던 버그.
+  // 통합 경로(전체 파이프라인)로 검증한다 — 단위 테스트만으로는 이 낙하를 잡지 못했다.
+  const forecast = buildRecoveryForecastFromPriceSeries(
+    {
+      primarySeries: buildPriceSeriesFromReturns(Array.from({ length: 12 }, () => 0.05)),
+      currentPrice: 100,
+      targetPrice: 112,
+    },
+    {
+      simulation: {
+        horizonDays: 780,
+        pathCount: 60,
+        seed: 'horizon-forward-regression',
+      },
+    },
+  )
+
+  assert.ok(forecast.consensus, 'consensus must exist')
+  const horizonProbabilities = forecast.consensus.horizonProbabilities
+  assert.ok(horizonProbabilities, 'consensus.horizonProbabilities must not be null (was dropped by modelResultFromDetail)')
+  for (const key of ['3m', '6m', '1y', '2y', '3y']) {
+    assert.equal(typeof horizonProbabilities[key], 'number', `bucket ${key} must be a number`)
+  }
+  assert.ok(horizonProbabilities['3m'] <= horizonProbabilities['6m'], 'monotone 3m<=6m')
+  assert.ok(horizonProbabilities['6m'] <= horizonProbabilities['1y'], 'monotone 6m<=1y')
+  assert.ok(horizonProbabilities['1y'] <= horizonProbabilities['2y'], 'monotone 1y<=2y')
+  assert.ok(horizonProbabilities['2y'] <= horizonProbabilities['3y'], 'monotone 2y<=3y')
+  // 3y 버킷은 전체 horizon(780거래일) 누적확률 — 컨센서스 대표 확률과 일치해야 한다.
+  assert.ok(
+    Math.abs(horizonProbabilities['3y'] - forecast.consensus.recoveryProbabilityPct) <= 1.5,
+    `3y bucket ${horizonProbabilities['3y']} ~= consensus pct ${forecast.consensus.recoveryProbabilityPct}`,
+  )
+  assert.equal(typeof forecast.consensus.probabilityHeadline, 'string')
+})
+
 test('buildRecoveryForecastFromPriceSeries infers current price from target drawdown pct', () => {
   const forecast = buildRecoveryForecastFromPriceSeries(
     {
