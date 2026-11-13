@@ -140,6 +140,7 @@ export function DeepScanLoadingScreen({
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [teamsSettledAtSeconds, setTeamsSettledAtSeconds] = useState<number | null>(null)
   const [prevCommitteeCardsSettled, setPrevCommitteeCardsSettled] = useState(false)
+  const [appliedStoredTeamSeedVersion, setAppliedStoredTeamSeedVersion] = useState<string | null>(null)
   const [teamSummaries, setTeamSummaries] = useState<Partial<Record<LoadingStageKey, TeamSummaryState>>>({})
   const [expandedTeamSummaries, setExpandedTeamSummaries] = useState<ReadonlySet<LoadingStageKey>>(() => new Set())
   const teamSummaryFetchCoordinatorRef = useRef(createTeamSummaryFetchCoordinator())
@@ -327,28 +328,23 @@ export function DeepScanLoadingScreen({
   // 저장된 팀 요약 씨드(2026-11-13, 캐시 로드 LLM 비용 제로화): 스냅샷 payload에 저장된
   // 문장 중 요청(팀+inputKey)이 정확히 일치하는 것을 성공 상태로 심는다. 씨드된 요청은 아래
   // 발사 effect가 건너뛴다 — 재방문할 때마다 team-summary LLM이 3회씩 다시 도는 것을 막는 게이트.
-  const seededTeamSummaryRequestKeysRef = useRef<ReadonlySet<string>>(new Set())
-  useEffect(() => {
-    const seeds = pickSeededTeamSummaries(storedTeamSummaries, teamSummaryRequests)
-    const seedEntries = Object.entries(seeds)
-    if (!seedEntries.length) return
-
-    const requestKeyByTeamKey = new Map<string, string>(teamSummaryRequests.map((request) => [request.teamKey, request.requestKey] as const))
-    const nextSeeded = new Set(seededTeamSummaryRequestKeysRef.current)
-    for (const [teamKey] of seedEntries) {
-      const requestKey = requestKeyByTeamKey.get(teamKey)
-      if (requestKey) nextSeeded.add(requestKey)
-    }
-    seededTeamSummaryRequestKeysRef.current = nextSeeded
-
+  // 렌더 중 상태 조정(React 공식 패턴 — You Might Not Need an Effect, 위 settledAt 기록과
+  // 동일 방식): effect 내 동기 setState가 아니라 prop 버전 비교로 1회만 반영한다.
+  const storedTeamSummariesSeed = useMemo(
+    () => pickSeededTeamSummaries(storedTeamSummaries, teamSummaryRequests),
+    [storedTeamSummaries, teamSummaryRequests],
+  )
+  const storedTeamSummariesSeedVersion = `${Object.keys(storedTeamSummariesSeed).sort().join(',')}|${teamSummaryRequests.map((request) => request.requestKey).join(',')}`
+  if (appliedStoredTeamSeedVersion !== storedTeamSummariesSeedVersion) {
+    setAppliedStoredTeamSeedVersion(storedTeamSummariesSeedVersion)
     setTeamSummaries((previous) => {
       const merged = { ...previous }
-      for (const [teamKey, entry] of seedEntries) {
+      for (const [teamKey, entry] of Object.entries(storedTeamSummariesSeed)) {
         merged[teamKey as LoadingStageKey] = { inputKey: entry.inputKey, status: 'success', summary: entry.summary }
       }
       return merged
     })
-  }, [storedTeamSummaries, teamSummaryRequests])
+  }
 
   // 팀 요약 fetch: 스테이지가 갱신돼도 진행 중 요청을 취소하지 않는다. 이전 구현은 effect
   // 재실행 시 공유 AbortController로 진행 중 fetch를 abort했고, abort된 요청은 상태를
@@ -358,7 +354,10 @@ export function DeepScanLoadingScreen({
   useEffect(() => {
     const pendingRequests = teamSummaryFetchCoordinatorRef.current
       .claimPendingRequests(teamSummaryRequests)
-      .filter((request) => !seededTeamSummaryRequestKeysRef.current.has(request.requestKey))
+      .filter((request) => {
+        const stored = storedTeamSummaries?.[request.teamKey]
+        return !(stored && stored.inputKey === request.inputKey)
+      })
 
     pendingRequests.forEach((request) => {
       const { teamKey, inputKey, requestKey } = request
@@ -421,7 +420,7 @@ export function DeepScanLoadingScreen({
           }))
         })
     })
-  }, [exchangeProduct, market, persistTarget, teamSummaryRequests])
+  }, [exchangeProduct, market, persistTarget, storedTeamSummaries, teamSummaryRequests])
 
   return (
     <div className={cn(styles.loadingCard, className)}>

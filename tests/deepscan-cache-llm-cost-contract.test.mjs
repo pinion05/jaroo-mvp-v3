@@ -88,13 +88,14 @@ test('TC-BUG-1: [수정 반영] 팀 요약 발사는 저장 요약 씨드 게이
   // 씨드 effect: 저장된 문장 중 요청(팀+inputKey)이 일치하는 것을 성공 상태로 심는다
   assert.match(screen, /pickSeededTeamSummaries\(storedTeamSummaries, teamSummaryRequests\)/)
 
-  // 발사 effect: 씨드된 요청은 클레임 후 필터로 제외 — 재방문(캐시 로드)에서 LLM 0회
-  assert.match(screen, /\.filter\(\(request\) => !seededTeamSummaryRequestKeysRef\.current\.has\(request\.requestKey\)\)/)
+  // 발사 effect: 저장 문면이 요청 inputKey와 일치하면 클레임 후 필터로 제외 — 재방문 LLM 0회
+  assert.match(screen, /const stored = storedTeamSummaries\?\.\[request\.teamKey\]/)
+  assert.match(screen, /return !\(stored && stored\.inputKey === request\.inputKey\)/)
 
-  // 씨드 effect가 발사 effect보다 먼저 정의·실행된다(같은 커밋에서 씨드 마킹 후 발사 필터)
+  // 씨드 계산(useMemo)이 발사 effect보다 앞선다 — 렌더 중 상태 조정 패턴(effect 내 setState 금지 준수)
   const seedEffectAt = screen.indexOf('pickSeededTeamSummaries(storedTeamSummaries, teamSummaryRequests)')
   const fireEffectAt = screen.indexOf('claimPendingRequests(teamSummaryRequests)')
-  assert.ok(seedEffectAt > -1 && fireEffectAt > seedEffectAt, '씨드 effect가 발사 effect보다 앞서 정의되어야 한다')
+  assert.ok(seedEffectAt > -1 && fireEffectAt > seedEffectAt, '씨드 useMemo가 발사 effect보다 앞서 정의되어야 한다')
 
   // 런 중 받은 문장은 스냅샷/기록에 영속화된다(persist POST)
   assert.match(screen, /fetch\('\/api\/deepscan\/team-summaries-persist',/)
