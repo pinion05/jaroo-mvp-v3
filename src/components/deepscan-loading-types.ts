@@ -46,6 +46,10 @@ export type DeepScanLoadingScreenProps = {
   snapshotCacheHit?: boolean
   /** 캐시된 스냅샷의 원본 분석 시각(ISO) */
   snapshotScannedAt?: string
+  /** 저장된 팀 요약(스냅샷 payload.teamSummaries) — 요청(팀+inputKey)이 일치하면 씨드해 발사를 건너뛴다 */
+  storedTeamSummaries?: Record<string, { inputKey: string; summary: string }> | null
+  /** 팀 요약 영속화 대상 식별자 — 런 중 받은 문장을 스냅샷/기록에 저장하는 persist 엔드포인트용 */
+  persistTarget?: { code?: string | null; ticker?: string | null } | null
   className?: string
   onBack?: () => void
   backHref?: string

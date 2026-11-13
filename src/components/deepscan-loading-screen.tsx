@@ -71,6 +71,7 @@ import {
 
 import { resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
 import { createTeamSummaryFetchCoordinator } from '@/lib/deepscan-team-summary-fetch'
+import { pickSeededTeamSummaries } from '@/lib/deepscan-team-summary-store'
 
 import {
   BackControl,
@@ -109,6 +110,8 @@ export function DeepScanLoadingScreen({
   resultsReady = false,
   snapshotCacheHit = false,
   snapshotScannedAt,
+  storedTeamSummaries = null,
+  persistTarget = null,
   className,
   onBack,
   backHref = '/home',
@@ -321,13 +324,41 @@ export function DeepScanLoadingScreen({
       : undefined
   ), [isTeamBridgeVisible])
 
+  // 저장된 팀 요약 씨드(2026-11-13, 캐시 로드 LLM 비용 제로화): 스냅샷 payload에 저장된
+  // 문장 중 요청(팀+inputKey)이 정확히 일치하는 것을 성공 상태로 심는다. 씨드된 요청은 아래
+  // 발사 effect가 건너뛴다 — 재방문할 때마다 team-summary LLM이 3회씩 다시 도는 것을 막는 게이트.
+  const seededTeamSummaryRequestKeysRef = useRef<ReadonlySet<string>>(new Set())
+  useEffect(() => {
+    const seeds = pickSeededTeamSummaries(storedTeamSummaries, teamSummaryRequests)
+    const seedEntries = Object.entries(seeds)
+    if (!seedEntries.length) return
+
+    const requestKeyByTeamKey = new Map<string, string>(teamSummaryRequests.map((request) => [request.teamKey, request.requestKey] as const))
+    const nextSeeded = new Set(seededTeamSummaryRequestKeysRef.current)
+    for (const [teamKey] of seedEntries) {
+      const requestKey = requestKeyByTeamKey.get(teamKey)
+      if (requestKey) nextSeeded.add(requestKey)
+    }
+    seededTeamSummaryRequestKeysRef.current = nextSeeded
+
+    setTeamSummaries((previous) => {
+      const merged = { ...previous }
+      for (const [teamKey, entry] of seedEntries) {
+        merged[teamKey as LoadingStageKey] = { inputKey: entry.inputKey, status: 'success', summary: entry.summary }
+      }
+      return merged
+    })
+  }, [storedTeamSummaries, teamSummaryRequests])
+
   // 팀 요약 fetch: 스테이지가 갱신돼도 진행 중 요청을 취소하지 않는다. 이전 구현은 effect
   // 재실행 시 공유 AbortController로 진행 중 fetch를 abort했고, abort된 요청은 상태를
   // 'error'로조차 바꾸지 않아 UI가 영구히 '요약 중'에 갇혔다. 발사 중복은 코디네이터가 막고,
   // 같은 팀에 새 요청이 들어오면 이전 요청의 결과는 파기한다. 실패 확정은 서버 타임아웃(10s
   // 기본)보다 여윈 개별 요청 타임아웃으로만 한다 — 실패 시 '요약 생략'으로 전환된다.
   useEffect(() => {
-    const pendingRequests = teamSummaryFetchCoordinatorRef.current.claimPendingRequests(teamSummaryRequests)
+    const pendingRequests = teamSummaryFetchCoordinatorRef.current
+      .claimPendingRequests(teamSummaryRequests)
+      .filter((request) => !seededTeamSummaryRequestKeysRef.current.has(request.requestKey))
 
     pendingRequests.forEach((request) => {
       const { teamKey, inputKey, requestKey } = request
@@ -364,6 +395,20 @@ export function DeepScanLoadingScreen({
             ...previous,
             [teamKey]: { inputKey, status: 'success', summary },
           }))
+
+          // 런 중 받은 문장을 스냅샷/기록에 영속화(2026-11-13) — 이후 재방문은 이 문장을
+          // 그대로 씨드해 LLM 호출 0회. 실패는 화면에 영향 없이 포기(다음 방문 재시도).
+          if (persistTarget) {
+            void fetch('/api/deepscan/team-summaries-persist', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                code: persistTarget.code ?? undefined,
+                ticker: persistTarget.ticker ?? undefined,
+                summaries: [{ teamKey, inputKey, summary }],
+              }),
+            }).catch(() => {})
+          }
         })
         .catch(() => {
           if (!teamSummaryFetchCoordinatorRef.current.isLatestRequest(teamKey, requestKey)) {
@@ -376,7 +421,7 @@ export function DeepScanLoadingScreen({
           }))
         })
     })
-  }, [exchangeProduct, market, teamSummaryRequests])
+  }, [exchangeProduct, market, persistTarget, teamSummaryRequests])
 
   return (
     <div className={cn(styles.loadingCard, className)}>

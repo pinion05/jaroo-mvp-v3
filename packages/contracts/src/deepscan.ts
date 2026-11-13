@@ -332,6 +332,20 @@ export type JarooDeepScanMetadata = {
   }
 }
 
+/**
+ * 팀 요약 영속화(#358 후속 — 캐시 로드 LLM 비용 제로화): 런 시점에 로딩 화면이 받은
+ * 3개 팀 최종 문장을 스냅샷/기록 payload에 그대로 저장한다. 키는 로딩 스테이지 키
+ * (marketTeam·contextTeam·fundamentalTeam), inputKey는 요약 입력 본문 해시 —
+ * 재방문 시 본문이 같으면 저장 문장을 그대로 씨드하고 발사를 건너뛴다.
+ */
+export type JarooDeepScanTeamSummaryEntry = {
+  inputKey: string
+  summary: string
+  model?: string
+  provider?: string
+  generatedAt?: string
+}
+
 export type JarooDeepScanPayload = {
   input: JarooDeepScanInput
   hero: JarooDeepScanHeroBlock
@@ -341,5 +355,7 @@ export type JarooDeepScanPayload = {
   recoveryForecast?: JarooDeepScanRecoveryForecastBlock
   sellNow: JarooDeepScanSellNowBlock
   portfolioSimulation: JarooDeepScanPortfolioSimulationBlock
+  /** 팀 요약 영속화 — 구형 스냅샷은 필드 없음(undefined)으로 폴백(1회 재생성 후 병합 저장) */
+  teamSummaries?: Record<string, JarooDeepScanTeamSummaryEntry>
   metadata: JarooDeepScanMetadata
 }
