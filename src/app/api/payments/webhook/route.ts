@@ -3,6 +3,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createSupabaseServiceClient } from '@/lib/supabase/service'
 import { getTossPayment } from '@/lib/payments/toss-client'
 import { hasTossServerConfig } from '@/lib/payments/config'
+import { PRO_PLAN } from '@/lib/payments/products'
 
 export const runtime = 'nodejs'
 
@@ -72,7 +73,9 @@ export async function POST(request: NextRequest) {
     })
     if (eventError) {
       console.error('[payments/webhook] record failed', eventError)
-      return NextResponse.json({ ok: true })
+      // 이벤트 저장 실패 = 멱등 처리가 불가능한 상태. 200 을 돌려주면 이 결제 상태는
+      // 영영 반영되지 않으므로 500 으로 토스 재전송을 유도한다.
+      return NextResponse.json({ ok: false, error: 'event-record-failed' }, { status: 500 })
     }
     if (!inserted) {
       return NextResponse.json({ ok: true, duplicate: true }) // 이미 처리된 이벤트
@@ -81,10 +84,14 @@ export async function POST(request: NextRequest) {
     if (eventType === 'PAYMENT_STATUS_CHANGED' && paymentKey) {
       await handlePaymentStatusChanged(service, paymentKey)
     } else if (eventType === 'BILLING_DELETED' && billingKey) {
+      // 빌링키 삭제(고객 직접 해지 등): 즉시 canceled 로 바꾸면 만료 cron(active 만
+      // 조회)이 이 구독을 만료 처리할 수 없어 성골 상태가 된다. 남은 기간은 유지하고
+      // 기간 말료 예약만 걸며, 실제 만료/빌링키 정리는 기존 갱신 cron 에 위임한다.
       await service
         .from('pro_subscriptions')
-        .update({ status: 'canceled', canceled_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+        .update({ cancel_at_period_end: true, updated_at: new Date().toISOString() })
         .eq('billing_key', billingKey)
+        .in('status', ['active', 'past_due'])
     }
 
     await service.from('payment_events').update({ processed_at: new Date().toISOString() }).eq('event_id', eventId)
@@ -109,33 +116,69 @@ async function handlePaymentStatusChanged(service: ReturnType<typeof createSupab
   if (!order) return
 
   if (payment.status === 'CANCELED' && order.status === 'DONE' && order.kind === 'credit_pack') {
-    // 환불: 이미 사용해 차감이 불가능한 만큼은 0에 클램프.
-    const { data: balanceRow } = await service
-      .from('credit_balances')
-      .select('balance')
-      .eq('user_id', order.user_id)
-      .maybeSingle()
-    const revoke = Math.min(order.credits ?? 0, balanceRow?.balance ?? 0)
-    if (revoke > 0) {
-      await service.from('credit_balances').update({ balance: revoke === (balanceRow?.balance ?? 0) ? 0 : (balanceRow?.balance ?? 0) - revoke }).eq('user_id', order.user_id)
-      await service.from('credit_ledger').insert({
-        user_id: order.user_id,
-        delta: -revoke,
-        reason: 'refund',
-        order_id: order.order_id,
-        balance_after: revoke === (balanceRow?.balance ?? 0) ? 0 : (balanceRow?.balance ?? 0) - revoke,
-      })
-    }
-    await service.from('payment_orders').update({ status: 'CANCELED', fail_reason: payment.cancels?.[0]?.cancelReason ?? 'canceled' }).eq('order_id', order.order_id)
-  } else if (payment.status === 'DONE' && order.status === 'PENDING' && order.kind === 'credit_pack') {
-    // confirm 누락 복구 (멱등 RPC)
-    await service.rpc('apply_credit_purchase', {
-      p_user_id: order.user_id,
+    // 전액 환불: 잔액 차감 + refund 원장 insert + 주문 CANCELED 전환을 하나의
+    // 원자적 RPC 로 처리한다(DONE→CANCELED 조건부 전환이 멱등 가드). 웹훅 재전송,
+    // 처리 도중 실패로 인한 부분 반영(잔액만 깎고 원장 누락 등)을 원천 차단한다.
+    const { error: revokeError } = await service.rpc('revoke_refunded_credits', {
       p_order_id: order.order_id,
-      p_credits: order.credits ?? 0,
-      p_payment_key: paymentKey,
-      p_toss_raw: payment,
+      p_fail_reason: payment.cancels?.[0]?.cancelReason ?? 'canceled',
     })
+    if (revokeError) {
+      console.error('[payments/webhook] revoke failed', order.order_id, revokeError)
+    }
+  } else if (payment.status === 'PARTIAL_CANCELED' && order.status === 'DONE' && order.kind === 'credit_pack') {
+    // 부분 취소: 취소 금액(cancelAmount 누적합)에 비례해 크레딧을 회수한다.
+    // RPC 가 이미 회수한 원장 합과의 차분만 차감하므로 재전송/누적 부분취소에 멱등.
+    const cancelledKrw = (payment.cancels ?? []).reduce((sum, cancel) => sum + (cancel.cancelAmount ?? 0), 0)
+    if (payment.totalAmount > 0 && cancelledKrw > 0) {
+      const { error: revokeError } = await service.rpc('revoke_partial_refund_credits', {
+        p_order_id: order.order_id,
+        p_cancel_amount: cancelledKrw,
+        p_total_amount: payment.totalAmount,
+      })
+      if (revokeError) {
+        console.error('[payments/webhook] partial revoke failed', order.order_id, revokeError)
+      }
+    }
+  } else if (payment.status === 'DONE' && order.status === 'PENDING') {
+    // confirm/확정 누락 복구 (멱등 RPC). 결제는 승인됐는데 주문이 PENDING 인 경우.
+    if (order.kind === 'credit_pack') {
+      await service.rpc('apply_credit_purchase', {
+        p_user_id: order.user_id,
+        p_order_id: order.order_id,
+        p_credits: order.credits ?? 0,
+        p_payment_key: paymentKey,
+        p_toss_raw: payment,
+      })
+    } else if (order.kind === 'pro_subscription') {
+      // 구독 주문 복구: 구독 row 가 있으면 기간 연장(갱신/재구독), 없으면(첫 결제
+      // 활성화 누락) 활성화로 이어진다. 빌링키는 웹훅에서 복구 불가하므로 결제분
+      // 기간만 활성화하고, 이후 갱신은 cron 이 past_due 경과 처리한다.
+      const { data: renewed, error: renewError } = await service.rpc('renew_pro_subscription', {
+        p_user_id: order.user_id,
+        p_order_id: order.order_id,
+        p_period_days: PRO_PLAN.periodDays,
+        p_payment_key: paymentKey,
+        p_toss_raw: payment,
+      })
+      if (renewError) {
+        console.error('[payments/webhook] subscription recover failed', order.order_id, renewError)
+      } else if (!renewed) {
+        const { error: activateError } = await service.rpc('activate_pro_subscription', {
+          p_user_id: order.user_id,
+          p_order_id: order.order_id,
+          p_billing_key: null,
+          p_card_company: null,
+          p_card_number: null,
+          p_period_days: PRO_PLAN.periodDays,
+          p_payment_key: paymentKey,
+          p_toss_raw: payment,
+        })
+        if (activateError) {
+          console.error('[payments/webhook] subscription activate failed', order.order_id, activateError)
+        }
+      }
+    }
   }
 }
 
