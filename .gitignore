@@ -59,3 +59,4 @@ supabase/.temp/
 
 *storybook.log
 storybook-static
+/bun.lock
