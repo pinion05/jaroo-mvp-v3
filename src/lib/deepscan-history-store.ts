@@ -41,6 +41,45 @@ function createHistoryServiceClient() {
   return createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
 }
 
+/**
+ * 팀 요약 영속화(2026-11-13) — (user_id, target_key) 최신 기록 1행의 payload만 갱신한다.
+ * 스냅샷과 달리 기록은 런마다 append되므로 "이 종목의 마지막 런"에 병합하는 게 정확하다.
+ * 실패는 스냅샷 저장과 무관하게 로그만 남긴다(요약 씨드는 스냅샷 경로가 담당).
+ */
+export async function updateLatestScanHistoryPayload(
+  userId: string,
+  targetKey: string,
+  payload: JarooDeepScanPayload,
+): Promise<boolean> {
+  const client = createHistoryServiceClient()
+  if (!client) return false
+  if (!isCanonicalPayload(payload)) return false
+
+  try {
+    const { data, error } = await client
+      .from('deepscan_scan_history')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('target_key', targetKey)
+      .order('scanned_at', { ascending: false })
+      .limit(1)
+    if (error || !data?.length) {
+      if (error) console.error('[deepscan-history] latest lookup failed', { targetKey, error: error.message })
+      return false
+    }
+
+    const { error: updateError } = await client.from('deepscan_scan_history').update({ payload }).eq('id', data[0].id)
+    if (updateError) {
+      console.error('[deepscan-history] payload update failed', { targetKey, error: updateError.message })
+      return false
+    }
+    return true
+  } catch (error) {
+    console.error('[deepscan-history] payload update threw', { targetKey, error })
+    return false
+  }
+}
+
 /** 기록 저장(append + 유저당 보존 한도 prune) — 실패해도 스캔 성공 응답에는 영향을 주지 않는다. */
 export async function recordScanHistory(input: {
   userId: string

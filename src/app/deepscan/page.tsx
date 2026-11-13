@@ -1068,6 +1068,10 @@ export default function DeepScanPage() {
         resultsReady={resultsReady}
         snapshotCacheHit={snapshotCacheInfo?.hit === true}
         snapshotScannedAt={snapshotCacheInfo?.scannedAt}
+        storedTeamSummaries={payload?.teamSummaries ?? null}
+        persistTarget={payload?.input.instrument
+          ? { code: payload.input.instrument.code ?? null, ticker: payload.input.instrument.ticker ?? null }
+          : null}
         inlineResults={resultsReady && payload ? <DeepScanInlineResults
             payload={payload}
             requestSeed={requestSeed}
