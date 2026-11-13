@@ -16,7 +16,11 @@ import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 import { fetchKrDailyPriceHistory, type KrDailyPricePoint } from '@/lib/kr-daily-price-history'
 import { scoreUsCommitteeFromGeneratedDump, type UsMemberKey } from './llm-committee'
 import { decodeUsConsensusObservation } from './us-consensus'
-import { buildRecoveryForecastFromPriceSeries } from '../../../packages/deepscan-runtime-core/src/recovery-forecast.js'
+import {
+  buildRecoveryForecastFromPriceSeries,
+  buildRecoveryProbabilityHeadline,
+  resolveRecoverySimulationHorizonDays,
+} from '../../../packages/deepscan-runtime-core/src/recovery-forecast.js'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -409,6 +413,9 @@ export function runRecoveryForecast(context: RecoveryForecastContext): {
       normalizeText(context.primarySeries.at(-1)?.date),
     ),
   ]
+  // 차트 기간(3년 확장 #334)과 확률 horizon을 정합 — KR 일봉(780봉)은 3년(780거래일),
+  // US OHLC(252봉 수준)는 1년(252거래일)까지 본다. (#358)
+  const recoveryHorizonDays = resolveRecoverySimulationHorizonDays(context.primarySeries.length)
   const forecast = buildRecoveryForecastFromPriceSeries(
     {
       primarySeries: context.primarySeries,
@@ -421,9 +428,10 @@ export function runRecoveryForecast(context: RecoveryForecastContext): {
         tolerancePct: 12,
         spacingDays: 20,
         minSampleSize: 3,
+        horizonDays: recoveryHorizonDays,
       },
       simulation: {
-        horizonDays: 252,
+        horizonDays: recoveryHorizonDays,
         pathCount: 5000,
         seed: `deepscan-recovery:${context.rawInput.instrument.ticker ?? context.rawInput.instrument.code ?? context.rawInput.instrument.name}:${currentPrice}:${targetPrice}`,
       },
@@ -540,6 +548,19 @@ export function shapeRecoveryForecastBlock(args: {
     ? createError('recovery-forecast-unavailable', normalizeText(forecastRecord?.reason) ?? '원금회수 예측에 필요한 모델 결과가 부족합니다.', true)
     : null
 
+  // 기간별(3개월/6개월/1년/2년/3년) 누적 복구확률 — 실효 horizon보다 긴 버킷은 null로 내려온다. (#358)
+  const horizonProbabilitiesRecord = asRecord(consensus?.horizonProbabilities)
+  const recoveryHorizonProbabilities = {
+    '3m': asFiniteNumber(horizonProbabilitiesRecord?.['3m']),
+    '6m': asFiniteNumber(horizonProbabilitiesRecord?.['6m']),
+    '1y': asFiniteNumber(horizonProbabilitiesRecord?.['1y']),
+    '2y': asFiniteNumber(horizonProbabilitiesRecord?.['2y']),
+    '3y': asFiniteNumber(horizonProbabilitiesRecord?.['3y']),
+  }
+  const hasHorizonProbabilities = Object.values(recoveryHorizonProbabilities).some((value) => value !== null)
+  // 비전공 유저용 한 문장: "본전 회복 확률은 3개월 내 34%, 6개월 내 52%, 1년 내 56%입니다"
+  const probabilityHeadline = buildRecoveryProbabilityHeadline(recoveryHorizonProbabilities)
+
   return {
     ...createBlockMeta(blockState, recoverySourceRefs, { fallback, error }),
     statusText: recoveryStatusText(status),
@@ -547,7 +568,9 @@ export function shapeRecoveryForecastBlock(args: {
       ? (error?.message ?? '원금회수 예측을 계산하지 못했어요.')
       : expectedRecoveryDays === 0
         ? '현재가가 이미 평단 이상이라 원금회수 목표에 도달한 상태입니다.'
-        : `세 가지 계산을 종합하면 평균적으로 약 ${formatRecoveryDays(expectedRecoveryDays)}에 본전에 도달해요.`,
+        : hasHorizonProbabilities && probabilityHeadline
+          ? `세 가지 계산을 종합하면 ${probabilityHeadline}. 평균적으로는 약 ${formatRecoveryDays(expectedRecoveryDays)}에 본전에 도달해요.`
+          : `세 가지 계산을 종합하면 평균적으로 약 ${formatRecoveryDays(expectedRecoveryDays)}에 본전에 도달해요.`,
     expectedRecoveryDaysText: formatRecoveryDays(expectedRecoveryDays),
     recoveryProbabilityText: formatProbability(recoveryProbabilityPct),
     confidenceText: confidenceLabel,
@@ -559,10 +582,12 @@ export function shapeRecoveryForecastBlock(args: {
     targetPrice,
     expectedRecoveryDays,
     recoveryProbabilityPct,
+    recoveryHorizonProbabilities: hasHorizonProbabilities ? recoveryHorizonProbabilities : null,
+    recoveryProbabilityHeadlineText: probabilityHeadline,
     confidenceLevel,
     priceHistory: buildRecoveryPriceHistory(primarySeries),
     similarPatternSamples: buildRecoverySimilarPatternSamples(forecast, primarySeries),
-    disclaimer: `${normalizeText(consensus?.disclaimer) ?? '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.'} 1년 내 도달 비율은 유사 과거 표본과 5,000개 모의 경로가 252거래일 안에 각 회복 기준을 한 번 이상 터치한 비율을 종합한 값이며, 예측 정확도나 회복 보장이 아닙니다.`,
+    disclaimer: `${normalizeText(consensus?.disclaimer) ?? '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.'} 기간별 도달 비율은 유사 과거 표본과 5,000개 모의 경로가 각 기간(3개월/6개월/1년/2년/3년, 실효 horizon 내) 안에 회복 기준을 한 번 이상 터치한 비율을 종합한 값이며, 예측 정확도나 회복 보장이 아닙니다.`,
   }
 }
 
@@ -1027,10 +1052,11 @@ export const KR_DAILY_RECOVERY_FORECAST_OPTIONS = {
     tolerancePct: 12,
     spacingDays: 20,
     minSampleSize: 3,
-    horizonDays: 252,
+    // KR 일봉은 3년치(780봉) — horizon도 3년(780거래일)까지. (#358)
+    horizonDays: 780,
   },
   simulation: {
-    horizonDays: 252,
+    horizonDays: 780,
     pathCount: 5000,
   },
 }

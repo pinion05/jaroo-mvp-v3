@@ -251,6 +251,19 @@ export type JarooDeepScanRecoveryForecastBlock = DeepScanBlockMeta & {
   targetPrice?: number | null
   expectedRecoveryDays?: number | null
   recoveryProbabilityPct?: number | null
+  /**
+   * 기간별 누적 복구확률(%) — 3개월/6개월/1년/2년/3년(63/126/252/504/756 거래일).
+   * 실효 horizon(계열 길이 기반, KR 3년·US 1년)보다 긴 버킷은 null. (#358)
+   */
+  recoveryHorizonProbabilities?: {
+    '3m'?: number | null
+    '6m'?: number | null
+    '1y'?: number | null
+    '2y'?: number | null
+    '3y'?: number | null
+  } | null
+  /** 비전공 유저용 한 문장 요약 — 예: "본전 회복 확률은 3개월 내 34%, 6개월 내 52%, 1년 내 56%입니다" */
+  recoveryProbabilityHeadlineText?: string | null
   confidenceLevel?: 'high' | 'medium' | 'low' | null
   /** 모델 입력에 쓴 가격 계열(KR은 최대 780포인트 ≈ 3년치 일봉) — 차트 렌더링용 */
   priceHistory?: JarooRecoveryPricePoint[]

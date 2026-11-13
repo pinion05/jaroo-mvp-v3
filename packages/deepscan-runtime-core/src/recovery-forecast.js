@@ -46,6 +46,86 @@ export const DEFAULT_SIMILAR_PATTERN_OPTIONS = Object.freeze({
 })
 
 /**
+ * 기간별 복구 누적확률 표시 기준(거래일). 차트가 3년 일봉(#334, 780봉)으로 확장됨에 따라
+ * 시뮬레이션 horizon도 계열 길이에 맞춰 최대 3년(756거래일)까지 본다.
+ * 실효 horizon(아래 resolveRecoverySimulationHorizonDays)보다 긴 버킷은 null —
+ * 1년치 계열에서 "2년 내 n%"가 1년 확률과 같은 값으로 중복 표시되는 왜곡을 막는다.
+ * (#358 — 이사님 요구: "3개월 내 n%, 6개월 내 N%, 1년 내 n%" 한 문장 표기)
+ */
+export const RECOVERY_PROBABILITY_HORIZONS = Object.freeze([
+  Object.freeze({ key: '3m', tradingDays: 63, label: '3개월' }),
+  Object.freeze({ key: '6m', tradingDays: 126, label: '6개월' }),
+  Object.freeze({ key: '1y', tradingDays: 252, label: '1년' }),
+  Object.freeze({ key: '2y', tradingDays: 504, label: '2년' }),
+  Object.freeze({ key: '3y', tradingDays: 756, label: '3년' }),
+])
+
+/** 시뮬레이션이 볼 수 있는 최대 horizon(거래일) — KR 3년 일봉 780봉 기준. */
+export const RECOVERY_MAX_SIMULATION_HORIZON_DAYS = 780
+
+/**
+ * 계열 길이에 맞는 실효 시뮬레이션 horizon(거래일).
+ * KR 일봉(약 780봉)은 3년까지, US OHLC(약 252봉)는 1년까지 — UI 차트 기간과 정합.
+ */
+export function resolveRecoverySimulationHorizonDays(pointCount) {
+  const count = Number.isInteger(pointCount) ? pointCount : 0
+  return count >= 500 ? RECOVERY_MAX_SIMULATION_HORIZON_DAYS : DEFAULT_RECOVERY_SIMULATION_OPTIONS.horizonDays
+}
+
+/**
+ * 경로/샘플별 최초 회복일 배열을 기간별 누적확률(%)로 변환.
+ * totalCount는 회복 여부와 무관한 전체 경로/샘플 수(미회복 경로가 분모에 들어가야 확률이 된다).
+ * effectiveHorizonDays(실효 horizon)보다 긴 버킷은 null.
+ */
+export function cumulativeHorizonProbabilities(recoveryDaysValues, totalCount, digits = 1, effectiveHorizonDays = null) {
+  const empty = {}
+  for (const horizon of RECOVERY_PROBABILITY_HORIZONS) {
+    empty[horizon.key] = null
+  }
+  if (!Number.isInteger(totalCount) || totalCount <= 0 || !Array.isArray(recoveryDaysValues)) {
+    return empty
+  }
+
+  const result = {}
+  for (const horizon of RECOVERY_PROBABILITY_HORIZONS) {
+    if (Number.isFinite(effectiveHorizonDays) && horizon.tradingDays > effectiveHorizonDays) {
+      result[horizon.key] = null
+      continue
+    }
+    const recoveredCount = recoveryDaysValues.filter(
+      (days) => isFiniteNumber(days) && days > 0 && days <= horizon.tradingDays,
+    ).length
+    result[horizon.key] = roundTo((recoveredCount / totalCount) * 100, digits)
+  }
+  return result
+}
+
+/**
+ * 기간별 누적확률을 비전공 유저용 한 문장으로 만든다.
+ * 예: "본전 회복 확률은 3개월 내 34%, 6개월 내 52%, 1년 내 56%입니다"
+ * 값이 없는 기간은 건너뛰고, 전부 없으면 null.
+ */
+export function buildRecoveryProbabilityHeadline(horizonProbabilities, options = {}) {
+  if (!isPlainObject(horizonProbabilities)) {
+    return null
+  }
+
+  const digits = Number.isInteger(options.digits) ? options.digits : 0
+  const parts = []
+  for (const horizon of RECOVERY_PROBABILITY_HORIZONS) {
+    const value = horizonProbabilities[horizon.key]
+    if (!isFiniteNumber(value)) {
+      continue
+    }
+    parts.push(`${horizon.label} 내 ${roundTo(value, digits)}%`)
+  }
+  if (parts.length === 0) {
+    return null
+  }
+  return `본전 회복 확률은 ${parts.join(', ')}입니다`
+}
+
+/**
  * @typedef {'similarPattern' | 'gbm' | 'jumpDiffusion'} RecoveryForecastModelKey
  * @typedef {'available' | 'unavailable' | 'low_confidence'} RecoveryForecastStatus
  * @typedef {'high' | 'medium' | 'low'} RecoveryForecastConfidenceLevel
@@ -232,6 +312,16 @@ function buildUnavailableForecast(reason, models = {}) {
   }
 }
 
+/** 모델 결과의 horizonProbabilities 정규화 — 0~100 범위 밖 값은 null 처리. */
+function normalizeHorizonProbabilities(source) {
+  const result = {}
+  for (const horizon of RECOVERY_PROBABILITY_HORIZONS) {
+    const value = source[horizon.key]
+    result[horizon.key] = isFiniteNumber(value) && value >= 0 && value <= 100 ? value : null
+  }
+  return result
+}
+
 function normalizeModelResults(modelResults) {
   if (!isPlainObject(modelResults)) {
     return { models: {}, errors: ['modelResults must be an object keyed by recovery model'] }
@@ -269,6 +359,10 @@ function normalizeModelResults(modelResults) {
       label: MODEL_LABELS[key],
       medianRecoveryDays,
       recoveryProbabilityPct: isFiniteNumber(recoveryProbabilityPct) ? recoveryProbabilityPct : null,
+      // 기간별 누적확률(3m/6m/1y/2y/3y) — 각 버킷값 검증 후 통과. (#358)
+      horizonProbabilities: isPlainObject(source.horizonProbabilities)
+        ? normalizeHorizonProbabilities(source.horizonProbabilities)
+        : null,
       sampleSize: isFiniteNumber(source.sampleSize) ? source.sampleSize : null,
       note: typeof source.note === 'string' && source.note.trim().length > 0 ? source.note.trim() : null,
     }
@@ -443,6 +537,7 @@ function buildSimulationUnavailable(reason, modelKey, options) {
     reason,
     medianRecoveryDays: null,
     recoveryProbabilityPct: null,
+    horizonProbabilities: null,
     recoveredPathCount: 0,
     pathCount: options.pathCount,
     horizonDays: options.horizonDays,
@@ -460,6 +555,13 @@ function summarizeSimulationRecoveryDays(recoveryDays, modelKey, options) {
     reason: recoveredPathCount === 0 ? '시뮬레이션 기간 안에 목표가에 도달한 경로가 없습니다.' : null,
     medianRecoveryDays,
     recoveryProbabilityPct,
+    // 1회 시뮬레이션의 경로별 최초 회복일로 기간별 누적확률을 함께 계산 (재시뮬 없이).
+    horizonProbabilities: cumulativeHorizonProbabilities(
+      recoveryDays,
+      options.pathCount,
+      options.probabilityDigits,
+      options.horizonDays,
+    ),
     recoveredPathCount,
     pathCount: options.pathCount,
     horizonDays: options.horizonDays,
@@ -698,6 +800,9 @@ function modelResultFromDetail(detail) {
   return {
     medianRecoveryDays: detail.medianRecoveryDays,
     recoveryProbabilityPct: isFiniteNumber(detail.recoveryProbabilityPct) ? detail.recoveryProbabilityPct : null,
+    // 시뮬레이터·유사패턴이 계산한 기간별 누적확률을 컨센서스로 전달 — 누락 시
+    // consensus.horizonProbabilities가 항상 null이 되어 카드에 칩이 뜨지 않는다. (#358)
+    horizonProbabilities: isPlainObject(detail.horizonProbabilities) ? detail.horizonProbabilities : null,
     sampleSize: isFiniteNumber(detail.sampleCount) ? detail.sampleCount : null,
     note: detail.reason,
   }
@@ -934,6 +1039,7 @@ export function calculateSimilarPatternRecovery(input, options = {}) {
       reason: '유사 하락 패턴 샘플을 찾지 못했습니다.',
       medianRecoveryDays: null,
       recoveryProbabilityPct: null,
+      horizonProbabilities: null,
       sampleCount: 0,
       recoveredSampleCount: 0,
       recoveryDaysP25: null,
@@ -955,6 +1061,13 @@ export function calculateSimilarPatternRecovery(input, options = {}) {
     reason: status === 'low_confidence' ? '유사 패턴 샘플 수가 충분하지 않습니다.' : null,
     medianRecoveryDays: roundTo(median(recoveredDays), patternOptions.recoveryDaysDigits),
     recoveryProbabilityPct: roundTo((recoveredSampleCount / samples.length) * 100, patternOptions.probabilityDigits),
+    // 샘플별 최초 회복일로 기간별 누적확률 — 1y는 recoveryProbabilityPct와 동일치.
+    horizonProbabilities: cumulativeHorizonProbabilities(
+      samples.map((sample) => sample.recoveryDays),
+      samples.length,
+      patternOptions.probabilityDigits,
+      patternOptions.horizonDays,
+    ),
     sampleCount: samples.length,
     recoveredSampleCount,
     recoveryDaysP25: roundTo(percentile(recoveredDays, 25), patternOptions.recoveryDaysDigits),
@@ -1094,6 +1207,35 @@ export function summarizeRecoveryForecast(modelResults, options = {}) {
   const recoveryProbabilityPctRaw = weightedAverage(models, 'recoveryProbabilityPct', weights)
   const expectedRecoveryDays = roundTo(expectedRecoveryDaysRaw, options.recoveryDaysDigits ?? 0)
   const recoveryProbabilityPct = roundTo(recoveryProbabilityPctRaw, options.probabilityDigits ?? 1)
+
+  // 기간별(3m/6m/1y) 누적확률도 모델 가중평균으로 합의. weightedAverage 가 숫자 필드만 다루므로
+  // 각 모델의 horizonProbabilities 를 평탄한 뷰를 만들어 기간 키별로 호출한다.
+  const horizonViews = {}
+  for (const key of RECOVERY_FORECAST_MODEL_KEYS) {
+    const probabilities = models[key]?.horizonProbabilities
+    if (isPlainObject(probabilities)) {
+      horizonViews[key] = {
+        hp3m: probabilities['3m'],
+        hp6m: probabilities['6m'],
+        hp1y: probabilities['1y'],
+        hp2y: probabilities['2y'],
+        hp3y: probabilities['3y'],
+      }
+    }
+  }
+  const probabilityDigits = options.probabilityDigits ?? 1
+  const horizonProbabilities = {}
+  let hasAnyHorizonValue = false
+  for (const horizon of RECOVERY_PROBABILITY_HORIZONS) {
+    const raw = weightedAverage(horizonViews, `hp${horizon.key}`, weights)
+    const value = raw === null ? null : roundTo(raw, probabilityDigits)
+    horizonProbabilities[horizon.key] = value
+    if (value !== null) {
+      hasAnyHorizonValue = true
+    }
+  }
+  const probabilityHeadline = buildRecoveryProbabilityHeadline(horizonProbabilities)
+
   const status = confidence.level === 'low' ? 'low_confidence' : 'available'
 
   const excludedKeys = RECOVERY_FORECAST_MODEL_KEYS.filter((key) => !availableKeys.includes(key))
@@ -1110,6 +1252,9 @@ export function summarizeRecoveryForecast(modelResults, options = {}) {
     consensus: {
       expectedRecoveryDays,
       recoveryProbabilityPct,
+      // 기간별 누적확률(3m/6m/1y/2y/3y)과 비전공 유저용 한 문장. (#358)
+      horizonProbabilities: hasAnyHorizonValue ? horizonProbabilities : null,
+      probabilityHeadline,
       confidence,
       weights,
       disclaimer: '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.',
