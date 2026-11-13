@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import {
   shouldDisplayDeepScanReadyResults,
@@ -83,6 +83,8 @@ import {
 // 팀 요약 클라이언트 타임아웃 — 서버 타임아웃(DEEPSCAN_TEAM_SUMMARY_TIMEOUT_MS, 기본 10s)보다
 // 여유를 둬야 서버의 502 응답을 정상 경로로 받을 수 있다.
 const TEAM_SUMMARY_FETCH_TIMEOUT_MS = 15_000
+// 팀 요약 영속화 배치 디바운스 — 세 팀 성공을 한 번에 묶는다(서버 read-modify-write 경합 방지).
+const PERSIST_TEAM_SUMMARIES_DEBOUNCE_MS = 1_500
 
 export function DeepScanLoadingScreen({
   name = '선택 종목',
@@ -144,6 +146,28 @@ export function DeepScanLoadingScreen({
   const [teamSummaries, setTeamSummaries] = useState<Partial<Record<LoadingStageKey, TeamSummaryState>>>({})
   const [expandedTeamSummaries, setExpandedTeamSummaries] = useState<ReadonlySet<LoadingStageKey>>(() => new Set())
   const teamSummaryFetchCoordinatorRef = useRef(createTeamSummaryFetchCoordinator())
+  // 팀 요약 영속화 배치 버퍼 — 성공 문장을 모았다가 디바운스 후 1회 POST(경합 방지).
+  const pendingPersistTeamSummariesRef = useRef<Array<{ teamKey: string; inputKey: string; summary: string }>>([])
+  const persistDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const flushPendingPersistTeamSummaries = useCallback(() => {
+    const entries = pendingPersistTeamSummariesRef.current
+    pendingPersistTeamSummariesRef.current = []
+    persistDebounceTimerRef.current = null
+    if (!entries.length || !persistTarget) return
+    void fetch('/api/deepscan/team-summaries-persist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: persistTarget.code ?? undefined,
+        ticker: persistTarget.ticker ?? undefined,
+        summaries: entries,
+      }),
+    }).catch(() => {})
+  }, [persistTarget])
+  useEffect(() => () => {
+    if (persistDebounceTimerRef.current) clearTimeout(persistDebounceTimerRef.current)
+    flushPendingPersistTeamSummaries()
+  }, [flushPendingPersistTeamSummaries])
   const teamBridgeRef = useRef<HTMLElement | null>(null)
   const narrativeStreamRef = useRef<HTMLElement | null>(null)
   const recoveryForecastRef = useRef<HTMLElement | null>(null)
@@ -397,17 +421,12 @@ export function DeepScanLoadingScreen({
 
           // 런 중 받은 문장을 스냅샷/기록에 영속화(2026-11-13) — 이후 재방문은 이 문장을
           // 그대로 씨드해 LLM 호출 0회. 실패는 화면에 영향 없이 포기(다음 방문 재시도).
-          if (persistTarget) {
-            void fetch('/api/deepscan/team-summaries-persist', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                code: persistTarget.code ?? undefined,
-                ticker: persistTarget.ticker ?? undefined,
-                summaries: [{ teamKey, inputKey, summary }],
-              }),
-            }).catch(() => {})
-          }
+          // 팀별 즉시 발사 대신 짧은 디바운스로 모아서 1회 호출로 보낸다 — 3개 호출이
+          // 동시에 read-modify-write 경합하면 마지막 작성자만 살아남아(프로덕션 실측
+          // 2026-11-13) 일부 팀이 저장에서 탈락하고 재방문마다 재생성된다.
+          pendingPersistTeamSummariesRef.current.push({ teamKey, inputKey, summary })
+          if (persistDebounceTimerRef.current) clearTimeout(persistDebounceTimerRef.current)
+          persistDebounceTimerRef.current = setTimeout(flushPendingPersistTeamSummaries, PERSIST_TEAM_SUMMARIES_DEBOUNCE_MS)
         })
         .catch(() => {
           if (!teamSummaryFetchCoordinatorRef.current.isLatestRequest(teamKey, requestKey)) {
