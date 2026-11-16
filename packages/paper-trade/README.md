@@ -35,7 +35,8 @@ JAROO 모의투자(매매체결) 시뮬레이터 — **증권사 API처럼** 보
 
 ## 스택
 
-Hono + Bun + `bun:sqlite` (네이티브 의존 0, 빌드 단계 없음) — 의존성은 hono 하나.
+Node.js(`node:http` + `node:sqlite`) — 런타임 의존성 **0**, 빌드 단계 없음(`.ts` 직접 실행, 타입 스트리핑).
+Railway 단일 컨테이너에서 크롤러(3040) 옆 **127.0.0.1:3041 사이드카 프로세스**로 동작한다.
 
 ## 매매 규칙
 
@@ -94,27 +95,24 @@ curl -s http://localhost:3041/v1/accounts/$AC/positions
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `PORT` | `3041` | 리슨 포트 (crawler 3040 옆) |
-| `DB_PATH` | `./data/paper-trade.db` | SQLite 파일 (`:memory:` 가능) |
+| `PAPER_TRADE_PORT` | `3041` | 리슨 포트 (crawler 3040 옆). Railway가 웹에 주입하는 공유 `PORT`는 **읽지 않는다** (EADDRINUSE 방지 — 크롤러의 `CRAWLER_PORT`와 동일한 규칙) |
+| `PAPER_TRADE_DB_PATH` | `./data/paper-trade.db` | SQLite 파일 (`:memory:` 가능) |
 | `BROKER_FEE_BPS` | `1.5` | 수수료 bps |
 | `SELL_TAX_BPS` | `15` | 증권거래세 bps (매도) |
 
 ## 실행
 
 ```bash
-bun install
-bun test          # 27 tests (엔진 수학 + API e2e + 재시작 정합성)
-bun src/index.ts
+npm run typecheck  # tsc -p tsconfig.json (noEmit)
+npm run start      # node --experimental-transform-types --disable-warning=ExperimentalWarning --max-old-space-size=96 src/index.ts
+npm test           # node --test tests/ (②단계에서 node:test로 포팅 예정)
 ```
 
-## Docker
+- `--experimental-transform-types`: `engine.ts`의 생성자 파라미터 프로퍼티(`constructor(public code, ...)`)는
+  타입 스트리핑(strip-only)만으로 지울 수 없는 구문이라 변환 모드가 필요하다 (Node 22·24 모두 지원)
 
-```bash
-docker build -t jaroo-paper-trade .
-docker run -d -p 3041:3041 -v "$PWD/data:/data" --name jaroo-paper-trade jaroo-paper-trade
-```
-
-`oven/bun:1-alpine` 기반. 네트워크 egress가 필요 없으므로 격리 네트워크로도 운영 가능.
+- 힙 상한 96MB + SQLite 페이지 캐시 2MB + prepared statement 사전 준비로 메모리 사용 최소화
+- 요청 바디 상한 32KB — 초과 시 `413 payload_too_large`로 즉시 거부·연결 종료
 
 ## 다음 단계 (PoC 범위 밖)
 
