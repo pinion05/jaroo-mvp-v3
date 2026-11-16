@@ -1,9 +1,11 @@
 # AI 트레이더 캐릭터 파이프라인 (매매 루프 + 메모리) — 설계 (이슈 #361)
 
-- **작성일**: 2026-11-16
+- **작성일**: 2026-11-16 · **개정**: 2026-11-16 (판단 입력 deepscan 전환 — 사용자 지시)
 - **상태**: 초안 — 사용자 설계 승인 대기
 - **추적**: GitHub #361 (2026-11-10 자루 회의 액션아이템) · 선행 PR #357 (`packages/paper-trade` 머지 c622828)
-- **공수**: Phase 1 1~2일 · Phase 2 1~2일 · Phase 3 0.5~1일
+- **공수**: Phase 1 1~2일 · Phase 2 1~2일 · Phase 3 1~2일 · Phase 4 0.5~1일
+
+> **제품 정의 (2026-11-16 사용자 지시)**: AI 트레이더는 **jaroo app의 deepscan AI 위원회가 사용자에게 보여주는 것과 동일한 리포트**를 기반으로 판단하고, **성향대로** 거래한다. 이 기능은 **jaroo deepscan을 홍보하기 위한 바이럴 기능**이다 — 캐릭터의 매매 입증이 곧 deepscan 성능의 입증이어야 한다.
 
 ## 1. 배경
 
@@ -22,20 +24,30 @@ PR #357 머지로 매매체결 원장(`packages/paper-trade`, quote ZERO·egress
 | D5 | **서빙 숫자는 fresh** | 일기에 실리는 금액·수익률·목표 진행률은 매번 원장+시세로 계산해 주입. 메모리는 톤·연속성·내러티브만 담당 (스테일 숫자 방지) |
 | D6 | **전용 메모리 스토어 (Honcho 기각)** | Supabase 테이블 + memory.md 뷰 렌더링. Honcho는 (a) 앱 사용자 메모리 모델이라 캐릭터=가공 페르소나와 불일치 (b) 3~4캐릭터×수백 줄은 전체 stuffing으로 충분 (c) 파생 메모리가 불투명해 매매 입증 역추적과 어긋남 (d) 자루 self-host 의존 = 프로덕 리스크. 이후 기억 검색 니즈(pgvector/Honcho) 발생 시 테이블 row 이관으로 확장 여지 유지 |
 | D7 | **매매 결정=규칙 엔진, 판단 서사=LLM** | 주문 자체는 성향 파라미터 기반 결정론적 규칙이 생성(비용·재현성·입증). LLM은 그 결정의 "왜 샀다" 판단 로그와 서사를 생성 — "AI 판단 로그 공개"는 이 로그로 충족 |
+| D8 | **판단 입력 = deepscan canonical 리포트 + 성향 오버레이** (2026-11-16 지시) | 매매 판단의 사실 소스는 사용자가 보는 것과 동일한 `JarooDeepScanPayload`(hero·committee·strategy·recoveryForecast·teamSummaries)다. 성향은 **같은 리포트를 다르게 해석하는 필터**(minHeroScore·requiredConfidence·축 가중치 등)로만 작동 — 성향이 사실을 만들지 않는다. 시세 규칙 기반 진입(dip 매수 등 Phase 1 임시 판단 소스)은 전환 후 폐기 |
+| D9 | **입증 체인 = 판단 로그 × deepscan 리포트 × 원장** | 판단 로그 `fact`에 근거 리포트의 추적 키(`metadata.debugId`·`generatedAt`·heroScore·recoveryPct·targetPrice)를 구조적으로 기록. "캐릭터가 왜 샀나" → deepscan 리포트 → paper-trade `orderId` 체인이 바이럴 콘텐츠의 핵심 증거다 |
+| D10 | **시세는 체결가 전달·리스크 관리용만** | paper-trade quote ZERO 계약 불변 — 판단은 리포트, 체결가 전달은 시세. 손절 밴드 등 계좌 보호(리스크 관리) 규칙은 시세 기반으로 잔존 가능하되, **진입 판단은 deepscan 리포트 없이는 절대 일어나지 않는다** |
 
 ## 3. 전체 구조
 
 ```
 [매매 루프 — 정기 실행]                    [메모리 컴파일 — 장마감 후 1회]
- 페르소나 카드 + 성향 파라미터              ① 원장 diff: GET /orders (watermark 이후)
- + 종목 유니버스                           ② event extractor (순수 코드) → typed events
+ 페르소나 카드 + 성향 오버레이(§5.2)        ① 원장 diff: GET /orders (watermark 이후)
+ + 종목 후보                              ② event extractor (순수 코드) → typed events
         │                                  ③ memory compiler (LLM①) → 기억 라인 draft
         ▼                                  ④ compaction (LLM②, 조건부) → 월별 digest
- deepscan에서 현재가 조회 ──┐               ⑤ (검수) 마케터 승인 → published
-        │                  │
-        ▼                  ▼               [서빙 — 일 1회 생성 후 정적 캐싱]
- POST /orders {priceKrw}  ← quote ZERO      주식일기 (LLM③): 페르소나 + digest + 최근 기억
-        │                                  + fresh 실시간 상태 → 캐시 → 모든 유저 동일 노출
+ deepscan 리포트 조회 (§5.1 — D8)          ⑤ (검수) 마케터 승인 → published
+ "사용자와 동일한 JarooDeepScanPayload"
+        │                                  [서빙 — 일 1회 생성 후 정적 캐싱]
+        ▼                                  주식일기 (LLM③): 페르소나 + digest + 최근 기억
+ 성향 필터 통과 종목만 진입                 + fresh 실시간 상태 → 캐시 → 모든 유저 동일 노출
+        │
+        ▼
+ 현재가 조회(체결가 전달용, D10) ──┐
+        │                         │
+        ▼                         ▼
+ POST /orders {priceKrw}  ← quote ZERO · 판단 로그에 리포트 근거(D9) 기록
+        │
         ▼
  paper-trade 원장 (orders/ledger/positions)
 ```
@@ -98,19 +110,36 @@ create index idx_memories_character on character_memories(character_id, kind, st
 
 ## 5. 매매 루프 워커 (`packages/ai-trader`)
 
-- **스택**: paper-trade와 동일하게 Hono + Bun. 상시 프로세스(내부 스케줄러) — Railway 서비스 1개
-- **루프 단계**: 유니버스 후보(관심 종목 풀) → 성향 파라미터 필터/포지션 점검 → deepscan 현재가 → 주문 생성(규칙) → `POST /orders` → 판단 로그 생성(LLM①) → Supabase 저장
-- **성향 파라미터** (`strategy_params` 예시 — 규칙 엔진의 입력):
+- **스택**: paper-trade와 동일한 상시 프로세스 — 런타임은 #368(Node 사이드카) 방향과 정렬해 Node(node:sqlite)로 통일 예정
+- **루프 단계 (Phase 2 개정)**: 종목 후보 → **deepscan 리포트 조회(§5.1 — 사용자와 동일한 산출물)** → 성향 오버레이 필터(§5.2, 규칙) → 현재가 조회(체결가 전달용, D10) → 주문 생성(규칙) → `POST /orders` → 판단 로그 저장(리포트 근거 포함, D9)
 
-| 파라미터 | 소심이(안정형) 예시 | 의미 |
+### 5.1 deepscan 리포트 소비 경로 (D8)
+
+"사용자가 보는 것과 동일한 리포트" = `packages/contracts`의 **`JarooDeepScanPayload`** (`hero`·`committee.axes[].members[]`·`strategy`·`recoveryForecast`·`teamSummaries`·`metadata.debugId`). 조사 결과:
+
+- 이 산출물의 유일한 생성 경로는 web 앱 `/api/deepscan`의 canonical 빌더 — 모듈 재사용은 web 내부 lib 구조상 불가, **HTTP 소비만이 "동일 리포트"를 보장**한다
+- `deepscan_snapshots`((user_id, target_key) 최신 1건 캐시)·`deepscan_scan_history`(실행 원장)는 user_id 스코프 + RLS deny-all — API 서비스 롤만 접근. 페이로드는 보유 수량·평단 반영 **개인화 데이터**라 캐릭터의 paper 포지션을 holding 입력으로 주입하면 캐릭터 계좌 상황이 반영된다
+- 결론: ai-trader는 **캐릭터 전용 서비스 계정(또는 서비스 롤 대리 실행)으로 deepscan 실행 경로를 내부 호출**한다. 실행 비용(크레딧)은 캐릭터 운영비로 처리하고, 매 실행의 `debugId`·스냅샷·기록이 D9 추적 키를 그대로 재사용한다. 인증·과금 인터페이스는 Phase 2 설계 확정 사항
+
+### 5.2 성향 오버레이 — 같은 리포트, 다른 해석 (D8)
+
+성향 파라미터(`strategy_params`)가 리포트 필터로 확장된다. 예시(소심이·안정형):
+
+| 파라미터 | 소심이 예시 | 의미 (같은 리포트를 어떻게 걸러내나) |
 |---|---|---|
-| `maxPositionPct` | 0.10 | 종목당 최대 비중 |
-| `maxDrawdownPct` | 0.05 | 손절 기준 |
-| `maxSymbols` | 5 | 보유 종목 수 상한 |
-| `tradeFrequency` | 'weekly' | 매매 빈도 상한 |
-| `buyDipPct` / `takeProfitPct` | -0.03 / +0.08 | 반등 매수·익절 룰 |
+| `minHeroScore` | 70 | hero 점수 미달 종목은 진입 후보 제외 |
+| `requiredRecoveryConfidence` | 'high' | 복구 전망 confidence 미달 제외 |
+| `minRecoveryPct1y` | 0.5 | 1년 내 복구 확률 50% 미달 제외 |
+| `maxAxisDisagreement` | 낮음 | 위원회 축 간 이견 크면 제외 (합의 중시) |
+| `entrySizingPct` | 0.10 | 통과 시 진입 크기 (기존 maxPositionPct 승계) |
+| `maxSymbols` / `tradeFrequency` | 5 / weekly | 포지션 수·빈도 상한 (계좌 보호, 승계) |
+| `maxDrawdownPct` / `takeProfitPct` | 0.05 / 0.08 | 손절·익절 밴드 (시세 기반, D10 — 계좌 보호) |
 
-- **판단 로그**: 주문(또는 보류)마다 "왜 이 결정인가"를 페르소카 카드 기반 LLM이 2~3문장으로 작성 → `character_events`(`fact.decisionRationale`) 또는 별도 로그 테이블에 저장, 콘텐츠 "AI 판단 로그 공개"의 원재료
+이후 캐릭터(중립·공격·감정형)는 **같은 필터 체계의 다른 파라미터 세트**로 같은 리포트를 다르게 실행한다(공격형 `minHeroScore: 40`, 감정형은 심리 축 가중 등). 규칙 엔진 결정론(D7) 유지 — 리포트 숫자 필터는 전부 결정론적 코드이며, LLM은 판단 서사만 담당.
+
+### 5.3 Phase 1 임시 판단 소스 (전환 후 폐기)
+
+PR #367의 규칙 엔진은 시세 규칙(dip -3% 매수 등) 기반이다 — 이는 **루프 골격 검증용 임시 판단 소스**이며 Phase 2에서 §5.1 경로로 교체된다. 손절/익절/빈도 게이트 등 리스크 관리 규칙은 계좌 보호(D10)로 잔존한다.
 
 ## 6. 메모리 컴파일 파이프라인
 
@@ -165,16 +194,21 @@ create index idx_memories_character on character_memories(character_id, kind, st
 
 | Phase | 범위 | 완료 기준 |
 |---|---|---|
-| 1 | `packages/ai-trader` 스켈레톤: 계좌 매핑 + 매매 루프(수동 트리거) + 판단 로그 | 캐릭터 1명("소심이")의 주문이 원장에 쌓이고 판단 로그 저장. paper-trade 테스트 27/27 회귀 통과 |
-| 2 | Supabase 마이그레이션(§4) + event extractor + memory compiler + compaction | 원장 diff → 기억 라인 draft → published까지 E2E. extractor 순수 함수 테스트 + compiler 산출물 검수 게이트 |
-| 3 | 주식일기 생성·캐싱 + 캐릭터 노출 페이지 | 일 1회 생성, 모든 유저 동일 응답 |
+| 1 | `packages/ai-trader` 스켈레톤: 계좌 매핑 + 매매 루프(수동 트리거, 임시 시세 규칙 §5.3) + 판단 로그 | 캐릭터 1명("소심이")의 주문이 원장에 쌓이고 판단 로그 저장. paper-trade 테스트 회귀 통과 — **PR #367** |
+| 2 (**갱신**) | **deepscan 리포트 판단 전환(§5.1~5.2)**: 캐릭터 서비스 경유 리포트 소비 + 성향 오버레이 파라미터 + 판단 로그 리포트 근거(D9) + Node 사이드카화(#368 정렬) | 매수 판단의 100%가 deepscan 리포트 기반 — 리포트 없는 진입 0건. 판단 로그에 debugId·heroScore·recoveryPct 입증 체인 |
+| 3 | Supabase 마이그레이션(§4) + event extractor + memory compiler + compaction (구 Phase 2) | 원장 diff → 기억 라인 draft → published까지 E2E |
+| 4 | 주식일기 생성·캐싱 + 캐릭터 노출 페이지 (구 Phase 3) | 일 1회 생성, 모든 유저 동일 응답 |
+
+**Phase 2가 LLM 서사(Phase 3)보다 선행하는 이유**: 바이럴 프루프 체인(판단 = deepscan 근거 × 원장 입증)이 이 기능의 제품 핵심이다. 서사·기억은 그 위에 얹히는 콘텐츠이며, 리포트 필터는 결정론적 코드라 LLM 없이도 전환 가능하다.
 
 ## 9. 비용 구조
 
-딥스캔 1회 LLM 원가 10~17원 감각 기준: 캐릭터 4명 × 일 (판단 로그 수 회 + 기억 컴파일 1회 + 일기 1회) ≒ **일 수십~수백 원**. 서빙은 캐싱으로 0원(D1·D3의 직접 이득).
+- **deepscan 실행(신규)**: 캐릭터 후보 종목 × 리포트 조회. 스냅샷 캐시((user_id, target_key) 최신 1건)가 히트하면 무료·즉시이므로, 캐릭터 계정의 스냅샷을 장중 1회 갱신하고 루프는 캐시 히트로 소비하는 구조면 런 비용을 종목당 일 1회로 억제 가능
+- **LLM**: 딥스캔 1회 원가 10~17원 감각 기준, 캐릭터 4명 × 일 (판단 서사 수 회 + 기억 컴파일 1회 + 일기 1회) ≒ **일 수십~수백 원**. 서빙은 캐싱으로 0원(D1·D3의 직접 이득)
 
 ## 10. 범위 외 (후속 과제 기록)
 
+- **watchlist 발굴의 deepscan 기반 전환**(§5.1 연장 — 상위 score 종목 자동 후보화): Phase 2에서 시드 watchlist 유지 후 별도 결정
 - 지정가 주문(paper-trade 후보에 병행)
 - 유저 반응 레이어: 팔로우·알림·댓글 (캐릭터 상태와 분리된 유저측 상태)
 - 배당의 원장 반영(필요 시 paper-trade 확장 — 현 설계는 별도 피드 유지)
