@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "node --watch --experimental-transform-types --disable-warning=ExperimentalWarning src/index.ts",
     "start": "node --experimental-transform-types --disable-warning=ExperimentalWarning --max-old-space-size=96 src/index.ts",
-    "test": "node --experimental-transform-types --disable-warning=ExperimentalWarning --test tests/",
+    "test": "node --experimental-transform-types --disable-warning=ExperimentalWarning --test \"tests/*.test.ts\"",
     "typecheck": "tsc -p tsconfig.json"
   }
 }
