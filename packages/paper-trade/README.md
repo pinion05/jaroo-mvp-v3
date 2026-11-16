@@ -1,15 +1,40 @@
 # jaroo-paper-trade
 
-JAROO 모의투자(매매체결) 시뮬레이터 — **증권사 API처럼** 보유종목·매매체결을 제공하는 독립 마이크로서비스 PoC.
+JAROO 모의투자(매매체결) 시스템 — 증권사 API처럼 보유종목·매매체결을 제공하는 **단일 컨테이너의 세 번째 사이드카 프로세스**.
 
 - 키움 사업자 모의계좌가 3개월 제한이라 자체 모의투자 시스템을 만들기로 한 것(2026-11-10 자루 회의)의 PoC
 - AI 트레이더 캐릭터("소심이" 등)의 계좌·매매 입증 데이터 소스로 쓰는 것이 목적
 
-## 설계 원칙
+## 아키텍처 — 단일 컨테이너, 세 프로세스
+
+Railway 하나의 컨테이너에서 `docker-entrypoint.sh`가 세 프로세스를 함께 띄운다. 어느 하나라도 죽으면
+나머지를 정리하고 컨테이너가 재시작된다(`wait -n`). 별도 마이크로서비스 컨테이너가 아니다.
+
+```
+Railway 프록시 ──▶ web (next start)          $PORT (Railway 주입, 유일한 외부 노출)
+                    │
+                    ├─ crawler               127.0.0.1:3040 (루프백)
+                    └─ paper-trade (본 패키지) 127.0.0.1:3041 (루프백)
+```
+
+- **외부에 노출되는 포트는 웹뿐**이다. crawler·paper-trade는 전부 루프백 바인딩이라 컨테이너 밖에서
+  접근할 수 없다(Railway 프록시는 웹만 전달).
+- `PAPER_TRADE_PORT` **만** 읽고 Railway가 웹에 주입하는 공유 `PORT`는 절대 읽지 않는다 —
+  크롤러의 `CRAWLER_PORT` 규칙과 동일(EADDRINUSE 사고 방지).
+- 웹 BFF가 같은 컨테이너 안에서 `http://127.0.0.1:3041` 로 호출하는 그림.
+
+로컬 개발도 동일하게 셋이 함께 뜬다 — 루트에서:
+
+```bash
+npm run dev               # dev-stack.cjs: web(3000) + crawler(3040) + paper-trade(3041)
+npm run dev:paper-trade   # paper-trade만 단독
+```
+
+## 설계 원칙 (계약 불변)
 
 | 원칙 | 의미 |
 |---|---|
-| **quote ZERO** | 이 컨테이너에는 시세 개념이 존재하지 않는다. 조회하지도, 저장하지도, **인터페이스로 노출하지도 않는다**. 체결가는 주문의 입력(`priceKrw`)으로 caller가 전달 |
+| **quote ZERO** | 이 프로세스에는 시세 개념이 존재하지 않는다. 조회하지도, 저장하지도, **인터페이스로 노출하지도 않는다**. 체결가는 주문의 입력(`priceKrw`)으로 caller가 전달 |
 | **cache ZERO** | 계좌·포지션·체결을 메모리에 두지 않음. 모든 읽기는 DB SELECT → 프로세스 무상태 |
 | **DB fetch only** | SQLite가 유일한 진실 소스. 파생값(평가손익 등)은 저장하지 않고 요청 시 계산 |
 | **정수 금액 연산** | 부동소수점 배제. 금액=원 단위 정수, 평단가=centi-won(원×100), 곱셈 중간값은 BigInt |
@@ -24,19 +49,27 @@ JAROO 모의투자(매매체결) 시뮬레이터 — **증권사 API처럼** 보
    ② POST /orders {.., priceKrw}       ← 가격을 실어 보냄
         │
         ▼
-[paper-trade 컨테이너]                 ← 원장 책임 ONLY
+[paper-trade 사이드카 프로세스]          ← 원장 책임 ONLY
    계좌·포지션·체결·현금원장 (SQLite)
    외부 네트워크 의존 0 · egress 0
 ```
 
 - caller가 전달한 가격이 체결되는 순간, "deepscan 소유의 시세"가 **"paper-trade 소유의 체결 사실"**(`orders.executed_price_won`, 불변)로 귀속된다
 - 평가손익·총자산(시세 평가)은 caller가 계산한다 — 이 API는 수량·평단가·매입원본만 돌려준다
-- 시세 신선도·거래정지 여부 판단도 시세 소유자(caller)의 책임. 이 컨테이너는 가격 검증(양의 정수·상한)만 한다
+- 시세 신선도·거래정지 여부 판단도 시세 소유자(caller)의 책임. 이 프로세스는 가격 검증(양의 정수·상한)만 한다
 
-## 스택
+## 스택 · 메모리 설계
 
-Node.js(`node:http` + `node:sqlite`) — 런타임 의존성 **0**, 빌드 단계 없음(`.ts` 직접 실행, 타입 스트리핑).
-Railway 단일 컨테이너에서 크롤러(3040) 옆 **127.0.0.1:3041 사이드카 프로세스**로 동작한다.
+Node.js 런타임(`node:http` + `node:sqlite`) — **런타임 의존성 0** (npm 설치 불필요), 빌드 단계 없음
+(`.ts` 직접 실행, 타입 스트리핑). 컨테이너를 늘리지 않고 기존 web+crawler 옆 프로세스 하나로 붙는다.
+
+| 항목 | 값 | 비고 |
+|---|---|---|
+| 힙 상한 | 96MB | `--max-old-space-size=96` (start 스크립트) |
+| SQLite 페이지 캐시 | ≈2MB | `PRAGMA cache_size = -2000` |
+| 저널 모드 | WAL | 동시 읽기 + 크래시 시 안전한 복구 |
+| prepared statement | 생성자에서 1회 사전 준비 | 요청 경로에서 `prepare()` 호출 없음 |
+| 요청 바디 상한 | 32KB | 초과 시 `413 payload_too_large`로 즉시 거부·연결 종료 |
 
 ## 매매 규칙
 
@@ -63,7 +96,7 @@ Railway 단일 컨테이너에서 크롤러(3040) 옆 **127.0.0.1:3041 사이드
 ### 오케스트레이션 예시 (시세 → 주문 → 평가)
 
 ```bash
-# ① caller가 deepscan에서 현재가 조회 (이 컨테이너와 무관한 단계)
+# ① caller가 deepscan에서 현재가 조회 (이 프로세스와 무관한 단계)
 PRICE=$(curl -s "https://jaroo.kr/api/quotes/current?codes=005930" \
   | python3 -c "import json,sys; print(int(json.load(sys.stdin)['data']['items'][0]['price']))")
 
@@ -95,28 +128,42 @@ curl -s http://localhost:3041/v1/accounts/$AC/positions
 
 | 변수 | 기본값 | 설명 |
 |---|---|---|
-| `PAPER_TRADE_PORT` | `3041` | 리슨 포트 (crawler 3040 옆). Railway가 웹에 주입하는 공유 `PORT`는 **읽지 않는다** (EADDRINUSE 방지 — 크롤러의 `CRAWLER_PORT`와 동일한 규칙) |
-| `PAPER_TRADE_DB_PATH` | `./data/paper-trade.db` | SQLite 파일 (`:memory:` 가능) |
+| `PAPER_TRADE_PORT` | `3041` | 리슨 포트 (crawler 3040 옆, 127.0.0.1 바인딩). Railway가 웹에 주입하는 공유 `PORT`는 **읽지 않는다** (EADDRINUSE 방지 — 크롤러의 `CRAWLER_PORT`와 동일한 규칙) |
+| `PAPER_TRADE_DB_PATH` | `./data/paper-trade.db` | SQLite 파일 경로 (워크스페이스 루트 기준. `:memory:` 가능) |
 | `BROKER_FEE_BPS` | `1.5` | 수수료 bps |
 | `SELL_TAX_BPS` | `15` | 증권거래세 bps (매도) |
 
 ## 실행
 
 ```bash
-npm run typecheck  # tsc -p tsconfig.json (noEmit)
-npm run start      # node --experimental-transform-types --disable-warning=ExperimentalWarning --max-old-space-size=96 src/index.ts
-npm test           # node --test tests/ (②단계에서 node:test로 포팅 예정)
+npm run dev     # node --watch (파일 저장 시 재시작)
+npm run start   # 프로덕션 — 힙 96MB 캡
+npm test        # node --test "tests/*.test.ts" (28개) — 루트 npm test 체인에 포함
+npm run typecheck
 ```
 
 - `--experimental-transform-types`: `engine.ts`의 생성자 파라미터 프로퍼티(`constructor(public code, ...)`)는
   타입 스트리핑(strip-only)만으로 지울 수 없는 구문이라 변환 모드가 필요하다 (Node 22·24 모두 지원)
 
-- 힙 상한 96MB + SQLite 페이지 캐시 2MB + prepared statement 사전 준비로 메모리 사용 최소화
-- 요청 바디 상한 32KB — 초과 시 `413 payload_too_large`로 즉시 거부·연결 종료
+## ⚠️ Railway 배포 시 SQLite 파일 휘발성
+
+Railway는 **재배포 시 컨테이너 파일시스템을 처음부터 다시 만든다**. 볼륨 마운트가 없으면 기본 경로의
+`paper-trade.db`(계좌·체결·원장 전체)는 배포마다 사라진다 — 모의투자 입증 데이터가 유지되어야 한다면
+다음 중 하나를 선택해야 한다:
+
+1. **볼륨 마운트 (권장)** — Railway에서 볼륨을 생성해 컨테이너에 붙이고, 마운트 지점을 향하도록
+   `PAPER_TRADE_DB_PATH`를 지정한다 (예: `/data/paper-trade.db`). WAL 모드이므로 같은 볼륨 재부착 시
+   체크포인트가 남은 `-wal`/`-shm` 파일도 함께 보존된다.
+2. **`:memory:` + 외부 덤프** — 휘발성을 전제로 운영하되, 필요 시점에 `orders` 테이블(append-only)을
+   외부 저장으로 내보낸다.
+
+현재는 기본 경로(`./data/paper-trade.db`) 그대로 두어 재배포 시 리셋되는 PoC 동작이며, 계좌 데이터
+영구 보존이 필요해지는 시점에 1번을 적용한다.
 
 ## 다음 단계 (PoC 범위 밖)
 
 - AI 트레이더 전략 워커: deepscan 조회 → 이 API 주문 (시세/원장 책임 분리의 오케스트레이터)
+- 웹 BFF 라우팅: 브라우저에서 사이드카를 직접 못 보므로 웹 API 라우트가 127.0.0.1:3041을 프록시
 - 지정가 주문 (미체결 잔량 상태 머신)
 - 해외 주식 (FX·결제통화 설계)
 - Postgres 이관 (멀티 레플리카) — `store.ts` 인터페이스만 교체
