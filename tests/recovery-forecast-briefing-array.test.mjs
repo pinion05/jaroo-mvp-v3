@@ -47,3 +47,47 @@ test('딥스캔 결과 카드의 알림 강도 선택기는 가운데 정렬이�
   assert.match(selector, /compact \? 'flex flex-col items-center gap-1\.5' : 'flex flex-wrap items-center gap-1\.5'/, '컴팩트 모드는 라벨·필 그룹을 세로 가운데 정렬')
   assert.match(selector, /\$\{compact \? 'text-center' : ''\}/, '컴팩트 모드 힌트도 가운데 정렬')
 })
+
+test('원금회수 브리핑 섹션 — payload에 기간별 확률이 있으면 v4 배열(5행 세로 스택)로 렌더한다(2026-11-18)', () => {
+  const briefingCard = readFileSync(new URL('../src/components/deepscan-loading-briefing-card.tsx', import.meta.url), 'utf8')
+  // 순수 헬퍼(lib)로 칩을 뽑는다 — 결과 카드(v4, #362)와 동일 규칙 공유.
+  assert.match(briefingCard, /import \{ buildRecoveryHorizonChips \} from '@\/lib\/deepscan-recovery-horizon'/, '칩 모델은 lib 단일 소스에서')
+  assert.match(briefingCard, /const horizonChips = buildRecoveryHorizonChips\(recovery\)/, 'recovery 블록에서 칩 생성')
+  // 세로 스택 5행 — 라벨·% 헤더 + 풀와이드 게이지, 결과 카드와 같은 role/aria 계약.
+  assert.match(briefingCard, /<ul className=\{styles\.recoveryHorizonList\} role='list' aria-label='기간별 본전 회복 확률'>/, '배열 컨테이너(role=list + 카드와 동일 aria-label)')
+  assert.match(briefingCard, /<span className=\{styles\.recoveryHorizonLabel\}>\{chip\.label\} 내<\/span>/, '기간 라벨(예: 3개월 내)')
+  assert.match(briefingCard, /\{Math\.max\(chip\.value, 0\)\.toFixed\(0\)\}%/, '퍼센트 정수 표기 — 카드 v4와 동일')
+  assert.match(briefingCard, /aria-label=\{`\$\{chip\.label\} 내 회복 확률 \$\{chip\.value\.toFixed\(1\)\}%`\}/, '게이지 aria 라벨 — 카드 v4와 동일')
+  assert.match(briefingCard, /width: `\$\{Math\.min\(100, Math\.max\(1\.5, chip\.value\)\)\}%`/, '게이지 폭 클램프 — 카드 v4와 동일')
+})
+
+test('기간별 배열이 있으면 문장·모델 로우·1년 단일 게이지는 렌더하지 않는다(v4 규칙)', () => {
+  const briefingCard = readFileSync(new URL('../src/components/deepscan-loading-briefing-card.tsx', import.meta.url), 'utf8')
+  // "1년 안에 본전 도달" 문구·게이지는 !hasHorizonChips 게이트 뒤로.
+  assert.match(briefingCard, /\{!hasHorizonChips && probabilityPct !== null \? <span className=\{styles\.recoveryProbText\}> · 1년 안에 본전 도달/, '1년 문구는 폴백 전용')
+  assert.match(briefingCard, /\{!hasHorizonChips && probabilityPct !== null \? \(\s*<div\s*className=\{styles\.recoveryGaugeTrack\}/, '1년 단일 게이지는 폴백 전용')
+  // 모델 로우·요약 문장은 폴백(else) 브랜치로.
+  assert.match(briefingCard, /\) : \(\s*<ul className=\{styles\.recoveryModels\}>/, '모델 로우는 배열 없을 때만')
+  assert.match(briefingCard, /\{!hasHorizonChips \? \(\s*<p className=\{styles\.todayBriefMeaning\}>/, '요약 문장은 배열 없을 때만')
+  // 로딩 프리뷰(LoadingBriefingRecoveryForecast)·구형 스냅샷 폴백 보존 — 기존 문구가 그대로 남는다.
+  assert.match(briefingCard, /1년 안에 본전 도달 \{recovery\.recoveryProbabilityText\}/, '폴백 문구 보존')
+  assert.match(briefingCard, /\(신뢰도 \{recovery\.confidenceText\}\)/, '폴백 신뢰도 표기 보존')
+})
+
+test('기간별 배열 스타일 — 세로 스택 5행(라벨·% 10px + 풀와이드 게이지)이 모듈에 정의된다', () => {
+  const css = readFileSync(new URL('../src/components/deepscan-loading-screen.module.css', import.meta.url), 'utf8')
+  assert.match(css, /\.recoveryHorizonList \{[^}]*flex-direction: column/, '세로 스택')
+  assert.match(css, /\.recoveryHorizonLabel \{[^}]*font-size: 10px/, '라벨 10px')
+  assert.match(css, /\.recoveryHorizonValue \{[^}]*font-size: 10px/, '퍼센트 10px')
+  assert.match(css, /\.recoveryHorizonGaugeTrack \{[^}]*overflow: hidden/, '게이지 트랙')
+  assert.match(css, /\.recoveryHorizonGaugeBar \{[^}]*height: 100%/, '게이지 바')
+})
+
+test('기간별 칩 순서·라벨은 결과 카드와 lib 단일 소스를 공유한다', () => {
+  const lib = readFileSync(new URL('../src/lib/deepscan-recovery-horizon.ts', import.meta.url), 'utf8')
+  assert.match(lib, /'3m', label: '3개월'/, '3개월 버킷')
+  assert.match(lib, /'3y', label: '3년'/, '3년 버킷')
+  const card = readFileSync(new URL('../src/components/deepscan-recovery-forecast-card.tsx', import.meta.url), 'utf8')
+  assert.match(card, /import \{ RECOVERY_HORIZON_CHIP_ORDER as HORIZON_CHIP_ORDER \} from '@\/lib\/deepscan-recovery-horizon'/, '카드도 lib에서 공유 받는다')
+  assert.doesNotMatch(card, /export const HORIZON_CHIP_ORDER = \[/, '카드에 로컬 중복 정의가 없어야 한다')
+})

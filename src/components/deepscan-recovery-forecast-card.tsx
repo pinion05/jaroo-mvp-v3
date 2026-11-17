@@ -4,19 +4,14 @@ import type { JarooDeepScanPayload, JarooRecoveryPricePoint, JarooRecoverySimila
 
 import { Target } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { RECOVERY_HORIZON_CHIP_ORDER as HORIZON_CHIP_ORDER } from '@/lib/deepscan-recovery-horizon'
 
 type DeepScanRecoveryForecastCardProps = {
   payload: JarooDeepScanPayload
 }
 
-// 기간별 확률 칩 표시 순서 — core RECOVERY_PROBABILITY_HORIZONS와 같은 5버킷. (#358)
-const HORIZON_CHIP_ORDER = [
-  { key: '3m', label: '3개월' },
-  { key: '6m', label: '6개월' },
-  { key: '1y', label: '1년' },
-  { key: '2y', label: '2년' },
-  { key: '3y', label: '3년' },
-] as const
+// 기간별 확률 칩 표시 순서·모델 — lib(deepscan-recovery-horizon) 공유 단일 소스를 쓴다.
+// 브리핑 카드 원금회수 섹션도 같은 순서·라벨로 렌더된다. (#358)
 
 function parsePercent(value: string | null | undefined) {
   if (!value) return null
