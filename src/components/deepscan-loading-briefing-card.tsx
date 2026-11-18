@@ -418,8 +418,8 @@ export function TodayRecoveryForecastBriefing({
     ? recovery.expectedRecoveryDays
     : recoveryNumberFromText(recovery.expectedRecoveryDaysText)
   const friendlyDuration = recoveryFriendlyTradingDays(recoveryDaysValue)
-  // 기간별(3개월~3년) 누적 복구확률 배열 — payload 블록에만 있다(브리핑 스냅샷 프리뷰·구형 스냅샷은 없음).
-  // 값이 있으면 v4 카드와 같은 세로 스택 5행으로 보여주고 문장·모델 로우는 뺀다(#362와 동일 규칙).
+  // 기간별(3개월~2년+) 누적 복구확률 배열 — payload 블록에만 있다(브리핑 스냅샷 프리뷰·구형 스냅샷은 없음).
+  // 값이 있으면 v4 카드와 같은 세로 스택(마지막 칩은 '2년+' 터미널)으로 보여주고 문장·모델 로우는 뺀다(#362와 동일 규칙).
   const horizonChips = buildRecoveryHorizonChips(recovery)
   const hasHorizonChips = horizonChips.length > 0
   const chartGeometry = recovery.priceHistory && recovery.priceHistory.length >= 3 && isFiniteNumber(recovery.targetPrice)
@@ -493,19 +493,19 @@ export function TodayRecoveryForecastBriefing({
             </svg>
           ) : null}
           {hasHorizonChips ? (
-            // 기간별 확률 배열(v4, #362와 동일 규칙) — 라벨·% 10px + 풀와이드 게이지 세로 스택 5행.
+            // 기간별 확률 배열(v4, #362와 동일 규칙) — 라벨·% 10px + 풀와이드 게이지 세로 스택(마지막 칩은 '2년+' 터미널).
             // 문장·모델별 로우는 이 배열이 대신한다(구형 스냅샷·프리뷰는 기존 렌더 유지).
             <ul className={styles.recoveryHorizonList} role='list' aria-label='기간별 본전 회복 확률'>
               {horizonChips.map((chip) => (
                 <li key={chip.key} role='listitem'>
                   <div className={styles.recoveryHorizonRowHeader}>
-                    <span className={styles.recoveryHorizonLabel}>{chip.label} 내</span>
+                    <span className={styles.recoveryHorizonLabel}>{chip.text}</span>
                     <span className={styles.recoveryHorizonValue}>{Math.max(chip.value, 0).toFixed(0)}%</span>
                   </div>
                   <div
                     className={styles.recoveryHorizonGaugeTrack}
                     role='img'
-                    aria-label={`${chip.label} 내 회복 확률 ${chip.value.toFixed(1)}%`}
+                    aria-label={`${chip.text} 회복 확률 ${chip.value.toFixed(1)}%`}
                   >
                     <div className={styles.recoveryHorizonGaugeBar} style={{ width: `${Math.min(100, Math.max(1.5, chip.value))}%` }} />
                   </div>

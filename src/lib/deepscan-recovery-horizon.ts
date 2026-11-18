@@ -1,6 +1,7 @@
 // 원금회수 기간별(3개월~3년) 누적 복구확률 칩 모델 — 순수 함수만 담는다(React·CSS import 금지).
 // 결과 카드(v4, #362)와 브리핑 카드 원금회수 섹션이 같은 순서·라벨·필터 규칙을 공유한다.
-// core RECOVERY_PROBABILITY_HORIZONS와 같은 5버킷이며, 실효 horizon 너머(null)는 표시하지 않는다.
+// core RECOVERY_PROBABILITY_HORIZONS와 같은 5버킷을 파싱하되, 2년 이후(3년) 꼬리는 화면에
+// 내보내지 않고 마지막 표시 칩을 '2년+' 터미널로 묶는다(2026-11-18 — 2년 넘는 구간의 세부는 중요도가 낮다).
 
 export const RECOVERY_HORIZON_CHIP_ORDER = [
   { key: '3m', label: '3개월' },
@@ -15,7 +16,19 @@ export type RecoveryHorizonKey = (typeof RECOVERY_HORIZON_CHIP_ORDER)[number]['k
 export type RecoveryHorizonChip = {
   key: RecoveryHorizonKey
   label: string
+  /** 화면 문구 — 일반 칩은 '3개월 내', 마지막 칩은 터미널 표기 '2년+'(이 기간 또는 그 이후) */
+  text: string
   value: number
+}
+
+/** 화면에 내보내지 않는 꼬리 버킷 — 마지막 표시 칩의 '+' 표기가 대신 묶어준다. */
+const RECOVERY_HORIZON_TAIL_HIDDEN_KEYS: ReadonlySet<RecoveryHorizonKey> = new Set<RecoveryHorizonKey>(['3y'])
+
+/** 파싱 직후 아직 화면 문구(text)를 붙이기 전의 칩 — value가 null인 버킷을 구분한다. */
+type RecoveryHorizonParsedChip = {
+  key: RecoveryHorizonKey
+  label: string
+  value: number | null
 }
 
 /**
@@ -32,11 +45,16 @@ export function buildRecoveryHorizonChips(recovery: unknown): RecoveryHorizonChi
     return []
   }
   const buckets = horizonProbabilities as Record<string, unknown>
-  return RECOVERY_HORIZON_CHIP_ORDER
-    .map(({ key, label }): RecoveryHorizonChip | { key: RecoveryHorizonKey; label: string; value: null } => ({
+  const visible = RECOVERY_HORIZON_CHIP_ORDER
+    .map(({ key, label }): RecoveryHorizonParsedChip => ({
       key,
       label,
       value: typeof buckets[key] === 'number' ? (buckets[key] as number) : null,
     }))
-    .filter((chip): chip is RecoveryHorizonChip => typeof chip.value === 'number')
+    .filter((chip): chip is RecoveryHorizonParsedChip & { value: number } => chip.value !== null)
+    .filter(({ key }) => !RECOVERY_HORIZON_TAIL_HIDDEN_KEYS.has(key))
+  return visible.map((chip, index) => ({
+    ...chip,
+    text: index === visible.length - 1 ? `${chip.label}+` : `${chip.label} 내`,
+  }))
 }
