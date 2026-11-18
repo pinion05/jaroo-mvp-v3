@@ -73,6 +73,10 @@ test('DeepScanRecoveryForecastCard renders the recovery forecast for a loss-maki
   assert.doesNotMatch(markup, /예상 회수 기간/)
   assert.match(markup, /유사 패턴/)
   assert.match(markup, /투자 권유/)
+  // 현재가·평단가·손실률 셀은 화면 상단 요약과 중복되므로 카드 facts 그리드에서 제거했다.
+  assert.doesNotMatch(markup, /현재가<\/div>/)
+  assert.doesNotMatch(markup, /평단가<\/div>/)
+  assert.doesNotMatch(markup, /손실률<\/div>/)
   // 수치 원본이 있으면 확률 게이지가 렌더된다.
   assert.match(markup, /width:61\.1%/)
   // priceHistory가 없으면(구형 페이로드) 차트 섹션은 렌더되지 않는다.

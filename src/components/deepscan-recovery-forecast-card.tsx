@@ -179,14 +179,11 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
       value: block.recoveryHorizonProbabilities?.[key] ?? null,
     }))
     .filter((chip): chip is HorizonChip => typeof chip.value === 'number')
-  const facts: ReadonlyArray<readonly [string, string]> = [
-    ['현재가', block.currentPriceText || '--'],
-    ['평단가', block.targetPriceText || '--'],
-    ['손실률', block.drawdownText || '--'],
-    ...(probabilityPct === null && horizonChips.length === 0
-      ? [['1년 내 도달 비율', block.recoveryProbabilityText || '--'] as const]
-      : []),
-  ]
+  // 현재가·평단가·손실률 셀은 화면 상단 요약에서 이미 보여주므로 카드에서는 중복으로 제거했다.
+  // 레거시 스냅샷(확률 텍스트만 있는 경우)의 '1년 내 도달 비율' 셀만 유지한다.
+  const facts: ReadonlyArray<readonly [string, string]> = probabilityPct === null && horizonChips.length === 0
+    ? [['1년 내 도달 비율', block.recoveryProbabilityText || '--'] as const]
+    : []
 
   return (
     <article
@@ -278,14 +275,16 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
         </div>
       ) : null}
 
-      <div className='grid grid-cols-3 border-t border-[#EFF1F4]'>
-        {facts.map(([label, value]) => (
-          <div key={label} className='border-b border-r border-[#EFF1F4] px-4 py-3 last:border-r-0 [&:nth-child(3n)]:border-r-0 [&:last-child]:border-b-0'>
-            <div className='text-[10px] text-[#97A0AE]'>{label}</div>
-            <div className='mt-1 text-[14px] font-bold text-[#0F1419]'>{value}</div>
-          </div>
-        ))}
-      </div>
+      {facts.length > 0 ? (
+        <div className='grid grid-cols-3 border-t border-[#EFF1F4]'>
+          {facts.map(([label, value]) => (
+            <div key={label} className='border-b border-r border-[#EFF1F4] px-4 py-3 last:border-r-0 [&:nth-child(3n)]:border-r-0 [&:last-child]:border-b-0'>
+              <div className='text-[10px] text-[#97A0AE]'>{label}</div>
+              <div className='mt-1 text-[14px] font-bold text-[#0F1419]'>{value}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
       {horizonChips.length > 0 ? (
         <div className='border-t border-[#EFF1F4] px-4 py-4'>
