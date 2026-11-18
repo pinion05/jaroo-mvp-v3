@@ -4,7 +4,7 @@ import type { JarooDeepScanPayload, JarooRecoveryPricePoint, JarooRecoverySimila
 
 import { Target } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { RECOVERY_HORIZON_CHIP_ORDER as HORIZON_CHIP_ORDER } from '@/lib/deepscan-recovery-horizon'
+import { buildRecoveryHorizonChips } from '@/lib/deepscan-recovery-horizon'
 
 type DeepScanRecoveryForecastCardProps = {
   payload: JarooDeepScanPayload
@@ -170,15 +170,8 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
   const geometry = block.priceHistory && targetPrice !== null
     ? buildRecoveryChartGeometry({ priceHistory: block.priceHistory, samples: block.similarPatternSamples, targetPrice })
     : null
-  // 기간별(3개월/6개월/1년/2년/3년) 누적 복구확률 칩 — 실효 horizon 너머(null)는 표시하지 않는다. (#358)
-  type HorizonChip = { key: (typeof HORIZON_CHIP_ORDER)[number]['key']; label: string; value: number }
-  const horizonChips: HorizonChip[] = HORIZON_CHIP_ORDER
-    .map(({ key, label }): HorizonChip | { key: HorizonChip['key']; label: string; value: number | null } => ({
-      key,
-      label,
-      value: block.recoveryHorizonProbabilities?.[key] ?? null,
-    }))
-    .filter((chip): chip is HorizonChip => typeof chip.value === 'number')
+  // 기간별(3개월~2년+) 누적 복구확률 칩 — 순서·라벨·필터·터미널('2년+') 규칙은 lib 단일 소스를 따른다. (#358)
+  const horizonChips = buildRecoveryHorizonChips(block)
   // 현재가·평단가·손실률 셀은 화면 상단 요약에서 이미 보여주므로 카드에서는 중복으로 제거했다.
   // 레거시 스냅샷(확률 텍스트만 있는 경우)의 '1년 내 도달 비율' 셀만 유지한다.
   const facts: ReadonlyArray<readonly [string, string]> = probabilityPct === null && horizonChips.length === 0
@@ -292,13 +285,13 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
             {horizonChips.map((chip) => (
               <div key={chip.key} role='listitem'>
                 <div className='flex items-center justify-between'>
-                  <span className='text-[10px] text-[#97A0AE]'>{chip.label} 내</span>
+                  <span className='text-[10px] text-[#97A0AE]'>{chip.text}</span>
                   <span className='text-[10px] font-black leading-none text-[#0F1419]'>{Math.max(chip.value, 0).toFixed(0)}%</span>
                 </div>
                 <div
                   className='mt-1 h-1 w-full overflow-hidden rounded-full bg-[#F1F3F6]'
                   role='img'
-                  aria-label={`${chip.label} 내 회복 확률 ${chip.value.toFixed(1)}%`}
+                  aria-label={`${chip.text} 회복 확률 ${chip.value.toFixed(1)}%`}
                 >
                   <div className='h-full rounded-full bg-[#2B6BE6]' style={{ width: `${Math.min(100, Math.max(1.5, chip.value))}%` }} />
                 </div>

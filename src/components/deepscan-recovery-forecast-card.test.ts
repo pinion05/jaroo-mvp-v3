@@ -137,8 +137,8 @@ test('DeepScanRecoveryForecastCard renders nothing for a profit position', () =>
   assert.equal(markup, '')
 })
 
-test('DeepScanRecoveryForecastCard renders horizon probability chips (3m/6m/1y/2y/3y) when available', () => {
-  // KR 3년 계열 — 실효 horizon 780거래일 → 5개 버킷 전부 표시. (#358)
+test('DeepScanRecoveryForecastCard renders horizon chips (3m/6m/1y/2y+) — 3년 꼬리는 숨긴다', () => {
+  // KR 3년 계열 — 실효 horizon 780거래일. 3년 버킷은 표시하지 않고 마지막 칩을 '2년+' 터미널로 묶는다. (#358)
   const markup = renderToStaticMarkup(createElement(DeepScanRecoveryForecastCard, {
     payload: payloadWithRecovery(baseRecoveryBlock({
       recoveryProbabilityPct: 56.1,
@@ -151,10 +151,12 @@ test('DeepScanRecoveryForecastCard renders horizon probability chips (3m/6m/1y/2
   assert.match(markup, /3개월 내/)
   assert.match(markup, /6개월 내/)
   assert.match(markup, /1년 내/)
-  assert.match(markup, /2년 내/)
-  assert.match(markup, /3년 내/)
+  assert.match(markup, /2년\+/)
   assert.match(markup, /34%/)
-  assert.match(markup, /78%/)
+  assert.match(markup, /71%/)
+  // 3년 칩(꼬리)은 렌더하지 않는다 — 2년 넘는 구간의 세부는 중요도가 낮다.
+  assert.doesNotMatch(markup, /3년/)
+  assert.doesNotMatch(markup, /78%/)
   // v4 레이아웃: 기간별 항목은 세로(column) 스택으로 모델 로우 위치에 — 게이지가 좌우를 꽉 채운다.
   assert.match(markup, /h-1 w-full/)
   // v4: 요약 문단(헤드라인 문장 포함)은 기간별 칩이 있으면 렌더하지 않는다.
@@ -167,8 +169,8 @@ test('DeepScanRecoveryForecastCard renders horizon probability chips (3m/6m/1y/2
   assert.doesNotMatch(markup, /1년 내 도달 비율/)
 })
 
-test('DeepScanRecoveryForecastCard renders partial horizon chips (US 1-year horizon) without 2y/3y', () => {
-  // US OHLC 계열 — 실효 horizon 252거래일 → 3m/6m/1y만. 2년/3년 칩은 렌더되지 않는다.
+test('DeepScanRecoveryForecastCard renders partial horizon chips (US 1-year horizon) — 마지막은 1년+', () => {
+  // US OHLC 계열 — 실효 horizon 252거래일 → 3m/6m/1y만. 2년 칩 없음, 마지막 칩이 '1년+' 터미널.
   const markup = renderToStaticMarkup(createElement(DeepScanRecoveryForecastCard, {
     payload: payloadWithRecovery(baseRecoveryBlock({
       recoveryProbabilityPct: 55.2,
@@ -177,9 +179,9 @@ test('DeepScanRecoveryForecastCard renders partial horizon chips (US 1-year hori
   }))
   assert.match(markup, /기간별 본전 회복 확률/)
   assert.match(markup, /3개월 내/)
-  assert.match(markup, /1년 내/)
-  assert.doesNotMatch(markup, /2년 내/)
-  assert.doesNotMatch(markup, /3년 내/)
+  assert.match(markup, /1년\+/)
+  assert.doesNotMatch(markup, /2년/)
+  assert.doesNotMatch(markup, /3년/)
   assert.doesNotMatch(markup, /1년 내 도달 비율/)
 })
 
