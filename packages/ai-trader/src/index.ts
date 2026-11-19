@@ -5,7 +5,7 @@ import { createApp } from './app.ts'
 import { DEFAULT_CHARACTERS } from './characters.ts'
 import { loadConfig } from './config.ts'
 import { Store } from './journal.ts'
-import { runLoop, type LoopDeps } from './loop.ts'
+import type { LoopDeps } from './loop.ts'
 import { createStaticQuotesProvider, createWebQuotesProvider } from './quotes.ts'
 import { PaperTradeClient } from './papertrade.ts'
 

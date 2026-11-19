@@ -1,24 +1,23 @@
 // API e2e — app.request() 로 서버 없이 전 흐름 검증 (paper-trade 계승).
-// FakePaper/페이크 시세 주입으로 외부 의존 0.
+// v2 C1 정리 후: 부트스트랩·load·판단 로그 저장/조회·원장 패스스루.
 
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { createApp } from '../src/app.ts'
 import { DEFAULT_CHARACTERS } from '../src/characters.ts'
 import { Store } from '../src/journal.ts'
-import { FakePaper, fakeQuotes, type NowStep } from './helpers.ts'
+import { FakePaper, fakeQuotes } from './helpers.ts'
 
 const schemaSql = await Bun.file(new URL('../migrations/0001_init.sql', import.meta.url)).text()
 
 let store: Store
 let paper: FakePaper
 let app: ReturnType<typeof createApp>
-const nowStep: NowStep = { ms: Date.parse('2026-11-16T10:00:00+09:00') }
 
 beforeEach(() => {
   store = new Store(':memory:', schemaSql)
   store.seedCharacters(DEFAULT_CHARACTERS)
   paper = new FakePaper()
-  app = createApp({ store, paper, quotes: fakeQuotes({}), now: () => nowStep.ms })
+  app = createApp({ store, paper, quotes: fakeQuotes({}) })
 })
 
 type Json = Record<string, any>
@@ -35,61 +34,66 @@ describe('라우팅 기본', () => {
     expect(notFound.json.error.code).toBe('not_found')
   })
 
-  test('캐릭터 목록 — 소심이 1명 시드', async () => {
+  test('캐릭터 목록 — 소심이 1명 시드 + 자기 원칙 문구', async () => {
     const { status, json } = await req('/v1/characters')
     expect(status).toBe(200)
     expect(json.data.items).toHaveLength(1)
     expect(json.data.items[0].slug).toBe('sosimi')
-    expect(json.data.items[0].narrativeGoal).toContain('여행자금')
-    expect(json.data.items[0].paperTradeAccountId).toBeNull() // bootstrap 전
+    expect(json.data.items[0].principles.length).toBeGreaterThan(0) // §5.2 자기 원칙
+    expect(json.data.items[0].paperTradeAccountId).toBeNull()
   })
 
   test('존재하지 않는 캐릭터 404', async () => {
-    const { status, json } = await req('/v1/characters/ghost/loop', { method: 'POST' })
+    const { status, json } = await req('/v1/characters/ghost/load', { method: 'POST' })
     expect(status).toBe(404)
     expect(json.error.code).toBe('character_not_found')
   })
 })
 
-describe('bootstrap / loop / journal / orders', () => {
-  test('bootstrap → loop → journal → orders 전 흐름', async () => {
-    // ① bootstrap — 계좌 생성·매핑
-    const boot = await req('/v1/characters/sosimi/bootstrap', { method: 'POST' })
-    expect(boot.status).toBe(200)
-    const accountId: string = boot.json.data.accountId
-    expect(accountId).toBeTruthy()
-    expect(paper.createAccountCalls).toEqual(['소심이'])
-
-    // ② loop — dip 매수 1건 + 관망 기록
-    app = createApp({
-      store,
-      paper,
-      quotes: fakeQuotes({ '005930': [70_000, -0.035], '000660': [180_000, 0.01] }),
-      now: () => nowStep.ms,
-    })
-    const loop = await req('/v1/characters/sosimi/loop', { method: 'POST' })
-    expect(loop.status).toBe(201)
-    expect(loop.json.data.decisions.some((d: Json) => d.orderStatus === 'placed')).toBe(true)
-    expect(loop.json.data.decisions.some((d: Json) => d.orderStatus === 'skipped')).toBe(true)
-
-    // ③ journal — 판단 로그 최신순
-    const journal = await req('/v1/characters/sosimi/journal')
-    expect(journal.status).toBe(200)
-    expect(journal.json.data.items.length).toBeGreaterThanOrEqual(2)
-    expect(journal.json.data.items[0].rationale).toBeTruthy()
-
-    // ④ orders — 원장 입증 패스스루
-    const orders = await req('/v1/characters/sosimi/orders')
-    expect(orders.status).toBe(200)
-    expect(orders.json.data.items).toHaveLength(1)
-    expect(orders.json.data.items[0].symbol).toBe('005930')
-    expect(orders.json.data.items[0].name).toBe('삼성전자')
-  })
-
-  test('bootstrap 멱등 — 재호출해도 계좌 추가 생성 없음', async () => {
+describe('bootstrap → load → judgments → orders', () => {
+  test('부트스트랩 멱등 후 load 상태 적재', async () => {
     await req('/v1/characters/sosimi/bootstrap', { method: 'POST' })
     await req('/v1/characters/sosimi/bootstrap', { method: 'POST' })
     expect(paper.createAccountCalls).toHaveLength(1)
+
+    const load = await req('/v1/characters/sosimi/load', { method: 'POST' })
+    expect(load.status).toBe(201)
+    expect(load.json.data.ledger.cashKrw).toBe(1_000_000)
+    expect(load.json.data.character.accountId).toBeTruthy()
+    expect(load.json.data.loadedAt).toMatch(/\+09:00$/)
+  })
+
+  test('판단 로그 저장(⑤ 실행 계층이 전달) → journal 조회', async () => {
+    const post = await req('/v1/characters/sosimi/judgments', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({
+        decision: 'sell',
+        symbol: '093320',
+        quantity: 4,
+        priceKrw: 31_100,
+        reasonCode: 'thesis_invalidated',
+        fact: { sellRatio: 0.5, heroScore: 38 },
+        rationale: '위원회 약화와 내 stop 관점이 일치 — 절반 정리',
+        order: { orderId: 'od_9', orderStatus: 'placed' },
+      }),
+    })
+    expect(post.status).toBe(201)
+    expect(post.json.data.orderId).toBe('od_9')
+
+    const journal = await req('/v1/characters/sosimi/journal')
+    expect(journal.json.data.items).toHaveLength(1)
+    expect(journal.json.data.items[0].rationale).toContain('절반 정리')
+  })
+
+  test('판단 로그 검증 — decision·rationale 필수', async () => {
+    const bad = await req('/v1/characters/sosimi/judgments', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'hold' }), // rationale 누락
+    })
+    expect(bad.status).toBe(400)
+    expect(bad.json.error.code).toBe('invalid_rationale')
   })
 
   test('계좌 매핑 전 orders는 빈 목록 + 힌트', async () => {
@@ -97,10 +101,5 @@ describe('bootstrap / loop / journal / orders', () => {
     expect(status).toBe(200)
     expect(json.data.items).toEqual([])
     expect(json.data.hint).toContain('bootstrap')
-  })
-
-  test('journal limit 검증 — 초과값은 50으로 정규화', async () => {
-    const { json } = await req('/v1/characters/sosimi/journal?limit=9999')
-    expect(json.data.items).toEqual([])
   })
 })

@@ -1,13 +1,12 @@
-// 매매 루프 — 오케스트레이터의 심장 (spec §5).
-// ① 원장에서 계좌·포지션·마지막 체결 조회 → ② 시세 조회 → ③ 규칙 엔진 판단
-// → ④ paper-trade 체결(가격을 실어 보냄) → ⑤ 판단 로그 저장.
-// Phase 1 은 수동 트리거(POST /v1/characters/:slug/loop). 정기 실행은 Phase 2 스케줄러.
+// [phase=load] 상태 적재 — v2 턴 파이프라인의 첫 단계만 담당 (2026-11-19 C1 정리).
+// 결정(⑤ 페르소나 LLM)·실행(물리 가드레일)·컴파일은 2.5a/2.5b/3에서 합류한다.
+//
+// 이 패키지의 생존 자산: 계좌 매핑(=캐릭터), 원장·시세 상태 적재, 판단 로그 저장.
+// 폐기됨: 시세 규칙 결정 엔진·템플릿 서사·정적 reason_code (spec D7/D8/D10 v2 개정).
 
-import type { Character, Decision, JudgmentEntry } from './domain.ts'
-import { renderRationale } from './rationale.ts'
+import type { TurnContext } from './domain.ts'
 import { nowKstIso, Store } from './journal.ts'
 import type { PaperGateway } from './papertrade.ts'
-import { synthesizeDecisions } from './strategy.ts'
 import type { QuotesProvider } from './quotes.ts'
 
 export class LoopError extends Error {
@@ -25,11 +24,10 @@ export type LoopDeps = {
   store: Store
   paper: PaperGateway
   quotes: QuotesProvider
-  now?: () => number
 }
 
 /** 계좌 부트스트랩 — 캐릭터=계좌 1개(spec D1). 매핑이 없으면 생성해 등록(멱등). */
-export async function ensureAccount(deps: LoopDeps, slug: string): Promise<Character> {
+export async function ensureAccount(deps: LoopDeps, slug: string) {
   const character = deps.store.getCharacter(slug)
   if (!character) {
     throw new LoopError(404, 'character_not_found', `존재하지 않는 캐릭터: ${slug}`)
@@ -45,20 +43,14 @@ export async function ensureAccount(deps: LoopDeps, slug: string): Promise<Chara
   return attached
 }
 
-export type LoopResult = {
-  character: { slug: string; displayName: string; accountId: string }
-  loopAt: string
-  decisions: JudgmentEntry[]
-}
-
-export async function runLoop(deps: LoopDeps, slug: string): Promise<LoopResult> {
+/** 턴 출발 상태 적재 — 원장(진실 소스) × 시세(체결가·평가용) → fresh 파생값(D5). 판단은 하지 않는다. */
+export async function loadTurnContext(deps: LoopDeps, slug: string): Promise<TurnContext> {
   const character = await ensureAccount(deps, slug)
   const accountId = character.paperTradeAccountId
   if (!accountId) {
     throw new LoopError(500, 'account_missing', `계좌 매핑이 없음: ${slug}`)
   }
 
-  // ① 원장 상태 — 사실의 소스
   const [account, positionsResult, ordersResult] = await Promise.all([
     deps.paper.getAccount(accountId),
     deps.paper.listPositions(accountId),
@@ -69,61 +61,42 @@ export async function runLoop(deps: LoopDeps, slug: string): Promise<LoopResult>
     return Date.parse(order.at) > Date.parse(latest) ? order.at : latest
   }, null)
 
-  // ② 시세 — 시세 소유자에게서만
-  const symbols = Array.from(
-    new Set([...character.watchlist.map((w) => w.symbol), ...positionsResult.items.map((p) => p.symbol)]),
-  )
-  const quotes = await deps.quotes.getQuotes(symbols)
+  const symbols = positionsResult.items.map((p) => p.symbol)
+  const quoteMap = await deps.quotes.getQuotes(symbols)
+  const quotes = Array.from(quoteMap.values())
 
-  // ③ 규칙 엔진 (순수)
-  const decisions = synthesizeDecisions({
-    params: character.strategyParams,
-    watchlist: character.watchlist,
-    snapshot: {
+  const unrealizedPctBySymbol: Record<string, number> = {}
+  const positionsValueKrw = positionsResult.items.reduce((sum, p) => {
+    const price = quoteMap.get(p.symbol)?.priceKrw
+    if (price !== undefined && p.avgPriceKrw > 0) {
+      unrealizedPctBySymbol[p.symbol] = Math.round(((price - p.avgPriceKrw) / p.avgPriceKrw) * 10_000) / 10_000
+    }
+    return sum + p.quantity * (price ?? p.avgPriceKrw)
+  }, 0)
+  const equityKrw = account.cashKrw + positionsValueKrw
+  const cashGoalProgressPct =
+    character.cashGoalKrw && character.cashGoalKrw > 0
+      ? Math.min(1, equityKrw / character.cashGoalKrw)
+      : null
+
+  return {
+    character: { slug: character.slug, displayName: character.displayName, accountId },
+    loadedAt: nowKstIso(),
+    ledger: {
       cashKrw: account.cashKrw,
+      investedBasisKrw: account.investedBasisKrw ?? 0,
+      realizedPnlTotalKrw: account.realizedPnlTotalKrw ?? 0,
+      feeTotalKrw: account.feeTotalKrw ?? 0,
+      orderCount: ordersResult.items.length,
+      lastOrderAt,
       positions: positionsResult.items.map((p) => ({
         symbol: p.symbol,
         name: p.name,
         quantity: p.quantity,
         avgPriceKrw: p.avgPriceKrw,
       })),
-      lastOrderAt,
     },
     quotes,
-    nowMs: (deps.now ?? Date.now)(),
-  })
-
-  // ④⑤ 체결 + 판단 로그 — 매수/매도/관망 전부 기록한다("AI 판단 로그 공개")
-  const loopAt = nowKstIso()
-  const entries: JudgmentEntry[] = []
-  for (const decision of decisions) {
-    const rationale = renderRationale(character, decision)
-    if (decision.kind === 'hold') {
-      entries.push(deps.store.appendJudgment(slug, loopAt, decision, rationale, { orderId: null, orderStatus: 'skipped', errorMessage: null }))
-      continue
-    }
-    const watchName = character.watchlist.find((w) => w.symbol === decision.symbol)?.name ?? null
-    try {
-      const order = await deps.paper.placeOrder(accountId, {
-        symbol: decision.symbol,
-        side: decision.kind,
-        quantity: decision.quantity,
-        priceKrw: decision.priceKrw,
-        name: watchName,
-        market: 'KR',
-      })
-      entries.push(deps.store.appendJudgment(slug, loopAt, decision, rationale, { orderId: order.orderId, orderStatus: 'placed', errorMessage: null }))
-    } catch (error) {
-      const message = error instanceof Error ? error.message : String(error)
-      entries.push(deps.store.appendJudgment(slug, loopAt, decision, rationale, { orderId: null, orderStatus: 'failed', errorMessage: message }))
-    }
-  }
-
-  return {
-    character: { slug: character.slug, displayName: character.displayName, accountId },
-    loopAt,
-    decisions: entries,
+    valuation: { positionsValueKrw, equityKrw, unrealizedPctBySymbol, cashGoalProgressPct },
   }
 }
-
-export type { Decision }

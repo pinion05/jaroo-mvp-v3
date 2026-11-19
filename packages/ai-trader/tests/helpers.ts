@@ -5,8 +5,6 @@
 import type { Quote } from '../src/domain.ts'
 import type { PaperAccount, PaperGateway, PaperOrder, PaperPosition } from '../src/papertrade.ts'
 
-export type NowStep = { ms: number }
-
 export class FakePaper implements PaperGateway {
   accounts = new Map<string, PaperAccount & { positions: Map<string, PaperPosition> }>()
   orders = new Map<string, PaperOrder[]>()
