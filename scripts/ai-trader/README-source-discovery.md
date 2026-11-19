@@ -1,5 +1,24 @@
 # 소스별 AI 트레이더 발굴 파이프라인 (issue #369 멀티소스 v1)
 
+## v2 덤프 빌더 (2.5a — [시안 v2](../../docs/superpowers/specs/2026-11-19-ai-trader-multiturn-loop-design.md) §4)
+
+`dump-builder.mjs`는 ②흥미 선정 턴과 ⑤매매 결정 턴이 **바이트 단위로 공유하는** 반고정층
+(소스 블록 + 보유종목 섹션)을 조립한다. 같은 입력 → 항상 같은 바이트(sha256 검증, 골든 테스트).
+
+```bash
+node scripts/ai-trader/dump-builder.mjs --self-test                       # 해시 안정성 확인
+node --test scripts/ai-trader/test/dump-builder.test.mjs                  # 골든 6종
+node scripts/ai-trader/dump-builder.mjs --source chart \
+  --source-snapshot output/discovery-source-YYYYMMDD-HHMM.json \
+  --holdings holdings.json --as-of 2026-11-19 --out output/dump-chart.md
+```
+
+- holdings.json: paper-trade 장부 스냅샷(code/name/quantity/avgPriceKrw/currentPriceKrw/openedAt/thesis.entryReasons)
+- 보유종목 오늘 증거는 `withEvidence()`가 이미 수집한 소스 데이터에서 뽑는다(추가 호출 없음):
+  [차트] 상위 후보 등장/이탈 · [재무] 랭크/권외 · [뉴스] 언급 N건/언급 없음
+
+---
+
 2026-11-19. 캐릭터 3인이 **각각 다른 데이터 소스만** 보고 종목을 발굴하고, 긍정 픽에
 딥스캔을 돌려 성향 게이트로 매수를 판정한다. 기존 뉴스 단일 소스(소심이/돌진이/배당콕)
 파이프라인은 그대로 두고, 새 세트가 나란히 돈다.

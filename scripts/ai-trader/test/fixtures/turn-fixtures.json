@@ -1,0 +1,35 @@
+{
+  "asOf": "2026-11-19",
+  "sourceData": {
+    "articles": [
+      { "text": "삼성전자, HBM4 양산 속도… 차세대 반도체 수주 경쟁 본격화. 업계 관계자는 올해 안에 안정적 공급이 관건이라고 밝혔다." },
+      { "text": "반도체 소부장 주가 강세. 케이아이엔엑스와 삼성전자를 비롯한 후공정 장비업체들이 상승 마감했다. 외국인 순매수가 이어졌다." },
+      { "text": "중소형 반도체 부품주 개별 재료 움직임. 케이아이엔엑스가 신규 수주 발표에 급등하며 거래량이 급증했다." }
+    ],
+    "chartRows": [
+      { "name": "케이아이엔엑스", "symbol": "093320", "market": "KOSDAQ", "side": "상승", "rank": 1, "top_score": 78.4, "bias": "상승 우위", "top": { "kind": "하강 쐐기", "direction": "bullish", "status": "확정", "target": 153116, "stop": 118943 }, "trend_label": "상승", "above_ma20": true, "change_pct": 2.1, "bullish_count": 4, "patterns": 6, "bearish_count": 1 },
+      { "name": "계룡건설", "symbol": "002690", "market": "KOSPI", "side": "하락", "rank": 2, "top_score": 41.0, "bias": "하락 우위", "top": { "kind": "삼각 수렴", "direction": "bearish", "status": "진행중", "target": null, "stop": 32050 }, "trend_label": "횡보", "above_ma20": false, "change_pct": -0.8, "bullish_count": 1, "patterns": 5, "bearish_count": 3 }
+    ],
+    "financeItems": [
+      { "no": 1, "code": "093320", "name": "케이아이엔엑스", "market": "KOSDAQ", "score": 71.2, "grade": "B+", "basis": "2025/12", "fscore": 7, "cats": { "수익성": 24.5, "재무건전성": 18.2, "성장성": 12.9, "현금흐름": 9.1, "효율성": 6.5 } },
+      { "no": 2, "code": "002690", "name": "계룡건설", "market": "KOSPI", "score": 63.8, "grade": "B", "basis": "2025/12", "fscore": 5, "cats": { "수익성": 19.0, "재무건전성": 16.4, "성장성": 9.2, "현금흐름": 11.0, "효율성": 8.2 } }
+    ]
+  },
+  "holdings": [
+    {
+      "code": "093320", "name": "케이아이엔엑스", "market": "KOSDAQ",
+      "quantity": 9, "avgPriceKrw": 118943, "currentPriceKrw": 114200, "openedAt": "2026-11-05",
+      "thesis": { "entryReasons": ["하강 쐐기 확정", "스코어 78.4 상위"] }
+    },
+    {
+      "code": "005930", "name": "삼성전자", "market": "KOSPI",
+      "quantity": 4, "avgPriceKrw": 79000, "currentPriceKrw": 80817, "openedAt": "2026-11-05",
+      "thesis": { "entryReasons": ["HBM4 양산 기대 뉴스"] }
+    },
+    {
+      "code": "005935", "name": "제주반도체", "market": "KOSPI",
+      "quantity": 2, "avgPriceKrw": 21000, "currentPriceKrw": 19530, "openedAt": "2026-10-08",
+      "thesis": { "entryReasons": ["컨센서스 상향"] }
+    }
+  ]
+}
