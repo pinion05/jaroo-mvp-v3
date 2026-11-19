@@ -6,7 +6,7 @@ import { Database } from 'bun:sqlite'
 import { mkdirSync } from 'node:fs'
 import { dirname } from 'node:path'
 import type { Account, LedgerEntry, OrderInput, OrderRecord, Position } from './domain.ts'
-import type { Execution } from './engine.ts'
+import { EngineError, executeMarketOrder, fitBuyQuantity, resolveRatioQuantity, type Execution, type Rates } from './engine.ts'
 
 export function newId(prefix: string): string {
   const bytes = new Uint8Array(6)
@@ -83,52 +83,124 @@ export class Store {
   applyExecution(accountId: string, order: OrderInput, exec: Execution): OrderRecord {
     const orderId = newId('od')
     const at = nowKstIso()
-    const positionAfter = exec.positionAfter
 
-    const tx = this.db.transaction(() => {
-      this.db
-        .prepare('UPDATE accounts SET cash_won = ? WHERE account_id = ?')
-        .run(exec.cashAfterKrw, accountId)
+    const tx = this.db.transaction(() => this.persistExecution(orderId, at, accountId, order, exec))
+    return tx()
+  }
 
-      if (positionAfter.quantity > 0) {
-        this.db
-          .prepare(
-            `INSERT INTO positions (account_id, symbol, symbol_name, market, quantity, avg_price_centiwon, updated_at)
-             VALUES (?, ?, ?, ?, ?, ?, ?)
-             ON CONFLICT(account_id, symbol) DO UPDATE SET
-               symbol_name = excluded.symbol_name,
-               market = excluded.market,
-               quantity = excluded.quantity,
-               avg_price_centiwon = excluded.avg_price_centiwon,
-               updated_at = excluded.updated_at`,
-          )
-          .run(accountId, order.symbol, order.name, order.market, positionAfter.quantity, positionAfter.avgPriceCenti, at)
+  /**
+   * fit/ratio 주문 체결 (v2 §6) — 잔고·포지션 읽기와 수량 치환을 체결 트랜잭션 **안에서** 원자 수행.
+   * 사전 계산의 TOCTOU(읽기와 체결 사이 잔고 변동)를 원천 제거한다.
+   *   fit  (매수): qty = max q s.t. debit(q) ≤ min(amountKrw, cashKrw) — 수수료 포함, 1주 미만이면 unaffordable
+   *   ratio(매도): qty = floor(보유수량 × ratio) — 체결가(priceKrw)는 caller 입력 그대로
+   * 시세 조회는 일절 없다(quote ZERO) — 잔고는 자기 원장, 단가는 주문 입력.
+   */
+  applyResolvedExecution(
+    accountId: string,
+    request: {
+      symbol: string
+      side: 'buy' | 'sell'
+      priceKrw: number
+      name: string | null
+      market: string | null
+      mode: 'fit' | 'ratio'
+      amountKrw?: number
+      ratio?: number
+    },
+    rates: Rates,
+  ): OrderRecord {
+    const orderId = newId('od')
+    const at = nowKstIso()
+
+    const tx = this.db.transaction((): OrderRecord => {
+      const account = this.db
+        .prepare('SELECT cash_won AS cashKrw FROM accounts WHERE account_id = ?')
+        .get(accountId) as { cashKrw: number } | null
+      if (!account) {
+        throw new EngineError('account_not_found', `존재하지 않는 계좌: ${accountId}`)
+      }
+      const position = this.getPosition(accountId, request.symbol)
+
+      let quantity: number
+      if (request.mode === 'fit') {
+        const limitKrw = Math.min(request.amountKrw ?? 0, account.cashKrw)
+        quantity = fitBuyQuantity(request.priceKrw, limitKrw, rates)
+        if (quantity < 1) {
+          throw new EngineError('unaffordable', '주문 금액/잔고로는 1주도 살 수 없습니다', {
+            amountKrw: request.amountKrw,
+            cashKrw: account.cashKrw,
+            priceKrw: request.priceKrw,
+          })
+        }
       } else {
-        this.db.prepare('DELETE FROM positions WHERE account_id = ? AND symbol = ?').run(accountId, order.symbol)
+        quantity = resolveRatioQuantity(position?.quantity ?? 0, request.ratio ?? 0)
       }
 
+      const order: OrderInput = {
+        symbol: request.symbol,
+        side: request.side,
+        quantity,
+        priceKrw: request.priceKrw,
+        name: request.name,
+        market: request.market,
+      }
+      const exec = executeMarketOrder({ cashKrw: account.cashKrw, position, order, rates })
+      return this.persistExecution(orderId, at, accountId, order, exec)
+    })
+    return tx()
+  }
+
+  /** 영속화(트랜잭션 내부 전제) — 원장·포지션·주문·현금 반영 + OrderRecord 조립. */
+  private persistExecution(
+    orderId: string,
+    at: string,
+    accountId: string,
+    order: OrderInput,
+    exec: Execution,
+  ): OrderRecord {
+    const positionAfter = exec.positionAfter
+
+    this.db
+      .prepare('UPDATE accounts SET cash_won = ? WHERE account_id = ?')
+      .run(exec.cashAfterKrw, accountId)
+
+    if (positionAfter.quantity > 0) {
       this.db
         .prepare(
-          `INSERT INTO orders (order_id, account_id, symbol, symbol_name, market, side, order_type, quantity,
-             executed_price_won, gross_won, fee_won, tax_won, settlement_won, realized_pnl_won,
-             quantity_after, avg_price_centiwon_after, cash_after_won, created_at)
-           VALUES (?, ?, ?, ?, ?, ?, 'market', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+          `INSERT INTO positions (account_id, symbol, symbol_name, market, quantity, avg_price_centiwon, updated_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(account_id, symbol) DO UPDATE SET
+             symbol_name = excluded.symbol_name,
+             market = excluded.market,
+             quantity = excluded.quantity,
+             avg_price_centiwon = excluded.avg_price_centiwon,
+             updated_at = excluded.updated_at`,
         )
-        .run(
-          orderId, accountId, order.symbol, order.name, order.market, exec.side, exec.quantity,
-          exec.executedPriceKrw, exec.grossKrw, exec.feeKrw, exec.taxKrw, exec.settlementKrw,
-          exec.realizedPnlKrw, positionAfter.quantity, positionAfter.avgPriceCenti, exec.cashAfterKrw, at,
-        )
+        .run(accountId, order.symbol, order.name, order.market, positionAfter.quantity, positionAfter.avgPriceCenti, at)
+    } else {
+      this.db.prepare('DELETE FROM positions WHERE account_id = ? AND symbol = ?').run(accountId, order.symbol)
+    }
 
-      this.db
-        .prepare('INSERT INTO ledger (ledger_id, account_id, kind, amount_won, balance_after_won, ref_order_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
-        .run(
-          newId('lg'), accountId,
-          exec.side === 'buy' ? 'buy_settlement' : 'sell_settlement',
-          exec.settlementKrw, exec.cashAfterKrw, orderId, at,
-        )
-    })
-    tx()
+    this.db
+      .prepare(
+        `INSERT INTO orders (order_id, account_id, symbol, symbol_name, market, side, order_type, quantity,
+           executed_price_won, gross_won, fee_won, tax_won, settlement_won, realized_pnl_won,
+           quantity_after, avg_price_centiwon_after, cash_after_won, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, 'market', ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run(
+        orderId, accountId, order.symbol, order.name, order.market, exec.side, exec.quantity,
+        exec.executedPriceKrw, exec.grossKrw, exec.feeKrw, exec.taxKrw, exec.settlementKrw,
+        exec.realizedPnlKrw, positionAfter.quantity, positionAfter.avgPriceCenti, exec.cashAfterKrw, at,
+      )
+
+    this.db
+      .prepare('INSERT INTO ledger (ledger_id, account_id, kind, amount_won, balance_after_won, ref_order_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)')
+      .run(
+        newId('lg'), accountId,
+        exec.side === 'buy' ? 'buy_settlement' : 'sell_settlement',
+        exec.settlementKrw, exec.cashAfterKrw, orderId, at,
+      )
 
     return {
       orderId,

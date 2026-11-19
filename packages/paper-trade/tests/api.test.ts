@@ -239,3 +239,107 @@ describe('cache ZERO 원칙 — 재시작(신규 Store 같은 파일) 후에도 
     store2.close()
   })
 })
+
+describe('fit/ratio 주문 (v2 §6) — 원자 치환', () => {
+  async function accountIdWith(name: string, initialCashKrw: number): Promise<string> {
+    const res = await post('/v1/accounts', { name, initialCashKrw })
+    return res.json.data.accountId as string
+  }
+
+  test('fit 매수 완료기준 — 잔고 30만·amountKrw 100만·시가 31,100 → 9주 체결', async () => {
+    const accountId = await accountIdWith('피토갑', 300_000)
+    const res = await post(`/v1/accounts/${accountId}/orders`, {
+      symbol: '093320', side: 'buy', amountKrw: 1_000_000, priceKrw: 31_100, name: '케이아이엔엑스',
+    })
+    expect(res.status).toBe(201)
+    const order = res.json.data
+    expect(order.quantity).toBe(9) // min(amountKrw, cashKrw)=300,000 한도
+    expect(order.grossKrw).toBe(279_900)
+    expect(order.feeKrw).toBe(42)
+    expect(order.settlementKrw).toBe(-279_942)
+    expect(order.cashAfterKrw).toBe(20_058)
+    expect(order.positionAfter.quantity).toBe(9)
+    expect(order.positionAfter.avgPriceCenti).toBe(3_110_000)
+
+    // 원장 정합 — 현금·포지션
+    const account = await get(`/v1/accounts/${accountId}`)
+    expect(account.json.data.cashKrw).toBe(20_058)
+    const positions = await get(`/v1/accounts/${accountId}/positions`)
+    expect(positions.json.data.items[0].quantity).toBe(9)
+  })
+
+  test('ratio 매도 — 9주 중 0.5 → 4주 체결, 잔여 5주', async () => {
+    const accountId = await accountIdWith('피을갑', 300_000)
+    await post(`/v1/accounts/${accountId}/orders`, {
+      symbol: '093320', side: 'buy', amountKrw: 1_000_000, priceKrw: 31_100, name: '케이아이엔엑스',
+    })
+    const res = await post(`/v1/accounts/${accountId}/orders`, {
+      symbol: '093320', side: 'sell', ratio: 0.5, priceKrw: 32_000,
+    })
+    expect(res.status).toBe(201)
+    const order = res.json.data
+    expect(order.quantity).toBe(4)
+    expect(order.grossKrw).toBe(128_000)
+    expect(order.feeKrw).toBe(20)
+    expect(order.taxKrw).toBe(192)
+    expect(order.settlementKrw).toBe(127_788) // 128,000 − 20 − 192
+    expect(order.positionAfter.quantity).toBe(5)
+
+    const positions = await get(`/v1/accounts/${accountId}/positions`)
+    expect(positions.json.data.items[0].quantity).toBe(5)
+  })
+
+  test('ratio 1.0 전량 매도 — 포지션 소멸', async () => {
+    const accountId = await accountIdWith('피병갑', 300_000)
+    await post(`/v1/accounts/${accountId}/orders`, {
+      symbol: '093320', side: 'buy', amountKrw: 1_000_000, priceKrw: 31_100,
+    })
+    const res = await post(`/v1/accounts/${accountId}/orders`, {
+      symbol: '093320', side: 'sell', ratio: 1.0, priceKrw: 33_000,
+    })
+    expect(res.status).toBe(201)
+    expect(res.json.data.positionAfter.quantity).toBe(0)
+    const positions = await get(`/v1/accounts/${accountId}/positions`)
+    expect(positions.json.data.items).toEqual([])
+  })
+
+  test('unaffordable — 잔고/금액으로 1주도 못 사면 400 (원장 변화 없음)', async () => {
+    const accountId = await accountIdWith('피정갑', 20_000)
+    const res = await post(`/v1/accounts/${accountId}/orders`, {
+      symbol: '093320', side: 'buy', amountKrw: 30_000, priceKrw: 31_100,
+    })
+    expect(res.status).toBe(400)
+    expect(res.json.error.code).toBe('unaffordable')
+    const account = await get(`/v1/accounts/${accountId}`)
+    expect(account.json.data.cashKrw).toBe(20_000) // 롤백 확인
+  })
+
+  test('모드 검증 — 조합 오류 400', async () => {
+    const accountId = await accountIdWith('피무갑', 1_000_000)
+    // 매수에 ratio
+    expect((await post(`/v1/accounts/${accountId}/orders`, { symbol: '005930', side: 'buy', ratio: 0.5, priceKrw: 70_000 })).json.error.code).toBe('invalid_order_mode')
+    // 매도에 amountKrw
+    expect((await post(`/v1/accounts/${accountId}/orders`, { symbol: '005930', side: 'sell', amountKrw: 100_000, priceKrw: 70_000 })).json.error.code).toBe('invalid_order_mode')
+    // quantity + amountKrw 동시
+    expect((await post(`/v1/accounts/${accountId}/orders`, { symbol: '005930', side: 'buy', quantity: 1, amountKrw: 100_000, priceKrw: 70_000 })).json.error.code).toBe('invalid_order_mode')
+    // 아무 수량 지정 없음
+    expect((await post(`/v1/accounts/${accountId}/orders`, { symbol: '005930', side: 'buy', priceKrw: 70_000 })).json.error.code).toBe('invalid_order_mode')
+  })
+
+  test('ratio 치환 1주 미만 — 400 insufficient_ratio_quantity', async () => {
+    const accountId = await accountIdWith('피기갑', 100_000)
+    await post(`/v1/accounts/${accountId}/orders`, { symbol: '005930', side: 'buy', quantity: 1, priceKrw: 70_000 })
+    const res = await post(`/v1/accounts/${accountId}/orders`, { symbol: '005930', side: 'sell', ratio: 0.5, priceKrw: 70_000 })
+    expect(res.status).toBe(400)
+    expect(res.json.error.code).toBe('insufficient_ratio_quantity')
+  })
+
+  test('레거시 quantity 주문은 그대로 동작 (회귀)', async () => {
+    const accountId = await accountIdWith('피종갑', 1_000_000)
+    const res = await post(`/v1/accounts/${accountId}/orders`, {
+      symbol: '005930', side: 'buy', quantity: 2, priceKrw: 70_000,
+    })
+    expect(res.status).toBe(201)
+    expect(res.json.data.quantity).toBe(2)
+  })
+})

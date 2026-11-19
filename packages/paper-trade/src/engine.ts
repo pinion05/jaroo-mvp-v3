@@ -71,6 +71,61 @@ export function computeSellTaxKrw(grossKrw: number, rates: Rates): number {
   return Number(ceilDiv(BigInt(grossKrw) * BigInt(rates.taxBpsX10), 100_000n))
 }
 
+/**
+ * fit 매수 수량 치환 (v2 §6) — `qty = max q s.t. debit(q) ≤ limitKrw`.
+ * debit(q) = q×price + 수수료(올림) — 전 과정 BigInt 정확 계산, 시세 조회 없음(quote ZERO).
+ * 이 컨테이너는 amountKrw 의사를 자기 원장 잔고와 함께 트랜잭션 안에서 치환한다
+ * (limitKrw = min(amountKrw, cashKrw)는 호출자(store)가 전달).
+ *
+ * 반환 0 = 1주도 살 수 없음 → 호출자가 `unaffordable` 로 매핑.
+ */
+export function fitBuyQuantity(priceKrw: number, limitKrw: number, rates: Rates): number {
+  if (!Number.isInteger(priceKrw) || priceKrw <= 0 || priceKrw > MAX_PRICE_KRW) {
+    throw new EngineError('invalid_price', `priceKrw는 1 이상 ${MAX_PRICE_KRW.toLocaleString()} 이하 정수(원): ${String(priceKrw)}`)
+  }
+  if (!Number.isInteger(limitKrw) || limitKrw < 0) {
+    throw new EngineError('invalid_amount', `limitKrw는 0 이상 정수(원): ${String(limitKrw)}`)
+  }
+
+  const price = BigInt(priceKrw)
+  const limit = BigInt(limitKrw)
+  const feeNum = BigInt(rates.feeBpsX10)
+  const DENOM = 100_000n
+
+  // 상한 추정: debit(q) ≥ q×price×(1+fee율) 이므로 이 부등식을 만족하는 최대 q는 참값의 상계.
+  const estimate = limit * DENOM / (price * (DENOM + feeNum))
+
+  // 정확한 debit과 비교해 내려가며 맞춘다 (올림 수수료 때문에 추정치와 최대 1~2 차).
+  const debit = (q: bigint): bigint => {
+    const gross = q * price
+    return gross + ceilDiv(gross * feeNum, DENOM)
+  }
+
+  let q = estimate
+  while (q > 0n && debit(q) > limit) {
+    q -= 1n
+  }
+  return Number(q)
+}
+
+/**
+ * ratio 매도 수량 치환 (v2 §6) — `qty = floor(보유수량 × ratio)`, ratio ∈ (0, 1].
+ * 분할 매도(전량=1.0). 체결가(priceKrw)는 여전히 caller 입력 — 원장 정산·기록에 필요.
+ */
+export function resolveRatioQuantity(heldQty: number, ratio: number): number {
+  if (!Number.isFinite(ratio) || ratio <= 0 || ratio > 1) {
+    throw new EngineError('invalid_ratio', 'ratio는 0 초과 1 이하(전량=1.0)여야 합니다', { ratio })
+  }
+  const qty = Math.floor(heldQty * ratio)
+  if (qty < 1) {
+    throw new EngineError('insufficient_ratio_quantity', 'ratio 치환 결과가 1주 미만입니다 — 체결 불가', {
+      held: heldQty,
+      ratio,
+    })
+  }
+  return qty
+}
+
 /** 매수 후 다음 평단가 (centi-won, 반올림) */
 export function nextAvgPriceCenti(
   prevQty: number,
