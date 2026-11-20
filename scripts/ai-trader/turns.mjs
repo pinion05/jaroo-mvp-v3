@@ -23,6 +23,10 @@ export const PERSONAS = {
     source: "finance",
     card: "너는 jaroo AI 트레이더 캐릭터 '재무콕'이다. 재무제표만 읽는 숫자 중독 — 이야기는 거짓말해도 숫자는 안 한다는 신념. 수익성·건전성·성장성·현금흐름·효율성·F-Score를 보고 진짜 우량인지, 총점에 비해 경계할 구멍이 있는지 판단한다. 높은 점수를 맹신하지 않는다. 말투는 냉정하고 계산적이다.",
   },
+  소심이: {
+    source: "chart", // v1 레지스트리 카드(master characters.ts) — 실턴 배선 실측용
+    card: "너는 jaroo AI 트레이더 캐릭터 '소심이'다. 안정형(금투협 1~2단계) — 여행자금 230만원이 목표다. 원칙: 위원회가 아무리 강세여도 한 종목에 총자산의 10%를 넘지 않는다 / 연속 손실이 쌓이면 다음 진입은 절반 크기 / 여행자금이 90% 이상 모이면 새 진입 중단 / 산 이유를 한 문장으로 못 쓰면 산 게 아니다. 떨어지면 소량씩 사고 모르는 종목은 안 산다. 말투: '으, 무섭지만 내 원칙대로라면 사는 거야.'",
+  },
 };
 
 const GUARDRAIL_NOTICE = `
@@ -92,16 +96,20 @@ export function validateInterest(turnResult, holdings) {
 
 const won = (n) => String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
-/** 시안 §4.3 — 웹 UI 3청크와 같은 모양의 조언 블록 */
+/** 시안 §4.3 — 웹 UI 3청크와 같은 모양의 조언 블록 (hero 근거 팩트 포함 옵션) */
 export function renderAdviceBlock(a) {
   const t = a.teams ?? {};
-  return [
+  const lines = [
     `## 위원회 조언 — ${a.name} (${a.code})`,
-    `종합 가중치 ${a.heroScore}/100 · 이것은 조언이다. 최종 결정은 당신이다.`,
+    `종합 가중치 ${a.heroScore ?? "?"}/100 · 이것은 조언이다. 최종 결정은 당신이다.`,
     `- 시장·차트 팀: ${t.market ?? "요약 없음"}`,
     `- 심리·환경 팀: ${t.context ?? "요약 없음"}`,
     `- 가치·기본 팀: ${t.fundamental ?? "요약 없음"}`,
-  ].join("\n");
+  ];
+  if (Array.isArray(a.facts) && a.facts.length) {
+    lines.push(`- 확인 근거: ${a.facts.join(" · ")}`);
+  }
+  return lines.join("\n");
 }
 
 export function buildDecisionTail({ interest, advices, account, memory, scanCodes, holdings }) {
