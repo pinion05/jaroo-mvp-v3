@@ -34,6 +34,13 @@ JAROO AI 트레이더 캐릭터 **오케스트레이터 골격** — 계좌 매�
 
 Hono + Bun + `bun:sqlite` (런타임은 #368 Node 사이드카 방향과 정렬해 Node 전환 예정).
 
+## 마이그레이션
+
+스타트업마다 `migrations/*.sql`을 파일명순 전체 재적용(DDL 멱등). 이력:
+
+- `0001` — 초기 스키마 (characters + judgment_logs)
+- `0002` — `order_status` 어휘 `placed`→`filled` 전환 (#373 후속): 기존 dev DB의 구 CHECK를 테이블 재구축으로 교체하고 `placed` 행을 `filled`로 변환(기존 기록 보존). **수동 재구축 불필요 — 구 DB로 그냥 기동하면 자동 전환됨**
+
 ## API
 
 모든 응답은 `{ ok: true, data }` 또는 `{ ok: false, error: { code, message } }`.

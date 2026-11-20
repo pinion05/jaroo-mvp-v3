@@ -5,13 +5,14 @@ import { createApp } from './app.ts'
 import { DEFAULT_CHARACTERS } from './characters.ts'
 import { loadConfig } from './config.ts'
 import { Store } from './journal.ts'
+import { loadMigrationsSql } from './migrations.ts'
 import type { LoopDeps } from './loop.ts'
 import { createStaticQuotesProvider, createWebQuotesProvider } from './quotes.ts'
 import { PaperTradeClient } from './papertrade.ts'
 
 const config = loadConfig()
 
-const schemaSql = await Bun.file(new URL('../migrations/0001_init.sql', import.meta.url)).text()
+const schemaSql = loadMigrationsSql()
 const store = new Store(config.dbPath, schemaSql)
 store.seedCharacters(DEFAULT_CHARACTERS)
 
