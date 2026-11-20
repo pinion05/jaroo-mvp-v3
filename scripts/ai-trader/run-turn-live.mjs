@@ -166,8 +166,7 @@ for (const d of decisions) {
         amountIntentKrw: d.amountKrw ?? null, sellRatio: d.sellRatio ?? null, scanSet: scanSet.map((s) => s.code),
       },
       rationale: d.reason ?? decision.parsed?.narrative ?? "",
-      // 어휘 매핑: paper-trade(#372) filled/rejected → ai-trader journal enum placed/failed
-      order: { orderId: order?.orderId ?? null, orderStatus: { filled: "placed", rejected: "failed" }[orderStatus] ?? orderStatus, errorMessage: errMsg },
+      order: { orderId: order?.orderId ?? null, orderStatus, errorMessage: errMsg }, // filled/skipped/failed — #373로 어휘 통일
     }),
   }).catch((e) => { log(`판단 로그 실패 ${code}: ${String(e).slice(0, 150)}`); return null; });
   fills.push({ d, order, orderStatus, judgmentId: jres?.data?.logId ?? null });
