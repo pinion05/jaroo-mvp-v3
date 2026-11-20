@@ -34,13 +34,14 @@ describe('라우팅 기본', () => {
     expect(notFound.json.error.code).toBe('not_found')
   })
 
-  test('캐릭터 목록 — 소심이 1명 시드 + 자기 원칙 문구', async () => {
+  test('캐릭터 목록 — v1 소심이 포함 4인 시드 + 자기 원칙 문구', async () => {
     const { status, json } = await req('/v1/characters')
     expect(status).toBe(200)
-    expect(json.data.items).toHaveLength(1)
-    expect(json.data.items[0].slug).toBe('sosimi')
-    expect(json.data.items[0].principles.length).toBeGreaterThan(0) // §5.2 자기 원칙
-    expect(json.data.items[0].paperTradeAccountId).toBeNull()
+    expect(json.data.count).toBe(4)
+    const sosimi = json.data.items.find((i: any) => i.slug === 'sosimi')
+    expect(sosimi.displayName).toBe('소심이')
+    expect(sosimi.principles.length).toBeGreaterThan(0) // §5.2 자기 원칙
+    expect(sosimi.paperTradeAccountId).toBeNull()
   })
 
   test('존재하지 않는 캐릭터 404', async () => {
@@ -75,7 +76,7 @@ describe('bootstrap → load → judgments → orders', () => {
         reasonCode: 'thesis_invalidated',
         fact: { sellRatio: 0.5, heroScore: 38 },
         rationale: '위원회 약화와 내 stop 관점이 일치 — 절반 정리',
-        order: { orderId: 'od_9', orderStatus: 'placed' },
+        order: { orderId: 'od_9', orderStatus: 'filled' },
       }),
     })
     expect(post.status).toBe(201)
@@ -94,6 +95,33 @@ describe('bootstrap → load → judgments → orders', () => {
     })
     expect(bad.status).toBe(400)
     expect(bad.json.error.code).toBe('invalid_rationale')
+  })
+
+  test('orderStatus 어휘 — placed(구)는 400, filled는 허용', async () => {
+    const legacy = await req('/v1/characters/sosimi/judgments', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'hold', rationale: '관망', order: { orderStatus: 'placed' } }),
+    })
+    expect(legacy.status).toBe(400)
+    expect(legacy.json.error.code).toBe('invalid_order_status')
+
+    const filled = await req('/v1/characters/sosimi/judgments', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ decision: 'hold', rationale: '관망', order: { orderStatus: 'filled' } }),
+    })
+    expect(filled.status).toBe(201)
+  })
+
+  test('캐릭터 목록 — 소스 페르소나 3인 추가 (chart-cok·news-cok·finance-cok)', async () => {
+    const { json } = await req('/v1/characters')
+    const slugs = json.data.items.map((i: any) => i.slug)
+    expect(slugs).toEqual(['chart-cok', 'finance-cok', 'news-cok', 'sosimi']) // slug 오름차순
+    const chart = json.data.items.find((i: any) => i.slug === 'chart-cok')
+    expect(chart.displayName).toBe('차트콕')
+    expect(chart.principles.length).toBeGreaterThanOrEqual(3)
+    expect(chart.cashGoalKrw).toBeNull()
   })
 
   test('계좌 매핑 전 orders는 빈 목록 + 힌트', async () => {

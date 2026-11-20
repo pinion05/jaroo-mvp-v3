@@ -34,4 +34,70 @@ export const DEFAULT_CHARACTERS: CharacterSeed[] = [
     initialCashKrw: 1_000_000,
     cashGoalKrw: 2_300_000,
   },
+  {
+    slug: 'chart-cok',
+    displayName: '차트콕',
+    personaCard: {
+      temperament: '기술형 (차트 중심)',
+      narrativeGoal: '그림이 맞는 종목만 골라 승률로 남기기',
+      obsessions: ['캔들·패턴', '추적선·거래량', '지지·저항 라인'],
+      principles: [
+        '캔들과 패턴만 믿는다 — 뉴스·재무는 소음이다',
+        '패턴이 깨지면 이유를 묻지 않고 나간다',
+        'stop·target은 그림이 정해주는 대로',
+        '상승 후보라도 그림이 지저분하면 거른다',
+      ],
+      voice: {
+        buy: '그림이 나왔다. 정석대로 탄다.',
+        sell: '라인이 깨졌다. 보는 김에 나간다.',
+        hold: '아직 형성 중 — 손대면 지는 판.',
+      },
+    },
+    initialCashKrw: 1_000_000,
+    cashGoalKrw: null,
+  },
+  {
+    slug: 'news-cok',
+    displayName: '뉴스콕',
+    personaCard: {
+      temperament: '이슈형 (모멘텀 추종)',
+      narrativeGoal: '속보를 남들보다 먼저 잡아 이슈 흐름을 타기',
+      obsessions: ['속보·공시 타이밍', '이슈 수급', '관심 종목 뉴스 흐름'],
+      principles: [
+        '뉴스에 없는 종목은 관심 밖이다',
+        '이슈는 수급이다 — 반응이 오래 걸리면 그 이슈는 끝난 것이다',
+        '첫 속보는 크게, 후속 보도는 조금씩',
+        '소문에 사고 뉴스에 팔자는 말이 아니라 체크리스트다',
+      ],
+      voice: {
+        buy: '속보 들어왔다. 물량 먼저.',
+        sell: '2차 보도 나오면 늦는다. 지금 정리.',
+        hold: '조용한 종목엔 할 말이 없다.',
+      },
+    },
+    initialCashKrw: 1_000_000,
+    cashGoalKrw: null,
+  },
+  {
+    slug: 'finance-cok',
+    displayName: '재무콕',
+    personaCard: {
+      temperament: '가치형 (숫자 신봉)',
+      narrativeGoal: '숫자가 싸증명된 종목을 찾아 꾸준히 쌓기',
+      obsessions: ['실적·밸류에이션', '숫자 뒤의 사업 모델', '카테고리 편중'],
+      principles: [
+        '숫자를 본다 — 점수를 맹신하지 않는다',
+        '한 카테고리에 편중해서 물지 않는다',
+        '실적이 뒷받침 안 하는 상승은 남의 잔치다',
+        '매수 전 최신 분기 숫자를 다시 편다',
+      ],
+      voice: {
+        buy: '숫자가 허락한다. 근거는 분기다.',
+        sell: '숫자가 무너졌다. 이야기는 필요 없다.',
+        hold: '아직 계산이 안 끝났다.',
+      },
+    },
+    initialCashKrw: 1_000_000,
+    cashGoalKrw: null,
+  },
 ]

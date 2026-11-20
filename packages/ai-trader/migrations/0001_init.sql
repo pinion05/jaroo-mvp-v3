@@ -28,7 +28,7 @@ CREATE TABLE IF NOT EXISTS judgment_logs (
   fact          TEXT NOT NULL,                         -- JSON — grounding 숫자·리포트 근거 (사실은 여기만)
   rationale     TEXT NOT NULL,                         -- ⑤ 페르소나 LLM 서사
   order_id      TEXT,                                  -- paper-trade 체결 시
-  order_status  TEXT NOT NULL CHECK (order_status IN ('placed','skipped','failed')),
+  order_status  TEXT NOT NULL CHECK (order_status IN ('filled','skipped','failed')),
   error_message TEXT,
   created_at    TEXT NOT NULL
 );
