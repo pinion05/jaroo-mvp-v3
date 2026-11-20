@@ -9,9 +9,11 @@ import {
   computeFeeKrw,
   computeSellTaxKrw,
   executeMarketOrder,
+  fitBuyQuantity,
   isKrSymbol,
   nextAvgPriceCenti,
   positionBasisKrw,
+  resolveRatioQuantity,
 } from '../src/engine.ts'
 
 const order = (symbol: string, side: 'buy' | 'sell', quantity: number, priceKrw: number) => ({
@@ -204,5 +206,80 @@ describe('매입원본 (자기 데이터만으로 계산)', () => {
     strictEqual(positionBasisKrw({ quantity: 10, avgPriceCenti: 5_000_000 }), 500_000)
     // 33,333.70 × 3 = 100,001.10 → 100,001
     strictEqual(positionBasisKrw({ quantity: 3, avgPriceCenti: 3_333_370 }), 100_001)
+  })
+})
+
+describe('fit 매수 수량 치환 (v2 §6)', () => {
+  test('완료기준 시나리오 — 시가 31,100 · 한도 300,000 → 9주 (수수료 포함)', () => {
+    // debit(9)  = 279,900 + 42 = 279,942 ≤ 300,000
+    // debit(10) = 311,000 + 47 = 311,047 > 300,000
+    strictEqual(fitBuyQuantity(31_100, 300_000, DEFAULT_RATES), 9)
+  })
+
+  test('금액 의사가 잔고보다 작으면 금액이 한도 — 100,000원 → 3주', () => {
+    // debit(3) = 93,300 + 14 = 93,314 ≤ 100,000 · debit(4) = 124,419 > 100,000
+    strictEqual(fitBuyQuantity(31_100, 100_000, DEFAULT_RATES), 3)
+  })
+
+  test('debit이 한도와 정확히 같으면 포함 (≤)', () => {
+    // price 100,000 · fee 1주 = ceil(100,000×15/100,000) = 15 → debit(1) = 100,015
+    strictEqual(fitBuyQuantity(100_000, 100_015, DEFAULT_RATES), 1)
+    strictEqual(fitBuyQuantity(100_000, 100_014, DEFAULT_RATES), 0)
+  })
+
+  test('1주도 살 수 없으면 0 (호출자가 unaffordable로 매핑)', () => {
+    strictEqual(fitBuyQuantity(31_100, 20_000, DEFAULT_RATES), 0)
+    strictEqual(fitBuyQuantity(31_100, 0, DEFAULT_RATES), 0)
+  })
+
+  test('수수료 0 레이트에서도 정확 — feeBpsX10=0', () => {
+    strictEqual(fitBuyQuantity(70_000, 210_000, { feeBpsX10: 0, taxBpsX10: 0 }), 3)
+    strictEqual(fitBuyQuantity(70_000, 209_999, { feeBpsX10: 0, taxBpsX10: 0 }), 2)
+  })
+
+  test('입력 검증 — priceKrw/limitKrw', () => {
+    try {
+      fitBuyQuantity(0, 100_000, DEFAULT_RATES)
+      fail('invalid_price 예상')
+    } catch (error) {
+      strictEqual((error as EngineError).code, 'invalid_price')
+    }
+    try {
+      fitBuyQuantity(70_000, -1, DEFAULT_RATES)
+      fail('invalid_amount 예상')
+    } catch (error) {
+      strictEqual((error as EngineError).code, 'invalid_amount')
+    }
+  })
+})
+
+describe('ratio 매도 수량 치환 (v2 §6)', () => {
+  test('floor(보유 × ratio) — 7주×0.5=3 · 9주×0.5=4', () => {
+    strictEqual(resolveRatioQuantity(7, 0.5), 3)
+    strictEqual(resolveRatioQuantity(9, 0.5), 4)
+  })
+
+  test('전량 = 1.0', () => {
+    strictEqual(resolveRatioQuantity(12, 1.0), 12)
+  })
+
+  test('치환 결과 1주 미만 → insufficient_ratio_quantity', () => {
+    try {
+      resolveRatioQuantity(1, 0.5)
+      fail('insufficient_ratio_quantity 예상')
+    } catch (error) {
+      strictEqual((error as EngineError).code, 'insufficient_ratio_quantity')
+    }
+  })
+
+  test('ratio 범위 검증 — (0, 1]', () => {
+    for (const bad of [0, -0.1, 1.5, Number.NaN]) {
+      try {
+        resolveRatioQuantity(10, bad)
+        fail('invalid_ratio 예상')
+      } catch (error) {
+        strictEqual((error as EngineError).code, 'invalid_ratio')
+      }
+    }
   })
 })

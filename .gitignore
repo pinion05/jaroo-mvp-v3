@@ -49,6 +49,9 @@ next-env.d.ts
 .codex/
 .gjc/
 
+# package-local SQLite data dirs (paper-trade, ai-trader — cache ZERO의 유일한 상태 저장소)
+packages/*/data/
+
 # supabase
 supabase/.temp/
 

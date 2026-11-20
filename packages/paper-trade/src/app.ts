@@ -126,6 +126,8 @@ export function createApp({ store, rates }: AppDeps): (req: IncomingMessage, res
           symbol?: unknown
           side?: unknown
           quantity?: unknown
+          amountKrw?: unknown
+          ratio?: unknown
           priceKrw?: unknown
           name?: unknown
           market?: unknown
@@ -140,19 +142,69 @@ export function createApp({ store, rates }: AppDeps): (req: IncomingMessage, res
             { symbol },
           )
         }
+        const side = b?.side === 'buy' || b?.side === 'sell' ? b.side : null
+        if (!side) {
+          throw new AppError(400, 'invalid_side', "side는 'buy' | 'sell'여야 합니다")
+        }
+        const priceKrw = b?.priceKrw
+        if (typeof priceKrw !== 'number' || !Number.isInteger(priceKrw) || priceKrw <= 0) {
+          throw new AppError(400, 'invalid_price', 'priceKrw는 양의 정수(원)여야 합니다 — 모든 모드에서 caller가 제시하는 체결가다(quote ZERO)')
+        }
+        const name = typeof b?.name === 'string' ? b.name : null
+        const market = typeof b?.market === 'string' ? b.market : null
 
-        const order = {
-          symbol,
-          side: b?.side as 'buy' | 'sell',
-          quantity: b?.quantity as number,
-          priceKrw: b?.priceKrw as number,
-          name: typeof b?.name === 'string' ? b.name : null,
-          market: typeof b?.market === 'string' ? b.market : null,
+        // 주문 모드 — quantity(기존) | amountKrw(fit 매수, v2 §6) | ratio(매도) 중 정확히 하나
+        const hasQuantity = b?.quantity !== undefined && b?.quantity !== null
+        const hasAmount = b?.amountKrw !== undefined && b?.amountKrw !== null
+        const hasRatio = b?.ratio !== undefined && b?.ratio !== null
+        if ([hasQuantity, hasAmount, hasRatio].filter(Boolean).length !== 1) {
+          throw new AppError(400, 'invalid_order_mode', 'quantity | amountKrw(fit 매수) | ratio(매도) 중 정확히 하나만 전달해야 합니다')
+        }
+        if (hasAmount && side !== 'buy') {
+          throw new AppError(400, 'invalid_order_mode', 'amountKrw(fit)는 매수 전용입니다 — 매도는 quantity 또는 ratio')
+        }
+        if (hasRatio && side !== 'sell') {
+          throw new AppError(400, 'invalid_order_mode', 'ratio는 매도 전용입니다 — 매수는 quantity 또는 amountKrw')
         }
 
-        const position = store.getPosition(account.accountId, order.symbol)
-        const execution = executeMarketOrder({ cashKrw: account.cashKrw, position, order, rates })
-        const record: OrderRecord = store.applyExecution(account.accountId, order, execution)
+        if (hasQuantity) {
+          const order = {
+            symbol,
+            side,
+            quantity: b?.quantity as number,
+            priceKrw,
+            name,
+            market,
+          }
+          const position = store.getPosition(account.accountId, order.symbol)
+          const execution = executeMarketOrder({ cashKrw: account.cashKrw, position, order, rates })
+          const record: OrderRecord = store.applyExecution(account.accountId, order, execution)
+          return { status: 201, data: record }
+        }
+
+        if (hasAmount) {
+          const amountKrw = b?.amountKrw
+          if (typeof amountKrw !== 'number' || !Number.isInteger(amountKrw) || amountKrw <= 0) {
+            throw new AppError(400, 'invalid_amount', 'amountKrw는 양의 정수(원)여야 합니다')
+          }
+          // fit: 잔고 읽기→수량 치환→체결이 원장 트랜잭션 안에서 원자 수행됨 (TOCTOU 없음)
+          const record = store.applyResolvedExecution(
+            account.accountId,
+            { symbol, side, priceKrw, name, market, mode: 'fit', amountKrw },
+            rates,
+          )
+          return { status: 201, data: record }
+        }
+
+        const ratio = b?.ratio
+        if (typeof ratio !== 'number' || !Number.isFinite(ratio) || ratio <= 0 || ratio > 1) {
+          throw new AppError(400, 'invalid_ratio', 'ratio는 0 초과 1 이하(전량=1.0)여야 합니다')
+        }
+        const record = store.applyResolvedExecution(
+          account.accountId,
+          { symbol, side, priceKrw, name, market, mode: 'ratio', ratio },
+          rates,
+        )
         return { status: 201, data: record }
       },
     },
