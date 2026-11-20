@@ -21,8 +21,11 @@ function parseBpsX10(raw: string | undefined, fallback: number, label: string): 
 
 export function loadConfig(env: Record<string, string | undefined> = process.env): Config {
   return {
-    port: Number(env.PORT) || 3041,
-    dbPath: env.DB_PATH || './data/paper-trade.db',
+    // PAPER_TRADE_PORT only — 절대 공유 PORT를 읽지 않는다. Railway는 웹(Next.js)에 PORT를
+    // 주입한다 — 크롤러 사이드카의 EADDRINUSE 사고 방지와 동일한 이유로 전용 변수만 읽는다
+    // (packages/crawler/src/server.js의 CRAWLER_PORT 주석 참고).
+    port: Number(env.PAPER_TRADE_PORT) || 3041,
+    dbPath: env.PAPER_TRADE_DB_PATH || './data/paper-trade.db',
     rates: {
       feeBpsX10: parseBpsX10(env.BROKER_FEE_BPS, 15, 'BROKER_FEE_BPS'),
       taxBpsX10: parseBpsX10(env.SELL_TAX_BPS, 150, 'SELL_TAX_BPS'),
