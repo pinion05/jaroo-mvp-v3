@@ -10,7 +10,7 @@ JAROO AI 트레이더 캐릭터 **오케스트레이터 골격** — 계좌 매�
 
 | 자산 | 내용 |
 |---|---|
-| 캐릭터 레지스트리 | 캐릭터=계좌 1개(spec D1, 모든 유저 동일 뷰) — 계좌 부트스트랩 멱등 |
+| 캐릭터 레지스트리 | 캐릭터=계좌 1개(spec D1, 모든 유저 동일 뷰) — 계좌 부트스트랩 멱등. 시드: 소심이(v1 안정형) + 소스 페르소나 3인(차트콕·뉴스콕·재무콕) |
 | [phase=load] 상태 적재 | 원장(paper-trade)×시세 조합 fresh 스냅샷 — 평가손익·목표 진행률(D5) |
 | 판단 로그(judgment_logs) | ⑤ 결정+체결 결과의 영속화 — `fact`에 리포트 근거(debugId·heroScore…, D9). 결정은 하지 않고 **저장만** |
 | 원장 패스스루 | 매매 입증 피드 (paper-trade orders) |
@@ -56,7 +56,7 @@ POST /v1/characters/sosimi/judgments
   "reasonCode": "thesis_invalidated",
   "fact": { "sellRatio": 0.5, "debugId": "ds_...", "heroScore": 38 },
   "rationale": "위원회 약화와 내 stop 관점이 일치 — 절반 정리",
-  "order": { "orderId": "od_...", "orderStatus": "placed" }
+  "order": { "orderId": "od_...", "orderStatus": "filled" }
 }
 ```
 

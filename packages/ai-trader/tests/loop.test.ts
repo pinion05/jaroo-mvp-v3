@@ -90,7 +90,7 @@ describe('판단 로그 저장 — 결정은 외부(⑤)에서 전달, 저장만
       reasonCode: 'wedge_breakout',
       fact: { amountKrw: 300_000, debugId: 'ds_xxx', heroScore: 62 },
       rationale: '하강 쐐기 돌파 + 위원회 강세 — 내 원칙 크기로 진입',
-      order: { orderId: 'od_1', orderStatus: 'placed' },
+      order: { orderId: 'od_1', orderStatus: 'filled' },
     })
     expect(entry.logId).toStartWith('jdg_')
     const journal = store.listJudgments('sosimi', 10)

@@ -69,6 +69,10 @@ export function createApp(deps: LoopDeps) {
       return c.json({ ok: false, error: { code: 'invalid_rationale', message: 'rationale(서사)은 필수입니다' } }, 400)
     }
     const reasonCode = typeof body?.reasonCode === 'string' && body.reasonCode.trim() ? body.reasonCode.trim() : 'untagged'
+    const orderStatus = body?.order?.orderStatus
+    if (orderStatus !== undefined && orderStatus !== 'filled' && orderStatus !== 'skipped' && orderStatus !== 'failed') {
+      return c.json({ ok: false, error: { code: 'invalid_order_status', message: "order.orderStatus는 'filled'|'skipped'|'failed'여야 합니다 (paper-trade는 즉시체결 — filled)" } }, 400)
+    }
     const entry = deps.store.appendJudgment(c.req.param('slug'), nowKstIso(), {
       decision,
       symbol: typeof body?.symbol === 'string' ? body.symbol : null,

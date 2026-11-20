@@ -82,7 +82,7 @@ export type JudgmentInput = {
   reasonCode: string
   fact: Record<string, unknown>
   rationale: string
-  order: { orderId: string | null; orderStatus: 'placed' | 'skipped' | 'failed'; errorMessage?: string | null }
+  order: { orderId: string | null; orderStatus: 'filled' | 'skipped' | 'failed'; errorMessage?: string | null }
 }
 
 export type JudgmentEntry = Omit<JudgmentInput, 'order'> & {
@@ -90,7 +90,7 @@ export type JudgmentEntry = Omit<JudgmentInput, 'order'> & {
   characterSlug: string
   loopAt: string
   orderId: string | null
-  orderStatus: 'placed' | 'skipped' | 'failed'
+  orderStatus: 'filled' | 'skipped' | 'failed'
   errorMessage: string | null
   createdAt: string
 }
