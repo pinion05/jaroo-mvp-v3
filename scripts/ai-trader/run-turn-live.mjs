@@ -188,7 +188,18 @@ log(`⑤ ok=${dv.ok} decisions=${(decision.parsed?.decisions ?? []).length} ${dv
 
 // ---------------------------------------------------------------- 5. 실행 — fit/ratio 체결 + 판단 로그
 
-const decisions = decision.parsed?.decisions ?? [];
+const decisions = (decision.parsed?.decisions ?? []).map((d) => {
+  // 스키마 혼동 정규화 — LLM이 action 자리에 status:"buy" 등을 쓰는 경우(2026-11-20 실측)
+  const verb = ["buy", "sell", "hold"].includes(d.status) ? d.status : null;
+  if (!d.action && verb) d.action = verb;
+  if (verb && !d.status?.match(/existing|new/)) d.status = undefined;
+  // 매도에 sellRatio 누락 → 전량(1.0) 기본(2026-11-20 실측: 계룡건설 매도 스킵 사고)
+  if (d.action === "sell" && !(Number(d.sellRatio) > 0)) {
+    d.sellRatio = 1.0;
+    log(`정규화: ${d.code} 매도 sellRatio 누락 → 전량 1.0 적용`);
+  }
+  return d;
+});
 const fills = [];
 for (const d of decisions) {
   const code = String(d.code ?? "").match(/\d{6}/)?.[0];

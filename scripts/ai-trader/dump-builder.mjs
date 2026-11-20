@@ -86,12 +86,11 @@ export function serializeHoldingsSection(holdings, asOf) {
     .sort((a, b) => String(a.code).localeCompare(String(b.code)))
     .map((h) => {
       const days = daysBetween(h.openedAt, asOf);
-      const weeks = Math.floor(days / 7);
       const reasons = h.thesis?.entryReasons?.length ? h.thesis.entryReasons.join(" + ") : "기록 없음";
       const ev = h.evidence ?? {};
       const line = (label, v) => (v == null || v === "" ? `${label} 수집 안 됨` : `${label} ${v}`);
       return [
-        `### ${h.name} (${h.code}) · ${weeks}주(${days}일) · 평단 ${won(h.avgPriceKrw)} · 현재 ${won(h.currentPriceKrw)} (${pct(h.avgPriceKrw, h.currentPriceKrw)}%)`,
+        `### ${h.name} (${h.code}) · 보유 ${h.quantity}주 · 진입 ${days}일째 · 평단 ${won(h.avgPriceKrw)} · 현재 ${won(h.currentPriceKrw)} (${pct(h.avgPriceKrw, h.currentPriceKrw)}%)`,
         `- 진입 근거(${days}일 전): ${reasons}`,
         `- 오늘 소스 증거: ${line("[차트]", ev.chart)} · ${line("[재무]", ev.finance)} · ${line("[뉴스]", ev.news)}`,
       ].join("\n");

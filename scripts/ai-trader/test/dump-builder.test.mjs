@@ -78,14 +78,16 @@ test("소스 증거 수집 — 등장/이탈/권외/언급없음 4형태", () =>
   assert.equal(ev2.news, "언급 없음");
 });
 
-test("보유종목 섹션 — 보유기간(주/일)·손익 부호·정렬(코드순)", () => {
+test("보유종목 섹션 — 수량 명시·진입일수·손익 부호·정렬(코드순)", () => {
   const section = serializeHoldingsSection(withEvidence(FIX.holdings, FIX.sourceData), AS_OF);
-  // 005930(11-05 진입, 14일=2주)이 코드순으로 093320 앞에 온다
+  // 005930(11-05 진입, 14일)이 코드순으로 093320 앞에 온다
   const iSamsung = section.indexOf("### 삼성전자");
   const iKinx = section.indexOf("### 케이아이엔엑스");
   assert.ok(iSamsung > -1 && iKinx > -1 && iSamsung < iKinx);
-  assert.match(section, /삼성전자 \(005930\) · 2주\(14일\)/);
-  assert.match(section, /케이아이엔엑스 \(093320\) · 2주\(14일\)/);
+  // '보유 N주'가 수량, '진입 N일째'가 기간 — 0주(0일) 혼동 방지 형식(2026-11-20 실측 교정)
+  assert.match(section, /삼성전자 \(005930\) · 보유 4주 · 진입 14일째/);
+  assert.match(section, /케이아이엔엑스 \(093320\) · 보유 9주 · 진입 14일째/);
+  assert.match(section, /제주반도체 \(005935\) · 보유 2주 · 진입 42일째/);
   assert.match(section, /\(-4\.0%\)/);   // 평단 대비 하락 부호
   assert.match(section, /\(\+2\.3%\)/);  // 상승 부호
 });
