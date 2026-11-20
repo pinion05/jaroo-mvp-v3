@@ -142,7 +142,7 @@ export function createApp({ store, rates }: AppDeps): (req: IncomingMessage, res
             { symbol },
           )
         }
-        const side = b?.side === 'buy' || b?.side === 'sell' ? b.side : null
+        const side: 'buy' | 'sell' | null = b?.side === 'buy' || b?.side === 'sell' ? b.side : null
         if (!side) {
           throw new AppError(400, 'invalid_side', "side는 'buy' | 'sell'여야 합니다")
         }
