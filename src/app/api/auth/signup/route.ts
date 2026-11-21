@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { originAllowedForStateChange } from '@/lib/http-origin-guard'
 import { createAuthMeFromSupabaseUser } from '@/lib/supabase/auth'
 import { createSupabaseServerClient } from '@/lib/supabase/server'
 import { EXISTING_SIGNUP_MESSAGE, isLikelyExistingSignupUser, signupErrorMessage } from '@/lib/supabase/signup'
@@ -33,6 +34,10 @@ function errorJson(message: string, status = 400, code = 'auth_error') {
 }
 
 export async function POST(request: Request) {
+  if (!originAllowedForStateChange(request)) {
+    return errorJson('요청을 처리할 수 없어요.', 403, 'origin_not_allowed')
+  }
+
   const body = (await request.json()) as SignupBody
   const email = normalizeEmail(body.email)
   const password = typeof body.password === 'string' ? body.password : ''
