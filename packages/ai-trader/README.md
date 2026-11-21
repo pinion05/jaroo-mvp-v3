@@ -36,7 +36,7 @@ Hono + Bun + `bun:sqlite` (런타임은 #368 Node 사이드카 방향과 정렬�
 
 ## 마이그레이션
 
-스타트업마다 `migrations/*.sql`을 파일명순 전체 재적용(DDL 멱등). 이력:
+스타트업마다 `migrations/*.sql`을 파일명순 전체 재적용(DDL 멱등). **한 번 적용한 마이그레이션 파일은 수정 금지 — 항상 새 파일(0003+) 추가** (in-place 수정은 #373·ae04121 두 번 사고 전례 — 기존 DB에 반영되지 않는다). 이력:
 
 - `0001` — 초기 스키마 (characters + judgment_logs)
 - `0002` — `order_status` 어휘 `placed`→`filled` 전환 (#373 후속): 기존 dev DB의 구 CHECK를 테이블 재구축으로 교체하고 `placed` 행을 `filled`로 변환(기존 기록 보존). **수동 재구축 불필요 — 구 DB로 그냥 기동하면 자동 전환됨**

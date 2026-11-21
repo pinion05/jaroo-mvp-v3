@@ -69,6 +69,12 @@ describe('0002 마이그레이션 — placed→filled 어휘 전환', () => {
          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       )
       .run('jdg_legacy2', 'sosimi', '2026-11-19T18:00:00+09:00', 'hold', null, null, null, 'no_signal', '{}', '관망', null, 'skipped', null, '2026-11-19T18:00:02+09:00')
+    legacy
+      .prepare(
+        `INSERT INTO judgment_logs (log_id, character_slug, loop_at, decision, symbol, quantity, price_krw, reason_code, fact, rationale, order_id, order_status, error_message, created_at)
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      )
+      .run('jdg_legacy3', 'sosimi', '2026-11-19T19:00:00+09:00', 'sell', '005930', 1, 72_000, 'thesis_invalidated', '{}', '체결 시도 실패 기록', null, 'failed', 'paper_trade_unavailable', '2026-11-19T19:00:01+09:00')
     legacy.close()
 
     // ② 마이그레이션 적용 — Store 생성 시 0001+0002 실행
@@ -77,6 +83,8 @@ describe('0002 마이그레이션 — placed→filled 어휘 전환', () => {
     const byId = new Map(judgments.map((j) => [j.logId, j]))
     expect(byId.get('jdg_legacy1')?.orderStatus).toBe('filled') // placed → filled 변환
     expect(byId.get('jdg_legacy2')?.orderStatus).toBe('skipped') // skipped 보존
+    expect(byId.get('jdg_legacy3')?.orderStatus).toBe('failed') // failed 보존
+    expect(byId.get('jdg_legacy3')?.errorMessage).toBe('paper_trade_unavailable') // error_message 열 fidelity
     expect(byId.get('jdg_legacy1')?.rationale).toBe('소심이 기록') // 서사 보존
 
     // ③ 새 CHECK에서 filled INSERT 성공 (구 DB였다면 SQLITE_CONSTRAINT_CHECK)

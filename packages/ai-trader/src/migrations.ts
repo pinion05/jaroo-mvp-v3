@@ -3,9 +3,12 @@
 
 import { readdirSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 
 export function loadMigrationsSql(migrationsDir?: string): string {
-  const dir = migrationsDir ?? new URL('../migrations/', import.meta.url).pathname
+  // fileURLToPath 필수 — URL.pathname은 퍼센트 인코딩을 반환해 경로에 공백·비ASCII가
+  // 있으면 scandir이 ENOENT로 죽는다 (평가 세션 실증).
+  const dir = migrationsDir ?? fileURLToPath(new URL('../migrations/', import.meta.url))
   const files = readdirSync(dir)
     .filter((name) => name.endsWith('.sql'))
     .sort()

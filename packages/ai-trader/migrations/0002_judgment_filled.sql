@@ -10,6 +10,13 @@
 -- fresh DB(0001이 이미 filled CHECK로 생성)에서도 멱등 — 변환 대상 없이 재구축만
 -- 수행되며 행 내용 불변. 인덱스는 DROP TABLE와 함께 소멸하므로 재생성.
 
+-- 전체를 한 트랜잭션으로 — SQLite DDL은 트랜잭셔널하다. db.exec()는 문장별
+-- 자동커밋이라 래핑이 없으면 INSERT 커밋 직후~DROP 직전 크래시 시 재기동
+-- 마이그레이션이 UNIQUE(judgment_logs_v2.log_id) 실패로 기동 루프에 빠진다
+-- (평가 세션 실증). BEGIN~COMMIT 안에서는 크래시 시 전체 롤백 → 재기동이 깨끗이 재실행.
+
+BEGIN;
+
 CREATE TABLE IF NOT EXISTS judgment_logs_v2 (
   log_id        TEXT PRIMARY KEY,
   character_slug TEXT NOT NULL,
@@ -41,3 +48,5 @@ DROP TABLE judgment_logs;
 ALTER TABLE judgment_logs_v2 RENAME TO judgment_logs;
 
 CREATE INDEX IF NOT EXISTS idx_judgment_character ON judgment_logs(character_slug, loop_at DESC);
+
+COMMIT;
