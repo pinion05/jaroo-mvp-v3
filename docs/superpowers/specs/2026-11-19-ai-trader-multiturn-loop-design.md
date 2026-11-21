@@ -186,16 +186,18 @@ create table position_theses (
   realized_pnl_won integer                 -- 표시용 — 진실은 원장
 );
 
--- 턴 세션 상태머신 (M1) — v2 phase 값
+-- 턴 세션 상태머신 (M1) — v2 phase 값 · #374 리뷰 정리(2026-11-21)
 create table trading_sessions (
+  id text primary key,                     -- 'turn:chart-cok:20261121-1539-01' — 턴=호출 단위(M1 v2)
   character_slug text not null,
-  trade_date text not null,                -- '2026-11-19' (KST 영업일)
+  started_at text not null,                -- KST ISO8601
+  updated_at text not null,
   phase text not null check (phase in
     ('load','dump','interest','scan','decide','execute','compile','completed')),
-  started_at text not null, updated_at text not null,
   context jsonb,                           -- 턴 스냅샷(현금·포지션 요약) — 재개용
-  primary key (character_slug, trade_date)
+  unique (character_slug, started_at)
 );
+-- (character_slug, trade_date) PK 폐지 — '당일' 개념이 없어(M1 v2) 같은 날 복수 턴과 충돌
 
 -- 일지 영속화 — 다중턴 회상의 소스 (M8)
 create table diary_entries (
@@ -208,15 +210,17 @@ create table diary_entries (
   unique (character_slug, trade_date)
 );
 
--- judgment_logs 확장
-alter table judgment_logs add column turn_date text;
-alter table judgment_logs add column side text check (side in ('buy','sell','hold'));
+-- judgment_logs 확장 · #374 리뷰 정리(2026-11-21)
+alter table judgment_logs add column turn_id text;           -- 소속 턴(trading_sessions.id)
 alter table judgment_logs add column thesis_id text;
 alter table judgment_logs add column decision_dump_ref text;  -- ⑤ 호출 스냅샷 포인터(입력 해시)
+-- side 컬럼 폐지 — decision(buy/sell/hold)과 중복 · turn_date 폐지 — '당일' 개념 없음(M1 v2), turn_id로만
 -- reason_code는 v2에서 자유 서사(reason)+태그로 완화 — 정적 3종 라벨 폐지
 ```
 
 계층(진실 소스 분리 — D2/D4 계승): **원장**(숫자·체결) / **테제**(진입↔매도 계약) / **기억**(페르소나 번역) / **일기**(표현).
+
+테이블 수명(#374 리뷰, 2026-11-21): 원장·판단 로그·테제·일기는 **영속**(입증 체인 자산). `trading_sessions`는 재개용 context일 뿐 — **completed 후 30일 경과 분은 아카이브/삭제**(진실은 원장·저널에 있으므로 잃을 것이 없다).
 
 ## 8. 일기 프롬프트 조립 (M8 — 스펙 §7.1 개정)
 
@@ -260,7 +264,7 @@ D+23 상승 후보 재등장 + 흥미 선정 → ⑤: 기억 회상 "저번 실�
 | **2.5a** | `position_theses` + `trading_sessions`(v2 phase) 마이그레이션, 통합 턴 골격, 덤프 빌더(소스×3+보유 섹션) 골든 테스트 | 수동 턴 1회 = load→compile 재개 가능. 덤프 바이트 재현 |
 | **2.5b** | ②흥미 턴 3상태 출력(신규/재확인/소멸) + ⑤ 결정 턴(prefix 재사용 검증: 캐시 hit 로그) + 조언 블록(팀 요약 재사용) | 동일 턴 ②→⑤ 캐시 hit 확인. 결정·서사 동시 출력 |
 | **3 개정** | 실행 계층 물리 가드레일(시가 고정·fit·ratio) + ⑤ 꼬리 fact 주입(기억·보유 종목 수·현금 비율·연속 손실·목표 진행률) + 메모리 파이프라인 + `diary_entries` | 물리 제약 위반 거부 로그 1건 이상. 일기 2일 연속 회상 |
-| **4 개정** | 턴 자동화(영업일 스케줄 — Windmill cron 후보) + 캐릭터 노출 | 무인 2주 운영, 재시작 0건 유실 |
+| **4 개정** | 턴 자동화(영업일 스케줄 — Windmill cron 후보) + 캐릭터 노출 | 무인 2주 운영, 재시작 0건 유실 · **멱등 게이트(#374 리뷰): 같은 턴 재실행 시 신규 주문 0건(원장 diff로 중복 차단) + 미완료 phase 재개 검증** |
 
 ## 11. 열린 질문 (다음 조율)
 
