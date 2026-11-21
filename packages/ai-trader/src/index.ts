@@ -27,13 +27,20 @@ const deps: LoopDeps = {
 
 const app = createApp(deps)
 
+// 바인딩·바디 상한 — 리뷰팀 합의(보안 S-1/S-2·SRE P0-1/P0-2):
+//   hostname 127.0.0.1: 무인증 API를 루프백으로 제한(paper-trade #368 패리티.
+//   Bun.serve 기본값은 전 인터페이스(*:) — tailnet 노출 실측)
+//   maxRequestBodySize 32KB: paper-trade 가드 계승 — 무제한 바디는 디스크 풀
+//   크래시 루프의 입구(64MB 저장 실측)
 const server = Bun.serve({
+  hostname: '127.0.0.1',
   port: config.port,
   fetch: app.fetch,
+  maxRequestBodySize: 32 * 1024,
 })
 
 console.log(
-  `[ai-trader] listening on :${server.port} | db=${config.dbPath}` +
+  `[ai-trader] listening on 127.0.0.1:${server.port} | db=${config.dbPath}` +
     ` | paper-trade=${config.paperTradeBaseUrl} | quotes=${config.quotesMode}` +
     (config.quotesMode === 'static' ? ` (${config.staticQuotes})` : ` (${config.quotesBaseUrl})`) +
     ` | characters=${DEFAULT_CHARACTERS.map((c) => c.slug).join(',')}`,
