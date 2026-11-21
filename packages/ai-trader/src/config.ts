@@ -17,7 +17,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     throw new Error(`QUOTES_MODE 파싱 실패 (web|static): ${quotesMode}`)
   }
   return {
-    port: Number(env.PORT) || 3042,
+    port: Number(env.AI_TRADER_PORT) || Number(env.PORT) || 3042,
     dbPath: env.DB_PATH || './data/ai-trader.db',
     paperTradeBaseUrl: env.PAPER_TRADE_BASE_URL || 'http://localhost:3041',
     quotesMode,

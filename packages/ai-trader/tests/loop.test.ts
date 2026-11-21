@@ -5,10 +5,11 @@
 import { beforeEach, describe, expect, test } from 'bun:test'
 import { DEFAULT_CHARACTERS } from '../src/characters.ts'
 import { Store } from '../src/journal.ts'
+import { loadMigrationsSql } from '../src/migrations.ts'
 import { ensureAccount, loadTurnContext } from '../src/loop.ts'
 import { FakePaper, fakeQuotes } from './helpers.ts'
 
-const schemaSql = await Bun.file(new URL('../migrations/0001_init.sql', import.meta.url)).text()
+const schemaSql = loadMigrationsSql()
 
 let store: Store
 let paper: FakePaper

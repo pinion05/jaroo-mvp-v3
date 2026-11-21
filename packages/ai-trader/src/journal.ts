@@ -54,6 +54,9 @@ export class Store {
     }
     this.db = new Database(dbPath, { create: true })
     this.db.exec('PRAGMA journal_mode = WAL')
+    // busy_timeout 5000 (paper-trade #368 정렬) — bun:sqlite 기본 0이라 동시 기동·
+    // watch 재시작 레이스에서 1ms 만에 'database is locked' 크래시(리뷰팀 실측).
+    this.db.exec('PRAGMA busy_timeout = 5000')
     this.db.exec(schemaSql)
   }
 
