@@ -14,7 +14,10 @@ set -e
 : "${CRAWLER_HOST:=127.0.0.1}"
 : "${PAPER_TRADE_PORT:=3041}"
 : "${AI_TRADER_PORT:=3042}"
-export PORT CRAWLER_PORT CRAWLER_HOST PAPER_TRADE_PORT AI_TRADER_PORT
+# S-1(#381 리뷰): Railway가 동적으로 주입하는 $PORT에 웹(시세 API)이 붙는다 —
+# 하드코딩 3000이 아니라 실제 $PORT를 가리키게 기본값을 바인딩한다.
+: "${QUOTES_BASE_URL:=http://127.0.0.1:${PORT}}"
+export PORT CRAWLER_PORT CRAWLER_HOST PAPER_TRADE_PORT AI_TRADER_PORT QUOTES_BASE_URL
 
 # Wisereport session cookies: Railway can't mount .env.cookie as a file, so we decode
 # it from a base64 env var. with-local-env.cjs then auto-detects the file and wires
