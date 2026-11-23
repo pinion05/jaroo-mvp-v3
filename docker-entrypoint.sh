@@ -1,9 +1,10 @@
 #!/bin/bash
 # Railway single-container entrypoint: runs web (Next.js) + crawler + paper-trade
-# concurrently — three processes in one container.
+# + ai-trader concurrently — four processes in one container.
 # - Web listens on $PORT (Railway-injected). Default 3000 locally.
 # - Crawler listens on $CRAWLER_HOST:$CRAWLER_PORT (loopback only, default 127.0.0.1:3040).
 # - Paper-trade listens on 127.0.0.1:$PAPER_TRADE_PORT (loopback only, default 3041).
+# - AI trader listens on 127.0.0.1:$AI_TRADER_PORT (loopback only, default 3042).
 # If any process dies, the others are killed and the container exits so Railway
 # restarts it. (Equivalent to OCI's systemd services in one container.)
 set -e
@@ -12,7 +13,14 @@ set -e
 : "${CRAWLER_PORT:=3040}"
 : "${CRAWLER_HOST:=127.0.0.1}"
 : "${PAPER_TRADE_PORT:=3041}"
-export PORT CRAWLER_PORT CRAWLER_HOST PAPER_TRADE_PORT
+: "${AI_TRADER_PORT:=3042}"
+# S-1(#381 리뷰): Railway가 동적으로 주입하는 $PORT에 웹(시세 API)이 붙는다 —
+# 하드코딩 3000이 아니라 실제 $PORT를 가리키게 기본값을 바인딩한다.
+: "${QUOTES_BASE_URL:=http://127.0.0.1:${PORT}}"
+# 같은 원리로 원장 URL도 실제 $PAPER_TRADE_PORT를 따르게 한다 — 미설정 시
+# config 기본값(localhost:3041 하드코딩)에 묶여 포트가 달라지면 엉뚱한 곳을 바라본다.
+: "${PAPER_TRADE_BASE_URL:=http://127.0.0.1:${PAPER_TRADE_PORT}}"
+export PORT CRAWLER_PORT CRAWLER_HOST PAPER_TRADE_PORT AI_TRADER_PORT QUOTES_BASE_URL PAPER_TRADE_BASE_URL
 
 # Wisereport session cookies: Railway can't mount .env.cookie as a file, so we decode
 # it from a base64 env var. with-local-env.cjs then auto-detects the file and wires
@@ -25,7 +33,7 @@ if [ -n "$WISEREPORT_COOKIES_B64" ]; then
   fi
 fi
 
-echo "[entrypoint] web -> :${PORT} | crawler -> ${CRAWLER_HOST}:${CRAWLER_PORT} | paper-trade -> 127.0.0.1:${PAPER_TRADE_PORT}"
+echo "[entrypoint] web -> :${PORT} | crawler -> ${CRAWLER_HOST}:${CRAWLER_PORT} | paper-trade -> 127.0.0.1:${PAPER_TRADE_PORT} | ai-trader -> 127.0.0.1:${AI_TRADER_PORT}"
 
 node scripts/with-local-env.cjs node_modules/.bin/next start &
 WEB_PID=$!
@@ -36,10 +44,13 @@ CRAWLER_PID=$!
 node scripts/with-local-env.cjs npm --prefix packages/paper-trade run start &
 PAPER_TRADE_PID=$!
 
+node scripts/with-local-env.cjs npm --prefix packages/ai-trader run start &
+AI_TRADER_PID=$!
+
 cleanup() {
-  echo "[entrypoint] shutting down (web=$WEB_PID crawler=$CRAWLER_PID paper-trade=$PAPER_TRADE_PID)"
-  kill "$WEB_PID" "$CRAWLER_PID" "$PAPER_TRADE_PID" 2>/dev/null || true
-  wait "$WEB_PID" "$CRAWLER_PID" "$PAPER_TRADE_PID" 2>/dev/null || true
+  echo "[entrypoint] shutting down (web=$WEB_PID crawler=$CRAWLER_PID paper-trade=$PAPER_TRADE_PID ai-trader=$AI_TRADER_PID)"
+  kill "$WEB_PID" "$CRAWLER_PID" "$PAPER_TRADE_PID" "$AI_TRADER_PID" 2>/dev/null || true
+  wait "$WEB_PID" "$CRAWLER_PID" "$PAPER_TRADE_PID" "$AI_TRADER_PID" 2>/dev/null || true
 }
 trap cleanup EXIT INT TERM
 

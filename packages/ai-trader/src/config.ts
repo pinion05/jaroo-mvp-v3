@@ -17,7 +17,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     throw new Error(`QUOTES_MODE 파싱 실패 (web|static): ${quotesMode}`)
   }
   return {
-    port: Number(env.AI_TRADER_PORT) || Number(env.PORT) || 3042,
+    // N-1(#381 리뷰): 공유 PORT는 절대 읽지 않는다(crawler/paper-trade 규칙) —
+    // Railway가 웹에 주입하는 PORT와 충돌해 EADDRINUSE 사고가 난다.
+    port: Number(env.AI_TRADER_PORT) || 3042,
     dbPath: env.DB_PATH || './data/ai-trader.db',
     paperTradeBaseUrl: env.PAPER_TRADE_BASE_URL || 'http://localhost:3041',
     quotesMode,

@@ -67,15 +67,22 @@ export type PaperGateway = {
 }
 
 export class PaperTradeClient implements PaperGateway {
+  /** #378 P2 — 원장 행업 시 /load·judgments 체인이 무기한 묶이지 않게 하는 상한(ms). */
+  private readonly timeoutMs: number
+
   constructor(
     private baseUrl: string,
     private fetcher: typeof fetch = fetch,
-  ) {}
+    timeoutMs = 10_000,
+  ) {
+    this.timeoutMs = timeoutMs
+  }
 
   private async request<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await this.fetcher(`${this.baseUrl.replace(/\/$/, '')}${path}`, {
       ...init,
       headers: { 'content-type': 'application/json', ...(init?.headers ?? {}) },
+      signal: AbortSignal.timeout(this.timeoutMs),
     })
     const body = (await response.json().catch(() => null)) as { ok?: boolean; data?: T; error?: { code?: string; message?: string } } | null
     if (!body || body.ok !== true || body.data === undefined) {
