@@ -53,6 +53,85 @@ test('웹훅은 본문이 아니라 시크릿 키 재조회로 상태를 확정�
   assert.match(webhook, /BILLING_DELETED/)
 })
 
+test('웹훅 환불/취소 상태머신: 원자 RPC·부분취소·500 재전송·구독 복구·말료 예약', () => {
+  const webhook = read('src/app/api/payments/webhook/route.ts')
+  // (a) 전액 환불은 원자적 RPC 로 처리(잔액 차감+원장+주문 CANCELED 단일 트랜잭션)
+  assert.match(webhook, /revoke_refunded_credits/)
+  assert.doesNotMatch(webhook, /from\('credit_balances'\)\.update/) // 웹훅 라우트에서 잔액 직접 update 금지
+  // (b) 부분 취소: cancelAmount 누적합 비례 회수
+  assert.match(webhook, /PARTIAL_CANCELED/)
+  assert.match(webhook, /revoke_partial_refund_credits/)
+  assert.match(webhook, /cancelAmount/)
+  // (c) 이벤트 저장 실패 시 500 (토스 재전송 유도)
+  assert.match(webhook, /event-record-failed[\s\S]*status: 500/)
+  // (d) DONE 복구 분기에 pro_subscription PENDING 주문 포함
+  assert.match(webhook, /pro_subscription[\s\S]*renew_pro_subscription/)
+  // (e) BILLING_DELETED 는 즉시 canceled 가 아니라 cancel_at_period_end
+  assert.match(webhook, /BILLING_DELETED[\s\S]*?cancel_at_period_end: true/)
+  assert.doesNotMatch(webhook, /BILLING_DELETED[\s\S]*?status: 'canceled'/)
+})
+
+test('환불 RPC 마이그레이션: 멱등 가드·부분 유니크 회피·서비스롤 전용', () => {
+  const migration = read('supabase/migrations/20261030060000_add_revoke_refunded_credits_rpc.sql')
+  assert.match(migration, /create or replace function public\.revoke_refunded_credits\(\s*p_order_id text/)
+  assert.match(migration, /create or replace function public\.revoke_partial_refund_credits/)
+  // 주문 DONE→CANCELED 조건부 전환(멱등 가드)
+  assert.match(migration, /status = 'DONE'/)
+  // refund 원장은 order_id 없이 ref 로 insert(credit_ledger_purchase_order_uq 회피)
+  assert.match(migration, /insert into public\.credit_ledger \(user_id, delta, reason, ref, balance_after\)/)
+  assert.doesNotMatch(migration, /insert into public\.credit_ledger \(user_id, delta, reason, order_id/)
+  // 서비스롤 전용 실행 권한
+  assert.match(migration, /grant execute on function public\.revoke_refunded_credits\(text, text\) to service_role/)
+  assert.match(migration, /grant execute on function public\.revoke_partial_refund_credits\(text, integer, integer\) to service_role/)
+  // renew 멱등 강화: 주문 전환 가드가 기간 연장보다 앞선다
+  const renewBody = migration.split('create or replace function public.renew_pro_subscription')[1]
+  assert.match(renewBody, /if not found then\s+return false/)
+  assert.ok(renewBody.indexOf('update public.payment_orders') < renewBody.indexOf('update public.pro_subscriptions'), '주문 DONE 가드가 기간 연장보다 먼저 와야 한다')
+})
+
+test('웹훅 재전송 안전망(F1): 미처리 재dispatch·처리 실패 500·catch 500', () => {
+  const webhook = read('src/app/api/payments/webhook/route.ts')
+  // (a-2) duplicate 판별은 row 존재가 아니라 processed_at — NULL 이면 재dispatch
+  assert.match(webhook, /select\('processed_at'\)/)
+  assert.match(webhook, /re-dispatching/)
+  // (a-1) 처리 실패 시 processed_at 라인 도달 전 500 → 재전송이 (a-2)로 회수
+  assert.match(webhook, /handler-failed' \}, \{ status: 500 \}\)/)
+  // catch 블록이 200 으로 삼키지 않는다
+  assert.doesNotMatch(webhook, /handler failed[\s\S]*?return NextResponse\.json\(\{ ok: true \}\)/)
+  // (F5) 에러 로그에 eventId 가 따라다닌다
+  assert.match(webhook, /revoke failed', eventId/)
+  assert.match(webhook, /handler failed', eventId/)
+})
+
+test('구독 폴백 판별(F2): 구독 row 존재로 스킵·DONE 주문 백필 자가회복', () => {
+  const webhook = read('src/app/api/payments/webhook/route.ts')
+  // 판별자는 구독 row (주문 재조회는 renew 가 주문을 소비해 판별 불가)
+  assert.match(webhook, /renew race lost — subscription exists, skip activate/)
+  // order DONE + 구독 부재 이상 상태의 자가회복 분기
+  assert.match(webhook, /subscription backfilled for DONE order/)
+})
+
+test('activate 보존형 재정의(F2): 제안값 우선 coalesce·기간 greatest·말료 예약 보존·ACL', () => {
+  const migration = read('supabase/migrations/20261030060000_add_revoke_refunded_credits_rpc.sql')
+  // 제안값 우선 + null 가드 (기존값 우선이면 재구독 신카드가 구키에 밀린다)
+  assert.match(migration, /billing_key = coalesce\(excluded\.billing_key, pro_subscriptions\.billing_key\)/)
+  assert.doesNotMatch(migration, /billing_key = coalesce\(pro_subscriptions\.billing_key, excluded\.billing_key\)/)
+  // 기간 단축 방지(기존 만료가 더 늦으면 유지)
+  assert.match(migration, /current_period_end = greatest\(pro_subscriptions\.current_period_end, now\(\) \+ make_interval\(days => p_period_days\)\)/)
+  // 키 null 폴백은 BILLING_DELETED 말료 예약을 지우지 않는다
+  assert.match(migration, /cancel_at_period_end = case when p_billing_key is null then pro_subscriptions\.cancel_at_period_end else false end/)
+  // ACL 셀프 도큐먼팅(N-2)
+  assert.match(migration, /revoke execute on function public\.renew_pro_subscription\(uuid, text, integer, text, jsonb\) from public, authenticated, anon/)
+  assert.match(migration, /revoke execute on function public\.activate_pro_subscription\(uuid, text, text, text, text, integer, text, jsonb\) from public, authenticated, anon/)
+})
+
+test('갱신 cron 미처리 웹훅 이벤트 탐지 스윕(F1 안전망)', () => {
+  const tick = read('src/app/api/payments/cron/tick/route.ts')
+  assert.match(tick, /unprocessed webhook events detected/)
+  assert.match(tick, /\.is\('processed_at', null\)/)
+  assert.match(tick, /\.limit\(50\)/)
+})
+
 test('갱신 cron은 Bearer 시크릿 보호를 받는다', () => {
   const cron = read('src/app/api/payments/cron/tick/route.ts')
   assert.match(cron, /PAYMENTS_CRON_SECRET/)

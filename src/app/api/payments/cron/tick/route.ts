@@ -208,6 +208,25 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // (웹훅 안전망, SRE F1) 500→토스 재전송→웹훅 (a-2) 재dispatch 로도 회수되지
+    // 않은 미처리 이벤트 점검(토스 재시도 예산 소진 등). 재발송 기관총이 되지
+    // 않게 탐지만 한다: 10분~7일 창의 NULL row 상한 50건. 발견 시 요약 에러 로그
+    // (Railway 로그 검색·알림 훅 연결점).
+    try {
+      const { data: stale, error: staleError } = await service
+        .from('payment_events')
+        .select('event_id, event_type, created_at')
+        .is('processed_at', null)
+        .lt('created_at', new Date(Date.now() - 10 * 60 * 1000).toISOString())
+        .gt('created_at', new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString())
+        .limit(50)
+      if (!staleError && stale && stale.length > 0) {
+        console.error('[payments/cron] unprocessed webhook events detected', stale.length, stale.map((e) => e.event_id).join(','))
+      }
+    } catch (sweepError) {
+      console.error('[payments/cron] unprocessed sweep failed', sweepError)
+    }
+
     return NextResponse.json({ ok: true, ...summary })
   } catch (error) {
     console.error('[payments/cron] tick failed', error)
