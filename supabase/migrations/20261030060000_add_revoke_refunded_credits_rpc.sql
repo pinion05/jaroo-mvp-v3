@@ -200,3 +200,54 @@ revoke execute on function public.revoke_refunded_credits(text, text) from publi
 revoke execute on function public.revoke_partial_refund_credits(text, integer, integer) from public, authenticated, anon;
 grant execute on function public.revoke_refunded_credits(text, text) to service_role;
 grant execute on function public.revoke_partial_refund_credits(text, integer, integer) to service_role;
+
+-- ========== activate 폴백 방어(F2): 보존형 on-conflict 갱신 ==========
+-- 웹훅 복구 경로의 activate(p_billing_key=null) 폴백이 갱신 cron·빌링 confirm 과
+-- 경합하면 원본(20260819)의 on-conflict 갱신이 ①billing_key·카드를 null 로 말소
+-- ②current_period_end 를 now()+N일로 리셋(기간 단축) ③cancel_at_period_end=false
+-- 리셋(BILLING_DELETED 말료 예약 삭제)까지 훼손한다. 제안값 우선 + null 가드로
+-- 방어한다: 새 실제 키는 승리(재구독 신카드), 폴백의 null 은 기존값 보존.
+-- 시그니처(8파라미터·void)는 20260819 원본과 완전 동일 — CREATE OR REPLACE 의
+-- ACL 승계로 service_role 전용이 유지된다(한 글자라도 다르면 PUBLIC execute 를
+-- 가진 신규 함수로 태어나는 함정).
+create or replace function public.activate_pro_subscription(
+  p_user_id uuid,
+  p_order_id text,
+  p_billing_key text,
+  p_card_company text,
+  p_card_number text,
+  p_period_days integer,
+  p_payment_key text,
+  p_toss_raw jsonb
+)
+returns void
+language plpgsql
+security definer
+set search_path = public, pg_temp
+as $$
+begin
+  insert into public.pro_subscriptions (user_id, status, billing_key, card_company, card_number,
+                                        current_period_start, current_period_end, cancel_at_period_end, canceled_at)
+  values (p_user_id, 'active', p_billing_key, p_card_company, p_card_number,
+          now(), now() + make_interval(days => p_period_days), false, null)
+  on conflict (user_id) do update
+    set status = 'active',
+        billing_key = coalesce(excluded.billing_key, pro_subscriptions.billing_key),
+        card_company = coalesce(excluded.card_company, pro_subscriptions.card_company),
+        card_number = coalesce(excluded.card_number, pro_subscriptions.card_number),
+        current_period_start = now(),
+        current_period_end = greatest(pro_subscriptions.current_period_end, now() + make_interval(days => p_period_days)),
+        cancel_at_period_end = case when p_billing_key is null then pro_subscriptions.cancel_at_period_end else false end,
+        canceled_at = null,
+        updated_at = now();
+
+  update public.payment_orders
+  set status = 'DONE', payment_key = p_payment_key, toss_raw = coalesce(p_toss_raw, toss_raw), updated_at = now()
+  where order_id = p_order_id and user_id = p_user_id and status = 'PENDING';
+end;
+$$;
+
+-- 보안(N-2): 재정의된 갱신·활성화 RPC 도 service_role 전용임을 재명시(ACL 승계와
+-- 무관하게 셀프 도큐먼팅 — 시그니처 변경 시 신규 함수 PUBLIC execute 함정 예방).
+revoke execute on function public.renew_pro_subscription(uuid, text, integer, text, jsonb) from public, authenticated, anon;
+revoke execute on function public.activate_pro_subscription(uuid, text, text, text, text, integer, text, jsonb) from public, authenticated, anon;

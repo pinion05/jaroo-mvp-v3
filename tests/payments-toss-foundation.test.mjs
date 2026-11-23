@@ -89,6 +89,49 @@ test('환불 RPC 마이그레이션: 멱등 가드·부분 유니크 회피·서
   assert.ok(renewBody.indexOf('update public.payment_orders') < renewBody.indexOf('update public.pro_subscriptions'), '주문 DONE 가드가 기간 연장보다 먼저 와야 한다')
 })
 
+test('웹훅 재전송 안전망(F1): 미처리 재dispatch·처리 실패 500·catch 500', () => {
+  const webhook = read('src/app/api/payments/webhook/route.ts')
+  // (a-2) duplicate 판별은 row 존재가 아니라 processed_at — NULL 이면 재dispatch
+  assert.match(webhook, /select\('processed_at'\)/)
+  assert.match(webhook, /re-dispatching/)
+  // (a-1) 처리 실패 시 processed_at 라인 도달 전 500 → 재전송이 (a-2)로 회수
+  assert.match(webhook, /handler-failed' \}, \{ status: 500 \}\)/)
+  // catch 블록이 200 으로 삼키지 않는다
+  assert.doesNotMatch(webhook, /handler failed[\s\S]*?return NextResponse\.json\(\{ ok: true \}\)/)
+  // (F5) 에러 로그에 eventId 가 따라다닌다
+  assert.match(webhook, /revoke failed', eventId/)
+  assert.match(webhook, /handler failed', eventId/)
+})
+
+test('구독 폴백 판별(F2): 구독 row 존재로 스킵·DONE 주문 백필 자가회복', () => {
+  const webhook = read('src/app/api/payments/webhook/route.ts')
+  // 판별자는 구독 row (주문 재조회는 renew 가 주문을 소비해 판별 불가)
+  assert.match(webhook, /renew race lost — subscription exists, skip activate/)
+  // order DONE + 구독 부재 이상 상태의 자가회복 분기
+  assert.match(webhook, /subscription backfilled for DONE order/)
+})
+
+test('activate 보존형 재정의(F2): 제안값 우선 coalesce·기간 greatest·말료 예약 보존·ACL', () => {
+  const migration = read('supabase/migrations/20261030060000_add_revoke_refunded_credits_rpc.sql')
+  // 제안값 우선 + null 가드 (기존값 우선이면 재구독 신카드가 구키에 밀린다)
+  assert.match(migration, /billing_key = coalesce\(excluded\.billing_key, pro_subscriptions\.billing_key\)/)
+  assert.doesNotMatch(migration, /billing_key = coalesce\(pro_subscriptions\.billing_key, excluded\.billing_key\)/)
+  // 기간 단축 방지(기존 만료가 더 늦으면 유지)
+  assert.match(migration, /current_period_end = greatest\(pro_subscriptions\.current_period_end, now\(\) \+ make_interval\(days => p_period_days\)\)/)
+  // 키 null 폴백은 BILLING_DELETED 말료 예약을 지우지 않는다
+  assert.match(migration, /cancel_at_period_end = case when p_billing_key is null then pro_subscriptions\.cancel_at_period_end else false end/)
+  // ACL 셀프 도큐먼팅(N-2)
+  assert.match(migration, /revoke execute on function public\.renew_pro_subscription\(uuid, text, integer, text, jsonb\) from public, authenticated, anon/)
+  assert.match(migration, /revoke execute on function public\.activate_pro_subscription\(uuid, text, text, text, text, integer, text, jsonb\) from public, authenticated, anon/)
+})
+
+test('갱신 cron 미처리 웹훅 이벤트 탐지 스윕(F1 안전망)', () => {
+  const tick = read('src/app/api/payments/cron/tick/route.ts')
+  assert.match(tick, /unprocessed webhook events detected/)
+  assert.match(tick, /\.is\('processed_at', null\)/)
+  assert.match(tick, /\.limit\(50\)/)
+})
+
 test('갱신 cron은 Bearer 시크릿 보호를 받는다', () => {
   const cron = read('src/app/api/payments/cron/tick/route.ts')
   assert.match(cron, /PAYMENTS_CRON_SECRET/)
