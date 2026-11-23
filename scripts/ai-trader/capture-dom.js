@@ -1,0 +1,15 @@
+(() => {
+  const b = document.body.cloneNode(true)
+  const rm = (s) => b.querySelectorAll(s).forEach((e) => e.remove())
+  rm('script')
+  rm('nextjs-portal')
+  rm('[data-nextjs-dev-tools]')
+  rm('[data-next-mark]')
+  rm('#__next-build-watcher')
+  rm('#__next-prerender-indicator')
+  rm('[role=group][aria-label="모드 전환"]')
+  rm('button[aria-label="실시간 발굴 데이터 갱신"]')
+  rm('[role=tablist][aria-label="AI 트레이더 캐릭터 선택"]')
+  rm('a[href^="/"]')
+  return 'CAP_START' + encodeURIComponent(b.innerHTML) + 'CAP_END'
+})()
