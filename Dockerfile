@@ -57,7 +57,8 @@ USER pwuser
 
 COPY --from=builder --chmod=0755 --chown=pwuser:pwuser /app/docker-entrypoint.sh ./docker-entrypoint.sh
 
-# Railway proxies the web port ($PORT). Crawler binds 127.0.0.1:3040 inside the container.
+# Railway proxies the web port ($PORT). Crawler binds 127.0.0.1:3040 and
+# paper-trade binds 127.0.0.1:3041 inside the container (loopback only).
 EXPOSE 3000
 
 CMD ["./docker-entrypoint.sh"]

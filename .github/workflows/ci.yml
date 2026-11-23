@@ -57,7 +57,7 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test (root + web TS + crawler + instrument-core)
+      - name: Test (root + web TS + crawler + instrument-core + runtime-core + paper-trade)
         run: npm test
 
       - name: Build (web)

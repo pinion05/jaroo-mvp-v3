@@ -3,11 +3,15 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["bun-types"],
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "noEmit": true
   },
+  // tests/**는 node:test 기반으로 포팅 완료 — 다시 include한다.
+  // node:sqlite 타입은 루트 @types/node(^20)에 없어
+  // src/types/node-sqlite.d.ts의 최소 선언으로 보완한다.
   "include": ["src/**/*.ts", "tests/**/*.ts"]
 }

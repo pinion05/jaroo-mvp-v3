@@ -1,18 +1,13 @@
 {
   "name": "jaroo-paper-trade",
   "version": "0.1.0",
-  "description": "JAROO 모의투자(매매체결) 시뮬레이터 — 증권사 API 스타일 독립 마이크로서비스 PoC (Hono + Bun, cache ZERO / DB fetch only)",
+  "description": "JAROO 모의투자(매매체결) 시뮬레이터 — 증권사 API 스타일 독립 사이드카 (Node.js + node:http + node:sqlite, 런타임 의존성 0 / cache ZERO / DB fetch only)",
   "type": "module",
   "module": "src/index.ts",
   "scripts": {
-    "dev": "bun --watch src/index.ts",
-    "start": "bun src/index.ts",
-    "test": "bun test"
-  },
-  "dependencies": {
-    "hono": "^4.9.0"
-  },
-  "devDependencies": {
-    "@types/bun": "latest"
+    "dev": "node --watch --experimental-transform-types --disable-warning=ExperimentalWarning src/index.ts",
+    "start": "node --experimental-transform-types --disable-warning=ExperimentalWarning --max-old-space-size=96 src/index.ts",
+    "test": "node --experimental-transform-types --disable-warning=ExperimentalWarning --test \"tests/*.test.ts\"",
+    "typecheck": "tsc -p tsconfig.json"
   }
 }
