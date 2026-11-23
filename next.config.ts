@@ -5,7 +5,7 @@ import type { NextConfig } from "next";
 const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 const nextConfig: NextConfig = {
-  allowedDevOrigins: ['127.0.0.1', 'localhost', '0.0.0.0'],
+  allowedDevOrigins: ['127.0.0.1', 'localhost', '0.0.0.0', 'pop-os.tailcff214.ts.net'],
   // 기본 보안 헤더(이슈 #224). CSP는 인라인 스크립트 사용량 조사 후 별도 도입.
   // dev 배포(Railway dev 환경) 전용 수파베이스 내부 프록시 — 셀프호스팅 GoTrue·PostgREST를
   // 앱 도메인의 /auth/v1·/rest/v1 경로로 리라이트한다. 내부 프라이빗 호스트는 env로 주입받고,
@@ -47,6 +47,19 @@ const nextConfig: NextConfig = {
       {
         source: '/:path*',
         headers: base,
+      },
+      {
+        // AI 트레이더 초안 카탈로그(public/ai-trader/catalog.html)가 같은 오리진
+        // iframe으로 /ai-trader/draft-* 를 라이브 임베드한다. 전역 DENY 는 그대로
+        // 두고 이 경로만 SAMEORIGIN 으로 완화(중복 키는 나중 매치가 이긴다 —
+        // headers.md 'Header Overriding Behavior').
+        source: '/ai-trader/:path*',
+        headers: [
+          {
+            key: 'X-Frame-Options',
+            value: 'SAMEORIGIN',
+          },
+        ],
       },
     ];
   },

@@ -9,6 +9,7 @@
 // - 보존: 유저당 최근 ETF_HISTORY_RETENTION_PER_USER건 — 삽입 후 초과분을 prune
 
 import { createClient } from '@supabase/supabase-js'
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/supabase/config'
 import type { EtfProfileJson } from './etf/etf-view-model'
 
 export const ETF_HISTORY_RETENTION_PER_USER = 30
@@ -56,8 +57,10 @@ export function resolveEtfPriceBasis(profile: EtfProfileJson): number | null {
 }
 
 function createEtfHistoryServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  // deepscan-history-store와 동일: 서버 표준 해석기로 SUPABASE_URL 런타임 값을
+  // 우선 반영한다(NEXT_PUBLIC_SUPABASE_URL 직접 읽기로는 dev 배포에서 null 클라이언트).
+  const url = getSupabaseUrl()
+  const serviceKey = getSupabaseServiceRoleKey()
   if (!url || !serviceKey) return null
   return createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
 }

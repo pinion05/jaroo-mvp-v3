@@ -9,6 +9,7 @@
 
 import { createClient } from '@supabase/supabase-js'
 import { isCanonicalPayload } from '@/lib/deepscan-canonical'
+import { getSupabaseServiceRoleKey, getSupabaseUrl } from '@/lib/supabase/config'
 import type { JarooDeepScanPayload } from '../../packages/contracts/src/deepscan'
 
 export const HISTORY_RETENTION_PER_USER = 30
@@ -29,10 +30,54 @@ export type DeepScanHistoryDetailRow = DeepScanHistoryListRow & {
 }
 
 function createHistoryServiceClient() {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  // 서버 표준 해석기(config.getSupabaseUrl)를 쓴다: SUPABASE_URL 런타임 값을
+  // NEXT_PUBLIC_SUPABASE_URL보다 우선한다. 과거 이곳에서
+  // process.env.NEXT_PUBLIC_SUPABASE_URL만 직접 읽어서, SUPABASE_URL만 정의된
+  // 배포(dev Railway·.env.local 관례)에서 클라이언트가 null로 죽었고 두 기록 API가
+  // 영구 503("기록을 불러오지 못했어요", TC-blackbox-data TC-BBD-015)로 떨어졌다.
+  const url = getSupabaseUrl()
+  const serviceKey = getSupabaseServiceRoleKey()
   if (!url || !serviceKey) return null
   return createClient(url, serviceKey, { auth: { autoRefreshToken: false, persistSession: false } })
+}
+
+/**
+ * 팀 요약 영속화(2026-11-13) — (user_id, target_key) 최신 기록 1행의 payload만 갱신한다.
+ * 스냅샷과 달리 기록은 런마다 append되므로 "이 종목의 마지막 런"에 병합하는 게 정확하다.
+ * 실패는 스냅샷 저장과 무관하게 로그만 남긴다(요약 씨드는 스냅샷 경로가 담당).
+ */
+export async function updateLatestScanHistoryPayload(
+  userId: string,
+  targetKey: string,
+  payload: JarooDeepScanPayload,
+): Promise<boolean> {
+  const client = createHistoryServiceClient()
+  if (!client) return false
+  if (!isCanonicalPayload(payload)) return false
+
+  try {
+    const { data, error } = await client
+      .from('deepscan_scan_history')
+      .select('id')
+      .eq('user_id', userId)
+      .eq('target_key', targetKey)
+      .order('scanned_at', { ascending: false })
+      .limit(1)
+    if (error || !data?.length) {
+      if (error) console.error('[deepscan-history] latest lookup failed', { targetKey, error: error.message })
+      return false
+    }
+
+    const { error: updateError } = await client.from('deepscan_scan_history').update({ payload }).eq('id', data[0].id)
+    if (updateError) {
+      console.error('[deepscan-history] payload update failed', { targetKey, error: updateError.message })
+      return false
+    }
+    return true
+  } catch (error) {
+    console.error('[deepscan-history] payload update threw', { targetKey, error })
+    return false
+  }
 }
 
 /** 기록 저장(append + 유저당 보존 한도 prune) — 실패해도 스캔 성공 응답에는 영향을 주지 않는다. */

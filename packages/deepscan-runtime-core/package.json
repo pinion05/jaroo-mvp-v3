@@ -2,5 +2,8 @@
   "name": "@jaroo/deepscan-runtime-core",
   "version": "0.1.0",
   "private": true,
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "test": "tsx --test test/*.test.ts test/*.test.js"
+  }
 }

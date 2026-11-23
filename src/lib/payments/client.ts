@@ -1,6 +1,7 @@
 'use client'
 
 import type { TossPaymentsPayment } from '@tosspayments/tosspayments-sdk'
+import { readJarooRuntimeEnv } from '@/lib/jaroo-runtime-env'
 import { CREDIT_PACKS, PRO_PLAN, type CreditPack } from './products'
 
 // 결제 클라이언트 플로우 (브라우저 전용).
@@ -34,6 +35,16 @@ export type PaymentsMe = {
 }
 
 export function isTossClientConfigured(): boolean {
+  // 런타임 주입(window.__JAROO_ENV__) 우선 — 서버가 결제 파이프라인 완비로 판정한 값.
+  // 빌드타임 NEXT_PUBLIC_ 스냅샷은 stale일 수 있다(2026-10-27 실측 패턴과 동일).
+  const runtime = readJarooRuntimeEnv()
+  if (runtime.paymentsOpen === true) {
+    return true
+  }
+  if (typeof window !== 'undefined' && window.__JAROO_ENV__) {
+    // 주입은 존재하는데 paymentsOpen이 없으면 파이프라인이 미완비라는 뜻이다.
+    return false
+  }
   return Boolean(process.env.NEXT_PUBLIC_TOSS_CLIENT_KEY)
 }
 

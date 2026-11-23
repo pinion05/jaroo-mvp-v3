@@ -4,6 +4,8 @@ import type { CSSProperties } from 'react'
 
 import { TodayBriefingCard } from './deepscan-loading-briefing-card'
 import { DEEPSCAN_CONSENSUS_EMPTY_STATE_TEXT } from './deepscan-loading-types'
+import { parseLoadingConsensusBody } from '../app/deepscan/deepscan-page-loading-facts'
+import type { JarooDeepScanConsensusStructured } from '../../packages/contracts/src/deepscan'
 
 type Story = StoryObj<typeof TodayBriefingCard>
 
@@ -91,20 +93,89 @@ const lossBriefingSnapshot = {
   },
 }
 
-const analystConsensus = {
-  targetPriceLabel: '53,000원',
-  currentPriceLabel: '25,800원',
-  analystCountLabel: '증권사 1곳',
-  upsideLabel: '+105.4%',
-  opinionLabel: '4.00',
-  highTargetLabel: '53,000원',
-  lowTargetLabel: '53,000원',
-  targetPriceValue: 53000,
-  currentPriceValue: 25800,
-  highTargetValue: 53000,
-  lowTargetValue: 53000,
-  summary: '매수 의견이 우세해요.',
+// 2026-10-30: 컨센서스 eyebrow('증권사 N곳' → 첫 증권사 노출) 실측용 데모.
+// 하드코딩 라벨 대신 프로덕션 파서 parseLoadingConsensusBody를 그대로 통과시켜
+// 스토리에 뜨는 analystCountLabel이 실코드 경로에서 만들어지는 값임을 보장한다.
+const consensusFromParser = (body: string, structured: JarooDeepScanConsensusStructured) => {
+  const parsed = parseLoadingConsensusBody(body, structured)
+  return {
+    ...parsed,
+    targetPriceLabel: parsed.targetPriceLabel ?? '53,000원',
+    summary: parsed.summary ?? '매수 의견이 우세해요.',
+  }
 }
+
+// 3개 증권사 — eyebrow: '미래에셋증권 외 2곳'
+const analystConsensus = consensusFromParser(
+  '증권사 3곳 평균 목표가 53,000원 · 현재가 대비 +105.4% · 매수 의견이 우세해요 · 투자의견 4.00 · 최고 56,000원 / 최저 49,000원',
+  {
+    targetPrice: 53000,
+    targetGapPct: 105.4,
+    analystCount: 3,
+    recommendationScore: 4.0,
+    highestTargetPrice: 56000,
+    lowestTargetPrice: 49000,
+    opinionSummary: '매수 의견이 우세해요',
+    brokers: [
+      { name: '미래에셋증권', targetPrice: 56000, date: '2026-10-18' },
+      { name: '하나증권', targetPrice: 52000, date: '2026-10-15' },
+      { name: 'KB증권', targetPrice: 49000, date: '2026-10-11' },
+    ],
+    currency: 'KRW',
+  },
+)
+
+// 49개 증권사 커버 — eyebrow: '하나증권 외 48곳'
+const wideCoverageConsensus = consensusFromParser(
+  '증권사 49곳 평균 목표가 487,045원 · 현재가 대비 +94.8% · 모두 매수 의견이에요 · 투자의견 4.35 · 최고 600,000원 / 최저 300,000원',
+  {
+    targetPrice: 487045,
+    targetGapPct: 94.8,
+    analystCount: 49,
+    recommendationScore: 4.35,
+    highestTargetPrice: 600000,
+    lowestTargetPrice: 300000,
+    opinionSummary: '모두 매수 의견이에요',
+    // analystCount(49)가 라벨 카운트의 원천이다 — brokers 배열은 첫 이름 공급원 역할만 한다.
+    brokers: [
+      { name: '하나증권', targetPrice: 600000, date: '2026-10-19' },
+      { name: '미래에셋증권', targetPrice: 580000, date: '2026-10-17' },
+    ],
+    currency: 'KRW',
+  },
+)
+
+// 단일 증권사 — eyebrow: 'NH증권'
+const singleBrokerConsensus = consensusFromParser(
+  '증권사 1곳 평균 목표가 53,000원 · 현재가 대비 +105.4% · 매수 의견이 우세해요 · 투자의견 4.00 · 최고 53,000원 / 최저 53,000원',
+  {
+    targetPrice: 53000,
+    targetGapPct: 105.4,
+    analystCount: 1,
+    recommendationScore: 4.0,
+    highestTargetPrice: 53000,
+    lowestTargetPrice: 53000,
+    opinionSummary: '매수 의견이 우세해요',
+    brokers: [{ name: 'NH증권', targetPrice: 53000, date: '2026-10-18' }],
+    currency: 'KRW',
+  },
+)
+
+// 구버전 크롤러 폴백(brokers 미제공) — eyebrow: '증권사 5곳' (기존 형식 유지)
+const legacyNoBrokersConsensus = consensusFromParser(
+  '증권사 5곳 평균 목표가 53,000원 · 현재가 대비 +105.4% · 매수 의견이 우세해요 · 투자의견 4.00 · 최고 56,000원 / 최저 49,000원',
+  {
+    targetPrice: 53000,
+    targetGapPct: 105.4,
+    analystCount: 5,
+    recommendationScore: 4.0,
+    highestTargetPrice: 56000,
+    lowestTargetPrice: 49000,
+    opinionSummary: '매수 의견이 우세해요',
+    brokers: null,
+    currency: 'KRW',
+  },
+)
 
 const meta: Meta<typeof TodayBriefingCard> = {
   title: 'Jaroo/딥스캔 · 오늘 장 브리핑 카드',
@@ -153,17 +224,9 @@ export const ProfitPosition: Story = {
     forceReady: true,
     elapsedSeconds: 60,
     consensus: {
-      ...analystConsensus,
-      targetPriceLabel: '487,045원',
+      ...wideCoverageConsensus,
       currentPriceLabel: '250,000원',
-      analystCountLabel: '49개 증권사 · TARGET VIEW',
-      upsideLabel: '+94.8%',
-      highTargetLabel: '600,000원',
-      lowTargetLabel: '300,000원',
-      targetPriceValue: 487045,
       currentPriceValue: 250000,
-      highTargetValue: 600000,
-      lowTargetValue: 300000,
     },
     dailyCloses: [232000, 235500, 238000, 236500, 241000, 243500, 242000, 246000, 248500, 250000],
     seedKey: 'storybook-profit',
@@ -183,5 +246,23 @@ export const ConsensusEmptyState: Story = {
     consensus: undefined,
     consensusEmptyState: DEEPSCAN_CONSENSUS_EMPTY_STATE_TEXT,
     seedKey: 'storybook-empty',
+  },
+}
+
+export const SingleBrokerConsensus: Story = {
+  name: '단일 증권사 — 브로커명만',
+  args: {
+    ...LossWithRecoveryForecast.args,
+    consensus: singleBrokerConsensus,
+    seedKey: 'storybook-single-broker',
+  },
+}
+
+export const LegacyNoBrokersConsensus: Story = {
+  name: '구버전 폴백 — brokers 미제공(증권사 N곳 유지)',
+  args: {
+    ...LossWithRecoveryForecast.args,
+    consensus: legacyNoBrokersConsensus,
+    seedKey: 'storybook-legacy-no-brokers',
   },
 }

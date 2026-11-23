@@ -1,0 +1,1169 @@
+{
+  "generatedAt": "2026-11-19T12:16:13.853+09:00",
+  "charSet": "source",
+  "source": {
+    "news": {
+      "count": 50
+    },
+    "chart": {
+      "bullish": 25,
+      "bearish": 15,
+      "filter": {
+        "above_ma20": false,
+        "direction": "bullish",
+        "market": null,
+        "min_score": 0,
+        "min_trend": null,
+        "min_value": 0,
+        "sort": "rank",
+        "top": 25
+      }
+    },
+    "finance": {
+      "via": "api",
+      "count": 30,
+      "universe": 2094,
+      "generatedAt": "2026-11-19T03:05:34Z"
+    }
+  },
+  "articleCount": 50,
+  "articles": [],
+  "characters": [
+    {
+      "name": "뉴스콕",
+      "source": "news",
+      "positive": [
+        {
+          "stock": "에스엠",
+          "reason": "한한령 해제 기대로 가격제한폭까지 급등, 엔터 4사 중 가장 강한 수급 폭발",
+          "articles": [
+            1,
+            5
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": {
+            "status": "pass",
+            "score": 55,
+            "threshold": 45,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:041510"
+          }
+        },
+        {
+          "stock": "JYP엔터",
+          "reason": "한한령 해제 기대에 3분기 어닝 서프라이즈까지 겹치며 이중 모멘텀",
+          "articles": [
+            1,
+            5
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          }
+        },
+        {
+          "stock": "스튜디오드래곤",
+          "reason": "한중 FTA 콘텐츠 최혜국대우 수혜로 상한가, 드라마 추가 판매 시 편당 30~40억원 매출 기대",
+          "articles": [
+            5
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": {
+            "status": "pass",
+            "score": 54,
+            "threshold": 45,
+            "sizing": "반 티켓",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:253450"
+          }
+        },
+        {
+          "stock": "삼성전기",
+          "reason": "엔비디아 기판 공급 계약 확대 + MLCC 장기공급으로 내년 영업이익 113% 증가 전망",
+          "articles": [
+            2
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          }
+        },
+        {
+          "stock": "현대모비스",
+          "reason": "현대차그룹 AI 투자 확대에 따라 전장시스템·로보틱스 성장, 방어주에서 성장주로 인식 전환",
+          "articles": [
+            10
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": {
+            "status": "pass",
+            "score": 61,
+            "threshold": 45,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:012330"
+          }
+        },
+        {
+          "stock": "한라캐스트",
+          "reason": "글로벌 AI 고객사향 휴머노이드 부품 양산 출하 시작, 수주잔고 9207억원으로 중장기 성장 가시성",
+          "articles": [
+            19
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          }
+        },
+        {
+          "stock": "디케이티",
+          "reason": "3분기 어닝 서프라이즈 + 휴머노이드 매출 첫 발생, 신사업 비중이 본업을 추월",
+          "articles": [
+            29
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          }
+        },
+        {
+          "stock": "현대글로비스",
+          "reason": "중국 완성차 수출 급증(1~9월 71%↑)과 PCTC 선대 확장이 맞물려 고운임 수혜 온전히 향유",
+          "articles": [
+            42
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          }
+        }
+      ],
+      "negative": [
+        {
+          "stock": "엔비디아",
+          "reason": "호실적에도 CEO 공백과 AI 투자 수익성 우려로 5거래일 연속 하락, 시총 5490억달러 증발",
+          "articles": [
+            8,
+            11,
+            13,
+            15,
+            20,
+            26
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": null
+        },
+        {
+          "stock": "삼성전자",
+          "reason": "외국인 5거래일 연속 매도에 4분기 실적 전망 하향까지 겹치며 5000선 붕괴 주도",
+          "articles": [
+            21,
+            33,
+            40,
+            50
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": null
+        },
+        {
+          "stock": "SK하이닉스",
+          "reason": "외국인 매도 집중과 메모리 가격 하락 전망으로 반등 제한, 목표주가 줄줄이 하향",
+          "articles": [
+            21,
+            28,
+            33,
+            40
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": null
+        },
+        {
+          "stock": "미래에셋증권",
+          "reason": "3분기 적자 전환 + 하반기 주가 52.40% 급락, 거래 위축과 과징금 이중고",
+          "articles": [
+            30
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": null
+        },
+        {
+          "stock": "한솔케미칼",
+          "reason": "원화 강세와 QD 소재 부진으로 목표주가 40만→30만원 하향, 4분기도 환율 부담 지속",
+          "articles": [
+            7
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": null
+        },
+        {
+          "stock": "롯데케미칼",
+          "reason": "4분기 영업손실 전망이 961억→1947억원으로 확대, 연말 비수기와 수요 부진 지속",
+          "articles": [
+            9,
+            50
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": null
+        },
+        {
+          "stock": "에코프로비엠",
+          "reason": "4분기 영업이익 전망치가 3개월 새 97% 급감, 유럽 EV 출하 부진으로 매출 감소 불가피",
+          "articles": [
+            9,
+            50
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": null
+        },
+        {
+          "stock": "한국전력",
+          "reason": "4분기 흑자(5187억원) 예상에서 적자(2989억원)로 전망 전환, 연료비·전력구입비 부담 지속",
+          "articles": [
+            9,
+            50
+          ],
+          "urls": [],
+          "evidence": [],
+          "source": "news",
+          "gate": null
+        }
+      ],
+      "diary": {
+        "mood": "🔥",
+        "paragraphs": [
+          "아침부터 피드 미친 듯이 훑었다, 오늘 네이버 메인뉴스 50건 중에 제일 먼저 눈에 꽂힌 건 \"한한령 해제 기대로 가격제한폭까지 급등\" — 엔터 4사 중 수급이 제일 빡센 에스엠이었고, 바로 deepscan 돌려서 55점 나왔다. 내 문턱 45점은 가뿐하게 넘겼고, 같은 테마에서 \"한중 FTA 콘텐츠 최혜국대우 수혜로 상한가\" 뜬 스튜디오드래곤도 54점으로 통과, 여기에 \"현대차그룹 AI 투자 확대\"로 방어주→성장주 갈아탄 현대모비스가 61점으로 제일 높게 찍혔다. 반대로 엔비디아는 \"CEO 공백과 AI 투자 수익성 우려로 5거래일 연속 하락\"에 삼성전자·SK하이닉스까지 외국인 매도로 털리니까, 이쪽은 아예 안 건드렸다. JYP엔터·삼성전기·한라캐스트·디케이티·현대글로비스는 판정 대기 5개로 아직 리포트 안 와서 손가락만 달싹이고 있는 중 🔥",
+          "결론은 매수 3건 — 에스엠은 문턱보다 10점 위라 중간 비중, 스튜디오드래곤은 9점 차라 반 티켓, 현대모비스는 16점 차로 중간 비중 넣었다. 25점 이상 벌어준 놈이 하나도 없어서 큰 비중은 못 실었는데, 이게 좀 아쉽다 😤 그래도 상한가 테마에서 제일 빠르게 올라탄 건 나니까 오늘은 만족, 대기 5개는 내일 아침에 점수 뜨자마자 물릴 준비 완료. 목표는 이슈 선점 승률 60%, 오늘도 뉴스 읽는 속도로 1승 챙긴다."
+        ],
+        "generatedBy": "deepseek/deepseek-v4.1-flash-eco",
+        "generatedAt": "2026-11-19T12:23:27.366+09:00"
+      }
+    },
+    {
+      "name": "차트콕",
+      "source": "chart",
+      "positive": [
+        {
+          "stock": "케이아이엔엑스",
+          "reason": "하강 쐐기 상승 확정에 상승 정배열·MA20 위, 목표 153116·손절 118943로 손익비가 계산되는 깔끔한 그림이다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "케이아이엔엑스 — 스코어 72.8 · 하강 쐐기(상승·확정) · 상승 정배열 · 목표 153116.6426512968·손절 118943.41978866467"
+          ],
+          "source": "chart",
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          },
+          "code": "093320"
+        },
+        {
+          "stock": "미원화학",
+          "reason": "하강 삼각형 상승 확정, 상승 정배열·MA20 위로 추세와 패턴이 같은 방향을 가리킨다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "미원화학 — 스코어 71.5 · 하강 삼각형(상승·확정) · 상승 정배열 · 목표 13022.052478272559·손절 10094.934097421203"
+          ],
+          "source": "chart",
+          "gate": {
+            "status": "pass",
+            "score": 53,
+            "threshold": 50,
+            "sizing": "반 티켓",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:134380"
+          },
+          "code": "134380"
+        },
+        {
+          "stock": "진양산업",
+          "reason": "삼중바닥 상승 확정에 상승 정배열·MA20 위, 상승패턴 3/14개로 패턴 지지가 두껍다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "진양산업 — 스코어 70.1 · 삼중바닥(상승·확정) · 상승 정배열 · 목표 8213.333333333332·손절 6500"
+          ],
+          "source": "chart",
+          "gate": {
+            "status": "fail",
+            "score": 44,
+            "threshold": 50,
+            "sizing": null,
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:003780"
+          },
+          "code": "003780"
+        },
+        {
+          "stock": "계룡건설",
+          "reason": "상승 삼각형 상승 확정, 상승 정배열·MA20 위로 목표 33142·손절 22466의 진입 그림이 성립한다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "계룡건설 — 스코어 74.3 · 상승 삼각형(상승·확정) · 상승 정배열 · 목표 33142.82771752543·손절 22466.303105848143"
+          ],
+          "source": "chart",
+          "gate": {
+            "status": "pass",
+            "score": 60,
+            "threshold": 50,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:013580"
+          },
+          "code": "013580"
+        },
+        {
+          "stock": "디씨엠",
+          "reason": "이중바닥 상승 확정에 상승 정배열·MA20 위, 상승패턴 3/14개로 확정 패턴과 추세가 일치한다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "디씨엠 — 스코어 74.3 · 이중바닥 (더블바텀)(상승·확정) · 상승 정배열 · 목표 13605·손절 10310"
+          ],
+          "source": "chart",
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          },
+          "code": "024090"
+        }
+      ],
+      "negative": [
+        {
+          "stock": "LX세미콘",
+          "reason": "이중천장 하락 확정에 하락 역배열·MA20 아래, 목표 30850으로 하방 그림이 완성됐다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "LX세미콘 — 스코어 83.4 · 이중천장 (더블탑)(하락·확정) · 하락 역배열 · 목표 30850·손절 38500"
+          ],
+          "source": "chart",
+          "gate": null
+        },
+        {
+          "stock": "삼원강재",
+          "reason": "삼중천장 하락 확정, 하락 역배열에 하락패턴 4/14개로 하락 신호가 가장 두껍다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "삼원강재 — 스코어 78.3 · 삼중천장(하락·확정) · 하락 역배열 · 목표 2025·손절 2260"
+          ],
+          "source": "chart",
+          "gate": null
+        },
+        {
+          "stock": "신한글로벌액티브리츠",
+          "reason": "약세 플래그 진행중, 하락 역배열·MA20 아래에 하락패턴 3/14개로 아래쪽 그림이다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "신한글로벌액티브리츠 — 스코어 81.5 · 약세 플래그(하락·진행중) · 하락 역배열 · 손절 822"
+          ],
+          "source": "chart",
+          "gate": null
+        },
+        {
+          "stock": "한솔홈데코",
+          "reason": "하강 쐐기 하락 확정, 하락 역배열에 하락패턴 4/14개로 반등 캔들(전일 +4.36%)도 추세를 못 뒤집는다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "한솔홈데코 — 스코어 74.4 · 하강 쐐기(하락·확정) · 하락 역배열 · 목표 1466.1796445515483·손절 1844.6938775510207"
+          ],
+          "source": "chart",
+          "gate": null
+        },
+        {
+          "stock": "셀레믹스",
+          "reason": "하강 쐐기 하락 확정에 하락 역배열·MA20 아래, 목표 3262로 하방 목표가 열려 있다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "셀레믹스 — 스코어 74.8 · 하강 쐐기(하락·확정) · 하락 역배열 · 목표 3262.3476116547245·손절 8128.4236902050325"
+          ],
+          "source": "chart",
+          "gate": null
+        },
+        {
+          "stock": "지씨셀",
+          "reason": "약세 플래그 진행중, 하락 역배열·MA20 아래에 하락패턴 3/14개로 하락 그림이 유지된다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "지씨셀 — 스코어 74 · 약세 플래그(하락·진행중) · 하락 역배열 · 손절 10560"
+          ],
+          "source": "chart",
+          "gate": null
+        },
+        {
+          "stock": "앱튼",
+          "reason": "약세 플래그 하락 확정, 하락 역배열에 전일 -11.33%로 캔들이 이미 아래로 붕괴했다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "앱튼 — 스코어 77 · 약세 플래그(하락·확정) · 하락 역배열 · 목표 -2023·손절 905"
+          ],
+          "source": "chart",
+          "gate": null
+        },
+        {
+          "stock": "KG스틸",
+          "reason": "상승 삼각형이 하락으로 확정된 역전 그림, 하락 역배열·MA20 아래로 목표 4716까지 열려 있다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "KG스틸 — 스코어 74.8 · 상승 삼각형(하락·확정) · 하락 역배열 · 목표 4716.152890263316·손절 5990.8401103175165"
+          ],
+          "source": "chart",
+          "gate": null
+        }
+      ],
+      "diary": {
+        "mood": "📐",
+        "paragraphs": [
+          "오늘 차트 패턴 점수 상위에서 케이아이엔엑스·미원화학·진양산업·계룡건설·디씨엠을 잡았다. 케이아이엔엑스는 스코어 72.8에 하강 쐐기 상승 확정, 목표 153116·손절 118943 — 그림이 깔끔하다. 계룡건설은 스코어 74.3 상승 삼각형 확정, 목표 33142·손절 22466. 미원화학 71.5, 진양산업 70.1, 디씨엠 74.3까지 전부 상승 정배열에 MA20 위다. 전부 deepscan에 돌렸고, 내 문턱은 50점이다.",
+          "결과는 계룡건설 60점 통과 — 문턱보다 10점 위라 중간 비중으로 간다. 미원화학 53점 통과지만 3점 차이라 반 티켓만. 진양산업은 44점, 문턱 미달… 못 산다, 관망. 케이아이엔엑스와 디씨엠은 판정 대기, 그림은 이미 마음에 들어왔다. 오늘 확정된 그림 2개, 목표는 연간 상승 그림 12개 완성이다. 🔥"
+        ],
+        "generatedBy": "deepseek/deepseek-v4.1-flash-eco",
+        "generatedAt": "2026-11-19T12:23:26.083+09:00"
+      }
+    },
+    {
+      "name": "재무콕",
+      "source": "finance",
+      "positive": [
+        {
+          "stock": "제닉",
+          "reason": "총점 99.5에 F-Score 7, 수익성 24.5·건전성 25·성장성 20·현금흐름 20·효율성 10으로 다섯 카테고리 모두 20 이상이고 효율성은 만점이다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "제닉 — 총점 99.5 A 우수 · F-Score 7 · 수익성 24.5 · 재무건전성 25 · 성장성 20 · 현금흐름 20 · 효율성(활동성) 10"
+          ],
+          "source": "finance",
+          "gate": {
+            "status": "pass",
+            "score": 55,
+            "threshold": 55,
+            "sizing": "반 티켓",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:123330"
+          },
+          "code": "123330"
+        },
+        {
+          "stock": "파마리서치",
+          "reason": "F-Score 8에 25/25/19/20/9로 카테고리 편중 없이 전 항목 상위권이다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "파마리서치 — 총점 98 A 우수 · F-Score 8 · 수익성 25 · 재무건전성 25 · 성장성 19 · 현금흐름 20 · 효율성(활동성) 9"
+          ],
+          "source": "finance",
+          "gate": {
+            "status": "pass",
+            "score": 63,
+            "threshold": 55,
+            "sizing": "반 티켓",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:214450"
+          },
+          "code": "214450"
+        },
+        {
+          "stock": "에이피알",
+          "reason": "F-Score 7에 25/25/20/20/8로 최저 카테고리가 효율성 8이며 성장성·현금흐름 모두 20이다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "에이피알 — 총점 98 A 우수 · F-Score 7 · 수익성 25 · 재무건전성 25 · 성장성 20 · 현금흐름 20 · 효율성(활동성) 8"
+          ],
+          "source": "finance",
+          "gate": {
+            "status": "pass",
+            "score": 60,
+            "threshold": 55,
+            "sizing": "반 티켓",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:278470"
+          },
+          "code": "278470"
+        },
+        {
+          "stock": "SK하이닉스",
+          "reason": "F-Score 7에 25/23/20/20/8로 건전성만 23일 뿐 성장성·현금흐름 20을 유지한다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "SK하이닉스 — 총점 96 A 우수 · F-Score 7 · 수익성 25 · 재무건전성 23 · 성장성 20 · 현금흐름 20 · 효율성(활동성) 8"
+          ],
+          "source": "finance",
+          "gate": {
+            "status": "pass",
+            "score": 71,
+            "threshold": 55,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:000660"
+          },
+          "code": "000660"
+        },
+        {
+          "stock": "코세스",
+          "reason": "F-Score 8에 24/25/18/20/9로 회계 신호와 카테고리 밸런스가 모두 깨끗하다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "코세스 — 총점 96 A 우수 · F-Score 8 · 수익성 24 · 재무건전성 25 · 성장성 18 · 현금흐름 20 · 효율성(활동성) 9"
+          ],
+          "source": "finance",
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          },
+          "code": "089890"
+        },
+        {
+          "stock": "폴레드",
+          "reason": "F-Score 8에 효율성 10(만점)·건전성 25·현금흐름 20이고 수익성 21.5만 상대적으로 낮다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "폴레드 — 총점 95.5 A 우수 · F-Score 8 · 수익성 21.5 · 재무건전성 25 · 성장성 19 · 현금흐름 20 · 효율성(활동성) 10"
+          ],
+          "source": "finance",
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          },
+          "code": "487580"
+        },
+        {
+          "stock": "삼성바이오로직스",
+          "reason": "F-Score 8에 25/23/19/20/8로 다섯 카테고리 어디에도 8 미만이 없다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "삼성바이오로직스 — 총점 95 A 우수 · F-Score 8 · 수익성 25 · 재무건전성 23 · 성장성 19 · 현금흐름 20 · 효율성(활동성) 8"
+          ],
+          "source": "finance",
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          },
+          "code": "207940"
+        },
+        {
+          "stock": "알테오젠",
+          "reason": "F-Score 7에 수익성 25·건전성 25·성장성 20으로 상위 세 카테고리가 최상위이고 현금흐름 17만 미세하게 낮다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "알테오젠 — 총점 95 A 우수 · F-Score 7 · 수익성 25 · 재무건전성 25 · 성장성 20 · 현금흐름 17 · 효율성(활동성) 8"
+          ],
+          "source": "finance",
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          },
+          "code": "196170"
+        }
+      ],
+      "negative": [
+        {
+          "stock": "한국캐피탈",
+          "reason": "총점 92.5지만 현금흐름 0·효율성 0에 수익성 14·건전성 10으로 두 카테고리가 통째로 비어 있다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "한국캐피탈 — 총점 92.5 A 우수 · F-Score ? · 수익성 14 · 재무건전성 10 · 성장성 13 · 현금흐름 0 · 효율성(활동성) 0"
+          ],
+          "source": "finance",
+          "gate": null
+        },
+        {
+          "stock": "한국금융지주",
+          "reason": "총점 92.5지만 현금흐름 0·효율성 0에 재무건전성 7로 실질 퀄리티는 최하위권이다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "한국금융지주 — 총점 92.5 A 우수 · F-Score ? · 수익성 15 · 재무건전성 7 · 성장성 15 · 현금흐름 0 · 효율성(활동성) 0"
+          ],
+          "source": "finance",
+          "gate": null
+        },
+        {
+          "stock": "NH투자증권",
+          "reason": "총점 91.25지만 현금흐름 0·효율성 0에 수익성 11.5·건전성 10으로 총점이 산식 왜곡의 산물이다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "NH투자증권 — 총점 91.25 A 우수 · F-Score ? · 수익성 11.5 · 재무건전성 10 · 성장성 15 · 현금흐름 0 · 효율성(활동성) 0"
+          ],
+          "source": "finance",
+          "gate": null
+        },
+        {
+          "stock": "키움증권",
+          "reason": "총점 91.25지만 현금흐름 0·효율성 0에 재무건전성 7로 두 카테고리 공백이 그대로다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "키움증권 — 총점 91.25 A 우수 · F-Score ? · 수익성 14.5 · 재무건전성 7 · 성장성 15 · 현금흐름 0 · 효율성(활동성) 0"
+          ],
+          "source": "finance",
+          "gate": null
+        },
+        {
+          "stock": "크리에이츠",
+          "reason": "총점 98.95로 2위인데 성장성 15가 유일한 흠으로, 성장 프리미엄이 빠지면 순위가 급락할 구멍이다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "크리에이츠 — 총점 98.94736842105263 A 우수 · F-Score 7 · 수익성 25 · 재무건전성 25 · 성장성 15 · 현금흐름 20 · 효율성(활동성) 9"
+          ],
+          "source": "finance",
+          "gate": null
+        },
+        {
+          "stock": "SNT에너지",
+          "reason": "총점 92에 효율성 10(만점)·건전성 25지만 성장성 13이 리스트 최저 수준인 정체형 우량주다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "SNT에너지 — 총점 92 A 우수 · F-Score 7 · 수익성 24 · 재무건전성 25 · 성장성 13 · 현금흐름 20 · 효율성(활동성) 10"
+          ],
+          "source": "finance",
+          "gate": null
+        },
+        {
+          "stock": "글로벌텍스프리",
+          "reason": "수익성 24.5·건전성 25·현금흐름 20인데 효율성 4로 자본 효율이 바닥이다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "글로벌텍스프리 — 총점 92.5 A 우수 · F-Score 6 · 수익성 24.5 · 재무건전성 25 · 성장성 19 · 현금흐름 20 · 효율성(활동성) 4"
+          ],
+          "source": "finance",
+          "gate": null
+        },
+        {
+          "stock": "HD현대마린엔진",
+          "reason": "총점 93.5지만 F-Score 5에 효율성 6으로 회계 신호와 자본 효율이 동시에 약하다",
+          "articles": [],
+          "urls": [],
+          "evidence": [
+            "HD현대마린엔진 — 총점 93.5 A 우수 · F-Score 5 · 수익성 24.5 · 재무건전성 23 · 성장성 20 · 현금흐름 20 · 효율성(활동성) 6"
+          ],
+          "source": "finance",
+          "gate": null
+        }
+      ],
+      "diary": {
+        "mood": "🧮",
+        "paragraphs": [
+          "오늘 재무 스코어 상위 30종목(2025/12 결산)부터 훑었다. 제닉 — 총점 99.5, F-Score 7, 수익성 24.5·건전성 25·성장성 20·현금흐름 20·효율성 10으로 다섯 칸에 구멍이 없다. deepscan 돌려보니 55점, 내 문턱 55점에 딱 붙어서 통과다. SK하이닉스는 F-Score 7에 25/23/20/20/8, deepscan 71점으로 여유 있게 넘겼고 파마리서치 63점·에이피알 60점도 문턱 위다. 코세스·폴레드·삼성바이오로직스·알테오젠은 F-Score 8에 총점 95~96인데 아직 판정이 안 왔다 — 숫자는 좋은데 확인 전엔 손대지 않는다.",
+          "결정은 매수 4건이다. 제닉 55점은 문턱과 0점 차이라 반 티켓, 파마리서치 63점·에이피알 60점도 10점 미만이라 반 티켓, SK하이닉스만 71점으로 16점 초과라 중간 비중이다. 반면 한국캐피탈·한국금융지주·NH투자증권·키움증권은 총점 91~92.5라도 현금흐름 0·효율성 0에 건전성 7~10 — 총점이 산식 왜곡으로 부풀려진 놈들이라 리스트에서 즉시 탈락시켰다. 턱걸이 통과한 55점짜리를 반 티켓으로만 담은 건 솔직히 찝찝하다. 판정 대기 4개가 도착하면 우량주 10개 포트폴리오에 한 칸 더 채운다."
+        ],
+        "generatedBy": "deepseek/deepseek-v4.1-flash-eco",
+        "generatedAt": "2026-11-19T12:23:27.839+09:00"
+      }
+    }
+  ],
+  "matrix": [
+    {
+      "stock": "에스엠",
+      "뉴스콕": 1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "JYP엔터",
+      "뉴스콕": 1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "스튜디오드래곤",
+      "뉴스콕": 1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "삼성전기",
+      "뉴스콕": 1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "현대모비스",
+      "뉴스콕": 1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "한라캐스트",
+      "뉴스콕": 1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "디케이티",
+      "뉴스콕": 1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "현대글로비스",
+      "뉴스콕": 1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "엔비디아",
+      "뉴스콕": -1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "삼성전자",
+      "뉴스콕": -1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "SK하이닉스",
+      "뉴스콕": -1,
+      "재무콕": 1,
+      "차트콕": 0,
+      "sum": 0
+    },
+    {
+      "stock": "미래에셋증권",
+      "뉴스콕": -1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "한솔케미칼",
+      "뉴스콕": -1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "롯데케미칼",
+      "뉴스콕": -1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "에코프로비엠",
+      "뉴스콕": -1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "한국전력",
+      "뉴스콕": -1,
+      "차트콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "케이아이엔엑스",
+      "차트콕": 1,
+      "뉴스콕": 0,
+      "재무콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "미원화학",
+      "차트콕": 1,
+      "뉴스콕": 0,
+      "재무콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "진양산업",
+      "차트콕": 1,
+      "뉴스콕": 0,
+      "재무콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "계룡건설",
+      "차트콕": 1,
+      "뉴스콕": 0,
+      "재무콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "디씨엠",
+      "차트콕": 1,
+      "뉴스콕": 0,
+      "재무콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "LX세미콘",
+      "차트콕": -1,
+      "뉴스콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "삼원강재",
+      "차트콕": -1,
+      "뉴스콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "신한글로벌액티브리츠",
+      "차트콕": -1,
+      "뉴스콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "한솔홈데코",
+      "차트콕": -1,
+      "뉴스콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "셀레믹스",
+      "차트콕": -1,
+      "뉴스콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "지씨셀",
+      "차트콕": -1,
+      "뉴스콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "앱튼",
+      "차트콕": -1,
+      "뉴스콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "KG스틸",
+      "차트콕": -1,
+      "뉴스콕": 0,
+      "재무콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "제닉",
+      "재무콕": 1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "파마리서치",
+      "재무콕": 1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "에이피알",
+      "재무콕": 1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "코세스",
+      "재무콕": 1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "폴레드",
+      "재무콕": 1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "삼성바이오로직스",
+      "재무콕": 1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "알테오젠",
+      "재무콕": 1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "한국캐피탈",
+      "재무콕": -1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "한국금융지주",
+      "재무콕": -1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "NH투자증권",
+      "재무콕": -1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "키움증권",
+      "재무콕": -1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "크리에이츠",
+      "재무콕": -1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "SNT에너지",
+      "재무콕": -1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "글로벌텍스프리",
+      "재무콕": -1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "HD현대마린엔진",
+      "재무콕": -1,
+      "뉴스콕": 0,
+      "차트콕": 0,
+      "sum": -1
+    }
+  ],
+  "deepscans": [
+    {
+      "code": "041510",
+      "name": "에스엠",
+      "heroScore": 55,
+      "scoreLabel": "moderate · 55 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "111,700원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:041510",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 31
+    },
+    {
+      "code": "123330",
+      "name": "제닉",
+      "heroScore": 55,
+      "scoreLabel": "moderate · 55 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "목표가 미제공",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:123330",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 28
+    },
+    {
+      "code": "253450",
+      "name": "스튜디오드래곤",
+      "heroScore": 54,
+      "scoreLabel": "caution · 54 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "33,650원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:253450",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 51
+    },
+    {
+      "code": "134380",
+      "name": "미원화학",
+      "heroScore": 53,
+      "scoreLabel": "caution · 53 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "목표가 미제공",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:134380",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 45
+    },
+    {
+      "code": "214450",
+      "name": "파마리서치",
+      "heroScore": 63,
+      "scoreLabel": "moderate · 63 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "422,429원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:214450",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 61
+    },
+    {
+      "code": "003780",
+      "name": "진양산업",
+      "heroScore": 44,
+      "scoreLabel": "caution · 44 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "목표가 미제공",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:003780",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 37
+    },
+    {
+      "code": "278470",
+      "name": "에이피알",
+      "heroScore": 60,
+      "scoreLabel": "moderate · 60 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "456,136원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:278470",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 46
+    },
+    {
+      "code": "012330",
+      "name": "현대모비스",
+      "heroScore": 61,
+      "scoreLabel": "moderate · 61 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "601,739원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:012330",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 43
+    },
+    {
+      "code": "013580",
+      "name": "계룡건설",
+      "heroScore": 60,
+      "scoreLabel": "moderate · 60 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "38,500원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:013580",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 46
+    },
+    {
+      "code": "000660",
+      "name": "SK하이닉스",
+      "heroScore": 71,
+      "scoreLabel": "strong · 71 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "3,001,905원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:000660",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 62
+    }
+  ],
+  "deepscanFetchedAt": "2026-11-19T12:23:22.215+09:00",
+  "thresholds": {
+    "뉴스콕": 45,
+    "차트콕": 50,
+    "재무콕": 55
+  }
+}

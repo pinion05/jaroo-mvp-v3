@@ -1,0 +1,102 @@
+{
+  "runId": "run-abandon-20261109T153148",
+  "meta": {
+    "kind": "run-abandon"
+  },
+  "sampleCount": 359,
+  "spanMs": 299745,
+  "pathDistribution": {
+    "/home": 3,
+    "/deepscan": 9,
+    "blank": 347
+  },
+  "events": [
+    {
+      "event": "stock-ready",
+      "at": "2026-11-09T06:32:17.385Z"
+    },
+    {
+      "event": "deepscan-start-click",
+      "at": "2026-11-09T06:32:22.032Z"
+    },
+    {
+      "event": "abandon-reload",
+      "at": "2026-11-09T06:32:27.311Z"
+    },
+    {
+      "event": "abandon-after-state",
+      "at": "2026-11-09T06:34:25.596Z"
+    },
+    {
+      "event": "sampler-lost-nav",
+      "at": "2026-11-09T06:34:27.256Z"
+    },
+    {
+      "event": "run-end",
+      "at": "2026-11-09T06:37:23.083Z"
+    }
+  ],
+  "order": {
+    "announced": [
+      "가격 위치",
+      "핵심 근거",
+      "세 팀 판단(팀1→2→3 순차: 세 분석가가 차례로)"
+    ],
+    "observed": [
+      {
+        "name": "가격 위치(오늘 장 기준)",
+        "t": 1794205942166,
+        "i": 2
+      },
+      {
+        "name": "핵심 근거(시세 완료 안내)",
+        "t": 1794205942166,
+        "i": 2
+      }
+    ],
+    "inversion": null
+  },
+  "occupation": [
+    {
+      "section": "가격 위치",
+      "arrived": true,
+      "firstAtMs": 4628,
+      "preWindow": 2,
+      "preWindowSkeleton": 0,
+      "occupied": false
+    },
+    {
+      "section": "팀1",
+      "arrived": false
+    },
+    {
+      "section": "팀2",
+      "arrived": false
+    },
+    {
+      "section": "팀3",
+      "arrived": false
+    }
+  ],
+  "regressions": [],
+  "skeletonReturns": [],
+  "stalls": [],
+  "teamReorders": [],
+  "terminal": {
+    "detected": false,
+    "detectedAtMs": null,
+    "lastFlags": {
+      "waitTop": false,
+      "readyTop": false,
+      "arrivedTop": false,
+      "teamLoading": false,
+      "doneCnt": 0,
+      "footer": false,
+      "emptyState": false,
+      "marketDone": false,
+      "price": false
+    },
+    "lastUrl": "blank",
+    "residual": null
+  }
+}

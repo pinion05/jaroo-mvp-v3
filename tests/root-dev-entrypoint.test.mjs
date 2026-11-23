@@ -62,14 +62,18 @@ test('root entry opens home and home does not force empty guests to screenshot',
 })
 
 test('root test script runs root smoke tests and key workspace package suites', () => {
+  // deepscan-runtime-core(회복 예측·위원회 LLM·safe-json) 포함 — 커버리지 공백 수정(2026-11-02).
+  // paper-trade(node:test 28개)는 2026-11-16 사이드카 배선부터 체인에 편입.
   assert.equal(
     packageJson.scripts.test,
-    'node --test tests/*.test.mjs && npm run test:web:ts && npm run test:crawler && npm run test:instrument-core',
+    'node --test tests/*.test.mjs && npm run test:web:ts && npm run test:crawler && npm run test:instrument-core && npm run test:runtime-core && npm run test:paper-trade',
   )
   assert.equal(packageJson.scripts['test:web:ts'], 'node scripts/run-web-ts-tests.cjs')
+  assert.equal(packageJson.scripts['test:runtime-core'], 'npm --prefix packages/deepscan-runtime-core run test')
+  assert.equal(packageJson.scripts['test:paper-trade'], 'npm --prefix packages/paper-trade run test')
 })
 
-test('dev stack launcher starts both web and crawler dev scripts and stops siblings on exit', () => {
+test('dev stack launcher starts web, crawler and paper-trade dev scripts and stops siblings on exit', () => {
   const spawns = []
   const fakeProcess = new FakeProcess()
   const fakeChildren = new Map()
@@ -90,16 +94,18 @@ test('dev stack launcher starts both web and crawler dev scripts and stops sibli
     [
       { command: 'npm', args: ['run', 'dev:web'], cwd: rootDir, stdio: 'inherit' },
       { command: 'npm', args: ['run', 'dev:crawler'], cwd: rootDir, stdio: 'inherit' },
+      { command: 'npm', args: ['run', 'dev:paper-trade'], cwd: rootDir, stdio: 'inherit' },
     ],
   )
 
   fakeChildren.get('dev:web').emit('exit', 0, null)
 
   assert.deepEqual(fakeChildren.get('dev:crawler').kills, ['SIGTERM'])
+  assert.deepEqual(fakeChildren.get('dev:paper-trade').kills, ['SIGTERM'])
   assert.equal(fakeProcess.exitCode, 0)
 })
 
-test('dev stack launcher forwards SIGINT to both child processes', () => {
+test('dev stack launcher forwards SIGINT to all child processes', () => {
   const fakeProcess = new FakeProcess()
   const fakeChildren = []
 
@@ -115,7 +121,7 @@ test('dev stack launcher forwards SIGINT to both child processes', () => {
 
   fakeProcess.emit('SIGINT')
 
-  assert.deepEqual(fakeChildren.map((child) => child.kills), [['SIGINT'], ['SIGINT']])
+  assert.deepEqual(fakeChildren.map((child) => child.kills), [['SIGINT'], ['SIGINT'], ['SIGINT']])
   assert.equal(fakeProcess.exitCode, 130)
 })
 
@@ -138,12 +144,14 @@ test('dev stack launcher escalates repeated shutdown signals to SIGKILL across c
 
   assert.deepEqual(
     spawns.map(({ options }) => options.detached),
-    [true, true],
+    [true, true, true],
   )
   assert.deepEqual(fakeProcess.killCalls, [
     { pid: -100, signal: 'SIGINT' },
     { pid: -101, signal: 'SIGINT' },
+    { pid: -102, signal: 'SIGINT' },
     { pid: -100, signal: 'SIGKILL' },
     { pid: -101, signal: 'SIGKILL' },
+    { pid: -102, signal: 'SIGKILL' },
   ])
 })

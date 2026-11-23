@@ -9,6 +9,7 @@ type DeepScanStoreState = {
   requestStatus: WorkflowAsyncStatus
   errorMessage: string | null
   errorCode: string | null
+  errorCredit: { balance: number; cost: number } | null
   activePayload: JarooDeepScanPayload | null
   activeTargetKey: string | null
   lastSuccessful: DeepScanResultCacheEntry | null
@@ -19,7 +20,7 @@ type DeepScanStoreActions = {
   startRequest: () => void
   finishSuccess: (payload: JarooDeepScanPayload, completedAt?: string) => void
   updateActivePayload: (updater: (payload: JarooDeepScanPayload) => JarooDeepScanPayload) => void
-  finishError: (errorMessage: string, errorCode?: string | null) => void
+  finishError: (errorMessage: string, errorCode?: string | null, errorCredit?: { balance: number; cost: number } | null) => void
   abandonInFlight: () => void
   clear: () => void
 }
@@ -29,6 +30,7 @@ const initialState: DeepScanStoreState = {
   requestStatus: 'idle',
   errorMessage: null,
   errorCode: null,
+  errorCredit: null,
   activePayload: null,
   activeTargetKey: null,
   lastSuccessful: null,
@@ -50,6 +52,7 @@ export const useDeepScanStore = create<DeepScanStoreState & DeepScanStoreActions
         requestStatus: 'idle',
         errorMessage: null,
         errorCode: null,
+        errorCredit: null,
         activePayload: null,
         activeTargetKey: null,
       }
@@ -60,6 +63,7 @@ export const useDeepScanStore = create<DeepScanStoreState & DeepScanStoreActions
       requestStatus: 'loading',
       errorMessage: null,
       errorCode: null,
+      errorCredit: null,
       activePayload: null,
       activeTargetKey: target ? getDeepScanTargetKey(target) : null,
     })
@@ -71,6 +75,7 @@ export const useDeepScanStore = create<DeepScanStoreState & DeepScanStoreActions
       requestStatus: 'success',
       errorMessage: null,
       errorCode: null,
+      errorCredit: null,
       activePayload: payload,
       activeTargetKey: targetKey,
       lastSuccessful: target && targetKey
@@ -99,12 +104,13 @@ export const useDeepScanStore = create<DeepScanStoreState & DeepScanStoreActions
           : state.lastSuccessful,
       }
     }),
-  finishError: (errorMessage, errorCode = null) => {
+  finishError: (errorMessage, errorCode = null, errorCredit = null) => {
     const { target } = get()
     set({
       requestStatus: 'error',
       errorMessage,
       errorCode,
+      errorCredit: errorCredit ?? null,
       activePayload: null,
       activeTargetKey: target ? getDeepScanTargetKey(target) : null,
     })
@@ -114,6 +120,7 @@ export const useDeepScanStore = create<DeepScanStoreState & DeepScanStoreActions
       requestStatus: 'idle',
       errorMessage: null,
       errorCode: null,
+      errorCredit: null,
       activePayload: null,
       activeTargetKey: null,
       lastSuccessful: state.lastSuccessful,

@@ -152,6 +152,8 @@ const sections: LegalSection[] = [
 
 export const metadata = {
   title: '서비스 이용약관 | Jaroo',
+  // 자기 참조 canonical(TC-BBL-020) — metadataBase(루트 layout) 기준 절대 URL로 직렬화된다.
+  alternates: { canonical: '/terms' },
 }
 
 export default function TermsPage() {

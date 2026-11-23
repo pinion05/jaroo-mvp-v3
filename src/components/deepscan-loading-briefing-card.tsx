@@ -54,8 +54,11 @@ import {
   RECOVERY_CHART_MARGIN,
   RECOVERY_CHART_WIDTH,
 } from './deepscan-recovery-forecast-card'
+import { buildRecoveryHorizonChips } from '@/lib/deepscan-recovery-horizon'
 import { cn } from '@/lib/utils'
 import styles from './deepscan-loading-screen.module.css'
+
+import { buildMarketMeaning } from '@/lib/deepscan-market-meaning'
 
 
 export function BackControl({ onBack, backHref }: Pick<DeepScanLoadingScreenProps, 'onBack' | 'backHref'>) {
@@ -302,27 +305,9 @@ export function TodayBriefingItem({
 }
 
 
-export function buildMarketMeaning(firstPct: number | null, secondPct: number | null, stockPct: number | null) {
-  if (!isFiniteNumber(stockPct)) {
-    return '내 종목의 장중 등락률을 확인하는 중이에요.'
-  }
-
-  const marketValues = [firstPct, secondPct].filter(isFiniteNumber)
-  if (marketValues.length === 0) {
-    return '시장 지수와 내 종목 흐름을 맞춰 보는 중이에요.'
-  }
-
-  const marketAverage = marketValues.reduce((sum, value) => sum + value, 0) / marketValues.length
-  if (stockPct >= marketAverage + 0.5) {
-    return '시장보다 더 강하게 움직이고 있어요.'
-  }
-
-  if (stockPct <= marketAverage - 0.5) {
-    return '시장 흐름 대비 아직 덜 따라온 상태예요.'
-  }
-
-  return '시장 흐름과 비슷한 속도로 움직이고 있어요.'
-}
+// '오늘 시장 속에서는?' 문구 — 순수 로직은 lib/deepscan-market-meaning(24분기 매트릭스)에 있다.
+// 하위 호환을 위해 기존 import 경로(src/components/deepscan-loading-briefing-card)로도 그대로 노출.
+export { buildMarketMeaning } from '@/lib/deepscan-market-meaning'
 
 export function TodayMarketBriefing({
   at,
@@ -406,7 +391,8 @@ function recoveryFriendlyTradingDays(days: number | null) {
 }
 
 // 원금회수 예측 브리핑 — '내 자리는 어디쯤일까요?' 바로 아래에서 이어지는 후속 질문.
-// 데이터가 확보되면 결과 카드와 같은 1년 차트(평단 점선·유사 패턴 밴드)도 함께 그린다.
+// 데이터가 확보되면 결과 카드와 같은 회복 차트(평단 점선·유사 패턴 밴드, KR은 3년
+// 일봉 기준 '최근 3년' 표기)도 함께 그린다.
 // data-today-briefing-item을 달지 않는다(공개 타이밍 시퀀스·모바일 자동스크롤 인덱스를
 // 밀지 않기 위해 — consensus 항목과 같은 보조 항목 패턴).
 export function TodayRecoveryForecastBriefing({
@@ -432,6 +418,10 @@ export function TodayRecoveryForecastBriefing({
     ? recovery.expectedRecoveryDays
     : recoveryNumberFromText(recovery.expectedRecoveryDaysText)
   const friendlyDuration = recoveryFriendlyTradingDays(recoveryDaysValue)
+  // 기간별(3개월~2년+) 누적 복구확률 배열 — payload 블록에만 있다(브리핑 스냅샷 프리뷰·구형 스냅샷은 없음).
+  // 값이 있으면 v4 카드와 같은 세로 스택(마지막 칩은 '2년+' 터미널)으로 보여주고 문장·모델 로우는 뺀다(#362와 동일 규칙).
+  const horizonChips = buildRecoveryHorizonChips(recovery)
+  const hasHorizonChips = horizonChips.length > 0
   const chartGeometry = recovery.priceHistory && recovery.priceHistory.length >= 3 && isFiniteNumber(recovery.targetPrice)
     ? buildRecoveryChartGeometry({
       priceHistory: recovery.priceHistory,
@@ -451,9 +441,9 @@ export function TodayRecoveryForecastBriefing({
           <div className={styles.todayBriefData}>
             {recovery.expectedRecoveryDaysText}
             {friendlyDuration !== null ? <span className={styles.recoveryProbText}>({friendlyDuration})</span> : null}
-            {probabilityPct !== null ? <span className={styles.recoveryProbText}> · 1년 안에 본전 도달 {recovery.recoveryProbabilityText}</span> : null}
+            {!hasHorizonChips && probabilityPct !== null ? <span className={styles.recoveryProbText}> · 1년 안에 본전 도달 {recovery.recoveryProbabilityText}</span> : null}
           </div>
-          {probabilityPct !== null ? (
+          {!hasHorizonChips && probabilityPct !== null ? (
             <div
               className={styles.recoveryGaugeTrack}
               role='img'
@@ -467,7 +457,7 @@ export function TodayRecoveryForecastBriefing({
               className={styles.recoveryChartSvg}
               viewBox={`0 0 ${RECOVERY_CHART_WIDTH} ${RECOVERY_CHART_HEIGHT}`}
               role='img'
-              aria-label='최근 1년 종가 차트. 파란 점선은 평단가, 호밍색 표시는 유사 과거 패턴 구간이다.'
+              aria-label={`${chartGeometry.periodLabel} 종가 차트. 파란 점선은 평단가, 호밍색 세로선은 유사 과거 패턴 구간이다.`}
             >
               {chartGeometry.gridlines.map((line) => (
                 <g key={`grid-${line.label}`}>
@@ -479,9 +469,14 @@ export function TodayRecoveryForecastBriefing({
                 <text key={`date-${tick.label}-${tick.x}`} className={styles.recoveryChartTick} x={tick.x} y={RECOVERY_CHART_HEIGHT - 4} textAnchor='middle'>{tick.label}</text>
               ))}
               {chartGeometry.bands.map((band) => (
-                <rect key={`band-${band.x}`} className={styles.recoveryChartBand} x={band.x - 3} y={RECOVERY_CHART_MARGIN.top} width='6' height={RECOVERY_CHART_HEIGHT - RECOVERY_CHART_MARGIN.top - RECOVERY_CHART_MARGIN.bottom} rx='1.5'>
-                  <title>{band.title}</title>
-                </rect>
+                // 유사 패턴 위치 표시 — 2026-11-02: 노란 밴드(rect)에서 얇은 세로선으로
+                // 변경(결과 카드와 동일 규격). 투명 rect는 툴팁 히트영역.
+                <g key={`band-${band.x}`}>
+                  <line className={styles.recoveryChartBand} x1={band.x} x2={band.x} y1={RECOVERY_CHART_MARGIN.top} y2={RECOVERY_CHART_HEIGHT - RECOVERY_CHART_MARGIN.bottom} />
+                  <rect x={band.x - 3} y={RECOVERY_CHART_MARGIN.top} width='6' height={RECOVERY_CHART_HEIGHT - RECOVERY_CHART_MARGIN.top - RECOVERY_CHART_MARGIN.bottom} fill='transparent'>
+                    <title>{band.title}</title>
+                  </rect>
+                </g>
               ))}
               {chartGeometry.targetY !== null ? (
                 <g>
@@ -497,22 +492,46 @@ export function TodayRecoveryForecastBriefing({
               ) : null}
             </svg>
           ) : null}
-          <ul className={styles.recoveryModels}>
-            {recovery.modelRows.map((row, index) => (
-              <li key={row.label} className={styles.recoveryModelRow}>
-                <span
-                  className={styles.recoveryModelDot}
-                  style={{ backgroundColor: RECOVERY_FORECAST_DOT_COLORS[index % RECOVERY_FORECAST_DOT_COLORS.length] }}
-                  aria-hidden='true'
-                />
-                <span className={styles.recoveryModelName}>{row.label}</span>
-                <span className={styles.recoveryModelDays}>{row.recoveryDaysText}</span>
-                {row.sampleText ? <span className={styles.recoveryModelSample}>· {row.sampleText}</span> : null}
-                <span className={styles.recoveryModelProb}>{row.probabilityText}</span>
-              </li>
-            ))}
-          </ul>
-          <p className={styles.todayBriefMeaning}><b>{recovery.summaryText}</b> (신뢰도 {recovery.confidenceText})</p>
+          {hasHorizonChips ? (
+            // 기간별 확률 배열(v4, #362와 동일 규칙) — 라벨·% 10px + 풀와이드 게이지 세로 스택(마지막 칩은 '2년+' 터미널).
+            // 문장·모델별 로우는 이 배열이 대신한다(구형 스냅샷·프리뷰는 기존 렌더 유지).
+            <ul className={styles.recoveryHorizonList} role='list' aria-label='기간별 본전 회복 확률'>
+              {horizonChips.map((chip) => (
+                <li key={chip.key} role='listitem'>
+                  <div className={styles.recoveryHorizonRowHeader}>
+                    <span className={styles.recoveryHorizonLabel}>{chip.text}</span>
+                    <span className={styles.recoveryHorizonValue}>{Math.max(chip.value, 0).toFixed(0)}%</span>
+                  </div>
+                  <div
+                    className={styles.recoveryHorizonGaugeTrack}
+                    role='img'
+                    aria-label={`${chip.text} 회복 확률 ${chip.value.toFixed(1)}%`}
+                  >
+                    <div className={styles.recoveryHorizonGaugeBar} style={{ width: `${Math.min(100, Math.max(1.5, chip.value))}%` }} />
+                  </div>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <ul className={styles.recoveryModels}>
+              {recovery.modelRows.map((row, index) => (
+                <li key={row.label} className={styles.recoveryModelRow}>
+                  <span
+                    className={styles.recoveryModelDot}
+                    style={{ backgroundColor: RECOVERY_FORECAST_DOT_COLORS[index % RECOVERY_FORECAST_DOT_COLORS.length] }}
+                    aria-hidden='true'
+                  />
+                  <span className={styles.recoveryModelName}>{row.label}</span>
+                  <span className={styles.recoveryModelDays}>{row.recoveryDaysText}</span>
+                  {row.sampleText ? <span className={styles.recoveryModelSample}>· {row.sampleText}</span> : null}
+                  <span className={styles.recoveryModelProb}>{row.probabilityText}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {!hasHorizonChips ? (
+            <p className={styles.todayBriefMeaning}><b>{recovery.summaryText}</b> (신뢰도 {recovery.confidenceText})</p>
+          ) : null}
           {'disclaimer' in recovery && recovery.disclaimer ? <p className={styles.recoveryDisclaimer}>{recovery.disclaimer}</p> : null}
         </div>
         <div className={cn(styles.todayBriefSkeleton, isContentReady ? styles.todayBriefSkeletonOut : undefined)} aria-hidden='true'>

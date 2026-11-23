@@ -1166,3 +1166,113 @@ test('buildDeepScanKrEvidencePacket carries naver fallback analyst brokers into 
   ]);
   assert.equal(packet.consensusSnapshot.analystCount, 3);
 });
+
+test('consensusSnapshot은 같은 증권사의 중복 행에서 날짜가 최신인 행만 남긴다(이름 기준 dedup)', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  // 루트 요약 필드(증권사수·최고/최저)가 없는 slim opinion 페이지 —
+  // syntheticSummary 조기 반환을 거치지 않고 행 레벨 통계(dedup) 경로를 탄다.
+  // 같은 증권사(미래에셋)가 이전 목표가 행과 최신 목표가 행으로 중복된다.
+  const packet = buildDeepScanKrEvidencePacket(
+    {
+      instrument: { code: '005930', name: '삼성전자' },
+      holding: { shares: '12', averagePrice: '71000' },
+    },
+    {
+      slim: {
+        code: '005930',
+        company: { code: '005930', name: '삼성전자' },
+        pages: {
+          opinion: {
+            rows: [
+              { 추정기관: '미래에셋증권', 목표주가: 100000, 날짜: '2026-09-01' },
+              { 추정기관: '미래에셋증권', 목표주가: 110000, 날짜: '2026-09-10' },
+              { 추정기관: '현대차증권', 목표주가: 90000, 날짜: '2026-08-05' },
+            ],
+          },
+        },
+      },
+    },
+  );
+
+  // 최신 날짜 행(2026-09-10·110000)만 살아남아야 한다(2026-09-01·100000 제거).
+  assert.equal(packet.consensusSnapshot.analystCount, 2);
+  assert.deepEqual(packet.consensusSnapshot.analystBrokers, [
+    { name: '미래에셋증권', targetPrice: 110000, date: '2026-09-10' },
+    { name: '현대차증권', targetPrice: 90000, date: '2026-08-05' },
+  ]);
+  assert.equal(packet.consensusSnapshot.highestTargetPrice, 110000);
+  assert.equal(packet.consensusSnapshot.lowestTargetPrice, 90000);
+});
+
+test('consensusSnapshot은 date null 혼합 중복 행에서 날짜 있는 행을 우선한다', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  const buildPacketWithRows = (rows) => buildDeepScanKrEvidencePacket(
+    {
+      instrument: { code: '005930', name: '삼성전자' },
+      holding: { shares: '12', averagePrice: '71000' },
+    },
+    {
+      slim: {
+        code: '005930',
+        company: { code: '005930', name: '삼성전자' },
+        pages: { opinion: { rows } },
+      },
+    },
+  );
+
+  // 날짜 없는 행이 먼저 오고 날짜 있는 행이 뒤에 와도 날짜 있는 행이 이긴다.
+  const datedLater = buildPacketWithRows([
+    { 추정기관: '미래에셋증권', 목표주가: 100000 },
+    { 추정기관: '미래에셋증권', 목표주가: 110000, 날짜: '2026-09-10' },
+    { 추정기관: '현대차증권', 목표주가: 90000 },
+  ]);
+  assert.equal(datedLater.consensusSnapshot.analystCount, 2);
+  assert.deepEqual(datedLater.consensusSnapshot.analystBrokers, [
+    { name: '미래에셋증권', targetPrice: 110000, date: '2026-09-10' },
+    { name: '현대차증권', targetPrice: 90000, date: null },
+  ]);
+
+  // 날짜 있는 행이 먼저 오고 날짜 없는 행이 뒤에 와도 날짜 있는 행이 유지된다.
+  const datedEarlier = buildPacketWithRows([
+    { 추정기관: '미래에셋증권', 목표주가: 110000, 날짜: '2026-09-10' },
+    { 추정기관: '미래에셋증권', 목표주가: 100000 },
+  ]);
+  assert.equal(datedEarlier.consensusSnapshot.analystCount, 1);
+  assert.deepEqual(datedEarlier.consensusSnapshot.analystBrokers, [
+    { name: '미래에셋증권', targetPrice: 110000, date: '2026-09-10' },
+  ]);
+});
+
+test('consensusSnapshot은 이름 없는 증권사 행만 있을 때 analystCount를 행 수로 폴백한다', async () => {
+  const { buildDeepScanKrEvidencePacket } = await import('../src/services/deepscan-kr-evidence.js');
+
+  // 증권사명 키가 없는 목표가 행들 — rowBrokers가 비어 analystCount가
+  // brokerRows.length 폴백(2026-11-02)으로 결정된다. brokers는 null을 유지한다.
+  const packet = buildDeepScanKrEvidencePacket(
+    {
+      instrument: { code: '005930', name: '삼성전자' },
+      holding: { shares: '12', averagePrice: '71000' },
+    },
+    {
+      slim: {
+        code: '005930',
+        company: { code: '005930', name: '삼성전자' },
+        pages: {
+          opinion: {
+            rows: [
+              { 목표주가: 100000 },
+              { 목표주가: 90000 },
+            ],
+          },
+        },
+      },
+    },
+  );
+
+  assert.equal(packet.consensusSnapshot.analystCount, 2);
+  assert.equal(packet.consensusSnapshot.analystBrokers, null);
+  assert.equal(packet.consensusSnapshot.highestTargetPrice, 100000);
+  assert.equal(packet.consensusSnapshot.lowestTargetPrice, 90000);
+});

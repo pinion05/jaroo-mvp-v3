@@ -1,3 +1,4 @@
+import { isKrRegularMarketWindow } from '@/lib/kr-market-hours'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import type { HomeHolding } from '@/lib/jaroo-home-data'
 
@@ -7,6 +8,9 @@ export type CurrentQuoteItem = {
   ticker?: string | null
   price?: number | null
   volume?: number | null
+  // 네이버 basic 응답의 권위 필드(tradeStopType/tradableStatus)에서 유래한 거래정지 여부.
+  // true = 정지, false = 거래 중, undefined = 제공 없음(KRX 폴백 등 — 이때만 volume 폴백 판정).
+  tradeHalted?: boolean
   currency?: string | null
   asOf?: string | null
   source?: string | null
@@ -15,6 +19,8 @@ export type CurrentQuoteItem = {
 
 export type CurrentQuoteFxOptions = {
   usdKrwRate?: number | null
+  // 시간 게이트(isKrRegularMarketWindow) 판정 기준 시각 — 테스트 주입용. 미지정 시 현재 시각.
+  now?: Date
 }
 
 function upsertMetric(
@@ -534,7 +540,14 @@ export function applyCurrentQuotesToHomeHoldings(
         'neutral',
       ),
     }
-    const isHaltedQuote = quoteItem.volume === 0
+    // 거래정지 판정 — 1순위는 네이버 권위 필드(tradeHalted). 시각과 무관하게 즉시 확정한다.
+    // 필드가 없는 시세(KRX 폴백·위세리포트 ETF 등)에서만 기존 '당일 거래량 0' 폴백을 쓰되,
+    // 정규장(월~금 09:00~15:30 KST) 안에서만 정지로 본다. 장전 롤오버 행(volume 0)과
+    // 개장 직후 무체결 종목의 오탐을 차단한다(정규장 밖 volume 0 = 중립 톤 유지).
+    const isHaltedQuote = quoteItem.tradeHalted === true
+      || (quoteItem.tradeHalted === undefined
+        && quoteItem.volume === 0
+        && isKrRegularMarketWindow(options.now))
     const nextHolding = isHaltedQuote
       ? applyHaltedTone({
           ...quotedHolding,

@@ -67,6 +67,7 @@ export type LoadingQuickQuote = {
   currentPrice?: number
   currentPriceCurrency?: WorkflowMoneyCurrency
   tradingVolume?: number
+  tradeHalted?: boolean
   week52High?: number
   week52Low?: number
 }
@@ -82,6 +83,7 @@ export type QuotesCurrentProxyResponse = {
       price?: number
       currency?: string | null
       volume?: number
+      tradeHalted?: boolean
       week52High?: number
       week52Low?: number
     }>

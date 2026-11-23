@@ -2,6 +2,13 @@ import { createRequire } from 'node:module';
 import { getCurrentQuotes } from '../crawlers/current-quotes.js';
 import { buildDartDisclosureDocumentDump, collectDartDisclosures } from '../crawlers/dart-filings.js';
 import { sanitizeForJson } from '../../../deepscan-runtime-core/src/safe-json.js';
+import {
+  createLlmMockSeededRandom,
+  isLlmMockEnabled,
+  llmMockDateToken,
+  pickLlmMockItem,
+  sleepLlmMockLatency,
+} from '../../../deepscan-runtime-core/src/llm-mock.js';
 import { fetchWiseReportEtfSnapshot } from '../crawlers/wisereport-etf.js';
 import { buildDeepScanKrEvidencePacket } from './deepscan-kr-evidence.js';
 import {
@@ -25,6 +32,7 @@ import {
   getDefaultCrawlerCacheStaleTtlMs,
   getDefaultSupabaseCrawlerCacheClient,
   isCacheRowFresh,
+  isCacheRowUsableAsStale,
   normalizeCrawlerCacheToggle,
   readThroughCrawlerCache,
 } from './supabase-crawler-cache.js';
@@ -1150,11 +1158,28 @@ function shouldInvokeKrCommitteeLlm() {
     return false;
   }
 
+  // JAROO_LLM_MOCK=1이면 키 없이도 위원회 LLM(모의) 경로가 돌아가게 한다(dev 비용 0).
+  if (isLlmMockEnabled()) {
+    return true;
+  }
+
   if (process.env.OPENROUTER_API_KEY) {
     return true;
   }
 
   return ['1', 'true', 'on', 'yes'].includes(explicitToggle ?? '');
+}
+
+// 요청 단위 위원회 LLM 스킵 — 워치 일일 배치처럼 committee 서사 없이 데이터(공시·가격)만
+// 필요한 소비처가 crawler ?committeeLlm=off 로 9인 위원회 LLM 호출을 끈다.
+// 강제 'on'은 없다(키 없는 강제 시도 방지) — 꺼기 값이 아니면 기존 환경 판정을 그대로 따른다.
+function committeeLlmEnabled(rawInput) {
+  const requestToggle = normalizeText(asObject(rawInput).committeeLlm)?.toLowerCase();
+  if (['0', 'false', 'off', 'no'].includes(requestToggle ?? '')) {
+    return false;
+  }
+
+  return shouldInvokeKrCommitteeLlm();
 }
 
 async function resolveKrSourceBundle(rawInput, input) {
@@ -1874,6 +1899,11 @@ function shouldSummarizePerformanceCommentWithLlm() {
     return false;
   }
 
+  // JAROO_LLM_MOCK=1이면 키 없이도 댓글 요약 LLM(모의) 경로가 돌아가게 한다(dev 비용 0).
+  if (isLlmMockEnabled()) {
+    return true;
+  }
+
   if (!process.env.OPENROUTER_API_KEY) {
     return false;
   }
@@ -2022,6 +2052,40 @@ function createLocalPerformanceCommentSummary(comment) {
   return lines.length === 3 ? lines : [];
 }
 
+// JAROO_LLM_MOCK=1용 결정적 실적 댓글 요약 템플릿 — 정확히 3줄(파서/소비부 계약),
+// 첫 줄에 [MOCK] 접두로 dev 모의 응답임을 화면에서 눈에 보이게 한다.
+const COMMENTARY_SUMMARY_LLM_MOCK_TEMPLATE_SETS = [
+  [
+    '[MOCK] 오늘 실적 댓글 요약은 dev 모의 응답이에요.',
+    '같은 종목을 같은 날 다시 스캔하면 같은 세 줄이 나와요.',
+    '실제 요약은 JAROO_LLM_MOCK을 끄면 다시 생성돼요.',
+  ],
+  [
+    '[MOCK] 목업 요약이라 원문 숫자는 옮기지 않아요.',
+    '요약 카드 표시와 로딩 흐름을 확인하는 용도예요.',
+    '운영에서는 실제 LLM이 숫자를 보존해 요약해요.',
+  ],
+  [
+    '[MOCK] dev 전용 실적 댓글 요약이에요.',
+    '점수·서사와 함께 모의 응답임을 표시해요.',
+    '투자 판단 근거로는 쓰지 않는 게 좋아요.',
+  ],
+  [
+    '[MOCK] 결정적 목업 요약으로 카드를 채웠어요.',
+    '입력이 같으면 하루 동안 같은 문장이 나와요.',
+    '실문장은 운영 모드에서 생성돼요.',
+  ],
+];
+
+// 테스트/진단용 export — 시드(종목+asOf+날짜)별로 항상 같은 3줄을 반환한다.
+export function buildLlmMockCommentarySummaryLines(input, performanceComment) {
+  const instrument = asObject(input).instrument ?? {};
+  const random = createLlmMockSeededRandom(
+    `commentary-summary|${instrument.code ?? instrument.ticker ?? instrument.name ?? 'unknown'}|${String(performanceComment?.asOf ?? '')}|${llmMockDateToken()}`,
+  );
+  return [...pickLlmMockItem(random, COMMENTARY_SUMMARY_LLM_MOCK_TEMPLATE_SETS)];
+}
+
 async function summarizePerformanceCommentForLoading(input, performanceComment) {
   if (!performanceComment?.text) {
     return null;
@@ -2042,6 +2106,17 @@ async function summarizePerformanceCommentForLoading(input, performanceComment) 
   );
 
   try {
+    // JAROO_LLM_MOCK=1: 네트워크 호출 없이 결정적 모의 3줄 요약을 반환한다(미설정 시 기존 경로 그대로).
+    if (isLlmMockEnabled()) {
+      const mockRandom = createLlmMockSeededRandom(
+        `commentary-summary|${input.instrument.code ?? input.instrument.ticker ?? input.instrument.name ?? 'unknown'}|${String(performanceComment.asOf ?? '')}|${llmMockDateToken()}`,
+      );
+      const lines = [...pickLlmMockItem(mockRandom, COMMENTARY_SUMMARY_LLM_MOCK_TEMPLATE_SETS)];
+      console.log(`[llm-mock] commentary-summary code=${input.instrument.code ?? input.instrument.ticker ?? 'NA'}`);
+      await sleepLlmMockLatency(mockRandom);
+      return { lines, method: 'mock' };
+    }
+
     const upstreamResponse = await fetch(OPENROUTER_CHAT_COMPLETIONS_URL, {
       method: 'POST',
       headers: {
@@ -2517,7 +2592,7 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
     let llmCommitteePartialPending = false;
     let committeeAxes = createCommitteeAxes(evidence, deterministicScored, sources.packageResult);
     const performanceCommentSummaryPromise = summarizePerformanceCommentForLoading(input, evidence.businessCommentary?.performanceComment);
-    const llmAttempted = isKrInput(input) && shouldInvokeKrCommitteeLlm();
+    const llmAttempted = isKrInput(input) && committeeLlmEnabled(rawInput);
 
     if (llmAttempted) {
       const committeeStartedAtMs = Date.now();
@@ -2740,13 +2815,70 @@ export async function buildJarooDeepScanPayload(rawInput = {}) {
 // 트렌드·시장 신호·가격 위치 3명만 LLM 분석한다(사용자 요청 2026-09-17).
 // 완성(complete) 결과만 캐시에 저장하고, 소프트데드라인에 걸린 셸은
 // requestId로 /kr/committee-status 폴링해 완성한다(딥스캔과 동일 계약).
+// 재계안 폭주(크레딧 나선)는 단일비행·stale 폴백·백오프로 막는다(아래 참조).
 const ETF_COMMITTEE_CACHE_ROUTE = 'etf-market-committee';
 const ETF_COMMITTEE_CACHE_ROUTE_VERSION = 'v1';
 const ETF_COMMITTEE_CACHE_SCHEMA_VERSION = 'etf-committee-market-timing-v1';
 const DEFAULT_ETF_COMMITTEE_SOFT_DEADLINE_MS = 25_000;
 
+// ─── 재계안 폭주 방지 — 단일비행·stale 폴백·백오프 ────────────────────────
+// 크레딧 부족 등으로 위원 일부만 성공(partial)하면 complete 캐시를 못 쓰고,
+// 매 요청마다 위원 LLM 재계산이 반복되며 남은 크레딧을 태우는 나선이 생긴다.
+// (a) 같은 캐시 키의 동시 재계산은 Promise 하나로 병합하고,
+// (b) 재계산이 partial/error로 끝나면 staleTtl 이내 complete 캐시로 폴백하며,
+// (c) 직전 재계산 실패 후 짧은 창(기본 60s)에는 재요청이 캐시 조회만 한다.
+const etfCommitteeRecomputeInFlight = new Map(); // cacheKey -> Promise<snapshot>
+const etfCommitteeLastFailedAtMs = new Map(); // cacheKey -> 직전 재계산 실패 시각(epoch ms)
+const DEFAULT_ETF_COMMITTEE_RECOMPUTE_BACKOFF_MS = 60_000;
+
+function getEtfCommitteeRecomputeBackoffMs() {
+  const raw = process.env.DEEPSCAN_ETF_COMMITTEE_RECOMPUTE_BACKOFF_MS;
+  // 명시적 0은 백오프 끄기 — 파싱 실패는 기본값으로.
+  return raw === '0' ? 0 : parsePositiveInteger(raw, DEFAULT_ETF_COMMITTEE_RECOMPUTE_BACKOFF_MS);
+}
+
+function isEtfCommitteeRecomputeCoolingDown(cacheKey, nowMs = Date.now()) {
+  const backoffMs = getEtfCommitteeRecomputeBackoffMs();
+  if (backoffMs <= 0) {
+    return false;
+  }
+
+  const lastFailedAtMs = etfCommitteeLastFailedAtMs.get(cacheKey);
+  return typeof lastFailedAtMs === 'number' && nowMs - lastFailedAtMs < backoffMs;
+}
+
+// 캐시 키용 보유값 파싱 — 증거 패킷(deepscan-kr-evidence normalizeNumber)과 같은 규칙으로
+// 쉼표/통화기호/공백을 제거해 숫자로 만든다.
+function parseEtfHoldingNumberForKey(value) {
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? value : null;
+  }
+  if (typeof value !== 'string') {
+    return null;
+  }
+  const cleaned = value.trim().replaceAll(',', '').replace(/\s+/g, '').replace(/[₩$€¥£%]/g, '');
+  if (!/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(cleaned)) {
+    return null;
+  }
+  const parsed = Number(cleaned);
+  return Number.isFinite(parsed) ? parsed : null;
+}
+
+// 키에는 반올림된 값 문자열만 담는다 — maxFractionDigits 자리에서 반올림해
+// 부동소수점 노이즈·표기 차이("70,000" vs "70000.0")로 인한 불필요한 캐시 미스를 막는다.
+function normalizeEtfHoldingValueForKey(value, maxFractionDigits) {
+  const parsed = parseEtfHoldingNumberForKey(value);
+  if (parsed === null) {
+    return null;
+  }
+  return String(Number(parsed.toFixed(maxFractionDigits)));
+}
+
 function buildEtfCommitteeCacheDescriptor(input) {
   const hasHolding = input.holding?.shares != null && input.holding?.averagePrice != null;
+  // shares는 정수·소수 구분을 유지(4자리 반올림), 평단은 원화 소수 2자리 반올림.
+  const holdingShares = normalizeEtfHoldingValueForKey(input.holding?.shares, 4);
+  const holdingAveragePrice = normalizeEtfHoldingValueForKey(input.holding?.averagePrice, 2);
 
   return {
     source: 'deepscan',
@@ -2763,6 +2895,11 @@ function buildEtfCommitteeCacheDescriptor(input) {
       memberKeys: [...KR_ETF_PAGE_MEMBER_KEYS],
       // 보유 맥락 유무가 위원 덤프·점수를 바꾼다 — 캐시 키에 반영한다.
       hasHolding: hasHolding ? '1' : '0',
+      // 평단격차·평가손익은 수량·평단 값 자체를 따라간다 — 1/0 비트만으로는 보유값이 다른
+      // 사용자가 타인의 평단이 반영된 스냅샷을 fresh TTL(기본 6시간) 동안 재사용하게 된다.
+      // 정규화된 보유값을 키에 포함해 보유값별로 캐시 엔트리를 분리한다.
+      holdingShares,
+      holdingAveragePrice,
     },
     metadata: {
       consumer: 'etf-page',
@@ -2789,6 +2926,47 @@ function createEtfCommitteeErrorSnapshot(errorCode, message) {
   };
 }
 
+async function readEtfCommitteeCacheRow(cacheClient, cacheKey) {
+  try {
+    return await cacheClient.readPayload(cacheKey);
+  } catch {
+    // 캐시 조회 실패는 정상 실행 경로를 막지 않는다.
+    return null;
+  }
+}
+
+function asEtfCommitteeFreshSnapshot(row) {
+  if (!row || !isCacheRowFresh(row)) {
+    return null;
+  }
+
+  const cached = getRowPayloadLike(row);
+  if (cached?.ok !== true || cached?.status !== 'complete') {
+    return null;
+  }
+
+  return {
+    ...cached,
+    cache: { hit: true, scannedAt: normalizeText(row.created_at ?? row.createdAt) ?? null },
+  };
+}
+
+function asEtfCommitteeStaleSnapshot(row) {
+  if (!row || !isCacheRowUsableAsStale(row)) {
+    return null;
+  }
+
+  const cached = getRowPayloadLike(row);
+  if (cached?.ok !== true || cached?.status !== 'complete') {
+    return null;
+  }
+
+  return {
+    ...cached,
+    cache: { hit: true, stale: true, scannedAt: normalizeText(row.created_at ?? row.createdAt) ?? null },
+  };
+}
+
 export async function buildEtfMarketCommitteeSnapshot(rawInput = {}) {
   const input = normalizeInput(rawInput);
   const code = normalizeText(input.instrument.code);
@@ -2807,29 +2985,68 @@ export async function buildEtfMarketCommitteeSnapshot(rawInput = {}) {
   const identity = buildCrawlerCacheIdentity(buildEtfCommitteeCacheDescriptor(input));
 
   if (cacheClient && !cacheOptions.bypassCache && !cacheOptions.forceRefresh) {
-    try {
-      const cachedRow = await cacheClient.readPayload(identity.cacheKey);
-      if (cachedRow && isCacheRowFresh(cachedRow)) {
-        const cached = getRowPayloadLike(cachedRow);
-        if (cached?.ok === true && cached?.status === 'complete') {
-          return {
-            ...cached,
-            cache: { hit: true, scannedAt: normalizeText(cachedRow.created_at ?? cachedRow.createdAt) ?? null },
-          };
-        }
-      }
-    } catch {
-      // 캐시 조회 실패는 정상 실행 경로를 막지 않는다.
+    const freshSnapshot = asEtfCommitteeFreshSnapshot(await readEtfCommitteeCacheRow(cacheClient, identity.cacheKey));
+    if (freshSnapshot) {
+      return freshSnapshot;
     }
   }
 
-  const committee = await scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources, {
-    memberKeys: KR_ETF_PAGE_MEMBER_KEYS,
-    softDeadlineMs: parsePositiveInteger(
-      process.env.DEEPSCAN_ETF_LLM_SOFT_DEADLINE_MS,
-      DEFAULT_ETF_COMMITTEE_SOFT_DEADLINE_MS,
-    ),
+  // 같은 캐시 키의 재계산이 이미 진행 중이면 그 Promise를 재사용한다(단일비행) —
+  // 동시 요청이 각자 위원 LLM을 호출하며 크레딧을 태우는 것을 막는다.
+  const inFlightRecompute = etfCommitteeRecomputeInFlight.get(identity.cacheKey);
+  if (inFlightRecompute) {
+    return inFlightRecompute;
+  }
+
+  // 직전 재계산이 백오프 창(기본 60s) 안에 실패했다면 재계산을 스킵한다 —
+  // 캐시(fresh→stale) 조회만 하고 둘 다 없으면 재시도 안내를 반환한다.
+  // forceRefresh·bypassCache(웹 새로고침 → crawlerCacheBypass=1)는 사용자의
+  // 명시적 재시도라 이 보호를 우회한다.
+  if (!cacheOptions.forceRefresh && !cacheOptions.bypassCache && isEtfCommitteeRecomputeCoolingDown(identity.cacheKey)) {
+    let cooledSnapshot = null;
+    if (cacheClient) {
+      const cooledRow = await readEtfCommitteeCacheRow(cacheClient, identity.cacheKey);
+      cooledSnapshot = asEtfCommitteeFreshSnapshot(cooledRow) ?? asEtfCommitteeStaleSnapshot(cooledRow);
+    }
+
+    return cooledSnapshot ?? createEtfCommitteeErrorSnapshot(
+      'committee-recompute-backoff',
+      'AI 위원회 계산이 방금 실패했어요. 잠시 후 다시 시도해주세요.',
+    );
+  }
+
+  const recompute = runEtfCommitteeRecompute({
+    rawInput,
+    input,
+    evidence,
+    sources,
+    code,
+    cacheClient,
+    cacheOptions,
+    identity,
+  }).finally(() => {
+    // 완료·실패 모두 맵을 정리한다 — 다음 요청이 새 재계산을 시작할 수 있게.
+    etfCommitteeRecomputeInFlight.delete(identity.cacheKey);
   });
+  etfCommitteeRecomputeInFlight.set(identity.cacheKey, recompute);
+  return recompute;
+}
+
+async function runEtfCommitteeRecompute({ rawInput, input, evidence, sources, code, cacheClient, cacheOptions, identity }) {
+  let committee;
+  try {
+    committee = await scoreDeepScanKrCommitteeFromDump(rawInput, input, evidence, sources, {
+      memberKeys: KR_ETF_PAGE_MEMBER_KEYS,
+      softDeadlineMs: parsePositiveInteger(
+        process.env.DEEPSCAN_ETF_LLM_SOFT_DEADLINE_MS,
+        DEFAULT_ETF_COMMITTEE_SOFT_DEADLINE_MS,
+      ),
+    });
+  } catch (error) {
+    etfCommitteeLastFailedAtMs.set(identity.cacheKey, Date.now());
+    throw error;
+  }
+
   const shape = buildKrCommitteeAxesFromLlmResults(evidence, committee.results, committee.errors, committee.pending, {
     memberKeys: KR_ETF_PAGE_MEMBER_KEYS,
   });
@@ -2847,15 +3064,34 @@ export async function buildEtfMarketCommitteeSnapshot(rawInput = {}) {
     cache: null,
   };
 
-  if (cacheClient && snapshot.status === 'complete') {
-    // partial 셸은 캐시하지 않는다 — 폴링 완성분까지 저장하면 무결성이 깨진다.
-    try {
-      await cacheClient.upsertPayload(buildCrawlerCachePayloadEntry(identity, snapshot, {
-        freshTtlMs: cacheOptions.freshTtlMs,
-        staleTtlMs: cacheOptions.staleTtlMs,
-      }));
-    } catch {
-      // 캐시 저장 실패는 응답에 영향 없음
+  if (snapshot.status === 'complete') {
+    etfCommitteeLastFailedAtMs.delete(identity.cacheKey);
+    if (cacheClient) {
+      // partial 셸은 캐시하지 않는다 — 폴링 완성분까지 저장하면 무결성이 깨진다.
+      try {
+        await cacheClient.upsertPayload(buildCrawlerCachePayloadEntry(identity, snapshot, {
+          freshTtlMs: cacheOptions.freshTtlMs,
+          staleTtlMs: cacheOptions.staleTtlMs,
+        }));
+      } catch {
+        // 캐시 저장 실패는 응답에 영향 없음
+      }
+    }
+    return snapshot;
+  }
+
+  // LLM 비용을 쓴 채 실패한 재계산만 백오프에 기록한다(disabled은 비용이 없다).
+  if (snapshot.status === 'partial' || snapshot.status === 'error') {
+    etfCommitteeLastFailedAtMs.set(identity.cacheKey, Date.now());
+  }
+
+  // 재계산이 complete 아닐 때 staleTtl 이내 complete 캐시가 있으면 그쪽이 더 나은
+  // 사용자 경험이다 — cache:{hit:true, stale:true} 마커로 폴백한다. 없으면 partial 그대로.
+  if (cacheClient && !cacheOptions.bypassCache) {
+    const fallbackRow = await readEtfCommitteeCacheRow(cacheClient, identity.cacheKey);
+    const fallbackSnapshot = asEtfCommitteeFreshSnapshot(fallbackRow) ?? asEtfCommitteeStaleSnapshot(fallbackRow);
+    if (fallbackSnapshot) {
+      return fallbackSnapshot;
     }
   }
 

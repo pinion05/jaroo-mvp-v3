@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation'
 import { useEffect, useMemo, useState, type FormEvent } from 'react'
 import { useDeepScanStore } from '@/lib/stores/use-deepscan-store'
+import { markDeepScanRunIntent } from '@/lib/deepscan-run-intent'
 import { getDeepScanTargetKey, type DeepScanTargetInput, type WorkflowInstrumentKind, type WorkflowMarketTone, type WorkflowMoneyCurrency } from '@/lib/workflow-types'
 
 const STORAGE_KEY = 'jaroo:deepscan-target'
@@ -212,6 +213,9 @@ export default function DebugDeepScanPage() {
 
     clearDeepScan()
     setDeepScanTarget(previewTarget)
+    // 폼 제출은 명시적 실행 액션이다 — /deepscan 자동 실행 표식을 남긴다
+    // (유료 실행 계약: 표식 없는 방문은 읽기 전용 조회로만 동작한다).
+    markDeepScanRunIntent()
 
     try {
       window.sessionStorage.setItem(

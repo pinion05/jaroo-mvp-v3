@@ -142,6 +142,56 @@ test('getNaverCurrentQuotes maps Naver mobile stock basic payloads to KR quote i
   assert.equal(result.asOf, '2026-04-30T15:30:00+09:00');
 });
 
+test('getNaverCurrentQuotes propagates the Naver tradeStopType authority field as tradeHalted', async () => {
+  const { getNaverCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
+
+  const payloads = {
+    // 실측(2026-10-30): 정상 종목은 TRADING/tradable
+    '005930': {
+      itemCode: '005930',
+      closePrice: '85,200',
+      tradeStopType: { code: '1', text: '운영.Trading', name: 'TRADING' },
+      tradableStatus: 'tradable',
+      localTradedAt: '2026-10-30T08:02:00+09:00',
+    },
+    // 실측(2026-10-30): 유틸렉스 263050 실제 거래정지 = HALTED/halt
+    '263050': {
+      itemCode: '263050',
+      closePrice: '959',
+      tradeStopType: { code: '2', text: '정지.Halted', name: 'HALTED' },
+      tradableStatus: 'halt',
+      localTradedAt: '2026-10-30T08:02:00+09:00',
+    },
+    // tradeStopType 없고 tradableStatus만 있어도 판별 가능
+    '003720': {
+      itemCode: '003720',
+      closePrice: '10,000',
+      tradableStatus: 'halt',
+      localTradedAt: '2026-10-30T08:02:00+09:00',
+    },
+    // 권위 필드 자체가 없는 응답 → tradeHalted 미부여(undefined)
+    '000660': {
+      itemCode: '000660',
+      closePrice: '180,000',
+      localTradedAt: '2026-10-30T08:02:00+09:00',
+    },
+  };
+
+  const result = await getNaverCurrentQuotes(Object.keys(payloads), {
+    naverCurrentQuotesTimeoutMs: null,
+    naverFetchImpl: async (url) => {
+      const code = String(url).match(/stock\/(\d{6})\/basic/)?.[1];
+      return new Response(JSON.stringify(payloads[code]));
+    },
+  });
+
+  const byCode = new Map(result.items.map((item) => [item.code, item]));
+  assert.equal(byCode.get('005930').tradeHalted, false);
+  assert.equal(byCode.get('263050').tradeHalted, true);
+  assert.equal(byCode.get('003720').tradeHalted, true);
+  assert.equal('tradeHalted' in byCode.get('000660'), false);
+});
+
 test('getNaverCurrentQuotes fills volume from the Naver price endpoint when basic omits it', async () => {
   const { getNaverCurrentQuotes } = await import('../src/crawlers/current-quotes.js');
   const requestedUrls = [];

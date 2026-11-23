@@ -2,14 +2,17 @@ const REDACTED = '[REDACTED]'
 const CIRCULAR = '[Circular]'
 const SENSITIVE_KEY_PATTERN = /(?:api[_-]?key|crtfc[_-]?key|token|secret|authorization|password|passwd|cookie)/i
 const SENSITIVE_QUERY_PATTERN = /([?&](?:crtfc_key|api_key|apikey|token|access_token|refresh_token|key)=)[^&#\s]*/gi
-const SENSITIVE_ASSIGNMENT_PATTERN = /\b((?:crtfc[_-]?key|api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|authorization|cookie)\s*[:=]\s*)([^\s,;]+)/gi
+const SENSITIVE_ASSIGNMENT_PATTERN = /\b((?:crtfc[_-]?key|api[_-]?key|access[_-]?token|refresh[_-]?token|token|secret|password|authorization|cookie)\s*[:=]\s*)((?!Bearer\b)[^\s,;]+)/gi
 const BEARER_PATTERN = /\b(Bearer\s+)[A-Za-z0-9._~+/=-]+/gi
 
 function redactString(value, secrets) {
   let redacted = String(value)
     .replace(SENSITIVE_QUERY_PATTERN, `$1${REDACTED}`)
-    .replace(SENSITIVE_ASSIGNMENT_PATTERN, `$1${REDACTED}`)
+    // BEARER를 ASSIGNMENT보다 먼저 적용해야 한다. 반대 순서면 'authorization:' 뒤의
+    // 'Bearer'라는 단어 자체가 ASSIGNMENT 값으로 소비되어 실제 토큰이 마스킹 없이
+    // 생존한다(BUG-CAND-001, 2026-11-06 수정).
     .replace(BEARER_PATTERN, `$1${REDACTED}`)
+    .replace(SENSITIVE_ASSIGNMENT_PATTERN, `$1${REDACTED}`)
 
   for (const secret of secrets) {
     if (secret.length >= 4) {

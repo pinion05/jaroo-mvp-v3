@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import {
   shouldDisplayDeepScanReadyResults,
@@ -9,6 +9,7 @@ import {
   shouldShowDeepScanSummarySkeleton,
 } from '@/lib/deepscan-loading-behavior'
 import { buildDeepScanReturnRateDisplay } from '@/lib/deepscan-loading-metrics'
+import { resolveDeepScanDisplayCurrencies } from '@/lib/deepscan-average-price-currency'
 import { cn } from '@/lib/utils'
 import styles from './deepscan-loading-screen.module.css'
 
@@ -70,6 +71,7 @@ import {
 
 import { resolveDeepScanLoadingCurrentPrice } from '@/lib/deepscan-loading-current-price'
 import { createTeamSummaryFetchCoordinator } from '@/lib/deepscan-team-summary-fetch'
+import { pickSeededTeamSummaries } from '@/lib/deepscan-team-summary-store'
 
 import {
   BackControl,
@@ -81,6 +83,8 @@ import {
 // 팀 요약 클라이언트 타임아웃 — 서버 타임아웃(DEEPSCAN_TEAM_SUMMARY_TIMEOUT_MS, 기본 10s)보다
 // 여유를 둬야 서버의 502 응답을 정상 경로로 받을 수 있다.
 const TEAM_SUMMARY_FETCH_TIMEOUT_MS = 15_000
+// 팀 요약 영속화 배치 디바운스 — 세 팀 성공을 한 번에 묶는다(서버 read-modify-write 경합 방지).
+const PERSIST_TEAM_SUMMARIES_DEBOUNCE_MS = 1_500
 
 export function DeepScanLoadingScreen({
   name = '선택 종목',
@@ -90,9 +94,9 @@ export function DeepScanLoadingScreen({
   instrumentKind,
   shares,
   averagePrice,
-  averagePriceCurrency = 'KRW',
+  averagePriceCurrency: averagePriceCurrencyProp,
   currentPrice,
-  currentPriceCurrency = averagePriceCurrency,
+  currentPriceCurrency: currentPriceCurrencyProp,
   usdKrwRate,
   tradingVolume,
   currentProfitRate,
@@ -108,6 +112,8 @@ export function DeepScanLoadingScreen({
   resultsReady = false,
   snapshotCacheHit = false,
   snapshotScannedAt,
+  storedTeamSummaries = null,
+  persistTarget = null,
   className,
   onBack,
   backHref = '/home',
@@ -118,12 +124,50 @@ export function DeepScanLoadingScreen({
   headerNotice,
 }: DeepScanLoadingScreenProps) {
   const isError = Boolean(errorNotice)
+  // 평단/현재가 통화 결정(T4L-B2 회귀, 2026-11-12) — US 종목의 평단 통화는 DB에
+  // 없는 경우가 있다(원화평단-미국주 가능성 때문). 과거엔 여기서 'KRW' 기본값을
+  // 물려 "평단 228원 → 환산 $0.17 → +207,846.84%" 폭주가 발생했다. 서버
+  // 빌더와 같은 추론(resolveDeepScanDisplayCurrencies)으로 통일한다.
+  const { averagePriceCurrency, currentPriceCurrency } = useMemo(
+    () => resolveDeepScanDisplayCurrencies({
+      market,
+      averagePrice,
+      averagePriceCurrency: averagePriceCurrencyProp,
+      currentPrice,
+      currentPriceCurrency: currentPriceCurrencyProp,
+      usdKrwRate,
+    }),
+    [averagePrice, averagePriceCurrencyProp, currentPrice, currentPriceCurrencyProp, market, usdKrwRate],
+  )
   const [elapsedSeconds, setElapsedSeconds] = useState(0)
   const [teamsSettledAtSeconds, setTeamsSettledAtSeconds] = useState<number | null>(null)
   const [prevCommitteeCardsSettled, setPrevCommitteeCardsSettled] = useState(false)
+  const [appliedStoredTeamSeedVersion, setAppliedStoredTeamSeedVersion] = useState<string | null>(null)
   const [teamSummaries, setTeamSummaries] = useState<Partial<Record<LoadingStageKey, TeamSummaryState>>>({})
   const [expandedTeamSummaries, setExpandedTeamSummaries] = useState<ReadonlySet<LoadingStageKey>>(() => new Set())
   const teamSummaryFetchCoordinatorRef = useRef(createTeamSummaryFetchCoordinator())
+  // 팀 요약 영속화 배치 버퍼 — 성공 문장을 모았다가 디바운스 후 1회 POST(경합 방지).
+  const pendingPersistTeamSummariesRef = useRef<Array<{ teamKey: string; inputKey: string; summary: string }>>([])
+  const persistDebounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const flushPendingPersistTeamSummaries = useCallback(() => {
+    const entries = pendingPersistTeamSummariesRef.current
+    pendingPersistTeamSummariesRef.current = []
+    persistDebounceTimerRef.current = null
+    if (!entries.length || !persistTarget) return
+    void fetch('/api/deepscan/team-summaries-persist', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        code: persistTarget.code ?? undefined,
+        ticker: persistTarget.ticker ?? undefined,
+        summaries: entries,
+      }),
+    }).catch(() => {})
+  }, [persistTarget])
+  useEffect(() => () => {
+    if (persistDebounceTimerRef.current) clearTimeout(persistDebounceTimerRef.current)
+    flushPendingPersistTeamSummaries()
+  }, [flushPendingPersistTeamSummaries])
   const teamBridgeRef = useRef<HTMLElement | null>(null)
   const narrativeStreamRef = useRef<HTMLElement | null>(null)
   const recoveryForecastRef = useRef<HTMLElement | null>(null)
@@ -305,13 +349,39 @@ export function DeepScanLoadingScreen({
       : undefined
   ), [isTeamBridgeVisible])
 
+  // 저장된 팀 요약 씨드(2026-11-13, 캐시 로드 LLM 비용 제로화): 스냅샷 payload에 저장된
+  // 문장 중 요청(팀+inputKey)이 정확히 일치하는 것을 성공 상태로 심는다. 씨드된 요청은 아래
+  // 발사 effect가 건너뛴다 — 재방문할 때마다 team-summary LLM이 3회씩 다시 도는 것을 막는 게이트.
+  // 렌더 중 상태 조정(React 공식 패턴 — You Might Not Need an Effect, 위 settledAt 기록과
+  // 동일 방식): effect 내 동기 setState가 아니라 prop 버전 비교로 1회만 반영한다.
+  const storedTeamSummariesSeed = useMemo(
+    () => pickSeededTeamSummaries(storedTeamSummaries, teamSummaryRequests),
+    [storedTeamSummaries, teamSummaryRequests],
+  )
+  const storedTeamSummariesSeedVersion = `${Object.keys(storedTeamSummariesSeed).sort().join(',')}|${teamSummaryRequests.map((request) => request.requestKey).join(',')}`
+  if (appliedStoredTeamSeedVersion !== storedTeamSummariesSeedVersion) {
+    setAppliedStoredTeamSeedVersion(storedTeamSummariesSeedVersion)
+    setTeamSummaries((previous) => {
+      const merged = { ...previous }
+      for (const [teamKey, entry] of Object.entries(storedTeamSummariesSeed)) {
+        merged[teamKey as LoadingStageKey] = { inputKey: entry.inputKey, status: 'success', summary: entry.summary }
+      }
+      return merged
+    })
+  }
+
   // 팀 요약 fetch: 스테이지가 갱신돼도 진행 중 요청을 취소하지 않는다. 이전 구현은 effect
   // 재실행 시 공유 AbortController로 진행 중 fetch를 abort했고, abort된 요청은 상태를
   // 'error'로조차 바꾸지 않아 UI가 영구히 '요약 중'에 갇혔다. 발사 중복은 코디네이터가 막고,
   // 같은 팀에 새 요청이 들어오면 이전 요청의 결과는 파기한다. 실패 확정은 서버 타임아웃(10s
   // 기본)보다 여윈 개별 요청 타임아웃으로만 한다 — 실패 시 '요약 생략'으로 전환된다.
   useEffect(() => {
-    const pendingRequests = teamSummaryFetchCoordinatorRef.current.claimPendingRequests(teamSummaryRequests)
+    const pendingRequests = teamSummaryFetchCoordinatorRef.current
+      .claimPendingRequests(teamSummaryRequests)
+      .filter((request) => {
+        const stored = storedTeamSummaries?.[request.teamKey]
+        return !(stored && stored.inputKey === request.inputKey)
+      })
 
     pendingRequests.forEach((request) => {
       const { teamKey, inputKey, requestKey } = request
@@ -348,6 +418,15 @@ export function DeepScanLoadingScreen({
             ...previous,
             [teamKey]: { inputKey, status: 'success', summary },
           }))
+
+          // 런 중 받은 문장을 스냅샷/기록에 영속화(2026-11-13) — 이후 재방문은 이 문장을
+          // 그대로 씨드해 LLM 호출 0회. 실패는 화면에 영향 없이 포기(다음 방문 재시도).
+          // 팀별 즉시 발사 대신 짧은 디바운스로 모아서 1회 호출로 보낸다 — 3개 호출이
+          // 동시에 read-modify-write 경합하면 마지막 작성자만 살아남아(프로덕션 실측
+          // 2026-11-13) 일부 팀이 저장에서 탈락하고 재방문마다 재생성된다.
+          pendingPersistTeamSummariesRef.current.push({ teamKey, inputKey, summary })
+          if (persistDebounceTimerRef.current) clearTimeout(persistDebounceTimerRef.current)
+          persistDebounceTimerRef.current = setTimeout(flushPendingPersistTeamSummaries, PERSIST_TEAM_SUMMARIES_DEBOUNCE_MS)
         })
         .catch(() => {
           if (!teamSummaryFetchCoordinatorRef.current.isLatestRequest(teamKey, requestKey)) {
@@ -360,7 +439,7 @@ export function DeepScanLoadingScreen({
           }))
         })
     })
-  }, [exchangeProduct, market, teamSummaryRequests])
+  }, [exchangeProduct, market, persistTarget, storedTeamSummaries, teamSummaryRequests])
 
   return (
     <div className={cn(styles.loadingCard, className)}>
@@ -458,14 +537,20 @@ export function DeepScanLoadingScreen({
           </section>
         ) : null}
 
-        <section ref={teamBridgeRef} className={cn(styles.teamBridgeCard, teamBridgeState ? styles.teamBridgeCardShow : styles.teamBridgeCardDone)} aria-label='세 팀 분석 전환 상태' aria-hidden={teamBridgeState ? undefined : true}>
-          <p className={styles.teamBridgeText}>시세는 다 봤어요. 이제 <b>세 팀이 더 깊이</b> 분석하는 중이에요.</p>
-          <div className={styles.teamBridgeProgress}>
-            <span className={styles.teamBridgeSpinner} aria-hidden='true' />
-            <span className={styles.teamBridgeStatus}>{teamBridgeState?.statusText ?? '세 팀이 의견을 정리하는 중…'}</span>
-            <span className={styles.teamBridgeTime}>{teamBridgeState?.remainingText ?? '0:00'}</span>
-          </div>
-        </section>
+        {/* 팀 브리지 카드는 진행 중에만 존재한다(TC-BBSC-005). 종결(ready)·브리지
+            종료 시점부터는 DOM에서 완전히 소거한다 — CSS 접힘(max-height/opacity)으로
+            가리는 구조는 "세 팀이 의견을 정리하는 중…" 라벨이 종결 후에도 DOM·페인트에
+            잔존하는 결함의 원인이었다. */}
+        {teamBridgeState ? (
+          <section ref={teamBridgeRef} className={cn(styles.teamBridgeCard, styles.teamBridgeCardShow)} aria-label='세 팀 분석 전환 상태'>
+            <p className={styles.teamBridgeText}>시세는 다 봤어요. 이제 <b>세 팀이 더 깊이</b> 분석하는 중이에요.</p>
+            <div className={styles.teamBridgeProgress}>
+              <span className={styles.teamBridgeSpinner} aria-hidden='true' />
+              <span className={styles.teamBridgeStatus}>{teamBridgeState.statusText}</span>
+              <span className={styles.teamBridgeTime}>{teamBridgeState.remainingText}</span>
+            </div>
+          </section>
+        ) : null}
 
         <section ref={narrativeStreamRef} className={styles.narrativeStream} aria-label='분석가 진행 메시지'>
           {sequentialNarrativeCards.map((card) => {

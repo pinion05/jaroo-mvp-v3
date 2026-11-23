@@ -251,8 +251,21 @@ export type JarooDeepScanRecoveryForecastBlock = DeepScanBlockMeta & {
   targetPrice?: number | null
   expectedRecoveryDays?: number | null
   recoveryProbabilityPct?: number | null
+  /**
+   * 기간별 누적 복구확률(%) — 3개월/6개월/1년/2년/3년(63/126/252/504/756 거래일).
+   * 실효 horizon(계열 길이 기반, KR 3년·US 1년)보다 긴 버킷은 null. (#358)
+   */
+  recoveryHorizonProbabilities?: {
+    '3m'?: number | null
+    '6m'?: number | null
+    '1y'?: number | null
+    '2y'?: number | null
+    '3y'?: number | null
+  } | null
+  /** 비전공 유저용 한 문장 요약 — 예: "본전 회복 확률은 3개월 내 34%, 6개월 내 52%, 1년 내 56%입니다" */
+  recoveryProbabilityHeadlineText?: string | null
   confidenceLevel?: 'high' | 'medium' | 'low' | null
-  /** 모델 입력에 쓴 가격 계열(최근 252포인트) — 차트 렌더링용 */
+  /** 모델 입력에 쓴 가격 계열(KR은 최대 780포인트 ≈ 3년치 일봉) — 차트 렌더링용 */
   priceHistory?: JarooRecoveryPricePoint[]
   /** 유사 패턴이 매칭한 과거 하락 구간(차트 하이라이트용) */
   similarPatternSamples?: JarooRecoverySimilarPatternSample[]
@@ -319,6 +332,20 @@ export type JarooDeepScanMetadata = {
   }
 }
 
+/**
+ * 팀 요약 영속화(#358 후속 — 캐시 로드 LLM 비용 제로화): 런 시점에 로딩 화면이 받은
+ * 3개 팀 최종 문장을 스냅샷/기록 payload에 그대로 저장한다. 키는 로딩 스테이지 키
+ * (marketTeam·contextTeam·fundamentalTeam), inputKey는 요약 입력 본문 해시 —
+ * 재방문 시 본문이 같으면 저장 문장을 그대로 씨드하고 발사를 건너뛴다.
+ */
+export type JarooDeepScanTeamSummaryEntry = {
+  inputKey: string
+  summary: string
+  model?: string
+  provider?: string
+  generatedAt?: string
+}
+
 export type JarooDeepScanPayload = {
   input: JarooDeepScanInput
   hero: JarooDeepScanHeroBlock
@@ -328,5 +355,7 @@ export type JarooDeepScanPayload = {
   recoveryForecast?: JarooDeepScanRecoveryForecastBlock
   sellNow: JarooDeepScanSellNowBlock
   portfolioSimulation: JarooDeepScanPortfolioSimulationBlock
+  /** 팀 요약 영속화 — 구형 스냅샷은 필드 없음(undefined)으로 폴백(1회 재생성 후 병합 저장) */
+  teamSummaries?: Record<string, JarooDeepScanTeamSummaryEntry>
   metadata: JarooDeepScanMetadata
 }

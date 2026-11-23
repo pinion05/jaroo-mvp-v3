@@ -1,6 +1,5 @@
 'use client'
 
-import 'pretendard/dist/web/static/pretendard.css'
 import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import type { ReactNode } from 'react'

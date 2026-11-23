@@ -42,6 +42,7 @@ test('deepscan-canonical endpoint definition is registered', async () => {
     'disclosureFrom(optional)',
     'disclosureTo(optional)',
     'disclosureLimit(optional)',
+    'committeeLlm(optional, off — 9인 위원회 LLM 호출 스킵)',
   ]);
 });
 

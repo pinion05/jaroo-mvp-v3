@@ -49,6 +49,9 @@ next-env.d.ts
 .codex/
 .gjc/
 
+# package-local SQLite data dirs (paper-trade, ai-trader — cache ZERO의 유일한 상태 저장소)
+packages/*/data/
+
 # supabase
 supabase/.temp/
 
@@ -59,3 +62,7 @@ supabase/.temp/
 
 *storybook.log
 storybook-static
+/bun.lock
+
+# ai-trader 파이프라인 실행 산출물 (재생성 가능)
+scripts/ai-trader/output/

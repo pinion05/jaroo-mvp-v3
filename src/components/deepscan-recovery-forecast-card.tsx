@@ -4,10 +4,14 @@ import type { JarooDeepScanPayload, JarooRecoveryPricePoint, JarooRecoverySimila
 
 import { Target } from 'lucide-react'
 import { cn } from '@/lib/utils'
+import { buildRecoveryHorizonChips } from '@/lib/deepscan-recovery-horizon'
 
 type DeepScanRecoveryForecastCardProps = {
   payload: JarooDeepScanPayload
 }
+
+// 기간별 확률 칩 표시 순서·모델 — lib(deepscan-recovery-horizon) 공유 단일 소스를 쓴다.
+// 브리핑 카드 원금회수 섹션도 같은 순서·라벨로 렌더된다. (#358)
 
 function parsePercent(value: string | null | undefined) {
   if (!value) return null
@@ -54,7 +58,25 @@ function shortDate(value: string | null | undefined) {
   return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(value) ? value.slice(5, 10).replace('-', '.') : ''
 }
 
+// 3년치 일봉의 연·월 틱(2024.06) — 월·일(MM.DD)은 3년 구간에서 같은 라벨이 해마다
+// 반복돼 구분할 수 없다.
+function yearMonthDate(value: string | null | undefined) {
+  return typeof value === 'string' && /^\d{4}-\d{2}-\d{2}/u.test(value) ? value.slice(0, 7).replace('-', '.') : ''
+}
+
+function chartSpanDays(points: ReadonlyArray<JarooRecoveryPricePoint>) {
+  const first = points[0]?.date
+  const last = points[points.length - 1]?.date
+  const firstMs = first ? Date.parse(`${first.slice(0, 10)}T00:00:00Z`) : Number.NaN
+  const lastMs = last ? Date.parse(`${last.slice(0, 10)}T00:00:00Z`) : Number.NaN
+  return Number.isFinite(firstMs) && Number.isFinite(lastMs) ? (lastMs - firstMs) / 86_400_000 : 0
+}
+
+// 구간이 2년을 넘으면 3년 차트 표기·연·월 틱으로 전환한다(KR 일봉 3년 확장).
+const THREE_YEAR_CHART_MIN_SPAN_DAYS = 365 * 2
+
 type RecoveryChartGeometry = {
+  periodLabel: string
   pricePath: string
   gridlines: Array<{ y: number; label: string }>
   dateTicks: Array<{ x: number; label: string }>
@@ -63,9 +85,11 @@ type RecoveryChartGeometry = {
   currentDot: { x: number; y: number } | null
 }
 
-// 1년 가격 계열 + 유사 패턴 샘플을 SVG 좌표로 변환한다. 모델이 실제로 본 데이터를
+// 가격 계열 + 유사 패턴 샘플을 SVG 좌표로 변환한다. 모델이 실제로 본 데이터를
 // 그대로 그리므로 "모델의 근거"가 차트로 드러난다. 결과 카드와 로딩 브리핑이 같은
-// 지오메트리를 공유한다.
+// 지오메트리를 공유한다. 기간 표기·틱은 실제 데이터 구간을 따른다 — KR 일봉은
+// 3년치(780봉)로 확장돼 '최근 3년' + 연·월 틱 5개, US OHLC(≈252봉)·상장 3년 미만
+// 종목은 실제 구간 그대로 '최근 1년' + 월·일 틱 3개.
 export function buildRecoveryChartGeometry(input: {
   priceHistory: ReadonlyArray<JarooRecoveryPricePoint>
   samples: ReadonlyArray<JarooRecoverySimilarPatternSample> | undefined
@@ -97,10 +121,13 @@ export function buildRecoveryChartGeometry(input: {
     return { y: yAt(value), label: compactPrice(value) }
   })
 
-  const dateTickCount = Math.min(3, points.length)
+  // 구간이 2년을 넘으면 3년 차트 표기(연·월 틱 5개), 그 이하는 기존 1년 표기(월·일 틱 3개).
+  const isThreeYearSpan = chartSpanDays(points) >= THREE_YEAR_CHART_MIN_SPAN_DAYS
+  const dateTickCount = Math.min(isThreeYearSpan ? 5 : 3, points.length)
   const dateTicks = Array.from({ length: dateTickCount }, (_, index) => {
     const pointIndex = Math.round((index / (dateTickCount - 1)) * (points.length - 1))
-    return { x: xAt(pointIndex), label: shortDate(points[pointIndex]?.date) }
+    const pointDate = points[pointIndex]?.date
+    return { x: xAt(pointIndex), label: isThreeYearSpan ? yearMonthDate(pointDate) : shortDate(pointDate) }
   })
 
   const bands = points
@@ -121,6 +148,7 @@ export function buildRecoveryChartGeometry(input: {
 
   const lastPoint = points[points.length - 1]
   return {
+    periodLabel: isThreeYearSpan ? '최근 3년' : '최근 1년',
     pricePath,
     gridlines,
     dateTicks,
@@ -142,12 +170,13 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
   const geometry = block.priceHistory && targetPrice !== null
     ? buildRecoveryChartGeometry({ priceHistory: block.priceHistory, samples: block.similarPatternSamples, targetPrice })
     : null
-  const facts: ReadonlyArray<readonly [string, string]> = [
-    ['현재가', block.currentPriceText || '--'],
-    ['평단가', block.targetPriceText || '--'],
-    ['손실률', block.drawdownText || '--'],
-    ...(probabilityPct === null ? [['1년 내 도달 비율', block.recoveryProbabilityText || '--'] as const] : []),
-  ]
+  // 기간별(3개월~2년+) 누적 복구확률 칩 — 순서·라벨·필터·터미널('2년+') 규칙은 lib 단일 소스를 따른다. (#358)
+  const horizonChips = buildRecoveryHorizonChips(block)
+  // 현재가·평단가·손실률 셀은 화면 상단 요약에서 이미 보여주므로 카드에서는 중복으로 제거했다.
+  // 레거시 스냅샷(확률 텍스트만 있는 경우)의 '1년 내 도달 비율' 셀만 유지한다.
+  const facts: ReadonlyArray<readonly [string, string]> = probabilityPct === null && horizonChips.length === 0
+    ? [['1년 내 도달 비율', block.recoveryProbabilityText || '--'] as const]
+    : []
 
   return (
     <article
@@ -170,7 +199,7 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
           <div className='text-[10px] text-[#97A0AE]'>평단 도달 예상 기간</div>
           <div className='mt-1 text-[28px] font-black leading-none text-[#0F1419]'>{block.expectedRecoveryDaysText || '--'}</div>
         </div>
-        {probabilityPct !== null ? (
+        {horizonChips.length === 0 && probabilityPct !== null ? (
           <div className='w-[136px]'>
             <div className='text-[10px] text-[#97A0AE]'>1년 내 도달 비율</div>
             <div className='mt-1 text-[22px] font-black leading-none text-[#0F1419]'>{Math.max(probabilityPct, 0).toFixed(1)}%</div>
@@ -184,23 +213,25 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
           </div>
         ) : null}
       </div>
-      <p className='border-t border-[#EFF1F4] px-4 py-3 text-[12px] leading-5 text-[#5A6473]'>{block.summaryText}</p>
+      {horizonChips.length === 0 ? (
+        <p className='border-t border-[#EFF1F4] px-4 py-3 text-[12px] leading-5 text-[#5A6473]'>{block.summaryText}</p>
+      ) : null}
 
       {geometry ? (
         <div className='border-t border-[#EFF1F4] px-4 py-4'>
           <div className='flex flex-wrap items-baseline justify-between gap-1'>
-            <span className='text-[10px] font-bold text-[#5A6473]'>최근 1년 종가와 유사 과거 패턴</span>
+            <span className='text-[10px] font-bold text-[#5A6473]'>{`${geometry.periodLabel} 종가와 유사 과거 패턴`}</span>
             <span className='flex gap-2 text-[10px] text-[#97A0AE]'>
               <span className='flex items-center gap-1'><span className='h-[2px] w-3 rounded bg-[#0F1419]' aria-hidden />종가</span>
               <span className='flex items-center gap-1'><span className='h-0 w-3 border-t-2 border-dashed border-[#2B6BE6]' aria-hidden />평단가</span>
-              <span className='flex items-center gap-1'><span className='size-2 rounded-[2px] border border-[#E0942A] bg-[#F0A73B]/40' aria-hidden />유사 패턴</span>
+              <span className='flex items-center gap-1'><span className='h-2.5 w-[2px] rounded-[1px] bg-[#F0A73B]' aria-hidden />유사 패턴</span>
             </span>
           </div>
           <svg
             className='mt-2 w-full'
             viewBox={`0 0 ${RECOVERY_CHART_WIDTH} ${RECOVERY_CHART_HEIGHT}`}
             role='img'
-            aria-label='최근 1년 종가 차트. 파란 점선은 평단가, 호밍색 표시는 유사 과거 패턴 구간이다.'
+            aria-label={`${geometry.periodLabel} 종가 차트. 파란 점선은 평단가, 호밍색 세로선은 유사 과거 패턴 구간이다.`}
           >
             {geometry.gridlines.map((line) => (
               <g key={`grid-${line.label}`}>
@@ -212,9 +243,14 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
               <text key={`date-${tick.label}-${tick.x}`} x={tick.x} y={RECOVERY_CHART_HEIGHT - 4} textAnchor='middle' fontSize='8' fill='#97A0AE'>{tick.label}</text>
             ))}
             {geometry.bands.map((band) => (
-              <rect key={`band-${band.x}`} x={band.x - 3} y={RECOVERY_CHART_MARGIN.top} width='6' height={RECOVERY_CHART_HEIGHT - RECOVERY_CHART_MARGIN.top - RECOVERY_CHART_MARGIN.bottom} rx='1.5' fill='#F0A73B' fillOpacity='0.28' stroke='#E0942A' strokeWidth='0.5'>
-                <title>{band.title}</title>
-              </rect>
+              // 유사 패턴 위치 표시 — 2026-11-02: 노란 밴드(rect)에서 얇은 세로선으로 변경.
+              // 투명 rect(6px)는 툴팁 히트영역으로만 남긴다(1.2px 선은 호버가 어렵다).
+              <g key={`band-${band.x}`}>
+                <line x1={band.x} x2={band.x} y1={RECOVERY_CHART_MARGIN.top} y2={RECOVERY_CHART_HEIGHT - RECOVERY_CHART_MARGIN.bottom} stroke='#F0A73B' strokeWidth='1.2' strokeOpacity='0.9' />
+                <rect x={band.x - 3} y={RECOVERY_CHART_MARGIN.top} width='6' height={RECOVERY_CHART_HEIGHT - RECOVERY_CHART_MARGIN.top - RECOVERY_CHART_MARGIN.bottom} fill='transparent'>
+                  <title>{band.title}</title>
+                </rect>
+              </g>
             ))}
             {geometry.targetY !== null ? (
               <g>
@@ -232,16 +268,38 @@ export function DeepScanRecoveryForecastCard({ payload }: DeepScanRecoveryForeca
         </div>
       ) : null}
 
-      <div className='grid grid-cols-3 border-t border-[#EFF1F4]'>
-        {facts.map(([label, value]) => (
-          <div key={label} className='border-b border-r border-[#EFF1F4] px-4 py-3 last:border-r-0 [&:nth-child(3n)]:border-r-0 [&:last-child]:border-b-0'>
-            <div className='text-[10px] text-[#97A0AE]'>{label}</div>
-            <div className='mt-1 text-[14px] font-bold text-[#0F1419]'>{value}</div>
-          </div>
-        ))}
-      </div>
+      {facts.length > 0 ? (
+        <div className='grid grid-cols-3 border-t border-[#EFF1F4]'>
+          {facts.map(([label, value]) => (
+            <div key={label} className='border-b border-r border-[#EFF1F4] px-4 py-3 last:border-r-0 [&:nth-child(3n)]:border-r-0 [&:last-child]:border-b-0'>
+              <div className='text-[10px] text-[#97A0AE]'>{label}</div>
+              <div className='mt-1 text-[14px] font-bold text-[#0F1419]'>{value}</div>
+            </div>
+          ))}
+        </div>
+      ) : null}
 
-      {block.modelRows.length > 0 ? (
+      {horizonChips.length > 0 ? (
+        <div className='border-t border-[#EFF1F4] px-4 py-4'>
+          <div className='flex flex-col gap-3' role='list' aria-label='기간별 본전 회복 확률'>
+            {horizonChips.map((chip) => (
+              <div key={chip.key} role='listitem'>
+                <div className='flex items-center justify-between'>
+                  <span className='text-[10px] text-[#97A0AE]'>{chip.text}</span>
+                  <span className='text-[10px] font-black leading-none text-[#0F1419]'>{Math.max(chip.value, 0).toFixed(0)}%</span>
+                </div>
+                <div
+                  className='mt-1 h-1 w-full overflow-hidden rounded-full bg-[#F1F3F6]'
+                  role='img'
+                  aria-label={`${chip.text} 회복 확률 ${chip.value.toFixed(1)}%`}
+                >
+                  <div className='h-full rounded-full bg-[#2B6BE6]' style={{ width: `${Math.min(100, Math.max(1.5, chip.value))}%` }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : block.modelRows.length > 0 ? (
         <div className='border-t border-[#EFF1F4] px-4 py-4'>
           <div className='mb-3 text-[10px] text-[#97A0AE]'>모델별 도달 기간 · 비율</div>
           <div className='space-y-3'>

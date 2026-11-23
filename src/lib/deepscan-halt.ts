@@ -3,13 +3,20 @@
 // 1차(힌트): 홈이 시세 병합 시점에 계산한 카드 톤(cardTone 'halt')이 세션으로 그대로
 //   전달된다. 진입 즉시 거래정지 화면을 띄우는 근거로 쓴다. 다만 신선도는 홈의
 //   마지막 시세 동기화 시점 기준이다.
-// 2차(권위): 딥스캔 페이지가 로딩 팩트용으로 이미 fetch하는 퀵시세의 당일 거래량.
-//   volume === 0이면 정지, volume > 0이면 거래 중. 홈을 거치지 않은 진입(기록 복원
-//   등)과 정지→해제 전환은 모두 여기서 최종 판정한다(톤 힌트보다 우선).
+// 2차(권위): 딥스캔 페이지가 로딩 팩트용으로 이미 fetch하는 퀵시세에서 판정한다.
+//   ① 네이버 권위 필드(tradeHalted — basic 응답의 tradeStopType/tradableStatus 유래)가
+//      있으면 시각과 무관하게 그것으로 즉시 확정한다(정지→해제 전환도 여기서 검출).
+//   ② 필드가 없는 시세(KRX 폴백·위세리포트 ETF 등)에서만 당일 거래량 폴백을 쓴다.
+//      volume === 0이면 '정규장 시간대'(월~금 09:00~15:30 KST)에서만 정지로 본다 —
+//      장전 롤오버 행과 개장 직후 무체결 종목의 오탐을 차단한다. volume > 0이면
+//      언제나 거래 중. 홈을 거치지 않은 진입(기록 복원 등)도 여기서 최종 판정한다.
+//   권위 판정이 불가능할 때(퀵시세 미도착, 필드·거래량 모두 없음)에만 1차 힌트와
+//   제한 시간 경과 fail-open이 최종 판정을 대신한다(톤 힌트보다 우선).
 // 퀵시세가 제한 시간 안에 오지 않으면 fail-open으로 일반 플로우를 유지한다 —
 // 정상 종목의 스캔 시작이 거래정지 검사 때문에 지연되어선 안 된다.
 
 import type { HomeHolding } from './holding-types'
+import { isKrRegularMarketWindow } from './kr-market-hours'
 
 export type DeepScanHaltVerdict = 'halted' | 'active' | 'pending'
 
@@ -34,7 +41,9 @@ export function resolveDeepScanHaltVerdict(input: {
   instrumentKind?: 'stock' | 'etf' | 'etn' | null
   haltHint: boolean
   quickQuoteVolume?: number | null
+  quickQuoteTradeHalted?: boolean | null
   checkExpired: boolean
+  now?: Date
 }): DeepScanHaltVerdict {
   if (!input.targetKey) {
     return 'active'
@@ -52,9 +61,25 @@ export function resolveDeepScanHaltVerdict(input: {
     return 'active'
   }
 
+  // 2차 권위 ① — 네이버 권위 필드. 시각과 무관하게 즉시 확정한다.
+  if (typeof input.quickQuoteTradeHalted === 'boolean') {
+    return input.quickQuoteTradeHalted ? 'halted' : 'active'
+  }
+
+  // 2차 권위 ② — 당일 거래량 폴백(정규장 시간 게이트와 함께).
   const haltedByVolume = resolveHaltedQuoteVolume(input.quickQuoteVolume)
-  if (haltedByVolume !== null) {
-    return haltedByVolume ? 'halted' : 'active'
+  if (haltedByVolume === false) {
+    return 'active'
+  }
+  if (haltedByVolume === true) {
+    if (isKrRegularMarketWindow(input.now)) {
+      return 'halted'
+    }
+
+    // 정규장 밖의 거래량 0은 정지 근거가 못 된다(장전 롤오버·무체결). 이 시점에 홈 힌트가
+    // 'halt'라면 권위 필드에서 나온 것(홈도 시간 게이트를 통과했으므로)이므로 유지하고,
+    // 아니면 새로 기다릴 근거가 없으니 즉시 일반 플로우로 연다.
+    return input.haltHint ? 'halted' : 'active'
   }
 
   if (input.haltHint) {

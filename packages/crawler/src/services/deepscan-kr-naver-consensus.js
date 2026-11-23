@@ -283,7 +283,23 @@ async function buildNaverConsensusSyntheticRow(code) {
             : {}),
         }
       : {}),
-    rows: [{ '투자의견(점수)': fallback.score ?? null, 목표주가: fallback.targetPrice }],
+    // 2026-11-02: 증권사별 행을 rows에도 싣는다. 딥스캔 canonical은 v1.1 slim 빌더로
+    // 페이지를 재조립하며, slimWiseReportKrValue는 rows 있는 페이지를 테이블 페이로드로
+    // 취급해 루트 요약 필드(증권사수·analystBrokers·최고/최저)를 전부 버린다.
+    // 루트 필드만 있으면 analystCount 1·brokers null로 떨어져(실측 005930) 웹에서
+    // '증권사 1곳' 폴백이 뜬다. 행으로 심으면 readTargetPriceFromRow/rowBrokers가
+    // 그대로 복원한다. 최고/최저·증권사수는 rows에 넣지 않는다 — syntheticSummary가
+    // 행 레벨 통계를 계산하기 전에 루트 요약으로 하이재크하는 것을 막는다.
+    rows: [
+      { 추정기관: 'consensus', 목표주가: fallback.targetPrice, '투자의견(점수)': fallback.score ?? null },
+      ...(Array.isArray(brokerStats?.brokers)
+        ? brokerStats.brokers.map((entry) => ({
+          추정기관: entry?.name,
+          목표주가: entry?.targetPrice,
+          ...(entry?.date ? { 날짜: entry.date } : {}),
+        }))
+        : []),
+    ],
   };
 }
 

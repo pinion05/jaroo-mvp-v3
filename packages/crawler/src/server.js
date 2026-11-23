@@ -155,6 +155,7 @@ function buildJarooDeepScanInputFromQuery(req) {
   const disclosureFrom = parseSingleQueryValue(req.query.disclosureFrom ?? req.query.dartFrom);
   const disclosureTo = parseSingleQueryValue(req.query.disclosureTo ?? req.query.dartTo);
   const disclosureLimit = parseSingleQueryValue(req.query.disclosureLimit ?? req.query.dartLimit);
+  const committeeLlm = parseSingleQueryValue(req.query.committeeLlm);
   const holding = {};
   const disclosureOptions = {};
 
@@ -210,6 +211,8 @@ function buildJarooDeepScanInputFromQuery(req) {
     ...(parseSingleQueryValue(req.query.crawlerCacheBypass) === '1'
       ? { crawlerCache: { bypassCache: true } }
       : {}),
+    // 워치 일일 배치 등 committee 서사 불필요 소비처용: ?committeeLlm=off → 9인 위원회 LLM 스킵
+    ...(committeeLlm ? { committeeLlm } : {}),
   };
 }
 
@@ -2968,6 +2971,7 @@ const endpointDefinitions = [
       'disclosureFrom(optional)',
       'disclosureTo(optional)',
       'disclosureLimit(optional)',
+      'committeeLlm(optional, off — 9인 위원회 LLM 호출 스킵)',
     ],
     rawSuccess: true,
     successStatus: (payload) => {

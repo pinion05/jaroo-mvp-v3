@@ -349,6 +349,25 @@ test('KR DeepScan crawler canonical URL은 market KOSPI 표기에서도 명시 k
   assert.match(url, /kind=etn/)
 })
 
+test('KR DeepScan crawler canonical URL은 skipCommitteeLlm 옵션에서만 committeeLlm=off를 붙인다', () => {
+  const rawInput: DeepScanRawInput = {
+    instrument: {
+      name: '삼성전자',
+      code: '005930',
+      market: 'KR',
+    },
+    sourceContext: {
+      from: 'system',
+    },
+  }
+
+  // 기본(유저 딥스캔)은 플래그가 없어야 한다
+  assert.doesNotMatch(buildKrDeepScanCrawlerCanonicalUrl(rawInput), /committeeLlm/)
+
+  // 워치 일괄 배치용 옵션은 committeeLlm=off를 전달한다
+  assert.match(buildKrDeepScanCrawlerCanonicalUrl(rawInput, { skipCommitteeLlm: true }), /committeeLlm=off/)
+})
+
 test('buildRawInputFromSearchParams 화이트리스트는 kind=etn을 드롭하지 않는다', async () => {
   const { buildRawInputFromSearchParams } = await import('./build-payload')
 
@@ -555,7 +574,7 @@ test('buildKrDeepScanPayloadViaCrawler recomputes optimistic crawler recovery ou
       targetPrice: 150,
     },
   }
-  const dailySeries = Array.from({ length: 260 }, (_, index) => ({
+  const dailySeries = Array.from({ length: 800 }, (_, index) => ({
     date: new Date(Date.UTC(2025, 0, index + 1)).toISOString().slice(0, 10),
     close: 100 + Math.sin(index) * 2,
   }))
@@ -588,14 +607,65 @@ test('buildKrDeepScanPayloadViaCrawler recomputes optimistic crawler recovery ou
   const rows = block.modelRows as Array<Record<string, unknown>>
   assert.notEqual(rows[1]?.recoveryDaysText, '15일')
   assert.notEqual(rows[1]?.probabilityText, '100%')
-  // 주입된 일봉 계열이 차트 재료(priceHistory, 최대 252포인트)로 내려간다.
+  // 주입된 일봉 계열이 차트 재료(priceHistory, 3년치 최대 780포인트)로 내려간다.
   const priceHistory = block.priceHistory as Array<{ date: string | null; close: number }>
   assert.ok(Array.isArray(priceHistory))
-  assert.equal(priceHistory.length, 252)
+  assert.equal(priceHistory.length, 780)
+  assert.equal(priceHistory[priceHistory.length - 1]?.date, dailySeries[dailySeries.length - 1]?.date)
   assert.equal(block.currentPrice, 100)
   assert.equal(block.targetPrice, 150)
   assert.equal(typeof block.recoveryProbabilityPct, 'number')
   assert.ok(['high', 'medium', 'low'].includes(String(block.confidenceLevel)))
+})
+
+test('similarPatternSamples 최대 12개를 3년 전 구간에 걸쳐 등간격으로 내린다(우측 편중 회귀)', async () => {
+  // 톱니파: 30거래일 주기로 150→100(-33%) 낙폭 후 회복. 평단 150·현재가 100이면
+  // 유사 패턴 스캔이 주기마다 1개씩 25개 샘플을 3년 전 구간부터 찾는다.
+  // 예전 slice(-12) 선택은 최근 12개만 남겨 차트 우측에만 밴드가 몰렸다(2026-11-02 삼영화학공업 실측).
+  const cycle = [150, 140, 130, 115, 100, 100, 110, 125, 140, 150, ...Array.from({ length: 20 }, () => 150)]
+  const dailySeries = Array.from({ length: 780 }, (_, index) => ({
+    date: new Date(Date.UTC(2024, 0, 2 + index)).toISOString().slice(0, 10),
+    close: cycle[(index + 5) % cycle.length] ?? 150,
+  }))
+  const crawlerPayload = {
+    recoveryForecastRaw: {
+      forecast: { status: 'available', models: {}, consensus: null },
+      currentPrice: 100,
+      targetPrice: 150,
+    },
+  }
+  const rawInput: DeepScanRawInput = {
+    instrument: { name: '테스트', code: '100840', market: 'KR', kind: 'stock' },
+    sourceContext: { from: 'holding' },
+  }
+
+  const payload = await buildKrDeepScanPayloadViaCrawler(
+    rawInput,
+    (async () => new Response(JSON.stringify(crawlerPayload), {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+    })) as typeof fetch,
+    {
+      fetchTimeoutMs: 1000,
+      recoveryPriceHistoryLoader: async () => dailySeries,
+    },
+  ) as Record<string, unknown>
+
+  const block = payload.recoveryForecast as Record<string, unknown>
+  const samples = block.similarPatternSamples as Array<{ date: string | null; close: number }>
+  assert.ok(Array.isArray(samples), 'similarPatternSamples must exist')
+  assert.equal(samples.length, 12, '25개 샘플 중 최대 12개만 내려간다')
+  // 첫 샘플이 계열 시작 연도(2024)에 있어야 한다 — 좌측 구간 근거가 잘리지 않는다.
+  assert.equal(samples[0]?.date?.slice(0, 4), '2024')
+  // 마지막 샘플은 계열 끝(2026) 근처 — 최근 사례도 유지된다.
+  assert.equal(samples[samples.length - 1]?.date?.slice(0, 4), '2026')
+  // 전체 계열의 첫/끝 샘플(28·778 거래일)이 선택돼 전 구간을 커버한다.
+  const priceHistory = block.priceHistory as Array<{ date: string | null }>
+  assert.equal(samples[0]?.date, priceHistory[28]?.date)
+  assert.equal(samples[samples.length - 1]?.date, priceHistory[778]?.date)
+  // 날짜 순 정렬 유지
+  const dates = samples.map((sample) => sample.date ?? '')
+  assert.deepEqual(dates, [...dates].sort())
 })
 
 test('buildKrDeepScanPayloadViaCrawler blocks recovery output when daily history loading fails', async () => {

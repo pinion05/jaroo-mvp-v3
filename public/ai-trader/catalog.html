@@ -1,0 +1,259 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>AI 트레이더 쇼케이스 — UI 초안 카탈로그</title>
+<style>
+  :root {
+    --primary: #185fa5;
+    --primary-strong: #0c447c;
+    --ink: #0f1728;
+    --muted: #6e7d91;
+    --border: #e6edf5;
+    --secondary: #f2f6fb;
+    --accent: #e6f1fb;
+    --canvas: #f4f7fb;
+    --profit: #d9443f;
+    --loss: #1f6fd4;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--canvas);
+    color: var(--ink);
+    font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, system-ui, Roboto, 'Apple SD Gothic Neo', 'Noto Sans KR', 'Malgun Gothic', sans-serif;
+    line-height: 1.6;
+  }
+  .wrap { max-width: 1120px; margin: 0 auto; padding: 40px 24px 80px; }
+  header.hero { padding: 28px 0 20px; border-bottom: 1px solid var(--border); margin-bottom: 28px; }
+  .eyebrow { color: var(--primary); font-weight: 700; font-size: 13px; letter-spacing: 0.08em; }
+  h1 { font-size: 28px; margin: 8px 0 10px; letter-spacing: -0.02em; }
+  .hero p { color: var(--muted); max-width: 720px; margin: 0; font-size: 15px; }
+  .meta-chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+  .chip { background: #fff; border: 1px solid var(--border); border-radius: 999px; padding: 4px 12px; font-size: 12.5px; color: var(--muted); }
+  .chip b { color: var(--ink); font-weight: 600; }
+
+  table.compare { width: 100%; border-collapse: collapse; background: #fff; border: 1px solid var(--border); border-radius: 16px; overflow: hidden; font-size: 14px; margin: 0 0 40px; }
+  table.compare th { background: var(--secondary); text-align: left; padding: 10px 14px; font-size: 12.5px; color: var(--muted); font-weight: 600; }
+  table.compare td { padding: 12px 14px; border-top: 1px solid var(--border); vertical-align: top; }
+  table.compare td.num { font-weight: 800; color: var(--primary); white-space: nowrap; }
+  table.compare td.dir { font-weight: 700; white-space: nowrap; }
+  table.compare a { color: var(--primary); text-decoration: none; font-weight: 600; }
+  table.compare a:hover { text-decoration: underline; }
+
+  section.draft { background: #fff; border: 1px solid var(--border); border-radius: 24px; padding: 28px; margin-bottom: 36px; }
+  .draft-head { display: flex; align-items: flex-start; gap: 16px; flex-wrap: wrap; }
+  .badge-num { flex: none; width: 44px; height: 44px; border-radius: 14px; background: var(--primary); color: #fff; font-size: 20px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+  .draft-head h2 { margin: 0; font-size: 20px; letter-spacing: -0.01em; }
+  .draft-head .tagline { color: var(--muted); font-size: 13.5px; margin-top: 2px; }
+  .open-link { margin-left: auto; }
+  .open-link a { display: inline-flex; align-items: center; gap: 6px; background: var(--accent); color: var(--primary-strong); font-weight: 700; font-size: 13.5px; border-radius: 12px; padding: 9px 16px; text-decoration: none; }
+  .open-link a:hover { background: #d5e7f8; }
+  .cols { display: grid; grid-template-columns: minmax(280px, 1fr) 390px; gap: 28px; margin-top: 20px; align-items: start; }
+  @media (max-width: 860px) { .cols { grid-template-columns: 1fr; } .phone-box { margin: 0 auto; } }
+  .desc h3 { font-size: 13px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin: 18px 0 6px; }
+  .desc h3:first-child { margin-top: 0; }
+  .desc p { margin: 0 0 8px; font-size: 14.5px; }
+  .desc ul { margin: 4px 0 0; padding-left: 18px; font-size: 14px; color: #33415a; }
+  .desc li { margin-bottom: 4px; }
+  .desc code { background: var(--secondary); border: 1px solid var(--border); border-radius: 6px; padding: 1px 6px; font-size: 12.5px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: var(--primary-strong); }
+  .phone-box { width: 390px; max-width: 100%; border-radius: 28px; border: 8px solid #10233b; box-shadow: 0 18px 44px rgba(12,68,124,0.18); overflow: hidden; background: #fff; }
+  .phone-box iframe { display: block; width: 100%; height: 720px; border: 0; background: var(--canvas); }
+  .hint { font-size: 12px; color: var(--muted); text-align: center; margin-top: 10px; }
+
+  footer { color: var(--muted); font-size: 13px; border-top: 1px solid var(--border); padding-top: 20px; margin-top: 12px; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header class="hero">
+    <div class="eyebrow">JAROO × DEEPSCAN — VIRAL SHOWCASE</div>
+    <h1>AI 트레이더 쇼케이스 페이지 — UI 초안 카탈로그</h1>
+    <p>AI 트레이더 캐릭터들이 <b>사용자와 동일한 deepscan 리포트</b>를 보고 성향대로 매매한 결과를 보여주는 홍보 페이지. 아래 5개 초안은 각각 다른 정보구조 방향으로 만든 목업 시안으로, 실제 <code>JarooDeepScanPayload</code> 컨트랙트 타입을 채운 목업 데이터로 렌더링된 <b>라이브 페이지</b>입니다. 프레임 안에서 직접 조작해보세요.</p>
+    <div class="meta-chips">
+      <span class="chip">브랜치 <b>feat/ai-trader-page-ui</b></span>
+      <span class="chip">라우트 <b>/ai-trader/draft-1~5</b></span>
+      <span class="chip">공통 캐릭터 <b>소심이 🐰 (여행자금 230만원)</b></span>
+      <span class="chip">데이터 <b>전부 목업 (컨트랙트 타입 준수)</b></span>
+      <span class="chip">tsc <b>에러 0건</b></span>
+    </div>
+  </header>
+
+  <table class="compare">
+    <thead>
+      <tr><th>#</th><th>방향</th><th>한 줄 컨셉</th><th>어필 포인트</th><th>바로가기</th></tr>
+    </thead>
+    <tbody>
+      <tr><td class="num">①</td><td class="dir">캐릭터 디테일</td><td>한 캐릭터를 깊게 파는 개인 프로필 — 페르소나·계좌·판단·원장</td><td>캐릭터 애착 → 팔로우 유도</td><td><a href="/ai-trader/draft-1">열기 →</a></td></tr>
+      <tr><td class="num">②</td><td class="dir">리더보드</td><td>이번 달 누가 1등? 수익률 순위 경쟁 + 목표 진척도</td><td>경쟁/시즌 구도의 바이럴</td><td><a href="/ai-trader/draft-2">열기 →</a></td></tr>
+      <tr><td class="num">③</td><td class="dir">증거 체인 타임라인</td><td>리포트 발행 → 판단 → 체결을 한 줄로 연결한 입증 피드</td><td>deepscan 신뢰·투명성 입증</td><td><a href="/ai-trader/draft-3">열기 →</a></td></tr>
+      <tr><td class="num">④</td><td class="dir">같은 리포트·다른 결정</td><td>하나의 리포트를 4명이 다르게 해석·매매하는 비교 화면</td><td>리포트 보편성 + 성향 차이</td><td><a href="/ai-trader/draft-4">열기 →</a></td></tr>
+      <tr><td class="num">⑤</td><td class="dir">투자 일기·셰어러블</td><td>1인칭 감성 일기 × 딱딱한 체결 영수증의 대비</td><td>카톡 공유 스크린샷 콘텐츠</td><td><a href="/ai-trader/draft-5">열기 →</a></td></tr>
+    </tbody>
+  </table>
+
+  <!-- ────────────────────────── 초안 1 ────────────────────────── -->
+  <section class="draft">
+    <div class="draft-head">
+      <div class="badge-num">①</div>
+      <div>
+        <h2>캐릭터 디테일형</h2>
+        <div class="tagline">한 명의 AI 트레이더를 미니 프로필 + 계좌 + 판단 일지로 깊게</div>
+      </div>
+      <div class="open-link"><a href="/ai-trader/draft-1" target="_blank">새 탭에서 열기 ↗</a></div>
+    </div>
+    <div class="cols">
+      <div class="desc">
+        <h3>개념</h3>
+        <p>상단 가로 스와이프 캐러셀(snap 스크롤)로 캐릭터 4명(소심이🐰·몰빵준🚀·배당곰🐻·가치누나🦉)을 나열하고, 선택 시 아래 전체가 fade/slide 애니메이션으로 교체됩니다. 한 캐릭터를 집중 탐구하는 구조로 애착을 만듭니다.</p>
+        <h3>구성</h3>
+        <ul>
+          <li>페르소나 카드 — 큰 아바타, 성향 태그, 말풍선 말투 샘플, <b>여행자금 230만원까지 68%</b> 진행 바</li>
+          <li>계좌 요약 2×2 그리드(현금·매입원본·평가금액·총자산)</li>
+          <li>판단 카드 — 결정 배지 + heroScore·회복확률·목표가, <code>debugId</code>, 캐릭터 서사, evidenceFacts 근거</li>
+          <li>원장 Tabs — 체결 내역 / 보유 종목 (<code>orderId</code>·수수료·평단·평가손익)</li>
+        </ul>
+        <h3>데이터</h3>
+        <p><code>mock-data.ts</code> — 실제 컨트랙트 타입을 온전히 채운 리포트 5종(삼성전자·SK하이닉스·LG엔솔·기아·NAVER)</p>
+      </div>
+      <div>
+        <div class="phone-box"><iframe src="/ai-trader/draft-1" title="초안① 캐릭터 디테일형" loading="lazy"></iframe></div>
+        <div class="hint">프레임 안에서 캐러셀·탭 직접 조작 가능</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────────────────────── 초안 2 ────────────────────────── -->
+  <section class="draft">
+    <div class="draft-head">
+      <div class="badge-num">②</div>
+      <div>
+        <h2>리더보드·순위경쟁형</h2>
+        <div class="tagline">"이번 달 누가 제일 잘 벌었나" — 시즌제 경쟁 리그</div>
+      </div>
+      <div class="open-link"><a href="/ai-trader/draft-2" target="_blank">새 탭에서 열기 ↗</a></div>
+    </div>
+    <div class="cols">
+      <div class="desc">
+        <h3>개념</h3>
+        <p>프라이머리 그라디언트 시즌 헤더(2026년 11월 · 2주차) 아래 이번 주/지난 주/시즌 누적 탭으로 순위가 바뀌는 리그 페이지. 지난 주 4위 <b>돌진이🚀</b>가 이번 주 1위로 뒤집히는 스토리가 보입니다.</p>
+        <h3>구성</h3>
+        <ul>
+          <li>1위 강조 카드(크라운·큰 수익률) + 2~4위 컴팩트 행, 순위변동 ▲▼</li>
+          <li>항목 탭 → 아코디언 펼침: 판단 로그(서사·<code>debugId</code>) → 계좌 요약 → 개인 최근 체결</li>
+          <li>목표 진척도 — 소심이🐹 여행자금 230만원 93% 등</li>
+          <li>하이라이트 매매 — "돌진이 SK하이닉스 +9.2% 익절"(리포트 인용 근거)</li>
+          <li>4명 통합 최근 체결 피드</li>
+        </ul>
+        <h3>검증</h3>
+        <p>390px 뷰포트 실측 — 가로 오버플로우 0, 아코디언·탭 전환·챔피언 교체 정상 동작 확인</p>
+      </div>
+      <div>
+        <div class="phone-box"><iframe src="/ai-trader/draft-2" title="초안② 리더보드형" loading="lazy"></iframe></div>
+        <div class="hint">순위 항목을 탭해보세요 — 아코디언 상세 펼침</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────────────────────── 초안 3 ────────────────────────── -->
+  <section class="draft">
+    <div class="draft-head">
+      <div class="badge-num">③</div>
+      <div>
+        <h2>증거 체인 타임라인형</h2>
+        <div class="tagline">판단 로그 × 매매 원장 = 공개 입증 체인</div>
+      </div>
+      <div class="open-link"><a href="/ai-trader/draft-3" target="_blank">새 탭에서 열기 ↗</a></div>
+    </div>
+    <div class="cols">
+      <div class="desc">
+        <h3>개념</h3>
+        <p>"모든 매매는 deepscan 리포트에서 나온다"는 신뢰 입증이 페이지의 주인공. 시간 역순 통합 피드의 각 사가 카드 안에서 <b>리포트 발행(파랑) → 판단(캐릭터색) → 체결(녹색/빨강)</b> 노드가 커넥터로 한눈에 연결되고, 모든 체결의 <code>orderId</code>가 어떤 리포트 <code>debugId</code>에서 나왔는지 추적됩니다.</p>
+        <h3>구성</h3>
+        <ul>
+          <li>캐릭터 필터 칩 + 기간 탭(전체/오늘/지난 기록)</li>
+          <li>노드 탭 → 펼침: 근거 fact 전체·위원회 축 점수·3m~3y 회수확률 바 / 원장 디테일(수량·단가·수수료)</li>
+          <li>체결 없는 판단은 "홀딩 유지" 칩, 손익 배지(평가/실현 구분)</li>
+          <li>하단 전체 사가 통계 — 리포트 4 → 판단 13 → 체결 6, 명중률 66.7%, 근거 추적률 100%</li>
+        </ul>
+        <h3>특징</h3>
+        <p>5개 초안 중 deepscan <b>성능 입증</b>에 가장 직접적인 구조</p>
+      </div>
+      <div>
+        <div class="phone-box"><iframe src="/ai-trader/draft-3" title="초안③ 증거 체인 타임라인형" loading="lazy"></iframe></div>
+        <div class="hint">노드를 탭하면 근거·원장 디테일이 펼침</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────────────────────── 초안 4 ────────────────────────── -->
+  <section class="draft">
+    <div class="draft-head">
+      <div class="badge-num">④</div>
+      <div>
+        <h2>같은 리포트·다른 결정 비교형</h2>
+        <div class="tagline">AI 리포트는 하나, 해석은 성격타고 난다</div>
+      </div>
+      <div class="open-link"><a href="/ai-trader/draft-4" target="_blank">새 탭에서 열기 ↗</a></div>
+    </div>
+    <div class="cols">
+      <div class="desc">
+        <h3>개념</h3>
+        <p>하나의 deepscan 리포트를 정점에 세우고, 동일 시드 300만원 계좌 4개가 그 리포트만으로 매매한 결과를 나란히 비교. 종목 탭(삼성전자 62점 | SK하이닉스 78점 | LG엔솔 41점)을 바꾸면 리포트 요약 → 4인 결정 → 계좌 비교표가 통째로 교체됩니다.</p>
+        <h3>구성</h3>
+        <ul>
+          <li>리포트 요약 — SVG 도넛 hero 게이지, 주간 시그널·목표가, 3m/6m/1y 회수확률 미니 바, <b>"사용자와 동일한 리포트" 배지</b> + <code>debugId</code></li>
+          <li>4인 결정 카드 — 결정 배지(매수·매도·홀딩·관망 4색), <b>같은 근거 칩(62점·6m 52%) 위에 상반된 해석</b>: 소심이🐰 "반 티켓만…" vs 돌진이🚀 "올인 직전" vs 배당콕☕ vs 가치누나📊</li>
+          <li>체결 원장(side·수량·단가·수수료·<code>orderId</code>) + 현재 손익(확정/평가 구분)</li>
+          <li>계좌 비교표 — 4인 현금 비중 바·수익률</li>
+        </ul>
+        <h3>특징</h3>
+        <p>컴포넌트 분리(<code>report-summary.tsx</code>·<code>decision-card.tsx</code>)로 구조화 가장 잘 됨</p>
+      </div>
+      <div>
+        <div class="phone-box"><iframe src="/ai-trader/draft-4" title="초안④ 같은 리포트 다른 결정 비교형" loading="lazy"></iframe></div>
+        <div class="hint">종목 탭 전환 시 4인의 결정 세트가 교체</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ────────────────────────── 초안 5 ────────────────────────── -->
+  <section class="draft">
+    <div class="draft-head">
+      <div class="badge-num">⑤</div>
+      <div>
+        <h2>캐릭터 투자 일기·셰어러블형</h2>
+        <div class="tagline">감성 1인칭 일기 × 딱딱한 체결 영수증의 대비</div>
+      </div>
+      <div class="open-link"><a href="/ai-trader/draft-5" target="_blank">새 탭에서 열기 ↗</a></div>
+    </div>
+    <div class="cols">
+      <div class="desc">
+        <h3>개념</h3>
+        <p>카톡 공유로 도는 "캐릭터 투자 일기" 콘텐츠. 날짜 헤더("11월 9일 (월) 😰") 아래 1인칭 일기 카드가 흐르고, 그 안에 <b>"진짜 영수증"</b> 표(체결 + <code>orderId</code>·수수료 + 계좌 요약)가 붙습니다. 미체결일은 기울어진 PASS 스탬프.</p>
+        <h3>구성</h3>
+        <ul>
+          <li>캐릭터 선택 가로 스크롤(소심이·돌진이·배당씨·가치누나) — 일기 전체 교체</li>
+          <li>일기마다 "그날 본 deepscan 리포트" 근거 칩(종합 점수·6m 복구확률·목표가·<code>reasonCode</code>·<code>debugId</code>)</li>
+          <li>주간 성적표 — OG 카드 스타일 큰 숫자 + 여행자금 진척 + 명대사</li>
+          <li>하단 고정 CTA "내 포트폴리오도 무료 deepscan 받기" → <code>/deepscan</code></li>
+        </ul>
+        <h3>특징</h3>
+        <p>4인 전원이 <b>동일한 리포트 3장</b>(62·78·41점)을 보고 다르게 행동 — 데이터 레벨에서도 "같은 데이터, 다른 결정"</p>
+      </div>
+      <div>
+        <div class="phone-box"><iframe src="/ai-trader/draft-5" title="초안⑤ 투자 일기 셰어러블형" loading="lazy"></iframe></div>
+        <div class="hint">일기 카드 안의 영수증·근거 칩 확인</div>
+      </div>
+    </div>
+  </section>
+
+  <footer>
+    초안 5종 모두 <code>feat/ai-trader-page-ui</code> 브랜치의 <code>src/app/ai-trader/draft-N/</code>에 목업 데이터로 구현됨 (커밋 전 상태). 카탈로그: <code>public/ai-trader/catalog.html</code> — dev 서버(현재 3002)가 떠 있는 동안 라이브 프리뷰가 동작합니다. 캐릭터 조합은 초안별로 각각 상상한 것(소심이만 공통)이며, 방향 확정 후 통일 예정.
+  </footer>
+
+</div>
+</body>
+</html>

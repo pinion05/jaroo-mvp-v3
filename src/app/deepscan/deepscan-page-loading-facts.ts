@@ -145,8 +145,30 @@ export function parseLoadingConsensusBody(body: string, structured?: JarooDeepSc
     ? targetValue / (1 + upsidePct / 100)
     : undefined
 
+  // '증권사 N곳' 대신 첫 번째 증권사명을 노출한다 — 2곳 이상이면 '미래에셋증권 외 2곳',
+  // 1곳이면 '미래에셋증권'. brokers가 없는 구버전 페이로드는 기존 '증권사 N곳'으로 유지된다.
+  const brokerNames = Array.isArray(s.brokers)
+    ? s.brokers
+      .map((entry) => (typeof entry?.name === 'string' ? entry.name.trim() : ''))
+      .filter((name) => name.length > 0)
+    : []
+  const leadBrokerName = brokerNames[0]
+  const analystCountForLabel = typeof analystCount === 'number'
+    ? analystCount
+    : (brokerNames.length > 0 ? brokerNames.length : undefined)
+  const analystCountLabel = (() => {
+    if (typeof analystCountForLabel !== 'number') {
+      return undefined
+    }
+    if (leadBrokerName) {
+      const remainingCount = analystCountForLabel - 1
+      return remainingCount > 0 ? `${leadBrokerName} 외 ${remainingCount}곳` : leadBrokerName
+    }
+    return `증권사 ${analystCountForLabel}곳`
+  })()
+
   return {
-    analystCountLabel: typeof analystCount === 'number' ? `증권사 ${analystCount}곳` : undefined,
+    analystCountLabel,
     targetPriceLabel: typeof targetValue === 'number' && Number.isFinite(targetValue)
       ? formatLoadingMoney(targetValue, targetCurrency)
       : undefined,

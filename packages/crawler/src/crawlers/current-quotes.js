@@ -361,6 +361,24 @@ function getUsProviderStatuses(providerStatus = null) {
   };
 }
 
+/** 네이버 basic 응답의 권위 필드로 거래정지 여부를 판정한다.
+ *  tradeStopType.name('TRADING'|'HALTED') 우선, 없으면 tradableStatus('tradable'|'halt').
+ *  실측(2026-10-30): 유틸렉스 263050 = HALTED/halt, 삼성전자 005930 = TRADING/tradable.
+ *  어느 쪽 필드도 판별 불가면 null → 아이템에 tradeHalted를 붙이지 않는다(undefined). */
+function resolveNaverTradeHalted(payload) {
+  const stopTypeName = String(payload?.tradeStopType?.name ?? '').trim().toUpperCase();
+  if (stopTypeName === 'HALTED' || stopTypeName === 'TRADING') {
+    return stopTypeName === 'HALTED';
+  }
+
+  const tradableStatus = String(payload?.tradableStatus ?? '').trim().toLowerCase();
+  if (tradableStatus === 'halt' || tradableStatus === 'tradable') {
+    return tradableStatus === 'halt';
+  }
+
+  return null;
+}
+
 async function getNaverCurrentQuote(code, options = {}) {
   if (typeof options.naverQuoteFetcher === 'function') {
     return options.naverQuoteFetcher(code);
@@ -401,6 +419,10 @@ async function getNaverCurrentQuote(code, options = {}) {
     return null;
   }
 
+  // 권위 필드(tradeStopType/tradableStatus)는 basic 페이로드에만 존재한다.
+  // /price 볼륨 폴백 경로에서는 부여할 수 없으므로 basic 성공 시에만 붙인다.
+  const tradeHalted = resolveNaverTradeHalted(payload);
+
   let volume = parseQuoteNumber(
     payload?.accumulatedTradingVolume
     ?? payload?.tradeVolume
@@ -432,6 +454,7 @@ async function getNaverCurrentQuote(code, options = {}) {
     price,
     currency: 'KRW',
     ...(volume !== null ? { volume } : {}),
+    ...(tradeHalted !== null ? { tradeHalted } : {}),
     ...(quoteContext?.week52High !== null && quoteContext?.week52High !== undefined
       ? { week52High: quoteContext.week52High }
       : {}),

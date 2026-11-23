@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { getSupabaseAnonKey, getSupabaseUrl } from './config'
+import { hardenSessionCookieOptions } from './session-cookie'
 
 // 로그인 없이는 접근할 수 없는 앱 경로.
 // 홈/스크린샷/OCR/병합/ETF/쉐어카드는 게스트 체험 funnel(둘러보기 → 스크린샷 맛보기)로 개방.
@@ -41,7 +42,13 @@ export async function updateSupabaseSession(request: NextRequest) {
       setAll(cookiesToSet) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
         response = NextResponse.next({ request })
-        cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options))
+        // 세션 리프레시가 여기(미들웨어)에서 쿠키를 다시 구을 때가 운영에서
+        // httpOnly=false 쿠키로 덮어써지던 지점이었다(TC-BBS-001/002). 발급·삭제
+        // 모두 session-cookie.ts 의 강화 속성(httpOnly·Secure·SameSite·30일 슬라이딩)을
+        // 따른다. 삭제(maxAge=0)도 httpOnly 로 굽는다 — 그래야 httpOnly 쿠키가 폐기된다.
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, hardenSessionCookieOptions(options ?? {})),
+        )
       },
     },
   })

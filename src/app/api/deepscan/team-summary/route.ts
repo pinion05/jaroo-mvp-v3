@@ -1,4 +1,11 @@
 import { NextResponse } from 'next/server'
+import {
+  createLlmMockSeededRandom,
+  isLlmMockEnabled,
+  llmMockDateToken,
+  pickLlmMockItem,
+  sleepLlmMockLatency,
+} from '../../../../../packages/deepscan-runtime-core/src/llm-mock.js'
 
 export const runtime = 'nodejs'
 
@@ -58,6 +65,15 @@ function parsePositiveInteger(value: string | undefined, fallback: number) {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed > 0 ? Math.round(parsed) : fallback
 }
+
+// JAROO_LLM_MOCK=1 전용 결정적 모의 팀 요약(dev 배포 비용 0) — [MOCK] 접두로 화면에서
+// dev 응답임이 눈에 보이게 한다. 실제 파서(parseTeamSummaryContent → 정리 체인)를 그대로 통과시킨다.
+const TEAM_SUMMARY_LLM_MOCK_TEMPLATES = [
+  '[MOCK] 지금 화면의 팀 해석은 dev 모의 응답이에요. 같은 팀·같은 날짜면 항상 같은 문장이 나와요. 실제 해석은 JAROO_LLM_MOCK을 끄면 돌아와요.',
+  '[MOCK] 목업 해석이라 수치·근거는 담기지 않아요. 화면 흐름과 말투를 확인하는 용도예요. 운영에서는 실제 LLM 해석이 같은 자리를 채워요.',
+  '[MOCK] dev 전용 팀 요약이에요. 입력이 같으면 하루 동안 결과도 같아요. 지금 구간의 확인점은 운영 모드에서 생성돼요.',
+  '[MOCK] 모의 팀 해석으로 카드를 채웠어요. 점수·서사와 함께 dev 응답임을 표시해요. 투자 판단 근거로는 쓰지 않는 게 좋아요.',
+]
 
 function isExchangeProductSummaryInput(input: { market?: string; instrumentKind?: string }) {
   return /(?:^|\b)(?:ETF|ETN)(?:\b|$)/iu.test(input.market ?? '') || /^(?:etf|etn)$/iu.test(input.instrumentKind ?? '')
@@ -148,15 +164,36 @@ export function parseTeamSummaryContent(content: string) {
   return removeForbiddenInvestmentActionAdvice(text.replace(/^```(?:json)?/i, '').replace(/```$/i, ''))
 }
 
-async function callOpenRouterTeamSummary(input: Parameters<TeamSummaryRequester>[0]): Promise<TeamSummaryResult> {
+export async function callOpenRouterTeamSummary(input: Parameters<TeamSummaryRequester>[0]): Promise<TeamSummaryResult> {
   const apiKey = process.env.OPENROUTER_API_KEY
-  if (!apiKey) {
+  // JAROO_LLM_MOCK=1이면 키 없이도 모의 경로가 돌아간다(dev 비용 0).
+  if (!apiKey && !isLlmMockEnabled()) {
     throw new Error('OPENROUTER_API_KEY is not configured.')
   }
 
   const startedAt = Date.now()
   const timeoutMs = parsePositiveInteger(process.env.DEEPSCAN_TEAM_SUMMARY_TIMEOUT_MS, DEFAULT_TEAM_SUMMARY_TIMEOUT_MS)
   const model = process.env.DEEPSCAN_TEAM_SUMMARY_MODEL ?? DEEPSCAN_TEAM_SUMMARY_MODEL
+
+  // JAROO_LLM_MOCK=1: 네트워크 호출 없이 결정적 모의 요약을 반환한다(미설정 시 기존 경로 그대로).
+  if (isLlmMockEnabled()) {
+    const mockRandom = createLlmMockSeededRandom(`team-summary|${input.teamKey}|${llmMockDateToken()}`)
+    const summaryText = pickLlmMockItem(mockRandom, TEAM_SUMMARY_LLM_MOCK_TEMPLATES)
+    console.log(`[llm-mock] team-summary teamKey='${input.teamKey}'`)
+    await sleepLlmMockLatency(mockRandom)
+    const summary = parseTeamSummaryContent(JSON.stringify({ summary: summaryText }))
+    if (!summary) {
+      throw new Error('llm-mock team summary returned empty content.')
+    }
+
+    return {
+      summary: cleanupTeamSummaryForInstrument(summary, input),
+      elapsedMs: Date.now() - startedAt,
+      model,
+      provider: 'llm-mock',
+    }
+  }
+
   const response = await fetch(OPENROUTER_URL, {
     method: 'POST',
     headers: {

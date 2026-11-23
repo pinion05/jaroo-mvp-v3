@@ -16,7 +16,11 @@ import { buildCrawlerUrl, getCrawlerBaseUrl } from '@/lib/crawler-api'
 import { fetchKrDailyPriceHistory, type KrDailyPricePoint } from '@/lib/kr-daily-price-history'
 import { scoreUsCommitteeFromGeneratedDump, type UsMemberKey } from './llm-committee'
 import { decodeUsConsensusObservation } from './us-consensus'
-import { buildRecoveryForecastFromPriceSeries } from '../../../packages/deepscan-runtime-core/src/recovery-forecast.js'
+import {
+  buildRecoveryForecastFromPriceSeries,
+  buildRecoveryProbabilityHeadline,
+  resolveRecoverySimulationHorizonDays,
+} from '../../../packages/deepscan-runtime-core/src/recovery-forecast.js'
 
 type UnknownRecord = Record<string, unknown>
 
@@ -96,26 +100,20 @@ type UsDeepScanFacts = {
   consensus?: ReturnType<typeof decodeUsConsensusObservation>
 }
 
-type MoneyCurrency = 'KRW' | 'USD'
+// 평단가 통화 정규화 헬퍼는 클라이언트(딥스캔 로딩 화면)와 공유한다(T4L-B2 회귀).
+// 순수 함수만 모듈로 분리했고, 아래 재수출로 기존 import 경로 호환을 유지한다.
+import {
+  parseNumberish,
+  normalizeMoneyCurrency,
+  normalizeUsdKrwRate,
+  resolveCurrencyAwareAveragePrice,
+} from '../deepscan-average-price-currency'
 
-export type CurrencyAwareAveragePriceInput = {
-  averagePrice?: string | number | null
-  averagePriceCurrency?: string | null
-  currentPrice?: number | null
-  currentPriceCurrency?: string | null
-  usdKrwRate?: number | null
-}
-
-export type CurrencyAwareAveragePriceResult = {
-  averagePrice: number | null
-  averagePriceCurrency: MoneyCurrency | null
-  currentPriceCurrency: MoneyCurrency
-  averagePriceInCurrentCurrency: number | null
-  requiresFx: boolean
-  usdKrwRate: number | null
-  converted: boolean
-  blockedReason: string | null
-}
+export { resolveCurrencyAwareAveragePrice } from '../deepscan-average-price-currency'
+export type {
+  CurrencyAwareAveragePriceInput,
+  CurrencyAwareAveragePriceResult,
+} from '../deepscan-average-price-currency'
 
 type RuntimeDumpQuality = {
   availability?: string
@@ -179,162 +177,8 @@ function asFiniteNumber(value: unknown) {
   return typeof value === 'number' && Number.isFinite(value) ? value : null
 }
 
-function parseNumberish(value: unknown) {
-  if (typeof value === 'number' && Number.isFinite(value)) {
-    return value
-  }
-
-  if (typeof value !== 'string') {
-    return null
-  }
-
-  const normalized = value.trim().replace(/[−–—]/g, '-')
-  if (!normalized) {
-    return null
-  }
-
-  const cleaned = normalized.replaceAll(',', '').replace(/[₩$€¥£%원주]/g, '')
-  if (!cleaned || !/^[+-]?(?:\d+\.?\d*|\.\d+)$/.test(cleaned)) {
-    return null
-  }
-
-  const parsed = Number(cleaned)
-  return Number.isFinite(parsed) ? parsed : null
-}
-
-function normalizeMoneyCurrency(value: unknown): MoneyCurrency | null {
-  if (typeof value !== 'string') {
-    return null
-  }
-
-  const normalized = value.trim().toUpperCase()
-  if (normalized === 'KRW' || normalized.includes('원') || normalized.includes('₩')) {
-    return 'KRW'
-  }
-
-  if (normalized === 'USD' || normalized.includes('$') || normalized.includes('달러')) {
-    return 'USD'
-  }
-
-  return null
-}
-
-function normalizeUsdKrwRate(value: unknown) {
-  const parsed = parseNumberish(value)
-  return typeof parsed === 'number' && parsed > 0 ? parsed : null
-}
-
-function inferAveragePriceCurrency({
-  averagePrice,
-  averagePriceCurrency,
-  currentPrice,
-  currentPriceCurrency,
-  usdKrwRate,
-}: Required<Pick<CurrencyAwareAveragePriceResult, 'currentPriceCurrency'>> & {
-  averagePrice: number | null
-  averagePriceCurrency?: string | null
-  currentPrice?: number | null
-  usdKrwRate?: number | null
-}) {
-  const explicitCurrency = normalizeMoneyCurrency(averagePriceCurrency)
-  if (explicitCurrency) {
-    return explicitCurrency
-  }
-
-  if (averagePrice === null) {
-    return null
-  }
-
-  if (currentPriceCurrency === 'KRW') {
-    return 'KRW'
-  }
-
-  if (typeof currentPrice !== 'number' || !Number.isFinite(currentPrice) || currentPrice <= 0) {
-    return averagePrice > 10_000 ? 'KRW' : 'USD'
-  }
-
-  if (typeof usdKrwRate === 'number' && Number.isFinite(usdKrwRate) && usdKrwRate > 0) {
-    const krwComparablePrice = currentPrice * usdKrwRate
-    const usdDistance = Math.abs(averagePrice - currentPrice) / Math.max(Math.abs(currentPrice), 1)
-    const krwDistance = Math.abs(averagePrice - krwComparablePrice) / Math.max(Math.abs(krwComparablePrice), 1)
-    return krwDistance < usdDistance ? 'KRW' : 'USD'
-  }
-
-  return averagePrice > currentPrice * 20 ? 'KRW' : 'USD'
-}
-
-export function resolveCurrencyAwareAveragePrice({
-  averagePrice: rawAveragePrice,
-  averagePriceCurrency: rawAveragePriceCurrency,
-  currentPrice,
-  currentPriceCurrency: rawCurrentPriceCurrency,
-  usdKrwRate: rawUsdKrwRate,
-}: CurrencyAwareAveragePriceInput): CurrencyAwareAveragePriceResult {
-  const averagePrice = parseNumberish(rawAveragePrice)
-  const currentCurrency = normalizeMoneyCurrency(rawCurrentPriceCurrency) ?? 'USD'
-  const usdKrwRate = normalizeUsdKrwRate(rawUsdKrwRate)
-  const averagePriceCurrency = inferAveragePriceCurrency({
-    averagePrice,
-    averagePriceCurrency: rawAveragePriceCurrency,
-    currentPrice,
-    currentPriceCurrency: currentCurrency,
-    usdKrwRate,
-  })
-
-  if (averagePrice === null || averagePriceCurrency === null) {
-    return {
-      averagePrice,
-      averagePriceCurrency,
-      currentPriceCurrency: currentCurrency,
-      averagePriceInCurrentCurrency: null,
-      requiresFx: false,
-      usdKrwRate,
-      converted: false,
-      blockedReason: 'average-price-missing',
-    }
-  }
-
-  if (averagePriceCurrency === currentCurrency) {
-    return {
-      averagePrice,
-      averagePriceCurrency,
-      currentPriceCurrency: currentCurrency,
-      averagePriceInCurrentCurrency: averagePrice,
-      requiresFx: false,
-      usdKrwRate,
-      converted: false,
-      blockedReason: null,
-    }
-  }
-
-  if (usdKrwRate === null) {
-    return {
-      averagePrice,
-      averagePriceCurrency,
-      currentPriceCurrency: currentCurrency,
-      averagePriceInCurrentCurrency: null,
-      requiresFx: true,
-      usdKrwRate,
-      converted: false,
-      blockedReason: 'usd-krw-rate-missing',
-    }
-  }
-
-  const convertedAveragePrice = averagePriceCurrency === 'KRW' && currentCurrency === 'USD'
-    ? averagePrice / usdKrwRate
-    : averagePrice * usdKrwRate
-
-  return {
-    averagePrice,
-    averagePriceCurrency,
-    currentPriceCurrency: currentCurrency,
-    averagePriceInCurrentCurrency: convertedAveragePrice,
-    requiresFx: true,
-    usdKrwRate,
-    converted: true,
-    blockedReason: null,
-  }
-}
+// 평단가 통화 헬퍼(parseNumberish·normalize*·resolveCurrencyAwareAveragePrice)는
+// deepscan-average-price-currency 모듈에서 import 한다(파일 상단 참고).
 
 function readRuntimeDumpFact<T>(memberDump: unknown, factKey: string): RuntimeDumpFact<T> | null {
   const facts = asRecord(asRecord(memberDump)?.facts)
@@ -569,6 +413,9 @@ export function runRecoveryForecast(context: RecoveryForecastContext): {
       normalizeText(context.primarySeries.at(-1)?.date),
     ),
   ]
+  // 차트 기간(3년 확장 #334)과 확률 horizon을 정합 — KR 일봉(780봉)은 3년(780거래일),
+  // US OHLC(252봉 수준)는 1년(252거래일)까지 본다. (#358)
+  const recoveryHorizonDays = resolveRecoverySimulationHorizonDays(context.primarySeries.length)
   const forecast = buildRecoveryForecastFromPriceSeries(
     {
       primarySeries: context.primarySeries,
@@ -581,9 +428,10 @@ export function runRecoveryForecast(context: RecoveryForecastContext): {
         tolerancePct: 12,
         spacingDays: 20,
         minSampleSize: 3,
+        horizonDays: recoveryHorizonDays,
       },
       simulation: {
-        horizonDays: 252,
+        horizonDays: recoveryHorizonDays,
         pathCount: 5000,
         seed: `deepscan-recovery:${context.rawInput.instrument.ticker ?? context.rawInput.instrument.code ?? context.rawInput.instrument.name}:${currentPrice}:${targetPrice}`,
       },
@@ -593,8 +441,23 @@ export function runRecoveryForecast(context: RecoveryForecastContext): {
   return { forecast, targetPrice, currentPrice, recoverySourceRefs }
 }
 
-const RECOVERY_PRICE_HISTORY_MAX_POINTS = 252
+// KR 일봉 3년치(13페이지 × 60 = 780봉)를 그대로 차트 재료로 내린다. US OHLC 계열은
+// 252봉 수준이라 이 상향의 영향을 받지 않는다(잘리지 않고 그대로 통과).
+const RECOVERY_PRICE_HISTORY_MAX_POINTS = 780
 const RECOVERY_SIMILAR_PATTERN_SAMPLES_MAX = 12
+
+// 3년 차트에서 유사 패턴 밴드가 오른쪽(최근)에만 몰려 보이는 문제(2026-11-02 삼영화학공업 실측).
+// 예전 1년 차트 시절의 slice(-N) 선택이 3년 확장(#334) 후에도 남아 최근 12개만
+// 내려갔고, 좌측 2년치 근거가 전부 잘려 나갔다. 통계(중앙값·확률)는 전체 샘플 기반이라
+// 수치는 맞지만 차트가 모델 근거를 왜곡해 보였다. 최대 12개를 전 구간에 걸쳐
+// 등간격(첫·끝 포함)으로 뽑아 전체 근거 분포를 보여준다.
+function selectEvenlyDistributedSamples<T>(samples: ReadonlyArray<T>, maxCount: number): T[] {
+  if (samples.length <= maxCount) {
+    return [...samples]
+  }
+  const stride = (samples.length - 1) / (maxCount - 1)
+  return Array.from({ length: maxCount }, (_, position) => samples[Math.round(position * stride)] as T)
+}
 
 function normalizeRecoverySeriesPoint(point: unknown): { date: string | null; close: number } | null {
   const record = asRecord(point)
@@ -652,9 +515,8 @@ function buildRecoverySimilarPatternSamples(
       }
     })
     .filter((sample): sample is NonNullable<typeof sample> => sample !== null)
-    .slice(-RECOVERY_SIMILAR_PATTERN_SAMPLES_MAX)
 
-  return mapped.length > 0 ? mapped : undefined
+  return mapped.length > 0 ? selectEvenlyDistributedSamples(mapped, RECOVERY_SIMILAR_PATTERN_SAMPLES_MAX) : undefined
 }
 
 export function shapeRecoveryForecastBlock(args: {
@@ -686,6 +548,19 @@ export function shapeRecoveryForecastBlock(args: {
     ? createError('recovery-forecast-unavailable', normalizeText(forecastRecord?.reason) ?? '원금회수 예측에 필요한 모델 결과가 부족합니다.', true)
     : null
 
+  // 기간별(3개월/6개월/1년/2년/3년) 누적 복구확률 — 실효 horizon보다 긴 버킷은 null로 내려온다. (#358)
+  const horizonProbabilitiesRecord = asRecord(consensus?.horizonProbabilities)
+  const recoveryHorizonProbabilities = {
+    '3m': asFiniteNumber(horizonProbabilitiesRecord?.['3m']),
+    '6m': asFiniteNumber(horizonProbabilitiesRecord?.['6m']),
+    '1y': asFiniteNumber(horizonProbabilitiesRecord?.['1y']),
+    '2y': asFiniteNumber(horizonProbabilitiesRecord?.['2y']),
+    '3y': asFiniteNumber(horizonProbabilitiesRecord?.['3y']),
+  }
+  const hasHorizonProbabilities = Object.values(recoveryHorizonProbabilities).some((value) => value !== null)
+  // 비전공 유저용 한 문장: "본전 회복 확률은 3개월 내 34%, 6개월 내 52%, 1년 내 56%입니다"
+  const probabilityHeadline = buildRecoveryProbabilityHeadline(recoveryHorizonProbabilities)
+
   return {
     ...createBlockMeta(blockState, recoverySourceRefs, { fallback, error }),
     statusText: recoveryStatusText(status),
@@ -693,7 +568,9 @@ export function shapeRecoveryForecastBlock(args: {
       ? (error?.message ?? '원금회수 예측을 계산하지 못했어요.')
       : expectedRecoveryDays === 0
         ? '현재가가 이미 평단 이상이라 원금회수 목표에 도달한 상태입니다.'
-        : `세 가지 계산을 종합하면 평균적으로 약 ${formatRecoveryDays(expectedRecoveryDays)}에 본전에 도달해요.`,
+        : hasHorizonProbabilities && probabilityHeadline
+          ? `세 가지 계산을 종합하면 ${probabilityHeadline}. 평균적으로는 약 ${formatRecoveryDays(expectedRecoveryDays)}에 본전에 도달해요.`
+          : `세 가지 계산을 종합하면 평균적으로 약 ${formatRecoveryDays(expectedRecoveryDays)}에 본전에 도달해요.`,
     expectedRecoveryDaysText: formatRecoveryDays(expectedRecoveryDays),
     recoveryProbabilityText: formatProbability(recoveryProbabilityPct),
     confidenceText: confidenceLabel,
@@ -705,10 +582,12 @@ export function shapeRecoveryForecastBlock(args: {
     targetPrice,
     expectedRecoveryDays,
     recoveryProbabilityPct,
+    recoveryHorizonProbabilities: hasHorizonProbabilities ? recoveryHorizonProbabilities : null,
+    recoveryProbabilityHeadlineText: probabilityHeadline,
     confidenceLevel,
     priceHistory: buildRecoveryPriceHistory(primarySeries),
     similarPatternSamples: buildRecoverySimilarPatternSamples(forecast, primarySeries),
-    disclaimer: `${normalizeText(consensus?.disclaimer) ?? '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.'} 1년 내 도달 비율은 유사 과거 표본과 5,000개 모의 경로가 252거래일 안에 각 회복 기준을 한 번 이상 터치한 비율을 종합한 값이며, 예측 정확도나 회복 보장이 아닙니다.`,
+    disclaimer: `${normalizeText(consensus?.disclaimer) ?? '데이터 분석 기반 참고 정보이며 투자 권유나 수익 보장이 아닙니다.'} 기간별 도달 비율은 유사 과거 표본과 5,000개 모의 경로가 각 기간(3개월/6개월/1년/2년/3년, 실효 horizon 내) 안에 회복 기준을 한 번 이상 터치한 비율을 종합한 값이며, 예측 정확도나 회복 보장이 아닙니다.`,
   }
 }
 
@@ -914,7 +793,10 @@ function resolveCrawlerDeepScanKind(input: DeepScanRawInput) {
   return input.instrument.kind === 'etf' ? 'etf' : undefined
 }
 
-export function buildKrDeepScanCrawlerCanonicalUrl(rawInput: DeepScanRawInput) {
+export function buildKrDeepScanCrawlerCanonicalUrl(
+  rawInput: DeepScanRawInput,
+  options?: { skipCommitteeLlm?: boolean },
+) {
   const input = prepareDeepScanRawInputForBuilder(rawInput)
   const searchParams = new URLSearchParams()
 
@@ -933,6 +815,11 @@ export function buildKrDeepScanCrawlerCanonicalUrl(rawInput: DeepScanRawInput) {
   setCrawlerDeepScanQueryValue(searchParams, 'usdKrwRate', input.holding?.usdKrwRate)
   setCrawlerDeepScanQueryValue(searchParams, 'selectedAt', input.selectedAt)
   setCrawlerDeepScanQueryValue(searchParams, 'from', normalizeSourceFrom(input.sourceContext.from))
+
+  // 워치 일일 배치 등 데이터 전용 소비처용: 위원회 LLM 스킵 — 유저 딥스캔(기본값)은 항상 LLM 실행
+  if (options?.skipCommitteeLlm) {
+    searchParams.set('committeeLlm', 'off')
+  }
 
   return buildCrawlerUrl(
     getCrawlerBaseUrl(),
@@ -1001,6 +888,8 @@ type KrDeepScanCrawlerFetchOptions = {
   fetchTimeoutMs?: number
   sleep?: (durationMs: number) => Promise<void>
   recoveryPriceHistoryLoader?: (code: string) => Promise<KrDailyPricePoint[]>
+  /** 9인 위원회 LLM 호출 스킵(crawler ?committeeLlm=off) — 워치 일일 배치 전용. 유저 딥스캔은 절대 스킵 금지. */
+  skipCommitteeLlm?: boolean
 }
 
 function sleep(durationMs: number) {
@@ -1094,7 +983,7 @@ export async function buildKrDeepScanPayloadViaCrawler(
   options: KrDeepScanCrawlerFetchOptions = {},
 ) {
   const fetchStartedAtMs = Date.now()
-  const upstreamUrl = buildKrDeepScanCrawlerCanonicalUrl(rawInput)
+  const upstreamUrl = buildKrDeepScanCrawlerCanonicalUrl(rawInput, { skipCommitteeLlm: options.skipCommitteeLlm })
   const preparedInput = prepareDeepScanRawInputForBuilder(rawInput)
   const recoveryCode = preparedInput.instrument.code
   const recoveryHistoryPromise = options.recoveryPriceHistoryLoader && recoveryCode
@@ -1163,10 +1052,11 @@ export const KR_DAILY_RECOVERY_FORECAST_OPTIONS = {
     tolerancePct: 12,
     spacingDays: 20,
     minSampleSize: 3,
-    horizonDays: 252,
+    // KR 일봉은 3년치(780봉) — horizon도 3년(780거래일)까지. (#358)
+    horizonDays: 780,
   },
   simulation: {
-    horizonDays: 252,
+    horizonDays: 780,
     pathCount: 5000,
   },
 }
@@ -1597,7 +1487,7 @@ function buildAxes(agentResults: DeepScanAgentResult[], exchangeProduct = false)
   })
 }
 
-function buildHeroScore(agentResults: DeepScanAgentResult[]) {
+export function buildHeroScore(agentResults: DeepScanAgentResult[]) {
   const weights: Record<DeepScanAgentResult['key'], number> = {
     valuation: 14,
     growth: 12,
@@ -1610,8 +1500,16 @@ function buildHeroScore(agentResults: DeepScanAgentResult[]) {
     'portfolio-fit': 12,
   }
 
+  // 분모를 고정 100이 아니라 "실제 응답 위원의 가중치 합"으로 정규화한다
+  // (버그헌트 3/5 — buildHeroScore 고정 분모 100). 위원 일부 실패 시에도 점수가
+  // 미응답 위원 몫만큼 일괄 감소(계통 축소)하지 않게 한다. 9인 전원 응답 시에는
+  // 가중치 합이 100이라 기존 산식과 완전히 동일하다.
+  const respondedWeight = agentResults.reduce((sum, agent) => sum + (weights[agent.key] ?? 0), 0)
   const weightedTotal = agentResults.reduce((sum, agent) => sum + (weights[agent.key] * agent.score), 0)
-  return clamp(weightedTotal / 100)
+  if (respondedWeight <= 0) {
+    return 0
+  }
+  return clamp(weightedTotal / respondedWeight)
 }
 
 function buildUsInsights(

@@ -2,7 +2,7 @@
 
 const { spawn } = require('node:child_process')
 
-const DEV_SCRIPTS = Object.freeze(['dev:web', 'dev:crawler'])
+const DEV_SCRIPTS = Object.freeze(['dev:web', 'dev:crawler', 'dev:paper-trade'])
 const SHUTDOWN_SIGNALS = new Set(['SIGINT', 'SIGTERM'])
 const FORCE_KILL_SIGNAL = 'SIGKILL'
 

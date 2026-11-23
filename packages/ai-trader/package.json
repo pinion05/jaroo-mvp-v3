@@ -1,0 +1,18 @@
+{
+  "name": "jaroo-ai-trader",
+  "version": "0.1.0",
+  "description": "JAROO AI 트레이더 캐릭터 오케스트레이터 — 성향 규칙 매매 루프 + 판단 로그 (paper-trade 원장 + 시세 결합, Phase 1 스켈레톤)",
+  "type": "module",
+  "module": "src/index.ts",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts",
+    "test": "bun test"
+  },
+  "dependencies": {
+    "hono": "^4.9.0"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  }
+}
