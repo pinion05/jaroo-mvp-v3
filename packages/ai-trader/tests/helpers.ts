@@ -58,11 +58,11 @@ export class FakePaper implements PaperGateway {
     const tax = order.side === 'sell' ? Math.ceil(gross * 0.0015) : 0
     const settlement = order.side === 'buy' ? -(gross + fee) : gross - fee - tax
 
-    let position = account.positions.get(order.symbol)
-    if (!position) {
-      position = { symbol: order.symbol, name: order.name, market: order.market, quantity: 0, avgPriceCenti: 0, basisKrw: 0, updatedAt: '' }
-      account.positions.set(order.symbol, position)
+    const existing = account.positions.get(order.symbol)
+    const position: PaperPosition = existing ?? {
+      symbol: order.symbol, name: order.name, market: order.market, quantity: 0, avgPriceCenti: 0, avgPriceKrw: 0, basisKrw: 0, updatedAt: '',
     }
+    if (!existing) account.positions.set(order.symbol, position)
 
     const record: PaperOrder = {
       orderId: `od_fake_${(this.orders.get(accountId)?.length ?? 0) + 1}`,

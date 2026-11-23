@@ -2,8 +2,10 @@
 // 재현 시나리오: #373 이전에 만들어진 dev DB(구 CHECK)에서 filled INSERT가
 // SQLITE_CONSTRAINT_CHECK로 죽던 버그(차트콕 실턴 실측)의 방어.
 
-import { Database } from 'bun:sqlite'
-import { afterEach, describe, expect, test } from 'bun:test'
+// #378 Node 전환: bun:sqlite → node:sqlite, bun:test → node:test
+import { DatabaseSync } from 'node:sqlite'
+import { afterEach, describe, test } from 'node:test'
+import assert from 'node:assert/strict'
 import { mkdtempSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -55,7 +57,7 @@ describe('0002 마이그레이션 — placed→filled 어휘 전환', () => {
     const dbPath = join(dir, 'legacy.db')
 
     // ① 구 스키마 DB + placed/skipped 행 (이전 dev DB 상태 재현)
-    const legacy = new Database(dbPath, { create: true })
+    const legacy = new DatabaseSync(dbPath)
     legacy.exec(LEGACY_SCHEMA)
     legacy
       .prepare(
@@ -81,11 +83,11 @@ describe('0002 마이그레이션 — placed→filled 어휘 전환', () => {
     const store = new Store(dbPath, loadMigrationsSql())
     const judgments = store.listJudgments('sosimi', 10)
     const byId = new Map(judgments.map((j) => [j.logId, j]))
-    expect(byId.get('jdg_legacy1')?.orderStatus).toBe('filled') // placed → filled 변환
-    expect(byId.get('jdg_legacy2')?.orderStatus).toBe('skipped') // skipped 보존
-    expect(byId.get('jdg_legacy3')?.orderStatus).toBe('failed') // failed 보존
-    expect(byId.get('jdg_legacy3')?.errorMessage).toBe('paper_trade_unavailable') // error_message 열 fidelity
-    expect(byId.get('jdg_legacy1')?.rationale).toBe('소심이 기록') // 서사 보존
+    assert.equal(byId.get('jdg_legacy1')?.orderStatus, 'filled') // placed → filled 변환
+    assert.equal(byId.get('jdg_legacy2')?.orderStatus, 'skipped') // skipped 보존
+    assert.equal(byId.get('jdg_legacy3')?.orderStatus, 'failed') // failed 보존
+    assert.equal(byId.get('jdg_legacy3')?.errorMessage, 'paper_trade_unavailable') // error_message 열 fidelity
+    assert.equal(byId.get('jdg_legacy1')?.rationale, '소심이 기록') // 서사 보존
 
     // ③ 새 CHECK에서 filled INSERT 성공 (구 DB였다면 SQLITE_CONSTRAINT_CHECK)
     const entry = store.appendJudgment('sosimi', '2026-11-20T14:00:00+09:00', {
@@ -98,7 +100,7 @@ describe('0002 마이그레이션 — placed→filled 어휘 전환', () => {
       rationale: '손절 22466 대 목표 33142로 손익비 남아 소액 진입',
       order: { orderId: 'od_new', orderStatus: 'filled' },
     })
-    expect(entry.orderStatus).toBe('filled')
+    assert.equal(entry.orderStatus, 'filled')
     store.close()
   })
 
@@ -123,8 +125,8 @@ describe('0002 마이그레이션 — placed→filled 어휘 전환', () => {
     // 두 번째 기동 — 0002가 다시 실행돼도 행이 그대로 (재구축 멱등)
     const second = new Store(dbPath, loadMigrationsSql())
     const judgments = second.listJudgments('sosimi', 10)
-    expect(judgments).toHaveLength(1)
-    expect(judgments[0]?.orderStatus).toBe('skipped')
+    assert.equal(judgments.length, 1)
+    assert.equal(judgments[0]?.orderStatus, 'skipped')
     second.close()
   })
 })

@@ -75,6 +75,21 @@ POST /v1/characters/sosimi/judgments
 ## 테스트
 
 ```bash
-npm run test:ai-trader   # 루트에서
-bun test                 # 패키지 안에서
+npm run test:ai-trader   # 루트에서 — node --test (23종: API e2e·loop·마이그레이션 회귀)
+npm test                 # 패키지 안에서
 ```
+
+## 런타임 (#378 Node 전환, 2026-11-23)
+
+- **Node.js 단일 런타임**(`node:http` + `node:sqlite`, 런타임 의존성 0) — Bun·Hono 의존 제거.
+  paper-trade(#368)와 동일한 단일 컨테이너 4프로세스 사이드카 패턴(entrypoint가 web·crawler·paper-trade·ai-trader 동시 기동).
+- 기동: `npm --prefix packages/ai-trader run start` · 환경변수 `AI_TRADER_PORT`(기본 3042, 루프백 전용)·`DB_PATH`·`PAPER_TRADE_BASE_URL`·`QUOTES_MODE`.
+- 판단 로그 입력 검증(#375): symbol 6자리·quantity/priceKrw 양의 정수·fact 8KB 상한·rationale 2000자. skipped 시 `order.errorMessage`에 미실행 사유 명시 권장.
+- read 방어(#376): 손상된 `fact`·`persona_card` 행은 해당 행만 강등(`{unparsable:true}`·`(손상)` 카드) — 조회 전체가 브릭되지 않는다.
+
+## 데이터 볼륨/휘발성 정책 + 외부 덤프 계획 (#378 P1)
+
+- **현재**: SQLite DB(`DB_PATH`, 기본 `./data/ai-trader.db`)는 컨테이너 재배포 시 휘발. paper-trade와 동일한 정책.
+- **판단 로그(`judgment_logs`)는 바이럴 매매 입증 데이터**다 — 원장 체결(paper-trade `orders`)과 함께 영속 보존이 전제여야 Phase 4(무인 2주)가 성립한다.
+- **정책 결정(Phase 3 선행 과제)**: Railway 볼륨 마운트(`DB_PATH` 외부 볼륨) 또는 재배포 후 논리 덤프 복원. append-only 테이블이라 논리 덤프(`SELECT → JSONL`)는 저렴하다.
+- **주기적 외부 덤프 계획**: ① `judgment_logs`·paper-trade `orders`를 일 1회 JSONL로 오브젝트 스토리지(Supabase Storage 후보)에 append ② 복원 스크립트는 스키마 순서 재적용(`migrations/*.sql`) + JSONL 재삽입. Windmill cron 후보 — Phase 3에서 구현, 이 섹션에 운영 기록을 남긴다.
