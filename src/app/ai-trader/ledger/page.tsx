@@ -113,27 +113,29 @@ export default function AiTraderLedgerPage() {
   }, [load])
 
   return (
-    <JarooShell>
-      <div className="mx-auto max-w-5xl px-4 py-8">
-        <header className="mb-6 flex items-end justify-between gap-3">
-          <div>
-            <h1 className="flex items-center gap-2 text-[20px] font-bold text-[#0F1419]">
-              <CircleDollarSign className="size-5" /> AI 트레이더 원장
-            </h1>
-            <p className="mt-1 text-[13px] text-[#5A6473]">
-              트레이더별 모의투자 계좌와 거래 판단 기록 — 판단은 캐릭터(LLM), 숫자는 원장이 진실
-              {data ? ` · ${atKst(data.generatedAt)} 기준` : ''}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void load()}
-            className="flex items-center gap-1.5 rounded-full border border-[#D5D8DD] bg-white px-3.5 py-1.5 text-[12.5px] font-semibold text-[#0F1419] transition-colors hover:bg-[#F0F1F3]"
-          >
-            <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} /> 새로고침
-          </button>
-        </header>
-
+    <JarooShell
+      title={
+        <span className='flex items-center gap-1.5'>
+          <CircleDollarSign className='size-4' /> AI 트레이더 원장
+        </span>
+      }
+      subtitle={
+        data
+          ? `판단은 캐릭터(LLM), 숫자는 원장이 진실 · ${atKst({ at: data.generatedAt })} 기준`
+          : '판단은 캐릭터(LLM), 숫자는 원장이 진실'
+      }
+      backHref='/home'
+      action={
+        <button
+          type='button'
+          onClick={() => void load()}
+          className='flex items-center gap-1.5 rounded-full border border-[#D5D8DD] bg-white px-3.5 py-1.5 text-[12.5px] font-semibold text-[#0F1419] transition-colors hover:bg-[#F0F1F3]'
+        >
+          <RefreshCw className={cn('size-3.5', loading && 'animate-spin')} /> 새로고침
+        </button>
+      }
+    >
+      <div className='mx-auto max-w-5xl'>
         {error ? (
           <div className="rounded-[14px] border border-[#E8EAEE] bg-white p-6 text-[13.5px] leading-6 text-[#5A6473]">
             <p className="font-bold text-[#0F1419]">원장 서비스에 닿지 않습니다</p>
