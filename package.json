@@ -30,7 +30,7 @@
     "start:paper-trade": "npm --prefix packages/paper-trade run start",
     "test:paper-trade": "npm --prefix packages/paper-trade run test",
     "dev:ai-trader": "npm --prefix packages/ai-trader run dev",
-    "start:ai-trader": "bun --cwd packages/ai-trader run start",
+    "start:ai-trader": "npm --prefix packages/ai-trader run start",
     "test:ai-trader": "npm --prefix packages/ai-trader run test"
   },
   "dependencies": {

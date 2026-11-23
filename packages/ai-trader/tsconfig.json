@@ -3,11 +3,15 @@
     "target": "ESNext",
     "module": "ESNext",
     "moduleResolution": "bundler",
-    "types": ["bun-types"],
+    "allowImportingTsExtensions": true,
+    "types": ["node"],
     "strict": true,
     "noUncheckedIndexedAccess": true,
     "skipLibCheck": true,
     "noEmit": true
   },
+  // #378 Node 전환: bun-types 제거 → types:["node"] + allowImportingTsExtensions(paper-trade 패턴).
+  // node:sqlite 타입은 루트 @types/node(^20)에 없어 src/types/node-sqlite.d.ts의
+  // 최소 선언으로 보완한다(paper-trade #368과 동일한 구조).
   "include": ["src/**/*.ts", "tests/**/*.ts"]
 }
