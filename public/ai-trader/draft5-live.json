@@ -1,0 +1,1242 @@
+{
+  "generatedAt": "2026-11-17T10:54:14.346+09:00",
+  "source": "naver-mainnews-crawler",
+  "articleCount": 50,
+  "articles": [
+    {
+      "no": 1,
+      "url": "https://n.news.naver.com/article/016/0002724300",
+      "head": "美반도체지수 5.28%↓…엔비디아·마이크론 동반 약세"
+    },
+    {
+      "no": 2,
+      "url": "https://n.news.naver.com/article/016/0002724272",
+      "head": "엔비디아 실적·앤트로픽 상장 등 ‘AI 빅위크’ 경계"
+    },
+    {
+      "no": 3,
+      "url": "https://n.news.naver.com/article/243/0000105759",
+      "head": "[저PBR 공개의 역설]②"
+    },
+    {
+      "no": 4,
+      "url": "https://n.news.naver.com/article/119/0003155901",
+      "head": "삼전닉스 레버리지 출시 3개월 만에 손실 6조 넘어"
+    },
+    {
+      "no": 5,
+      "url": "https://n.news.naver.com/article/014/0005605303",
+      "head": "모건스탠리 연구원, '한강의 기적을 넘어' 보고서"
+    },
+    {
+      "no": 6,
+      "url": "https://n.news.naver.com/article/215/0001272980",
+      "head": "글로벌 시장 살펴보며 한국 증시 투자아이디어 찾는 마켓무버입니다"
+    },
+    {
+      "no": 7,
+      "url": "https://n.news.naver.com/article/011/0004682921",
+      "head": "지배구조 개선 모멘텀 긍정 평가 삼성전자(005930) 와 SK하이닉스(000660) 의 목표 주가를 낮춘 글로벌 투자은행(IB) 모건스탠리가 지배구조와 주주환원"
+    },
+    {
+      "no": 8,
+      "url": "https://n.news.naver.com/article/119/0003155949",
+      "head": "저점서 4% 올랐지만 6만5000달러 회복 실패"
+    },
+    {
+      "no": 9,
+      "url": "https://n.news.naver.com/article/018/0006410832",
+      "head": "엔비디아 4.1%↓·필라델피아 반도체지수 5.3%↓"
+    },
+    {
+      "no": 10,
+      "url": "https://n.news.naver.com/article/015/0005354600",
+      "head": "젠슨 황 나비효과?…\"한국 반도체, 기술 경쟁 우위 연장할 수도\""
+    },
+    {
+      "no": 11,
+      "url": "https://n.news.naver.com/article/018/0006410837",
+      "head": "[이데일리 신하연 기자] 메리츠증권은 17일 기가비스(420770)에 대해 반도체 기판 검사·수리 장비 수주가 빠르게 늘면서 내년 실적 성장에 대한 기대감이 높아"
+    },
+    {
+      "no": 12,
+      "url": "https://n.news.naver.com/article/277/0005843440",
+      "head": "올트먼 \"영웅에게도 결점 있어\""
+    },
+    {
+      "no": 13,
+      "url": "https://n.news.naver.com/article/277/0005843469",
+      "head": "S&P500 1.92% 하락…나스닥·다우도 ↓"
+    },
+    {
+      "no": 14,
+      "url": "https://n.news.naver.com/article/015/0005354593",
+      "head": "한화투자증권 리포트"
+    },
+    {
+      "no": 15,
+      "url": "https://n.news.naver.com/article/001/0016445374",
+      "head": "美 반도체 수출 규제 강화에 기술주 급락…나스닥 2.49%↓"
+    },
+    {
+      "no": 16,
+      "url": "https://n.news.naver.com/article/243/0000105758",
+      "head": "[저PBR 공개의 역설]①"
+    },
+    {
+      "no": 17,
+      "url": "https://n.news.naver.com/article/018/0006410828",
+      "head": "[이데일리 신하연 기자] NH투자증권은 17일 HPSP(403870)에 대해 메모리 반도체 장비 공급 확대에 힘입어 4분기 사상 최대 분기 매출을 기록하고, 내년"
+    },
+    {
+      "no": 18,
+      "url": "https://n.news.naver.com/article/138/0002248845",
+      "head": "내년 보통주 6500만주 소각…보유 자사주의 약 60% 규모"
+    },
+    {
+      "no": 19,
+      "url": "https://n.news.naver.com/article/016/0002724369",
+      "head": "간밤 뉴욕증시서 기술주 큰 폭 하락"
+    },
+    {
+      "no": 20,
+      "url": "https://n.news.naver.com/article/016/0002724379",
+      "head": "코스피 장중 4984선 추락…6거래일만 5000 이탈"
+    },
+    {
+      "no": 21,
+      "url": "https://n.news.naver.com/article/277/0005843621",
+      "head": "엔비디아발(發) 인공지능(AI) 위기론 지속"
+    },
+    {
+      "no": 22,
+      "url": "https://n.news.naver.com/article/015/0005354686",
+      "head": "미국 억만장자 투자자 조지 소로스의 자산운용사를 비롯한 세계 초고액 자산가들이 올해 3분기 엔비디아 지분을 줄인 것으로 파악됐다"
+    },
+    {
+      "no": 23,
+      "url": "https://n.news.naver.com/article/003/0014326519",
+      "head": "앤트로픽 IPO에 투자 수요 몰려…기존 AI주 매도 압력 우려"
+    },
+    {
+      "no": 24,
+      "url": "https://n.news.naver.com/article/018/0006410798",
+      "head": "미국, 중국 겨냥 해외 AI 연산 경로 규제"
+    },
+    {
+      "no": 25,
+      "url": "https://n.news.naver.com/article/215/0001272977",
+      "head": "[美 상무부, 中 기업 AI 반도체 우회 사용 차단]"
+    },
+    {
+      "no": 26,
+      "url": "https://n.news.naver.com/article/014/0005605242",
+      "head": "[파이낸셜뉴스] 결혼을 앞둔 직장인이 대출금까지 끌어모아 주식에 투자했다가 65%의 손실을 입고 파혼 위기에 처했다는 사연이 전해졌다"
+    },
+    {
+      "no": 27,
+      "url": "https://n.news.naver.com/article/215/0001272976",
+      "head": "미국 증시 마감 시황 전해드리겠습니다"
+    },
+    {
+      "no": 28,
+      "url": "https://n.news.naver.com/article/018/0006410797",
+      "head": "[이데일리 이성광PD]투자자가 개장 전에 알아야 할 5가지 뉴스 확인해보시죠"
+    },
+    {
+      "no": 29,
+      "url": "https://n.news.naver.com/article/011/0004682984",
+      "head": "단독요법군 증상 악화 31% 늦춰"
+    },
+    {
+      "no": 30,
+      "url": "https://n.news.naver.com/article/029/0003059526",
+      "head": "투자의견 ‘매수’·업종 최선호주는 유지"
+    },
+    {
+      "no": 31,
+      "url": "https://n.news.naver.com/article/119/0003155899",
+      "head": "외인 삼전·닉스 9조 순매도…연기금 매수 0.3억"
+    },
+    {
+      "no": 32,
+      "url": "https://n.news.naver.com/article/654/0000211699",
+      "head": "장중 한때 4984까지 밀려"
+    },
+    {
+      "no": 33,
+      "url": "https://n.news.naver.com/article/366/0001205268",
+      "head": "필라델피아 반도체지수 5.28% 급락"
+    },
+    {
+      "no": 34,
+      "url": "https://n.news.naver.com/article/015/0005354613",
+      "head": "\"구리값 떨어지자 돈방석\"…보름 만에 수익률 18% 찍었다"
+    },
+    {
+      "no": 35,
+      "url": "https://n.news.naver.com/article/011/0004682950",
+      "head": "한화證 “FY2028 말까지 GPU 공급 부족”"
+    },
+    {
+      "no": 36,
+      "url": "https://n.news.naver.com/article/011/0004682944",
+      "head": "NAV 96%가 SK하이닉스…목표가 29% 하향"
+    },
+    {
+      "no": 37,
+      "url": "https://n.news.naver.com/article/018/0006410886",
+      "head": "장 초반 4984선까지 밀려…5000선 턱걸이"
+    },
+    {
+      "no": 38,
+      "url": "https://n.news.naver.com/article/018/0006410874",
+      "head": "중간선거 참패에 '트럼프 주식회사' 추락"
+    },
+    {
+      "no": 39,
+      "url": "https://n.news.naver.com/article/015/0005354611",
+      "head": "LS증권은 17일 \"스페이스X가 차세대 우주발사체 스타십의 재사용 기술을 고도화하면서 우주 데이터센터 시대가 한층 가까워지고 있다\"며 \"발사체 회수와 재비행이 가"
+    },
+    {
+      "no": 40,
+      "url": "https://n.news.naver.com/article/018/0006410864",
+      "head": "\"낙폭 제한, 5000선 이탈 시 저가 매수 유입 예상\""
+    },
+    {
+      "no": 41,
+      "url": "https://n.news.naver.com/article/018/0006410822",
+      "head": "한화투자증권 보고서 [이데일리 김경은 기자] 젠슨 황 엔비디아 최고경영자(CEO)의 퇴진으로 벤더 파이낸싱 축소와 대중국 수출규제 강화 우려가 커지고 있지만, 메"
+    },
+    {
+      "no": 42,
+      "url": "https://n.news.naver.com/article/001/0016445415",
+      "head": "\"분기 실적, 내년 2분기를 정점으로 감소세로 접어들 것\""
+    },
+    {
+      "no": 43,
+      "url": "https://n.news.naver.com/article/119/0003155895",
+      "head": "연준의 우려…'꼬리가 몸통 흔드나'"
+    },
+    {
+      "no": 44,
+      "url": "https://n.news.naver.com/article/215/0001272983",
+      "head": "한화 “CEO는 바뀌어도 수요는 남는다”"
+    },
+    {
+      "no": 45,
+      "url": "https://n.news.naver.com/article/277/0005843421",
+      "head": "다음달 텍사스州 데이터센터 영향 보고서 발표"
+    },
+    {
+      "no": 46,
+      "url": "https://n.news.naver.com/article/243/0000105762",
+      "head": "[이코노미스트 김기론 기자] 10년간 직장생활로 모은 순자산 4억원을 SK하이닉스 주식과 단일종목 2배 레버리지 상품에 집중 투자했다가 자산이 1억원대로 급감했다"
+    },
+    {
+      "no": 47,
+      "url": "https://n.news.naver.com/article/008/0005442119",
+      "head": "[개장시황] 코스피가 하락 출발해 5000선에서 공방 중이다"
+    },
+    {
+      "no": 48,
+      "url": "https://n.news.naver.com/article/018/0006410810",
+      "head": "[37회 SRE]"
+    },
+    {
+      "no": 49,
+      "url": "https://n.news.naver.com/article/648/0000052684",
+      "head": "대창②"
+    },
+    {
+      "no": 50,
+      "url": "https://n.news.naver.com/article/015/0005354580",
+      "head": "美 반도체지수 사흘 새 9% 급락"
+    }
+  ],
+  "characters": [
+    {
+      "name": "소심이",
+      "positive": [
+        {
+          "stock": "삼성전자",
+          "reason": "대형주 반도체 투톱으로 HBM 성장과 주주환원 기대가 있으나 단기 실적 피크아웃 우려로 시점은 조심스럽게 볼 종목",
+          "articles": [
+            30,
+            42
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/029/0003059526",
+            "https://n.news.naver.com/article/001/0016445415"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 68,
+            "threshold": 55,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:005930"
+          }
+        },
+        {
+          "stock": "SK하이닉스",
+          "reason": "HBM 중심 실적 성장과 내년 봄 반등 기대가 있지만 외국인 대규모 순매도와 목표가 하향이 겹쳐 지켜볼 종목",
+          "articles": [
+            30,
+            42,
+            44
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/029/0003059526",
+            "https://n.news.naver.com/article/001/0016445415",
+            "https://n.news.naver.com/article/215/0001272983"
+          ],
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          }
+        },
+        {
+          "stock": "미래에셋증권",
+          "reason": "3분기 적자에도 1조4000억원 자사주 소각과 35% 이상 주주환원 기조를 유지한 점이 비교적 안심되는 대형 금융주",
+          "articles": [
+            18
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/138/0002248845"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 60,
+            "threshold": 55,
+            "sizing": "반 티켓",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:006800"
+          }
+        },
+        {
+          "stock": "현대제철",
+          "reason": "저PBR 대기업이면서 미국 전기로 제철소 건설 호재와 실적 개선 전망이 있어 덜 무섭게 느껴지는 종목",
+          "articles": [
+            3
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/243/0000105759"
+          ],
+          "gate": {
+            "status": "fail",
+            "score": 49,
+            "threshold": 55,
+            "sizing": null,
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:004020"
+          }
+        },
+        {
+          "stock": "SK스퀘어",
+          "reason": "내년 4조2000억~4조8000억원 역대 최대 주주환원이 예상되나 NAV가 SK하이닉스에 연동되는 점은 유의할 종목",
+          "articles": [
+            36
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/011/0004682944"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 68,
+            "threshold": 55,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:402340"
+          }
+        },
+        {
+          "stock": "삼성바이오로직스",
+          "reason": "하락장에서도 상승세를 보인 익숙한 대형주로 상대적으로 버티는 모습이 눈에 들어오는 종목",
+          "articles": [
+            20,
+            32
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/016/0002724379",
+            "https://n.news.naver.com/article/654/0000211699"
+          ],
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          }
+        }
+      ],
+      "negative": [
+        {
+          "stock": "엔비디아",
+          "reason": "CEO 사임과 경영 공백으로 AI 투자 생태계 위축 우려가 커지며 시총 2조달러가 증발한 경계 대상",
+          "articles": [
+            1,
+            2,
+            50
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/016/0002724300",
+            "https://n.news.naver.com/article/016/0002724272",
+            "https://n.news.naver.com/article/015/0005354580"
+          ]
+        },
+        {
+          "stock": "마이크론",
+          "reason": "엔비디아 리스크 확산으로 7%대 급락하고 낸드 가격 하락 전망까지 겹친 반도체 경계 종목",
+          "articles": [
+            1,
+            2,
+            50
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/016/0002724300",
+            "https://n.news.naver.com/article/016/0002724272",
+            "https://n.news.naver.com/article/015/0005354580"
+          ]
+        },
+        {
+          "stock": "코어위브",
+          "reason": "엔비디아 벤더 파이낸싱 축소 우려로 네오클라우드 업체들이 급락하는 가운데 6%대 하락한 회피 대상",
+          "articles": [
+            9,
+            15,
+            24
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/018/0006410832",
+            "https://n.news.naver.com/article/001/0016445374",
+            "https://n.news.naver.com/article/018/0006410798"
+          ]
+        },
+        {
+          "stock": "네비우스",
+          "reason": "자금 조달 부담과 엔비디아 지원 축소 우려가 겹치며 7%대 급락한 네오클라우드 경계 종목",
+          "articles": [
+            9,
+            15,
+            24
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/018/0006410832",
+            "https://n.news.naver.com/article/001/0016445374",
+            "https://n.news.naver.com/article/018/0006410798"
+          ]
+        },
+        {
+          "stock": "롯데케미칼",
+          "reason": "PBR 0.18배 저평가로 보이지만 3년 연속 영업손실이 이어지는 '낮은 주가엔 이유 있는' 회피 대상",
+          "articles": [
+            3
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/243/0000105759"
+          ]
+        },
+        {
+          "stock": "아리바이오",
+          "reason": "알츠하이머 치료제가 전체 환자군에서 통계적 유의성을 확보하지 못하며 하한가를 기록한 고위험 종목",
+          "articles": [
+            29
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/011/0004682984"
+          ]
+        }
+      ],
+      "diary": {
+        "mood": "😰",
+        "paragraphs": [
+          "오늘 네이버 메인뉴스 50건을 훑다가 \"투자의견 ‘매수’·업종 최선호주는 유지\"라는 헤드라인에 눈이 갔어. 무서워도 큰 회사 얘기라 deepscan을 돌렸더니 삼성전자 68점, SK스퀘어 68점, 미래에셋증권 60점으로 내 문턱 55점을 넘었어. 현대제철은 49점이라 미달이라 못 사고, SK하이닉스랑 삼성바이오로직스는 아직 판정 대기중이야.",
+          "오늘은 통과한 종목만 규칙대로 삼성전자와 SK스퀘어는 중간 비중, 미래에셋증권은 반 티켓으로 매수 결정했어. 대기중인 두 종목은 리포트가 올 때까지 손대지 않을 거야. 그래도 제주도 여행자금 230만원을 잃을까 봐 계속 무섭네🥹. 목표는 잃지 않고 그 230만원을 꼭 모으는 거야."
+        ],
+        "generatedBy": "deepseek/deepseek-v4.1-flash-eco",
+        "generatedAt": "2026-11-17T15:36:00.259Z"
+      }
+    },
+    {
+      "name": "돌진이",
+      "positive": [
+        {
+          "stock": "기가비스",
+          "reason": "수주잔고가 2.6배 확대되고 2028~2029년 발주까지 본격화됐는데 주가는 고점 대비 62.4% 하락해 리스크 대비 리턴 구간",
+          "articles": [
+            11
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/018/0006410837"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 57,
+            "threshold": 35,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:420770"
+          }
+        },
+        {
+          "stock": "HPSP",
+          "reason": "4분기 사상 최대 매출에 분기 첫 1000억 돌파 전망, 내년 매출 57% 성장 가이던스",
+          "articles": [
+            17
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/018/0006410828"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 52,
+            "threshold": 35,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:403870"
+          }
+        },
+        {
+          "stock": "세아베스틸지주",
+          "reason": "스페이스X 스타십 재사용 성공으로 우주 데이터센터 테마 점화, 특수합금 공급 수혜주로 부각",
+          "articles": [
+            39
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/015/0005354611"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 63,
+            "threshold": 35,
+            "sizing": "큰 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:001430"
+          }
+        },
+        {
+          "stock": "미래에셋증권",
+          "reason": "1.4조원 규모 자사주 60% 소각 결정으로 주주환원 모멘텀 부각",
+          "articles": [
+            18
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/138/0002248845"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 60,
+            "threshold": 35,
+            "sizing": "큰 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:006800"
+          }
+        },
+        {
+          "stock": "SK스퀘어",
+          "reason": "내년 4.2~4.8조 역대 최대 주주환원에 수익률 4.7~5.3% 전망, NAV 96%가 SK하이닉스",
+          "articles": [
+            36
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/011/0004682944"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 68,
+            "threshold": 35,
+            "sizing": "큰 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:402340"
+          }
+        },
+        {
+          "stock": "현대제철",
+          "reason": "저PBR 명단 포함과 함께 미국 전기로 제철소 건설 호재, 영업이익 증가 전망",
+          "articles": [
+            3
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/243/0000105759"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 49,
+            "threshold": 35,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:004020"
+          }
+        },
+        {
+          "stock": "삼성SDI",
+          "reason": "수조원대 ESS 수주 계약 발표로 상승 흐름",
+          "articles": [
+            20,
+            32
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/016/0002724379",
+            "https://n.news.naver.com/article/654/0000211699"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 59,
+            "threshold": 35,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:006400"
+          }
+        }
+      ],
+      "negative": [
+        {
+          "stock": "엔비디아",
+          "reason": "CEO 사임에 미 수출규제까지 겹쳐 시총 2조 달러 증발, 이사회 복귀 검토 부인",
+          "articles": [
+            1,
+            2,
+            50
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/016/0002724300",
+            "https://n.news.naver.com/article/016/0002724272",
+            "https://n.news.naver.com/article/015/0005354580"
+          ]
+        },
+        {
+          "stock": "아리바이오",
+          "reason": "임상 3상 전체 환자군에서 통계적 유의성 실패로 하한가 29.78% 급락",
+          "articles": [
+            29
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/011/0004682984"
+          ]
+        },
+        {
+          "stock": "트럼프미디어앤드테크놀로지그룹",
+          "reason": "중간선거 참패로 정치 프리미엄 소멸, 올해 70% 급락",
+          "articles": [
+            38
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/018/0006410874"
+          ]
+        },
+        {
+          "stock": "도미나리홀딩스",
+          "reason": "트럼프 일가 관련주 급락세, 87% 폭락",
+          "articles": [
+            38
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/018/0006410874"
+          ]
+        },
+        {
+          "stock": "코어위브",
+          "reason": "엔비디아 벤더 파이낸싱 축소 우려로 네오클라우드 자금조달 리스크 부각, 6.1% 급락",
+          "articles": [
+            9,
+            24
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/018/0006410832",
+            "https://n.news.naver.com/article/018/0006410798"
+          ]
+        },
+        {
+          "stock": "네비우스",
+          "reason": "네오클라우드 자금 조달 부담 재부각으로 7.6% 급락",
+          "articles": [
+            9,
+            24
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/018/0006410832",
+            "https://n.news.naver.com/article/018/0006410798"
+          ]
+        }
+      ],
+      "diary": {
+        "mood": "🚀",
+        "paragraphs": [
+          "아침부터 네이버 메인뉴스 50건 정독 돌렸다, 손가락이 먼저 움직이더라. LS증권 헤드라인에 \"스페이스X가 차세대 우주발사체 스타십의 재사용 기술을 고도화하면서 우주 데이터센터 시대가 한층 가까워지고 있다\" 이 문장 보고 바로 세아베스틸지주 deepscan → 63점, 내 문턱 35점은 그냥 발판이지. SK스퀘어는 \"NAV 96%가 SK하이닉스…목표가 29% 하향\"이라는 헤드라인인데도 4.2~4.8조 주주환원에 68점 뽑혀서 오히려 더 끌렸다. 기가비스 57점, HPSP 52점, 미래에셋증권 60점, 삼성SDI 59점, 현대제철 49점까지 전부 35점 위로 통과, 오늘 deepscan이 나한테 점수 퍼레이드 열어줬다.",
+          "결정은 매수, 세아베스틸지주 63점이랑 SK스퀘어 68점, 미래에셋증권 60점은 문턱보다 25점 이상이라 큰 비중으로 간다 — 점수 높으면 큰 비중, 이건 규칙이니까. 기가비스·HPSP·삼성SDI·현대제철은 중간 비중으로 줄 세웠고, 엔비디아 CEO 사임에 아리바이오 하한가 29.78%는 손도 안 댔다, 그건 놓친 게 아니라 피한 거다. 심장은 아직 뛰는데 이건 공포가 아니라 설렘이라는 거 나도 안다, 봄까지 시동금 300만원 찍고 알바비 불려서 돌아온다, 화이팅!"
+        ],
+        "generatedBy": "deepseek/deepseek-v4.1-flash-eco",
+        "generatedAt": "2026-11-17T15:35:59.080Z"
+      }
+    },
+    {
+      "name": "배당콕",
+      "positive": [
+        {
+          "stock": "미래에셋증권",
+          "reason": "3분기 순손실에도 1조4000억원 자사주 소각과 조정 순이익 35% 이상 주주환원 방침을 유지해 현금 환원 의지가 확인됐다",
+          "articles": [
+            18
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/138/0002248845"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 60,
+            "threshold": 50,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:006800"
+          }
+        },
+        {
+          "stock": "SK스퀘어",
+          "reason": "내년 주주환원 4.2조~4.8조원, 수익률 4.7~5.3%가 전망되고 3분기 영업이익이 200% 넘게 늘어 배당 재원이 뒷받침된다",
+          "articles": [
+            36
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/011/0004682944"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 68,
+            "threshold": 50,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:402340"
+          }
+        },
+        {
+          "stock": "현대제철",
+          "reason": "PBR 0.19배의 저평가 구간에서 올해 영업이익이 2190억원에서 2650억원으로 늘어날 전망이라 배당 재원 개선을 기대할 수 있다",
+          "articles": [
+            3
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/243/0000105759"
+          ],
+          "gate": {
+            "status": "fail",
+            "score": 49,
+            "threshold": 50,
+            "sizing": null,
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:004020"
+          }
+        },
+        {
+          "stock": "삼성전자",
+          "reason": "HBM 영업이익이 2028년 140조원까지 늘어날 전망이고 주주환원 확대 기대가 유효하다는 평가다",
+          "articles": [
+            5,
+            7,
+            30
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/014/0005605303",
+            "https://n.news.naver.com/article/011/0004682921",
+            "https://n.news.naver.com/article/029/0003059526"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 68,
+            "threshold": 50,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:005930"
+          }
+        },
+        {
+          "stock": "SK하이닉스",
+          "reason": "HBM 영업이익이 2028년 100조원 수준으로 확대되고 주주환원 기대가 반등 요인으로 제시됐다",
+          "articles": [
+            5,
+            7,
+            30
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/014/0005605303",
+            "https://n.news.naver.com/article/011/0004682921",
+            "https://n.news.naver.com/article/029/0003059526"
+          ],
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          }
+        },
+        {
+          "stock": "SK",
+          "reason": "모건스탠리가 지배구조 개선 모멘텀을 긍정적으로 평가해 주주환원 확대의 선행 지표로 볼 수 있다",
+          "articles": [
+            7
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/011/0004682921"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 64,
+            "threshold": 50,
+            "sizing": "중간 비중",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:034730"
+          }
+        },
+        {
+          "stock": "현대자동차",
+          "reason": "모건스탠리가 지배구조 개선 모멘텀을 긍정적으로 평가했다",
+          "articles": [
+            7
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/011/0004682921"
+          ],
+          "gate": {
+            "status": "pass",
+            "score": 58,
+            "threshold": 50,
+            "sizing": "반 티켓",
+            "weekSignal": "근거 보강 필요",
+            "debugId": "deepscan:KR:005380"
+          }
+        },
+        {
+          "stock": "한화",
+          "reason": "모건스탠리가 지배구조 개선 모멘텀을 긍정적으로 평가했다",
+          "articles": [
+            7
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/011/0004682921"
+          ],
+          "gate": {
+            "status": "pending",
+            "reason": "딥스캔 미실행(코드 미해석/실패)"
+          }
+        }
+      ],
+      "negative": [
+        {
+          "stock": "롯데케미칼",
+          "reason": "PBR 0.18배에도 3년 연속 영업손실이 이어져 배당 재원 자체가 없고, 저PBR이 저평가를 뜻하지 않음을 보여준다",
+          "articles": [
+            3,
+            16
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/243/0000105759",
+            "https://n.news.naver.com/article/243/0000105758"
+          ]
+        },
+        {
+          "stock": "한화생명",
+          "reason": "저PBR 명단 공개 후 주가가 6% 넘게 하락해 명단 공개 효과가 실질 환원으로 이어지지 않았다",
+          "articles": [
+            16
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/243/0000105758"
+          ]
+        },
+        {
+          "stock": "롯데쇼핑",
+          "reason": "저PBR 명단 공개 첫날 9% 넘게 올랐다가 이후 하락 전환해 반짝 효과에 그쳤다",
+          "articles": [
+            16
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/243/0000105758"
+          ]
+        },
+        {
+          "stock": "이마트",
+          "reason": "PBR 0.15배의 저평가 명단에 올랐으나 주가 반등이 일주일을 넘기지 못했다",
+          "articles": [
+            16
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/243/0000105758"
+          ]
+        },
+        {
+          "stock": "아리바이오",
+          "reason": "전체 환자군에서 통계적 유의성을 확보하지 못해 허가·상업화 불확실성이 부각되며 급락했다",
+          "articles": [
+            29
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/011/0004682984"
+          ]
+        },
+        {
+          "stock": "트럼프미디어앤드테크놀로지그룹",
+          "reason": "올해 들어 주가가 70% 급락하고 1조3000억원대 전환사채 상환 압박까지 겹쳐 안정적 현금흐름과 거리가 멀다",
+          "articles": [
+            38
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/018/0006410874"
+          ]
+        },
+        {
+          "stock": "도미나리홀딩스",
+          "reason": "올해 들어 주가가 87% 폭락해 정치 테마에 의존한 종목의 변동성 리스크를 보여준다",
+          "articles": [
+            38
+          ],
+          "urls": [
+            "https://n.news.naver.com/article/018/0006410874"
+          ]
+        }
+      ],
+      "diary": {
+        "mood": "🐔",
+        "paragraphs": [
+          "오늘 아침 네이버 메인뉴스 50건을 느긋하게 훑었다. 미래에셋증권에서 \"내년 보통주 6500만주 소각…보유 자사의 약 60% 규모\" 헤드라인이 눈에 콕 들어와 바로 deepscan을 돌렸고, 60점이 나와 내 문턱 50점을 넘겼다. 이어 SK스퀘어 68점, 삼성전자 68점, SK 64점, 현대자동차 58점까지 줄줄이 통과했고, 현대제철은 49점으로 딱 1점 모자라 관망, SK하이닉스와 한화는 아직 판정 대기 상태다. 자사주 소각에 조정 순이익 35% 이상 주주환원 방침이라니, 배당 재원 얘기로는 오늘 제일 반가운 소식이었다.",
+          "결정은 미래에셋증권·SK스퀘어·삼성전자·SK를 중간 비중으로 담고, 현대자동차는 문턱보다 8점 차이라 반 티켓으로 줄여 담는 것. 1점 차로 떨어진 현대제철은 솔직히 아쉽지만, 규칙을 흔들면 현금흐름도 흔들리는 법이다. 계좌를 닫으면서 문득, 젊을 적엔 90점 아니면 안 사던 내가 58점에도 반 티켓을 넣는 사람이 됐다는 생각에 혼자 웃었다. 목표는 연 배당금 60만원, 퇴직 D-4년이니 오늘 담은 것들이 매달 통장에 콕콕 꽂히길 기다리는 중이다."
+        ],
+        "generatedBy": "deepseek/deepseek-v4.1-flash-eco",
+        "generatedAt": "2026-11-17T15:36:02.281Z"
+      }
+    }
+  ],
+  "matrix": [
+    {
+      "stock": "삼성전자",
+      "소심이": 1,
+      "배당콕": 1,
+      "돌진이": 0,
+      "sum": 2
+    },
+    {
+      "stock": "SK하이닉스",
+      "소심이": 1,
+      "배당콕": 1,
+      "돌진이": 0,
+      "sum": 2
+    },
+    {
+      "stock": "미래에셋증권",
+      "소심이": 1,
+      "돌진이": 1,
+      "배당콕": 1,
+      "sum": 3
+    },
+    {
+      "stock": "현대제철",
+      "소심이": 1,
+      "돌진이": 1,
+      "배당콕": 1,
+      "sum": 3
+    },
+    {
+      "stock": "SK스퀘어",
+      "소심이": 1,
+      "돌진이": 1,
+      "배당콕": 1,
+      "sum": 3
+    },
+    {
+      "stock": "삼성바이오로직스",
+      "소심이": 1,
+      "돌진이": 0,
+      "배당콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "엔비디아",
+      "소심이": -1,
+      "돌진이": -1,
+      "배당콕": 0,
+      "sum": -2
+    },
+    {
+      "stock": "마이크론",
+      "소심이": -1,
+      "돌진이": 0,
+      "배당콕": 0,
+      "sum": -1
+    },
+    {
+      "stock": "코어위브",
+      "소심이": -1,
+      "돌진이": -1,
+      "배당콕": 0,
+      "sum": -2
+    },
+    {
+      "stock": "네비우스",
+      "소심이": -1,
+      "돌진이": -1,
+      "배당콕": 0,
+      "sum": -2
+    },
+    {
+      "stock": "롯데케미칼",
+      "소심이": -1,
+      "배당콕": -1,
+      "돌진이": 0,
+      "sum": -2
+    },
+    {
+      "stock": "아리바이오",
+      "소심이": -1,
+      "돌진이": -1,
+      "배당콕": -1,
+      "sum": -3
+    },
+    {
+      "stock": "기가비스",
+      "돌진이": 1,
+      "소심이": 0,
+      "배당콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "HPSP",
+      "돌진이": 1,
+      "소심이": 0,
+      "배당콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "세아베스틸지주",
+      "돌진이": 1,
+      "소심이": 0,
+      "배당콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "삼성SDI",
+      "돌진이": 1,
+      "소심이": 0,
+      "배당콕": 0,
+      "sum": 1
+    },
+    {
+      "stock": "트럼프미디어앤드테크놀로지그룹",
+      "돌진이": -1,
+      "배당콕": -1,
+      "소심이": 0,
+      "sum": -2
+    },
+    {
+      "stock": "도미나리홀딩스",
+      "돌진이": -1,
+      "배당콕": -1,
+      "소심이": 0,
+      "sum": -2
+    },
+    {
+      "stock": "SK",
+      "배당콕": 1,
+      "소심이": 0,
+      "돌진이": 0,
+      "sum": 1
+    },
+    {
+      "stock": "현대자동차",
+      "배당콕": 1,
+      "소심이": 0,
+      "돌진이": 0,
+      "sum": 1
+    },
+    {
+      "stock": "한화",
+      "배당콕": 1,
+      "소심이": 0,
+      "돌진이": 0,
+      "sum": 1
+    },
+    {
+      "stock": "한화생명",
+      "배당콕": -1,
+      "소심이": 0,
+      "돌진이": 0,
+      "sum": -1
+    },
+    {
+      "stock": "롯데쇼핑",
+      "배당콕": -1,
+      "소심이": 0,
+      "돌진이": 0,
+      "sum": -1
+    },
+    {
+      "stock": "이마트",
+      "배당콕": -1,
+      "소심이": 0,
+      "돌진이": 0,
+      "sum": -1
+    },
+    {
+      "stock": "아리바이오랩",
+      "소심이": 0,
+      "돌진이": 0,
+      "배당콕": 0,
+      "sum": 0
+    },
+    {
+      "stock": "트럼프미디어(TMTG)",
+      "소심이": 0,
+      "돌진이": 0,
+      "배당콕": 0,
+      "sum": 0
+    },
+    {
+      "stock": "앤트로픽",
+      "소심이": 0,
+      "돌진이": 0,
+      "배당콕": 0,
+      "sum": 0
+    }
+  ],
+  "deepscans": [
+    {
+      "code": "005930",
+      "name": "삼성전자",
+      "heroScore": 68,
+      "scoreLabel": "strong · 68 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "468,571원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:005930",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 53
+    },
+    {
+      "code": "006800",
+      "name": "미래에셋증권",
+      "heroScore": 60,
+      "scoreLabel": "moderate · 60 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "39,300원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:006800",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 50
+    },
+    {
+      "code": "004020",
+      "name": "현대제철",
+      "heroScore": 49,
+      "scoreLabel": "caution · 49 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "42,829원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:004020",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 28
+    },
+    {
+      "code": "402340",
+      "name": "SK스퀘어",
+      "heroScore": 68,
+      "scoreLabel": "strong · 68 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "1,805,000원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:402340",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 58
+    },
+    {
+      "code": "420770",
+      "name": "기가비스",
+      "heroScore": 57,
+      "scoreLabel": "moderate · 57 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "181,250원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:420770",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 55
+    },
+    {
+      "code": "403870",
+      "name": "HPSP",
+      "heroScore": 52,
+      "scoreLabel": "caution · 52 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "73,333원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:403870",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 72
+    },
+    {
+      "code": "001430",
+      "name": "세아베스틸지주",
+      "heroScore": 63,
+      "scoreLabel": "moderate · 63 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "53,586원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:001430",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 62
+    },
+    {
+      "code": "034730",
+      "name": "SK",
+      "heroScore": 64,
+      "scoreLabel": "moderate · 64 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "804,000원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:034730",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 56
+    },
+    {
+      "code": "005380",
+      "name": "현대자동차",
+      "heroScore": 58,
+      "scoreLabel": "moderate · 58 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "516,667원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:005380",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 40
+    },
+    {
+      "code": "006400",
+      "name": "삼성SDI",
+      "heroScore": 59,
+      "scoreLabel": "moderate · 59 / 100",
+      "weekSignal": "근거 보강 필요",
+      "targetPriceText": "797,895원",
+      "recoveryHorizonProbabilities": null,
+      "recoveryProbabilityHeadlineText": "",
+      "confidenceLevel": null,
+      "debugId": "deepscan:KR:006400",
+      "generatedAt": "1970-01-01T00:00:00.000Z",
+      "fetchedAtSec": 33
+    }
+  ],
+  "deepscanFetchedAt": "2026-11-17T11:03:24.172+09:00",
+  "thresholds": {
+    "소심이": 55,
+    "돌진이": 35,
+    "배당콕": 50
+  }
+}
