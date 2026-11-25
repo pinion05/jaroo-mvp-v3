@@ -192,6 +192,49 @@ test('겹치는 종목 선택은 종목마다 독립적으로 적용된다', () 
   assert.equal(plan.keptRowCount, 1)
 })
 
+test('수량 합산: 소수 수량은 반올림하지 않고 소수 4자리까지 보존한다 (미국 주식 소수 주)', () => {
+  // 1.5 + 2.25 = 3.75 — 정수 반올림 포맷터였다면 4 가 됐다.
+  const fractional = planPortfolioMerge(
+    [row({ name: 'AAPL', resolvedName: 'AAPL', ticker: 'AAPL', resolvedTicker: 'AAPL', quantity: '1.5', averagePrice: '150', profitRate: '', averagePriceCurrency: 'USD' })],
+    [row({ name: 'AAPL', resolvedName: 'AAPL', ticker: 'AAPL', resolvedTicker: 'AAPL', quantity: '2.25주', averagePrice: '160', profitRate: '+1%', averagePriceCurrency: 'USD' })],
+    { 'ticker:AAPL': 'sum' },
+  )
+  assert.equal(fractional.overlaps[0]?.result.quantity, '3.75')
+
+  // 부동소수점 오차(0.1 + 0.2)가 표기에 새어 나오지 않는다.
+  const floatingPoint = planPortfolioMerge(
+    [row({ name: 'AAPL', ticker: 'AAPL', resolvedTicker: 'AAPL', quantity: '0.1', averagePrice: '150', averagePriceCurrency: 'USD' })],
+    [row({ name: 'AAPL', ticker: 'AAPL', resolvedTicker: 'AAPL', quantity: '0.2주', averagePrice: '160', profitRate: '+1%', averagePriceCurrency: 'USD' })],
+    { 'ticker:AAPL': 'sum' },
+  )
+  assert.equal(floatingPoint.overlaps[0]?.result.quantity, '0.3')
+
+  // 정수 합계는 기존처럼 천 단위 구분 정수다.
+  const integral = planPortfolioMerge([samsung()], [incomingRow('삼성전자', '005930', '7주', '88,100', '-3.5%')], { 'code:005930': 'sum' })
+  assert.equal(integral.overlaps[0]?.result.quantity, '19')
+})
+
+test('수량 합산: 런타임에 필드가 비어 있어도(undefined) 깨지지 않고 안전하게 떨어진다', () => {
+  // 타입상 문자열이지만 세션저장소 등에서 온 값을 그대로 신뢰하지 않는다. 파서에 undefined 가 넘어가면
+  // TypeError 로 적용 전체가 깨진다.
+  const sparseExisting = { ...samsung(), averagePrice: undefined, evaluationAmount: undefined, profitRate: undefined, profitAmount: undefined } as unknown as AppliedHomePortfolioRow
+  const sparseIncoming = { ...incomingRow('삼성전자', '005930', '7주', '88,100', '-3.5%'), evaluationAmount: undefined } as unknown as AppliedHomePortfolioRow
+  const plan = planPortfolioMerge([sparseExisting], [sparseIncoming], { 'code:005930': 'sum' })
+
+  // 수량은 합산(12 + 7). 기존 평단이 없어 평단·수익률은 이번 값으로 떨어지고, 평가금액은 빈 문자열.
+  assert.equal(plan.overlaps[0]?.result.quantity, '19')
+  assert.equal(plan.overlaps[0]?.result.averagePrice, '88,100')
+  assert.equal(plan.overlaps[0]?.result.profitRate, '-3.5%')
+  assert.equal(plan.overlaps[0]?.result.evaluationAmount, '')
+  assert.equal(plan.overlaps[0]?.result.profitAmount, undefined)
+
+  const missingQuantity = { ...samsung(), quantity: undefined } as unknown as AppliedHomePortfolioRow
+  const fallback = planPortfolioMerge([missingQuantity], [sparseIncoming], { 'code:005930': 'sum' })
+
+  // 수량을 읽을 수 없으면 합산하지 않고 이번 행으로 떨어진다(갱신과 같은 결과).
+  assert.equal(fallback.overlaps[0]?.result, sparseIncoming)
+})
+
 test('겹치는 종목 선택은 종목 키(코드 → 티커 → 정규화 이름)로 맞춘다', () => {
   assert.equal(getPortfolioMergeKey(dbRow('삼성전자', '005930', '1', '1')), 'code:005930')
   assert.equal(getPortfolioMergeKey(incomingRow('삼성전자보통주', '005930', '2주', '1', '0%')), 'code:005930')

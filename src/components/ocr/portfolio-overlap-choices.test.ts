@@ -122,3 +122,15 @@ test('서버에서 기존 포트폴리오를 못 읽은 상태면 경고를 함�
   assert.match(markup, /불러오지 못했어요/)
   assert.doesNotMatch(render(plan, 'server'), /role="alert"/)
 })
+
+test('행의 값이 런타임에 비어 있어도(undefined) 화면이 깨지지 않고 렌더된다', () => {
+  const sparseExisting = { ...samsung(), averagePrice: undefined } as unknown as AppliedHomePortfolioRow
+  const sparseIncoming = { ...samsungIncoming(), quantity: undefined, averagePrice: undefined } as unknown as AppliedHomePortfolioRow
+  const plan = planPortfolioMerge([sparseExisting, kia()], [sparseIncoming])
+  const markup = render(plan)
+
+  // 평단이 없으면 수량만 보여 주고, 수량·평단이 모두 없으면 빈 요약이 된다.
+  assert.match(markup, /기존<\/span>12주/)
+  assert.match(markup, /기존 포트폴리오와 1개 종목이 겹쳐요/)
+  assert.match(markup, /삼성전자 처리 방법/)
+})

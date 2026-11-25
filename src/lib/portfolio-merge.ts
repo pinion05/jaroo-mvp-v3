@@ -73,18 +73,32 @@ function formatRate(value: number): string {
   return `${value > 0 ? '+' : ''}${value.toFixed(1)}%`
 }
 
+// 합산 수량 표기. 정수면 천 단위 구분 정수로, 소수면 최대 소수 4자리로 나타낸다.
+// formatComputedNumber 는 정수 반올림이라 소수 주(미국 주식 등)를 왜곡한다 — 1.5 + 2.25 가 4 가 된다.
+function formatSummedQuantity(value: number): string {
+  return Number.isInteger(value)
+    ? formatComputedNumber(value)
+    : value.toLocaleString('ko-KR', { maximumFractionDigits: 4 })
+}
+
+// 타입상 문자열이지만, 세션저장소 등에서 온 행의 런타임 값을 그대로 신뢰하지 않는다 — 파서에 undefined 가
+// 넘어가면 TypeError 로 적용 전체가 깨진다. 비어 있으면 "없음"으로 취급해 안전하게 떨어진다.
+function toText(value: string | undefined): string {
+  return typeof value === 'string' ? value : ''
+}
+
 // 겹치는 종목을 "수량 합산"으로 처리한 행. 묶음 안 계좌 집계(aggregateGroup)와 같은 규칙이다:
 // 수량은 더하고, 평단은 수량 가중평균. 평단 화폐가 다르면 더할 수 없어 이번 값(갱신)으로 떨어진다.
 function sumOverlapRows(existing: AppliedHomePortfolioRow, incoming: AppliedHomePortfolioRow): AppliedHomePortfolioRow {
-  const existingQuantity = parseOcrNumber(existing.quantity)
-  const incomingQuantity = parseOcrNumber(incoming.quantity)
+  const existingQuantity = parseOcrNumber(toText(existing.quantity))
+  const incomingQuantity = parseOcrNumber(toText(incoming.quantity))
   if (existingQuantity === null || incomingQuantity === null) {
     return incoming
   }
 
   const quantity = existingQuantity + incomingQuantity
-  const existingPrice = parseOcrNumber(existing.averagePrice)
-  const incomingPrice = parseOcrNumber(incoming.averagePrice)
+  const existingPrice = parseOcrNumber(toText(existing.averagePrice))
+  const incomingPrice = parseOcrNumber(toText(incoming.averagePrice))
   const sameCurrency = (existing.averagePriceCurrency ?? null) === (incoming.averagePriceCurrency ?? null)
   const canAveragePrice = sameCurrency
     && existingPrice !== null
@@ -96,22 +110,22 @@ function sumOverlapRows(existing: AppliedHomePortfolioRow, incoming: AppliedHome
     ? (existingQuantity * (existingPrice as number) + incomingQuantity * (incomingPrice as number)) / quantity
     : null
 
-  const existingEvaluationAmount = parseOcrNumber(existing.evaluationAmount)
-  const incomingEvaluationAmount = parseOcrNumber(incoming.evaluationAmount)
+  const existingEvaluationAmount = parseOcrNumber(toText(existing.evaluationAmount))
+  const incomingEvaluationAmount = parseOcrNumber(toText(incoming.evaluationAmount))
   const evaluationAmount = existingEvaluationAmount !== null && incomingEvaluationAmount !== null
     ? formatComputedNumber(existingEvaluationAmount + incomingEvaluationAmount)
-    : incoming.evaluationAmount
+    : toText(incoming.evaluationAmount)
 
-  const existingProfitAmount = parseOcrNumber(existing.profitAmount ?? '')
-  const incomingProfitAmount = parseOcrNumber(incoming.profitAmount ?? '')
+  const existingProfitAmount = parseOcrNumber(toText(existing.profitAmount))
+  const incomingProfitAmount = parseOcrNumber(toText(incoming.profitAmount))
   const profitAmount = existingProfitAmount !== null && incomingProfitAmount !== null
     ? formatSignedAmount(existingProfitAmount + incomingProfitAmount)
     : incoming.profitAmount
 
   // 수익률은 원금(수량×평단) 가중. DB에서 읽은 기존 행은 수익률이 비어 있어 이번 값으로 떨어진다
   // (홈은 어차피 실시간 시세로 다시 계산한다).
-  const existingRate = parseOcrProfitRate(existing.profitRate ?? '')
-  const incomingRate = parseOcrProfitRate(incoming.profitRate)
+  const existingRate = parseOcrProfitRate(toText(existing.profitRate))
+  const incomingRate = parseOcrProfitRate(toText(incoming.profitRate))
   const existingPrincipal = canAveragePrice ? existingQuantity * (existingPrice as number) : null
   const incomingPrincipal = canAveragePrice ? incomingQuantity * (incomingPrice as number) : null
   const profitRate = existingRate !== null && incomingRate !== null && existingPrincipal !== null && incomingPrincipal !== null
@@ -119,12 +133,12 @@ function sumOverlapRows(existing: AppliedHomePortfolioRow, incoming: AppliedHome
     ? formatRate(
         (existingPrincipal * existingRate + incomingPrincipal * incomingRate) / (existingPrincipal + incomingPrincipal),
       )
-    : incoming.profitRate
+    : toText(incoming.profitRate)
 
   return {
     ...existing,
-    quantity: formatComputedNumber(quantity),
-    averagePrice: averagePrice === null ? incoming.averagePrice : formatComputedNumber(averagePrice),
+    quantity: formatSummedQuantity(quantity),
+    averagePrice: averagePrice === null ? toText(incoming.averagePrice) : formatComputedNumber(averagePrice),
     averagePriceCurrency: canAveragePrice ? (existing.averagePriceCurrency ?? incoming.averagePriceCurrency) : incoming.averagePriceCurrency,
     evaluationAmount,
     profitAmount,

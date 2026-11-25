@@ -26,15 +26,21 @@ type PortfolioOverlapRow = Pick<
   'quantity' | 'averagePrice' | 'averagePriceCurrency' | 'resolvedMarket' | 'resolvedCode' | 'resolvedTicker'
 >
 
+// 값은 타입상 문자열이지만 세션저장소 등에서 온 행의 런타임 값을 그대로 신뢰하지 않는다 — 빈 값이
+// 파서에 넘어가면 검수 화면 전체가 깨진다.
+function toText(value: string | undefined): string {
+  return typeof value === 'string' ? value : ''
+}
+
 function formatQuantity(value: string): string {
-  const parsedValue = parseOcrNumber(value)
-  return parsedValue === null ? value : `${formatComputedNumber(parsedValue)}주`
+  const parsedValue = parseOcrNumber(toText(value))
+  return parsedValue === null ? toText(value) : `${formatComputedNumber(parsedValue)}주`
 }
 
 // 평단 표기는 출처마다 다르다 — 스토어를 거친 기존 행 "71,500원"·"$150.2", DB 행 "71500", OCR 행 "88,100".
 // 나란히 놓였을 때 어긋나지 않게 숫자 부분만 천 단위 구분으로 맞춰 보여준다.
 function formatAveragePrice(value: string, currency?: string): string {
-  const trimmedValue = value.trim()
+  const trimmedValue = toText(value)
   const parsedValue = parseOcrNumber(trimmedValue)
   if (parsedValue === null) {
     return trimmedValue
