@@ -60,5 +60,58 @@ export async function GET() {
     }),
   )
 
+  // UI 표시용 종목명 채우기 — 보유·판단 전체 코드를 한 번에 조회(공용 종목은 1회).
+  const symbols = traders.flatMap((t) => [
+    ...((t.positions ?? []) as Array<{ symbol?: string }>).map((p) => String(p.symbol ?? '')),
+    ...((t.judgments ?? []) as Array<{ symbol?: string | null }>).map((j) => String(j.symbol ?? '')),
+  ])
+  attachSymbolNames(traders as Array<Record<string, unknown>>, await resolveSymbolNames(symbols))
+
   return NextResponse.json({ ok: true, data: { traders, generatedAt: new Date().toISOString() } })
+}
+
+/**
+ * 종목 코드 → 종목명. krchart(:13100) /api/analyze 가 {name, symbol}을 돌려준다.
+ * 원장(paper-trade·journal)은 심볼 코드만 저장하므로 여기서 UI 표시용 이름을 채운다.
+ * 조회 실패·미등록 코드는 맵에 없는 채로 둔다 — 페이지가 코드로 폴백 렌더한다.
+ */
+async function resolveSymbolNames(symbols: Array<string>): Promise<Map<string, string>> {
+  const map = new Map<string, string>()
+  const KRCHART = process.env.KRCHART_URL ?? 'http://localhost:13100'
+  await Promise.all(
+    [...new Set(symbols)]
+      .filter((s) => /^\d{6}$/.test(s))
+      .map(async (symbol) => {
+        try {
+          const res = await fetch(`${KRCHART}/api/analyze?symbol=${symbol}`, {
+            cache: 'no-store',
+            signal: timeout(4000),
+          })
+          if (!res.ok) return
+          const body = (await res.json().catch(() => null)) as { name?: string } | null
+          const name = body?.name?.trim()
+          if (name) map.set(symbol, name)
+        } catch {
+          // krchart 미응답 — 코드 폴백 유지 (원장 자체에는 영향 없음)
+        }
+      }),
+  )
+  return map
+}
+
+/** traders 의 보유·판단 항목에 종목명을 붙인다 (in-place, 공용 코드는 한 번만 조회). */
+function attachSymbolNames(
+  traders: Array<Record<string, unknown>>,
+  names: Map<string, string>,
+): void {
+  for (const t of traders) {
+    for (const p of (t.positions ?? []) as Array<{ symbol?: string; name?: string }>) {
+      const name = names.get(String(p.symbol ?? ''))
+      if (name) p.name = name
+    }
+    for (const j of (t.judgments ?? []) as Array<{ symbol?: string | null; name?: string }>) {
+      const name = names.get(String(j.symbol ?? ''))
+      if (name) j.name = name
+    }
+  }
 }

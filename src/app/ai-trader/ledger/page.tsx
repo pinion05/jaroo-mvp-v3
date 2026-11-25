@@ -18,6 +18,8 @@ type Judgment = {
   loopAt?: string
   decision?: 'buy' | 'sell' | 'hold'
   symbol?: string | null
+  /** UI 표시용 종목명 — API가 krchart에서 조회해 채운다 (없으면 코드 폴백) */
+  name?: string | null
   quantity?: number | null
   priceKrw?: number | null
   reasonCode?: string
@@ -212,7 +214,10 @@ export default function AiTraderLedgerPage() {
                           <li key={j.logId ?? idx} className="rounded-[10px] border border-[#EFF1F4] px-3 py-2.5">
                             <div className="flex flex-wrap items-center gap-2">
                               <DecisionBadge decision={j.decision} />
-                              <span className="text-[13px] font-bold text-[#0F1419]">{j.symbol ?? '–'}</span>
+                              <span className="text-[13px] font-bold text-[#0F1419]">{j.name ?? j.symbol ?? '–'}</span>
+                              {j.name && j.symbol ? (
+                                <span className="font-mono text-[11px] text-[#97A0AE]">{j.symbol}</span>
+                              ) : null}
                               {j.quantity != null && j.priceKrw != null ? (
                                 <span className="text-[12px] text-[#5A6473]">{j.quantity}주 @ {won(j.priceKrw)}</span>
                               ) : null}
