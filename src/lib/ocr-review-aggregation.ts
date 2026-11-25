@@ -22,7 +22,11 @@ export type AggregatedOcrReviewRow = OcrReviewRow & {
   isAccountMerged: boolean
 }
 
-function getAggregationKey(row: OcrReviewRow) {
+// 종목 동일 판정 키(코드 → 티커 → 정규화 이름). 묶음 안 계좌 집계와 재적용 병합(portfolio-merge)이
+// 같은 규칙을 쓴다. 적용된 포트폴리오 행에는 id가 없어 선택 속성으로 둔다.
+export function getAggregationKey(
+  row: Pick<OcrReviewRow, 'resolvedCode' | 'resolvedTicker' | 'resolvedName' | 'name'> & { id?: string },
+) {
   const resolvedCode = row.resolvedCode?.trim().toUpperCase()
   if (resolvedCode) {
     return `code:${resolvedCode}`
@@ -34,7 +38,7 @@ function getAggregationKey(row: OcrReviewRow) {
   }
 
   const normalizedName = normalizeStockName(row.resolvedName || row.name)
-  return `name:${normalizedName || row.id}`
+  return `name:${normalizedName || row.id || ''}`
 }
 
 function sumParsed(rows: OcrReviewRow[], field: 'quantity' | 'evaluationAmount') {

@@ -4,7 +4,9 @@ export const MAX_PORTFOLIO_REQUEST_BODY_BYTES = 256 * 1024
 const MAX_PORTFOLIO_TEXT_LENGTH = 80
 const MAX_PORTFOLIO_CODE_LENGTH = 32
 const MAX_PORTFOLIO_MONEY_VALUE = 1_000_000_000_000_000
-const PORTFOLIO_MARKETS = new Set(['KR', 'KOSPI', 'KOSDAQ', 'ETF', 'ETN', 'US', 'NASDAQ', 'NYSE', 'AMEX'])
+// KONEX: 종목 유니버스(src/lib/data/instrument-universe.json)의 KONEX 종목 199건이 내놓는 시장값.
+// 누락돼 있으면 KONEX 종목이 하나라도 섞인 저장이 통째로 400으로 거절됐다.
+const PORTFOLIO_MARKETS = new Set(['KR', 'KOSPI', 'KOSDAQ', 'KONEX', 'ETF', 'ETN', 'US', 'NASDAQ', 'NYSE', 'AMEX'])
 const PORTFOLIO_MARKET_TONES = new Set(['kospi', 'kosdaq', 'etf', 'nasdaq'])
 const PORTFOLIO_KINDS = new Set(['stock', 'etf', 'etn'])
 const PORTFOLIO_CURRENCIES = new Set(['KRW', 'USD'])

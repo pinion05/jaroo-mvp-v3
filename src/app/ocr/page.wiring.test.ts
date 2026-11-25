@@ -33,3 +33,22 @@ test('OCR 적용 직후 업로드 세션 정리는 언마운트 시점에 한다
   assert.ok(handleContinueBody.includes('await Promise.race(['), '적용 후 push 전 시세 프리페치를 상한과 함께 기다린다')
   assert.ok(handleContinueBody.includes('OCR_APPLY_QUOTE_PREFETCH_CAP_MS'), '프리페치 상한 상수를 참조한다')
 })
+
+test('OCR 적용은 기존 포트폴리오와 병합한 결과를 저장한다(재적용 때 기존 종목 보존, 2026-11)', () => {
+  const page = source
+  const handleContinueBody = page.slice(page.indexOf('const handleContinue'), page.indexOf('isIdentifierResolving'))
+
+  // 적용 시점에 기존 포트폴리오를 다시 읽고(다른 기기 변경 반영), 이번 묶음만이 아니라 병합 결과로 저장한다.
+  assert.ok(handleContinueBody.includes('resolveExistingPortfolioForMerge()'), '적용 시점에 기존 포트폴리오를 읽는다')
+  assert.ok(handleContinueBody.includes('persistMergedAppliedPortfolio({'), '병합 적용 함수로 세션·스토어를 갱신한다')
+  assert.ok(handleContinueBody.includes('syncMergedPortfolioAfterApply(existing, applyResult.plan.rows)'), '서버에는 병합 결과 전체를 보낸다')
+  assert.ok(handleContinueBody.includes('replacePortfolioItems(applyResult.mergedItems)'), '스토어도 병합 결과로 교체한다')
+  // 이번 묶음만 서버로 보내 저장 RPC 의 전체 교체를 유발하던 옛 호출이 남아 있지 않아야 한다.
+  assert.ok(!page.includes('syncPortfolioToServer('), '이번 묶음만 보내는 옛 저장 호출이 없다')
+  assert.ok(!page.includes('persistAppliedPortfolioFromMergeRows'), '교체 방식 적용 함수가 쓰이지 않는다')
+  // 겹치는 종목 선택 UI 가 검수 화면에 연결돼 있다.
+  assert.match(page, /import \{ PortfolioOverlapChoices \} from '@\/components\/ocr\/portfolio-overlap-choices'/)
+  assert.match(page, /plan=\{mergePlan\}/)
+  // 기존 포트폴리오를 읽기 전과 상한 초과 시에는 적용할 수 없다.
+  assert.match(page, /&& existingPortfolio !== null\n    && !exceedsRowLimit\n    && applyStatus !== 'loading'/)
+})
