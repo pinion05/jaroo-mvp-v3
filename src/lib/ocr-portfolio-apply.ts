@@ -1,5 +1,18 @@
-import { buildHomeHoldingsFromPortfolioItems, persistAppliedHomePortfolio, type AppliedHomePortfolioRow } from '@/lib/jaroo-home-data'
+import {
+  buildHomeHoldingsFromPortfolioItems,
+  buildPortfolioItemsFromAppliedHomePortfolioRows,
+  persistAppliedHomePortfolio,
+  readAppliedHomePortfolio,
+  type AppliedHomePortfolioRow,
+} from '@/lib/jaroo-home-data'
 import { fetchHomeQuoteResponseWithTimeout } from '@/lib/home-quote-bootstrap'
+import {
+  exceedsPortfolioRowLimit,
+  planPortfolioMerge,
+  type ExistingPortfolioResolution,
+  type PortfolioMergePlan,
+  type PortfolioOverlapChoiceMap,
+} from '@/lib/portfolio-merge'
 import { formatComputedNumber, parseOcrProfitRate } from '@/lib/screenshot-ocr'
 import {
   createMergeRowId,
@@ -244,16 +257,42 @@ export function buildAppliedPortfolioFromMergeRows(rows: MergeRow[]): AppliedPor
   }
 }
 
-export function persistAppliedPortfolioFromMergeRows(rows: MergeRow[], appliedAt: string) {
-  const result = buildAppliedPortfolioFromMergeRows(rows)
-  const persisted = persistAppliedHomePortfolio({
-    broker: 'OCR 적용 포트폴리오',
-    rows: result.persistedRows,
-    appliedAt,
-  })
+export type MergedPortfolioApplyInput = {
+  mergeRows: MergeRow[]
+  // 적용 시점의 기존 포트폴리오(resolveExistingPortfolioForMerge).
+  existing: ExistingPortfolioResolution
+  // 겹치는 종목 처리 선택(종목 키 → 갱신/합산/유지). 선택이 없는 종목은 갱신.
+  overlapChoices: PortfolioOverlapChoiceMap
+  appliedAt: string
+}
+
+export type MergedPortfolioApplyResult = AppliedPortfolioBuildResult & {
+  plan: PortfolioMergePlan
+  mergedItems: PortfolioNormalizedItem[]
+  persisted: boolean
+}
+
+// 적용 단위를 "이번 묶음만 저장"에서 "기존 포트폴리오 + 이번 묶음(병합) 저장"으로 바꾼다.
+// 세션스토리지와 서버 교체 RPC에는 병합 결과 전체(plan.rows)가 들어가므로 새 스크린샷에 없는
+// 기존 종목이 지워지지 않는다. 반환값의 normalizedItems/nextQuoteHoldings는 여전히 "이번 묶음"이다.
+export function persistMergedAppliedPortfolio({
+  mergeRows,
+  existing,
+  overlapChoices,
+  appliedAt,
+}: MergedPortfolioApplyInput): MergedPortfolioApplyResult {
+  const incoming = buildAppliedPortfolioFromMergeRows(mergeRows)
+  const plan = planPortfolioMerge(existing.rows, incoming.persistedRows, overlapChoices)
+  const mergedItems = buildPortfolioItemsFromAppliedHomePortfolioRows(plan.rows)
+  const canPersist = incoming.normalizedItems.length > 0 && mergedItems.length > 0 && !exceedsPortfolioRowLimit(plan.rows.length)
+  // 세션 라벨은 이전 세션 값을 이어 쓴다(홈의 종목 삭제 흐름과 같다).
+  const broker = readAppliedHomePortfolio()?.broker ?? 'OCR 적용 포트폴리오'
+  const persisted = canPersist && persistAppliedHomePortfolio({ broker, rows: plan.rows, appliedAt })
 
   return {
-    ...result,
+    ...incoming,
+    plan,
+    mergedItems,
     persisted,
   }
 }

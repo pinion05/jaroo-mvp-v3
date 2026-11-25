@@ -56,3 +56,9 @@ test('portfolio API는 enum과 numeric bound를 검증한다', () => {
 test('portfolio API는 kind etn 행을 허용한다(유니버스 389종 교정 수용)', () => {
   assert.equal(getPortfolioRowsValidationError([{ ...validRow, kind: 'etn', market: 'ETN', market_tone: 'etf' }]), '')
 })
+
+test('portfolio API는 KONEX market 행을 허용한다(종목 유니버스 KONEX 199종 수용)', () => {
+  // 종목 유니버스가 KONEX 종목에 내놓는 시장값이다. 화이트리스트에 없으면 KONEX 종목이 하나라도
+  // 섞인 저장이 통째로 400으로 거절됐다(저장은 전체-아니면-전무).
+  assert.equal(getPortfolioRowsValidationError([{ ...validRow, code: '123456', market: 'KONEX', market_tone: 'kospi' }]), '')
+})

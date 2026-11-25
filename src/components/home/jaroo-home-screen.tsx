@@ -41,6 +41,7 @@ import {
   type HomeHolding,
 } from '@/lib/jaroo-home-data'
 import { fetchPortfolio, shouldUsePortfolioSessionFallback, syncPortfolioToServer } from '@/lib/portfolio-sync'
+import { clearPortfolioSyncNotice, PORTFOLIO_SYNC_NOTICE_EVENT, readPortfolioSyncNotice } from '@/lib/portfolio-sync-notice'
 import { markDeepScanRunIntent } from '@/lib/deepscan-run-intent'
 import { parseOcrNumber } from '@/lib/screenshot-ocr'
 import { AppBottomNav } from '@/components/app-bottom-nav'
@@ -673,6 +674,23 @@ export function JarooHomeScreen() {
     }
   }, [hasPortfolioItems, replacePortfolioItems])
 
+  // 적용(/ocr·/merge) 뒤 서버 저장이 실패하면 세션스토리지에 남은 알림을 보여준다. 저장 요청은 홈
+  // 이동 뒤에 끝날 수 있어 마운트 때 한 번 읽고, 그 뒤 늦게 온 실패는 이벤트로 받는다.
+  const [portfolioSyncNotice, setPortfolioSyncNotice] = useState<string | null>(null)
+
+  useEffect(() => {
+    const syncNotice = () => setPortfolioSyncNotice(readPortfolioSyncNotice())
+    syncNotice()
+    window.addEventListener(PORTFOLIO_SYNC_NOTICE_EVENT, syncNotice)
+
+    return () => window.removeEventListener(PORTFOLIO_SYNC_NOTICE_EVENT, syncNotice)
+  }, [])
+
+  const dismissPortfolioSyncNotice = useCallback(() => {
+    clearPortfolioSyncNotice()
+    setPortfolioSyncNotice(null)
+  }, [])
+
 
 
   useEffect(() => {
@@ -1165,6 +1183,13 @@ export function JarooHomeScreen() {
             <div className={styles.forecastCard}>
               <div className={styles.forecastLabel}>일부 시세 대기</div>
               <div className={styles.forecastText}>{quoteSummaryMessage}</div>
+            </div>
+          ) : null}
+          {portfolioSyncNotice ? (
+            <div className={styles.syncNoticeCard} role='alert'>
+              <div className={styles.syncNoticeLabel}>서버 저장 실패</div>
+              <div className={styles.syncNoticeText}>{portfolioSyncNotice}</div>
+              <button type='button' className={styles.syncNoticeClose} onClick={dismissPortfolioSyncNotice}>닫기</button>
             </div>
           ) : null}
 

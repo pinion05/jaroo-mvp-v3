@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 
@@ -182,4 +183,23 @@ test('MergeResultRowCard는 양수 수익률에 국내식 수익 색상을 적�
   const markup = renderToStaticMarkup(createElement(MergeResultRowCard, { row: mergeRow, isLast: true }))
 
   assert.match(markup, /text-\[color:var\(--jaroo-profit\)\]/)
+})
+
+test('/merge 화면 적용도 기존 포트폴리오와 병합하고 업로드 세션을 정리한다(2026-11)', () => {
+  const source = readFileSync(new URL('./jaroo-merge-screen.tsx', import.meta.url), 'utf8')
+  const handleApplyBody = source.slice(source.indexOf('const handleApply = async'), source.indexOf('if (mergeRows.length === 0 && reviewRows.length === 0)'))
+
+  // /ocr 과 같은 병합 적용 경로를 쓴다 — 이 화면에서 적용해도 기존 종목이 지워지지 않아야 한다.
+  assert.ok(handleApplyBody.includes('resolveExistingPortfolioForMerge()'), '적용 시점에 기존 포트폴리오를 읽는다')
+  assert.ok(handleApplyBody.includes('persistMergedAppliedPortfolio({ mergeRows, existing, overlapChoices, appliedAt })'), '병합 적용 함수로 저장한다')
+  assert.ok(handleApplyBody.includes('syncMergedPortfolioAfterApply(existing, applyResult.plan.rows)'), '서버에는 병합 결과 전체를 보낸다')
+  assert.ok(handleApplyBody.includes('replacePortfolioItems(applyResult.mergedItems)'), '스토어도 병합 결과로 교체한다')
+  assert.ok(!source.includes('syncPortfolioToServer('), '이번 묶음만 보내는 옛 저장 호출이 없다')
+  assert.match(source, /import \{ PortfolioOverlapChoices \} from '@\/components\/ocr\/portfolio-overlap-choices'/)
+  assert.match(source, /plan=\{mergePlan\}/)
+
+  // 적용 뒤 업로드 세션을 지운다 — 남으면 검수로 되돌아갔을 때 같은 이미지로 유료 OCR 이 다시 돈다.
+  const appliedTail = handleApplyBody.slice(handleApplyBody.indexOf('markApplied(appliedAt)'))
+  assert.ok(appliedTail.includes('clearPersistedScreenshotUploadSession()'), '적용 뒤 업로드 세션 저장소를 지운다')
+  assert.ok(appliedTail.includes('useOcrUploadStore.getState().clear()'), '적용 뒤 업로드 store를 지운다')
 })

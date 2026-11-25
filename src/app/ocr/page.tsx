@@ -30,13 +30,23 @@ import {
   formatEvaluationPreviewAmount,
 } from '@/lib/ocr-evaluation-preview'
 import {
+  buildAppliedHomePortfolioRowsFromConfirmedHoldings,
   buildMergeRowsFromReviewRows,
   fillMissingAveragePricesFromQuotes,
   isMissingAveragePrice,
   markMissingAveragePriceErrors,
-  persistAppliedPortfolioFromMergeRows,
+  persistMergedAppliedPortfolio,
 } from '@/lib/ocr-portfolio-apply'
-import { syncPortfolioToServer } from '@/lib/portfolio-sync'
+import { buildHomeHoldingsFromPortfolioItems } from '@/lib/jaroo-home-data'
+import {
+  exceedsPortfolioRowLimit,
+  planPortfolioMerge,
+  type ExistingPortfolioResolution,
+  type PortfolioOverlapChoice,
+} from '@/lib/portfolio-merge'
+import { resolveExistingPortfolioForMerge, syncMergedPortfolioAfterApply } from '@/lib/portfolio-sync'
+import { MAX_PORTFOLIO_ROWS } from '@/lib/portfolio-validation'
+import { PortfolioOverlapChoices } from '@/components/ocr/portfolio-overlap-choices'
 import { useMergeStore } from '@/lib/stores/use-merge-store'
 import { useOcrReviewStore } from '@/lib/stores/use-ocr-review-store'
 import { useOcrUploadStore } from '@/lib/stores/use-ocr-upload-store'
@@ -49,7 +59,7 @@ import {
   mergeResolvedRowsWithExistingReviewRows,
   toReviewRow,
 } from '@/lib/ocr-review-resolution'
-import type { OcrReviewRow } from '@/lib/workflow-types'
+import { getApplicableConfirmedHoldings, type OcrReviewRow } from '@/lib/workflow-types'
 
 type OcrRequestState = 'idle' | 'loading' | 'success' | 'error'
 type UploadRequestState = 'idle' | 'loading' | 'success' | 'error'
@@ -83,6 +93,9 @@ const MIN_IDENTIFIER_SEARCH_RING_MS = 900
 // 적용 후 홈 이동 전 시세 프리페치 상한 — 이 시간을 넘으면 이동을 먼저 하고
 // 시세 하이드레이션은 백그라운드로 계속한다(2026-10-29).
 const OCR_APPLY_QUOTE_PREFETCH_CAP_MS = 2_500
+
+// 저장 API 의 종목 상한(portfolio-validation). 병합 결과가 이보다 크면 저장이 통째로 거절되므로 적용 전에 막는다.
+const PORTFOLIO_ROW_LIMIT_MESSAGE = `포트폴리오는 최대 ${MAX_PORTFOLIO_ROWS}개 종목까지예요. 기존 종목을 정리한 뒤 다시 시도해주세요.`
 
 function waitForMinimumIdentifierSearchRing(startedAt: number) {
   const remainingMs = MIN_IDENTIFIER_SEARCH_RING_MS - (Date.now() - startedAt)
@@ -356,6 +369,9 @@ export default function OcrPage() {
   const [conflicts, setConflicts] = useState<OcrConflict[]>([])
   const [conflictSelections, setConflictSelections] = useState<Record<string, string>>({})
   const [removedRowIds, setRemovedRowIds] = useState<Record<string, true>>({})
+  // 재적용 병합: 기존 포트폴리오(null = 아직 못 읽음)와 겹치는 종목별 처리 선택(종목 키 → 갱신/합산/유지).
+  const [existingPortfolio, setExistingPortfolio] = useState<ExistingPortfolioResolution | null>(null)
+  const [overlapChoices, setOverlapChoices] = useState<Record<string, PortfolioOverlapChoice>>({})
   const [persistedUploadSession, setPersistedUploadSession] = useState<ScreenshotUploadSession | null>(null)
   const [hasCheckedPersistedUploadSession, setHasCheckedPersistedUploadSession] = useState(false)
   const [evaluationPreviewPrices, setEvaluationPreviewPrices] = useState<Map<string, number>>(() => new Map())
@@ -440,6 +456,9 @@ export default function OcrPage() {
     setConflicts([])
     setConflictSelections({})
     setRemovedRowIds({})
+    // 새 묶음이면 이전 묶음의 병합 선택을 끌어쓰지 않는다(종목 키가 같아도 값이 다르다).
+    setExistingPortfolio(null)
+    setOverlapChoices({})
 
     const nextRowsByUpload: Record<string, OcrRow[]> = {}
     let hasErrors = false
@@ -557,6 +576,24 @@ export default function OcrPage() {
     autoOcrSessionKeyRef.current = sessionRunKey
     void runOcrBatch(session)
   }, [runOcrBatch, session])
+
+  // OCR 이 끝나면 기존 포트폴리오를 읽어 겹치는 종목 선택 UI를 준비한다. 적용 때 한 번 더 읽는다.
+  useEffect(() => {
+    if (requestState !== 'success') {
+      return
+    }
+
+    let cancelled = false
+    void resolveExistingPortfolioForMerge().then((resolution) => {
+      if (!cancelled) {
+        setExistingPortfolio(resolution)
+      }
+    })
+
+    return () => {
+      cancelled = true
+    }
+  }, [requestState])
 
   const conflictsWithRemainingCandidates = useMemo(
     () =>
@@ -717,6 +754,21 @@ export default function OcrPage() {
     [mergeRowsForApply],
   )
 
+  // 이번 묶음을 "기존 포트폴리오 + 이번 묶음"으로 병합했을 때의 미리보기(겹치는 종목 선택 UI용).
+  const incomingRowsForMerge = useMemo(
+    () => buildAppliedHomePortfolioRowsFromConfirmedHoldings(getApplicableConfirmedHoldings(mergeRowsForApply)),
+    [mergeRowsForApply],
+  )
+  const mergePlan = useMemo(
+    () => (existingPortfolio ? planPortfolioMerge(existingPortfolio.rows, incomingRowsForMerge, overlapChoices) : null),
+    [existingPortfolio, incomingRowsForMerge, overlapChoices],
+  )
+  const exceedsRowLimit = mergePlan ? exceedsPortfolioRowLimit(mergePlan.rows.length) : false
+  const applyFooterMessage = applyError
+    || (exceedsRowLimit ? PORTFOLIO_ROW_LIMIT_MESSAGE : '')
+    || (requestState === 'success' && existingPortfolio === null ? '기존 포트폴리오를 불러오고 있어요' : '')
+    || '적용하면 홈에서 분석을 시작할 수 있어요'
+
   const processedUploadCount = useMemo(
     () => session?.uploads.filter((upload) => {
       const uploadState = uploadStatuses[upload.id]?.state
@@ -746,6 +798,9 @@ export default function OcrPage() {
     && unresolvedConflictCount === 0
     && applicableApplyCount > 0
     && invalidManualRowIds.length === 0
+    // 기존 포트폴리오를 읽어야 병합 기준이 생기고, 상한을 넘으면 저장이 거절되므로 적용을 막는다.
+    && existingPortfolio !== null
+    && !exceedsRowLimit
     && applyStatus !== 'loading'
 
   const handleManualFieldChange = useCallback((rowId: string, field: ManualEditableField, value: string) => {
@@ -811,29 +866,41 @@ export default function OcrPage() {
       const filledRows = await fillMissingAveragePricesFromQuotes(aggregatedRows)
       const nextMergeRows = markMissingAveragePriceErrors(buildMergeRowsFromReviewRows(filledRows))
       const appliedAt = new Date().toISOString()
-      const applyResult = persistAppliedPortfolioFromMergeRows(nextMergeRows, appliedAt)
 
       setReviewRows(filledRows)
       setMergeRows(nextMergeRows)
 
-      if (!applyResult.persisted || applyResult.normalizedItems.length === 0) {
-        throw new Error('포트폴리오에 적용할 종목을 찾지 못했어요.')
-      }
-
-      void syncPortfolioToServer(applyResult.persistedRows).then((result) => {
-        if (!result.ok) {
-          console.warn('portfolio save failed (logged-out or server error)')
-        }
+      // 기존 포트폴리오(로그인: 서버, 비로그인: 이 탭)와 병합한다. 적용 시점에 다시 읽어 다른 기기의 변경을
+      // 반영한다. 검수에서 제외된 행은 nextMergeRows에 없어 기존 종목을 건드리지 않는다.
+      const existing = await resolveExistingPortfolioForMerge()
+      const applyResult = persistMergedAppliedPortfolio({
+        mergeRows: nextMergeRows,
+        existing,
+        overlapChoices,
+        appliedAt,
       })
 
-      const nextQuoteQuery = buildHomeCurrentQuoteQuery(applyResult.nextQuoteHoldings)
-      replacePortfolioItems(applyResult.normalizedItems)
+      if (applyResult.normalizedItems.length === 0) {
+        throw new Error('포트폴리오에 적용할 종목을 찾지 못했어요.')
+      }
+      if (exceedsPortfolioRowLimit(applyResult.plan.rows.length)) {
+        throw new Error(PORTFOLIO_ROW_LIMIT_MESSAGE)
+      }
+      if (!applyResult.persisted) {
+        throw new Error('홈 포트폴리오 저장에 실패했어요. 다시 시도해주세요.')
+      }
+
+      // 서버에는 병합 결과 전체를 보낸다(저장 RPC는 전체 교체). 기존 목록을 서버에서 못 읽었으면 보내지 않는다.
+      syncMergedPortfolioAfterApply(existing, applyResult.plan.rows)
+
+      const nextQuoteQuery = buildHomeCurrentQuoteQuery(buildHomeHoldingsFromPortfolioItems(applyResult.mergedItems))
+      replacePortfolioItems(applyResult.mergedItems)
       setQuoteStatus('loading', null, nextQuoteQuery)
       // 시세 프리페치(2026-10-29): 완료 또는 상한(2.5s)까지 홈 이동을 잠깐 미룬다 — 홈 첫 프레임이
       // '- · - · 관찰' 임시값으로 깜빡이는 갭 제거. 상한 도달 시 백그라운드 하이드레이션이 계속
       // 이어져 기존 동작(홈에서 늦게 시세 반영)으로 떨어진다. 실패해도 이동은 계속한다.
       await Promise.race([
-        hydratePortfolioItemsWithCurrentQuotes(applyResult.normalizedItems)
+        hydratePortfolioItemsWithCurrentQuotes(applyResult.mergedItems)
           .then((result) => {
             replacePortfolioItems(result.items)
             setQuoteStatus(result.quoteStatus, result.quoteErrorMessage, result.quoteQuery)
@@ -1195,6 +1262,14 @@ export default function OcrPage() {
               </div>
             ) : null}
 
+            {mergePlan && existingPortfolio ? (
+              <PortfolioOverlapChoices
+                plan={mergePlan}
+                existingStatus={existingPortfolio.status}
+                onChange={(key, choice) => setOverlapChoices((current) => ({ ...current, [key]: choice }))}
+              />
+            ) : null}
+
             {requestState === 'success' && instrumentResolveState === 'error' ? (
               <div className='jaroo-ocr-warn-card'>
                 <div className='jaroo-ocr-warn-head'>
@@ -1220,7 +1295,7 @@ export default function OcrPage() {
           <button type='button' className='jaroo-ocr-apply-btn' onClick={() => void handleContinue()} disabled={!canContinue}>
             → {applyStatus === 'loading' ? '적용 중...' : `${applicableApplyCount}개 종목 적용하기`}
           </button>
-          <div className='jaroo-ocr-apply-sub'>{applyError || '적용하면 홈에서 분석을 시작할 수 있어요'}</div>
+          <div className='jaroo-ocr-apply-sub'>{applyFooterMessage}</div>
         </div>
       </div>
     </div>
